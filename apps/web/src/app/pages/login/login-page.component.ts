@@ -117,8 +117,9 @@ export class LoginPageComponent {
       const result = await this.auth.login(this.email, this.password);
 
       if (result.requires2fa) {
-        // TODO: navigate to 2FA verification page
-        this.errorMessage.set('2FA verification is not yet implemented.');
+        await this.router.navigate(['/login/2fa'], {
+          state: { tempToken: result.tempToken },
+        });
         return;
       }
 

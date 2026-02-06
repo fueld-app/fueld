@@ -1,5 +1,5 @@
 import { Injectable, signal, computed } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Role } from '@fueld/types';
 import type {
@@ -8,6 +8,7 @@ import type {
   LoginResponseDto,
   Login2faPendingDto,
   RegisterResponseDto,
+  TwoFactorSetupDto,
   ApiResponse,
 } from '@fueld/types';
 import { firstValueFrom } from 'rxjs';
@@ -134,6 +135,48 @@ export class AuthService {
     } catch {
       this.logout();
       return false;
+    }
+  }
+
+  // ─── 2FA Setup ────────────────────────────────────────────────────
+
+  /** Generate a TOTP secret + QR code for setup. Requires an active session. */
+  async setup2fa(): Promise<TwoFactorSetupDto> {
+    const token = this.getAccessToken();
+    const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
+
+    const res = await firstValueFrom(
+      this.http.post<ApiResponse<TwoFactorSetupDto>>(
+        `${API_URL}/auth/2fa/generate`,
+        {},
+        { headers },
+      ),
+    );
+
+    return res.data;
+  }
+
+  /** Verify the first TOTP code and enable 2FA on the account. */
+  async enable2fa(code: string): Promise<void> {
+    const token = this.getAccessToken();
+    const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
+
+    const res = await firstValueFrom(
+      this.http.post<ApiResponse<null>>(
+        `${API_URL}/auth/2fa/enable`,
+        { code },
+        { headers },
+      ),
+    );
+
+    if (!res.success) {
+      throw new Error(res.message ?? 'Failed to enable 2FA');
+    }
+
+    // Update the local user state to reflect 2FA being enabled
+    const currentUser = this.user();
+    if (currentUser) {
+      this.setUser({ ...currentUser, is2faEnabled: true });
     }
   }
 

@@ -8,6 +8,13 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./pages/login/login-page.component').then((m) => m.LoginPageComponent),
   },
+  {
+    path: 'login/2fa',
+    loadComponent: () =>
+      import('./pages/two-factor-verify/two-factor-verify-page.component').then(
+        (m) => m.TwoFactorVerifyPageComponent,
+      ),
+  },
 
   // ─── Protected routes (inside main layout) ─────────────────────
   {
@@ -125,6 +132,14 @@ export const routes: Routes = [
                 (m) => m.PlaceholderPageComponent,
               ),
             data: { title: 'Settings' },
+          },
+          {
+            path: 'security',
+            loadComponent: () =>
+              import('./pages/two-factor-setup/two-factor-setup-page.component').then(
+                (m) => m.TwoFactorSetupPageComponent,
+              ),
+            data: { title: 'Security — 2FA Setup' },
           },
         ],
       },

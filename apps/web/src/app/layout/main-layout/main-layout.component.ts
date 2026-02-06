@@ -56,6 +56,7 @@ const NAVIGATION: NavItem[] = [
       { label: 'Vessels', route: '/admin/vessels' },
       { label: 'Ports', route: '/admin/ports' },
       { label: 'Settings', route: '/admin/settings' },
+      { label: 'Security', route: '/admin/security' },
     ],
   },
 ];
