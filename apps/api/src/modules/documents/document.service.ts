@@ -1,4 +1,4 @@
-import { createPdf, setFonts } from 'pdfmake';
+import pdfmake from 'pdfmake';
 import type { TDocumentDefinitions, Content, TableCell } from 'pdfmake/interfaces';
 import { eq } from 'drizzle-orm';
 import { db } from '../../db';
@@ -9,12 +9,12 @@ import { orders, orderItems, counterparties, vessels, ports, invoices, users } f
 // ═══════════════════════════════════════════════════════════════════════
 
 // Configure fonts (server-side: use built-in Roboto shipped with pdfmake)
-setFonts({
+pdfmake.setFonts({
   Roboto: {
-    normal: 'node_modules/pdfmake/build/vfs_fonts/Roboto/Roboto-Regular.ttf',
-    bold: 'node_modules/pdfmake/build/vfs_fonts/Roboto/Roboto-Medium.ttf',
-    italics: 'node_modules/pdfmake/build/vfs_fonts/Roboto/Roboto-Italic.ttf',
-    bolditalics: 'node_modules/pdfmake/build/vfs_fonts/Roboto/Roboto-MediumItalic.ttf',
+    normal: 'node_modules/pdfmake/fonts/Roboto/Roboto-Regular.ttf',
+    bold: 'node_modules/pdfmake/fonts/Roboto/Roboto-Medium.ttf',
+    italics: 'node_modules/pdfmake/fonts/Roboto/Roboto-Italic.ttf',
+    bolditalics: 'node_modules/pdfmake/fonts/Roboto/Roboto-MediumItalic.ttf',
   },
 });
 
@@ -405,6 +405,6 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
 // ─── Internal: pdfmake → Buffer ──────────────────────────────────────
 
 function createPdfBuffer(docDefinition: TDocumentDefinitions): Promise<Buffer> {
-  const pdf = createPdf(docDefinition);
+  const pdf = pdfmake.createPdf(docDefinition);
   return pdf.getBuffer();
 }
