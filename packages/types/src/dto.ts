@@ -296,3 +296,64 @@ export interface SsoLoginRequestDto {
 export interface RefreshTokenRequestDto {
   refreshToken: string;
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+//  DASHBOARD
+// ═══════════════════════════════════════════════════════════════════════
+
+/** An invoice that is past its due date and not fully paid. */
+export interface OverdueInvoiceDto {
+  invoiceId: string;
+  invoiceNumber: string;
+  orderId: string;
+  clientName: string;
+  vesselName: string;
+  amount: string | null;
+  amountPaid: string | null;
+  dueDate: string;
+  daysOverdue: number;
+  status: string;
+}
+
+/** Profit / volume stats for a single trader. */
+export interface TraderStatsDto {
+  traderId: string;
+  traderName: string;
+  traderEmail: string;
+  orderCount: number;
+  totalVolume: string;
+  totalRevenue: string;
+  totalCost: string;
+  totalProfit: string;
+}
+
+/** A single stage in the order pipeline summary. */
+export interface PipelineStageDto {
+  status: string;
+  count: number;
+  totalValue: string;
+}
+
+/** Collections dashboard response. */
+export interface CollectionsResponseDto {
+  items: OverdueInvoiceDto[];
+  count: number;
+}
+
+/** Team stats dashboard response. */
+export interface TeamStatsResponseDto {
+  traders: TraderStatsDto[];
+}
+
+/** Pipeline summary response. */
+export interface PipelineResponseDto {
+  stages: PipelineStageDto[];
+}
+
+/** Request to send an invoice email. */
+export interface SendInvoiceRequestDto {
+  accessToken: string;
+  recipientEmail: string;
+  vesselName?: string;
+  portName?: string;
+}
