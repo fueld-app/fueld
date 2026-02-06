@@ -313,6 +313,7 @@ export interface OverdueInvoiceDto {
   dueDate: string;
   daysOverdue: number;
   status: string;
+  comments: InvoiceCommentDto[];
 }
 
 /** Profit / volume stats for a single trader. */
@@ -342,7 +343,11 @@ export interface CollectionsResponseDto {
 
 /** Team stats dashboard response. */
 export interface TeamStatsResponseDto {
-  traders: TraderStatsDto[];
+  totalTraders: number;
+  activeOrders: number;
+  totalRevenueYTD: string;
+  avgDealSize: string;
+  traderPerformance: { name: string; orders: number; revenue: string; margin: string; }[];
 }
 
 /** Pipeline summary response. */

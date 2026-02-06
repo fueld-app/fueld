@@ -2,11 +2,9 @@ import {
   Component,
   ChangeDetectionStrategy,
   signal,
-  computed,
   input,
 } from '@angular/core';
-import { NgClass } from '@angular/common';
-import type { OverdueInvoiceDto, InvoiceCommentDto } from '@fueld/types';
+import type { OverdueInvoiceDto } from '@fueld/types';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Collections Widget — Lists overdue invoices and allows adding notes
@@ -15,7 +13,7 @@ import type { OverdueInvoiceDto, InvoiceCommentDto } from '@fueld/types';
 @Component({
   selector: 'app-collections-widget',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgClass],
+  imports: [],
   template: `
     <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
       <div class="flex items-center justify-between border-b border-gray-200 p-5">
@@ -29,7 +27,7 @@ import type { OverdueInvoiceDto, InvoiceCommentDto } from '@fueld/types';
         </div>
       } @else {
         <ul class="divide-y divide-gray-100">
-          @for (invoice of overdueInvoices(); track invoice.id) {
+          @for (invoice of overdueInvoices(); track invoice.invoiceId) {
             <li class="p-5 hover:bg-gray-50/50 transition-colors last:border-b-0">
               <div class="flex justify-between items-start">
                 <div>
@@ -40,18 +38,18 @@ import type { OverdueInvoiceDto, InvoiceCommentDto } from '@fueld/types';
                   </p>
                 </div>
                 <div class="text-right">
-                  <p class="text-sm font-semibold text-red-700">USD {{ invoice.amountDue }}</p>
+                  <p class="text-sm font-semibold text-red-700">USD {{ invoice.amount }}</p>
                   <p class="text-xs text-gray-500">Due {{ invoice.dueDate }}</p>
                 </div>
               </div>
-              @if (selectedInvoiceId() === invoice.id) {
+              @if (selectedInvoiceId() === invoice.invoiceId) {
                 <div class="mt-4 flex flex-col gap-2">
                   <textarea
                     #noteTextarea
                     class="w-full rounded-md border-gray-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 text-sm"
                     rows="3"
                     placeholder="Add a follow-up note..."
-                    (input)="noteContent.set($event.target.value)"
+                    (input)="noteContent.set($any($event.target).value)"
                     [value]="noteContent()"
                   ></textarea>
                   <div class="flex justify-end gap-2">
@@ -62,7 +60,7 @@ import type { OverdueInvoiceDto, InvoiceCommentDto } from '@fueld/types';
                       Cancel
                     </button>
                     <button
-                      (click)="saveNote(invoice.id)"
+                      (click)="saveNote(invoice.invoiceId)"
                       [disabled]="!noteContent() || savingNote()"
                       class="rounded-md bg-brand-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 disabled:opacity-50"
                     >
@@ -80,7 +78,7 @@ import type { OverdueInvoiceDto, InvoiceCommentDto } from '@fueld/types';
                       <p class="text-xs font-medium text-gray-600 mb-2">Previous Notes:</p>
                       @for (comment of invoice.comments; track comment.id) {
                         <div class="text-xs text-gray-500 mb-1">
-                          <span class="font-medium">{{ comment.userInitials }}</span>: {{ comment.comment }}
+                          <span class="font-medium">{{ comment.userId }}</span>: {{ comment.comment }}
                           <span class="text-gray-400">({{ comment.createdAt }})</span>
                         </div>
                       }
@@ -90,7 +88,7 @@ import type { OverdueInvoiceDto, InvoiceCommentDto } from '@fueld/types';
               } @else {
                 <div class="mt-4 text-right">
                   <button
-                    (click)="selectInvoiceForNote(invoice.id)"
+                    (click)="selectInvoiceForNote(invoice.invoiceId)"
                     class="text-sm font-medium text-brand-600 hover:text-brand-700 transition-colors"
                   >
                     Add Note

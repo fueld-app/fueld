@@ -1,6 +1,7 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
+import { Role } from '@fueld/types';
 import type {
   UserDto,
   AuthTokensDto,
@@ -30,6 +31,7 @@ export class AuthService {
   readonly userName = computed(() => this.user()?.name ?? '');
   readonly userEmail = computed(() => this.user()?.email ?? '');
   readonly userRole = computed(() => this.user()?.role ?? '');
+  readonly isAdmin = computed(() => this.user()?.role === Role.Admin);
   readonly userInitials = computed(() => {
     const name = this.user()?.name ?? '';
     const parts = name.split(' ').filter(Boolean);

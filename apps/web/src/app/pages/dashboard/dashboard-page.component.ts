@@ -4,14 +4,10 @@ import {
   signal,
   computed,
   inject,
-  OnInit,
-  OnDestroy,
+  effect,
 } from '@angular/core';
-import { JsonPipe, NgClass } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
+import { JsonPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { switchMap, of, delay, Subscription } from 'rxjs';
 import type { CollectionsResponseDto, OverdueInvoiceDto, TeamStatsResponseDto } from '@fueld/types';
 
 import { CollectionsWidgetComponent } from '../../features/dashboard/components/collections-widget/collections-widget.component';
@@ -26,7 +22,7 @@ const API_URL = 'http://localhost:3000';
 @Component({
   selector: 'app-dashboard-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgClass, JsonPipe, RouterLink, CollectionsWidgetComponent],
+  imports: [JsonPipe, RouterLink, CollectionsWidgetComponent],
   template: `
     <div>
       <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
@@ -68,7 +64,7 @@ const API_URL = 'http://localhost:3000';
 
       <!-- Collections Widget -->
       <div class="mt-8">
-        <app-collections-widget [overdueInvoices]="collections()?.overdueInvoices ?? []" />
+        <app-collections-widget [overdueInvoices]="collections().items" />
       </div>
 
       <!-- Pipeline & Team Stats (placeholders for now) -->
@@ -87,14 +83,12 @@ const API_URL = 'http://localhost:3000';
     </div>
   `,
 })
-export class DashboardPageComponent implements OnInit, OnDestroy {
+export class DashboardPageComponent {
   readonly auth = inject(AuthService);
-  private readonly http = inject(HttpClient);
-  private subscriptions = new Subscription();
 
   // ─── State ───────────────────────────────────────────────────────
   readonly teamView = signal(false);
-  readonly collections = signal<CollectionsResponseDto>({ overdueInvoices: [] });
+  readonly collections = signal<CollectionsResponseDto>({ items: [], count: 0 });
   readonly teamStats = signal<TeamStatsResponseDto>({
     totalTraders: 0,
     activeOrders: 0,
@@ -108,78 +102,76 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   // Mock data for overdue invoices
   private mockOverdueInvoices: OverdueInvoiceDto[] = [
     {
-      id: 'inv-001',
+      invoiceId: 'inv-001',
       invoiceNumber: 'INV-2026-0001',
+      orderId: 'ord-001',
       clientName: 'Oceanic Logistics',
-      amountDue: '125,000.00',
+      vesselName: 'MV Neptune',
+      amount: '125,000.00',
+      amountPaid: '0.00',
       dueDate: '2026-01-15',
       daysOverdue: 22,
+      status: 'OVERDUE',
       comments: [
-        { id: 'cmt-1', invoiceId: 'inv-001', userId: 'u-2', userInitials: 'JS', comment: 'Followed up with client, awaiting payment approval.', createdAt: '2026-02-01' }
+        { id: 'cmt-1', invoiceId: 'inv-001', userId: 'u-2', comment: 'Followed up with client, awaiting payment approval.', nextActionDate: null, createdAt: '2026-02-01' }
       ]
     },
     {
-      id: 'inv-002',
+      invoiceId: 'inv-002',
       invoiceNumber: 'INV-2026-0005',
+      orderId: 'ord-002',
       clientName: 'Global Shipping Corp.',
-      amountDue: '75,500.00',
+      vesselName: 'MV Horizon',
+      amount: '75,500.00',
+      amountPaid: '0.00',
       dueDate: '2026-01-20',
       daysOverdue: 17,
+      status: 'OVERDUE',
       comments: []
     },
     {
-      id: 'inv-003',
+      invoiceId: 'inv-003',
       invoiceNumber: 'INV-2026-0012',
+      orderId: 'ord-003',
       clientName: 'Apex Maritime Solutions',
-      amountDue: '210,000.00',
+      vesselName: 'MV Voyager',
+      amount: '210,000.00',
+      amountPaid: '0.00',
       dueDate: '2026-01-05',
       daysOverdue: 32,
+      status: 'OVERDUE',
       comments: [
-        { id: 'cmt-2', invoiceId: 'inv-003', userId: 'u-1', userInitials: 'PN', comment: 'Client requesting partial payment plan. Pending approval.', createdAt: '2026-01-30' },
-        { id: 'cmt-3', invoiceId: 'inv-003', userId: 'u-1', userInitials: 'PN', comment: 'Sent reminder 3 days ago.', createdAt: '2026-01-28' }
+        { id: 'cmt-2', invoiceId: 'inv-003', userId: 'u-1', comment: 'Client requesting partial payment plan. Pending approval.', nextActionDate: null, createdAt: '2026-01-30' },
+        { id: 'cmt-3', invoiceId: 'inv-003', userId: 'u-1', comment: 'Sent reminder 3 days ago.', nextActionDate: null, createdAt: '2026-01-28' }
       ]
     },
   ];
 
-  ngOnInit(): void {
-    this.subscriptions.add(
-      this.teamView().pipe(
-        delay(200),
-        switchMap((teamView) => {
-          const mockData: CollectionsResponseDto = {
-            overdueInvoices: this.mockOverdueInvoices,
-          };
-          return of(mockData);
-        }),
-      ).subscribe((data) => this.collections.set(data))
-    );
+  constructor() {
+    // Load mock data reactively when teamView changes
+    effect(() => {
+      const isTeamView = this.teamView();
 
-    this.subscriptions.add(
-      this.teamView().pipe(
-        delay(300),
-        switchMap((teamView) => {
-          const mockStats: TeamStatsResponseDto = {
-            totalTraders: teamView ? 4 : 1,
-            activeOrders: teamView ? 25 : 7,
-            totalRevenueYTD: teamView ? 'USD 12,345,678' : 'USD 3,210,987',
-            avgDealSize: teamView ? 'USD 250,000' : 'USD 180,000',
-            traderPerformance: teamView ? [
-              { name: 'Patrick Nielsen', orders: 7, revenue: '2.3M', margin: '3.1%' },
-              { name: 'Jane Smith', orders: 8, revenue: '3.5M', margin: '3.0%' },
-              { name: 'John Doe', orders: 6, revenue: '2.8M', margin: '3.2%' },
-              { name: 'Emily White', orders: 4, revenue: '3.7M', margin: '2.9%' },
-            ] : [
-              { name: 'Patrick Nielsen', orders: 7, revenue: '2.3M', margin: '3.1%' },
-            ],
-          };
-          return of(mockStats);
-        }),
-      ).subscribe((data) => this.teamStats.set(data))
-    );
-  }
+      this.collections.set({
+        items: this.mockOverdueInvoices,
+        count: this.mockOverdueInvoices.length,
+      });
 
-  ngOnDestroy(): void {
-    this.subscriptions.unsubscribe();
+      this.teamStats.set({
+        totalTraders: isTeamView ? 4 : 1,
+        activeOrders: isTeamView ? 25 : 7,
+        totalRevenueYTD: isTeamView ? 'USD 12,345,678' : 'USD 3,210,987',
+        avgDealSize: isTeamView ? 'USD 250,000' : 'USD 180,000',
+        traderPerformance: isTeamView ? [
+          { name: 'Patrick Nielsen', orders: 7, revenue: '2.3M', margin: '3.1%' },
+          { name: 'Jane Smith', orders: 8, revenue: '3.5M', margin: '3.0%' },
+          { name: 'John Doe', orders: 6, revenue: '2.8M', margin: '3.2%' },
+          { name: 'Emily White', orders: 4, revenue: '3.7M', margin: '2.9%' },
+        ] : [
+          { name: 'Patrick Nielsen', orders: 7, revenue: '2.3M', margin: '3.1%' },
+        ],
+      });
+    });
   }
 
   // ─── Computed ────────────────────────────────────────────────────
@@ -188,7 +180,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     { label: 'Total Orders', value: this.teamStats().activeOrders.toString() },
     { label: 'Total Revenue YTD', value: this.teamStats().totalRevenueYTD },
     { label: 'Avg. Deal Size', value: this.teamStats().avgDealSize },
-    { label: 'Overdue Invoices', value: this.collections().overdueInvoices.length.toString() },
+    { label: 'Overdue Invoices', value: this.collections().items.length.toString() },
   ]);
 
   // ─── Actions ─────────────────────────────────────────────────────

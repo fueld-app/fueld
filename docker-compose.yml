@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: fueld-postgres
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: fueld
+      POSTGRES_PASSWORD: fueld
+      POSTGRES_DB: fueld
+    volumes:
+      - fueld_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U fueld']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  fueld_pgdata:
