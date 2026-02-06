@@ -1,38 +1,15 @@
-import type { FuelGrade, OrderStatus, Role } from './enums';
+import type {
+  OrderStatus,
+  ProductType,
+  PaymentTerms,
+  CounterpartyType,
+  InvoiceStatus,
+  Role,
+} from './enums';
 
-// ─── DTOs ────────────────────────────────────────────────────────────
-
-/** Represents a single bunker order. */
-export interface OrderDto {
-  id: string;
-  vesselName: string;
-  port: string;
-  fuelGrade: FuelGrade;
-  quantityMt: number;
-  pricePerMt: number | null;
-  status: OrderStatus;
-  eta: string; // ISO-8601
-  createdAt: string;
-  updatedAt: string;
-}
-
-/** Payload to create a new order. */
-export interface CreateOrderDto {
-  vesselName: string;
-  port: string;
-  fuelGrade: FuelGrade;
-  quantityMt: number;
-  eta: string;
-}
-
-/** Minimal user representation (public-safe, no secrets). */
-export interface UserDto {
-  id: string;
-  email: string;
-  name: string;
-  role: Role;
-  is2faEnabled: boolean;
-}
+// ═══════════════════════════════════════════════════════════════════════
+//  GENERIC WRAPPERS
+// ═══════════════════════════════════════════════════════════════════════
 
 /** Standard API response wrapper. */
 export interface ApiResponse<T> {
@@ -49,7 +26,218 @@ export interface PaginatedResponse<T> {
   pageSize: number;
 }
 
-// ─── Auth DTOs ───────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════
+//  USER
+// ═══════════════════════════════════════════════════════════════════════
+
+/** Minimal user representation (public-safe, no secrets). */
+export interface UserDto {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+  tenantId: string | null;
+  is2faEnabled: boolean;
+  isOnLeave: boolean;
+  leaveEndDate: string | null;
+  delegateId: string | null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  TENANT
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface TenantDto {
+  id: string;
+  name: string;
+  domain: string;
+  createdAt: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  COUNTERPARTY
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface CounterpartyDto {
+  id: string;
+  tenantId: string;
+  name: string;
+  type: CounterpartyType;
+  creditLimit: string;
+  creditUsed: string;
+  country: string | null;
+}
+
+export interface CreateCounterpartyDto {
+  name: string;
+  type: CounterpartyType;
+  creditLimit?: string;
+  country?: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  PORT
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface PortDto {
+  id: string;
+  name: string;
+  country: string;
+  lat: number | null;
+  long: number | null;
+}
+
+export interface CreatePortDto {
+  name: string;
+  country: string;
+  lat?: number;
+  long?: number;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  VESSEL
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface VesselDto {
+  id: string;
+  name: string;
+  imo: string | null;
+  mmsi: string | null;
+  flag: string | null;
+}
+
+export interface CreateVesselDto {
+  name: string;
+  imo?: string;
+  mmsi?: string;
+  flag?: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  ORDER (Trading Aggregate)
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface OrderDto {
+  id: string;
+  tenantId: string;
+  clientId: string;
+  vesselId: string;
+  portId: string;
+  salesRepId: string | null;
+  status: OrderStatus;
+  eta: string | null;
+  etd: string | null;
+  lossReason: string | null;
+  closedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateOrderDto {
+  clientId: string;
+  vesselId: string;
+  portId: string;
+  salesRepId?: string;
+  eta?: string;
+  etd?: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  ORDER ITEM (line items)
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface OrderItemDto {
+  id: string;
+  orderId: string;
+  supplierId: string | null;
+  productType: ProductType;
+  quantity: string;
+  unit: string;
+  costPrice: string | null;
+  salesPrice: string | null;
+  profit: string | null;
+  paymentTerms: PaymentTerms | null;
+}
+
+export interface CreateOrderItemDto {
+  productType: ProductType;
+  quantity: string;
+  unit?: string;
+  supplierId?: string;
+  costPrice?: string;
+  salesPrice?: string;
+  paymentTerms?: PaymentTerms;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  INVOICE
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface InvoiceDto {
+  id: string;
+  orderId: string;
+  invoiceNumber: string;
+  status: InvoiceStatus;
+  dueDate: string;
+  pdfPath: string | null;
+  amount: string | null;
+  amountPaid: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateInvoiceDto {
+  orderId: string;
+  invoiceNumber: string;
+  dueDate: string;
+  amount?: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  INVOICE COMMENTS (collections)
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface InvoiceCommentDto {
+  id: string;
+  invoiceId: string;
+  userId: string;
+  comment: string;
+  nextActionDate: string | null;
+  createdAt: string;
+}
+
+export interface CreateInvoiceCommentDto {
+  comment: string;
+  nextActionDate?: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  AUDIT LOG
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface AuditLogDto {
+  id: string;
+  userId: string | null;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  changesJson: unknown;
+  createdAt: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  VACATION / DELEGATION
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface SetLeaveDto {
+  isOnLeave: boolean;
+  leaveEndDate?: string;
+  delegateId?: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  AUTH DTOs (kept from Phase 2)
+// ═══════════════════════════════════════════════════════════════════════
 
 /** Tokens returned after a successful authentication. */
 export interface AuthTokensDto {
