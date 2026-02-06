@@ -1,1 +1,65 @@
-/* You can add global styles to this file, and also import other style files */
+@import 'tailwindcss';
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Fueld — Global Styles & Design Tokens (Tailwind v4)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+@theme {
+  /* Brand palette */
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-200: #bfdbfe;
+  --color-brand-300: #93c5fd;
+  --color-brand-400: #60a5fa;
+  --color-brand-500: #3b82f6;
+  --color-brand-600: #1a56db;
+  --color-brand-700: #1e40af;
+  --color-brand-800: #1e3a8a;
+  --color-brand-900: #1e2756;
+
+  /* Sidebar dark slate */
+  --color-sidebar: #0f172a;
+  --color-sidebar-hover: #1e293b;
+  --color-sidebar-active: #334155;
+  --color-sidebar-text: #94a3b8;
+  --color-sidebar-text-active: #f8fafc;
+
+  /* Status colors */
+  --color-status-inquiry: #eab308;
+  --color-status-offer: #f97316;
+  --color-status-confirmed: #3b82f6;
+  --color-status-delivered: #8b5cf6;
+  --color-status-invoiced: #6366f1;
+  --color-status-paid: #22c55e;
+  --color-status-cancelled: #ef4444;
+  --color-status-overdue: #dc2626;
+
+  /* Fonts */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+/* ─── Base resets ─────────────────────────────────────────────────── */
+
+html,
+body {
+  @apply h-full m-0 p-0 bg-gray-50 text-gray-900 antialiased;
+  font-family: var(--font-sans);
+}
+
+/* ─── Scrollbar styling ───────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-400;
+}
