@@ -1,0 +1,21 @@
+node_modules
+dist
+.angular
+.bun
+*.tsbuildinfo
+bun.lock
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# OS
+.DS_Store
+Thumbs.db

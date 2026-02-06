@@ -1,0 +1,15 @@
+{
+  "name": "fueld",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "bun run --filter @fueld/api dev",
+    "dev:web": "bun run --filter @fueld/web start",
+    "build:api": "bun run --filter @fueld/api build",
+    "build:web": "bun run --filter @fueld/web build",
+    "dev": "bun run dev:api & bun run dev:web"
+  }
+}
