@@ -26,6 +26,14 @@ export const routes: Routes = [
             (m) => m.DashboardPageComponent,
           ),
       },
+      {
+        path: 'analytics',
+        loadComponent: () =>
+          import('./features/dashboard/pages/analytics/analytics-page.component').then(
+            (m) => m.AnalyticsPageComponent,
+          ),
+        data: { title: 'Analytics' },
+      },
       // ── Trading ──
       {
         path: 'trading',
