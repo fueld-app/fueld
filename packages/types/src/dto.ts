@@ -25,12 +25,13 @@ export interface CreateOrderDto {
   eta: string;
 }
 
-/** Minimal user representation. */
+/** Minimal user representation (public-safe, no secrets). */
 export interface UserDto {
   id: string;
   email: string;
   name: string;
   role: Role;
+  is2faEnabled: boolean;
 }
 
 /** Standard API response wrapper. */
@@ -46,4 +47,64 @@ export interface PaginatedResponse<T> {
   total: number;
   page: number;
   pageSize: number;
+}
+
+// ─── Auth DTOs ───────────────────────────────────────────────────────
+
+/** Tokens returned after a successful authentication. */
+export interface AuthTokensDto {
+  accessToken: string;
+  refreshToken: string;
+}
+
+/** Full login response (when 2FA is NOT required). */
+export interface LoginResponseDto {
+  requires2fa: false;
+  user: UserDto;
+  accessToken: string;
+  refreshToken: string;
+}
+
+/** Partial login response (when 2FA IS required). */
+export interface Login2faPendingDto {
+  requires2fa: true;
+  tempToken: string;
+}
+
+/** Response after successful registration. */
+export interface RegisterResponseDto {
+  user: UserDto;
+  accessToken: string;
+  refreshToken: string;
+}
+
+/** 2FA setup response with QR code. */
+export interface TwoFactorSetupDto {
+  secret: string;
+  qrDataUrl: string;
+}
+
+/** Request bodies */
+export interface LoginRequestDto {
+  email: string;
+  password: string;
+}
+
+export interface RegisterRequestDto {
+  email: string;
+  password: string;
+  name: string;
+}
+
+export interface Verify2faRequestDto {
+  tempToken: string;
+  code: string;
+}
+
+export interface SsoLoginRequestDto {
+  microsoftAccessToken: string;
+}
+
+export interface RefreshTokenRequestDto {
+  refreshToken: string;
 }

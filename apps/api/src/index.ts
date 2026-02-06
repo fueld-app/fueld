@@ -2,6 +2,7 @@ import { Elysia } from 'elysia';
 import { swagger } from '@elysiajs/swagger';
 import { cors } from '@elysiajs/cors';
 import type { ApiResponse } from '@fueld/types';
+import { authController } from './modules/auth';
 
 const PORT = Number(process.env['PORT']) || 3000;
 
@@ -16,8 +17,18 @@ const app = new Elysia()
         },
         tags: [
           { name: 'Health', description: 'Health-check endpoints' },
+          { name: 'Auth', description: 'Authentication & 2FA' },
           { name: 'Orders', description: 'Bunker order management' },
         ],
+        components: {
+          securitySchemes: {
+            bearerAuth: {
+              type: 'http',
+              scheme: 'bearer',
+              bearerFormat: 'JWT',
+            },
+          },
+        },
       },
     }),
   )
@@ -39,6 +50,7 @@ const app = new Elysia()
       detail: { tags: ['Health'], summary: 'Health check' },
     },
   )
+  .use(authController)
   .listen(PORT);
 
 console.log(
