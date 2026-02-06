@@ -1,0 +1,461 @@
+import {
+  Component,
+  ChangeDetectionStrategy,
+  input,
+  output,
+  signal,
+  computed,
+  linkedSignal,
+} from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { DecimalPipe } from '@angular/common';
+import { ProductType, PaymentTerms } from '@fueld/types';
+import {
+  SearchableDropdownComponent,
+  type DropdownOption,
+} from '../../../../shared/components/searchable-dropdown/searchable-dropdown.component';
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Order Items Grid — Desktop table / Mobile card layout
+//
+//  Uses linkedSignal for live Profit = (Sell - Cost) * Qty calculation
+// ═══════════════════════════════════════════════════════════════════════
+
+/** Local mutable model for an order item row. */
+export interface OrderItemRow {
+  id: string;
+  productType: string;
+  supplierId: string;
+  quantity: number;
+  unit: string;
+  costPrice: number;
+  salesPrice: number;
+  profit: number;
+  paymentTerms: string;
+}
+
+@Component({
+  selector: 'app-order-items',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [FormsModule, DecimalPipe, SearchableDropdownComponent],
+  template: `
+    <!-- ═════════════════════════════════════════════════════════════ -->
+    <!--  Add row button                                              -->
+    <!-- ═════════════════════════════════════════════════════════════ -->
+    <div class="mb-4 flex items-center justify-between">
+      <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">
+        Line Items
+      </h3>
+      @if (!readonly()) {
+        <button
+          (click)="addRow()"
+          class="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold
+                 text-white shadow-sm transition-colors hover:bg-brand-700 focus:outline-none
+                 focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+          </svg>
+          Add Item
+        </button>
+      }
+    </div>
+
+    <!-- ═════════════════════════════════════════════════════════════ -->
+    <!--  Desktop Table (hidden on mobile)                            -->
+    <!-- ═════════════════════════════════════════════════════════════ -->
+    <div class="hidden md:block overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-gray-200 bg-gray-50/80">
+            <th class="px-4 py-3 text-left font-medium text-gray-600">#</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-600 min-w-[140px]">Product</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-600 min-w-[160px]">Supplier</th>
+            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[100px]">Qty</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-600 w-16">Unit</th>
+            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[110px]">Cost (USD)</th>
+            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[110px]">Sell (USD)</th>
+            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Profit (USD)</th>
+            @if (!readonly()) {
+              <th class="px-4 py-3 w-12"></th>
+            }
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          @for (row of rows(); track row.id; let i = $index) {
+            <tr class="group transition-colors hover:bg-gray-50/50">
+              <td class="px-4 py-3 text-gray-400 tabular-nums">{{ i + 1 }}</td>
+
+              <!-- Product -->
+              <td class="px-4 py-2">
+                @if (readonly()) {
+                  <span>{{ row.productType }}</span>
+                } @else {
+                  <app-searchable-dropdown
+                    [options]="productOptions"
+                    [selected]="row.productType"
+                    placeholder="Product..."
+                    (selectionChange)="updateField(i, 'productType', $event)"
+                  />
+                }
+              </td>
+
+              <!-- Supplier -->
+              <td class="px-4 py-2">
+                @if (readonly()) {
+                  <span>{{ getSupplierLabel(row.supplierId) }}</span>
+                } @else {
+                  <app-searchable-dropdown
+                    [options]="supplierOptions()"
+                    [selected]="row.supplierId"
+                    placeholder="Supplier..."
+                    (selectionChange)="updateField(i, 'supplierId', $event)"
+                  />
+                }
+              </td>
+
+              <!-- Qty -->
+              <td class="px-4 py-2">
+                @if (readonly()) {
+                  <span class="block text-right tabular-nums">{{ row.quantity | number:'1.3-3' }}</span>
+                } @else {
+                  <input
+                    type="number" step="0.001" min="0"
+                    [ngModel]="row.quantity"
+                    (ngModelChange)="updateField(i, 'quantity', $event)"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-right text-sm tabular-nums
+                           focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  />
+                }
+              </td>
+
+              <!-- Unit -->
+              <td class="px-4 py-2 text-gray-500">{{ row.unit }}</td>
+
+              <!-- Cost -->
+              <td class="px-4 py-2">
+                @if (readonly()) {
+                  <span class="block text-right tabular-nums">{{ row.costPrice | number:'1.2-4' }}</span>
+                } @else {
+                  <input
+                    type="number" step="0.01" min="0"
+                    [ngModel]="row.costPrice"
+                    (ngModelChange)="updateField(i, 'costPrice', $event)"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-right text-sm tabular-nums
+                           focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  />
+                }
+              </td>
+
+              <!-- Sell -->
+              <td class="px-4 py-2">
+                @if (readonly()) {
+                  <span class="block text-right tabular-nums">{{ row.salesPrice | number:'1.2-4' }}</span>
+                } @else {
+                  <input
+                    type="number" step="0.01" min="0"
+                    [ngModel]="row.salesPrice"
+                    (ngModelChange)="updateField(i, 'salesPrice', $event)"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-right text-sm tabular-nums
+                           focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  />
+                }
+              </td>
+
+              <!-- Profit (auto-calculated) -->
+              <td class="px-4 py-3 text-right tabular-nums"
+                [class.text-green-600]="row.profit > 0"
+                [class.text-red-600]="row.profit < 0"
+                [class.font-semibold]="row.profit !== 0"
+              >
+                {{ row.profit | number:'1.2-2' }}
+              </td>
+
+              <!-- Delete -->
+              @if (!readonly()) {
+                <td class="px-2 py-2">
+                  <button
+                    (click)="removeRow(i)"
+                    class="rounded-md p-1 text-gray-300 opacity-0 transition-all hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
+                    aria-label="Remove item"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022 1.005 11.36A2.75 2.75 0 0 0 7.763 20h4.474a2.75 2.75 0 0 0 2.744-2.689l1.005-11.36.149.022a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
+                </td>
+              }
+            </tr>
+          } @empty {
+            <tr>
+              <td [attr.colspan]="readonly() ? 8 : 9" class="px-4 py-12 text-center">
+                <p class="text-sm text-gray-400">No line items yet.</p>
+                @if (!readonly()) {
+                  <button
+                    (click)="addRow()"
+                    class="mt-2 text-sm font-medium text-brand-600 hover:text-brand-700"
+                  >
+                    + Add your first item
+                  </button>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+        <!-- Totals row -->
+        @if (rows().length > 0) {
+          <tfoot>
+            <tr class="border-t-2 border-gray-200 bg-gray-50/50 font-semibold">
+              <td [attr.colspan]="3" class="px-4 py-3 text-right text-gray-600">Totals</td>
+              <td class="px-4 py-3 text-right tabular-nums text-gray-900">{{ totalQty() | number:'1.3-3' }}</td>
+              <td></td>
+              <td class="px-4 py-3 text-right tabular-nums text-gray-600">{{ totalCost() | number:'1.2-2' }}</td>
+              <td class="px-4 py-3 text-right tabular-nums text-gray-600">{{ totalRevenue() | number:'1.2-2' }}</td>
+              <td class="px-4 py-3 text-right tabular-nums"
+                [class.text-green-600]="totalProfit() > 0"
+                [class.text-red-600]="totalProfit() < 0"
+              >
+                {{ totalProfit() | number:'1.2-2' }}
+              </td>
+              @if (!readonly()) { <td></td> }
+            </tr>
+          </tfoot>
+        }
+      </table>
+    </div>
+
+    <!-- ═════════════════════════════════════════════════════════════ -->
+    <!--  Mobile Cards (visible only on mobile)                       -->
+    <!-- ═════════════════════════════════════════════════════════════ -->
+    <div class="space-y-3 md:hidden">
+      @for (row of rows(); track row.id; let i = $index) {
+        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <!-- Card header -->
+          <div class="flex items-center justify-between mb-3">
+            <span class="inline-flex items-center rounded-md bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
+              {{ row.productType || 'New Item' }}
+            </span>
+            @if (!readonly()) {
+              <button
+                (click)="removeRow(i)"
+                class="rounded-md p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"
+                aria-label="Remove item"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+                </svg>
+              </button>
+            }
+          </div>
+
+          <!-- Card fields -->
+          <div class="grid grid-cols-2 gap-3">
+            <!-- Product -->
+            <div class="col-span-2">
+              <label class="mb-1 block text-xs font-medium text-gray-500">Product</label>
+              @if (readonly()) {
+                <span class="text-sm">{{ row.productType }}</span>
+              } @else {
+                <app-searchable-dropdown
+                  [options]="productOptions"
+                  [selected]="row.productType"
+                  placeholder="Product..."
+                  (selectionChange)="updateField(i, 'productType', $event)"
+                />
+              }
+            </div>
+
+            <!-- Supplier -->
+            <div class="col-span-2">
+              <label class="mb-1 block text-xs font-medium text-gray-500">Supplier</label>
+              @if (readonly()) {
+                <span class="text-sm">{{ getSupplierLabel(row.supplierId) }}</span>
+              } @else {
+                <app-searchable-dropdown
+                  [options]="supplierOptions()"
+                  [selected]="row.supplierId"
+                  placeholder="Supplier..."
+                  (selectionChange)="updateField(i, 'supplierId', $event)"
+                />
+              }
+            </div>
+
+            <!-- Qty -->
+            <div>
+              <label class="mb-1 block text-xs font-medium text-gray-500">Quantity</label>
+              @if (readonly()) {
+                <span class="text-sm tabular-nums">{{ row.quantity | number:'1.3-3' }} {{ row.unit }}</span>
+              } @else {
+                <input type="number" step="0.001" min="0"
+                  [ngModel]="row.quantity"
+                  (ngModelChange)="updateField(i, 'quantity', $event)"
+                  class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
+                         focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                />
+              }
+            </div>
+
+            <!-- Cost -->
+            <div>
+              <label class="mb-1 block text-xs font-medium text-gray-500">Cost (USD)</label>
+              @if (readonly()) {
+                <span class="text-sm tabular-nums">{{ row.costPrice | number:'1.2-4' }}</span>
+              } @else {
+                <input type="number" step="0.01" min="0"
+                  [ngModel]="row.costPrice"
+                  (ngModelChange)="updateField(i, 'costPrice', $event)"
+                  class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
+                         focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                />
+              }
+            </div>
+
+            <!-- Sell -->
+            <div>
+              <label class="mb-1 block text-xs font-medium text-gray-500">Sell (USD)</label>
+              @if (readonly()) {
+                <span class="text-sm tabular-nums">{{ row.salesPrice | number:'1.2-4' }}</span>
+              } @else {
+                <input type="number" step="0.01" min="0"
+                  [ngModel]="row.salesPrice"
+                  (ngModelChange)="updateField(i, 'salesPrice', $event)"
+                  class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
+                         focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                />
+              }
+            </div>
+
+            <!-- Profit -->
+            <div>
+              <label class="mb-1 block text-xs font-medium text-gray-500">Profit (USD)</label>
+              <span
+                class="text-sm font-semibold tabular-nums"
+                [class.text-green-600]="row.profit > 0"
+                [class.text-red-600]="row.profit < 0"
+              >
+                {{ row.profit | number:'1.2-2' }}
+              </span>
+            </div>
+          </div>
+        </div>
+      } @empty {
+        <div class="rounded-xl border-2 border-dashed border-gray-300 bg-white p-8 text-center">
+          <p class="text-sm text-gray-400">No line items yet.</p>
+          @if (!readonly()) {
+            <button (click)="addRow()" class="mt-2 text-sm font-medium text-brand-600 hover:text-brand-700">
+              + Add your first item
+            </button>
+          }
+        </div>
+      }
+
+      <!-- Mobile totals bar -->
+      @if (rows().length > 0) {
+        <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+          <div class="flex items-center justify-between text-sm">
+            <span class="font-medium text-gray-600">Total Profit</span>
+            <span
+              class="text-lg font-bold tabular-nums"
+              [class.text-green-600]="totalProfit() > 0"
+              [class.text-red-600]="totalProfit() < 0"
+            >
+              {{ totalProfit() | number:'1.2-2' }} USD
+            </span>
+          </div>
+          <div class="mt-1 flex items-center justify-between text-xs text-gray-400">
+            <span>{{ rows().length }} item(s) · {{ totalQty() | number:'1.0-0' }} MT</span>
+            <span>Rev {{ totalRevenue() | number:'1.2-2' }}</span>
+          </div>
+        </div>
+      }
+    </div>
+  `,
+})
+export class OrderItemsComponent {
+  /** Items passed in from the order detail page. */
+  readonly items = input<OrderItemRow[]>([]);
+  readonly suppliers = input<DropdownOption[]>([]);
+  readonly readonly = input(false);
+  readonly itemsChange = output<OrderItemRow[]>();
+
+  /** Internal mutable signal, linked to the input. */
+  readonly rows = linkedSignal(() =>
+    this.items().map((item) => ({
+      ...item,
+      profit: (item.salesPrice - item.costPrice) * item.quantity,
+    })),
+  );
+
+  // ─── Dropdown options ────────────────────────────────────────────
+
+  readonly productOptions: DropdownOption[] = Object.values(ProductType).map((v) => ({
+    value: v,
+    label: v,
+  }));
+
+  readonly supplierOptions = computed(() => this.suppliers());
+
+  // ─── Computed totals ─────────────────────────────────────────────
+
+  readonly totalQty = computed(() =>
+    this.rows().reduce((s, r) => s + (r.quantity || 0), 0),
+  );
+
+  readonly totalCost = computed(() =>
+    this.rows().reduce((s, r) => s + (r.costPrice || 0) * (r.quantity || 0), 0),
+  );
+
+  readonly totalRevenue = computed(() =>
+    this.rows().reduce((s, r) => s + (r.salesPrice || 0) * (r.quantity || 0), 0),
+  );
+
+  readonly totalProfit = computed(() =>
+    this.rows().reduce((s, r) => s + r.profit, 0),
+  );
+
+  // ─── Actions ─────────────────────────────────────────────────────
+
+  getSupplierLabel(supplierId: string): string {
+    return this.supplierOptions().find((o) => o.value === supplierId)?.label ?? (supplierId || '—');
+  }
+
+  addRow(): void {
+    const newRow: OrderItemRow = {
+      id: crypto.randomUUID(),
+      productType: '',
+      supplierId: '',
+      quantity: 0,
+      unit: 'MT',
+      costPrice: 0,
+      salesPrice: 0,
+      profit: 0,
+      paymentTerms: '',
+    };
+    this.rows.update((prev) => [...prev, newRow]);
+    this.emitChange();
+  }
+
+  removeRow(index: number): void {
+    this.rows.update((prev) => prev.filter((_, i) => i !== index));
+    this.emitChange();
+  }
+
+  updateField(index: number, field: keyof OrderItemRow, value: unknown): void {
+    this.rows.update((prev) => {
+      const updated = [...prev];
+      const row = { ...updated[index]! };
+
+      (row as Record<string, unknown>)[field] = value;
+
+      // Auto-recalculate profit
+      row.profit = (row.salesPrice - row.costPrice) * row.quantity;
+      updated[index] = row;
+      return updated;
+    });
+    this.emitChange();
+  }
+
+  private emitChange(): void {
+    this.itemsChange.emit(this.rows());
+  }
+}

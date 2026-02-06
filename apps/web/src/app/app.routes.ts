@@ -34,10 +34,16 @@ export const routes: Routes = [
           {
             path: 'orders',
             loadComponent: () =>
-              import('./pages/placeholder/placeholder-page.component').then(
-                (m) => m.PlaceholderPageComponent,
+              import('./features/trading/pages/orders-list/orders-list-page.component').then(
+                (m) => m.OrdersListPageComponent,
               ),
-            data: { title: 'Orders' },
+          },
+          {
+            path: 'orders/:id',
+            loadComponent: () =>
+              import('./features/trading/pages/order-detail/order-detail-page.component').then(
+                (m) => m.OrderDetailPageComponent,
+              ),
           },
           {
             path: 'inquiries',
