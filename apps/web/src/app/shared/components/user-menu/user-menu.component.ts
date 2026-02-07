@@ -8,6 +8,7 @@ import {
   OnInit,
   OnDestroy,
 } from '@angular/core';
+import { Router } from '@angular/router';
 import { AuthService } from '../../../core/auth/auth.service';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -63,6 +64,16 @@ import { AuthService } from '../../../core/auth/auth.service';
         </div>
         <div class="py-1">
           <button
+            (click)="goToSecurity()"
+            class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+            role="menuitem"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M10 1a4.5 4.5 0 0 0-4.5 4.5V9H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-.5V5.5A4.5 4.5 0 0 0 10 1Zm3 8V5.5a3 3 0 1 0-6 0V9h6Z" clip-rule="evenodd" />
+            </svg>
+            Security
+          </button>
+          <button
             (click)="handleLogout()"
             class="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
             role="menuitem"
@@ -80,6 +91,7 @@ import { AuthService } from '../../../core/auth/auth.service';
 })
 export class UserMenuComponent implements OnInit, OnDestroy {
   private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
   private readonly elRef = inject(ElementRef);
 
   readonly isOpen = signal(false);
@@ -103,6 +115,11 @@ export class UserMenuComponent implements OnInit, OnDestroy {
 
   toggleMenu(): void {
     this.isOpen.update((v) => !v);
+  }
+
+  goToSecurity(): void {
+    this.isOpen.set(false);
+    this.router.navigate(['/account/security']);
   }
 
   handleLogout(): void {

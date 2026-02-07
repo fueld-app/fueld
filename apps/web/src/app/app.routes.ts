@@ -133,15 +133,16 @@ export const routes: Routes = [
               ),
             data: { title: 'Settings' },
           },
-          {
-            path: 'security',
-            loadComponent: () =>
-              import('./pages/two-factor-setup/two-factor-setup-page.component').then(
-                (m) => m.TwoFactorSetupPageComponent,
-              ),
-            data: { title: 'Security — 2FA Setup' },
-          },
         ],
+      },
+      // ── Account ──
+      {
+        path: 'account/security',
+        loadComponent: () =>
+          import('./pages/two-factor-setup/two-factor-setup-page.component').then(
+            (m) => m.TwoFactorSetupPageComponent,
+          ),
+        data: { title: 'Security — 2FA Setup' },
       },
     ],
   },

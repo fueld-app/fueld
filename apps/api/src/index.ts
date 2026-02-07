@@ -5,6 +5,7 @@ import type { ApiResponse } from '@fueld/types';
 import { authController } from './modules/auth';
 import { documentsController } from './modules/documents/documents.controller';
 import { dashboardController } from './modules/dashboard/dashboard.controller';
+import { lloydsController } from './modules/lloyds';
 
 const PORT = Number(process.env['PORT']) || 3000;
 
@@ -23,6 +24,7 @@ const app = new Elysia()
           { name: 'Orders', description: 'Bunker order management' },
           { name: 'Documents', description: 'Invoice PDF generation & email' },
           { name: 'Dashboard', description: 'Collections, pipeline & team stats' },
+          { name: 'Lloyd\'s', description: 'Lloyd\'s List Intelligence vessel, port & company lookup' },
         ],
         components: {
           securitySchemes: {
@@ -57,6 +59,7 @@ const app = new Elysia()
   .use(authController)
   .use(documentsController)
   .use(dashboardController)
+  .use(lloydsController)
   .listen(PORT);
 
 console.log(
