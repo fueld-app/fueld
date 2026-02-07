@@ -292,8 +292,6 @@ export interface PlaceSearchResult {
   longitude: number | null;
   unlocode?: string;
   admiraltyChart?: string;
-  principalFacilities?: string[];
-  portAuthorityName?: string;
   parentPlaceId?: string;
   parentPlaceName?: string;
 }
@@ -335,8 +333,6 @@ export async function searchPlaces(query: {
         longitude: p.long,
         unlocode: p.unlocode ?? undefined,
         admiraltyChart: p.admiraltyChart ?? undefined,
-        principalFacilities: (p.principalFacilities as string[]) ?? undefined,
-        portAuthorityName: p.portAuthorityName ?? undefined,
         parentPlaceName: p.parentPlaceName ?? undefined,
       });
     }
@@ -433,8 +429,6 @@ export async function importPlaceFromLli(lliPlaceId: string): Promise<{ id: stri
       long: pd.location?.lng ?? null,
       unlocode: pd.unctadLocode || null,
       admiraltyChart: pd.admiraltyChart || null,
-      principalFacilities: null,
-      portAuthorityName: null,
       parentPlaceName: pd.parentPlaceName ?? null,
       lliLastUpdated: pd.editDate ? new Date(pd.editDate) : null,
     })

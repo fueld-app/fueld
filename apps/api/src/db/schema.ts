@@ -161,8 +161,6 @@ export const places = pgTable('places', {
 
   // ── Port-specific extras ───────────────────────────────────────────
   admiraltyChart: text('admiralty_chart'),            // e.g. "122/132/133"
-  principalFacilities: jsonb('principal_facilities'), // string[] from LLI
-  portAuthorityName: text('port_authority_name'),
 
   // ── Hierarchy (sub-port → parent port) ─────────────────────────────
   parentPlaceId: uuid('parent_place_id'),            // self-ref FK

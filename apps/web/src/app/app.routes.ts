@@ -96,6 +96,23 @@ export const routes: Routes = [
           ),
         data: { title: 'Credit' },
       },
+      // ── Places ──
+      {
+        path: 'places',
+        loadComponent: () =>
+          import('./features/admin/pages/places/places-page.component').then(
+            (m) => m.PlacesPageComponent,
+          ),
+        data: { title: 'Places' },
+      },
+      {
+        path: 'places/:id',
+        loadComponent: () =>
+          import('./features/admin/pages/place-detail/place-detail-page.component').then(
+            (m) => m.PlaceDetailPageComponent,
+          ),
+        data: { title: 'Place Detail' },
+      },
       // ── Admin ──
       {
         path: 'admin',
@@ -116,22 +133,6 @@ export const routes: Routes = [
                 (m) => m.PlaceholderPageComponent,
               ),
             data: { title: 'Vessels' },
-          },
-          {
-            path: 'places',
-            loadComponent: () =>
-              import('./features/admin/pages/places/places-page.component').then(
-                (m) => m.PlacesPageComponent,
-              ),
-            data: { title: 'Places' },
-          },
-          {
-            path: 'places/:id',
-            loadComponent: () =>
-              import('./features/admin/pages/place-detail/place-detail-page.component').then(
-                (m) => m.PlaceDetailPageComponent,
-              ),
-            data: { title: 'Place Detail' },
           },
           {
             path: 'settings',

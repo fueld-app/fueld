@@ -263,8 +263,6 @@ export class OrderDetailPageComponent {
       lat: 51.9225,
       long: 4.4792,
       admiraltyChart: null,
-      principalFacilities: null,
-      portAuthorityName: null,
       parentPlaceId: null,
       parentPlaceName: null,
       subRegion: null,

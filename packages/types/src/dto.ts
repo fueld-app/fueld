@@ -95,8 +95,6 @@ export interface PlaceDto {
   lat: number | null;
   long: number | null;
   admiraltyChart: string | null;
-  principalFacilities: string[] | null;
-  portAuthorityName: string | null;
   parentPlaceId: string | null;
   parentPlaceName: string | null;
 }
@@ -113,8 +111,6 @@ export interface CreatePlaceDto {
   long?: number;
   unlocode?: string;
   admiraltyChart?: string;
-  principalFacilities?: string[];
-  portAuthorityName?: string;
   parentPlaceId?: string;
   parentPlaceName?: string;
 }

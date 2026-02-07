@@ -7,6 +7,7 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
+import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
 import { firstValueFrom } from 'rxjs';
 import type { PlaceDto, ApiResponse } from '@fueld/types';
 
@@ -132,12 +133,6 @@ const ISO3_TO_ISO2: Record<string, string> = {
                     <dt class="text-gray-500">Admiralty Chart</dt>
                     <dd class="mt-0.5 font-medium text-gray-900">{{ place()!.admiraltyChart ?? '—' }}</dd>
                   </div>
-                  @if (place()!.portAuthorityName) {
-                    <div class="sm:col-span-2">
-                      <dt class="text-gray-500">Port Authority</dt>
-                      <dd class="mt-0.5 font-medium text-gray-900">{{ place()!.portAuthorityName }}</dd>
-                    </div>
-                  }
                   @if (place()!.parentPlaceName) {
                     <div class="sm:col-span-2">
                       <dt class="text-gray-500">Parent Place</dt>
@@ -148,23 +143,6 @@ const ISO3_TO_ISO2: Record<string, string> = {
               </div>
             </div>
 
-            <!-- Principal Facilities -->
-            @if (place()!.principalFacilities && place()!.principalFacilities!.length > 0) {
-              <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
-                <div class="border-b border-gray-100 px-5 py-3">
-                  <h2 class="text-sm font-semibold text-gray-700">Principal Facilities</h2>
-                </div>
-                <div class="p-5">
-                  <div class="flex flex-wrap gap-2">
-                    @for (f of place()!.principalFacilities!; track f) {
-                      <span class="inline-flex items-center rounded-md bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
-                        {{ f }}
-                      </span>
-                    }
-                  </div>
-                </div>
-              </div>
-            }
           </div>
 
           <!-- Right column: map + coordinates -->
@@ -229,6 +207,7 @@ export class PlaceDetailPageComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly http = inject(HttpClient);
+  private readonly sanitizer = inject(DomSanitizer);
 
   readonly place = signal<PlaceDto | null>(null);
   readonly loading = signal(true);
@@ -259,7 +238,7 @@ export class PlaceDetailPageComponent implements OnInit {
   }
 
   goBack(): void {
-    this.router.navigate(['/admin/places']);
+    this.router.navigate(['/places']);
   }
 
   countryFlag(): string {
@@ -274,10 +253,11 @@ export class PlaceDetailPageComponent implements OnInit {
     return String.fromCodePoint(a, b);
   }
 
-  mapUrl(): string {
+  mapUrl(): SafeResourceUrl {
     const p = this.place();
     if (!p?.lat || !p?.long) return '';
-    return `https://www.openstreetmap.org/export/embed.html?bbox=${p.long - 0.05},${p.lat - 0.03},${p.long + 0.05},${p.lat + 0.03}&layer=mapnik&marker=${p.lat},${p.long}`;
+    const url = `https://www.openstreetmap.org/export/embed.html?bbox=${p.long - 0.05},${p.lat - 0.03},${p.long + 0.05},${p.lat + 0.03}&layer=mapnik&marker=${p.lat},${p.long}`;
+    return this.sanitizer.bypassSecurityTrustResourceUrl(url);
   }
 
   placeTypeLabel(type: string): string {

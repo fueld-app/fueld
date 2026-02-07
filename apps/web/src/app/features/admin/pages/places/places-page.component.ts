@@ -34,8 +34,6 @@ interface LliSearchResult {
   longitude?: number;
   unlocode?: string;
   admiraltyChart?: string;
-  principalFacilities?: string[];
-  portAuthorityName?: string;
   parentPlaceName?: string;
 }
 
@@ -436,7 +434,7 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
   }
 
   openPlace(id: string): void {
-    this.router.navigate(['/admin/places', id]);
+    this.router.navigate(['/places', id]);
   }
 
   min(a: number, b: number): number {
