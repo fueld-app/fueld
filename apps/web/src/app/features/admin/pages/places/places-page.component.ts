@@ -508,6 +508,11 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
 
   onSearchInput(term: string): void {
     this.lliSearchTerm.set(term);
+    // Immediately hide the dropdown and mark search as pending so the
+    // "Create manually" button won't flash while debouncing / waiting
+    // for local + Seasearcher results to come back.
+    this.searchDone.set(false);
+    this.lliDropdownOpen.set(false);
     this.searchSubject.next(term);
   }
 
