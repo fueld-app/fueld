@@ -187,6 +187,26 @@ export async function enable2fa(
   return true;
 }
 
+export async function disable2fa(
+  userId: string,
+  token: string,
+): Promise<boolean> {
+  const user = await findUserById(userId);
+  if (!user || !user.twoFactorSecret || !user.is2faEnabled) {
+    throw new Error('2FA is not enabled for this user');
+  }
+
+  const valid = verifyTotpToken(token, user.twoFactorSecret);
+  if (!valid) return false;
+
+  await db
+    .update(users)
+    .set({ is2faEnabled: false, twoFactorSecret: null, updatedAt: new Date() })
+    .where(eq(users.id, userId));
+
+  return true;
+}
+
 export async function verify2faToken(
   userId: string,
   token: string,

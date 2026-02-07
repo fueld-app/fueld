@@ -19,7 +19,7 @@ import { AuthService } from '../../core/auth/auth.service';
       <div class="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
         <h1
           class="text-xl font-bold text-gray-900"
-        >Set Up Two-Factor Authentication</h1>
+        >Two-Factor Authentication</h1>
         <p class="mt-1 text-sm text-gray-500">
           Secure your account with a time-based one-time password (TOTP).
         </p>
@@ -37,14 +37,13 @@ import { AuthService } from '../../core/auth/auth.service';
         }
 
         @if (!enabled()) {
-          <!-- Step 1: Loading / QR code -->
+          <!-- Setup flow: Loading / QR code -->
           @if (loadingQr()) {
             <div class="mt-8 flex flex-col items-center gap-4">
               <div class="h-52 w-52 animate-pulse rounded-xl bg-gray-100"></div>
               <p class="text-sm text-gray-400">Generating QR code…</p>
             </div>
           } @else if (qrDataUrl()) {
-            <!-- Step 2: Show QR code + confirm -->
             <div class="mt-6 space-y-6">
               <div>
                 <h2 class="text-sm font-semibold text-gray-700">Step 1 — Scan the QR code</h2>
@@ -66,7 +65,6 @@ import { AuthService } from '../../core/auth/auth.service';
                 </div>
               </div>
 
-              <!-- Manual secret -->
               <details class="text-sm">
                 <summary
                   class="cursor-pointer font-medium text-brand-600 hover:text-brand-700"
@@ -76,7 +74,6 @@ import { AuthService } from '../../core/auth/auth.service';
                 </div>
               </details>
 
-              <!-- Step 3: Enter code to confirm -->
               <div>
                 <h2 class="text-sm font-semibold text-gray-700">Step 2 — Enter the 6-digit code</h2>
                 <p class="mt-1 text-sm text-gray-500">
@@ -116,26 +113,71 @@ import { AuthService } from '../../core/auth/auth.service';
             </div>
           }
         } @else {
-          <!-- Success state -->
-          <div class="mt-8 flex flex-col items-center gap-4 text-center">
-            <div class="flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-green-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
-              </svg>
+          <!-- 2FA is active — show status + reset option -->
+          <div class="mt-6 space-y-6">
+            <div class="flex items-start gap-4 rounded-lg border border-green-200 bg-green-50 p-4">
+              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-green-100">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div>
+                <h2 class="text-sm font-semibold text-green-900">2FA is enabled</h2>
+                <p class="mt-0.5 text-sm text-green-700">
+                  Your account is protected with two-factor authentication.
+                  You're asked for a code each time you sign in.
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 class="text-lg font-semibold text-gray-900">2FA Enabled!</h2>
+
+            <!-- Reset 2FA section -->
+            <div class="border-t border-gray-200 pt-6">
+              <h2 class="text-sm font-semibold text-gray-900">Reset Two-Factor Authentication</h2>
               <p class="mt-1 text-sm text-gray-500">
-                Your account is now protected with two-factor authentication.
-                You'll be asked for a code each time you sign in.
+                To reset 2FA (e.g. if you switched phones), enter your current
+                authenticator code to disable it, then set it up again.
               </p>
+
+              @if (!showResetForm()) {
+                <button
+                  (click)="showResetForm.set(true)"
+                  class="mt-4 rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-600
+                         hover:bg-red-50 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                >
+                  Reset 2FA
+                </button>
+              } @else {
+                <form (ngSubmit)="onDisable()" class="mt-4 flex items-end gap-3">
+                  <div class="flex-1">
+                    <label for="disable-code" class="block text-xs font-medium text-gray-600 mb-1">Current 6-digit code</label>
+                    <input
+                      id="disable-code"
+                      type="text"
+                      inputmode="numeric"
+                      pattern="[0-9]*"
+                      maxlength="6"
+                      autocomplete="one-time-code"
+                      [(ngModel)]="disableCode"
+                      name="disableCode"
+                      required
+                      class="block w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-center font-mono text-lg tracking-[0.3em] shadow-sm placeholder:text-gray-400 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                      placeholder="000000"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    [disabled]="disabling()"
+                    class="rounded-lg bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    @if (disabling()) {
+                      Disabling…
+                    } @else {
+                      Confirm Disable
+                    }
+                  </button>
+                </form>
+              }
             </div>
-            <a
-              routerLink="/dashboard"
-              class="mt-4 inline-flex rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-700"
-            >
-              Go to Dashboard
-            </a>
           </div>
         }
       </div>
@@ -155,8 +197,12 @@ export class TwoFactorSetupPageComponent implements OnInit {
   readonly errorMessage = signal('');
   readonly successMessage = signal('');
 
+  // Reset state
+  readonly showResetForm = signal(false);
+  readonly disabling = signal(false);
+  disableCode = '';
+
   async ngOnInit(): Promise<void> {
-    // If user already has 2FA, show the success state
     const user = this.auth.user();
     if (user?.is2faEnabled) {
       this.enabled.set(true);
@@ -199,6 +245,39 @@ export class TwoFactorSetupPageComponent implements OnInit {
       );
     } finally {
       this.verifying.set(false);
+    }
+  }
+
+  async onDisable(): Promise<void> {
+    const trimmed = this.disableCode.trim();
+    if (trimmed.length !== 6) {
+      this.errorMessage.set('Please enter a 6-digit code.');
+      return;
+    }
+
+    this.disabling.set(true);
+    this.errorMessage.set('');
+    this.successMessage.set('');
+
+    try {
+      await this.auth.disable2fa(trimmed);
+      this.enabled.set(false);
+      this.showResetForm.set(false);
+      this.disableCode = '';
+      this.successMessage.set('2FA has been disabled. You can set it up again below.');
+
+      // Auto-generate a new QR code so they can re-enroll immediately
+      const { secret, qrDataUrl } = await this.auth.setup2fa();
+      this.qrDataUrl.set(qrDataUrl);
+      this.secret.set(secret);
+    } catch (err) {
+      this.errorMessage.set(
+        err instanceof Error
+          ? err.message
+          : 'Invalid code. Please try again.',
+      );
+    } finally {
+      this.disabling.set(false);
     }
   }
 }

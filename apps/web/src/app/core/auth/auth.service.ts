@@ -190,6 +190,32 @@ export class AuthService {
     }
   }
 
+  /** Verify a TOTP code and disable 2FA on the account. */
+  async disable2fa(code: string): Promise<void> {
+    const token = this.getAccessToken();
+    if (!token) throw new Error('Not authenticated. Please log in again.');
+
+    const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
+
+    const res = await firstValueFrom(
+      this.http.post<ApiResponse<null>>(
+        `${API_URL}/auth/2fa/disable`,
+        { code },
+        { headers },
+      ),
+    );
+
+    if (!res.success) {
+      throw new Error(res.message ?? 'Failed to disable 2FA');
+    }
+
+    // Update the local user state
+    const currentUser = this.user();
+    if (currentUser) {
+      this.setUser({ ...currentUser, is2faEnabled: false });
+    }
+  }
+
   logout(): void {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);

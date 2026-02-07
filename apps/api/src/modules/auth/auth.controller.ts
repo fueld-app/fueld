@@ -9,6 +9,7 @@ import {
   findUserById,
   generate2faSecret,
   enable2fa,
+  disable2fa,
   verify2faToken,
 } from './auth.service';
 import type { ApiResponse } from '@fueld/types';
@@ -445,6 +446,61 @@ export const authController = new Elysia({ prefix: '/auth' })
       detail: {
         tags: ['Auth'],
         summary: 'Verify TOTP code and enable 2FA on account',
+        security: [{ bearerAuth: [] }],
+      },
+    },
+  )
+
+  // ── POST /auth/2fa/disable ───────────────────────────────────────
+  .post(
+    '/2fa/disable',
+    async ({ body, headers, jwtAccess }) => {
+      try {
+        const authHeader = headers['authorization'];
+        if (!authHeader?.startsWith('Bearer ')) {
+          return {
+            success: false,
+            data: null,
+            message: 'Missing authorization header',
+          } satisfies ApiResponse<null>;
+        }
+
+        const token = authHeader.slice(7);
+        const decoded = extractPayload(await jwtAccess.verify(token));
+        if (!decoded) {
+          return {
+            success: false,
+            data: null,
+            message: 'Invalid token',
+          } satisfies ApiResponse<null>;
+        }
+
+        const disabled = await disable2fa(decoded.sub, body.code);
+        if (!disabled) {
+          return {
+            success: false,
+            data: null,
+            message: 'Invalid TOTP code — 2FA not disabled',
+          } satisfies ApiResponse<null>;
+        }
+
+        return {
+          success: true,
+          data: null,
+          message: '2FA has been disabled',
+        } satisfies ApiResponse<null>;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : '2FA disable failed';
+        return { success: false, data: null, message } satisfies ApiResponse<null>;
+      }
+    },
+    {
+      body: t.Object({
+        code: t.String({ minLength: 6, maxLength: 6 }),
+      }),
+      detail: {
+        tags: ['Auth'],
+        summary: 'Verify TOTP code and disable 2FA on account',
         security: [{ bearerAuth: [] }],
       },
     },
