@@ -27,6 +27,7 @@ export class WebSocketService {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 10;
   private intentionallyClosed = false;
+  private pendingMessages: { type: string; [key: string]: unknown }[] = [];
 
   /** Stream of all incoming messages */
   private readonly messages$ = new Subject<WsMessage>();
@@ -57,12 +58,23 @@ export class WebSocketService {
 
   /**
    * Send a typed message to the server.
+   * If the socket isn't authenticated yet, the message is queued
+   * and will be flushed as soon as the connection is ready.
    */
   send(message: { type: string; [key: string]: unknown }): void {
-    if (this.ws?.readyState === WebSocket.OPEN) {
+    if (this.ws?.readyState === WebSocket.OPEN && this.authenticated()) {
       this.ws.send(JSON.stringify(message));
     } else {
-      console.warn('[WS] Cannot send — not connected');
+      this.pendingMessages.push(message);
+    }
+  }
+
+  /** Flush any messages that were queued before the socket was ready. */
+  private flushPending(): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    const queued = this.pendingMessages.splice(0);
+    for (const msg of queued) {
+      this.ws.send(JSON.stringify(msg));
     }
   }
 
@@ -94,6 +106,7 @@ export class WebSocketService {
         if (msg.type === 'connected') {
           this.authenticated.set(true);
           console.log('[WS] Authenticated');
+          this.flushPending();
           return;
         }
 
@@ -132,6 +145,7 @@ export class WebSocketService {
     this.currentToken = null;
     this.connected.set(false);
     this.authenticated.set(false);
+    this.pendingMessages = [];
 
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
