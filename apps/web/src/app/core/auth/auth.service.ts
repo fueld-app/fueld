@@ -46,17 +46,19 @@ export class AuthService {
     private readonly http: HttpClient,
     private readonly router: Router,
   ) {
-    // Connect WebSocket on page reload if already authenticated
+    // On page reload, refresh the access token then connect WebSocket
     if (this.isAuthenticated()) {
-      const token = this.getAccessToken();
-      if (token) {
-        // Lazy-inject to avoid circular dependency timing issues
-        setTimeout(() => this.wsService.connect(token), 0);
-      }
+      setTimeout(() => this.refreshAndConnectWs(), 0);
     }
   }
 
   private readonly wsService = inject(WebSocketService);
+
+  /** Refresh the access token, then open the WebSocket with the fresh token. */
+  private async refreshAndConnectWs(): Promise<void> {
+    await this.refreshToken();
+    // refreshToken() calls setTokens() which calls wsService.connect()
+  }
 
   // ─── Token management ────────────────────────────────────────────
 
