@@ -283,6 +283,8 @@ export async function searchPlaces(query: {
   country?: string;
   placeType?: string;
 }): Promise<PlaceSearchResult[]> {
+  const results: PlaceSearchResult[] = [];
+
   // ── 1. Local DB search ─────────────────────────────────────────────
   const conditions = [];
   if (query.name) conditions.push(ilike(places.name, `%${query.name}%`));
@@ -295,10 +297,11 @@ export async function searchPlaces(query: {
       .where(conditions.length === 1 ? conditions[0] : or(...conditions))
       .limit(50);
 
-    if (localResults.length > 0) {
-      return localResults.map((p) => ({
+    for (const p of localResults) {
+      results.push({
         source: 'local' as const,
         localId: p.id,
+        lliPlaceId: p.lliPlaceId ?? undefined,
         name: p.name,
         country: p.country,
         countryIso: p.countryIso ?? undefined,
@@ -311,40 +314,56 @@ export async function searchPlaces(query: {
         principalFacilities: (p.principalFacilities as string[]) ?? undefined,
         portAuthorityName: p.portAuthorityName ?? undefined,
         parentPlaceName: p.parentPlaceName ?? undefined,
-      }));
+      });
     }
   }
 
-  // ── 2. LLI fallback ───────────────────────────────────────────────
-  const params: Record<string, string | undefined> = {};
-  if (query.name) params.placeName = query.name;
-  if (query.country) params.country = query.country;
-  if (query.placeType) params.placeType = query.placeType;
+  // ── 2. LLI search (always, to supplement local results) ───────────
+  try {
+    const params: Record<string, string | undefined> = {};
+    if (query.name) params.placeName = query.name;
+    if (query.country) params.country = query.country;
+    if (query.placeType) params.placeType = query.placeType;
 
-  const lli = await lliGet<LliResponse<LliPlaceBasicCharsData>>(
-    'placebasicchars_v2',
-    params,
-  );
+    const lli = await lliGet<LliResponse<LliPlaceAdvancedCharsData>>(
+      'placeadvancedchars_v3',
+      params,
+    );
 
-  if (!lli.IsSuccess || !lli.Data?.items?.length) {
-    return [];
+    if (lli.IsSuccess && lli.Data?.items?.length) {
+      // Collect local LLI IDs to avoid duplicates
+      const localLliIds = new Set(results.map((r) => r.lliPlaceId).filter(Boolean));
+
+      for (const item of lli.Data.items) {
+        const pd = item.placeDetails;
+        const ppd = item.parentPlaceDetails;
+
+        if (localLliIds.has(pd.placeId)) continue; // skip duplicates
+
+        results.push({
+          source: 'lloyds' as const,
+          lliPlaceId: pd.placeId,
+          name: pd.name,
+          country: pd.country,
+          countryIso: pd.countryIso,
+          area: pd.area,
+          type: pd.type,
+          latitude: pd.latitude,
+          longitude: pd.longitude,
+          unlocode: pd.unlocode,
+          admiraltyChart: pd.admiraltyChart,
+          principalFacilities: pd.principalFacitilies,
+          portAuthorityName: pd.portAuthorityName,
+          parentPlaceName: ppd?.parentPlaceName,
+        });
+      }
+    }
+  } catch (err) {
+    console.error('[LLI] Place search API call failed:', err);
+    // Continue with local results only
   }
 
-  return lli.Data.items.map((p) => ({
-    source: 'lloyds' as const,
-    lliPlaceId: p.placeId,
-    name: p.name,
-    country: p.country,
-    countryIso: p.countryIso,
-    area: p.area,
-    type: p.type,
-    latitude: p.latitude,
-    longitude: p.longitude,
-    unlocode: p.unlocode,
-    admiraltyChart: p.admiraltyChart,
-    principalFacilities: p.principalFacitilies,
-    portAuthorityName: p.portAuthorityName,
-  }));
+  return results;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
