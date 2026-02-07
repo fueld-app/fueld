@@ -123,7 +123,7 @@ export class LoginPageComponent {
         return;
       }
 
-      await this.router.navigate(['/dashboard']);
+      await this.router.navigate(['/']);
     } catch (err: unknown) {
       const msg =
         err instanceof Error ? err.message : 'Login failed. Please try again.';

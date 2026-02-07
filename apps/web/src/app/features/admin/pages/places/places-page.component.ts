@@ -168,6 +168,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
               <th class="px-4 py-3 text-left font-medium text-gray-600">UNLOCODE</th>
               <th class="px-4 py-3 text-left font-medium text-gray-600">Area</th>
               <th class="px-4 py-3 text-left font-medium text-gray-600">LLI ID</th>
+              <th class="px-4 py-3 text-right font-medium text-gray-600"></th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
@@ -191,10 +192,21 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
                 <td class="px-4 py-3 text-gray-500 font-mono text-xs">{{ place.unlocode ?? '—' }}</td>
                 <td class="px-4 py-3 text-gray-500">{{ place.area ?? '—' }}</td>
                 <td class="px-4 py-3 text-gray-400 text-xs">{{ place.lliPlaceId ?? '—' }}</td>
+                <td class="px-4 py-3 text-right">
+                  <button
+                    (click)="confirmDelete(place); $event.stopPropagation()"
+                    class="rounded-md p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                    title="Delete place"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
+                </td>
               </tr>
             } @empty {
               <tr>
-                <td colspan="6" class="px-4 py-8 text-center text-sm text-gray-400 italic">
+                <td colspan="7" class="px-4 py-8 text-center text-sm text-gray-400 italic">
                   @if (loading()) {
                     Loading places…
                   } @else {
@@ -262,6 +274,32 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
       }
 
       <!-- Import success toast -->
+      @if (deleteTarget()) {
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div class="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
+            <h3 class="text-lg font-semibold text-gray-900">Delete Place</h3>
+            <p class="mt-2 text-sm text-gray-600">
+              Are you sure you want to delete <strong>{{ deleteTarget()!.name }}</strong>?
+              This cannot be undone.
+            </p>
+            <div class="mt-5 flex justify-end gap-3">
+              <button
+                (click)="deleteTarget.set(null)"
+                class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                (click)="executeDelete()"
+                [disabled]="deleting()"
+                class="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
+              >
+                {{ deleting() ? 'Deleting…' : 'Delete' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
       @if (importSuccess()) {
         <div class="fixed bottom-4 right-4 z-50 rounded-lg bg-green-600 px-4 py-3 text-sm font-medium text-white shadow-lg
                     animate-in slide-in-from-bottom-2">
@@ -294,6 +332,10 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
   // ─── Import state ───────────────────────────────────────────────
   readonly importingId = signal<string | null>(null);
   readonly importSuccess = signal(false);
+
+  // ─── Delete state ─────────────────────────────────────────────────
+  readonly deleteTarget = signal<PlaceDto | null>(null);
+  readonly deleting = signal(false);
 
   ngOnInit(): void {
     this.loadPlaces();
@@ -397,6 +439,30 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
   goToPage(page: number): void {
     this.currentPage.set(page);
     this.loadPlaces();
+  }
+
+  // ─── Delete place ─────────────────────────────────────────────────
+
+  confirmDelete(place: PlaceDto): void {
+    this.deleteTarget.set(place);
+  }
+
+  async executeDelete(): Promise<void> {
+    const target = this.deleteTarget();
+    if (!target) return;
+
+    this.deleting.set(true);
+    try {
+      await firstValueFrom(
+        this.http.delete<ApiResponse<{ id: string }>>(`${API}/lloyds/places/local/${target.id}`),
+      );
+      this.deleteTarget.set(null);
+      await this.loadPlaces();
+    } catch (err) {
+      console.error('Delete failed:', err);
+    } finally {
+      this.deleting.set(false);
+    }
   }
 
   // ─── Helpers ───────────────────────────────────────────────────

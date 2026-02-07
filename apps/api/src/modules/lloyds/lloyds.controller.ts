@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia';
 import { authGuard } from '../auth/auth.guard';
-import { searchVessels, searchPlaces, searchCompanies, importPlaceFromLli, listPlaces, getPlaceById, getPlaceByLliId, getPlaceEnrichment } from './lli.service';
+import { searchVessels, searchPlaces, searchCompanies, importPlaceFromLli, listPlaces, getPlaceById, getPlaceByLliId, getPlaceEnrichment, deletePlace, syncPlaceFromSeasearcher } from './lli.service';
 import type { ApiResponse } from '@fueld/types';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -184,6 +184,45 @@ export const lloydsController = new Elysia({ prefix: '/lloyds' })
         summary: 'Import a place from LLI into local database',
         description:
           'Fetches full place details from LLI /placeadvancedchars_v3 and upserts into local DB.',
+      },
+    },
+  )
+
+  // ─── Delete Place (local DB) ───────────────────────────────────────
+  .delete(
+    '/places/local/:id',
+    async ({ params }) => {
+      const deleted = await deletePlace(params.id);
+      if (!deleted) {
+        return { success: false, data: null, message: 'Place not found' };
+      }
+      return { success: true, data: { id: params.id } } satisfies ApiResponse<{ id: string }>;
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: {
+        tags: ["Lloyd's"],
+        summary: 'Delete a place from local database',
+      },
+    },
+  )
+
+  // ─── Sync Place from Seasearcher ──────────────────────────────────
+  .post(
+    '/places/local/:id/sync',
+    async ({ params }) => {
+      const updated = await syncPlaceFromSeasearcher(params.id);
+      if (!updated) {
+        return { success: false, data: null, message: 'Place not found or no Seasearcher ID' };
+      }
+      return { success: true, data: updated } satisfies ApiResponse<typeof updated>;
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: {
+        tags: ["Lloyd's"],
+        summary: 'Sync place data from Seasearcher',
+        description: 'Fetches latest data from Seasearcher and updates the local record.',
       },
     },
   )

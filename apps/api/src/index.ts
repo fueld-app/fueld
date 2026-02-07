@@ -6,7 +6,7 @@ import { authController } from './modules/auth';
 import { documentsController } from './modules/documents/documents.controller';
 import { dashboardController } from './modules/dashboard/dashboard.controller';
 import { lloydsController } from './modules/lloyds';
-import { getNearbyVessels } from './modules/lloyds/lli.service';
+import { getNearbyVessels, syncPlaceFromSeasearcher } from './modules/lloyds/lli.service';
 
 const PORT = Number(process.env['PORT']) || 3000;
 
@@ -64,14 +64,23 @@ const app = new Elysia()
 
   // ─── WebSocket: nearby vessels push ────────────────────────────────
   .ws('/ws/nearby-vessels', {
-    body: t.String(),
     open(ws) {
       console.log('[WS] Client connected to nearby-vessels');
     },
     async message(ws, message) {
       try {
-        const data = JSON.parse(message);
-        if (data.placeId) {
+        const data = JSON.parse(String(message));
+
+        if (data.type === 'sync-place' && data.placeId) {
+          console.log(`[WS] Syncing place ${data.placeId} from Seasearcher…`);
+          const updated = await syncPlaceFromSeasearcher(String(data.placeId));
+          if (updated) {
+            ws.send(JSON.stringify({ type: 'place-synced', data: updated }));
+            console.log(`[WS] Place ${data.placeId} synced successfully`);
+          } else {
+            ws.send(JSON.stringify({ type: 'sync-error', message: 'Place not found or no Seasearcher ID' }));
+          }
+        } else if (data.placeId) {
           console.log(`[WS] Fetching nearby vessels for place ${data.placeId}…`);
           const vessels = await getNearbyVessels(String(data.placeId));
           ws.send(JSON.stringify({ type: 'nearby-vessels', data: vessels }));
@@ -79,7 +88,7 @@ const app = new Elysia()
         }
       } catch (err) {
         console.error('[WS] Error:', err);
-        ws.send(JSON.stringify({ type: 'error', message: 'Failed to fetch nearby vessels' }));
+        ws.send(JSON.stringify({ type: 'error', message: 'Failed to process request' }));
       }
     },
     close(ws) {

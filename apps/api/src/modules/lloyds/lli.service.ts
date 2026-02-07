@@ -581,6 +581,58 @@ export async function getNearbyVessels(seasearcherId: string): Promise<NearbyVes
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+//  DELETE LOCAL PLACE
+// ═══════════════════════════════════════════════════════════════════════
+
+export async function deletePlace(id: string): Promise<boolean> {
+  const result = await db
+    .delete(places)
+    .where(eq(places.id, id))
+    .returning({ id: places.id });
+
+  return result.length > 0;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  SYNC PLACE FROM SEASEARCHER (update local record with latest data)
+// ═══════════════════════════════════════════════════════════════════════
+
+export async function syncPlaceFromSeasearcher(placeId: string): Promise<typeof places.$inferSelect | null> {
+  // Get the local place record
+  const local = await getPlaceById(placeId);
+  if (!local || !local.lliPlaceId) return null;
+
+  // Fetch latest from Seasearcher
+  const pd = await seasearcherPlaceDetail<SeasearcherPlace>(local.lliPlaceId);
+  if (!pd || !pd.id) return null;
+
+  const mapped = PLACE_TYPE_MAP[pd.type] ?? (pd.typeCode as any) ?? null;
+
+  const [updated] = await db
+    .update(places)
+    .set({
+      name: pd.name,
+      country: pd.country?.code ?? pd.country?.name ?? local.country,
+      countryIso: pd.country?.code ?? local.countryIso,
+      area: pd.area || local.area,
+      subRegion: pd.subRegion || local.subRegion,
+      placeType: mapped ?? local.placeType,
+      timezone: pd.timezone || local.timezone,
+      lat: pd.location?.lat ?? local.lat,
+      long: pd.location?.lng ?? local.long,
+      unlocode: pd.unctadLocode || local.unlocode,
+      admiraltyChart: pd.admiraltyChart || local.admiraltyChart,
+      parentPlaceName: pd.parentPlaceName ?? local.parentPlaceName,
+      lliLastUpdated: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(places.id, placeId))
+    .returning();
+
+  return updated ?? null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 //  COMPANY / CONTACT SEARCH
 // ═══════════════════════════════════════════════════════════════════════
 

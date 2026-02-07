@@ -25,13 +25,13 @@ export const routes: Routes = [
       ),
     canActivate: [authGuard],
     children: [
-      { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
       {
-        path: 'dashboard',
+        path: '',
         loadComponent: () =>
           import('./pages/dashboard/dashboard-page.component').then(
             (m) => m.DashboardPageComponent,
           ),
+        pathMatch: 'full',
       },
       {
         path: 'analytics',
@@ -157,5 +157,5 @@ export const routes: Routes = [
   },
 
   // ─── Catch-all ──────────────────────────────────────────────────
-  { path: '**', redirectTo: 'dashboard' },
+  { path: '**', redirectTo: '' },
 ];

@@ -122,7 +122,7 @@ export class TwoFactorVerifyPageComponent implements OnInit {
 
     try {
       await this.auth.verify2fa(this.tempToken, trimmed);
-      await this.router.navigate(['/dashboard']);
+      await this.router.navigate(['/']);
     } catch (err: unknown) {
       const msg =
         err instanceof Error

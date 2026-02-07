@@ -97,6 +97,7 @@ export interface PlaceDto {
   admiraltyChart: string | null;
   parentPlaceId: string | null;
   parentPlaceName: string | null;
+  lliLastUpdated: string | null;
 }
 
 export interface CreatePlaceDto {

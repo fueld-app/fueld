@@ -11,7 +11,7 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
-import { DecimalPipe } from '@angular/common';
+import { DecimalPipe, DatePipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
 import type { PlaceDto, ApiResponse } from '@fueld/types';
 import * as L from 'leaflet';
@@ -116,7 +116,7 @@ function vesselIcon(heading: number | null): L.DivIcon {
 @Component({
   selector: 'app-place-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, DecimalPipe],
+  imports: [RouterLink, DecimalPipe, DatePipe],
   styles: [`
     :host ::ng-deep .leaflet-container { font-family: inherit; }
   `],
@@ -152,13 +152,40 @@ function vesselIcon(heading: number | null): L.DivIcon {
                 {{ placeTypeLabel(place()!.placeType!) }}
               </span>
             }
+            @if (syncing()) {
+              <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-600">
+                <svg class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                Syncing…
+              </span>
+            }
+            <div class="ml-auto flex items-center gap-2">
+              <button
+                (click)="confirmDeletePlace()"
+                class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
           </div>
-          <p class="text-sm text-gray-500">
-            {{ place()!.country }}
-            @if (place()!.countryIso) { ({{ place()!.countryIso }}) }
-            @if (place()!.area) { &middot; {{ place()!.area }} }
-            @if (place()!.subRegion) { &middot; {{ place()!.subRegion }} }
-          </p>
+          <div class="flex items-center gap-3">
+            <p class="text-sm text-gray-500">
+              {{ place()!.country }}
+              @if (place()!.countryIso) { ({{ place()!.countryIso }}) }
+              @if (place()!.area) { &middot; {{ place()!.area }} }
+              @if (place()!.subRegion) { &middot; {{ place()!.subRegion }} }
+            </p>
+            @if (place()!.lliLastUpdated) {
+              <span class="inline-flex items-center gap-1 text-xs text-gray-400" title="Last synced with Seasearcher">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" />
+                </svg>
+                Synced {{ place()!.lliLastUpdated | date:'short' }}
+              </span>
+            }
+          </div>
           <!-- Parent place link -->
           @if (parentPlaceName()) {
             <p class="mt-1 text-sm text-gray-500">
@@ -429,6 +456,34 @@ function vesselIcon(heading: number | null): L.DivIcon {
           <p class="mt-1 text-sm text-gray-500">The place you're looking for doesn't exist or has been removed.</p>
         </div>
       }
+
+      <!-- Delete confirmation modal -->
+      @if (showDeleteModal()) {
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div class="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
+            <h3 class="text-lg font-semibold text-gray-900">Delete Place</h3>
+            <p class="mt-2 text-sm text-gray-600">
+              Are you sure you want to delete <strong>{{ place()!.name }}</strong>?
+              This cannot be undone.
+            </p>
+            <div class="mt-5 flex justify-end gap-3">
+              <button
+                (click)="showDeleteModal.set(false)"
+                class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                (click)="executeDeletePlace()"
+                [disabled]="deletingPlace()"
+                class="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
+              >
+                {{ deletingPlace() ? 'Deleting…' : 'Delete' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
     </div>
   `,
 })
@@ -447,6 +502,9 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
   readonly expandedNodes = signal<Set<string>>(new Set());
   readonly nearbyVessels = signal<NearbyVessel[]>([]);
   readonly vesselsLoading = signal(false);
+  readonly syncing = signal(false);
+  readonly showDeleteModal = signal(false);
+  readonly deletingPlace = signal(false);
 
   // Grouped hierarchy — terminals vs anchorages
   readonly terminals = computed(() =>
@@ -540,11 +598,15 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
 
   private connectVesselWebSocket(placeId: string): void {
     this.vesselsLoading.set(true);
+    this.syncing.set(true);
     try {
       this.ws = new WebSocket(WS_URL);
 
       this.ws.onopen = () => {
+        // Request nearby vessels
         this.ws!.send(JSON.stringify({ placeId }));
+        // Trigger async place sync
+        this.ws!.send(JSON.stringify({ type: 'sync-place', placeId: this.place()!.id }));
       };
 
       this.ws.onmessage = (event) => {
@@ -554,9 +616,17 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
             this.nearbyVessels.set(msg.data);
             this.vesselsLoading.set(false);
             this.addVesselMarkers(msg.data);
+          } else if (msg.type === 'place-synced' && msg.data) {
+            // Update the local place data with synced result
+            this.place.set(msg.data);
+            this.syncing.set(false);
+          } else if (msg.type === 'sync-error') {
+            console.warn('[WS] Sync error:', msg.message);
+            this.syncing.set(false);
           } else if (msg.type === 'error') {
             console.error('[WS] Error:', msg.message);
             this.vesselsLoading.set(false);
+            this.syncing.set(false);
           }
         } catch (err) {
           console.error('[WS] Parse error:', err);
@@ -565,14 +635,17 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
 
       this.ws.onerror = () => {
         this.vesselsLoading.set(false);
+        this.syncing.set(false);
       };
 
       this.ws.onclose = () => {
         this.vesselsLoading.set(false);
+        this.syncing.set(false);
       };
     } catch (err) {
       console.error('WebSocket connection failed:', err);
       this.vesselsLoading.set(false);
+      this.syncing.set(false);
     }
   }
 
@@ -659,6 +732,30 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
       );
 
       marker.addTo(this.vesselLayer);
+    }
+  }
+
+  // ─── Delete place ─────────────────────────────────────────────────────
+
+  confirmDeletePlace(): void {
+    this.showDeleteModal.set(true);
+  }
+
+  async executeDeletePlace(): Promise<void> {
+    const p = this.place();
+    if (!p) return;
+
+    this.deletingPlace.set(true);
+    try {
+      await firstValueFrom(
+        this.http.delete<ApiResponse<{ id: string }>>(`${API}/lloyds/places/local/${p.id}`),
+      );
+      this.showDeleteModal.set(false);
+      this.router.navigate(['/places']);
+    } catch (err) {
+      console.error('Delete failed:', err);
+    } finally {
+      this.deletingPlace.set(false);
     }
   }
 

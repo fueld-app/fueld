@@ -267,6 +267,7 @@ export class OrderDetailPageComponent {
       parentPlaceName: null,
       subRegion: null,
       timezone: null,
+      lliLastUpdated: null,
     });
 
     this.suppliers.set([
