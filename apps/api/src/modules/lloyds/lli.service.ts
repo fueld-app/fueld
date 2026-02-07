@@ -6,7 +6,7 @@
 import { eq, ilike, or, and, sql } from 'drizzle-orm';
 import { db } from '../../db';
 import { vessels, places, counterparties } from '../../db/schema';
-import { lliGet, seasearcherPlaceSearch, seasearcherPlaceDetail } from './lli.client';
+import { lliGet, seasearcherPlaceSearch, seasearcherPlaceDetail, seasearcherNearbyVessels } from './lli.client';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Response types for LLI API
@@ -534,6 +534,50 @@ export async function getPlaceEnrichment(seasearcherId: string): Promise<PlaceEn
     parentPlaceName: (detail.parentPlaceName as string) ?? null,
     childrenData: (detail.childrenData as { type: string; count: number }[]) ?? [],
   };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  NEARBY VESSELS (Seasearcher nearPort)
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface NearbyVessel {
+  id: string;
+  name: string;
+  imo: string | null;
+  mmsi: string | null;
+  lat: number;
+  lng: number;
+  heading: number | null;
+  speed: number | null;
+  lengthOverall: number | null;
+  breadth: number | null;
+  vesselType: string | null;
+  flag: string | null;
+  distance: number | null;
+}
+
+export async function getNearbyVessels(seasearcherId: string): Promise<NearbyVessel[]> {
+  const data = await seasearcherNearbyVessels<{ results: Record<string, unknown>[]; totalMatches: number }>(
+    seasearcherId,
+  );
+
+  if (!data?.results?.length) return [];
+
+  return data.results.map((v) => ({
+    id: String(v.id ?? v.vesselId ?? ''),
+    name: String(v.name ?? v.vesselName ?? ''),
+    imo: v.imo ? String(v.imo) : null,
+    mmsi: v.mmsi ? String(v.mmsi) : null,
+    lat: Number((v.location as any)?.lat ?? v.latitude ?? 0),
+    lng: Number((v.location as any)?.lng ?? v.longitude ?? 0),
+    heading: v.heading != null ? Number(v.heading) : (v.trueHeading != null ? Number(v.trueHeading) : null),
+    speed: v.speed != null ? Number(v.speed) : (v.speedOverGround != null ? Number(v.speedOverGround) : null),
+    lengthOverall: v.lengthOverall != null ? Number(v.lengthOverall) : (v.length != null ? Number(v.length) : null),
+    breadth: v.breadth != null ? Number(v.breadth) : (v.width != null ? Number(v.width) : null),
+    vesselType: v.vesselType ? String(v.vesselType) : (v.type ? String(v.type) : null),
+    flag: v.flag ? String(v.flag) : null,
+    distance: v.distance != null ? Number(v.distance) : null,
+  }));
 }
 
 // ═══════════════════════════════════════════════════════════════════════

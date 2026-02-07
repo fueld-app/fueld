@@ -190,3 +190,56 @@ export async function seasearcherPlaceDetail<T = unknown>(placeId: string): Prom
 
   return (await res.json()) as T;
 }
+
+/**
+ * Fetch vessels near a port from Seasearcher.
+ * GET https://www.seasearcher.com/api/vessel/nearPort/query?query=...
+ */
+export async function seasearcherNearbyVessels<T = unknown>(
+  placeId: string,
+  distance = 50,
+  pageSize = 1000,
+): Promise<T> {
+  const token = await getToken();
+
+  const query = JSON.stringify({
+    PageNumber: 0,
+    PageSize: pageSize,
+    Filters: {
+      distance,
+      statuses: ['L'],
+      placeId,
+      classbIndicator: null,
+    },
+    SortFields: { distance: 1 },
+    ReturnFields: null,
+    HighlightFields: null,
+  });
+
+  const url = `${SEASEARCHER_BASE}/vessel/nearPort/query?query=${encodeURIComponent(query)}`;
+
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (res.status === 401) {
+    console.log('[Seasearcher] 401 on nearPort, forcing token refresh…');
+    tokenState = null;
+    const freshToken = await getToken();
+    const retry = await fetch(url, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${freshToken}` },
+    });
+    if (!retry.ok) {
+      throw new Error(`Seasearcher nearPort failed after retry: ${retry.status}`);
+    }
+    return (await retry.json()) as T;
+  }
+
+  if (!res.ok) {
+    throw new Error(`Seasearcher nearPort failed: ${res.status} ${res.statusText}`);
+  }
+
+  return (await res.json()) as T;
+}

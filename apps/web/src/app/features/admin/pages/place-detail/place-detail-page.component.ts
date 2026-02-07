@@ -2,6 +2,7 @@ import {
   Component,
   ChangeDetectionStrategy,
   signal,
+  computed,
   inject,
   OnInit,
   OnDestroy,
@@ -10,15 +11,18 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
+import { DecimalPipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
 import type { PlaceDto, ApiResponse } from '@fueld/types';
 import * as L from 'leaflet';
 
 // ═══════════════════════════════════════════════════════════════════════
-//  Place Detail Page — GeoJSON map, hierarchy tree, parent link
+//  Place Detail Page — GeoJSON map, hierarchy tree, parent link,
+//  nearby vessels via WebSocket
 // ═══════════════════════════════════════════════════════════════════════
 
 const API = 'http://localhost:3000';
+const WS_URL = 'ws://localhost:3000/ws/nearby-vessels';
 
 const PLACE_TYPE_LABELS: Record<string, string> = {
   POR: 'Port',
@@ -42,6 +46,22 @@ interface PlaceEnrichment {
   parentPlaceId: string | null;
   parentPlaceName: string | null;
   childrenData: { type: string; count: number }[];
+}
+
+interface NearbyVessel {
+  id: string;
+  name: string;
+  imo: string | null;
+  mmsi: string | null;
+  lat: number;
+  lng: number;
+  heading: number | null;
+  speed: number | null;
+  lengthOverall: number | null;
+  breadth: number | null;
+  vesselType: string | null;
+  flag: string | null;
+  distance: number | null;
 }
 
 // Compact ISO 3166-1 alpha-3 → alpha-2 map (maritime-relevant)
@@ -79,10 +99,24 @@ const CATEGORY_ICONS: Record<string, string> = {
   BERTH: '🔗',
 };
 
+function vesselIcon(heading: number | null): L.DivIcon {
+  const deg = heading ?? 0;
+  return L.divIcon({
+    className: '',
+    html: `<div style="transform:rotate(${deg}deg);width:14px;height:20px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.3))">
+      <svg viewBox="0 0 14 20" width="14" height="20" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="7,0 14,20 7,15 0,20" fill="#ef4444" stroke="#991b1b" stroke-width="0.8"/>
+      </svg>
+    </div>`,
+    iconSize: [14, 20],
+    iconAnchor: [7, 10],
+  });
+}
+
 @Component({
   selector: 'app-place-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink],
+  imports: [RouterLink, DecimalPipe],
   styles: [`
     :host ::ng-deep .leaflet-container { font-family: inherit; }
   `],
@@ -150,7 +184,22 @@ const CATEGORY_ICONS: Record<string, string> = {
             @if (place()!.lat && place()!.long) {
               <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
                 <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
-                  <h2 class="text-sm font-semibold text-gray-700">Location</h2>
+                  <h2 class="text-sm font-semibold text-gray-700">
+                    Location
+                    @if (vesselsLoading()) {
+                      <span class="ml-2 inline-flex items-center gap-1 text-xs font-normal text-gray-400">
+                        <svg class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                        Loading vessels…
+                      </span>
+                    } @else if (nearbyVessels().length) {
+                      <span class="ml-2 text-xs font-normal text-gray-400">
+                        {{ nearbyVessels().length }} vessels nearby
+                      </span>
+                    }
+                  </h2>
                   <span class="font-mono text-xs text-gray-400">{{ place()!.lat }}° N, {{ place()!.long }}° E</span>
                 </div>
                 <div class="h-[400px]" #mapContainer></div>
@@ -192,31 +241,26 @@ const CATEGORY_ICONS: Record<string, string> = {
               </div>
             </div>
 
-            <!-- Hierarchy -->
-            @if (enrichment()?.hierarchy?.length) {
+            <!-- Terminals -->
+            @if (terminals().length) {
               <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
                 <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
-                  <h2 class="text-sm font-semibold text-gray-700">Terminals &amp; Berths</h2>
-                  @if (enrichment()!.childrenData.length) {
-                    <div class="flex gap-2">
-                      @for (c of enrichment()!.childrenData; track c.type) {
-                        <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
-                          {{ c.count }} {{ c.type }}{{ c.count > 1 ? 's' : '' }}
-                        </span>
-                      }
-                    </div>
-                  }
+                  <h2 class="text-sm font-semibold text-gray-700">
+                    🏭 Terminals
+                  </h2>
+                  <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
+                    {{ terminals().length }}
+                  </span>
                 </div>
                 <div class="p-5">
                   <div class="space-y-1">
-                    @for (node of enrichment()!.hierarchy; track node.id) {
-                      <!-- Terminal / top-level child -->
+                    @for (node of terminals(); track node.id) {
                       <div>
                         <button
                           (click)="toggleNode(node.id)"
                           class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors"
                         >
-                          <span class="text-base">{{ categoryIcon(node.category) }}</span>
+                          <span class="text-base">🏭</span>
                           @if (node.children.length) {
                             <svg class="h-3.5 w-3.5 text-gray-400 transition-transform"
                                  [class.rotate-90]="expandedNodes().has(node.id)"
@@ -232,7 +276,59 @@ const CATEGORY_ICONS: Record<string, string> = {
                             <span class="text-[10px] text-gray-400">({{ node.children.length }})</span>
                           }
                         </button>
-                        <!-- Berths (collapsible) -->
+                        @if (node.children.length && expandedNodes().has(node.id)) {
+                          <div class="ml-10 border-l border-gray-100 pl-3 space-y-0.5 mb-1">
+                            @for (child of node.children; track child.id) {
+                              <div class="flex items-center gap-2 px-2 py-1.5 text-sm text-gray-600">
+                                <span class="text-xs">{{ categoryIcon(child.category) }}</span>
+                                <span>{{ child.name }}</span>
+                                <span class="ml-auto text-[10px] text-gray-400">{{ child.type }}</span>
+                              </div>
+                            }
+                          </div>
+                        }
+                      </div>
+                    }
+                  </div>
+                </div>
+              </div>
+            }
+
+            <!-- Anchorages -->
+            @if (anchorages().length) {
+              <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
+                <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
+                  <h2 class="text-sm font-semibold text-gray-700">
+                    ⚓ Anchorages
+                  </h2>
+                  <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
+                    {{ anchorages().length }}
+                  </span>
+                </div>
+                <div class="p-5">
+                  <div class="space-y-1">
+                    @for (node of anchorages(); track node.id) {
+                      <div>
+                        <button
+                          (click)="toggleNode(node.id)"
+                          class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors"
+                        >
+                          <span class="text-base">⚓</span>
+                          @if (node.children.length) {
+                            <svg class="h-3.5 w-3.5 text-gray-400 transition-transform"
+                                 [class.rotate-90]="expandedNodes().has(node.id)"
+                                 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                              <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
+                            </svg>
+                          } @else {
+                            <span class="w-3.5"></span>
+                          }
+                          <span>{{ node.name }}</span>
+                          <span class="ml-auto text-xs text-gray-400">{{ node.type }}</span>
+                          @if (node.children.length) {
+                            <span class="text-[10px] text-gray-400">({{ node.children.length }})</span>
+                          }
+                        </button>
                         @if (node.children.length && expandedNodes().has(node.id)) {
                           <div class="ml-10 border-l border-gray-100 pl-3 space-y-0.5 mb-1">
                             @for (child of node.children; track child.id) {
@@ -252,7 +348,7 @@ const CATEGORY_ICONS: Record<string, string> = {
             }
           </div>
 
-          <!-- Right column: identifiers -->
+          <!-- Right column: identifiers + summary -->
           <div class="space-y-6">
             <!-- Quick stats card -->
             <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -295,6 +391,36 @@ const CATEGORY_ICONS: Record<string, string> = {
                 </div>
               </div>
             }
+
+            <!-- Nearby vessels list -->
+            @if (nearbyVessels().length) {
+              <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
+                <div class="border-b border-gray-100 px-5 py-3">
+                  <h2 class="text-sm font-semibold text-gray-700">Nearby Vessels</h2>
+                </div>
+                <div class="divide-y divide-gray-50 max-h-[400px] overflow-y-auto">
+                  @for (v of nearbyVessels(); track v.id) {
+                    <div class="flex items-center justify-between px-5 py-2 text-sm">
+                      <div class="min-w-0">
+                        <p class="font-medium text-gray-900 truncate">{{ v.name }}</p>
+                        <p class="text-[10px] text-gray-400">
+                          @if (v.imo) { IMO {{ v.imo }} }
+                          @if (v.vesselType) { &middot; {{ v.vesselType }} }
+                        </p>
+                      </div>
+                      <div class="text-right text-[10px] text-gray-400 whitespace-nowrap ml-3">
+                        @if (v.distance != null) {
+                          <p>{{ v.distance | number:'1.1-1' }} nm</p>
+                        }
+                        @if (v.speed != null) {
+                          <p>{{ v.speed | number:'1.1-1' }} kn</p>
+                        }
+                      </div>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
           </div>
         </div>
       } @else {
@@ -319,8 +445,20 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
   readonly parentLocalId = signal<string | null>(null);
   readonly parentPlaceName = signal<string | null>(null);
   readonly expandedNodes = signal<Set<string>>(new Set());
+  readonly nearbyVessels = signal<NearbyVessel[]>([]);
+  readonly vesselsLoading = signal(false);
+
+  // Grouped hierarchy — terminals vs anchorages
+  readonly terminals = computed(() =>
+    this.enrichment()?.hierarchy?.filter((n) => n.category !== 'ANCHORAGE') ?? [],
+  );
+  readonly anchorages = computed(() =>
+    this.enrichment()?.hierarchy?.filter((n) => n.category === 'ANCHORAGE') ?? [],
+  );
 
   private map: L.Map | null = null;
+  private vesselLayer: L.LayerGroup | null = null;
+  private ws: WebSocket | null = null;
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
@@ -333,6 +471,7 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.map?.remove();
+    this.ws?.close();
   }
 
   async loadPlace(id: string): Promise<void> {
@@ -344,14 +483,14 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
       if (res.success && res.data) {
         this.place.set(res.data);
 
-        // Use parentPlaceName from our local record as initial value
         if (res.data.parentPlaceName) {
           this.parentPlaceName.set(res.data.parentPlaceName);
         }
 
-        // Load enrichment from Seasearcher if we have a Seasearcher ID
         if (res.data.lliPlaceId) {
           this.loadEnrichment(res.data.lliPlaceId);
+          // Fire-and-forget: nearby vessels via WebSocket
+          this.connectVesselWebSocket(res.data.lliPlaceId);
         }
       }
     } catch (err) {
@@ -369,12 +508,10 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
       if (res.success && res.data) {
         this.enrichment.set(res.data);
 
-        // Overwrite parentPlaceName from enrichment (more authoritative)
         if (res.data.parentPlaceName) {
           this.parentPlaceName.set(res.data.parentPlaceName);
         }
 
-        // If there's a parent place, try to find its local ID for deep linking
         if (res.data.parentPlaceId) {
           this.resolveParentLocalId(res.data.parentPlaceId);
         }
@@ -382,7 +519,6 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
     } catch (err) {
       console.error('Failed to load enrichment:', err);
     } finally {
-      // Init map regardless (with or without GeoJSON)
       setTimeout(() => this.initMap(), 0);
     }
   }
@@ -396,15 +532,57 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
         this.parentLocalId.set(res.data.id);
       }
     } catch {
-      // Parent link just won't be clickable — that's fine
+      // Parent link just won't be clickable
     }
   }
+
+  // ─── WebSocket: nearby vessels ───────────────────────────────────────
+
+  private connectVesselWebSocket(placeId: string): void {
+    this.vesselsLoading.set(true);
+    try {
+      this.ws = new WebSocket(WS_URL);
+
+      this.ws.onopen = () => {
+        this.ws!.send(JSON.stringify({ placeId }));
+      };
+
+      this.ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'nearby-vessels' && Array.isArray(msg.data)) {
+            this.nearbyVessels.set(msg.data);
+            this.vesselsLoading.set(false);
+            this.addVesselMarkers(msg.data);
+          } else if (msg.type === 'error') {
+            console.error('[WS] Error:', msg.message);
+            this.vesselsLoading.set(false);
+          }
+        } catch (err) {
+          console.error('[WS] Parse error:', err);
+        }
+      };
+
+      this.ws.onerror = () => {
+        this.vesselsLoading.set(false);
+      };
+
+      this.ws.onclose = () => {
+        this.vesselsLoading.set(false);
+      };
+    } catch (err) {
+      console.error('WebSocket connection failed:', err);
+      this.vesselsLoading.set(false);
+    }
+  }
+
+  // ─── Map ─────────────────────────────────────────────────────────────
 
   private initMap(): void {
     const p = this.place();
     const el = this.mapContainer()?.nativeElement;
     if (!p?.lat || !p?.long || !el) return;
-    if (this.map) return; // Already initialised
+    if (this.map) return;
 
     // Fix Leaflet default icon paths (webpack/Angular issue)
     delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -420,14 +598,17 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
       scrollWheelZoom: true,
     });
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
-      maxZoom: 19,
+    // CartoDB Voyager — always English labels
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+      maxZoom: 20,
+      subdomains: 'abcd',
     }).addTo(this.map);
+
+    this.vesselLayer = L.layerGroup().addTo(this.map);
 
     const enrichment = this.enrichment();
     if (enrichment?.geoJsonObject) {
-      // Render GeoJSON polygon
       const geoLayer = L.geoJSON(enrichment.geoJsonObject as any, {
         style: {
           color: '#3b82f6',
@@ -436,14 +617,52 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
           fillOpacity: 0.15,
         },
       }).addTo(this.map);
-
-      // Fit map to polygon bounds
       this.map.fitBounds(geoLayer.getBounds(), { padding: [30, 30] });
     } else {
-      // Fallback: just place a marker
       L.marker([p.lat, p.long]).addTo(this.map);
     }
+
+    // If vessels already arrived before the map initialised
+    if (this.nearbyVessels().length) {
+      this.addVesselMarkers(this.nearbyVessels());
+    }
   }
+
+  private addVesselMarkers(vessels: NearbyVessel[]): void {
+    if (!this.map || !this.vesselLayer) return;
+
+    this.vesselLayer.clearLayers();
+
+    for (const v of vessels) {
+      if (!v.lat || !v.lng) continue;
+
+      const marker = L.marker([v.lat, v.lng], {
+        icon: vesselIcon(v.heading),
+      });
+
+      const popupLines = [
+        `<strong>${v.name}</strong>`,
+        v.imo ? `IMO: ${v.imo}` : null,
+        v.vesselType ? `Type: ${v.vesselType}` : null,
+        v.flag ? `Flag: ${v.flag}` : null,
+        v.lengthOverall || v.breadth
+          ? `Size: ${v.lengthOverall ?? '?'}m × ${v.breadth ?? '?'}m`
+          : null,
+        v.speed != null ? `Speed: ${v.speed.toFixed(1)} kn` : null,
+        v.heading != null ? `Heading: ${v.heading}°` : null,
+        v.distance != null ? `Distance: ${v.distance.toFixed(1)} nm` : null,
+      ].filter(Boolean);
+
+      marker.bindPopup(
+        `<div class="text-xs leading-relaxed">${popupLines.join('<br>')}</div>`,
+        { closeButton: false, className: 'vessel-popup' },
+      );
+
+      marker.addTo(this.vesselLayer);
+    }
+  }
+
+  // ─── Navigation & helpers ────────────────────────────────────────────
 
   goBack(): void {
     this.router.navigate(['/places']);
