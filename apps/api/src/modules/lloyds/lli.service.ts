@@ -6,7 +6,7 @@
 import { eq, ilike, or, and, sql } from 'drizzle-orm';
 import { db } from '../../db';
 import { vessels, places, counterparties } from '../../db/schema';
-import { lliGet, seasearcherPlaceSearch } from './lli.client';
+import { lliGet, seasearcherPlaceSearch, seasearcherPlaceDetail } from './lli.client';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Response types for LLI API
@@ -130,6 +130,7 @@ interface SeasearcherPlace {
   location: { lat: number; lng: number };
   parentPlaceId: string | null;
   parentPlaceName: string | null;
+  editDate: string | null;
 }
 
 // ── Company Details ──────────────────────────────────────────────────
@@ -404,39 +405,34 @@ export async function importPlaceFromLli(lliPlaceId: string): Promise<{ id: stri
     return existing[0];
   }
 
-  // Fetch advanced details from LLI
-  const lli = await lliGet<LliResponse<LliPlaceAdvancedCharsData>>(
-    'placeadvancedchars_v3',
-    { placeId: lliPlaceId },
+  // Fetch details from Seasearcher
+  const pd = await seasearcherPlaceDetail<SeasearcherPlace>(
+    lliPlaceId,
   );
 
-  if (!lli.IsSuccess || !lli.Data?.items?.length) {
-    throw new Error(`LLI place ${lliPlaceId} not found`);
+  if (!pd || !pd.id) {
+    throw new Error(`Seasearcher place ${lliPlaceId} not found`);
   }
 
-  const item = lli.Data.items[0];
-  const pd = item.placeDetails;
-  const ppd = item.parentPlaceDetails;
-
-  const mapped = PLACE_TYPE_MAP[pd.type] ?? null;
+  const mapped = PLACE_TYPE_MAP[pd.type] ?? (pd.typeCode as any) ?? null;
 
   const [inserted] = await db
     .insert(places)
     .values({
-      lliPlaceId: pd.placeId,
+      lliPlaceId: pd.id,
       name: pd.name,
-      country: pd.countryIso ?? pd.country,
-      countryIso: pd.countryIso,
-      area: pd.area,
+      country: pd.country?.code ?? pd.country?.name ?? '',
+      countryIso: pd.country?.code ?? null,
+      area: pd.area || null,
       placeType: mapped,
-      lat: pd.latitude,
-      long: pd.longitude,
-      unlocode: pd.unlocode,
-      admiraltyChart: pd.admiraltyChart,
-      principalFacilities: pd.principalFacitilies,
-      portAuthorityName: pd.portAuthorityName ?? null,
-      parentPlaceName: ppd?.parentPlaceName ?? null,
-      lliLastUpdated: pd.lastUpdated ? new Date(pd.lastUpdated) : null,
+      lat: pd.location?.lat ?? null,
+      long: pd.location?.lng ?? null,
+      unlocode: pd.unctadLocode || null,
+      admiraltyChart: pd.admiraltyChart || null,
+      principalFacilities: null,
+      portAuthorityName: null,
+      parentPlaceName: pd.parentPlaceName ?? null,
+      lliLastUpdated: pd.editDate ? new Date(pd.editDate) : null,
     })
     .returning({ id: places.id, name: places.name });
 

@@ -156,3 +156,37 @@ export async function seasearcherPlaceSearch<T = unknown>(
 
   return (await res.json()) as T;
 }
+
+/**
+ * Fetch full place details from Seasearcher by place ID.
+ * GET https://www.seasearcher.com/api/place/{id}
+ */
+export async function seasearcherPlaceDetail<T = unknown>(placeId: string): Promise<T> {
+  const token = await getToken();
+  const url = `${SEASEARCHER_BASE}/place/${placeId}`;
+
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (res.status === 401) {
+    console.log('[Seasearcher] 401 on detail, forcing token refresh…');
+    tokenState = null;
+    const freshToken = await getToken();
+    const retry = await fetch(url, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${freshToken}` },
+    });
+    if (!retry.ok) {
+      throw new Error(`Seasearcher place detail failed after retry: ${retry.status}`);
+    }
+    return (await retry.json()) as T;
+  }
+
+  if (!res.ok) {
+    throw new Error(`Seasearcher place detail failed: ${res.status} ${res.statusText}`);
+  }
+
+  return (await res.json()) as T;
+}
