@@ -3,9 +3,9 @@
 //  Search local DB first; fall back to LLI API if not found.
 // ═══════════════════════════════════════════════════════════════════════
 
-import { eq, ilike, or } from 'drizzle-orm';
+import { eq, ilike, or, and, sql } from 'drizzle-orm';
 import { db } from '../../db';
-import { vessels, ports, counterparties } from '../../db/schema';
+import { vessels, places, counterparties } from '../../db/schema';
 import { lliGet } from './lli.client';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -66,6 +66,49 @@ interface LliPlaceBasic {
   principalFacitilies: string[];
   portAuthorityName: string;
   lastUpdated: string;
+}
+
+// ── Place Advanced Characteristics (placeadvancedchars_v3) ────────────
+
+interface LliPlaceAdvancedCharsData {
+  currentPage: number;
+  totalPages: number;
+  totalRecords: number;
+  items: LliPlaceAdvancedItem[];
+}
+
+interface LliPlaceAdvancedItem {
+  placeDetails: LliPlaceDetails;
+  parentPlaceDetails: LliParentPlaceDetails | null;
+  terminals: unknown[];
+  berths: unknown[];
+  commodity: unknown[];
+  mechanicalHandling: unknown[];
+  storage: unknown[];
+  portCompanies: unknown[];
+}
+
+interface LliPlaceDetails {
+  placeId: string;
+  name: string;
+  country: string;
+  countryIso: string;
+  area: string;
+  type: string;
+  latitude: number;
+  longitude: number;
+  admiraltyChart: string;
+  unlocode: string;
+  principalFacitilies: string[];
+  portAuthorityName?: string;
+  lastUpdated: string;
+}
+
+interface LliParentPlaceDetails {
+  parentPlaceId: string;
+  parentPlaceName: string;
+  parentPlaceType: string;
+  parentPlaceCountry: string;
 }
 
 // ── Company Details ──────────────────────────────────────────────────
@@ -209,41 +252,48 @@ export async function searchVessels(query: {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-//  PORT SEARCH
+//  PLACE SEARCH  (ports, anchorages, sub-ports, terminals, fields)
 // ═══════════════════════════════════════════════════════════════════════
 
-export interface PortSearchResult {
+export interface PlaceSearchResult {
   source: 'local' | 'lloyds';
   localId?: string;
   lliPlaceId?: string;
   name: string;
   country: string;
   countryIso?: string;
+  area?: string;
   type?: string;
   latitude: number | null;
   longitude: number | null;
   unlocode?: string;
+  admiraltyChart?: string;
+  principalFacilities?: string[];
+  portAuthorityName?: string;
+  parentPlaceId?: string;
+  parentPlaceName?: string;
 }
 
 /**
- * Search ports by name or country.
+ * Search places by name, country, or place type.
  * Checks local DB first, falls back to LLI.
  */
-export async function searchPorts(query: {
+export async function searchPlaces(query: {
   name?: string;
   country?: string;
-}): Promise<PortSearchResult[]> {
+  placeType?: string;
+}): Promise<PlaceSearchResult[]> {
   // ── 1. Local DB search ─────────────────────────────────────────────
   const conditions = [];
-  if (query.name) conditions.push(ilike(ports.name, `%${query.name}%`));
-  if (query.country) conditions.push(ilike(ports.country, `%${query.country}%`));
+  if (query.name) conditions.push(ilike(places.name, `%${query.name}%`));
+  if (query.country) conditions.push(ilike(places.country, `%${query.country}%`));
 
   if (conditions.length > 0) {
     const localResults = await db
       .select()
-      .from(ports)
+      .from(places)
       .where(conditions.length === 1 ? conditions[0] : or(...conditions))
-      .limit(20);
+      .limit(50);
 
     if (localResults.length > 0) {
       return localResults.map((p) => ({
@@ -251,19 +301,25 @@ export async function searchPorts(query: {
         localId: p.id,
         name: p.name,
         country: p.country,
+        countryIso: p.countryIso ?? undefined,
+        area: p.area ?? undefined,
+        type: p.placeType ?? undefined,
         latitude: p.lat,
         longitude: p.long,
+        unlocode: p.unlocode ?? undefined,
+        admiraltyChart: p.admiraltyChart ?? undefined,
+        principalFacilities: (p.principalFacilities as string[]) ?? undefined,
+        portAuthorityName: p.portAuthorityName ?? undefined,
+        parentPlaceName: p.parentPlaceName ?? undefined,
       }));
     }
   }
 
   // ── 2. LLI fallback ───────────────────────────────────────────────
-  // LLI requires country code (e.g. GBR) when searching by name
   const params: Record<string, string | undefined> = {};
   if (query.name) params.placeName = query.name;
   if (query.country) params.country = query.country;
-  // Default to searching ports only
-  params.placeType = 'POR';
+  if (query.placeType) params.placeType = query.placeType;
 
   const lli = await lliGet<LliResponse<LliPlaceBasicCharsData>>(
     'placebasicchars_v2',
@@ -280,11 +336,121 @@ export async function searchPorts(query: {
     name: p.name,
     country: p.country,
     countryIso: p.countryIso,
+    area: p.area,
     type: p.type,
     latitude: p.latitude,
     longitude: p.longitude,
     unlocode: p.unlocode,
+    admiraltyChart: p.admiraltyChart,
+    principalFacilities: p.principalFacitilies,
+    portAuthorityName: p.portAuthorityName,
   }));
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  IMPORT PLACE — upsert an LLI place into local DB
+// ═══════════════════════════════════════════════════════════════════════
+
+const PLACE_TYPE_MAP: Record<string, 'POR' | 'PSP' | 'ANC' | 'TER' | 'FIL'> = {
+  'Port': 'POR',
+  'Sub Port': 'PSP',
+  'Anchorage': 'ANC',
+  'Terminal': 'TER',
+  'Hydrocarbon Field': 'FIL',
+};
+
+export async function importPlaceFromLli(lliPlaceId: string): Promise<{ id: string; name: string }> {
+  // Check if already imported
+  const existing = await db
+    .select({ id: places.id, name: places.name })
+    .from(places)
+    .where(eq(places.lliPlaceId, lliPlaceId))
+    .limit(1);
+
+  if (existing.length > 0) {
+    return existing[0];
+  }
+
+  // Fetch advanced details from LLI
+  const lli = await lliGet<LliResponse<LliPlaceAdvancedCharsData>>(
+    'placeadvancedchars_v3',
+    { placeId: lliPlaceId },
+  );
+
+  if (!lli.IsSuccess || !lli.Data?.items?.length) {
+    throw new Error(`LLI place ${lliPlaceId} not found`);
+  }
+
+  const item = lli.Data.items[0];
+  const pd = item.placeDetails;
+  const ppd = item.parentPlaceDetails;
+
+  const mapped = PLACE_TYPE_MAP[pd.type] ?? null;
+
+  const [inserted] = await db
+    .insert(places)
+    .values({
+      lliPlaceId: pd.placeId,
+      name: pd.name,
+      country: pd.countryIso ?? pd.country,
+      countryIso: pd.countryIso,
+      area: pd.area,
+      placeType: mapped,
+      lat: pd.latitude,
+      long: pd.longitude,
+      unlocode: pd.unlocode,
+      admiraltyChart: pd.admiraltyChart,
+      principalFacilities: pd.principalFacitilies,
+      portAuthorityName: pd.portAuthorityName ?? null,
+      parentPlaceName: ppd?.parentPlaceName ?? null,
+      lliLastUpdated: pd.lastUpdated ? new Date(pd.lastUpdated) : null,
+    })
+    .returning({ id: places.id, name: places.name });
+
+  return inserted;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  LIST ALL LOCAL PLACES
+// ═══════════════════════════════════════════════════════════════════════
+
+export async function listPlaces(query?: {
+  placeType?: string;
+  country?: string;
+  search?: string;
+  limit?: number;
+  page?: number;
+}) {
+  const conditions = [];
+  if (query?.search) conditions.push(ilike(places.name, `%${query.search}%`));
+  if (query?.country) conditions.push(ilike(places.country, `%${query.country}%`));
+  if (query?.placeType) conditions.push(eq(places.placeType, query.placeType as any));
+
+  const where = conditions.length
+    ? conditions.length === 1
+      ? conditions[0]
+      : and(...conditions)
+    : undefined;
+
+  const limit = query?.limit ?? 25;
+  const page = query?.page ?? 1;
+  const offset = (page - 1) * limit;
+
+  const [rows, countResult] = await Promise.all([
+    db
+      .select()
+      .from(places)
+      .where(where)
+      .limit(limit)
+      .offset(offset)
+      .orderBy(places.name),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(places)
+      .where(where),
+  ]);
+
+  return { places: rows, total: countResult[0]?.count ?? 0 };
 }
 
 // ═══════════════════════════════════════════════════════════════════════

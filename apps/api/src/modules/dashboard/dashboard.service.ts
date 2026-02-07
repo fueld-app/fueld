@@ -7,7 +7,7 @@ import {
   users,
   counterparties,
   vessels,
-  ports,
+  places,
 } from '../../db/schema';
 
 // ═══════════════════════════════════════════════════════════════════════

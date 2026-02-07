@@ -54,7 +54,7 @@ const NAVIGATION: NavItem[] = [
     children: [
       { label: 'Users', route: '/admin/users' },
       { label: 'Vessels', route: '/admin/vessels' },
-      { label: 'Ports', route: '/admin/ports' },
+      { label: 'Places', route: '/admin/places' },
       { label: 'Settings', route: '/admin/settings' },
     ],
   },

@@ -2,7 +2,7 @@ import pdfmake from 'pdfmake';
 import type { TDocumentDefinitions, Content, TableCell } from 'pdfmake/interfaces';
 import { eq } from 'drizzle-orm';
 import { db } from '../../db';
-import { orders, orderItems, counterparties, vessels, ports, invoices, users } from '../../db/schema';
+import { orders, orderItems, counterparties, vessels, places, invoices, users } from '../../db/schema';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Document Service — Server-side PDF generation (pdfmake v0.3)
@@ -46,7 +46,7 @@ async function fetchInvoiceData(invoiceId: string) {
         with: {
           client: true,
           vessel: true,
-          port: true,
+          place: true,
           salesRep: true,
           items: {
             with: {
@@ -68,7 +68,7 @@ async function fetchOrderForInvoice(orderId: string) {
     with: {
       client: true,
       vessel: true,
-      port: true,
+      place: true,
       salesRep: true,
       items: {
         with: {
@@ -339,7 +339,7 @@ export async function generateInvoicePdfBuffer(invoiceId: string): Promise<Buffe
     clientCountry: order.client.country,
     vesselName: order.vessel.name,
     vesselImo: order.vessel.imo,
-    portName: order.port.name,
+    portName: order.place.name,
     salesRepName: order.salesRep?.name ?? null,
     items: order.items.map((item) => ({
       productType: item.productType,
@@ -381,7 +381,7 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
     clientCountry: order.client.country,
     vesselName: order.vessel.name,
     vesselImo: order.vessel.imo,
-    portName: order.port.name,
+    portName: order.place.name,
     salesRepName: order.salesRep?.name ?? null,
     items: order.items.map((item) => ({
       productType: item.productType,

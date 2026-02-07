@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia';
 import { authGuard } from '../auth/auth.guard';
-import { searchVessels, searchPorts, searchCompanies } from './lli.service';
+import { searchVessels, searchPlaces, searchCompanies, importPlaceFromLli, listPlaces } from './lli.service';
 import type { ApiResponse } from '@fueld/types';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -8,7 +8,9 @@ import type { ApiResponse } from '@fueld/types';
 //  All routes are protected via authGuard.
 //
 //  GET /lloyds/vessels?imo=...&name=...&mmsi=...
-//  GET /lloyds/ports?name=...&country=...
+//  GET /lloyds/places?name=...&country=...&placeType=...
+//  GET /lloyds/places/local?search=...&country=...&placeType=...&page=...&limit=...
+//  POST /lloyds/places/import   { lliPlaceId: number }
 //  GET /lloyds/companies?name=...&country=...&imo=...
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -42,13 +44,14 @@ export const lloydsController = new Elysia({ prefix: '/lloyds' })
     },
   )
 
-  // ─── Port Search ──────────────────────────────────────────────────
+  // ─── Place Search (LLI) ───────────────────────────────────────────
   .get(
-    '/ports',
+    '/places',
     async ({ query }) => {
-      const results = await searchPorts({
+      const results = await searchPlaces({
         name: query.name,
         country: query.country,
+        placeType: query.placeType,
       });
       return { success: true, data: results } satisfies ApiResponse<typeof results>;
     },
@@ -56,13 +59,65 @@ export const lloydsController = new Elysia({ prefix: '/lloyds' })
       query: t.Object({
         name: t.Optional(t.String()),
         country: t.Optional(t.String()),
+        placeType: t.Optional(t.String()),
       }),
       detail: {
         tags: ['Lloyd\'s'],
-        summary: 'Search ports (local DB → LLI fallback)',
+        summary: 'Search places (local DB → LLI fallback)',
         description:
-          'Search by port name or country code. ' +
+          'Search by place name, country code, or place type (POR, PSP, ANC, TER, FIL). ' +
           'Returns local DB matches first; falls back to Lloyd\'s List Intelligence if none found.',
+      },
+    },
+  )
+
+  // ─── Place List (local DB) ────────────────────────────────────────
+  .get(
+    '/places/local',
+    async ({ query }) => {
+      const results = await listPlaces({
+        search: query.search,
+        country: query.country,
+        placeType: query.placeType,
+        page: query.page ? parseInt(query.page) : undefined,
+        limit: query.limit ? parseInt(query.limit) : undefined,
+      });
+      return { success: true, data: results } satisfies ApiResponse<typeof results>;
+    },
+    {
+      query: t.Object({
+        search: t.Optional(t.String()),
+        country: t.Optional(t.String()),
+        placeType: t.Optional(t.String()),
+        page: t.Optional(t.String()),
+        limit: t.Optional(t.String()),
+      }),
+      detail: {
+        tags: ['Lloyd\'s'],
+        summary: 'List places from local database',
+        description:
+          'Returns paginated list of places stored locally. ' +
+          'Supports filtering by search term, country code, and place type.',
+      },
+    },
+  )
+
+  // ─── Import Place from LLI ────────────────────────────────────────
+  .post(
+    '/places/import',
+    async ({ body }) => {
+      const place = await importPlaceFromLli(body.lliPlaceId);
+      return { success: true, data: place } satisfies ApiResponse<typeof place>;
+    },
+    {
+      body: t.Object({
+        lliPlaceId: t.Number(),
+      }),
+      detail: {
+        tags: ['Lloyd\'s'],
+        summary: 'Import a place from LLI into local database',
+        description:
+          'Fetches full place details from LLI /placeadvancedchars_v3 and upserts into local DB.',
       },
     },
   )

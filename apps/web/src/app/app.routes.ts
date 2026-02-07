@@ -118,12 +118,12 @@ export const routes: Routes = [
             data: { title: 'Vessels' },
           },
           {
-            path: 'ports',
+            path: 'places',
             loadComponent: () =>
-              import('./pages/placeholder/placeholder-page.component').then(
-                (m) => m.PlaceholderPageComponent,
+              import('./features/admin/pages/places/places-page.component').then(
+                (m) => m.PlacesPageComponent,
               ),
-            data: { title: 'Ports' },
+            data: { title: 'Places' },
           },
           {
             path: 'settings',

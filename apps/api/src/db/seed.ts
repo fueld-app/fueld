@@ -89,17 +89,18 @@ async function seed() {
   console.log(`  ✓ Users: ${[admin, trader1, trader2, operator].map((u) => u.name).join(', ')}`);
   console.log(`    → All passwords: password123`);
 
-  // ─── 3. Ports ──────────────────────────────────────────────────────
-  const portsData = [
-    { name: 'Singapore', country: 'SG', lat: 1.2644, long: 103.8222 },
-    { name: 'Fujairah', country: 'AE', lat: 25.1288, long: 56.3264 },
-    { name: 'Rotterdam', country: 'NL', lat: 51.9496, long: 4.1453 },
-    { name: 'Houston', country: 'US', lat: 29.7604, long: -95.3698 },
-    { name: 'Hong Kong', country: 'HK', lat: 22.3193, long: 114.1694 },
-    { name: 'Piraeus', country: 'GR', lat: 37.9475, long: 23.6372 },
+  // ─── 3. Places ─────────────────────────────────────────────────────
+  const placesData = [
+    { name: 'Singapore',  country: 'SGP', countryIso: 'SGP', area: 'Far East',         placeType: 'POR' as const, lat: 1.2644,   long: 103.8222, unlocode: 'SG SIN', lliPlaceId: '15007' },
+    { name: 'Fujairah',   country: 'ARE', countryIso: 'ARE', area: 'Arabian Gulf',     placeType: 'POR' as const, lat: 25.1288,  long: 56.3264,  unlocode: 'AE FJR', lliPlaceId: '11375' },
+    { name: 'Rotterdam',  country: 'NLD', countryIso: 'NLD', area: 'N Cont Europe',    placeType: 'POR' as const, lat: 51.9496,  long: 4.1453,   unlocode: 'NL RTM', lliPlaceId: '1830'  },
+    { name: 'Houston',    country: 'USA', countryIso: 'USA', area: 'US Gulf',          placeType: 'POR' as const, lat: 29.7604,  long: -95.3698, unlocode: 'US HOU', lliPlaceId: '18316' },
+    { name: 'Hong Kong',  country: 'HKG', countryIso: 'HKG', area: 'Far East',         placeType: 'POR' as const, lat: 22.3193,  long: 114.1694, unlocode: 'HK HKG', lliPlaceId: '11654' },
+    { name: 'Piraeus',    country: 'GRC', countryIso: 'GRC', area: 'E Mediterranean',  placeType: 'POR' as const, lat: 37.9475,  long: 23.6372,  unlocode: 'GR PIR', lliPlaceId: '14144' },
   ];
-  const ports = await db.insert(schema.ports).values(portsData).returning();
-  console.log(`  ✓ Ports: ${ports.map((p) => p.name).join(', ')}`);
+  const places = await db.insert(schema.places).values(placesData).returning();
+  console.log(`  ✓ Places: ${places.map((p) => p.name).join(', ')}`);
+
 
   // ─── 4. Vessels ────────────────────────────────────────────────────
   const vesselsData = [
@@ -144,7 +145,7 @@ async function seed() {
       tenantId: tenant.id,
       clientId: clients[0].id,
       vesselId: vessels[0].id,
-      portId: ports[0].id,
+      placeId: places[0].id,
       salesRepId: admin.id,
       status: 'INQUIRY' as const,
       eta: daysFromNow(10),
@@ -153,7 +154,7 @@ async function seed() {
       tenantId: tenant.id,
       clientId: clients[1].id,
       vesselId: vessels[1].id,
-      portId: ports[1].id,
+      placeId: places[1].id,
       salesRepId: trader1.id,
       status: 'OFFER' as const,
       eta: daysFromNow(7),
@@ -162,7 +163,7 @@ async function seed() {
       tenantId: tenant.id,
       clientId: clients[2].id,
       vesselId: vessels[2].id,
-      portId: ports[2].id,
+      placeId: places[2].id,
       salesRepId: trader2.id,
       status: 'CONFIRMED' as const,
       eta: daysFromNow(3),
@@ -171,7 +172,7 @@ async function seed() {
       tenantId: tenant.id,
       clientId: clients[0].id,
       vesselId: vessels[3].id,
-      portId: ports[3].id,
+      placeId: places[3].id,
       salesRepId: admin.id,
       status: 'DELIVERED' as const,
       eta: daysAgo(2),
@@ -180,7 +181,7 @@ async function seed() {
       tenantId: tenant.id,
       clientId: clients[3].id,
       vesselId: vessels[4].id,
-      portId: ports[4].id,
+      placeId: places[4].id,
       salesRepId: trader1.id,
       status: 'INVOICED' as const,
       eta: daysAgo(10),
@@ -189,7 +190,7 @@ async function seed() {
       tenantId: tenant.id,
       clientId: clients[1].id,
       vesselId: vessels[5].id,
-      portId: ports[5].id,
+      placeId: places[5].id,
       salesRepId: trader2.id,
       status: 'PAID' as const,
       eta: daysAgo(30),
@@ -200,7 +201,7 @@ async function seed() {
       tenantId: tenant.id,
       clientId: clients[2].id,
       vesselId: vessels[0].id,
-      portId: ports[0].id,
+      placeId: places[0].id,
       salesRepId: trader1.id,
       status: 'CANCELLED' as const,
       lossReason: 'Price too high — client went with competitor',

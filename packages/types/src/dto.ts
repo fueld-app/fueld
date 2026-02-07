@@ -76,23 +76,49 @@ export interface CreateCounterpartyDto {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-//  PORT
+//  PLACE  (ports, anchorages, sub-ports, terminals, fields)
 // ═══════════════════════════════════════════════════════════════════════
 
-export interface PortDto {
+export type PlaceType = 'POR' | 'PSP' | 'ANC' | 'TER' | 'FIL';
+
+export interface PlaceDto {
   id: string;
+  lliPlaceId: string | null;
+  unlocode: string | null;
   name: string;
   country: string;
+  countryIso: string | null;
+  area: string | null;
+  placeType: PlaceType | null;
   lat: number | null;
   long: number | null;
+  admiraltyChart: string | null;
+  principalFacilities: string[] | null;
+  portAuthorityName: string | null;
+  parentPlaceId: string | null;
+  parentPlaceName: string | null;
 }
 
-export interface CreatePortDto {
+export interface CreatePlaceDto {
   name: string;
   country: string;
+  countryIso?: string;
+  area?: string;
+  placeType?: PlaceType;
   lat?: number;
   long?: number;
+  unlocode?: string;
+  admiraltyChart?: string;
+  principalFacilities?: string[];
+  portAuthorityName?: string;
+  parentPlaceId?: string;
+  parentPlaceName?: string;
 }
+
+/** @deprecated Use PlaceDto instead */
+export type PortDto = PlaceDto;
+/** @deprecated Use CreatePlaceDto instead */
+export type CreatePortDto = CreatePlaceDto;
 
 // ═══════════════════════════════════════════════════════════════════════
 //  VESSEL

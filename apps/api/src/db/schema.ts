@@ -127,15 +127,47 @@ export const counterparties = pgTable('counterparties', {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-//  4. PORTS
+//  4. PLACES  (ports, anchorages, sub-ports, terminals, fields)
+//     Modelled after LLI /placeadvancedchars_v3  →  placeDetails
 // ═══════════════════════════════════════════════════════════════════════
 
-export const ports = pgTable('ports', {
+export const placeTypeEnum = pgEnum('place_type', [
+  'POR',   // Port
+  'PSP',   // Sub Port
+  'ANC',   // Anchorage
+  'TER',   // Terminal
+  'FIL',   // Hydrocarbon Field
+]);
+
+export const places = pgTable('places', {
   id: uuid('id').defaultRandom().primaryKey(),
+
+  // ── LLI identifiers ────────────────────────────────────────────────
+  lliPlaceId: text('lli_place_id').unique(),        // LLI unique place ID
+  unlocode: text('unlocode'),                       // UN/LOCODE e.g. "NL RTM"
+
+  // ── Core info ──────────────────────────────────────────────────────
   name: text('name').notNull(),
-  country: text('country').notNull(),
+  country: text('country').notNull(),                // ISO-3 or short code
+  countryIso: text('country_iso'),                   // ISO-3 code from LLI
+  area: text('area'),                                // e.g. "N Cont Europe"
+  placeType: placeTypeEnum('place_type'),            // POR / ANC / PSP / TER / FIL
+
+  // ── Geo ────────────────────────────────────────────────────────────
   lat: doublePrecision('lat'),
   long: doublePrecision('long'),
+
+  // ── Port-specific extras ───────────────────────────────────────────
+  admiraltyChart: text('admiralty_chart'),            // e.g. "122/132/133"
+  principalFacilities: jsonb('principal_facilities'), // string[] from LLI
+  portAuthorityName: text('port_authority_name'),
+
+  // ── Hierarchy (sub-port → parent port) ─────────────────────────────
+  parentPlaceId: uuid('parent_place_id'),            // self-ref FK
+  parentPlaceName: text('parent_place_name'),
+
+  // ── Sync metadata ─────────────────────────────────────────────────
+  lliLastUpdated: timestamp('lli_last_updated', { withTimezone: true }),
 
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -165,7 +197,7 @@ export const orders = pgTable('orders', {
   tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
   clientId: uuid('client_id').notNull().references(() => counterparties.id),
   vesselId: uuid('vessel_id').notNull().references(() => vessels.id),
-  portId: uuid('port_id').notNull().references(() => ports.id),
+  placeId: uuid('place_id').notNull().references(() => places.id),
   salesRepId: uuid('sales_rep_id').references(() => users.id),
   status: orderStatusEnum('status').notNull().default('INQUIRY'),
 
@@ -279,7 +311,13 @@ export const counterpartiesRelations = relations(counterparties, ({ one, many })
   suppliedItems: many(orderItems),
 }));
 
-export const portsRelations = relations(ports, ({ many }) => ({
+export const placesRelations = relations(places, ({ one, many }) => ({
+  parentPlace: one(places, {
+    fields: [places.parentPlaceId],
+    references: [places.id],
+    relationName: 'parentChild',
+  }),
+  childPlaces: many(places, { relationName: 'parentChild' }),
   orders: many(orders),
 }));
 
@@ -291,7 +329,7 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
   tenant: one(tenants, { fields: [orders.tenantId], references: [tenants.id] }),
   client: one(counterparties, { fields: [orders.clientId], references: [counterparties.id] }),
   vessel: one(vessels, { fields: [orders.vesselId], references: [vessels.id] }),
-  port: one(ports, { fields: [orders.portId], references: [ports.id] }),
+  place: one(places, { fields: [orders.placeId], references: [places.id] }),
   salesRep: one(users, { fields: [orders.salesRepId], references: [users.id] }),
   items: many(orderItems),
   invoices: many(invoices),
@@ -329,8 +367,8 @@ export type NewTenant = typeof tenants.$inferInsert;
 export type Counterparty = typeof counterparties.$inferSelect;
 export type NewCounterparty = typeof counterparties.$inferInsert;
 
-export type Port = typeof ports.$inferSelect;
-export type NewPort = typeof ports.$inferInsert;
+export type Place = typeof places.$inferSelect;
+export type NewPlace = typeof places.$inferInsert;
 
 export type Vessel = typeof vessels.$inferSelect;
 export type NewVessel = typeof vessels.$inferInsert;
