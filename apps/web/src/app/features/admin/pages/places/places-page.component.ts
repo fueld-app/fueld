@@ -282,6 +282,11 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
               Are you sure you want to delete <strong>{{ deleteTarget()!.name }}</strong>?
               This cannot be undone.
             </p>
+            @if (deleteError()) {
+              <div class="mt-3 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+                {{ deleteError() }}
+              </div>
+            }
             <div class="mt-5 flex justify-end gap-3">
               <button
                 (click)="deleteTarget.set(null)"
@@ -336,6 +341,7 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
   // ─── Delete state ─────────────────────────────────────────────────
   readonly deleteTarget = signal<PlaceDto | null>(null);
   readonly deleting = signal(false);
+  readonly deleteError = signal<string | null>(null);
 
   ngOnInit(): void {
     this.loadPlaces();
@@ -444,6 +450,7 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
   // ─── Delete place ─────────────────────────────────────────────────
 
   confirmDelete(place: PlaceDto): void {
+    this.deleteError.set(null);
     this.deleteTarget.set(place);
   }
 
@@ -452,13 +459,16 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
     if (!target) return;
 
     this.deleting.set(true);
+    this.deleteError.set(null);
     try {
       await firstValueFrom(
         this.http.delete<ApiResponse<{ id: string }>>(`${API}/lloyds/places/local/${target.id}`),
       );
       this.deleteTarget.set(null);
       await this.loadPlaces();
-    } catch (err) {
+    } catch (err: any) {
+      const message = err?.error?.message || 'Failed to delete place';
+      this.deleteError.set(message);
       console.error('Delete failed:', err);
     } finally {
       this.deleting.set(false);

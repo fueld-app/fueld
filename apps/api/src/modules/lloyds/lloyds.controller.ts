@@ -191,12 +191,28 @@ export const lloydsController = new Elysia({ prefix: '/lloyds' })
   // ─── Delete Place (local DB) ───────────────────────────────────────
   .delete(
     '/places/local/:id',
-    async ({ params }) => {
-      const deleted = await deletePlace(params.id);
-      if (!deleted) {
-        return { success: false, data: null, message: 'Place not found' };
+    async ({ params, set }) => {
+      try {
+        const deleted = await deletePlace(params.id);
+        if (!deleted) {
+          return { success: false, data: null, message: 'Place not found' };
+        }
+        return { success: true, data: { id: params.id } } satisfies ApiResponse<{ id: string }>;
+      } catch (err: any) {
+        // FK violation — place is referenced by orders or other records
+        const pgCode = err?.code || err?.cause?.code;
+        if (pgCode === '23503') {
+          set.status = 409;
+          return {
+            success: false,
+            data: null,
+            message: 'Cannot delete this place because it is referenced by one or more orders. Remove or reassign those orders first.',
+          };
+        }
+        console.error('[Delete Place] Error:', err);
+        set.status = 500;
+        return { success: false, data: null, message: 'Failed to delete place' };
       }
-      return { success: true, data: { id: params.id } } satisfies ApiResponse<{ id: string }>;
     },
     {
       params: t.Object({ id: t.String() }),
