@@ -494,6 +494,48 @@ export async function getPlaceById(id: string) {
   return rows[0] ?? null;
 }
 
+export async function getPlaceByLliId(lliPlaceId: string) {
+  const rows = await db
+    .select()
+    .from(places)
+    .where(eq(places.lliPlaceId, lliPlaceId))
+    .limit(1);
+
+  return rows[0] ?? null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  GET SEASEARCHER ENRICHMENT (geoJson, hierarchy, parent)
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface HierarchyNode {
+  id: string;
+  name: string;
+  type: string;
+  category: string;
+  children: HierarchyNode[];
+}
+
+export interface PlaceEnrichment {
+  geoJsonObject: unknown | null;
+  hierarchy: HierarchyNode[];
+  parentPlaceId: string | null;
+  parentPlaceName: string | null;
+  childrenData: { type: string; count: number }[];
+}
+
+export async function getPlaceEnrichment(seasearcherId: string): Promise<PlaceEnrichment> {
+  const detail = await seasearcherPlaceDetail<Record<string, unknown>>(seasearcherId);
+
+  return {
+    geoJsonObject: (detail.geoJsonObject as unknown) ?? null,
+    hierarchy: (detail.hierarchy as HierarchyNode[]) ?? [],
+    parentPlaceId: (detail.parentPlaceId as string) ?? null,
+    parentPlaceName: (detail.parentPlaceName as string) ?? null,
+    childrenData: (detail.childrenData as { type: string; count: number }[]) ?? [],
+  };
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  COMPANY / CONTACT SEARCH
 // ═══════════════════════════════════════════════════════════════════════

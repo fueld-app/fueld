@@ -4,15 +4,18 @@ import {
   signal,
   inject,
   OnInit,
+  OnDestroy,
+  ElementRef,
+  viewChild,
 } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
-import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
 import { firstValueFrom } from 'rxjs';
 import type { PlaceDto, ApiResponse } from '@fueld/types';
+import * as L from 'leaflet';
 
 // ═══════════════════════════════════════════════════════════════════════
-//  Place Detail Page — Full view of a single place
+//  Place Detail Page — GeoJSON map, hierarchy tree, parent link
 // ═══════════════════════════════════════════════════════════════════════
 
 const API = 'http://localhost:3000';
@@ -24,6 +27,22 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
   TER: 'Terminal',
   FIL: 'Hydrocarbon Field',
 };
+
+interface HierarchyNode {
+  id: string;
+  name: string;
+  type: string;
+  category: string;
+  children: HierarchyNode[];
+}
+
+interface PlaceEnrichment {
+  geoJsonObject: unknown | null;
+  hierarchy: HierarchyNode[];
+  parentPlaceId: string | null;
+  parentPlaceName: string | null;
+  childrenData: { type: string; count: number }[];
+}
 
 // Compact ISO 3166-1 alpha-3 → alpha-2 map (maritime-relevant)
 const ISO3_TO_ISO2: Record<string, string> = {
@@ -54,9 +73,19 @@ const ISO3_TO_ISO2: Record<string, string> = {
   VNM:'VN',VUT:'VU',WSM:'WS',YEM:'YE',ZAF:'ZA',ZMB:'ZM',ZWE:'ZW',
 };
 
+const CATEGORY_ICONS: Record<string, string> = {
+  TERMINAL: '🏭',
+  ANCHORAGE: '⚓',
+  BERTH: '🔗',
+};
+
 @Component({
   selector: 'app-place-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [RouterLink],
+  styles: [`
+    :host ::ng-deep .leaflet-container { font-family: inherit; }
+  `],
   template: `
     <div>
       <!-- Back link -->
@@ -93,14 +122,40 @@ const ISO3_TO_ISO2: Record<string, string> = {
           <p class="text-sm text-gray-500">
             {{ place()!.country }}
             @if (place()!.countryIso) { ({{ place()!.countryIso }}) }
-            @if (place()!.area) { · {{ place()!.area }} }
-            @if (place()!.subRegion) { · {{ place()!.subRegion }} }
+            @if (place()!.area) { &middot; {{ place()!.area }} }
+            @if (place()!.subRegion) { &middot; {{ place()!.subRegion }} }
           </p>
+          <!-- Parent place link -->
+          @if (parentPlaceName()) {
+            <p class="mt-1 text-sm text-gray-500">
+              Parent:
+              @if (parentLocalId()) {
+                <a [routerLink]="['/places', parentLocalId()]"
+                   class="text-brand-600 hover:text-brand-800 font-medium hover:underline">
+                  {{ parentPlaceName() }}
+                </a>
+              } @else {
+                <span class="font-medium text-gray-700">{{ parentPlaceName() }}</span>
+                <span class="text-xs text-gray-400 ml-1">(not imported)</span>
+              }
+            </p>
+          }
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <!-- Left column: info cards -->
+          <!-- Left column: map + info -->
           <div class="lg:col-span-2 space-y-6">
+
+            <!-- Map -->
+            @if (place()!.lat && place()!.long) {
+              <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
+                  <h2 class="text-sm font-semibold text-gray-700">Location</h2>
+                  <span class="font-mono text-xs text-gray-400">{{ place()!.lat }}° N, {{ place()!.long }}° E</span>
+                </div>
+                <div class="h-[400px]" #mapContainer></div>
+              </div>
+            }
 
             <!-- General info -->
             <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -114,7 +169,7 @@ const ISO3_TO_ISO2: Record<string, string> = {
                     <dd class="mt-0.5 font-medium text-gray-900 font-mono">{{ place()!.unlocode ?? '—' }}</dd>
                   </div>
                   <div>
-                    <dt class="text-gray-500">LLI Place ID</dt>
+                    <dt class="text-gray-500">Seasearcher ID</dt>
                     <dd class="mt-0.5 font-medium text-gray-900">{{ place()!.lliPlaceId ?? '—' }}</dd>
                   </div>
                   <div>
@@ -133,41 +188,72 @@ const ISO3_TO_ISO2: Record<string, string> = {
                     <dt class="text-gray-500">Admiralty Chart</dt>
                     <dd class="mt-0.5 font-medium text-gray-900">{{ place()!.admiraltyChart ?? '—' }}</dd>
                   </div>
-                  @if (place()!.parentPlaceName) {
-                    <div class="sm:col-span-2">
-                      <dt class="text-gray-500">Parent Place</dt>
-                      <dd class="mt-0.5 font-medium text-gray-900">{{ place()!.parentPlaceName }}</dd>
-                    </div>
-                  }
                 </dl>
               </div>
             </div>
 
-          </div>
-
-          <!-- Right column: map + coordinates -->
-          <div class="space-y-6">
-            <!-- Map -->
-            @if (place()!.lat && place()!.long) {
-              <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-                <div class="border-b border-gray-100 px-5 py-3">
-                  <h2 class="text-sm font-semibold text-gray-700">Location</h2>
+            <!-- Hierarchy -->
+            @if (enrichment()?.hierarchy?.length) {
+              <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
+                <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
+                  <h2 class="text-sm font-semibold text-gray-700">Terminals &amp; Berths</h2>
+                  @if (enrichment()!.childrenData.length) {
+                    <div class="flex gap-2">
+                      @for (c of enrichment()!.childrenData; track c.type) {
+                        <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
+                          {{ c.count }} {{ c.type }}{{ c.count > 1 ? 's' : '' }}
+                        </span>
+                      }
+                    </div>
+                  }
                 </div>
-                <div class="aspect-[4/3] bg-gray-100">
-                  <iframe
-                    [src]="mapUrl()"
-                    class="h-full w-full border-0"
-                    loading="lazy"
-                    referrerpolicy="no-referrer-when-downgrade"
-                    allowfullscreen
-                  ></iframe>
-                </div>
-                <div class="px-5 py-3 text-xs text-gray-500">
-                  <span class="font-mono">{{ place()!.lat }}° N, {{ place()!.long }}° E</span>
+                <div class="p-5">
+                  <div class="space-y-1">
+                    @for (node of enrichment()!.hierarchy; track node.id) {
+                      <!-- Terminal / top-level child -->
+                      <div>
+                        <button
+                          (click)="toggleNode(node.id)"
+                          class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors"
+                        >
+                          <span class="text-base">{{ categoryIcon(node.category) }}</span>
+                          @if (node.children.length) {
+                            <svg class="h-3.5 w-3.5 text-gray-400 transition-transform"
+                                 [class.rotate-90]="expandedNodes().has(node.id)"
+                                 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                              <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
+                            </svg>
+                          } @else {
+                            <span class="w-3.5"></span>
+                          }
+                          <span>{{ node.name }}</span>
+                          <span class="ml-auto text-xs text-gray-400">{{ node.type }}</span>
+                          @if (node.children.length) {
+                            <span class="text-[10px] text-gray-400">({{ node.children.length }})</span>
+                          }
+                        </button>
+                        <!-- Berths (collapsible) -->
+                        @if (node.children.length && expandedNodes().has(node.id)) {
+                          <div class="ml-10 border-l border-gray-100 pl-3 space-y-0.5 mb-1">
+                            @for (child of node.children; track child.id) {
+                              <div class="flex items-center gap-2 px-2 py-1.5 text-sm text-gray-600">
+                                <span class="text-xs">{{ categoryIcon(child.category) }}</span>
+                                <span>{{ child.name }}</span>
+                                <span class="ml-auto text-[10px] text-gray-400">{{ child.type }}</span>
+                              </div>
+                            }
+                          </div>
+                        }
+                      </div>
+                    }
+                  </div>
                 </div>
               </div>
             }
+          </div>
 
+          <!-- Right column: identifiers -->
+          <div class="space-y-6">
             <!-- Quick stats card -->
             <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
               <div class="border-b border-gray-100 px-5 py-3">
@@ -192,6 +278,23 @@ const ISO3_TO_ISO2: Record<string, string> = {
                 }
               </div>
             </div>
+
+            <!-- Children summary -->
+            @if (enrichment()?.childrenData?.length) {
+              <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
+                <div class="border-b border-gray-100 px-5 py-3">
+                  <h2 class="text-sm font-semibold text-gray-700">Children Summary</h2>
+                </div>
+                <div class="divide-y divide-gray-50">
+                  @for (c of enrichment()!.childrenData; track c.type) {
+                    <div class="flex items-center justify-between px-5 py-2.5 text-sm">
+                      <span class="text-gray-600">{{ c.type }}s</span>
+                      <span class="font-semibold text-gray-900">{{ c.count }}</span>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
           </div>
         </div>
       } @else {
@@ -203,14 +306,21 @@ const ISO3_TO_ISO2: Record<string, string> = {
     </div>
   `,
 })
-export class PlaceDetailPageComponent implements OnInit {
+export class PlaceDetailPageComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly http = inject(HttpClient);
-  private readonly sanitizer = inject(DomSanitizer);
+
+  readonly mapContainer = viewChild<ElementRef<HTMLDivElement>>('mapContainer');
 
   readonly place = signal<PlaceDto | null>(null);
+  readonly enrichment = signal<PlaceEnrichment | null>(null);
   readonly loading = signal(true);
+  readonly parentLocalId = signal<string | null>(null);
+  readonly parentPlaceName = signal<string | null>(null);
+  readonly expandedNodes = signal<Set<string>>(new Set());
+
+  private map: L.Map | null = null;
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
@@ -221,6 +331,10 @@ export class PlaceDetailPageComponent implements OnInit {
     }
   }
 
+  ngOnDestroy(): void {
+    this.map?.remove();
+  }
+
   async loadPlace(id: string): Promise<void> {
     this.loading.set(true);
     try {
@@ -229,6 +343,16 @@ export class PlaceDetailPageComponent implements OnInit {
       );
       if (res.success && res.data) {
         this.place.set(res.data);
+
+        // Use parentPlaceName from our local record as initial value
+        if (res.data.parentPlaceName) {
+          this.parentPlaceName.set(res.data.parentPlaceName);
+        }
+
+        // Load enrichment from Seasearcher if we have a Seasearcher ID
+        if (res.data.lliPlaceId) {
+          this.loadEnrichment(res.data.lliPlaceId);
+        }
       }
     } catch (err) {
       console.error('Failed to load place:', err);
@@ -237,8 +361,102 @@ export class PlaceDetailPageComponent implements OnInit {
     }
   }
 
+  private async loadEnrichment(seasearcherId: string): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<PlaceEnrichment>>(`${API}/lloyds/places/enrichment/${seasearcherId}`),
+      );
+      if (res.success && res.data) {
+        this.enrichment.set(res.data);
+
+        // Overwrite parentPlaceName from enrichment (more authoritative)
+        if (res.data.parentPlaceName) {
+          this.parentPlaceName.set(res.data.parentPlaceName);
+        }
+
+        // If there's a parent place, try to find its local ID for deep linking
+        if (res.data.parentPlaceId) {
+          this.resolveParentLocalId(res.data.parentPlaceId);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load enrichment:', err);
+    } finally {
+      // Init map regardless (with or without GeoJSON)
+      setTimeout(() => this.initMap(), 0);
+    }
+  }
+
+  private async resolveParentLocalId(seasearcherParentId: string): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<PlaceDto>>(`${API}/lloyds/places/by-lli/${seasearcherParentId}`),
+      );
+      if (res.success && res.data) {
+        this.parentLocalId.set(res.data.id);
+      }
+    } catch {
+      // Parent link just won't be clickable — that's fine
+    }
+  }
+
+  private initMap(): void {
+    const p = this.place();
+    const el = this.mapContainer()?.nativeElement;
+    if (!p?.lat || !p?.long || !el) return;
+    if (this.map) return; // Already initialised
+
+    // Fix Leaflet default icon paths (webpack/Angular issue)
+    delete (L.Icon.Default.prototype as any)._getIconUrl;
+    L.Icon.Default.mergeOptions({
+      iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+      iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+      shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+    });
+
+    this.map = L.map(el, {
+      center: [p.lat, p.long],
+      zoom: 13,
+      scrollWheelZoom: true,
+    });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
+      maxZoom: 19,
+    }).addTo(this.map);
+
+    const enrichment = this.enrichment();
+    if (enrichment?.geoJsonObject) {
+      // Render GeoJSON polygon
+      const geoLayer = L.geoJSON(enrichment.geoJsonObject as any, {
+        style: {
+          color: '#3b82f6',
+          weight: 2,
+          fillColor: '#3b82f6',
+          fillOpacity: 0.15,
+        },
+      }).addTo(this.map);
+
+      // Fit map to polygon bounds
+      this.map.fitBounds(geoLayer.getBounds(), { padding: [30, 30] });
+    } else {
+      // Fallback: just place a marker
+      L.marker([p.lat, p.long]).addTo(this.map);
+    }
+  }
+
   goBack(): void {
     this.router.navigate(['/places']);
+  }
+
+  toggleNode(nodeId: string): void {
+    const current = new Set(this.expandedNodes());
+    if (current.has(nodeId)) {
+      current.delete(nodeId);
+    } else {
+      current.add(nodeId);
+    }
+    this.expandedNodes.set(current);
   }
 
   countryFlag(): string {
@@ -253,11 +471,8 @@ export class PlaceDetailPageComponent implements OnInit {
     return String.fromCodePoint(a, b);
   }
 
-  mapUrl(): SafeResourceUrl {
-    const p = this.place();
-    if (!p?.lat || !p?.long) return '';
-    const url = `https://www.openstreetmap.org/export/embed.html?bbox=${p.long - 0.05},${p.lat - 0.03},${p.long + 0.05},${p.lat + 0.03}&layer=mapnik&marker=${p.lat},${p.long}`;
-    return this.sanitizer.bypassSecurityTrustResourceUrl(url);
+  categoryIcon(category: string): string {
+    return CATEGORY_ICONS[category] ?? '📍';
   }
 
   placeTypeLabel(type: string): string {

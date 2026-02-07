@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia';
 import { authGuard } from '../auth/auth.guard';
-import { searchVessels, searchPlaces, searchCompanies, importPlaceFromLli, listPlaces, getPlaceById } from './lli.service';
+import { searchVessels, searchPlaces, searchCompanies, importPlaceFromLli, listPlaces, getPlaceById, getPlaceByLliId, getPlaceEnrichment } from './lli.service';
 import type { ApiResponse } from '@fueld/types';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -11,6 +11,7 @@ import type { ApiResponse } from '@fueld/types';
 //  GET /lloyds/places?name=...&country=...&placeType=...
 //  GET /lloyds/places/local?search=...&country=...&placeType=...&page=...&limit=...
 //  GET /lloyds/places/local/:id
+//  GET /lloyds/places/enrichment/:seasearcherId
 //  POST /lloyds/places/import   { lliPlaceId: number }
 //  GET /lloyds/companies?name=...&country=...&imo=...
 // ═══════════════════════════════════════════════════════════════════════
@@ -123,6 +124,46 @@ export const lloydsController = new Elysia({ prefix: '/lloyds' })
       detail: {
         tags: ["Lloyd's"],
         summary: 'Get a single place by ID',
+      },
+    },
+  )
+
+  // ─── Place Enrichment (Seasearcher geoJson, hierarchy) ────────────
+  .get(
+    '/places/enrichment/:seasearcherId',
+    async ({ params }) => {
+      try {
+        const enrichment = await getPlaceEnrichment(params.seasearcherId);
+        return { success: true, data: enrichment } satisfies ApiResponse<typeof enrichment>;
+      } catch (err) {
+        console.error('[Seasearcher] Enrichment failed:', err);
+        return { success: false, data: null, message: 'Failed to load enrichment data' };
+      }
+    },
+    {
+      params: t.Object({ seasearcherId: t.String() }),
+      detail: {
+        tags: ["Lloyd's"],
+        summary: 'Get Seasearcher enrichment (geoJson, hierarchy, parent)',
+      },
+    },
+  )
+
+  // ─── Find Place by LLI/Seasearcher ID ─────────────────────────────
+  .get(
+    '/places/by-lli/:lliPlaceId',
+    async ({ params }) => {
+      const place = await getPlaceByLliId(params.lliPlaceId);
+      if (!place) {
+        return { success: false, data: null };
+      }
+      return { success: true, data: place } satisfies ApiResponse<typeof place>;
+    },
+    {
+      params: t.Object({ lliPlaceId: t.String() }),
+      detail: {
+        tags: ["Lloyd's"],
+        summary: 'Find a local place by its Seasearcher/LLI ID',
       },
     },
   )
