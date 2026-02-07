@@ -106,20 +106,30 @@ const CATEGORY_ICONS: Record<string, string> = {
 };
 
 /**
- * Ship-shaped SVG marker sized by vessel LOA.
- * Small vessels (~50m) → 16px, large vessels (~400m) → 32px.
- * The SVG is a top-down vessel silhouette: pointed bow, squared stern.
+ * Meters per pixel at a given latitude and zoom level.
+ * Standard Web Mercator formula.
  */
-function vesselIcon(heading: number | null, loa: number | null): L.DivIcon {
+function metersPerPx(lat: number, zoom: number): number {
+  return (156543.03392 * Math.cos((lat * Math.PI) / 180)) / Math.pow(2, zoom);
+}
+
+/**
+ * Ship-shaped SVG marker scaled to real-world vessel size.
+ * LOA (meters) is converted to pixels using the map's current zoom & lat.
+ * A minimum pixel size keeps small/zoomed-out vessels visible.
+ */
+function vesselIcon(heading: number | null, loa: number | null, zoom: number, lat: number): L.DivIcon {
   const deg = heading ?? 0;
-  // Map LOA to pixel size: clamp 50–400m → 16–32px
-  const loaVal = Math.max(50, Math.min(loa ?? 100, 400));
-  const h = Math.round(16 + ((loaVal - 50) / 350) * 16);
+  const loaMeters = loa ?? 100;
+  const mpp = metersPerPx(lat, zoom);
+
+  // Convert LOA to pixels, with min 10px and max 120px
+  const h = Math.round(Math.max(10, Math.min(loaMeters / mpp, 120)));
   const w = Math.round(h * 0.35);
 
-  // Colours by size: small=blue, medium=orange, large=red
-  const fill = loaVal < 120 ? '#3b82f6' : loaVal < 250 ? '#f97316' : '#ef4444';
-  const stroke = loaVal < 120 ? '#1d4ed8' : loaVal < 250 ? '#c2410c' : '#991b1b';
+  // Colours by real size: small=blue, medium=orange, large=red
+  const fill = loaMeters < 120 ? '#3b82f6' : loaMeters < 250 ? '#f97316' : '#ef4444';
+  const stroke = loaMeters < 120 ? '#1d4ed8' : loaMeters < 250 ? '#c2410c' : '#991b1b';
 
   // Top-down vessel SVG: pointed bow at top, flat stern at bottom
   const svg = `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
@@ -724,6 +734,13 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
 
     this.vesselLayer = L.layerGroup().addTo(this.map);
 
+    // Re-render vessel markers on zoom so they scale to real-world size
+    this.map.on('zoomend', () => {
+      if (this.nearbyVessels().length) {
+        this.addVesselMarkers(this.nearbyVessels());
+      }
+    });
+
     const enrichment = this.enrichment();
     if (enrichment?.geoJsonObject) {
       const geoLayer = L.geoJSON(enrichment.geoJsonObject as any, {
@@ -753,8 +770,9 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
     for (const v of vessels) {
       if (!v.lat || !v.lng) continue;
 
+      const zoom = this.map!.getZoom();
       const marker = L.marker([v.lat, v.lng], {
-        icon: vesselIcon(v.heading, v.lengthOverall),
+        icon: vesselIcon(v.heading, v.lengthOverall, zoom, v.lat),
       });
 
       const popupLines = [
