@@ -151,7 +151,9 @@ export const places = pgTable('places', {
   country: text('country').notNull(),                // ISO-3 or short code
   countryIso: text('country_iso'),                   // ISO-3 code from LLI
   area: text('area'),                                // e.g. "N Cont Europe"
+  subRegion: text('sub_region'),                     // e.g. "Western Asia"
   placeType: placeTypeEnum('place_type'),            // POR / ANC / PSP / TER / FIL
+  timezone: text('timezone'),                        // e.g. "GMT +04H"
 
   // ── Geo ────────────────────────────────────────────────────────────
   lat: doublePrecision('lat'),

@@ -89,7 +89,9 @@ export interface PlaceDto {
   country: string;
   countryIso: string | null;
   area: string | null;
+  subRegion: string | null;
   placeType: PlaceType | null;
+  timezone: string | null;
   lat: number | null;
   long: number | null;
   admiraltyChart: string | null;
@@ -104,7 +106,9 @@ export interface CreatePlaceDto {
   country: string;
   countryIso?: string;
   area?: string;
+  subRegion?: string;
   placeType?: PlaceType;
+  timezone?: string;
   lat?: number;
   long?: number;
   unlocode?: string;

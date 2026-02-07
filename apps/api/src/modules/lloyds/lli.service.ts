@@ -123,10 +123,12 @@ interface SeasearcherPlace {
   name: string;
   country: { code: string; name: string };
   area: string;
+  subRegion: string;
   type: string;
   typeCode: string;
   unctadLocode: string;
   admiraltyChart: string;
+  timezone: string;
   location: { lat: number; lng: number };
   parentPlaceId: string | null;
   parentPlaceName: string | null;
@@ -424,7 +426,9 @@ export async function importPlaceFromLli(lliPlaceId: string): Promise<{ id: stri
       country: pd.country?.code ?? pd.country?.name ?? '',
       countryIso: pd.country?.code ?? null,
       area: pd.area || null,
+      subRegion: pd.subRegion || null,
       placeType: mapped,
+      timezone: pd.timezone || null,
       lat: pd.location?.lat ?? null,
       long: pd.location?.lng ?? null,
       unlocode: pd.unctadLocode || null,
@@ -480,6 +484,20 @@ export async function listPlaces(query?: {
   ]);
 
   return { places: rows, total: countResult[0]?.count ?? 0 };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  GET SINGLE LOCAL PLACE BY ID
+// ═══════════════════════════════════════════════════════════════════════
+
+export async function getPlaceById(id: string) {
+  const rows = await db
+    .select()
+    .from(places)
+    .where(eq(places.id, id))
+    .limit(1);
+
+  return rows[0] ?? null;
 }
 
 // ═══════════════════════════════════════════════════════════════════════

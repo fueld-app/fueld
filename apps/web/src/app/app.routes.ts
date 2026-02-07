@@ -126,6 +126,14 @@ export const routes: Routes = [
             data: { title: 'Places' },
           },
           {
+            path: 'places/:id',
+            loadComponent: () =>
+              import('./features/admin/pages/place-detail/place-detail-page.component').then(
+                (m) => m.PlaceDetailPageComponent,
+              ),
+            data: { title: 'Place Detail' },
+          },
+          {
             path: 'settings',
             loadComponent: () =>
               import('./pages/placeholder/placeholder-page.component').then(

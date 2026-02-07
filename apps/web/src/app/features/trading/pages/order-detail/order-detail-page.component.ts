@@ -267,6 +267,8 @@ export class OrderDetailPageComponent {
       portAuthorityName: null,
       parentPlaceId: null,
       parentPlaceName: null,
+      subRegion: null,
+      timezone: null,
     });
 
     this.suppliers.set([

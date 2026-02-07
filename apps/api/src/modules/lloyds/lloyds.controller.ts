@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia';
 import { authGuard } from '../auth/auth.guard';
-import { searchVessels, searchPlaces, searchCompanies, importPlaceFromLli, listPlaces } from './lli.service';
+import { searchVessels, searchPlaces, searchCompanies, importPlaceFromLli, listPlaces, getPlaceById } from './lli.service';
 import type { ApiResponse } from '@fueld/types';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -10,6 +10,7 @@ import type { ApiResponse } from '@fueld/types';
 //  GET /lloyds/vessels?imo=...&name=...&mmsi=...
 //  GET /lloyds/places?name=...&country=...&placeType=...
 //  GET /lloyds/places/local?search=...&country=...&placeType=...&page=...&limit=...
+//  GET /lloyds/places/local/:id
 //  POST /lloyds/places/import   { lliPlaceId: number }
 //  GET /lloyds/companies?name=...&country=...&imo=...
 // ═══════════════════════════════════════════════════════════════════════
@@ -103,6 +104,25 @@ export const lloydsController = new Elysia({ prefix: '/lloyds' })
         description:
           'Returns paginated list of places stored locally. ' +
           'Supports filtering by search term, country code, and place type.',
+      },
+    },
+  )
+
+  // ─── Get Single Place (local DB) ──────────────────────────────────
+  .get(
+    '/places/local/:id',
+    async ({ params }) => {
+      const place = await getPlaceById(params.id);
+      if (!place) {
+        return { success: false, data: null, error: 'Place not found' };
+      }
+      return { success: true, data: place } satisfies ApiResponse<typeof place>;
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: {
+        tags: ["Lloyd's"],
+        summary: 'Get a single place by ID',
       },
     },
   )

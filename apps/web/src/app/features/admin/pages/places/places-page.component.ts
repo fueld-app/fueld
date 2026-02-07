@@ -7,6 +7,7 @@ import {
   OnDestroy,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap, tap, filter, catchError } from 'rxjs/operators';
@@ -173,8 +174,8 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
           </thead>
           <tbody class="divide-y divide-gray-100">
             @for (place of places(); track place.id) {
-              <tr class="transition-colors hover:bg-gray-50/50">
-                <td class="px-4 py-3 font-medium text-gray-900">{{ place.name }}</td>
+              <tr (click)="openPlace(place.id)" class="cursor-pointer transition-colors hover:bg-gray-50/50">
+                <td class="px-4 py-3 font-medium text-brand-700 hover:underline">{{ place.name }}</td>
                 <td class="px-4 py-3 text-gray-600">
                   <span class="mr-1.5">{{ countryFlag(place) }}</span>{{ place.country }}
                   @if (place.countryIso) {
@@ -211,7 +212,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
       <!-- Mobile cards -->
       <div class="space-y-3 md:hidden">
         @for (place of places(); track place.id) {
-          <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div (click)="openPlace(place.id)" class="cursor-pointer rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-brand-300 transition-colors">
             <div class="flex items-center justify-between mb-2">
               <span class="font-semibold text-gray-900">{{ place.name }}</span>
               @if (place.placeType) {
@@ -274,6 +275,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
 })
 export class PlacesPageComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
+  private readonly router = inject(Router);
   private readonly searchSubject = new Subject<string>();
   private readonly destroy$ = new Subject<void>();
 
@@ -431,6 +433,10 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
     // Regional indicator symbols: A = U+1F1E6, B = U+1F1E7, …
     const [a, b] = [...iso2].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65);
     return String.fromCodePoint(a, b);
+  }
+
+  openPlace(id: string): void {
+    this.router.navigate(['/admin/places', id]);
   }
 
   min(a: number, b: number): number {
