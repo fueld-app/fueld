@@ -81,6 +81,10 @@ export class AuthService {
       ),
     );
 
+    if (!res.success || !res.data) {
+      throw new Error(res.message ?? 'Login failed');
+    }
+
     const data = res.data;
 
     if (!data.requires2fa) {
