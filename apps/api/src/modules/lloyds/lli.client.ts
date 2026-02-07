@@ -197,7 +197,7 @@ export async function seasearcherPlaceDetail<T = unknown>(placeId: string): Prom
  */
 export async function seasearcherNearbyVessels<T = unknown>(
   placeId: string,
-  distance = 50,
+  distance = 10,
   pageSize = 1000,
 ): Promise<T> {
   const token = await getToken();
