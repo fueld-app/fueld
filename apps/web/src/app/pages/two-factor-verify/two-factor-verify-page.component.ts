@@ -50,6 +50,7 @@ import { AuthService } from '../../core/auth/auth.service';
                 maxlength="6"
                 autocomplete="one-time-code"
                 [(ngModel)]="code"
+                (input)="onCodeInput()"
                 name="code"
                 required
                 autofocus
@@ -107,6 +108,13 @@ export class TwoFactorVerifyPageComponent implements OnInit {
     if (!this.tempToken) {
       // No temp token — redirect back to login
       this.router.navigate(['/login']);
+    }
+  }
+
+  onCodeInput(): void {
+    const digits = this.code.replace(/\D/g, '');
+    if (digits.length === 6) {
+      this.onSubmit();
     }
   }
 
