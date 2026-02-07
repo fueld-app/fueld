@@ -112,3 +112,47 @@ export async function lliGet<T = unknown>(
 
   return (await res.json()) as T;
 }
+
+// ── Seasearcher Place Search ──────────────────────────────────────────
+
+const SEASEARCHER_BASE = 'https://www.seasearcher.com/api';
+
+export async function seasearcherPlaceSearch<T = unknown>(
+  searchPhrase: string,
+  pageSize = 10,
+): Promise<T> {
+  const token = await getToken();
+
+  const query = JSON.stringify({
+    SearchPhrase: searchPhrase,
+    SearchFields: { placeName: 1 },
+    PageSize: pageSize,
+  });
+
+  const url = `${SEASEARCHER_BASE}/place/query?query=${encodeURIComponent(query)}`;
+
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (res.status === 401) {
+    console.log('[Seasearcher] 401 received, forcing token refresh…');
+    tokenState = null;
+    const freshToken = await getToken();
+    const retry = await fetch(url, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${freshToken}` },
+    });
+    if (!retry.ok) {
+      throw new Error(`Seasearcher place search failed after retry: ${retry.status}`);
+    }
+    return (await retry.json()) as T;
+  }
+
+  if (!res.ok) {
+    throw new Error(`Seasearcher place search failed: ${res.status} ${res.statusText}`);
+  }
+
+  return (await res.json()) as T;
+}

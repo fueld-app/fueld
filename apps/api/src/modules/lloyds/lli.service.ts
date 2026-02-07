@@ -6,7 +6,7 @@
 import { eq, ilike, or, and, sql } from 'drizzle-orm';
 import { db } from '../../db';
 import { vessels, places, counterparties } from '../../db/schema';
-import { lliGet } from './lli.client';
+import { lliGet, seasearcherPlaceSearch } from './lli.client';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Response types for LLI API
@@ -109,6 +109,27 @@ interface LliParentPlaceDetails {
   parentPlaceName: string;
   parentPlaceType: string;
   parentPlaceCountry: string;
+}
+
+// ── Seasearcher Place Response ───────────────────────────────────────
+
+interface SeasearcherPlaceResponse {
+  results: SeasearcherPlace[];
+  totalMatches: number;
+}
+
+interface SeasearcherPlace {
+  id: string;
+  name: string;
+  country: { code: string; name: string };
+  area: string;
+  type: string;
+  typeCode: string;
+  unctadLocode: string;
+  admiraltyChart: string;
+  location: { lat: number; lng: number };
+  parentPlaceId: string | null;
+  parentPlaceName: string | null;
 }
 
 // ── Company Details ──────────────────────────────────────────────────
@@ -318,48 +339,41 @@ export async function searchPlaces(query: {
     }
   }
 
-  // ── 2. LLI search (always, to supplement local results) ───────────
+  // ── 2. Seasearcher search (always, to supplement local results) ────
   try {
-    const params: Record<string, string | undefined> = {};
-    if (query.name) params.placeName = query.name;
-    if (query.country) params.country = query.country;
-    if (query.placeType) params.placeType = query.placeType;
+    if (query.name) {
+      const ss = await seasearcherPlaceSearch<SeasearcherPlaceResponse>(query.name, 10);
 
-    const lli = await lliGet<LliResponse<LliPlaceAdvancedCharsData>>(
-      'placeadvancedchars_v3',
-      params,
-    );
+      if (ss.results?.length) {
+        // Collect local LLI IDs to avoid duplicates
+        const localLliIds = new Set(results.map((r) => r.lliPlaceId).filter(Boolean));
 
-    if (lli.IsSuccess && lli.Data?.items?.length) {
-      // Collect local LLI IDs to avoid duplicates
-      const localLliIds = new Set(results.map((r) => r.lliPlaceId).filter(Boolean));
+        for (const p of ss.results) {
+          if (localLliIds.has(p.id)) continue; // skip duplicates
 
-      for (const item of lli.Data.items) {
-        const pd = item.placeDetails;
-        const ppd = item.parentPlaceDetails;
+          // Filter by placeType if requested
+          if (query.placeType && p.typeCode !== query.placeType) continue;
 
-        if (localLliIds.has(pd.placeId)) continue; // skip duplicates
-
-        results.push({
-          source: 'lloyds' as const,
-          lliPlaceId: pd.placeId,
-          name: pd.name,
-          country: pd.country,
-          countryIso: pd.countryIso,
-          area: pd.area,
-          type: pd.type,
-          latitude: pd.latitude,
-          longitude: pd.longitude,
-          unlocode: pd.unlocode,
-          admiraltyChart: pd.admiraltyChart,
-          principalFacilities: pd.principalFacitilies,
-          portAuthorityName: pd.portAuthorityName,
-          parentPlaceName: ppd?.parentPlaceName,
-        });
+          results.push({
+            source: 'lloyds' as const,
+            lliPlaceId: p.id,
+            name: p.name,
+            country: p.country.name,
+            countryIso: p.country.code,
+            area: p.area,
+            type: p.typeCode,
+            latitude: p.location?.lat ?? null,
+            longitude: p.location?.lng ?? null,
+            unlocode: p.unctadLocode || undefined,
+            admiraltyChart: p.admiraltyChart || undefined,
+            parentPlaceId: p.parentPlaceId ?? undefined,
+            parentPlaceName: p.parentPlaceName ?? undefined,
+          });
+        }
       }
     }
   } catch (err) {
-    console.error('[LLI] Place search API call failed:', err);
+    console.error('[Seasearcher] Place search failed:', err);
     // Continue with local results only
   }
 
