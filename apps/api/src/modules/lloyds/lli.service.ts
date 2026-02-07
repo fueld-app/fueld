@@ -551,9 +551,15 @@ export interface NearbyVessel {
   speed: number | null;
   lengthOverall: number | null;
   breadth: number | null;
+  draught: number | null;
+  dwt: number | null;
+  grossTonnage: number | null;
+  buildYear: number | null;
   vesselType: string | null;
   flag: string | null;
+  flagCode: string | null;
   distance: number | null;
+  status: string | null;
 }
 
 export async function getNearbyVessels(seasearcherId: string): Promise<NearbyVessel[]> {
@@ -563,21 +569,32 @@ export async function getNearbyVessels(seasearcherId: string): Promise<NearbyVes
 
   if (!data?.results?.length) return [];
 
-  return data.results.map((v) => ({
-    id: String(v.id ?? v.vesselId ?? ''),
-    name: String(v.name ?? v.vesselName ?? ''),
-    imo: v.imo ? String(v.imo) : null,
-    mmsi: v.mmsi ? String(v.mmsi) : null,
-    lat: Number((v.location as any)?.lat ?? v.latitude ?? 0),
-    lng: Number((v.location as any)?.lng ?? v.longitude ?? 0),
-    heading: v.heading != null ? Number(v.heading) : (v.trueHeading != null ? Number(v.trueHeading) : null),
-    speed: v.speed != null ? Number(v.speed) : (v.speedOverGround != null ? Number(v.speedOverGround) : null),
-    lengthOverall: v.lengthOverall != null ? Number(v.lengthOverall) : (v.length != null ? Number(v.length) : null),
-    breadth: v.breadth != null ? Number(v.breadth) : (v.width != null ? Number(v.width) : null),
-    vesselType: v.vesselType ? String(v.vesselType) : (v.type ? String(v.type) : null),
-    flag: v.flag ? String(v.flag) : null,
-    distance: v.distance != null ? Number(v.distance) : null,
-  }));
+  return data.results.map((v: any) => {
+    const info = v.latestInformation ?? {};
+    const pos = info.position ?? {};
+
+    return {
+      id: String(v.id ?? ''),
+      name: String(v.name ?? ''),
+      imo: v.imo ? String(v.imo) : null,
+      mmsi: v.mmsi ? String(v.mmsi) : null,
+      lat: Number(pos.lat ?? 0),
+      lng: Number(pos.lng ?? 0),
+      heading: info.trueHeading != null ? Number(info.trueHeading) : null,
+      speed: info.aisSpeed != null ? Number(info.aisSpeed) : null,
+      lengthOverall: v.lengthOverall != null ? Number(v.lengthOverall) : (info.length != null ? Number(info.length) : null),
+      breadth: v.breadthExtreme != null ? Number(v.breadthExtreme) : (info.width != null ? Number(info.width) : null),
+      draught: info.draught != null ? Number(info.draught) : (v.draught != null ? Number(v.draught) : null),
+      dwt: v.deadWeightTonnage != null ? Number(v.deadWeightTonnage) : (v.derivedDwt?.value != null ? Number(v.derivedDwt.value) : null),
+      grossTonnage: v.grossTonnage != null ? Number(v.grossTonnage) : (v.derivedGt?.value != null ? Number(v.derivedGt.value) : null),
+      buildYear: v.buildYear != null ? Number(v.buildYear) : null,
+      vesselType: v.type ? String(v.type) : null,
+      flag: v.flag?.name ? String(v.flag.name) : null,
+      flagCode: v.flag?.code ? String(v.flag.code) : null,
+      distance: v.distance != null ? Number(v.distance) : null,
+      status: info.status ? String(info.status) : null,
+    };
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════════

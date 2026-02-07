@@ -59,9 +59,15 @@ interface NearbyVessel {
   speed: number | null;
   lengthOverall: number | null;
   breadth: number | null;
+  draught: number | null;
+  dwt: number | null;
+  grossTonnage: number | null;
+  buildYear: number | null;
   vesselType: string | null;
   flag: string | null;
+  flagCode: string | null;
   distance: number | null;
+  status: string | null;
 }
 
 // Compact ISO 3166-1 alpha-3 → alpha-2 map (maritime-relevant)
@@ -99,17 +105,35 @@ const CATEGORY_ICONS: Record<string, string> = {
   BERTH: '🔗',
 };
 
-function vesselIcon(heading: number | null): L.DivIcon {
+/**
+ * Ship-shaped SVG marker sized by vessel LOA.
+ * Small vessels (~50m) → 16px, large vessels (~400m) → 32px.
+ * The SVG is a top-down vessel silhouette: pointed bow, squared stern.
+ */
+function vesselIcon(heading: number | null, loa: number | null): L.DivIcon {
   const deg = heading ?? 0;
+  // Map LOA to pixel size: clamp 50–400m → 16–32px
+  const loaVal = Math.max(50, Math.min(loa ?? 100, 400));
+  const h = Math.round(16 + ((loaVal - 50) / 350) * 16);
+  const w = Math.round(h * 0.35);
+
+  // Colours by size: small=blue, medium=orange, large=red
+  const fill = loaVal < 120 ? '#3b82f6' : loaVal < 250 ? '#f97316' : '#ef4444';
+  const stroke = loaVal < 120 ? '#1d4ed8' : loaVal < 250 ? '#c2410c' : '#991b1b';
+
+  // Top-down vessel SVG: pointed bow at top, flat stern at bottom
+  const svg = `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
+    <path d="M${w / 2},0 L${w},${h * 0.3} L${w},${h} L0,${h} L0,${h * 0.3} Z"
+          fill="${fill}" stroke="${stroke}" stroke-width="0.8" stroke-linejoin="round"/>
+    <line x1="${w / 2}" y1="${h * 0.15}" x2="${w / 2}" y2="${h * 0.65}"
+          stroke="${stroke}" stroke-width="0.6" opacity="0.5"/>
+  </svg>`;
+
   return L.divIcon({
     className: '',
-    html: `<div style="transform:rotate(${deg}deg);width:14px;height:20px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.3))">
-      <svg viewBox="0 0 14 20" width="14" height="20" xmlns="http://www.w3.org/2000/svg">
-        <polygon points="7,0 14,20 7,15 0,20" fill="#ef4444" stroke="#991b1b" stroke-width="0.8"/>
-      </svg>
-    </div>`,
-    iconSize: [14, 20],
-    iconAnchor: [7, 10],
+    html: `<div style="transform:rotate(${deg}deg);width:${w}px;height:${h}px;filter:drop-shadow(0 1px 3px rgba(0,0,0,.35))">${svg}</div>`,
+    iconSize: [w, h],
+    iconAnchor: [w / 2, h / 2],
   });
 }
 
@@ -427,20 +451,49 @@ function vesselIcon(heading: number | null): L.DivIcon {
                 </div>
                 <div class="divide-y divide-gray-50 max-h-[400px] overflow-y-auto">
                   @for (v of nearbyVessels(); track v.id) {
-                    <div class="flex items-center justify-between px-5 py-2 text-sm">
-                      <div class="min-w-0">
-                        <p class="font-medium text-gray-900 truncate">{{ v.name }}</p>
-                        <p class="text-[10px] text-gray-400">
+                    <div class="flex items-start gap-3 px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors">
+                      <!-- Flag + name -->
+                      <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-1.5">
+                          @if (v.flagCode) {
+                            <span class="text-sm">{{ vesselFlag(v.flagCode) }}</span>
+                          }
+                          <p class="font-medium text-gray-900 truncate">{{ v.name }}</p>
+                          @if (v.status) {
+                            <span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-medium"
+                                  [class]="v.status === 'stopped' || v.status === 'moored' ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700'">
+                              {{ v.status }}
+                            </span>
+                          }
+                        </div>
+                        <p class="text-[10px] text-gray-400 mt-0.5">
                           @if (v.imo) { IMO {{ v.imo }} }
                           @if (v.vesselType) { &middot; {{ v.vesselType }} }
+                          @if (v.buildYear) { &middot; {{ v.buildYear }} }
                         </p>
+                        <!-- Dimensions row -->
+                        <div class="flex items-center gap-2 mt-1 text-[10px] text-gray-400">
+                          @if (v.lengthOverall || v.breadth) {
+                            <span>{{ v.lengthOverall ?? '?' }}m × {{ v.breadth ?? '?' }}m</span>
+                          }
+                          @if (v.dwt) {
+                            <span>&middot; {{ v.dwt | number:'1.0-0' }} DWT</span>
+                          }
+                          @if (v.draught) {
+                            <span>&middot; {{ v.draught | number:'1.1-1' }}m draft</span>
+                          }
+                        </div>
                       </div>
-                      <div class="text-right text-[10px] text-gray-400 whitespace-nowrap ml-3">
+                      <!-- Stats -->
+                      <div class="text-right text-[10px] text-gray-400 whitespace-nowrap shrink-0">
                         @if (v.distance != null) {
                           <p>{{ v.distance | number:'1.1-1' }} nm</p>
                         }
                         @if (v.speed != null) {
                           <p>{{ v.speed | number:'1.1-1' }} kn</p>
+                        }
+                        @if (v.heading != null) {
+                          <p>{{ v.heading }}°</p>
                         }
                       </div>
                     </div>
@@ -701,7 +754,7 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
       if (!v.lat || !v.lng) continue;
 
       const marker = L.marker([v.lat, v.lng], {
-        icon: vesselIcon(v.heading),
+        icon: vesselIcon(v.heading, v.lengthOverall),
       });
 
       const popupLines = [
@@ -712,6 +765,8 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
         v.lengthOverall || v.breadth
           ? `Size: ${v.lengthOverall ?? '?'}m × ${v.breadth ?? '?'}m`
           : null,
+        v.dwt ? `DWT: ${v.dwt.toLocaleString()}` : null,
+        v.draught != null ? `Draft: ${v.draught.toFixed(1)}m` : null,
         v.speed != null ? `Speed: ${v.speed.toFixed(1)} kn` : null,
         v.heading != null ? `Heading: ${v.heading}°` : null,
         v.distance != null ? `Distance: ${v.distance.toFixed(1)} nm` : null,
@@ -795,5 +850,13 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
       case 'FIL': return 'bg-red-100 text-red-800';
       default:    return 'bg-gray-100 text-gray-800';
     }
+  }
+
+  /** Convert ISO 3166-1 alpha-3 flag code to emoji flag. */
+  vesselFlag(code: string): string {
+    const iso2 = ISO3_TO_ISO2[code.toUpperCase()];
+    if (!iso2 || iso2.length !== 2) return '';
+    const [a, b] = [...iso2].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65);
+    return String.fromCodePoint(a, b);
   }
 }
