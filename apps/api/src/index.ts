@@ -116,9 +116,14 @@ const app = new Elysia()
           case 'nearby-vessels': {
             if (!data.placeId) break;
             console.log(`[WS] Fetching nearby vessels for place ${data.placeId}…`);
-            const vessels = await getNearbyVessels(String(data.placeId));
-            ws.send(JSON.stringify({ type: 'nearby-vessels', data: vessels }));
-            console.log(`[WS] Sent ${vessels.length} nearby vessels`);
+            try {
+              const vessels = await getNearbyVessels(String(data.placeId));
+              ws.send(JSON.stringify({ type: 'nearby-vessels', data: vessels }));
+              console.log(`[WS] Sent ${vessels.length} nearby vessels`);
+            } catch (err: any) {
+              console.warn(`[WS] Nearby vessels failed for ${data.placeId}:`, err.message);
+              ws.send(JSON.stringify({ type: 'nearby-vessels', data: [] }));
+            }
             break;
           }
 
