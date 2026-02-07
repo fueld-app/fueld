@@ -1,4 +1,4 @@
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, signal, computed, inject } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Role } from '@fueld/types';
@@ -12,6 +12,7 @@ import type {
   ApiResponse,
 } from '@fueld/types';
 import { firstValueFrom } from 'rxjs';
+import { WebSocketService } from '../websocket/websocket.service';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Auth Service — JWT Token Management & User State
@@ -44,7 +45,18 @@ export class AuthService {
   constructor(
     private readonly http: HttpClient,
     private readonly router: Router,
-  ) {}
+  ) {
+    // Connect WebSocket on page reload if already authenticated
+    if (this.isAuthenticated()) {
+      const token = this.getAccessToken();
+      if (token) {
+        // Lazy-inject to avoid circular dependency timing issues
+        setTimeout(() => this.wsService.connect(token), 0);
+      }
+    }
+  }
+
+  private readonly wsService = inject(WebSocketService);
 
   // ─── Token management ────────────────────────────────────────────
 
@@ -55,6 +67,8 @@ export class AuthService {
   private setTokens(tokens: AuthTokensDto): void {
     localStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
     localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
+    // Connect WebSocket with the new token
+    this.wsService.connect(tokens.accessToken);
   }
 
   private setUser(user: UserDto): void {
@@ -217,6 +231,7 @@ export class AuthService {
   }
 
   logout(): void {
+    this.wsService.disconnect();
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(USER_KEY);

@@ -12,9 +12,10 @@ import {
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { DecimalPipe, DatePipe } from '@angular/common';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, Subscription } from 'rxjs';
 import type { PlaceDto, ApiResponse } from '@fueld/types';
 import * as L from 'leaflet';
+import { WebSocketService } from '../../../../core/websocket/websocket.service';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Place Detail Page — GeoJSON map, hierarchy tree, parent link,
@@ -22,7 +23,6 @@ import * as L from 'leaflet';
 // ═══════════════════════════════════════════════════════════════════════
 
 const API = 'http://localhost:3000';
-const WS_URL = 'ws://localhost:3000/ws/nearby-vessels';
 
 const PLACE_TYPE_LABELS: Record<string, string> = {
   POR: 'Port',
@@ -491,6 +491,7 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly http = inject(HttpClient);
+  private readonly wsService = inject(WebSocketService);
 
   readonly mapContainer = viewChild<ElementRef<HTMLDivElement>>('mapContainer');
 
@@ -516,7 +517,7 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
 
   private map: L.Map | null = null;
   private vesselLayer: L.LayerGroup | null = null;
-  private ws: WebSocket | null = null;
+  private wsSubs: Subscription[] = [];
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
@@ -529,7 +530,7 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.map?.remove();
-    this.ws?.close();
+    this.wsSubs.forEach((s) => s.unsubscribe());
   }
 
   async loadPlace(id: string): Promise<void> {
@@ -547,8 +548,8 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
 
         if (res.data.lliPlaceId) {
           this.loadEnrichment(res.data.lliPlaceId);
-          // Fire-and-forget: nearby vessels via WebSocket
-          this.connectVesselWebSocket(res.data.lliPlaceId);
+          // Request nearby vessels + sync via persistent WebSocket
+          this.requestViaWebSocket(res.data.lliPlaceId);
         }
       }
     } catch (err) {
@@ -594,59 +595,49 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  // ─── WebSocket: nearby vessels ───────────────────────────────────────
+  // ─── WebSocket: nearby vessels + place sync ──────────────────────────
 
-  private connectVesselWebSocket(placeId: string): void {
+  private requestViaWebSocket(lliPlaceId: string): void {
     this.vesselsLoading.set(true);
     this.syncing.set(true);
-    try {
-      this.ws = new WebSocket(WS_URL);
 
-      this.ws.onopen = () => {
-        // Request nearby vessels
-        this.ws!.send(JSON.stringify({ placeId }));
-        // Trigger async place sync
-        this.ws!.send(JSON.stringify({ type: 'sync-place', placeId: this.place()!.id }));
-      };
+    // Subscribe to nearby-vessels response
+    this.wsSubs.push(
+      this.wsService.on<NearbyVessel[]>('nearby-vessels').subscribe((vessels) => {
+        this.nearbyVessels.set(vessels);
+        this.vesselsLoading.set(false);
+        this.addVesselMarkers(vessels);
+      }),
+    );
 
-      this.ws.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data);
-          if (msg.type === 'nearby-vessels' && Array.isArray(msg.data)) {
-            this.nearbyVessels.set(msg.data);
-            this.vesselsLoading.set(false);
-            this.addVesselMarkers(msg.data);
-          } else if (msg.type === 'place-synced' && msg.data) {
-            // Update the local place data with synced result
-            this.place.set(msg.data);
-            this.syncing.set(false);
-          } else if (msg.type === 'sync-error') {
-            console.warn('[WS] Sync error:', msg.message);
-            this.syncing.set(false);
-          } else if (msg.type === 'error') {
-            console.error('[WS] Error:', msg.message);
-            this.vesselsLoading.set(false);
-            this.syncing.set(false);
-          }
-        } catch (err) {
-          console.error('[WS] Parse error:', err);
-        }
-      };
+    // Subscribe to place-synced response
+    this.wsSubs.push(
+      this.wsService.on<PlaceDto>('place-synced').subscribe((updated) => {
+        this.place.set(updated);
+        this.syncing.set(false);
+      }),
+    );
 
-      this.ws.onerror = () => {
+    // Subscribe to sync-error
+    this.wsSubs.push(
+      this.wsService.onRaw('sync-error').subscribe((msg) => {
+        console.warn('[WS] Sync error:', msg.message);
+        this.syncing.set(false);
+      }),
+    );
+
+    // Subscribe to generic errors
+    this.wsSubs.push(
+      this.wsService.onRaw('error').subscribe((msg) => {
+        console.error('[WS] Error:', msg.message);
         this.vesselsLoading.set(false);
         this.syncing.set(false);
-      };
+      }),
+    );
 
-      this.ws.onclose = () => {
-        this.vesselsLoading.set(false);
-        this.syncing.set(false);
-      };
-    } catch (err) {
-      console.error('WebSocket connection failed:', err);
-      this.vesselsLoading.set(false);
-      this.syncing.set(false);
-    }
+    // Send requests via the persistent WS
+    this.wsService.send({ type: 'nearby-vessels', placeId: lliPlaceId });
+    this.wsService.send({ type: 'sync-place', placeId: this.place()!.id });
   }
 
   // ─── Map ─────────────────────────────────────────────────────────────
