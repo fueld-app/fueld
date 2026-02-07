@@ -17,7 +17,7 @@ import {
   type OrderItemDto,
   type CounterpartyDto,
   type VesselDto,
-  type PortDto,
+  type PlaceDto,
   type ApiResponse,
 } from '@fueld/types';
 
@@ -185,7 +185,7 @@ export class OrderDetailPageComponent {
   readonly order = signal<OrderDto | null>(null);
   readonly client = signal<CounterpartyDto | null>(null);
   readonly vessel = signal<VesselDto | null>(null);
-  readonly port = signal<PortDto | null>(null);
+  readonly port = signal<PlaceDto | null>(null);
   readonly suppliers = signal<CounterpartyDto[]>([]);
   readonly itemRows = signal<OrderItemRow[]>([]);
   readonly saving = signal(false);
@@ -222,7 +222,7 @@ export class OrderDetailPageComponent {
       tenantId: 'tenant-1',
       clientId: 'cp-1',
       vesselId: 'v-1',
-      portId: 'p-1',
+      placeId: 'p-1',
       salesRepId: 'u-1',
       status: OrderStatus.Confirmed,
       eta: '2026-02-15',
@@ -253,10 +253,20 @@ export class OrderDetailPageComponent {
 
     this.port.set({
       id: 'p-1',
+      lliPlaceId: null,
+      unlocode: 'NL RTM',
       name: 'Rotterdam',
       country: 'Netherlands',
+      countryIso: 'NLD',
+      area: 'N Cont Europe',
+      placeType: 'POR',
       lat: 51.9225,
       long: 4.4792,
+      admiraltyChart: null,
+      principalFacilities: null,
+      portAuthorityName: null,
+      parentPlaceId: null,
+      parentPlaceName: null,
     });
 
     this.suppliers.set([

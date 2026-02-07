@@ -148,7 +148,7 @@ export interface OrderDto {
   tenantId: string;
   clientId: string;
   vesselId: string;
-  portId: string;
+  placeId: string;
   salesRepId: string | null;
   status: OrderStatus;
   eta: string | null;
@@ -162,7 +162,7 @@ export interface OrderDto {
 export interface CreateOrderDto {
   clientId: string;
   vesselId: string;
-  portId: string;
+  placeId: string;
   salesRepId?: string;
   eta?: string;
   etd?: string;
