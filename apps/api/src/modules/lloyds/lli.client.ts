@@ -195,6 +195,40 @@ export async function seasearcherPlaceDetail<T = unknown>(placeId: string): Prom
  * Fetch vessels near a port from Seasearcher.
  * GET https://www.seasearcher.com/api/vessel/nearPort/query?query=...
  */
+/**
+ * Fetch port facilities from Seasearcher.
+ * GET https://www.seasearcher.com/api/place/{id}/port-facilities
+ */
+export async function seasearcherPortFacilities<T = unknown>(placeId: string): Promise<T> {
+  const token = await getToken();
+  const url = `${SEASEARCHER_BASE}/place/${placeId}/port-facilities`;
+
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (res.status === 401) {
+    console.log('[Seasearcher] 401 on port-facilities, forcing token refresh…');
+    tokenState = null;
+    const freshToken = await getToken();
+    const retry = await fetch(url, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${freshToken}` },
+    });
+    if (!retry.ok) {
+      throw new Error(`Seasearcher port-facilities failed after retry: ${retry.status}`);
+    }
+    return (await retry.json()) as T;
+  }
+
+  if (!res.ok) {
+    throw new Error(`Seasearcher port-facilities failed: ${res.status} ${res.statusText}`);
+  }
+
+  return (await res.json()) as T;
+}
+
 export async function seasearcherNearbyVessels<T = unknown>(
   placeId: string,
   distance = 10,

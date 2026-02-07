@@ -6,7 +6,7 @@
 import { eq, ilike, or, and, sql } from 'drizzle-orm';
 import { db } from '../../db';
 import { vessels, places, counterparties, orders } from '../../db/schema';
-import { lliGet, seasearcherPlaceSearch, seasearcherPlaceDetail, seasearcherNearbyVessels } from './lli.client';
+import { lliGet, seasearcherPlaceSearch, seasearcherPlaceDetail, seasearcherNearbyVessels, seasearcherPortFacilities } from './lli.client';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Response types for LLI API
@@ -789,4 +789,133 @@ export async function searchCompanies(query: {
     communications: c.communications,
     personnel: c.personnel,
   }));
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  ORDERS FOR A PLACE
+// ═══════════════════════════════════════════════════════════════════════
+
+export async function getOrdersForPlace(placeId: string) {
+  const rows = await db
+    .select({
+      id: orders.id,
+      status: orders.status,
+      eta: orders.eta,
+      etd: orders.etd,
+      createdAt: orders.createdAt,
+      updatedAt: orders.updatedAt,
+      clientName: counterparties.name,
+      vesselName: vessels.name,
+      vesselImo: vessels.imo,
+      salesRepId: orders.salesRepId,
+    })
+    .from(orders)
+    .innerJoin(counterparties, eq(orders.clientId, counterparties.id))
+    .innerJoin(vessels, eq(orders.vesselId, vessels.id))
+    .where(eq(orders.placeId, placeId))
+    .orderBy(sql`${orders.createdAt} desc`);
+
+  return rows;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  PORT FACILITIES (from Seasearcher)
+// ═══════════════════════════════════════════════════════════════════════
+
+const FACILITY_TYPE_LABELS: Record<number, string> = {
+  1: 'Port Authority',
+  2: 'Overview',
+  3: 'Security',
+  4: 'Regulations',
+  5: 'Documentation',
+  6: 'Approach',
+  7: 'Anchorage',
+  8: 'Pilotage',
+  9: 'Radio',
+  10: 'Pratique',
+  11: 'Quarantine',
+  12: 'Customs',
+  13: 'Maximum Size',
+  14: 'Berths',
+  15: 'Cranes',
+  16: 'Storage',
+  17: 'Passenger Facilities',
+  18: 'Cargo Handling',
+  19: 'Bunkering',
+  20: 'Fresh Water',
+  21: 'Towage',
+  22: 'Repairs & Maintenance',
+  23: 'Ship Chandlers',
+  24: 'Shipping Agents',
+  25: 'Stevedoring',
+  26: 'Surveyors',
+  27: 'Medical',
+  28: 'Airport',
+  29: 'Railway',
+  30: 'Developments',
+  31: "Lloyd's Agents",
+  32: 'Waste Reception',
+};
+
+interface SeasearcherFacility {
+  id: string;
+  type: number;
+  text: string;
+  editDate: string;
+}
+
+interface SeasearcherCompanyFacility {
+  type: number;
+  companies: {
+    id: string;
+    sectorName: string;
+    companyName: string;
+    addressLine1: string;
+    addressLine2: string;
+    town: string;
+    countyState: string;
+    postCode1: string;
+    postCode2: string;
+    country: string;
+    telephone: string;
+    fax: string;
+    emailAddress: string;
+    webAddress: string;
+  }[];
+}
+
+interface SeasearcherPortFacilitiesResponse {
+  portFacilities: SeasearcherFacility[];
+  portCompanyFacilities: SeasearcherCompanyFacility[];
+}
+
+export async function getPortFacilities(seasearcherId: string) {
+  const data = await seasearcherPortFacilities<SeasearcherPortFacilitiesResponse>(seasearcherId);
+
+  const facilities = (data.portFacilities ?? []).map((f) => ({
+    id: f.id,
+    type: f.type,
+    label: FACILITY_TYPE_LABELS[f.type] ?? `Type ${f.type}`,
+    text: f.text,
+    editDate: f.editDate,
+  }));
+
+  const companies = (data.portCompanyFacilities ?? []).map((c) => ({
+    type: c.type,
+    label: FACILITY_TYPE_LABELS[c.type] ?? c.companies[0]?.sectorName ?? `Type ${c.type}`,
+    companies: c.companies.map((co) => ({
+      id: co.id,
+      name: co.companyName,
+      sector: co.sectorName,
+      address: [co.addressLine1, co.addressLine2].filter(Boolean).join(', '),
+      town: co.town,
+      country: co.country,
+      telephone: co.telephone?.trim() || null,
+      fax: co.fax?.trim() || null,
+      email: co.emailAddress || null,
+      website: co.webAddress || null,
+    })),
+  }));
+
+  return { facilities, companies };
 }

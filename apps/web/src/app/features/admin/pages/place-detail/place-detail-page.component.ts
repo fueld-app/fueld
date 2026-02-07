@@ -70,6 +70,46 @@ interface NearbyVessel {
   status: string | null;
 }
 
+interface PlaceOrder {
+  id: string;
+  status: string;
+  eta: string | null;
+  etd: string | null;
+  createdAt: string;
+  updatedAt: string;
+  clientName: string;
+  vesselName: string;
+  vesselImo: string | null;
+  salesRepId: string | null;
+}
+
+interface PortFacility {
+  id: string;
+  type: number;
+  label: string;
+  text: string;
+  editDate: string;
+}
+
+interface FacilityCompany {
+  id: string;
+  name: string;
+  sector: string;
+  address: string;
+  town: string;
+  country: string;
+  telephone: string | null;
+  fax: string | null;
+  email: string | null;
+  website: string | null;
+}
+
+interface FacilityCompanyGroup {
+  type: number;
+  label: string;
+  companies: FacilityCompany[];
+}
+
 // Compact ISO 3166-1 alpha-3 → alpha-2 map (maritime-relevant)
 const ISO3_TO_ISO2: Record<string, string> = {
   ABW:'AW',AFG:'AF',AGO:'AO',ALB:'AL',AND:'AD',ARE:'AE',ARG:'AR',ARM:'AM',
@@ -196,6 +236,20 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
               </span>
             }
             <div class="ml-auto flex items-center gap-2">
+              @if (place()!.lliPlaceId) {
+                <a
+                  [href]="'https://www.seasearcher.com/port-detail/' + place()!.lliPlaceId"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
+                    <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
+                  </svg>
+                  Seasearcher
+                </a>
+              }
               <button
                 (click)="confirmDeletePlace()"
                 class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
@@ -407,6 +461,93 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 </div>
               </div>
             }
+
+            <!-- Facilities (from Seasearcher) -->
+            @if (place()!.lliPlaceId) {
+              <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
+                <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
+                  <h2 class="text-sm font-semibold text-gray-700">
+                    Port Facilities
+                    @if (facilitiesLoading()) {
+                      <span class="ml-2 inline-flex items-center gap-1 text-xs font-normal text-gray-400">
+                        <svg class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                        Loading…
+                      </span>
+                    }
+                  </h2>
+                  <!-- Tab switches -->
+                  <div class="flex gap-1">
+                    <button (click)="facilitiesTab.set('info')"
+                      class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
+                      [class]="facilitiesTab() === 'info' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'">
+                      Info
+                    </button>
+                    <button (click)="facilitiesTab.set('companies')"
+                      class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
+                      [class]="facilitiesTab() === 'companies' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'">
+                      Companies
+                    </button>
+                  </div>
+                </div>
+
+                @if (facilitiesTab() === 'info') {
+                  @if (!facilities().length && !facilitiesLoading()) {
+                    <div class="px-5 py-6 text-center text-sm text-gray-400">No facility data available</div>
+                  } @else {
+                    <div class="divide-y divide-gray-50 max-h-[600px] overflow-y-auto">
+                      @for (f of facilities(); track f.id) {
+                        <div class="px-5 py-3">
+                          <div class="flex items-center gap-2 mb-1">
+                            <span class="text-xs">{{ facilityIcon(f.type) }}</span>
+                            <h4 class="text-xs font-semibold text-gray-700">{{ f.label }}</h4>
+                          </div>
+                          <p class="text-xs text-gray-600 leading-relaxed whitespace-pre-line">{{ f.text }}</p>
+                        </div>
+                      }
+                    </div>
+                  }
+                } @else {
+                  @if (!facilityCompanies().length && !facilitiesLoading()) {
+                    <div class="px-5 py-6 text-center text-sm text-gray-400">No company data available</div>
+                  } @else {
+                    <div class="divide-y divide-gray-100 max-h-[600px] overflow-y-auto">
+                      @for (group of facilityCompanies(); track group.type) {
+                        <div class="px-5 py-3">
+                          <h4 class="text-xs font-semibold text-gray-700 mb-2">{{ group.label }}</h4>
+                          <div class="space-y-2">
+                            @for (co of group.companies; track co.name) {
+                              <div class="rounded-lg bg-gray-50 px-3 py-2">
+                                <p class="text-xs font-medium text-gray-900">{{ co.name }}</p>
+                                @if (co.address || co.town) {
+                                  <p class="text-[10px] text-gray-500 mt-0.5">
+                                    {{ co.address }}@if (co.town) {, {{ co.town }}}@if (co.country) {, {{ co.country }}}
+                                  </p>
+                                }
+                                <div class="flex items-center gap-3 mt-1 text-[10px]">
+                                  @if (co.telephone) {
+                                    <span class="text-gray-500">📞 {{ co.telephone }}</span>
+                                  }
+                                  @if (co.email) {
+                                    <a [href]="'mailto:' + co.email" class="text-brand-600 hover:underline">{{ co.email }}</a>
+                                  }
+                                  @if (co.website) {
+                                    <a [href]="co.website.startsWith('http') ? co.website : 'https://' + co.website"
+                                       target="_blank" rel="noopener" class="text-brand-600 hover:underline">🌐 Website</a>
+                                  }
+                                </div>
+                              </div>
+                            }
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  }
+                }
+              </div>
+            }
           </div>
 
           <!-- Right column: identifiers + summary -->
@@ -452,6 +593,55 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 </div>
               </div>
             }
+
+            <!-- Orders at this place -->
+            <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
+              <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
+                <h2 class="text-sm font-semibold text-gray-700">Orders</h2>
+                @if (placeOrders().length) {
+                  <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
+                    {{ placeOrders().length }}
+                  </span>
+                }
+              </div>
+              @if (ordersLoading()) {
+                <div class="flex items-center justify-center py-6">
+                  <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                  </svg>
+                </div>
+              } @else if (!placeOrders().length) {
+                <div class="px-5 py-6 text-center text-sm text-gray-400">No orders at this place</div>
+              } @else {
+                <div class="divide-y divide-gray-50 max-h-[320px] overflow-y-auto">
+                  @for (o of placeOrders(); track o.id) {
+                    <div class="px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors">
+                      <div class="flex items-center justify-between">
+                        <span class="font-medium text-gray-900 truncate">{{ o.vesselName }}</span>
+                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                              [class]="orderStatusClass(o.status)">
+                          {{ o.status }}
+                        </span>
+                      </div>
+                      <div class="flex items-center gap-2 mt-0.5 text-xs text-gray-500">
+                        <span>{{ o.clientName }}</span>
+                        @if (o.vesselImo) {
+                          <span class="text-gray-300">&middot;</span>
+                          <span class="font-mono text-gray-400">IMO {{ o.vesselImo }}</span>
+                        }
+                      </div>
+                      @if (o.eta || o.etd) {
+                        <div class="flex items-center gap-3 mt-1 text-[10px] text-gray-400">
+                          @if (o.eta) { <span>ETA {{ o.eta | date:'mediumDate' }}</span> }
+                          @if (o.etd) { <span>ETD {{ o.etd | date:'mediumDate' }}</span> }
+                        </div>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            </div>
 
             <!-- Nearby vessels list -->
             @if (nearbyVessels().length) {
@@ -570,6 +760,16 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
   readonly showDeleteModal = signal(false);
   readonly deletingPlace = signal(false);
 
+  // Orders at this place
+  readonly placeOrders = signal<PlaceOrder[]>([]);
+  readonly ordersLoading = signal(false);
+
+  // Facilities
+  readonly facilities = signal<PortFacility[]>([]);
+  readonly facilityCompanies = signal<FacilityCompanyGroup[]>([]);
+  readonly facilitiesLoading = signal(false);
+  readonly facilitiesTab = signal<'info' | 'companies'>('info');
+
   // Grouped hierarchy — terminals vs anchorages
   readonly terminals = computed(() =>
     this.enrichment()?.hierarchy?.filter((n) => n.category !== 'ANCHORAGE') ?? [],
@@ -605,12 +805,16 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
       if (res.success && res.data) {
         this.place.set(res.data);
 
+        // Load orders for this place
+        this.loadOrders(res.data.id);
+
         if (res.data.parentPlaceName) {
           this.parentPlaceName.set(res.data.parentPlaceName);
         }
 
         if (res.data.lliPlaceId) {
           this.loadEnrichment(res.data.lliPlaceId);
+          this.loadFacilities(res.data.lliPlaceId);
           // Request nearby vessels + sync via persistent WebSocket
           this.requestViaWebSocket(res.data.lliPlaceId);
         }
@@ -797,6 +1001,70 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
 
       marker.addTo(this.vesselLayer);
     }
+  }
+
+  // ─── Orders for this place ────────────────────────────────────────────
+
+  private async loadOrders(placeId: string): Promise<void> {
+    this.ordersLoading.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<PlaceOrder[]>>(`${API}/lloyds/places/local/${placeId}/orders`),
+      );
+      if (res.success && res.data) {
+        this.placeOrders.set(res.data);
+      }
+    } catch (err) {
+      console.error('Failed to load orders:', err);
+    } finally {
+      this.ordersLoading.set(false);
+    }
+  }
+
+  orderStatusClass(status: string): string {
+    switch (status) {
+      case 'INQUIRY':   return 'bg-blue-50 text-blue-700';
+      case 'OFFER':     return 'bg-violet-50 text-violet-700';
+      case 'CONFIRMED': return 'bg-emerald-50 text-emerald-700';
+      case 'DELIVERED':  return 'bg-teal-50 text-teal-700';
+      case 'INVOICED':  return 'bg-amber-50 text-amber-700';
+      case 'PAID':      return 'bg-green-50 text-green-700';
+      case 'CANCELLED': return 'bg-red-50 text-red-700';
+      default:          return 'bg-gray-50 text-gray-700';
+    }
+  }
+
+  // ─── Port Facilities ──────────────────────────────────────────────────
+
+  private async loadFacilities(seasearcherId: string): Promise<void> {
+    this.facilitiesLoading.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ facilities: PortFacility[]; companies: FacilityCompanyGroup[] }>>(
+          `${API}/lloyds/places/facilities/${seasearcherId}`,
+        ),
+      );
+      if (res.success && res.data) {
+        this.facilities.set(res.data.facilities);
+        this.facilityCompanies.set(res.data.companies);
+      }
+    } catch (err) {
+      console.error('Failed to load facilities:', err);
+    } finally {
+      this.facilitiesLoading.set(false);
+    }
+  }
+
+  facilityIcon(type: number): string {
+    const icons: Record<number, string> = {
+      1: '🏛️', 2: '📋', 3: '🔒', 4: '📜', 5: '📄', 6: '🚢',
+      7: '⚓', 8: '🧭', 9: '📻', 10: '🏥', 11: '🏥', 12: '🛃',
+      13: '📏', 14: '🔗', 15: '🏗️', 16: '📦', 17: '👥', 18: '📥',
+      19: '⛽', 20: '💧', 21: '🚤', 22: '🔧', 23: '🛒', 24: '🚢',
+      25: '📦', 26: '🔎', 27: '🏥', 28: '✈️', 29: '🚂', 30: '🏗️',
+      31: '🏢', 32: '♻️',
+    };
+    return icons[type] ?? '📋';
   }
 
   // ─── Delete place ─────────────────────────────────────────────────────

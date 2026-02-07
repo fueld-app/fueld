@@ -12,6 +12,8 @@ import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subject, of } from 'rxjs';
 import { debounceTime, switchMap, tap, catchError, takeUntil } from 'rxjs/operators';
 import type { PlaceDto, ApiResponse, CreatePlaceDto } from '@fueld/types';
+import { COUNTRIES } from '../../../../shared/data/countries';
+import { AREAS } from '../../../../shared/data/areas';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Places Page — Browse local places + search & import from Lloyd's
@@ -357,8 +359,13 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
                 </div>
                 <div class="col-span-2 sm:col-span-1">
                   <label class="block text-sm font-medium text-gray-700">Country *</label>
-                  <input type="text" [(ngModel)]="createForm.country" name="country" required
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
+                  <select [ngModel]="createForm.countryIso" (ngModelChange)="onCountryChange($event)" name="country" required
+                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white">
+                    <option value="">Select country…</option>
+                    @for (c of countries; track c.code) {
+                      <option [value]="c.code">{{ c.name }}</option>
+                    }
+                  </select>
                 </div>
                 <div>
                   <label class="block text-sm font-medium text-gray-700">Type</label>
@@ -389,8 +396,13 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
                 </div>
                 <div class="col-span-2">
                   <label class="block text-sm font-medium text-gray-700">Area</label>
-                  <input type="text" [(ngModel)]="createForm.area" name="area"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
+                  <select [(ngModel)]="createForm.area" name="area"
+                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white">
+                    <option [ngValue]="undefined">—</option>
+                    @for (a of areas; track a) {
+                      <option [value]="a">{{ a }}</option>
+                    }
+                  </select>
                 </div>
               </div>
 
@@ -441,6 +453,8 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
   readonly creating = signal(false);
   readonly createError = signal<string | null>(null);
   createForm: CreatePlaceDto = { name: '', country: '' };
+  readonly countries = COUNTRIES;
+  readonly areas = AREAS;
 
   // ─── Delete state ─────────────────────────────────────────────────
   readonly deleteTarget = signal<PlaceDto | null>(null);
@@ -603,10 +617,17 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
     this.createForm = {
       name: this.lliSearchTerm(),
       country: '',
+      countryIso: '',
     };
     this.createError.set(null);
     this.lliDropdownOpen.set(false);
     this.showCreateModal.set(true);
+  }
+
+  onCountryChange(code: string): void {
+    const c = COUNTRIES.find((x) => x.code === code);
+    this.createForm.countryIso = code;
+    this.createForm.country = c?.name ?? '';
   }
 
   async executeCreate(): Promise<void> {
@@ -621,6 +642,7 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
         name: this.createForm.name.trim(),
         country: this.createForm.country.trim(),
       };
+      if (this.createForm.countryIso?.trim()) body['countryIso'] = this.createForm.countryIso.trim();
       if (this.createForm.placeType) body['placeType'] = this.createForm.placeType;
       if (this.createForm.unlocode?.trim()) body['unlocode'] = this.createForm.unlocode.trim();
       if (this.createForm.lat != null) body['lat'] = this.createForm.lat;

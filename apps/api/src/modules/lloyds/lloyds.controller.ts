@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia';
 import { authGuard } from '../auth/auth.guard';
-import { searchVessels, searchPlaces, searchCompanies, importPlaceFromLli, listPlaces, getPlaceById, getPlaceByLliId, getPlaceEnrichment, createPlace, deletePlace, syncPlaceFromSeasearcher } from './lli.service';
+import { searchVessels, searchPlaces, searchCompanies, importPlaceFromLli, listPlaces, getPlaceById, getPlaceByLliId, getPlaceEnrichment, createPlace, deletePlace, syncPlaceFromSeasearcher, getOrdersForPlace, getPortFacilities } from './lli.service';
 import type { ApiResponse } from '@fueld/types';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -275,6 +275,48 @@ export const lloydsController = new Elysia({ prefix: '/lloyds' })
         tags: ["Lloyd's"],
         summary: 'Sync place data from Seasearcher',
         description: 'Fetches latest data from Seasearcher and updates the local record.',
+      },
+    },
+  )
+
+  // ─── Orders for a Place ────────────────────────────────────────────
+  .get(
+    '/places/local/:id/orders',
+    async ({ params }) => {
+      try {
+        const orders = await getOrdersForPlace(params.id);
+        return { success: true, data: orders } satisfies ApiResponse<typeof orders>;
+      } catch (err) {
+        console.error('[Orders] Failed to load orders for place:', err);
+        return { success: false, data: [], message: 'Failed to load orders' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: {
+        tags: ["Lloyd's"],
+        summary: 'Get all orders for a place',
+      },
+    },
+  )
+
+  // ─── Port Facilities (Seasearcher) ────────────────────────────────
+  .get(
+    '/places/facilities/:seasearcherId',
+    async ({ params }) => {
+      try {
+        const data = await getPortFacilities(params.seasearcherId);
+        return { success: true, data } satisfies ApiResponse<typeof data>;
+      } catch (err) {
+        console.error('[Seasearcher] Port facilities failed:', err);
+        return { success: false, data: null, message: 'Failed to load port facilities' };
+      }
+    },
+    {
+      params: t.Object({ seasearcherId: t.String() }),
+      detail: {
+        tags: ["Lloyd's"],
+        summary: 'Get port facilities from Seasearcher',
       },
     },
   )
