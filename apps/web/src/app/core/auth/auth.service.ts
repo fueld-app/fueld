@@ -143,6 +143,8 @@ export class AuthService {
   /** Generate a TOTP secret + QR code for setup. Requires an active session. */
   async setup2fa(): Promise<TwoFactorSetupDto> {
     const token = this.getAccessToken();
+    if (!token) throw new Error('Not authenticated. Please log in again.');
+
     const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
 
     const res = await firstValueFrom(
@@ -152,6 +154,10 @@ export class AuthService {
         { headers },
       ),
     );
+
+    if (!res.success || !res.data) {
+      throw new Error(res.message ?? 'Failed to generate 2FA secret');
+    }
 
     return res.data;
   }
