@@ -9,17 +9,15 @@ import {
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { firstValueFrom, Subject } from 'rxjs';
-import { debounceTime, distinctUntilChanged, switchMap, tap, filter, catchError } from 'rxjs/operators';
-import type { PlaceDto, ApiResponse } from '@fueld/types';
+import { firstValueFrom, Subject, of } from 'rxjs';
+import { debounceTime, switchMap, tap, catchError, takeUntil } from 'rxjs/operators';
+import type { PlaceDto, ApiResponse, CreatePlaceDto } from '@fueld/types';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Places Page — Browse local places + search & import from Lloyd's
 // ═══════════════════════════════════════════════════════════════════════
 
 const API = 'http://localhost:3000';
-
-type PlaceType = 'POR' | 'PSP' | 'ANC' | 'TER' | 'FIL';
 
 interface LliSearchResult {
   source: 'local' | 'lloyds';
@@ -75,8 +73,8 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
             type="text"
             [ngModel]="lliSearchTerm()"
             (ngModelChange)="onSearchInput($event)"
-            (focus)="lliDropdownOpen.set(lliResults().length > 0)"
-            placeholder="Search places to import (min. 2 characters)…"
+            (focus)="onSearchFocus()"
+            placeholder="Search places to import or create (min. 2 characters)…"
             class="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm
                    focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
           />
@@ -90,7 +88,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
           }
 
           <!-- Typeahead dropdown -->
-          @if (lliDropdownOpen() && lliResults().length > 0) {
+          @if (lliDropdownOpen() && searchDone()) {
             <div class="absolute z-20 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-80 overflow-y-auto">
               @for (r of lliResults(); track r.lliPlaceId ?? r.localId) {
                 <div class="flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0">
@@ -125,6 +123,20 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
                       {{ importingId() === r.lliPlaceId ? 'Importing…' : 'Import' }}
                     </button>
                   }
+                </div>
+              } @empty {
+                <div class="px-3 py-4 text-center">
+                  <p class="text-sm text-gray-500">No places found matching "{{ lliSearchTerm() }}"</p>
+                  <button
+                    (click)="openCreateModal(); $event.stopPropagation()"
+                    class="mt-2 inline-flex items-center gap-1.5 rounded-md bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white
+                           hover:bg-brand-700 transition-colors"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+                    </svg>
+                    Create "{{ lliSearchTerm() }}" manually
+                  </button>
                 </div>
               }
             </div>
@@ -311,6 +323,80 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
           ✓ Place imported successfully
         </div>
       }
+
+      <!-- Create Place Modal -->
+      @if (showCreateModal()) {
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div class="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+            <h3 class="text-lg font-semibold text-gray-900">Create Place</h3>
+            <p class="mt-1 text-sm text-gray-500">Add a place manually that isn't in Lloyd's List Intelligence.</p>
+
+            @if (createError()) {
+              <div class="mt-3 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+                {{ createError() }}
+              </div>
+            }
+
+            <form class="mt-4 space-y-4" (ngSubmit)="executeCreate()">
+              <div class="grid grid-cols-2 gap-4">
+                <div class="col-span-2 sm:col-span-1">
+                  <label class="block text-sm font-medium text-gray-700">Name *</label>
+                  <input type="text" [(ngModel)]="createForm.name" name="name" required
+                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
+                </div>
+                <div class="col-span-2 sm:col-span-1">
+                  <label class="block text-sm font-medium text-gray-700">Country *</label>
+                  <input type="text" [(ngModel)]="createForm.country" name="country" required
+                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700">Type</label>
+                  <select [(ngModel)]="createForm.placeType" name="placeType"
+                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white">
+                    <option [ngValue]="undefined">—</option>
+                    <option value="POR">Port</option>
+                    <option value="PSP">Sub Port</option>
+                    <option value="ANC">Anchorage</option>
+                    <option value="TER">Terminal</option>
+                    <option value="FIL">Hydrocarbon Field</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700">UNLOCODE</label>
+                  <input type="text" [(ngModel)]="createForm.unlocode" name="unlocode"
+                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700">Latitude</label>
+                  <input type="number" step="any" [(ngModel)]="createForm.lat" name="lat"
+                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700">Longitude</label>
+                  <input type="number" step="any" [(ngModel)]="createForm.long" name="long"
+                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
+                </div>
+                <div class="col-span-2">
+                  <label class="block text-sm font-medium text-gray-700">Area</label>
+                  <input type="text" [(ngModel)]="createForm.area" name="area"
+                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
+                </div>
+              </div>
+
+              <div class="flex justify-end gap-3 pt-2">
+                <button type="button" (click)="showCreateModal.set(false)"
+                  class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                  Cancel
+                </button>
+                <button type="submit" [disabled]="creating()"
+                  class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50 transition-colors">
+                  {{ creating() ? 'Creating…' : 'Create Place' }}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      }
     </div>
   `,
 })
@@ -333,10 +419,17 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
   readonly lliResults = signal<LliSearchResult[]>([]);
   readonly lliSearching = signal(false);
   readonly lliDropdownOpen = signal(false);
+  readonly searchDone = signal(false);
 
   // ─── Import state ───────────────────────────────────────────────
   readonly importingId = signal<string | null>(null);
   readonly importSuccess = signal(false);
+
+  // ─── Create state ───────────────────────────────────────────────
+  readonly showCreateModal = signal(false);
+  readonly creating = signal(false);
+  readonly createError = signal<string | null>(null);
+  createForm: CreatePlaceDto = { name: '', country: '' };
 
   // ─── Delete state ─────────────────────────────────────────────────
   readonly deleteTarget = signal<PlaceDto | null>(null);
@@ -349,33 +442,36 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
     // Set up debounced typeahead
     this.searchSubject
       .pipe(
+        takeUntil(this.destroy$),
         debounceTime(300),
-        distinctUntilChanged(),
         tap((term) => {
           if (term.length < 2) {
             this.lliResults.set([]);
             this.lliDropdownOpen.set(false);
             this.lliSearching.set(false);
+            this.searchDone.set(false);
           }
         }),
-        filter((term) => term.length >= 2),
-        tap(() => this.lliSearching.set(true)),
-        switchMap((term) =>
-          this.http
+        switchMap((term) => {
+          if (term.length < 2) return of(null);
+          this.lliSearching.set(true);
+          return this.http
             .get<ApiResponse<LliSearchResult[]>>(
               `${API}/lloyds/places?name=${encodeURIComponent(term)}`,
             )
-            .pipe(catchError(() => [{ success: true, data: [] } as ApiResponse<LliSearchResult[]>])),
-        ),
+            .pipe(catchError(() => of({ success: true, data: [] } as ApiResponse<LliSearchResult[]>)));
+        }),
       )
       .subscribe((res) => {
+        if (!res) return; // cleared / too short
         this.lliSearching.set(false);
+        this.searchDone.set(true);
         if (res.success && res.data) {
           this.lliResults.set(res.data);
-          this.lliDropdownOpen.set(res.data.length > 0);
+          this.lliDropdownOpen.set(true);
         } else {
           this.lliResults.set([]);
-          this.lliDropdownOpen.set(false);
+          this.lliDropdownOpen.set(true);
         }
       });
   }
@@ -388,8 +484,11 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
   onSearchInput(term: string): void {
     this.lliSearchTerm.set(term);
     this.searchSubject.next(term);
-    if (term.length >= 2) {
-      this.lliSearching.set(true);
+  }
+
+  onSearchFocus(): void {
+    if (this.searchDone() && this.lliSearchTerm().length >= 2) {
+      this.lliDropdownOpen.set(true);
     }
   }
 
@@ -472,6 +571,53 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
       console.error('Delete failed:', err);
     } finally {
       this.deleting.set(false);
+    }
+  }
+
+  // ─── Create place (manual) ──────────────────────────────────────
+
+  openCreateModal(): void {
+    this.createForm = {
+      name: this.lliSearchTerm(),
+      country: '',
+    };
+    this.createError.set(null);
+    this.lliDropdownOpen.set(false);
+    this.showCreateModal.set(true);
+  }
+
+  async executeCreate(): Promise<void> {
+    if (!this.createForm.name?.trim() || !this.createForm.country?.trim()) {
+      this.createError.set('Name and country are required.');
+      return;
+    }
+    this.creating.set(true);
+    this.createError.set(null);
+    try {
+      const body: Record<string, unknown> = {
+        name: this.createForm.name.trim(),
+        country: this.createForm.country.trim(),
+      };
+      if (this.createForm.placeType) body['placeType'] = this.createForm.placeType;
+      if (this.createForm.unlocode?.trim()) body['unlocode'] = this.createForm.unlocode.trim();
+      if (this.createForm.lat != null) body['lat'] = this.createForm.lat;
+      if (this.createForm.long != null) body['long'] = this.createForm.long;
+      if (this.createForm.area?.trim()) body['area'] = this.createForm.area.trim();
+
+      await firstValueFrom(
+        this.http.post<ApiResponse<PlaceDto>>(`${API}/lloyds/places/local`, body),
+      );
+      this.showCreateModal.set(false);
+      this.lliSearchTerm.set('');
+      this.lliResults.set([]);
+      this.searchDone.set(false);
+      await this.loadPlaces();
+    } catch (err: any) {
+      const message = err?.error?.message || 'Failed to create place';
+      this.createError.set(message);
+      console.error('Create failed:', err);
+    } finally {
+      this.creating.set(false);
     }
   }
 

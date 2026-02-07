@@ -598,6 +598,47 @@ export async function getNearbyVessels(seasearcherId: string): Promise<NearbyVes
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+//  CREATE LOCAL PLACE (manual entry)
+// ═══════════════════════════════════════════════════════════════════════
+
+export async function createPlace(data: {
+  name: string;
+  country: string;
+  countryIso?: string;
+  area?: string;
+  subRegion?: string;
+  placeType?: 'POR' | 'PSP' | 'ANC' | 'TER' | 'FIL';
+  timezone?: string;
+  lat?: number;
+  long?: number;
+  unlocode?: string;
+  admiraltyChart?: string;
+  parentPlaceId?: string;
+  parentPlaceName?: string;
+}) {
+  const [created] = await db
+    .insert(places)
+    .values({
+      name: data.name,
+      country: data.country,
+      countryIso: data.countryIso ?? null,
+      area: data.area ?? null,
+      subRegion: data.subRegion ?? null,
+      placeType: data.placeType ?? null,
+      timezone: data.timezone ?? null,
+      lat: data.lat ?? null,
+      long: data.long ?? null,
+      unlocode: data.unlocode ?? null,
+      admiraltyChart: data.admiraltyChart ?? null,
+      parentPlaceId: data.parentPlaceId ?? null,
+      parentPlaceName: data.parentPlaceName ?? null,
+    })
+    .returning();
+
+  return created;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 //  DELETE LOCAL PLACE
 // ═══════════════════════════════════════════════════════════════════════
 

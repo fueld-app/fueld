@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia';
 import { authGuard } from '../auth/auth.guard';
-import { searchVessels, searchPlaces, searchCompanies, importPlaceFromLli, listPlaces, getPlaceById, getPlaceByLliId, getPlaceEnrichment, deletePlace, syncPlaceFromSeasearcher } from './lli.service';
+import { searchVessels, searchPlaces, searchCompanies, importPlaceFromLli, listPlaces, getPlaceById, getPlaceByLliId, getPlaceEnrichment, createPlace, deletePlace, syncPlaceFromSeasearcher } from './lli.service';
 import type { ApiResponse } from '@fueld/types';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -164,6 +164,42 @@ export const lloydsController = new Elysia({ prefix: '/lloyds' })
       detail: {
         tags: ["Lloyd's"],
         summary: 'Find a local place by its Seasearcher/LLI ID',
+      },
+    },
+  )
+
+  // ─── Create Place (manual entry) ──────────────────────────────────
+  .post(
+    '/places/local',
+    async ({ body }) => {
+      const place = await createPlace(body);
+      return { success: true, data: place } satisfies ApiResponse<typeof place>;
+    },
+    {
+      body: t.Object({
+        name: t.String({ minLength: 1 }),
+        country: t.String({ minLength: 1 }),
+        countryIso: t.Optional(t.String()),
+        area: t.Optional(t.String()),
+        subRegion: t.Optional(t.String()),
+        placeType: t.Optional(t.Union([
+          t.Literal('POR'),
+          t.Literal('PSP'),
+          t.Literal('ANC'),
+          t.Literal('TER'),
+          t.Literal('FIL'),
+        ])),
+        timezone: t.Optional(t.String()),
+        lat: t.Optional(t.Number()),
+        long: t.Optional(t.Number()),
+        unlocode: t.Optional(t.String()),
+        admiraltyChart: t.Optional(t.String()),
+        parentPlaceId: t.Optional(t.String()),
+        parentPlaceName: t.Optional(t.String()),
+      }),
+      detail: {
+        tags: ["Lloyd's"],
+        summary: 'Create a place manually in local database',
       },
     },
   )
