@@ -4,10 +4,12 @@ import {
   signal,
   inject,
   OnInit,
+  OnDestroy,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, Subject } from 'rxjs';
+import { debounceTime, distinctUntilChanged, switchMap, tap, filter, catchError } from 'rxjs/operators';
 import type { PlaceDto, ApiResponse } from '@fueld/types';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -19,16 +21,21 @@ const API = 'http://localhost:3000';
 type PlaceType = 'POR' | 'PSP' | 'ANC' | 'TER' | 'FIL';
 
 interface LliSearchResult {
-  lliPlaceId: number;
+  source: 'local' | 'lloyds';
+  localId?: string;
+  lliPlaceId?: string;
   name: string;
   country: string;
-  area: string | null;
-  unlocode: string | null;
-  placeType: string | null;
-  admiraltyChart: string | null;
-  principalFacilities: string | null;
-  portAuthorityName: string | null;
-  parentPlaceName: string | null;
+  countryIso?: string;
+  area?: string;
+  type?: string;
+  latitude?: number;
+  longitude?: number;
+  unlocode?: string;
+  admiraltyChart?: string;
+  principalFacilities?: string[];
+  portAuthorityName?: string;
+  parentPlaceName?: string;
 }
 
 const PLACE_TYPE_LABELS: Record<string, string> = {
@@ -54,128 +61,76 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
             Import from Lloyd's List Intelligence.
           </p>
         </div>
-        <button
-          (click)="showLliSearch.set(!showLliSearch())"
-          class="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold shadow-sm
-                 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2"
-          [class]="showLliSearch()
-            ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 focus:ring-gray-400'
-            : 'bg-brand-600 text-white hover:bg-brand-700 focus:ring-brand-500'"
-        >
-          @if (!showLliSearch()) {
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
-            </svg>
-            Search Lloyd's
-          } @else {
-            Close Search
-          }
-        </button>
       </div>
 
-      <!-- LLI Search Panel -->
-      @if (showLliSearch()) {
-        <div class="mb-6 rounded-xl border border-blue-200 bg-blue-50/50 p-4">
-          <h2 class="text-sm font-semibold text-blue-900 mb-3">Search Lloyd's List Intelligence</h2>
-          <div class="flex flex-col sm:flex-row gap-3 mb-4">
-            <input
-              type="text"
-              [(ngModel)]="lliSearchName"
-              placeholder="Place name…"
-              class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm
-                     focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
-              (keydown.enter)="searchLli()"
-            />
-            <input
-              type="text"
-              [(ngModel)]="lliSearchCountry"
-              placeholder="Country code…"
-              class="w-full sm:w-28 rounded-lg border border-gray-300 px-3 py-2 text-sm
-                     focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
-              (keydown.enter)="searchLli()"
-            />
-            <select
-              [(ngModel)]="lliSearchType"
-              class="w-full sm:w-40 rounded-lg border border-gray-300 px-3 py-2 text-sm
-                     focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
-            >
-              <option value="">All types</option>
-              <option value="POR">Port</option>
-              <option value="PSP">Sub Port</option>
-              <option value="ANC">Anchorage</option>
-              <option value="TER">Terminal</option>
-              <option value="FIL">Hydrocarbon Field</option>
-            </select>
-            <button
-              (click)="searchLli()"
-              [disabled]="lliSearching()"
-              class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white
-                     hover:bg-blue-700 disabled:opacity-50 transition-colors"
-            >
-              {{ lliSearching() ? 'Searching…' : 'Search' }}
-            </button>
+      <!-- Search + Import bar -->
+      <div class="flex flex-col sm:flex-row gap-3 mb-4">
+        <!-- Typeahead search (LLI + local) -->
+        <div class="relative flex-1">
+          <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+            <svg class="h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+            </svg>
           </div>
-
-          <!-- LLI Results -->
-          @if (lliResults().length > 0) {
-            <div class="overflow-x-auto rounded-lg border border-blue-200 bg-white">
-              <table class="w-full text-sm">
-                <thead>
-                  <tr class="border-b border-blue-100 bg-blue-50/60">
-                    <th class="px-3 py-2 text-left font-medium text-blue-800">Name</th>
-                    <th class="px-3 py-2 text-left font-medium text-blue-800">Country</th>
-                    <th class="px-3 py-2 text-left font-medium text-blue-800">Type</th>
-                    <th class="px-3 py-2 text-left font-medium text-blue-800">UNLOCODE</th>
-                    <th class="px-3 py-2 text-left font-medium text-blue-800">Parent</th>
-                    <th class="px-3 py-2 w-24"></th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-blue-50">
-                  @for (r of lliResults(); track r.lliPlaceId) {
-                    <tr class="hover:bg-blue-50/30 transition-colors">
-                      <td class="px-3 py-2 font-medium text-gray-900">{{ r.name }}</td>
-                      <td class="px-3 py-2 text-gray-600">{{ r.country }}</td>
-                      <td class="px-3 py-2">
-                        @if (r.placeType) {
-                          <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                                [class]="placeTypeBadgeClass(r.placeType)">
-                            {{ placeTypeLabel(r.placeType) }}
-                          </span>
-                        }
-                      </td>
-                      <td class="px-3 py-2 text-gray-500 font-mono text-xs">{{ r.unlocode ?? '—' }}</td>
-                      <td class="px-3 py-2 text-gray-500 text-xs">{{ r.parentPlaceName ?? '—' }}</td>
-                      <td class="px-3 py-2">
-                        <button
-                          (click)="importPlace(r.lliPlaceId)"
-                          [disabled]="importingId() === r.lliPlaceId"
-                          class="rounded-md bg-green-600 px-3 py-1 text-xs font-semibold text-white
-                                 hover:bg-green-700 disabled:opacity-50 transition-colors"
-                        >
-                          {{ importingId() === r.lliPlaceId ? 'Importing…' : 'Import' }}
-                        </button>
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
+          <input
+            type="text"
+            [ngModel]="lliSearchTerm()"
+            (ngModelChange)="onSearchInput($event)"
+            (focus)="lliDropdownOpen.set(lliResults().length > 0)"
+            placeholder="Search places to import (min. 2 characters)…"
+            class="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm
+                   focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+          />
+          @if (lliSearching()) {
+            <div class="absolute inset-y-0 right-0 flex items-center pr-3">
+              <svg class="h-4 w-4 animate-spin text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+              </svg>
             </div>
-          } @else if (lliSearched() && !lliSearching()) {
-            <p class="text-sm text-gray-500 italic">No results found.</p>
+          }
+
+          <!-- Typeahead dropdown -->
+          @if (lliDropdownOpen() && lliResults().length > 0) {
+            <div class="absolute z-20 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-80 overflow-y-auto">
+              @for (r of lliResults(); track r.lliPlaceId ?? r.localId) {
+                <div class="flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0">
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm font-medium text-gray-900 truncate">{{ r.name }}</span>
+                      @if (r.type) {
+                        <span class="inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+                              [class]="placeTypeBadgeClass(r.type)">
+                          {{ placeTypeLabel(r.type) }}
+                        </span>
+                      }
+                      @if (r.source === 'local') {
+                        <span class="inline-flex shrink-0 items-center rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
+                          Local
+                        </span>
+                      }
+                    </div>
+                    <div class="mt-0.5 text-xs text-gray-500 truncate">
+                      {{ r.country }}
+                      @if (r.unlocode) { · {{ r.unlocode }} }
+                      @if (r.area) { · {{ r.area }} }
+                    </div>
+                  </div>
+                  @if (r.source === 'lloyds' && r.lliPlaceId) {
+                    <button
+                      (click)="importPlace(r.lliPlaceId); $event.stopPropagation()"
+                      [disabled]="importingId() === r.lliPlaceId"
+                      class="shrink-0 rounded-md bg-green-600 px-3 py-1 text-xs font-semibold text-white
+                             hover:bg-green-700 disabled:opacity-50 transition-colors"
+                    >
+                      {{ importingId() === r.lliPlaceId ? 'Importing…' : 'Import' }}
+                    </button>
+                  }
+                </div>
+              }
+            </div>
           }
         </div>
-      }
-
-      <!-- Local Places Search -->
-      <div class="flex flex-col sm:flex-row gap-3 mb-4">
-        <input
-          type="text"
-          [(ngModel)]="localSearch"
-          placeholder="Search local places…"
-          class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm
-                 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
-          (keydown.enter)="loadPlaces()"
-        />
         <select
           [(ngModel)]="localTypeFilter"
           (ngModelChange)="loadPlaces()"
@@ -197,6 +152,11 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
           Refresh
         </button>
       </div>
+
+      <!-- Click-away backdrop for dropdown -->
+      @if (lliDropdownOpen()) {
+        <div class="fixed inset-0 z-10" (click)="lliDropdownOpen.set(false)"></div>
+      }
 
       <!-- Desktop table -->
       <div class="hidden md:block overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -312,8 +272,10 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
     </div>
   `,
 })
-export class PlacesPageComponent implements OnInit {
+export class PlacesPageComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
+  private readonly searchSubject = new Subject<string>();
+  private readonly destroy$ = new Subject<void>();
 
   // ─── Local places state ──────────────────────────────────────────
   readonly places = signal<PlaceDto[]>([]);
@@ -321,24 +283,66 @@ export class PlacesPageComponent implements OnInit {
   readonly totalCount = signal(0);
   readonly currentPage = signal(1);
   readonly pageSize = 25;
-  localSearch = '';
   localTypeFilter = '';
 
-  // ─── LLI search state ───────────────────────────────────────────
-  readonly showLliSearch = signal(false);
+  // ─── LLI typeahead state ─────────────────────────────────────────
+  readonly lliSearchTerm = signal('');
   readonly lliResults = signal<LliSearchResult[]>([]);
   readonly lliSearching = signal(false);
-  readonly lliSearched = signal(false);
-  lliSearchName = '';
-  lliSearchCountry = '';
-  lliSearchType = '';
+  readonly lliDropdownOpen = signal(false);
 
   // ─── Import state ───────────────────────────────────────────────
-  readonly importingId = signal<number | null>(null);
+  readonly importingId = signal<string | null>(null);
   readonly importSuccess = signal(false);
 
   ngOnInit(): void {
     this.loadPlaces();
+
+    // Set up debounced typeahead
+    this.searchSubject
+      .pipe(
+        debounceTime(300),
+        distinctUntilChanged(),
+        tap((term) => {
+          if (term.length < 2) {
+            this.lliResults.set([]);
+            this.lliDropdownOpen.set(false);
+            this.lliSearching.set(false);
+          }
+        }),
+        filter((term) => term.length >= 2),
+        tap(() => this.lliSearching.set(true)),
+        switchMap((term) =>
+          this.http
+            .get<ApiResponse<LliSearchResult[]>>(
+              `${API}/lloyds/places?name=${encodeURIComponent(term)}`,
+            )
+            .pipe(catchError(() => [{ success: true, data: [] } as ApiResponse<LliSearchResult[]>])),
+        ),
+      )
+      .subscribe((res) => {
+        this.lliSearching.set(false);
+        if (res.success && res.data) {
+          this.lliResults.set(res.data);
+          this.lliDropdownOpen.set(res.data.length > 0);
+        } else {
+          this.lliResults.set([]);
+          this.lliDropdownOpen.set(false);
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  onSearchInput(term: string): void {
+    this.lliSearchTerm.set(term);
+    this.searchSubject.next(term);
+    if (term.length >= 2) {
+      this.lliSearching.set(true);
+    }
   }
 
   // ─── Load local places ──────────────────────────────────────────
@@ -347,7 +351,6 @@ export class PlacesPageComponent implements OnInit {
     this.loading.set(true);
     try {
       const params = new URLSearchParams();
-      if (this.localSearch) params.set('search', this.localSearch);
       if (this.localTypeFilter) params.set('placeType', this.localTypeFilter);
       params.set('page', String(this.currentPage()));
       params.set('limit', String(this.pageSize));
@@ -367,43 +370,18 @@ export class PlacesPageComponent implements OnInit {
     }
   }
 
-  // ─── Search LLI ────────────────────────────────────────────────
-
-  async searchLli(): Promise<void> {
-    if (!this.lliSearchName && !this.lliSearchCountry) return;
-
-    this.lliSearching.set(true);
-    this.lliSearched.set(false);
-    try {
-      const params = new URLSearchParams();
-      if (this.lliSearchName) params.set('name', this.lliSearchName);
-      if (this.lliSearchCountry) params.set('country', this.lliSearchCountry);
-      if (this.lliSearchType) params.set('placeType', this.lliSearchType);
-
-      const qs = params.toString();
-      const res = await firstValueFrom(
-        this.http.get<ApiResponse<LliSearchResult[]>>(`${API}/lloyds/places?${qs}`),
-      );
-      if (res.success && res.data) {
-        this.lliResults.set(res.data);
-      }
-    } catch (err) {
-      console.error('LLI search failed:', err);
-    } finally {
-      this.lliSearching.set(false);
-      this.lliSearched.set(true);
-    }
-  }
-
   // ─── Import from LLI ──────────────────────────────────────────
 
-  async importPlace(lliPlaceId: number): Promise<void> {
+  async importPlace(lliPlaceId: string): Promise<void> {
     this.importingId.set(lliPlaceId);
     try {
       await firstValueFrom(
         this.http.post<ApiResponse<PlaceDto>>(`${API}/lloyds/places/import`, { lliPlaceId }),
       );
       this.importSuccess.set(true);
+      this.lliDropdownOpen.set(false);
+      this.lliSearchTerm.set('');
+      this.lliResults.set([]);
       setTimeout(() => this.importSuccess.set(false), 3000);
       // Refresh local list
       await this.loadPlaces();

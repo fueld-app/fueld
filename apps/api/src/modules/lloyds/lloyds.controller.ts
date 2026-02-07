@@ -48,12 +48,17 @@ export const lloydsController = new Elysia({ prefix: '/lloyds' })
   .get(
     '/places',
     async ({ query }) => {
-      const results = await searchPlaces({
-        name: query.name,
-        country: query.country,
-        placeType: query.placeType,
-      });
-      return { success: true, data: results } satisfies ApiResponse<typeof results>;
+      try {
+        const results = await searchPlaces({
+          name: query.name,
+          country: query.country,
+          placeType: query.placeType,
+        });
+        return { success: true, data: results } satisfies ApiResponse<typeof results>;
+      } catch (err) {
+        console.error('[LLI] Place search failed:', err);
+        return { success: true, data: [] } satisfies ApiResponse<never[]>;
+      }
     },
     {
       query: t.Object({
@@ -106,12 +111,12 @@ export const lloydsController = new Elysia({ prefix: '/lloyds' })
   .post(
     '/places/import',
     async ({ body }) => {
-      const place = await importPlaceFromLli(body.lliPlaceId);
+      const place = await importPlaceFromLli(String(body.lliPlaceId));
       return { success: true, data: place } satisfies ApiResponse<typeof place>;
     },
     {
       body: t.Object({
-        lliPlaceId: t.Number(),
+        lliPlaceId: t.Union([t.String(), t.Number()]),
       }),
       detail: {
         tags: ['Lloyd\'s'],
