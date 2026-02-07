@@ -91,7 +91,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
           @if (lliDropdownOpen() && searchDone()) {
             <div class="absolute z-20 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-80 overflow-y-auto">
               @for (r of lliResults(); track r.lliPlaceId ?? r.localId) {
-                <div class="flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0">
+                <div (click)="onTypeaheadClick(r)" class="flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0 cursor-pointer">
                   <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-2">
                       <span class="text-sm font-medium text-gray-900 truncate">{{ r.name }}</span>
@@ -179,7 +179,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
               <th class="px-4 py-3 text-left font-medium text-gray-600">Type</th>
               <th class="px-4 py-3 text-left font-medium text-gray-600">UNLOCODE</th>
               <th class="px-4 py-3 text-left font-medium text-gray-600">Area</th>
-              <th class="px-4 py-3 text-left font-medium text-gray-600">LLI ID</th>
+              <th class="px-4 py-3 text-center font-medium text-gray-600">Orders</th>
               <th class="px-4 py-3 text-right font-medium text-gray-600"></th>
             </tr>
           </thead>
@@ -203,7 +203,18 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
                 </td>
                 <td class="px-4 py-3 text-gray-500 font-mono text-xs">{{ place.unlocode ?? '—' }}</td>
                 <td class="px-4 py-3 text-gray-500">{{ place.area ?? '—' }}</td>
-                <td class="px-4 py-3 text-gray-400 text-xs">{{ place.lliPlaceId ?? '—' }}</td>
+                <td class="px-4 py-3 text-center">
+                  @if (place.orderCount) {
+                    <span class="inline-flex items-center gap-1 text-xs">
+                      <span class="font-medium text-gray-700">{{ place.orderCount }}</span>
+                      @if (place.activeOrderCount) {
+                        <span class="rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700">{{ place.activeOrderCount }} active</span>
+                      }
+                    </span>
+                  } @else {
+                    <span class="text-xs text-gray-300">—</span>
+                  }
+                </td>
                 <td class="px-4 py-3 text-right">
                   <button
                     (click)="confirmDelete(place); $event.stopPropagation()"
@@ -248,7 +259,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
               <span>{{ countryFlag(place) }} {{ place.country }}</span>
               <span>🏷️ {{ place.unlocode ?? '—' }}</span>
               <span>🌍 {{ place.area ?? '—' }}</span>
-              <span>🔗 LLI {{ place.lliPlaceId ?? '—' }}</span>
+              <span>� {{ place.orderCount ?? 0 }} orders @if (place.activeOrderCount) { ({{ place.activeOrderCount }} active) }</span>
             </div>
           </div>
         } @empty {
@@ -514,6 +525,18 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
       console.error('Failed to load places:', err);
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  // ─── Typeahead click ──────────────────────────────────────────
+
+  onTypeaheadClick(r: LliSearchResult): void {
+    if (r.source === 'local' && r.localId) {
+      this.lliDropdownOpen.set(false);
+      this.lliSearchTerm.set('');
+      this.lliResults.set([]);
+      this.searchDone.set(false);
+      this.router.navigate(['/places', r.localId]);
     }
   }
 

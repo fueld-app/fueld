@@ -5,7 +5,7 @@
 
 import { eq, ilike, or, and, sql } from 'drizzle-orm';
 import { db } from '../../db';
-import { vessels, places, counterparties } from '../../db/schema';
+import { vessels, places, counterparties, orders } from '../../db/schema';
 import { lliGet, seasearcherPlaceSearch, seasearcherPlaceDetail, seasearcherNearbyVessels } from './lli.client';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -465,9 +465,32 @@ export async function listPlaces(query?: {
 
   const [rows, countResult] = await Promise.all([
     db
-      .select()
+      .select({
+        id: places.id,
+        lliPlaceId: places.lliPlaceId,
+        unlocode: places.unlocode,
+        name: places.name,
+        country: places.country,
+        countryIso: places.countryIso,
+        area: places.area,
+        subRegion: places.subRegion,
+        placeType: places.placeType,
+        timezone: places.timezone,
+        lat: places.lat,
+        long: places.long,
+        admiraltyChart: places.admiraltyChart,
+        parentPlaceId: places.parentPlaceId,
+        parentPlaceName: places.parentPlaceName,
+        lliLastUpdated: places.lliLastUpdated,
+        createdAt: places.createdAt,
+        updatedAt: places.updatedAt,
+        orderCount: sql<number>`count(${orders.id})::int`.as('order_count'),
+        activeOrderCount: sql<number>`count(case when ${orders.status} in ('INQUIRY','OFFER','CONFIRMED') then 1 end)::int`.as('active_order_count'),
+      })
       .from(places)
+      .leftJoin(orders, eq(orders.placeId, places.id))
       .where(where)
+      .groupBy(places.id)
       .limit(limit)
       .offset(offset)
       .orderBy(places.name),

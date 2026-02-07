@@ -98,6 +98,8 @@ export interface PlaceDto {
   parentPlaceId: string | null;
   parentPlaceName: string | null;
   lliLastUpdated: string | null;
+  orderCount?: number;
+  activeOrderCount?: number;
 }
 
 export interface CreatePlaceDto {
