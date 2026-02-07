@@ -191,7 +191,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
                 <td class="px-4 py-3 font-medium text-brand-700 hover:underline">{{ place.name }}</td>
                 <td class="px-4 py-3 text-gray-600">
                   <span class="mr-1.5">{{ countryFlag(place) }}</span>{{ place.country }}
-                  @if (place.countryIso) {
+                  @if (place.countryIso && place.countryIso !== place.country) {
                     <span class="ml-1 text-xs text-gray-400">({{ place.countryIso }})</span>
                   }
                 </td>
