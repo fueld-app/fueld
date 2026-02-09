@@ -10,6 +10,7 @@ DEPLOY_USER="deploy"
 DB_NAME="fueld"
 DB_USER="fueld"
 DB_PASSWORD="${DB_PASSWORD:-$(openssl rand -base64 24)}"
+ADMIN_PASSWORD="$(openssl rand -base64 16 | tr -dc 'A-Za-z0-9' | head -c 20)"
 
 echo "═══════════════════════════════════════════════════════════"
 echo "  Fueld VPS Setup — $DOMAIN"
@@ -131,6 +132,9 @@ APP_URL=https://$DOMAIN
 WEBAUTHN_RP_NAME=Fueld
 WEBAUTHN_RP_ID=$DOMAIN
 WEBAUTHN_ORIGIN=https://$DOMAIN
+
+# Admin seed password (auto-generated)
+ADMIN_PASSWORD=$ADMIN_PASSWORD
 
 # Drizzle migrations directory
 MIGRATIONS_DIR=/opt/fueld/drizzle
@@ -383,15 +387,18 @@ echo "════════════════════════�
 echo "  ✅ VPS Setup Complete!"
 echo "═══════════════════════════════════════════════════════════"
 echo ""
-echo "  Domain:     $DOMAIN"
-echo "  DB User:    $DB_USER"
-echo "  DB Pass:    $DB_PASSWORD"
-echo "  DB Name:    $DB_NAME"
-echo "  DB URL:     postgres://$DB_USER:$DB_PASSWORD@localhost:5432/$DB_NAME"
-echo "  Env File:   /opt/fueld/.env"
-echo "  App Dir:    /opt/fueld/"
+echo "  Domain:       $DOMAIN"
+echo "  DB User:      $DB_USER"
+echo "  DB Pass:      $DB_PASSWORD"
+echo "  DB Name:      $DB_NAME"
+echo "  DB URL:       postgres://$DB_USER:$DB_PASSWORD@localhost:5432/$DB_NAME"
+echo "  Env File:     /opt/fueld/.env"
+echo "  App Dir:      /opt/fueld/"
 echo ""
-echo "  ⚠️  SAVE THE DATABASE PASSWORD ABOVE — it won't be shown again."
+echo "  Admin Login:  admin@fueld.app"
+echo "  Admin Pass:   $ADMIN_PASSWORD"
+echo ""
+echo "  ⚠️  SAVE THE PASSWORDS ABOVE — they won't be shown again."
 echo ""
 echo "  Next steps:"
 echo "  1. Add VPS_SSH_KEY to GitHub repository secrets"

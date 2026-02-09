@@ -41,7 +41,14 @@ async function seed() {
 
   // ─── 2. Users ──────────────────────────────────────────────────────
   const defaultPassword = await hashPassword('password123');
-  const adminPassword = await hashPassword(process.env['ADMIN_PASSWORD'] ?? 'Pereira123');
+  const rawAdminPassword = process.env['ADMIN_PASSWORD'];
+  if (!rawAdminPassword) {
+    console.error('❌ ADMIN_PASSWORD environment variable is required');
+    console.error('   Set it in /opt/fueld/.env or pass it directly:');
+    console.error('   ADMIN_PASSWORD=mypassword bun run src/db/seed.ts');
+    process.exit(1);
+  }
+  const adminPassword = await hashPassword(rawAdminPassword);
 
   // Production admin user
   const [prodAdmin] = await db
