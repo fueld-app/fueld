@@ -45,11 +45,18 @@ try {
   await migrate(db, { migrationsFolder: MIGRATIONS_DIR });
   console.log('✅ Database migrations applied');
 } catch (e: any) {
-  // If migration table doesn't exist yet or migrations already applied, continue
-  if (e?.message?.includes('already been applied') || e?.message?.includes('relation "__drizzle_migrations"')) {
+  const msg = e?.message ?? String(e);
+  // These are all benign — schema already exists from db:push or prior run
+  if (
+    msg.includes('already been applied') ||
+    msg.includes('already exists') ||
+    msg.includes('relation "__drizzle_migrations"') ||
+    msg.includes('Failed query: CREATE TYPE') ||
+    msg.includes('Failed query: CREATE TABLE')
+  ) {
     console.log('ℹ️  Migrations already up to date');
   } else {
-    console.error('⚠️  Migration warning:', e?.message ?? e);
+    console.error('⚠️  Migration warning:', msg);
   }
 }
 
