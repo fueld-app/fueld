@@ -5,11 +5,17 @@ import {
   computed,
   inject,
   ElementRef,
+  ViewChild,
   OnInit,
   OnDestroy,
 } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
+import type { ApiResponse } from '@fueld/types';
 import { AuthService } from '../../../core/auth/auth.service';
+
+import { API } from '@app/core/config/api';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  UserMenu — Avatar dropdown with user info & logout
@@ -20,6 +26,15 @@ import { AuthService } from '../../../core/auth/auth.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'relative inline-block' },
   template: `
+    <!-- Hidden file input for avatar upload -->
+    <input
+      #avatarInput
+      type="file"
+      accept="image/jpeg,image/png,image/webp,image/gif"
+      class="hidden"
+      (change)="onAvatarSelected($event)"
+    />
+
     <button
       (click)="toggleMenu()"
       class="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
@@ -27,11 +42,19 @@ import { AuthService } from '../../../core/auth/auth.service';
       aria-haspopup="true"
     >
       <!-- Avatar circle -->
-      <span
-        class="flex h-8 w-8 items-center justify-center rounded-full bg-brand-600 text-xs font-semibold text-white"
-      >
-        {{ initials() }}
-      </span>
+      @if (avatarUrl()) {
+        <img
+          [src]="avatarUrl()"
+          alt="Avatar"
+          class="h-8 w-8 rounded-full object-cover"
+        />
+      } @else {
+        <span
+          class="flex h-8 w-8 items-center justify-center rounded-full bg-brand-600 text-xs font-semibold text-white"
+        >
+          {{ initials() }}
+        </span>
+      }
       <span class="hidden text-sm font-medium text-gray-700 md:inline">
         {{ userName() }}
       </span>
@@ -59,8 +82,46 @@ import { AuthService } from '../../../core/auth/auth.service';
         role="menu"
       >
         <div class="border-b border-gray-100 px-4 py-3">
-          <p class="text-sm font-medium text-gray-900">{{ userName() }}</p>
-          <p class="truncate text-xs text-gray-500">{{ userEmail() }}</p>
+          <div class="flex items-center gap-3">
+            <!-- Clickable avatar for upload -->
+            <button
+              (click)="triggerAvatarUpload($event)"
+              class="relative group flex-shrink-0"
+              title="Change avatar"
+            >
+              @if (avatarUrl()) {
+                <img
+                  [src]="avatarUrl()"
+                  alt="Avatar"
+                  class="h-10 w-10 rounded-full object-cover"
+                />
+              } @else {
+                <span
+                  class="flex h-10 w-10 items-center justify-center rounded-full bg-brand-600 text-sm font-semibold text-white"
+                >
+                  {{ initials() }}
+                </span>
+              }
+              <span class="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M4 5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1.586a1 1 0 0 1-.707-.293l-1.121-1.121A2 2 0 0 0 11.172 3H8.828a2 2 0 0 0-1.414.586L6.293 4.707A1 1 0 0 1 5.586 5H4z" />
+                  <path d="M10 14a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
+                </svg>
+              </span>
+              @if (uploadingAvatar()) {
+                <span class="absolute inset-0 flex items-center justify-center rounded-full bg-black/50">
+                  <svg class="h-4 w-4 animate-spin text-white" viewBox="0 0 24 24" fill="none">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                  </svg>
+                </span>
+              }
+            </button>
+            <div class="min-w-0">
+              <p class="text-sm font-medium text-gray-900">{{ userName() }}</p>
+              <p class="truncate text-xs text-gray-500">{{ userEmail() }}</p>
+            </div>
+          </div>
         </div>
         <div class="py-1">
           <button
@@ -91,13 +152,18 @@ import { AuthService } from '../../../core/auth/auth.service';
 })
 export class UserMenuComponent implements OnInit, OnDestroy {
   private readonly auth = inject(AuthService);
+  private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
   private readonly elRef = inject(ElementRef);
 
+  @ViewChild('avatarInput') avatarInput!: ElementRef<HTMLInputElement>;
+
   readonly isOpen = signal(false);
+  readonly uploadingAvatar = signal(false);
   readonly userName = this.auth.userName;
   readonly userEmail = this.auth.userEmail;
   readonly initials = this.auth.userInitials;
+  readonly avatarUrl = this.auth.avatarUrl;
 
   private clickOutsideHandler = (event: MouseEvent) => {
     if (!this.elRef.nativeElement.contains(event.target)) {
@@ -125,5 +191,46 @@ export class UserMenuComponent implements OnInit, OnDestroy {
   handleLogout(): void {
     this.isOpen.set(false);
     this.auth.logout();
+  }
+
+  triggerAvatarUpload(event: Event): void {
+    event.stopPropagation();
+    this.avatarInput.nativeElement.click();
+  }
+
+  async onAvatarSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    // Validate size (2MB max)
+    if (file.size > 2 * 1024 * 1024) {
+      alert('File too large. Maximum size is 2MB.');
+      return;
+    }
+
+    this.uploadingAvatar.set(true);
+    try {
+      const formData = new FormData();
+      formData.append('avatar', file);
+
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<{ user: any; avatarUrl: string }>>(`${API}/auth/avatar`, formData),
+      );
+
+      if (res.success && res.data?.user) {
+        // Update the stored user with new avatar URL
+        const current = this.auth.user();
+        if (current) {
+          this.auth.user.set({ ...current, avatarUrl: res.data.avatarUrl });
+          localStorage.setItem('fueld_user', JSON.stringify({ ...current, avatarUrl: res.data.avatarUrl }));
+        }
+      }
+    } catch (err) {
+      console.error('[Avatar] Upload failed:', err);
+    } finally {
+      this.uploadingAvatar.set(false);
+      input.value = ''; // Reset so same file can be re-selected
+    }
   }
 }

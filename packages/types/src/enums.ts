@@ -48,6 +48,6 @@ export enum InvoiceStatus {
 export enum Role {
   Admin = 'ADMIN',
   Trader = 'TRADER',
-  Operator = 'OPERATOR',
-  Viewer = 'VIEWER',
+  Finance = 'FINANCE',
+  Teamlead = 'TEAMLEAD',
 }

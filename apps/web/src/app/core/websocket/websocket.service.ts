@@ -11,7 +11,7 @@ import { Subject, Observable, filter, map } from 'rxjs';
 //  • Backend can push messages to the client at any time
 // ═══════════════════════════════════════════════════════════════════════
 
-const WS_BASE = 'ws://localhost:3000/ws';
+import { WS_BASE } from '@app/core/config/api';
 
 interface WsMessage {
   type: string;
@@ -69,6 +69,61 @@ export class WebSocketService {
     }
   }
 
+  /**
+   * Send a presence update with the current page URL, timezone, platform, and page title.
+   * Called on every route navigation by MainLayoutComponent.
+   */
+  sendPresence(url: string, pageTitle?: string): void {
+    // Strip "Fueld | " prefix from the page title for the backend
+    const cleanTitle = pageTitle?.replace(/^Fueld\s*\|\s*/, '') ?? null;
+    this.send({
+      type: 'presence',
+      url,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      platform: navigator.userAgent,
+      language: navigator.language,
+      pageTitle: cleanTitle,
+    });
+  }
+
+  /**
+   * Send a copy event when the user copies text.
+   * Called by the global copy listener in MainLayoutComponent.
+   */
+  sendCopyEvent(text: string, sourceUrl: string, pageTitle?: string): void {
+    const cleanTitle = pageTitle?.replace(/^Fueld\s*\|\s*/, '') ?? null;
+    this.send({
+      type: 'copy-event',
+      text: text.slice(0, 500),
+      sourceUrl,
+      pageTitle: cleanTitle,
+    });
+  }
+
+  /**
+   * Send a print event when the user prints the page.
+   */
+  sendPrintEvent(sourceUrl: string, pageTitle?: string): void {
+    const cleanTitle = pageTitle?.replace(/^Fueld\s*\|\s*/, '') ?? null;
+    this.send({
+      type: 'print-event',
+      sourceUrl,
+      pageTitle: cleanTitle,
+    });
+  }
+
+  /**
+   * Send a screenshot event when the user takes a screenshot.
+   */
+  sendScreenshotEvent(sourceUrl: string, pageTitle?: string): void {
+    const cleanTitle = pageTitle?.replace(/^Fueld\s*\|\s*/, '') ?? null;
+    this.send({
+      type: 'screenshot-event',
+      sourceUrl,
+      pageTitle: cleanTitle,
+    });
+  }
+
   /** Flush any messages that were queued before the socket was ready. */
   private flushPending(): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
@@ -113,6 +168,14 @@ export class WebSocketService {
         if (msg.type === 'auth-error') {
           console.error('[WS] Auth error:', msg.message);
           this.authenticated.set(false);
+          return;
+        }
+
+        // Handle force-logout from server (e.g. account deactivated)
+        if (msg.type === 'force-logout') {
+          console.warn('[WS] Force logout:', msg.message);
+          this.intentionallyClosed = true;
+          this.messages$.next(msg);
           return;
         }
 

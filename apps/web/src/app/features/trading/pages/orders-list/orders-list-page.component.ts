@@ -32,16 +32,6 @@ interface OrderRow {
           <h1 class="text-2xl font-bold text-gray-900">Orders</h1>
           <p class="mt-1 text-sm text-gray-500">Manage your bunker trading orders.</p>
         </div>
-        <button
-          class="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold
-                 text-white shadow-sm transition-colors hover:bg-brand-700
-                 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-            <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
-          </svg>
-          New Order
-        </button>
       </div>
 
       <!-- Desktop table -->

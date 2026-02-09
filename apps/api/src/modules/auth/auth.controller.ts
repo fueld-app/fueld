@@ -1,4 +1,5 @@
 import { Elysia, t } from 'elysia';
+import { join } from 'path';
 import { jwtAccessPlugin, jwtRefreshPlugin, type JwtPayload } from './jwt.setup';
 import {
   loginWithPassword,
@@ -7,11 +8,27 @@ import {
   storeRefreshToken,
   clearRefreshToken,
   findUserById,
+  findUserByEmail,
   generate2faSecret,
   enable2fa,
   disable2fa,
   verify2faToken,
 } from './auth.service';
+import {
+  listPasskeys,
+  renamePasskey,
+  deletePasskey,
+  isPasskeyEnabled,
+  userHasPasskeys,
+  generatePasskeyRegistrationOptions,
+  verifyAndStorePasskey,
+  generatePasskeyAuthenticationOptions,
+  verifyPasskeyAuthentication,
+} from './passkey.service';
+import type {
+  RegistrationResponseJSON,
+  AuthenticationResponseJSON,
+} from '@simplewebauthn/server';
 import type { ApiResponse } from '@fueld/types';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -22,14 +39,26 @@ function sanitiseUser(user: {
   email: string;
   name: string;
   role: string;
+  tenantId: string | null;
   is2faEnabled: boolean;
+  isActive: boolean;
+  isOnLeave: boolean;
+  leaveEndDate: string | null;
+  delegateId: string | null;
+  avatarUrl?: string | null;
 }) {
   return {
     id: user.id,
     email: user.email,
     name: user.name,
     role: user.role,
+    tenantId: user.tenantId,
     is2faEnabled: user.is2faEnabled,
+    isActive: user.isActive,
+    isOnLeave: user.isOnLeave,
+    leaveEndDate: user.leaveEndDate,
+    delegateId: user.delegateId,
+    avatarUrl: user.avatarUrl ?? null,
   };
 }
 
@@ -49,8 +78,8 @@ function extractPayload(
 }
 
 /** Build a `JwtPayload` from a user record. */
-function userToPayload(user: { id: string; email: string; role: string }): JwtPayload {
-  return { sub: user.id, email: user.email, role: user.role };
+function userToPayload(user: { id: string; email: string; name: string; role: string }): JwtPayload {
+  return { sub: user.id, email: user.email, name: user.name, role: user.role };
 }
 
 // ─── Auth Controller ─────────────────────────────────────────────────
@@ -108,6 +137,15 @@ export const authController = new Elysia({ prefix: '/auth' })
           body.password,
         );
 
+        // Block deactivated users
+        if (!user.isActive) {
+          return {
+            success: false,
+            data: null,
+            message: 'Your account has been deactivated. Contact an admin.',
+          } satisfies ApiResponse<null>;
+        }
+
         // If 2FA is required, return a temporary token (sub only)
         // The client must call /auth/verify-2fa with this token + TOTP code
         if (requires2fa) {
@@ -118,11 +156,16 @@ export const authController = new Elysia({ prefix: '/auth' })
             pending2fa: 'true',
           } satisfies JwtPayload);
 
+          // Check if the user has passkeys (so the 2FA page can show "Use Passkey")
+          const hasKeys = await userHasPasskeys(user.id);
+          const passkeyConfig = await isPasskeyEnabled();
+
           return {
             success: true,
             data: {
               requires2fa: true,
               tempToken,
+              hasPasskeys: passkeyConfig.enabled && hasKeys,
             },
           } satisfies ApiResponse<unknown>;
         }
@@ -223,6 +266,247 @@ export const authController = new Elysia({ prefix: '/auth' })
       detail: {
         tags: ['Auth'],
         summary: 'Verify TOTP 2FA code to complete login',
+      },
+    },
+  )
+
+  // ── POST /auth/verify-passkey ────────────────────────────────────
+  // Step 2 of 2FA passkey flow: verify the assertion from the browser
+  .post(
+    '/verify-passkey',
+    async ({ body, jwtAccess, jwtRefresh }) => {
+      try {
+        const raw = await jwtAccess.verify(body.tempToken);
+        const decoded = raw ? (raw as Record<string, unknown>) : null;
+        if (!decoded || !decoded['sub'] || decoded['pending2fa'] !== 'true') {
+          return {
+            success: false,
+            data: null,
+            message: 'Invalid or expired temporary token',
+          } satisfies ApiResponse<null>;
+        }
+
+        const userId = decoded['sub'] as string;
+
+        // Check passkeys are enabled
+        const config = await isPasskeyEnabled();
+        if (!config.enabled) {
+          return {
+            success: false,
+            data: null,
+            message: 'Passkey authentication is not enabled',
+          } satisfies ApiResponse<null>;
+        }
+
+        const verified = await verifyPasskeyAuthentication(userId, body.assertionResponse);
+        if (!verified) {
+          return {
+            success: false,
+            data: null,
+            message: 'Passkey verification failed',
+          } satisfies ApiResponse<null>;
+        }
+
+        const user = await findUserById(userId);
+        if (!user) {
+          return {
+            success: false,
+            data: null,
+            message: 'User not found',
+          } satisfies ApiResponse<null>;
+        }
+
+        const payload = userToPayload(user);
+        const accessToken = await jwtAccess.sign(payload);
+        const refreshToken = await jwtRefresh.sign(payload);
+        await storeRefreshToken(user.id, refreshToken);
+
+        return {
+          success: true,
+          data: {
+            user: sanitiseUser(user),
+            accessToken,
+            refreshToken,
+          },
+        } satisfies ApiResponse<unknown>;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Passkey verification failed';
+        return { success: false, data: null, message } satisfies ApiResponse<null>;
+      }
+    },
+    {
+      body: t.Object({
+        tempToken: t.String(),
+        assertionResponse: t.Any(),
+      }),
+      detail: {
+        tags: ['Auth'],
+        summary: 'Verify 2FA using a registered passkey (WebAuthn assertion)',
+      },
+    },
+  )
+
+  // ── POST /auth/passkeys/auth-options ──────────────────────────────
+  // Step 1 of passwordless passkey login: generate an authentication challenge
+  .post(
+    '/passkeys/auth-options',
+    async ({ body }) => {
+      try {
+        const config = await isPasskeyEnabled();
+        if (!config.enabled || !config.allowPasswordless) {
+          return {
+            success: false,
+            data: null,
+            message: 'Passwordless passkey login is not enabled',
+          } satisfies ApiResponse<null>;
+        }
+
+        const result = await generatePasskeyAuthenticationOptions({ email: body.email });
+        if (!result) {
+          return { success: false, data: null, message: 'No passkeys registered for this account' } satisfies ApiResponse<null>;
+        }
+        return { success: true, data: result.options } satisfies ApiResponse<typeof result.options>;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to generate passkey options';
+        return { success: false, data: null, message } satisfies ApiResponse<null>;
+      }
+    },
+    {
+      body: t.Object({
+        email: t.String({ format: 'email' }),
+      }),
+      detail: {
+        tags: ['Auth'],
+        summary: 'Generate WebAuthn authentication options for passwordless login',
+      },
+    },
+  )
+
+  // ── POST /auth/passkeys/auth-options-2fa ────────────────────────
+  // Step 1 of 2FA passkey flow: generate an authentication challenge
+  .post(
+    '/passkeys/auth-options-2fa',
+    async ({ body, jwtAccess }) => {
+      try {
+        const config = await isPasskeyEnabled();
+        if (!config.enabled) {
+          return {
+            success: false,
+            data: null,
+            message: 'Passkey authentication is not enabled',
+          } satisfies ApiResponse<null>;
+        }
+
+        const raw = await jwtAccess.verify(body.tempToken);
+        const decoded = raw ? (raw as Record<string, unknown>) : null;
+        if (!decoded || !decoded['sub'] || decoded['pending2fa'] !== 'true') {
+          return {
+            success: false,
+            data: null,
+            message: 'Invalid or expired temporary token',
+          } satisfies ApiResponse<null>;
+        }
+
+        const userId = decoded['sub'] as string;
+        const result = await generatePasskeyAuthenticationOptions({ userId });
+        if (!result) {
+          return { success: false, data: null, message: 'No passkeys registered for this account' } satisfies ApiResponse<null>;
+        }
+        return { success: true, data: result.options } satisfies ApiResponse<typeof result.options>;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to generate passkey options';
+        return { success: false, data: null, message } satisfies ApiResponse<null>;
+      }
+    },
+    {
+      body: t.Object({
+        tempToken: t.String(),
+      }),
+      detail: {
+        tags: ['Auth'],
+        summary: 'Generate WebAuthn authentication options for 2FA passkey verification',
+      },
+    },
+  )
+
+  // ── POST /auth/login/passkey ─────────────────────────────────────
+  // Step 2 of passwordless login: verify the assertion response
+  .post(
+    '/login/passkey',
+    async ({ body, jwtAccess, jwtRefresh }) => {
+      try {
+        const config = await isPasskeyEnabled();
+        if (!config.enabled || !config.allowPasswordless) {
+          return {
+            success: false,
+            data: null,
+            message: 'Passwordless passkey login is not enabled',
+          } satisfies ApiResponse<null>;
+        }
+
+        // Look up user by email
+        const userRecord = await findUserByEmail(body.email);
+        if (!userRecord) {
+          return {
+            success: false,
+            data: null,
+            message: 'User not found',
+          } satisfies ApiResponse<null>;
+        }
+
+        if (!userRecord.isActive) {
+          return {
+            success: false,
+            data: null,
+            message: 'Your account has been deactivated. Contact an admin.',
+          } satisfies ApiResponse<null>;
+        }
+
+        const verified = await verifyPasskeyAuthentication(userRecord.id, body.assertionResponse);
+        if (!verified) {
+          return {
+            success: false,
+            data: null,
+            message: 'Passkey authentication failed',
+          } satisfies ApiResponse<null>;
+        }
+
+        const user = await findUserById(userRecord.id);
+        if (!user) {
+          return {
+            success: false,
+            data: null,
+            message: 'User not found',
+          } satisfies ApiResponse<null>;
+        }
+
+        const payload = userToPayload(user);
+        const accessToken = await jwtAccess.sign(payload);
+        const refreshToken = await jwtRefresh.sign(payload);
+        await storeRefreshToken(user.id, refreshToken);
+
+        return {
+          success: true,
+          data: {
+            requires2fa: false,
+            user: sanitiseUser(user),
+            accessToken,
+            refreshToken,
+          },
+        } satisfies ApiResponse<unknown>;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Passkey login failed';
+        return { success: false, data: null, message } satisfies ApiResponse<null>;
+      }
+    },
+    {
+      body: t.Object({
+        email: t.String({ format: 'email' }),
+        assertionResponse: t.Any(),
+      }),
+      detail: {
+        tags: ['Auth'],
+        summary: 'Verify WebAuthn assertion for passwordless login',
       },
     },
   )
@@ -503,5 +787,271 @@ export const authController = new Elysia({ prefix: '/auth' })
         summary: 'Verify TOTP code and disable 2FA on account',
         security: [{ bearerAuth: [] }],
       },
+    },
+  )
+
+  // ── GET /auth/passkeys — list user's passkeys ──────────────────────
+  .get(
+    '/passkeys',
+    async ({ headers, jwtAccess }) => {
+      try {
+        const authHeader = headers['authorization'];
+        if (!authHeader?.startsWith('Bearer ')) {
+          return { success: false, data: null, message: 'Missing authorization header' } satisfies ApiResponse<null>;
+        }
+        const token = authHeader.slice(7);
+        const decoded = extractPayload(await jwtAccess.verify(token));
+        if (!decoded) {
+          return { success: false, data: null, message: 'Invalid token' } satisfies ApiResponse<null>;
+        }
+        const keys = await listPasskeys(decoded.sub);
+        return { success: true, data: keys } satisfies ApiResponse<typeof keys>;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to list passkeys';
+        return { success: false, data: null, message } satisfies ApiResponse<null>;
+      }
+    },
+    {
+      detail: { tags: ['Auth'], summary: 'List all passkeys for the current user', security: [{ bearerAuth: [] }] },
+    },
+  )
+
+  // ── POST /auth/passkeys/register-options — generate registration challenge ──
+  .post(
+    '/passkeys/register-options',
+    async ({ headers, jwtAccess }) => {
+      try {
+        const authHeader = headers['authorization'];
+        if (!authHeader?.startsWith('Bearer ')) {
+          return { success: false, data: null, message: 'Missing authorization header' } satisfies ApiResponse<null>;
+        }
+        const token = authHeader.slice(7);
+        const decoded = extractPayload(await jwtAccess.verify(token));
+        if (!decoded) {
+          return { success: false, data: null, message: 'Invalid token' } satisfies ApiResponse<null>;
+        }
+        const user = await findUserById(decoded.sub);
+        if (!user) {
+          return { success: false, data: null, message: 'User not found' } satisfies ApiResponse<null>;
+        }
+        const options = await generatePasskeyRegistrationOptions(user.id, user.email, user.name);
+        return { success: true, data: options } satisfies ApiResponse<typeof options>;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to generate registration options';
+        return { success: false, data: null, message } satisfies ApiResponse<null>;
+      }
+    },
+    {
+      detail: { tags: ['Auth'], summary: 'Generate WebAuthn registration options', security: [{ bearerAuth: [] }] },
+    },
+  )
+
+  // ── POST /auth/passkeys/register-verify — verify attestation and store passkey ──
+  .post(
+    '/passkeys/register-verify',
+    async ({ body, headers, jwtAccess }) => {
+      try {
+        const authHeader = headers['authorization'];
+        if (!authHeader?.startsWith('Bearer ')) {
+          return { success: false, data: null, message: 'Missing authorization header' } satisfies ApiResponse<null>;
+        }
+        const token = authHeader.slice(7);
+        const decoded = extractPayload(await jwtAccess.verify(token));
+        if (!decoded) {
+          return { success: false, data: null, message: 'Invalid token' } satisfies ApiResponse<null>;
+        }
+        const passkey = await verifyAndStorePasskey(
+          decoded.sub,
+          body.friendlyName,
+          body.attestationResponse as RegistrationResponseJSON,
+        );
+        return { success: true, data: passkey } satisfies ApiResponse<typeof passkey>;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to register passkey';
+        return { success: false, data: null, message } satisfies ApiResponse<null>;
+      }
+    },
+    {
+      body: t.Object({
+        friendlyName: t.String({ minLength: 1, maxLength: 100 }),
+        attestationResponse: t.Any(),
+      }),
+      detail: { tags: ['Auth'], summary: 'Verify WebAuthn attestation and store passkey', security: [{ bearerAuth: [] }] },
+    },
+  )
+
+  // ── PUT /auth/passkeys/:id — rename a passkey ──────────────────────
+  .put(
+    '/passkeys/:id',
+    async ({ params, body, headers, jwtAccess }) => {
+      try {
+        const authHeader = headers['authorization'];
+        if (!authHeader?.startsWith('Bearer ')) {
+          return { success: false, data: null, message: 'Missing authorization header' } satisfies ApiResponse<null>;
+        }
+        const token = authHeader.slice(7);
+        const decoded = extractPayload(await jwtAccess.verify(token));
+        if (!decoded) {
+          return { success: false, data: null, message: 'Invalid token' } satisfies ApiResponse<null>;
+        }
+        const ok = await renamePasskey(decoded.sub, params.id, body.friendlyName);
+        if (!ok) {
+          return { success: false, data: null, message: 'Passkey not found' } satisfies ApiResponse<null>;
+        }
+        return { success: true, data: null, message: 'Passkey renamed' } satisfies ApiResponse<null>;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to rename passkey';
+        return { success: false, data: null, message } satisfies ApiResponse<null>;
+      }
+    },
+    {
+      body: t.Object({ friendlyName: t.String({ minLength: 1, maxLength: 100 }) }),
+      detail: { tags: ['Auth'], summary: 'Rename a passkey', security: [{ bearerAuth: [] }] },
+    },
+  )
+
+  // ── DELETE /auth/passkeys/:id — delete a passkey ───────────────────
+  .delete(
+    '/passkeys/:id',
+    async ({ params, headers, jwtAccess }) => {
+      try {
+        const authHeader = headers['authorization'];
+        if (!authHeader?.startsWith('Bearer ')) {
+          return { success: false, data: null, message: 'Missing authorization header' } satisfies ApiResponse<null>;
+        }
+        const token = authHeader.slice(7);
+        const decoded = extractPayload(await jwtAccess.verify(token));
+        if (!decoded) {
+          return { success: false, data: null, message: 'Invalid token' } satisfies ApiResponse<null>;
+        }
+        const ok = await deletePasskey(decoded.sub, params.id);
+        if (!ok) {
+          return { success: false, data: null, message: 'Passkey not found' } satisfies ApiResponse<null>;
+        }
+        return { success: true, data: null, message: 'Passkey deleted' } satisfies ApiResponse<null>;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to delete passkey';
+        return { success: false, data: null, message } satisfies ApiResponse<null>;
+      }
+    },
+    {
+      detail: { tags: ['Auth'], summary: 'Delete a passkey', security: [{ bearerAuth: [] }] },
+    },
+  )
+
+  // ══════════════════════════════════════════════════════════════════
+  //  AVATAR
+  // ══════════════════════════════════════════════════════════════════
+
+  // ── PUT /auth/avatar — upload user avatar ──────────────────────────
+  .put(
+    '/avatar',
+    async ({ body, headers, jwtAccess }) => {
+      try {
+        const authHeader = headers['authorization'];
+        if (!authHeader?.startsWith('Bearer ')) {
+          return { success: false, data: null, message: 'Missing authorization header' } satisfies ApiResponse<null>;
+        }
+        const decoded = extractPayload(await jwtAccess.verify(authHeader.slice(7)));
+        if (!decoded) {
+          return { success: false, data: null, message: 'Invalid token' } satisfies ApiResponse<null>;
+        }
+
+        const file = body.avatar;
+        if (!file || !(file instanceof Blob)) {
+          return { success: false, data: null, message: 'No file provided' } satisfies ApiResponse<null>;
+        }
+
+        // Validate type
+        const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+        if (!allowed.includes(file.type)) {
+          return { success: false, data: null, message: 'Only JPEG, PNG, WebP or GIF allowed' } satisfies ApiResponse<null>;
+        }
+
+        // Max 2MB
+        if (file.size > 2 * 1024 * 1024) {
+          return { success: false, data: null, message: 'File too large (max 2MB)' } satisfies ApiResponse<null>;
+        }
+
+        const ext = file.type.split('/')[1] === 'jpeg' ? 'jpg' : file.type.split('/')[1];
+        const filename = `${decoded.sub}.${ext}`;
+        const uploadDir = join(import.meta.dir, '../../../uploads/avatars');
+        const filepath = join(uploadDir, filename);
+
+        // Delete old avatar files for this user
+        const { readdirSync, unlinkSync } = await import('fs');
+        try {
+          for (const f of readdirSync(uploadDir)) {
+            if (f.startsWith(decoded.sub + '.')) {
+              unlinkSync(join(uploadDir, f));
+            }
+          }
+        } catch { /* dir may not exist yet */ }
+
+        // Write new file
+        await Bun.write(filepath, file);
+
+        // Update user record
+        const avatarUrl = `/uploads/avatars/${filename}`;
+        const { db } = await import('../../db');
+        const { users } = await import('../../db/schema');
+        const { eq } = await import('drizzle-orm');
+        await db.update(users).set({ avatarUrl, updatedAt: new Date() }).where(eq(users.id, decoded.sub));
+
+        // Return updated user
+        const user = await findUserById(decoded.sub);
+        if (!user) {
+          return { success: false, data: null, message: 'User not found' } satisfies ApiResponse<null>;
+        }
+        return { success: true, data: { user: sanitiseUser(user), avatarUrl } } satisfies ApiResponse<any>;
+      } catch (err) {
+        console.error('[Avatar] Upload failed:', err);
+        return { success: false, data: null, message: 'Failed to upload avatar' } satisfies ApiResponse<null>;
+      }
+    },
+    {
+      body: t.Object({ avatar: t.File() }),
+      detail: { tags: ['Auth'], summary: 'Upload user avatar', security: [{ bearerAuth: [] }] },
+    },
+  )
+
+  // ── DELETE /auth/avatar — remove user avatar ───────────────────────
+  .delete(
+    '/avatar',
+    async ({ headers, jwtAccess }) => {
+      try {
+        const authHeader = headers['authorization'];
+        if (!authHeader?.startsWith('Bearer ')) {
+          return { success: false, data: null, message: 'Missing authorization header' } satisfies ApiResponse<null>;
+        }
+        const decoded = extractPayload(await jwtAccess.verify(authHeader.slice(7)));
+        if (!decoded) {
+          return { success: false, data: null, message: 'Invalid token' } satisfies ApiResponse<null>;
+        }
+
+        // Delete avatar files
+        const uploadDir = join(import.meta.dir, '../../../uploads/avatars');
+        const { readdirSync, unlinkSync } = await import('fs');
+        try {
+          for (const f of readdirSync(uploadDir)) {
+            if (f.startsWith(decoded.sub + '.')) {
+              unlinkSync(join(uploadDir, f));
+            }
+          }
+        } catch { /* ok */ }
+
+        // Clear avatar URL in DB
+        const { db } = await import('../../db');
+        const { users } = await import('../../db/schema');
+        const { eq } = await import('drizzle-orm');
+        await db.update(users).set({ avatarUrl: null, updatedAt: new Date() }).where(eq(users.id, decoded.sub));
+
+        return { success: true, data: null, message: 'Avatar removed' } satisfies ApiResponse<null>;
+      } catch (err) {
+        return { success: false, data: null, message: 'Failed to remove avatar' } satisfies ApiResponse<null>;
+      }
+    },
+    {
+      detail: { tags: ['Auth'], summary: 'Remove user avatar', security: [{ bearerAuth: [] }] },
     },
   );

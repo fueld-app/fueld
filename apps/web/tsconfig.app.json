@@ -6,7 +6,8 @@
     "outDir": "./out-tsc/app",
     "types": [],
     "paths": {
-      "@fueld/types": ["../../packages/types/src/index.ts"]
+      "@fueld/types": ["../../packages/types/src/index.ts"],
+      "@app/*": ["src/app/*"]
     }
   },
   "include": [

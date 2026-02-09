@@ -1,0 +1,325 @@
+import {
+  Component,
+  ChangeDetectionStrategy,
+  signal,
+  computed,
+  inject,
+  input,
+  effect,
+  OnDestroy,
+} from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { FormsModule } from '@angular/forms';
+import { DatePipe } from '@angular/common';
+import { firstValueFrom } from 'rxjs';
+import { AuthService } from '../../../core/auth/auth.service';
+import type { ApiResponse } from '@fueld/types';
+
+import { API } from '@app/core/config/api';
+
+interface Comment {
+  id: string;
+  entityType: string;
+  entityId: string;
+  userId: string;
+  userName: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+@Component({
+  selector: 'app-comments-card',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [FormsModule, DatePipe],
+  template: `
+    <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
+      <!-- Header -->
+      <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-gray-700">Comments</h2>
+        @if (comments().length) {
+          <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
+            {{ comments().length }}
+          </span>
+        }
+      </div>
+
+      <!-- Comment input -->
+      <div class="border-b border-gray-50 px-5 py-3">
+        <div class="flex gap-3">
+          <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-medium text-brand-700">
+            {{ currentUserInitials() }}
+          </div>
+          <div class="min-w-0 flex-1">
+            <textarea
+              [(ngModel)]="newContent"
+              placeholder="Write a comment…"
+              rows="2"
+              class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none resize-none"
+            ></textarea>
+            <div class="mt-1.5 flex justify-end">
+              <button
+                (click)="addComment()"
+                [disabled]="!newContent.trim() || saving()"
+                class="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                @if (saving()) {
+                  <svg class="inline h-3.5 w-3.5 animate-spin mr-1" viewBox="0 0 24 24" fill="none">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                  </svg>
+                }
+                Post
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Comments list -->
+      @if (loading()) {
+        <div class="flex items-center justify-center py-8">
+          <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+        </div>
+      } @else if (comments().length) {
+        <div class="divide-y divide-gray-50 max-h-96 overflow-y-auto">
+          @for (c of comments(); track c.id) {
+            <div class="px-5 py-3 group hover:bg-gray-50/50 transition-colors">
+              <div class="flex items-start gap-3">
+                <!-- Avatar -->
+                <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-xs font-medium text-gray-600">
+                  {{ initials(c.userName) }}
+                </div>
+
+                <!-- Content -->
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium text-gray-900">{{ c.userName }}</span>
+                    <span class="text-[11px] text-gray-400">{{ c.createdAt | date:'short' }}</span>
+                    @if (c.updatedAt !== c.createdAt) {
+                      <span class="text-[10px] text-gray-400 italic">(edited)</span>
+                    }
+                  </div>
+
+                  @if (editingId() === c.id) {
+                    <!-- Edit mode -->
+                    <textarea
+                      [(ngModel)]="editContent"
+                      rows="2"
+                      class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none resize-none"
+                    ></textarea>
+                    <div class="mt-1.5 flex items-center gap-2">
+                      <button
+                        (click)="saveEdit(c.id)"
+                        [disabled]="!editContent.trim() || saving()"
+                        class="rounded-md bg-brand-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                      >
+                        Save
+                      </button>
+                      <button
+                        (click)="cancelEdit()"
+                        class="rounded-md px-2.5 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  } @else {
+                    <!-- Display mode -->
+                    <p class="mt-0.5 text-sm text-gray-600 whitespace-pre-line">{{ c.content }}</p>
+                  }
+                </div>
+
+                <!-- Actions (only for own comments) -->
+                @if (c.userId === currentUserId() && editingId() !== c.id) {
+                  <div class="shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      (click)="startEdit(c)"
+                      class="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                      title="Edit"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="m5.433 13.917 1.262-3.155A4 4 0 0 1 7.58 9.42l6.92-6.918a2.121 2.121 0 0 1 3 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 0 1-.65-.65Z" />
+                      </svg>
+                    </button>
+                    <button
+                      (click)="removeComment(c.id)"
+                      class="rounded-md p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"
+                      title="Delete"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022 1.005 11.36A2.75 2.75 0 0 0 7.765 20h4.47a2.75 2.75 0 0 0 2.742-2.53l.954-10.788c.793-.122 1.577-.221 2.367-.298a.75.75 0 0 0-.23-1.482c-.781.122-1.57.22-2.365.298v-.443A2.75 2.75 0 0 0 12.75 1h-4Z" clip-rule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      } @else {
+        <div class="px-5 py-8 text-center text-sm text-gray-400">
+          No comments yet — be the first to add one.
+        </div>
+      }
+    </div>
+  `,
+})
+export class CommentsCardComponent implements OnDestroy {
+  private readonly http = inject(HttpClient);
+  private readonly auth = inject(AuthService);
+
+  readonly entityType = input.required<string>();
+  readonly entityId = input.required<string>();
+
+  readonly comments = signal<Comment[]>([]);
+  readonly loading = signal(true);
+  readonly saving = signal(false);
+  readonly editingId = signal<string | null>(null);
+
+  newContent = '';
+  editContent = '';
+
+  readonly currentUserId = computed(() => this.auth.user()?.id ?? '');
+  readonly currentUserInitials = computed(() => {
+    const name = this.auth.user()?.name ?? '';
+    const parts = name.split(' ').filter(Boolean);
+    if (parts.length === 0) return '?';
+    return parts.length === 1
+      ? parts[0][0].toUpperCase()
+      : (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  });
+
+  private refreshTimer: ReturnType<typeof setInterval> | null = null;
+
+  constructor() {
+    effect(() => {
+      const id = this.entityId();
+      const type = this.entityType();
+      if (id && type) this.loadComments();
+    });
+
+    this.refreshTimer = setInterval(() => this.loadComments(false), 30_000);
+  }
+
+  ngOnDestroy() {
+    if (this.refreshTimer) {
+      clearInterval(this.refreshTimer);
+      this.refreshTimer = null;
+    }
+  }
+
+  initials(name: string): string {
+    const parts = name.split(' ').filter(Boolean);
+    if (parts.length === 0) return '?';
+    return parts.length === 1
+      ? parts[0][0].toUpperCase()
+      : (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+
+  async loadComments(showLoading = true): Promise<void> {
+    const type = this.entityType();
+    const id = this.entityId();
+    if (!type || !id) return;
+
+    if (showLoading) this.loading.set(true);
+
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<Comment[]>>(
+          `${API}/comments/${encodeURIComponent(type)}/${encodeURIComponent(id)}`,
+        ),
+      );
+      if (res.success && res.data) {
+        this.comments.set(res.data);
+      }
+    } catch {
+      // silent
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  async addComment(): Promise<void> {
+    const content = this.newContent.trim();
+    if (!content) return;
+
+    const type = this.entityType();
+    const id = this.entityId();
+    if (!type || !id) return;
+
+    this.saving.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<Comment>>(
+          `${API}/comments/${encodeURIComponent(type)}/${encodeURIComponent(id)}`,
+          { content },
+        ),
+      );
+      if (res.success && res.data) {
+        this.comments.update((list) => [res.data!, ...list]);
+        this.newContent = '';
+      }
+    } catch {
+      // silent
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  startEdit(c: Comment): void {
+    this.editingId.set(c.id);
+    this.editContent = c.content;
+  }
+
+  cancelEdit(): void {
+    this.editingId.set(null);
+    this.editContent = '';
+  }
+
+  async saveEdit(commentId: string): Promise<void> {
+    const content = this.editContent.trim();
+    if (!content) return;
+
+    this.saving.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<Comment>>(
+          `${API}/comments/${encodeURIComponent(commentId)}`,
+          { content },
+        ),
+      );
+      if (res.success && res.data) {
+        this.comments.update((list) =>
+          list.map((c) => (c.id === commentId ? res.data! : c)),
+        );
+        this.editingId.set(null);
+        this.editContent = '';
+      }
+    } catch {
+      // silent
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  async removeComment(commentId: string): Promise<void> {
+    this.saving.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.delete<ApiResponse<{ id: string }>>(
+          `${API}/comments/${encodeURIComponent(commentId)}`,
+        ),
+      );
+      if (res.success) {
+        this.comments.update((list) => list.filter((c) => c.id !== commentId));
+      }
+    } catch {
+      // silent
+    } finally {
+      this.saving.set(false);
+    }
+  }
+}

@@ -1,7 +1,8 @@
 import { Elysia, t } from 'elysia';
 import { authGuard } from '../auth/auth.guard';
-import { generateOrderInvoicePdfBuffer } from './document.service';
+import { generateOrderInvoicePdfBuffer, generateOfferPdfBuffer, generateProformaInvoicePdfBuffer } from './document.service';
 import { sendInvoiceEmail } from './mail.service';
+import { resolveOrderId } from '../orders/orders.service';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Documents Controller
@@ -11,11 +12,61 @@ export const documentsController = new Elysia({ prefix: '/orders' })
   // ── Require authentication for all routes ──
   .use(authGuard)
 
+  // ── GET /orders/:id/offer/pdf ──────────────────────────────────────
+  .get(
+    '/:id/offer/pdf',
+    async ({ params, set }) => {
+      const orderId = await resolveOrderId(params.id);
+      if (!orderId) { set.status = 404; return { success: false, message: 'Order not found' }; }
+      const { buffer, fileName } = await generateOfferPdfBuffer(orderId);
+
+      set.headers['Content-Type'] = 'application/pdf';
+      set.headers['Content-Disposition'] = `attachment; filename="${fileName}"`;
+      set.headers['Content-Length'] = String(buffer.length);
+
+      return buffer;
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: {
+        tags: ['Documents'],
+        summary: 'Generate offer PDF for an order/inquiry',
+        security: [{ bearerAuth: [] }],
+      },
+    },
+  )
+
+  // ── GET /orders/:id/proforma/pdf ───────────────────────────────────
+  .get(
+    '/:id/proforma/pdf',
+    async ({ params, set }) => {
+      const orderId = await resolveOrderId(params.id);
+      if (!orderId) { set.status = 404; return { success: false, message: 'Order not found' }; }
+      const { buffer, fileName } = await generateProformaInvoicePdfBuffer(orderId);
+
+      set.headers['Content-Type'] = 'application/pdf';
+      set.headers['Content-Disposition'] = `attachment; filename="${fileName}"`;
+      set.headers['Content-Length'] = String(buffer.length);
+
+      return buffer;
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: {
+        tags: ['Documents'],
+        summary: 'Generate proforma invoice PDF for an order/inquiry',
+        security: [{ bearerAuth: [] }],
+      },
+    },
+  )
+
   // ── GET /orders/:id/invoice/pdf ────────────────────────────────────
   .get(
     '/:id/invoice/pdf',
     async ({ params, set }) => {
-      const { buffer, fileName } = await generateOrderInvoicePdfBuffer(params.id);
+      const orderId = await resolveOrderId(params.id);
+      if (!orderId) { set.status = 404; return { success: false, message: 'Order not found' }; }
+      const { buffer, fileName } = await generateOrderInvoicePdfBuffer(orderId);
 
       set.headers['Content-Type'] = 'application/pdf';
       set.headers['Content-Disposition'] = `attachment; filename="${fileName}"`;
@@ -38,8 +89,10 @@ export const documentsController = new Elysia({ prefix: '/orders' })
   .post(
     '/:id/invoice/send',
     async ({ params, body, store }) => {
+      const orderId = await resolveOrderId(params.id);
+      if (!orderId) return { success: false, message: 'Order not found' };
       // Generate the PDF
-      const { buffer, invoiceNumber, fileName } = await generateOrderInvoicePdfBuffer(params.id);
+      const { buffer, invoiceNumber, fileName } = await generateOrderInvoicePdfBuffer(orderId);
 
       // We need the user's O365 token to send via Graph.
       // The token is expected to be passed in the request body.

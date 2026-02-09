@@ -6,6 +6,7 @@ import {
   signal,
   computed,
   linkedSignal,
+  effect,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
@@ -27,6 +28,8 @@ export interface OrderItemRow {
   productType: string;
   supplierId: string;
   quantity: number;
+  quantityMin: number | null;
+  quantityMax: number | null;
   unit: string;
   costPrice: number;
   salesPrice: number;
@@ -71,11 +74,11 @@ export interface OrderItemRow {
             <th class="px-4 py-3 text-left font-medium text-gray-600">#</th>
             <th class="px-4 py-3 text-left font-medium text-gray-600 min-w-[140px]">Product</th>
             <th class="px-4 py-3 text-left font-medium text-gray-600 min-w-[160px]">Supplier</th>
-            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[100px]">Qty</th>
+            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Qty</th>
             <th class="px-4 py-3 text-left font-medium text-gray-600 w-16">Unit</th>
-            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[110px]">Cost (USD)</th>
-            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[110px]">Sell (USD)</th>
-            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Profit (USD)</th>
+            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[110px]">Cost ({{ currency() }})</th>
+            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[110px]">Sell ({{ currency() }})</th>
+            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Profit ({{ currency() }})</th>
             @if (!readonly()) {
               <th class="px-4 py-3 w-12"></th>
             }
@@ -108,7 +111,11 @@ export interface OrderItemRow {
                   <app-searchable-dropdown
                     [options]="supplierOptions()"
                     [selected]="row.supplierId"
+                    [asyncSearch]="true"
+                    [loading]="supplierSearchLoading()"
                     placeholder="Supplier..."
+                    [clearable]="true"
+                    (searchChange)="supplierSearch.emit($event)"
                     (selectionChange)="updateField(i, 'supplierId', $event)"
                   />
                 }
@@ -117,20 +124,69 @@ export interface OrderItemRow {
               <!-- Qty -->
               <td class="px-4 py-2">
                 @if (readonly()) {
-                  <span class="block text-right tabular-nums">{{ row.quantity | number:'1.3-3' }}</span>
+                  <span class="block text-right tabular-nums">
+                    @if (row.quantityMin != null && row.quantityMin !== row.quantity) {
+                      {{ row.quantityMin | number:'1.0-0' }}–{{ row.quantity | number:'1.0-0' }}
+                    } @else {
+                      {{ row.quantity | number:'1.3-3' }}
+                    }
+                  </span>
                 } @else {
-                  <input
-                    type="number" step="0.001" min="0"
-                    [ngModel]="row.quantity"
-                    (ngModelChange)="updateField(i, 'quantity', $event)"
-                    class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-right text-sm tabular-nums
-                           focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                  />
+                  <div class="flex items-center gap-1 justify-end">
+                    @if (spreadEnabled().has(row.id)) {
+                      <input
+                        type="number" step="0.001" min="0"
+                        [ngModel]="row.quantityMin ?? row.quantity"
+                        (ngModelChange)="updateQuantityMin(i, $event)"
+                        placeholder="Min"
+                        class="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm tabular-nums
+                               focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                      />
+                      <span class="text-gray-400 text-xs">–</span>
+                    }
+                    <input
+                      type="number" step="0.001" min="0"
+                      [ngModel]="row.quantity"
+                      (ngModelChange)="updateQuantity(i, $event)"
+                      placeholder="Qty"
+                      class="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm tabular-nums
+                             focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                    />
+                    <button
+                      type="button"
+                      (click)="toggleSpread(row.id, i)"
+                      [class.text-brand-600]="spreadEnabled().has(row.id)"
+                      [class.bg-brand-50]="spreadEnabled().has(row.id)"
+                      [class.text-gray-400]="!spreadEnabled().has(row.id)"
+                      class="rounded p-1 text-xs hover:bg-gray-100 transition-colors"
+                      [attr.title]="spreadEnabled().has(row.id) ? 'Remove min qty' : 'Add min qty spread'"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10.75 6.75a.75.75 0 0 0-1.5 0v2.5h-2.5a.75.75 0 0 0 0 1.5h2.5v2.5a.75.75 0 0 0 1.5 0v-2.5h2.5a.75.75 0 0 0 0-1.5h-2.5v-2.5Z" />
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.536-9.146a.5.5 0 0 0-.707-.708L10 10.975 7.172 8.146a.5.5 0 1 0-.708.708L10 12.39l3.536-3.536Z" clip-rule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
                 }
               </td>
 
               <!-- Unit -->
-              <td class="px-4 py-2 text-gray-500">{{ row.unit }}</td>
+              <td class="px-4 py-2">
+                @if (readonly()) {
+                  <span class="text-gray-500">{{ row.unit }}</span>
+                } @else {
+                  <select
+                    [ngModel]="row.unit"
+                    (ngModelChange)="updateField(i, 'unit', $event)"
+                    class="rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                  >
+                    @for (u of unitOptions; track u.value) {
+                      <option [value]="u.value">{{ u.label }}</option>
+                    }
+                  </select>
+                }
+              </td>
 
               <!-- Cost -->
               <td class="px-4 py-2">
@@ -274,7 +330,11 @@ export interface OrderItemRow {
                 <app-searchable-dropdown
                   [options]="supplierOptions()"
                   [selected]="row.supplierId"
+                  [asyncSearch]="true"
+                  [loading]="supplierSearchLoading()"
                   placeholder="Supplier..."
+                  [clearable]="true"
+                  (searchChange)="supplierSearch.emit($event)"
                   (selectionChange)="updateField(i, 'supplierId', $event)"
                 />
               }
@@ -284,20 +344,71 @@ export interface OrderItemRow {
             <div>
               <label class="mb-1 block text-xs font-medium text-gray-500">Quantity</label>
               @if (readonly()) {
-                <span class="text-sm tabular-nums">{{ row.quantity | number:'1.3-3' }} {{ row.unit }}</span>
+                <span class="text-sm tabular-nums">
+                  @if (row.quantityMin != null && row.quantityMin !== row.quantity) {
+                    {{ row.quantityMin | number:'1.0-0' }}–{{ row.quantity | number:'1.0-0' }}
+                  } @else {
+                    {{ row.quantity | number:'1.3-3' }}
+                  }
+                  {{ row.unit }}
+                </span>
               } @else {
-                <input type="number" step="0.001" min="0"
-                  [ngModel]="row.quantity"
-                  (ngModelChange)="updateField(i, 'quantity', $event)"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
-                         focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                />
+                <div class="space-y-1">
+                  <div class="flex items-center gap-2">
+                    <input type="number" step="0.001" min="0"
+                      [ngModel]="row.quantity"
+                      (ngModelChange)="updateQuantity(i, $event)"
+                      placeholder="Qty"
+                      class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
+                             focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                    />
+                    <button
+                      type="button"
+                      (click)="toggleSpread(row.id, i)"
+                      [class.text-brand-600]="spreadEnabled().has(row.id)"
+                      [class.bg-brand-50]="spreadEnabled().has(row.id)"
+                      [class.text-gray-400]="!spreadEnabled().has(row.id)"
+                      class="shrink-0 rounded p-1 text-xs hover:bg-gray-100 transition-colors"
+                      [attr.title]="spreadEnabled().has(row.id) ? 'Remove min qty' : 'Add min qty spread'"
+                    >
+                      ±
+                    </button>
+                  </div>
+                  @if (spreadEnabled().has(row.id)) {
+                    <input type="number" step="0.001" min="0"
+                      [ngModel]="row.quantityMin ?? row.quantity"
+                      (ngModelChange)="updateQuantityMin(i, $event)"
+                      placeholder="Min qty"
+                      class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
+                             focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                    />
+                  }
+                </div>
+              }
+            </div>
+
+            <!-- Unit -->
+            <div>
+              <label class="mb-1 block text-xs font-medium text-gray-500">Unit</label>
+              @if (readonly()) {
+                <span class="text-sm text-gray-500">{{ row.unit }}</span>
+              } @else {
+                <select
+                  [ngModel]="row.unit"
+                  (ngModelChange)="updateField(i, 'unit', $event)"
+                  class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                         focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                >
+                  @for (u of unitOptions; track u.value) {
+                    <option [value]="u.value">{{ u.label }}</option>
+                  }
+                </select>
               }
             </div>
 
             <!-- Cost -->
             <div>
-              <label class="mb-1 block text-xs font-medium text-gray-500">Cost (USD)</label>
+              <label class="mb-1 block text-xs font-medium text-gray-500">Cost ({{ currency() }})</label>
               @if (readonly()) {
                 <span class="text-sm tabular-nums">{{ row.costPrice | number:'1.2-4' }}</span>
               } @else {
@@ -312,7 +423,7 @@ export interface OrderItemRow {
 
             <!-- Sell -->
             <div>
-              <label class="mb-1 block text-xs font-medium text-gray-500">Sell (USD)</label>
+              <label class="mb-1 block text-xs font-medium text-gray-500">Sell ({{ currency() }})</label>
               @if (readonly()) {
                 <span class="text-sm tabular-nums">{{ row.salesPrice | number:'1.2-4' }}</span>
               } @else {
@@ -327,7 +438,7 @@ export interface OrderItemRow {
 
             <!-- Profit -->
             <div>
-              <label class="mb-1 block text-xs font-medium text-gray-500">Profit (USD)</label>
+              <label class="mb-1 block text-xs font-medium text-gray-500">Profit ({{ currency() }})</label>
               <span
                 class="text-sm font-semibold tabular-nums"
                 [class.text-green-600]="row.profit > 0"
@@ -359,7 +470,7 @@ export interface OrderItemRow {
               [class.text-green-600]="totalProfit() > 0"
               [class.text-red-600]="totalProfit() < 0"
             >
-              {{ totalProfit() | number:'1.2-2' }} USD
+              {{ totalProfit() | number:'1.2-2' }} {{ currency() }}
             </span>
           </div>
           <div class="mt-1 flex items-center justify-between text-xs text-gray-400">
@@ -376,7 +487,10 @@ export class OrderItemsComponent {
   readonly items = input<OrderItemRow[]>([]);
   readonly suppliers = input<DropdownOption[]>([]);
   readonly readonly = input(false);
+  readonly currency = input('USD');
+  readonly supplierSearchLoading = input(false);
   readonly itemsChange = output<OrderItemRow[]>();
+  readonly supplierSearch = output<string>();
 
   /** Internal mutable signal, linked to the input. */
   readonly rows = linkedSignal(() =>
@@ -386,12 +500,41 @@ export class OrderItemsComponent {
     })),
   );
 
+  /** Track which row IDs have the min-qty spread enabled */
+  readonly spreadEnabled = signal<Set<string>>(new Set());
+  private spreadInitialized = false;
+
+  constructor() {
+    // Initialize spreadEnabled once from loaded items that already have quantityMin
+    effect(() => {
+      const items = this.items();
+      if (this.spreadInitialized) return;
+      const spreads = new Set<string>();
+      for (const item of items) {
+        if (item.quantityMin != null) spreads.add(item.id);
+      }
+      if (items.length > 0) {
+        this.spreadInitialized = true;
+        this.spreadEnabled.set(spreads);
+      }
+    });
+  }
+
   // ─── Dropdown options ────────────────────────────────────────────
 
   readonly productOptions: DropdownOption[] = Object.values(ProductType).map((v) => ({
     value: v,
     label: v,
   }));
+
+  readonly unitOptions: DropdownOption[] = [
+    { value: 'MT', label: 'MT' },
+    { value: 'CBM', label: 'CBM' },
+    { value: 'LT', label: 'LT' },
+    { value: 'BBL', label: 'BBL' },
+    { value: 'GAL', label: 'GAL' },
+    { value: 'KG', label: 'KG' },
+  ];
 
   readonly supplierOptions = computed(() => this.suppliers());
 
@@ -425,6 +568,8 @@ export class OrderItemsComponent {
       productType: '',
       supplierId: '',
       quantity: 0,
+      quantityMin: null,
+      quantityMax: null,
       unit: 'MT',
       costPrice: 0,
       salesPrice: 0,
@@ -447,11 +592,67 @@ export class OrderItemsComponent {
 
       (row as Record<string, unknown>)[field] = value;
 
-      // Auto-recalculate profit
+      // Auto-recalculate profit using main quantity
       row.profit = (row.salesPrice - row.costPrice) * row.quantity;
       updated[index] = row;
       return updated;
     });
+    this.emitChange();
+  }
+
+  /** Update the main quantity (used for calculations/invoicing) */
+  updateQuantity(index: number, value: number): void {
+    this.rows.update((prev) => {
+      const updated = [...prev];
+      const row = { ...updated[index]! };
+      row.quantity = value;
+      // If spread is active, ensure min doesn't exceed qty
+      if (row.quantityMin !== null && row.quantityMin > value) {
+        row.quantityMin = value;
+      }
+      row.profit = (row.salesPrice - row.costPrice) * value;
+      updated[index] = row;
+      return updated;
+    });
+    this.emitChange();
+  }
+
+  updateQuantityMin(index: number, value: number): void {
+    this.rows.update((prev) => {
+      const updated = [...prev];
+      const row = { ...updated[index]! };
+      row.quantityMin = value;
+      // If min exceeds qty, bump qty up
+      if (value > row.quantity) {
+        row.quantity = value;
+      }
+      // Profit always uses main qty
+      row.profit = (row.salesPrice - row.costPrice) * row.quantity;
+      updated[index] = row;
+      return updated;
+    });
+    this.emitChange();
+  }
+
+  /** Toggle the min-qty spread for a row */
+  toggleSpread(rowId: string, index: number): void {
+    const wasEnabled = this.spreadEnabled().has(rowId);
+    const next = new Set(this.spreadEnabled());
+    if (wasEnabled) {
+      next.delete(rowId);
+    } else {
+      next.add(rowId);
+    }
+    this.spreadEnabled.set(next);
+
+    // Clear quantityMin when disabling spread
+    if (wasEnabled) {
+      this.rows.update((rows) => {
+        const updated = [...rows];
+        updated[index] = { ...updated[index]!, quantityMin: null };
+        return updated;
+      });
+    }
     this.emitChange();
   }
 

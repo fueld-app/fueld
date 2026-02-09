@@ -11,7 +11,9 @@ export const authGuard: CanActivateFn = (route, state) => {
   const router = inject(Router);
 
   if (!authService.isAuthenticated()) {
-    return router.createUrlTree(['/login']);
+    return router.createUrlTree(['/login'], {
+      queryParams: { returnUrl: state.url },
+    });
   }
 
   // Enforce mandatory 2FA — redirect to setup if not enabled

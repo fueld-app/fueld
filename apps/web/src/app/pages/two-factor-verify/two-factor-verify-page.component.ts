@@ -72,6 +72,35 @@ import { AuthService } from '../../core/auth/auth.service';
             </button>
           </form>
 
+          @if (hasPasskeys()) {
+            <div class="mt-5">
+              <div class="relative">
+                <div class="absolute inset-0 flex items-center">
+                  <div class="w-full border-t border-gray-200"></div>
+                </div>
+                <div class="relative flex justify-center text-sm">
+                  <span class="bg-white px-3 text-gray-500">or</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                [disabled]="passkeyLoading()"
+                (click)="onPasskeyVerify()"
+                class="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <svg class="h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z" />
+                  <circle cx="16.5" cy="7.5" r=".5" fill="currentColor" />
+                </svg>
+                @if (passkeyLoading()) {
+                  Verifying with passkey…
+                } @else {
+                  Use a Passkey instead
+                }
+              </button>
+            </div>
+          }
+
           <div class="mt-6 text-center">
             <button
               (click)="backToLogin()"
@@ -91,19 +120,32 @@ export class TwoFactorVerifyPageComponent implements OnInit {
 
   code = '';
   readonly loading = signal(false);
+  readonly passkeyLoading = signal(false);
   readonly errorMessage = signal('');
+  readonly hasPasskeys = signal(false);
 
   private tempToken = '';
+  private returnUrl = '/';
 
   ngOnInit(): void {
     // The temp token is passed via router state from the login page
     const nav = this.router.getCurrentNavigation();
     this.tempToken = (nav?.extras?.state?.['tempToken'] as string) ?? '';
+    const passkeys = nav?.extras?.state?.['hasPasskeys'] as boolean | undefined;
 
     // Also check history state (for page refreshes / direct navigation)
     if (!this.tempToken) {
       this.tempToken = (history.state?.['tempToken'] as string) ?? '';
     }
+    if (passkeys === undefined) {
+      this.hasPasskeys.set(!!(history.state?.['hasPasskeys']));
+    } else {
+      this.hasPasskeys.set(!!passkeys);
+    }
+
+    this.returnUrl = (nav?.extras?.state?.['returnUrl'] as string)
+      ?? (history.state?.['returnUrl'] as string)
+      ?? '/';
 
     if (!this.tempToken) {
       // No temp token — redirect back to login
@@ -130,7 +172,7 @@ export class TwoFactorVerifyPageComponent implements OnInit {
 
     try {
       await this.auth.verify2fa(this.tempToken, trimmed);
-      await this.router.navigate(['/']);
+      await this.router.navigateByUrl(this.returnUrl);
     } catch (err: unknown) {
       const msg =
         err instanceof Error
@@ -139,6 +181,24 @@ export class TwoFactorVerifyPageComponent implements OnInit {
       this.errorMessage.set(msg);
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  async onPasskeyVerify(): Promise<void> {
+    this.passkeyLoading.set(true);
+    this.errorMessage.set('');
+
+    try {
+      await this.auth.verify2faWithPasskey(this.tempToken);
+      await this.router.navigateByUrl(this.returnUrl);
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : 'Passkey verification failed. Please try again.';
+      this.errorMessage.set(msg);
+    } finally {
+      this.passkeyLoading.set(false);
     }
   }
 

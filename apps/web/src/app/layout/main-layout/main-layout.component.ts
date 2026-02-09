@@ -4,10 +4,40 @@ import {
   signal,
   computed,
   inject,
+  ElementRef,
+  viewChild,
+  HostListener,
+  OnInit,
+  OnDestroy,
 } from '@angular/core';
-import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
+import { DecimalPipe } from '@angular/common';
+import { Router, RouterOutlet, RouterLink, RouterLinkActive, NavigationEnd } from '@angular/router';
+import { firstValueFrom, Subscription, filter } from 'rxjs';
+import { Title } from '@angular/platform-browser';
 import { AuthService } from '../../core/auth/auth.service';
+import { WebSocketService } from '../../core/websocket/websocket.service';
 import { UserMenuComponent } from '../../shared/components/user-menu/user-menu.component';
+import type { ApiResponse, PlaceDto, VesselDto } from '@fueld/types';
+
+import { API } from '@app/core/config/api';
+
+interface CommodityPrice {
+  ticker: string;
+  name: string;
+  price: number;
+  change: number;
+  changePercent: number;
+  currency: string;
+  updatedAt: string;
+}
+
+interface SearchResult {
+  id: string;
+  name: string;
+  subtitle: string;
+  kind: 'place' | 'company' | 'vessel';
+}
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Main Layout — Responsive sidebar + top bar shell
@@ -21,6 +51,7 @@ interface NavItem {
   icon: string;
   route?: string;
   children?: { label: string; route: string }[];
+  adminOnly?: boolean;
 }
 
 const NAVIGATION: NavItem[] = [
@@ -35,18 +66,21 @@ const NAVIGATION: NavItem[] = [
     children: [
       { label: 'Orders', route: '/trading/orders' },
       { label: 'Inquiries', route: '/trading/inquiries' },
-      { label: 'Counterparties', route: '/trading/counterparties' },
     ],
-  },
-  {
-    label: 'Operations',
-    icon: 'M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z',
-    route: '/operations',
   },
   {
     label: 'Credit',
     icon: 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z',
-    route: '/credit',
+    adminOnly: true,
+    children: [
+      { label: 'Suppliers', route: '/credit/suppliers' },
+      { label: 'Customers', route: '/credit/customers' },
+    ],
+  },
+  {
+    label: 'Companies',
+    icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4',
+    route: '/companies',
   },
   {
     label: 'Places',
@@ -54,11 +88,22 @@ const NAVIGATION: NavItem[] = [
     route: '/places',
   },
   {
+    label: 'Vessels',
+    icon: 'M4 19h16M5 19l1-9h12l1 9M8 10V7a1 1 0 011-1h6a1 1 0 011 1v3M12 6V3',
+    route: '/vessels',
+  },
+  {
     label: 'Admin',
     icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z',
+    adminOnly: true,
     children: [
       { label: 'Users', route: '/admin/users' },
-      { label: 'Vessels', route: '/admin/vessels' },
+      { label: 'Our Companies', route: '/admin/our-companies' },
+      { label: 'Teams', route: '/admin/teams' },
+      { label: 'Company Groups', route: '/admin/company-groups' },
+      { label: 'Integrations', route: '/admin/integrations' },
+      { label: 'Activity Log', route: '/admin/activity' },
+      { label: 'Security', route: '/admin/security' },
       { label: 'Settings', route: '/admin/settings' },
     ],
   },
@@ -67,7 +112,7 @@ const NAVIGATION: NavItem[] = [
 @Component({
   selector: 'app-main-layout',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, UserMenuComponent],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, UserMenuComponent, DecimalPipe],
   template: `
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <!--  Mobile Overlay Backdrop                                       -->
@@ -100,12 +145,13 @@ const NAVIGATION: NavItem[] = [
 
       <!-- Nav list -->
       <nav class="mt-4 flex-1 space-y-1 overflow-y-auto px-3">
-        @for (item of navItems; track item.label) {
+        @for (item of navItems(); track item.label) {
           @if (item.route) {
             <!-- Simple nav link -->
             <a
               [routerLink]="item.route"
               routerLinkActive="bg-sidebar-active text-sidebar-text-active"
+              [routerLinkActiveOptions]="{ exact: item.route === '/' }"
               class="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-text transition-colors hover:bg-sidebar-hover hover:text-sidebar-text-active"
               (click)="closeSidebar()"
             >
@@ -168,7 +214,7 @@ const NAVIGATION: NavItem[] = [
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <div class="flex min-h-screen flex-col lg:pl-64">
       <!-- Top bar -->
-      <header class="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-gray-200 bg-white/80 px-4 backdrop-blur-md sm:px-6">
+      <header class="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-gray-200 bg-white/80 px-4 backdrop-blur-md sm:px-6 lg:px-8">
         <!-- Hamburger (mobile only) -->
         <button
           class="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 lg:hidden"
@@ -184,11 +230,111 @@ const NAVIGATION: NavItem[] = [
           </svg>
         </button>
 
-        <!-- Page title (filled by child routes if needed) -->
-        <div class="flex-1"></div>
+        <!-- Global Search -->
+        <div class="relative flex-1 transition-all duration-300" [class]="searchFocused() ? 'max-w-2xl' : 'max-w-md'" #searchWrapper>
+          <div class="relative">
+            <svg xmlns="http://www.w3.org/2000/svg" class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Search…"
+              class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm text-gray-700
+                     placeholder:text-gray-400 transition-colors
+                     focus:border-brand-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100"
+              [value]="searchTerm()"
+              (input)="onSearchInput($event)"
+              (focus)="onSearchFocus()"
+              (blur)="onSearchBlur()"
+              (keydown.escape)="closeSearch()"
+              (keydown.enter)="navigateFirstResult()"
+            />
+            @if (searchLoading()) {
+              <svg class="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+              </svg>
+            }
+          </div>
+
+          <!-- Search Results Dropdown -->
+          @if (searchOpen() && (searchResults().length || (searchTerm().length >= 2 && !searchLoading()))) {
+            <div class="absolute left-0 right-0 top-full z-50 mt-1 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden">
+              @if (searchResults().length) {
+                @for (result of searchResults(); track result.id + result.kind) {
+                  <button
+                    class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50"
+                    (click)="goToResult(result)"
+                  >
+                    @if (result.kind === 'company') {
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-2a1 1 0 00-1-1H9a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clip-rule="evenodd" />
+                      </svg>
+                    } @else if (result.kind === 'vessel') {
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-teal-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M3 18h18l-3-9H6L3 18zM10 2l2 7H8l2-7z" />
+                      </svg>
+                    } @else {
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" />
+                      </svg>
+                    }
+                    <div class="min-w-0 flex-1">
+                      <p class="truncate font-medium text-gray-900">{{ result.name }}</p>
+                      <p class="truncate text-xs text-gray-500">{{ result.subtitle }}</p>
+                    </div>
+                    <span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium"
+                      [class]="result.kind === 'company' ? 'bg-blue-50 text-blue-600' : result.kind === 'vessel' ? 'bg-teal-50 text-teal-600' : 'bg-gray-100 text-gray-500'">
+                      {{ result.kind === 'company' ? 'Company' : result.kind === 'vessel' ? 'Vessel' : 'Place' }}
+                    </span>
+                  </button>
+                }
+              } @else {
+                <div class="px-4 py-3 text-sm text-gray-500">No results found</div>
+              }
+            </div>
+          }
+        </div>
 
         <!-- Right side actions -->
-        <div class="flex items-center gap-3">
+        <div class="ml-auto flex items-center gap-3">
+          <!-- Commodity Prices (shrinks / hides when search expands) -->
+          <div class="hidden shrink items-center gap-3 overflow-hidden md:flex">
+            @for (p of commodityPrices(); track p.ticker) {
+              <div class="flex shrink-0 flex-col leading-tight">
+                <div class="flex items-center gap-1 text-xs">
+                  <span class="font-medium text-gray-500">{{ p.name }}</span>
+                  <span class="font-semibold text-gray-900">{{ p.price | number:'1.2-2' }}</span>
+                </div>
+                <span
+                  class="text-[11px] font-medium"
+                  [class]="p.change >= 0 ? 'text-emerald-600' : 'text-red-600'"
+                >
+                  {{ p.change >= 0 ? '+' : '' }}{{ p.change | number:'1.2-2' }}
+                  ({{ p.change >= 0 ? '+' : '' }}{{ p.changePercent | number:'1.2-2' }}%)
+                </span>
+              </div>
+            }
+          </div>
+
+          @if (commodityPrices().length > 0) {
+            <div class="hidden h-6 w-px bg-gray-200 md:block"></div>
+          }
+
+          <!-- New Inquiry quick button -->
+          <button
+            (click)="openNewInquiry()"
+            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 p-2 sm:px-3.5 sm:py-2 text-sm font-semibold
+                   text-white shadow-sm transition-colors hover:bg-brand-700
+                   focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
+            aria-label="New Inquiry"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+            </svg>
+            <span class="hidden sm:inline">New Inquiry</span>
+          </button>
+
           <!-- Notifications bell -->
           <button
             class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
@@ -217,12 +363,255 @@ const NAVIGATION: NavItem[] = [
     }
   `,
 })
-export class MainLayoutComponent {
+export class MainLayoutComponent implements OnInit, OnDestroy {
   private readonly auth = inject(AuthService);
+  private readonly http = inject(HttpClient);
+  private readonly router = inject(Router);
+  private readonly wsService = inject(WebSocketService);
+  private readonly titleService = inject(Title);
+  private routerSub: Subscription | null = null;
+  private priceSub: Subscription | null = null;
+  private copyHandler: ((e: ClipboardEvent) => void) | null = null;
+  private printHandler: (() => void) | null = null;
+  private screenshotHandler: ((e: KeyboardEvent) => void) | null = null;
 
   readonly sidebarOpen = signal(false);
+  readonly commodityPrices = signal<CommodityPrice[]>([]);
+
+  ngOnInit(): void {
+    // Subscribe to commodity price updates from WebSocket
+    this.priceSub = this.wsService
+      .on<{ prices: CommodityPrice[] }>('prices')
+      .subscribe((data) => {
+        this.commodityPrices.set(data.prices);
+      });
+
+    // Request prices once WS is authenticated
+    const authCheck = setInterval(() => {
+      if (this.wsService.authenticated()) {
+        clearInterval(authCheck);
+        this.wsService.send({ type: 'get-prices' });
+      }
+    }, 200);
+    // Safety: clear after 10s
+    setTimeout(() => clearInterval(authCheck), 10_000);
+
+    // Send presence on every route navigation (with slight delay for TitleStrategy)
+    this.routerSub = this.router.events
+      .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
+      .subscribe((event) => {
+        setTimeout(() => {
+          this.wsService.sendPresence(event.urlAfterRedirects, this.titleService.getTitle());
+        }, 50);
+      });
+
+    // Send initial presence
+    setTimeout(() => {
+      this.wsService.sendPresence(this.router.url, this.titleService.getTitle());
+    }, 100);
+
+    // Track copy events
+    this.copyHandler = (e: ClipboardEvent) => {
+      const text = e.clipboardData?.getData?.('text/plain') || window.getSelection()?.toString() || '';
+      if (text.trim().length > 0) {
+        this.wsService.sendCopyEvent(text, this.router.url, this.titleService.getTitle());
+      }
+    };
+    document.addEventListener('copy', this.copyHandler as EventListener);
+
+    // Track print events (Ctrl/Cmd+P, window.print())
+    this.printHandler = () => {
+      this.wsService.sendPrintEvent(this.router.url, this.titleService.getTitle());
+    };
+    window.addEventListener('beforeprint', this.printHandler);
+
+    // Track screenshot key combos (best-effort)
+    this.screenshotHandler = (e: KeyboardEvent) => {
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      if (isMac && e.metaKey && e.shiftKey && (e.key === '3' || e.key === '4' || e.key === '5')) {
+        this.wsService.sendScreenshotEvent(this.router.url, this.titleService.getTitle());
+      } else if (!isMac && e.key === 'PrintScreen') {
+        this.wsService.sendScreenshotEvent(this.router.url, this.titleService.getTitle());
+      }
+    };
+    document.addEventListener('keydown', this.screenshotHandler as EventListener);
+  }
+
+  ngOnDestroy(): void {
+    this.routerSub?.unsubscribe();
+    this.priceSub?.unsubscribe();
+    if (this.copyHandler) {
+      document.removeEventListener('copy', this.copyHandler as EventListener);
+    }
+    if (this.printHandler) {
+      window.removeEventListener('beforeprint', this.printHandler);
+    }
+    if (this.screenshotHandler) {
+      document.removeEventListener('keydown', this.screenshotHandler as EventListener);
+    }
+  }
+
+  openNewInquiry(): void {
+    this.router.navigate(['/trading/inquiries'], { queryParams: { new: '1' } });
+  }
+
   readonly openGroups = signal<Set<string>>(new Set());
-  readonly navItems = NAVIGATION;
+  readonly navItems = computed(() =>
+    NAVIGATION.filter((item) => !item.adminOnly || this.auth.isAdmin()),
+  );
+
+  // ─── Global search ──────────────────────────────────────────────
+  readonly searchTerm = signal('');
+  readonly searchFocused = signal(false);
+  readonly searchResults = signal<SearchResult[]>([]);
+  readonly searchLoading = signal(false);
+  readonly searchOpen = signal(false);
+  private searchTimer: ReturnType<typeof setTimeout> | null = null;
+  readonly searchWrapper = viewChild<ElementRef<HTMLDivElement>>('searchWrapper');
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    const wrapper = this.searchWrapper()?.nativeElement;
+    if (wrapper && !wrapper.contains(event.target as Node)) {
+      this.closeSearch();
+    }
+  }
+
+  onSearchInput(event: Event): void {
+    const term = (event.target as HTMLInputElement).value;
+    this.searchTerm.set(term);
+
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+
+    if (term.trim().length < 2) {
+      this.searchResults.set([]);
+      this.searchOpen.set(false);
+      return;
+    }
+
+    this.searchLoading.set(true);
+    this.searchOpen.set(true);
+
+    this.searchTimer = setTimeout(() => this.executeSearch(term.trim()), 300);
+  }
+
+  onSearchFocus(): void {
+    this.searchFocused.set(true);
+    if (this.searchTerm().length >= 2 && this.searchResults().length) {
+      this.searchOpen.set(true);
+    }
+  }
+
+  onSearchBlur(): void {
+    // Delay to allow click on search results
+    setTimeout(() => this.searchFocused.set(false), 200);
+  }
+
+  closeSearch(): void {
+    this.searchOpen.set(false);
+    this.searchFocused.set(false);
+  }
+
+  async executeSearch(term: string): Promise<void> {
+    try {
+      const [placesRes, companiesRes, vesselsRes] = await Promise.all([
+        firstValueFrom(
+          this.http.get<ApiResponse<{ places: PlaceDto[]; total: number }>>(
+            `${API}/lloyds/places/local?search=${encodeURIComponent(term)}&limit=5`,
+          ),
+        ),
+        firstValueFrom(
+          this.http.get<ApiResponse<{ companies: any[]; total: number }>>(
+            `${API}/companies/local?search=${encodeURIComponent(term)}&limit=5`,
+          ),
+        ),
+        firstValueFrom(
+          this.http.get<ApiResponse<{ vessels: VesselDto[]; total: number }>>(
+            `${API}/vessels/local?search=${encodeURIComponent(term)}&limit=5`,
+          ),
+        ),
+      ]);
+
+      const results: SearchResult[] = [];
+
+      if (companiesRes.success && companiesRes.data?.companies?.length) {
+        for (const c of companiesRes.data.companies) {
+          results.push({
+            id: c.id,
+            name: c.name,
+            subtitle: [c.country, c.types?.join(', ')].filter(Boolean).join(' · '),
+            kind: 'company',
+          });
+        }
+      }
+
+      if (placesRes.success && placesRes.data?.places?.length) {
+        for (const p of placesRes.data.places) {
+          results.push({
+            id: p.id,
+            name: p.name,
+            subtitle: [p.country, p.placeType].filter(Boolean).join(' · '),
+            kind: 'place',
+          });
+        }
+      }
+
+      if (vesselsRes.success && vesselsRes.data?.vessels?.length) {
+        for (const v of vesselsRes.data.vessels) {
+          results.push({
+            id: v.id,
+            name: v.name,
+            subtitle: [v.imo ? `IMO ${v.imo}` : null, v.flag, v.type].filter(Boolean).join(' · '),
+            kind: 'vessel',
+          });
+        }
+      }
+
+      this.searchResults.set(results);
+    } catch {
+      this.searchResults.set([]);
+    } finally {
+      this.searchLoading.set(false);
+    }
+  }
+
+  goToPlace(id: string): void {
+    this.searchOpen.set(false);
+    this.searchTerm.set('');
+    this.searchResults.set([]);
+    this.router.navigate(['/places', id]);
+  }
+
+  goToCompany(id: string): void {
+    this.searchOpen.set(false);
+    this.searchTerm.set('');
+    this.searchResults.set([]);
+    this.router.navigate(['/companies', id]);
+  }
+
+  goToVessel(id: string): void {
+    this.searchOpen.set(false);
+    this.searchTerm.set('');
+    this.searchResults.set([]);
+    this.router.navigate(['/vessels', id]);
+  }
+
+  goToResult(result: SearchResult): void {
+    if (result.kind === 'company') {
+      this.goToCompany(result.id);
+    } else if (result.kind === 'vessel') {
+      this.goToVessel(result.id);
+    } else {
+      this.goToPlace(result.id);
+    }
+  }
+
+  navigateFirstResult(): void {
+    const results = this.searchResults();
+    if (results.length) {
+      this.goToResult(results[0]);
+    }
+  }
 
   readonly sidebarClasses = computed(() => {
     const base =

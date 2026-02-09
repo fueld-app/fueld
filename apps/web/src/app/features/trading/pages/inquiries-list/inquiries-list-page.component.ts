@@ -1,0 +1,495 @@
+import {
+  Component,
+  ChangeDetectionStrategy,
+  signal,
+  inject,
+  OnInit,
+  OnDestroy,
+  computed,
+} from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { RouterLink, Router, ActivatedRoute } from '@angular/router';
+import { Subscription } from 'rxjs';
+import { FormsModule } from '@angular/forms';
+import { StatusBadgeComponent } from '../../../../shared/components/status-badge/status-badge.component';
+import { SearchableDropdownComponent, type DropdownOption } from '../../../../shared/components/searchable-dropdown/searchable-dropdown.component';
+import type { ApiResponse, OrderListRowDto, CounterpartyDto, VesselDto, PlaceDto } from '@fueld/types';
+import { DecimalPipe, DatePipe } from '@angular/common';
+import { firstValueFrom } from 'rxjs';
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Inquiries List Page — INQUIRY + OFFER status orders
+// ═══════════════════════════════════════════════════════════════════════
+
+import { API } from '@app/core/config/api';
+
+@Component({
+  selector: 'app-inquiries-list-page',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [RouterLink, StatusBadgeComponent, FormsModule, DecimalPipe, DatePipe, SearchableDropdownComponent],
+  template: `
+    <div>
+      <!-- Header -->
+      <div class="mb-6">
+        <h1 class="text-2xl font-bold text-gray-900">Inquiries</h1>
+        <p class="mt-1 text-sm text-gray-500">Manage bunker inquiries and offers before confirmation.</p>
+      </div>
+
+      <!-- Search bar -->
+      <div class="mb-4">
+        <input
+          type="text"
+          [ngModel]="searchTerm()"
+          (ngModelChange)="onSearch($event)"
+          placeholder="Search by client, vessel or port..."
+          class="w-full max-w-md rounded-lg border border-gray-300 px-4 py-2.5 text-sm shadow-sm
+                 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none
+                 focus:ring-2 focus:ring-brand-500/20"
+        />
+      </div>
+
+      <!-- Loading state -->
+      @if (loading()) {
+        <div class="flex items-center justify-center py-20">
+          <svg class="h-8 w-8 animate-spin text-brand-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+        </div>
+      } @else {
+        <!-- Desktop table -->
+        <div class="hidden md:block overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-gray-200 bg-gray-50/80">
+                <th class="px-4 py-3 text-left font-medium text-gray-600">No.</th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600">Client</th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600">Vessel</th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600">Port</th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600">Status</th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600">ETA</th>
+                <th class="px-4 py-3 text-right font-medium text-gray-600">Value (USD)</th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600">Created</th>
+                <th class="px-4 py-3 w-12"></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              @for (inq of inquiries(); track inq.id) {
+                <tr class="transition-colors hover:bg-gray-50/50 cursor-pointer" (click)="goToDetail(inq.orderNumber || inq.id)">
+                  <td class="px-4 py-3 font-mono text-xs text-gray-500">{{ inq.orderNumber ?? '—' }}</td>
+                  <td class="px-4 py-3 font-medium text-gray-900">{{ inq.clientName }}</td>
+                  <td class="px-4 py-3 text-gray-600">{{ inq.vesselName }}</td>
+                  <td class="px-4 py-3 text-gray-600">{{ inq.placeName }}</td>
+                  <td class="px-4 py-3">
+                    <app-status-badge [status]="inq.status" />
+                  </td>
+                  <td class="px-4 py-3 text-gray-500">{{ inq.eta ? (inq.eta | date:'mediumDate') : '—' }}</td>
+                  <td class="px-4 py-3 text-right tabular-nums text-gray-900">
+                    @if (inq.totalValue > 0) {
+                      {{ inq.totalValue | number:'1.2-2' }}
+                    } @else {
+                      <span class="text-gray-400">—</span>
+                    }
+                  </td>
+                  <td class="px-4 py-3 text-gray-500">{{ inq.createdAt | date:'mediumDate' }}</td>
+                  <td class="px-4 py-3">
+                    <a
+                      [routerLink]="['/trading/inquiries', inq.orderNumber || inq.id]"
+                      class="rounded-md p-1 text-gray-400 hover:text-brand-600 transition-colors"
+                      aria-label="View inquiry"
+                      (click)="$event.stopPropagation()"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+                      </svg>
+                    </a>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="9" class="px-4 py-12 text-center">
+                    <p class="text-sm text-gray-400">No inquiries found.</p>
+                    <button
+                      (click)="showNewInquiryModal.set(true)"
+                      class="mt-2 text-sm font-medium text-brand-600 hover:text-brand-700"
+                    >
+                      + Create your first inquiry
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        @if (totalItems() > pageSize()) {
+          <div class="mt-4 flex items-center justify-between">
+            <p class="text-sm text-gray-500">
+              Showing {{ ((currentPage() - 1) * pageSize()) + 1 }}–{{ Math.min(currentPage() * pageSize(), totalItems()) }}
+              of {{ totalItems() }}
+            </p>
+            <div class="flex gap-2">
+              <button
+                (click)="goToPage(currentPage() - 1)"
+                [disabled]="currentPage() <= 1"
+                class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700
+                       hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <button
+                (click)="goToPage(currentPage() + 1)"
+                [disabled]="currentPage() * pageSize() >= totalItems()"
+                class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700
+                       hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        }
+
+        <!-- Mobile cards -->
+        <div class="space-y-3 md:hidden">
+          @for (inq of inquiries(); track inq.id) {
+            <a
+              [routerLink]="['/trading/inquiries', inq.orderNumber || inq.id]"
+              class="block rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+            >
+              <div class="flex items-center justify-between mb-2">
+                <span class="font-semibold text-gray-900">{{ inq.clientName }}</span>
+                <app-status-badge [status]="inq.status" />
+              </div>
+              @if (inq.orderNumber) {
+                <p class="text-xs font-mono text-gray-400 mb-1">{{ inq.orderNumber }}</p>
+              }
+              <div class="grid grid-cols-2 gap-1 text-xs text-gray-500">
+                <span>{{ inq.vesselName }}</span>
+                <span>{{ inq.placeName }}</span>
+                <span>ETA {{ inq.eta ? (inq.eta | date:'mediumDate') : '—' }}</span>
+                <span>{{ inq.createdAt | date:'mediumDate' }}</span>
+              </div>
+            </a>
+          } @empty {
+            <div class="rounded-xl border-2 border-dashed border-gray-300 bg-white p-8 text-center">
+              <p class="text-sm text-gray-400">No inquiries yet.</p>
+              <button
+                (click)="showNewInquiryModal.set(true)"
+                class="mt-2 text-sm font-medium text-brand-600 hover:text-brand-700"
+              >
+                + Create your first inquiry
+              </button>
+            </div>
+          }
+        </div>
+      }
+    </div>
+
+    <!-- ═════════════════════════════════════════════════════════════ -->
+    <!--  New Inquiry Modal                                           -->
+    <!-- ═════════════════════════════════════════════════════════════ -->
+    @if (showNewInquiryModal()) {
+      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div class="w-full max-w-lg rounded-2xl bg-white shadow-2xl" role="dialog" aria-modal="true">
+          <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+            <h2 class="text-lg font-semibold text-gray-900">New Inquiry</h2>
+            <button
+              (click)="showNewInquiryModal.set(false)"
+              class="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              aria-label="Close"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+              </svg>
+            </button>
+          </div>
+
+          <div class="space-y-4 px-6 py-5">
+            <!-- Client -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Client</label>
+              <app-searchable-dropdown
+                [options]="clientOptions()"
+                [selected]="newClientId()"
+                placeholder="Select client..."
+                (selectionChange)="newClientId.set($event)"
+              />
+            </div>
+
+            <!-- Vessel -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Vessel</label>
+              <app-searchable-dropdown
+                [options]="vesselOptions()"
+                [selected]="newVesselId()"
+                placeholder="Select vessel..."
+                (selectionChange)="newVesselId.set($event)"
+              />
+            </div>
+
+            <!-- Port -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Port</label>
+              <app-searchable-dropdown
+                [options]="placeOptions()"
+                [selected]="newPlaceId()"
+                placeholder="Select port..."
+                (selectionChange)="newPlaceId.set($event)"
+              />
+            </div>
+
+            <!-- ETA/ETD date range -->
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label for="new-eta" class="block text-sm font-medium text-gray-700 mb-1.5">ETA</label>
+                <input
+                  id="new-eta"
+                  type="date"
+                  [min]="minDate"
+                  [ngModel]="newEta()"
+                  (ngModelChange)="onEtaChange($event)"
+                  class="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm shadow-sm
+                         focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                />
+              </div>
+              <div>
+                <label for="new-etd" class="block text-sm font-medium text-gray-700 mb-1.5">ETD <span class="text-gray-400 font-normal">(optional)</span></label>
+                <input
+                  id="new-etd"
+                  type="date"
+                  [min]="etdMinDate()"
+                  [ngModel]="newEtd()"
+                  (ngModelChange)="newEtd.set($event)"
+                  class="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm shadow-sm
+                         focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-4">
+            <button
+              (click)="showNewInquiryModal.set(false)"
+              class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700
+                     shadow-sm hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              (click)="createInquiry()"
+              [disabled]="creating() || !canCreateInquiry()"
+              class="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold
+                     text-white shadow-sm transition-colors hover:bg-brand-700
+                     disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              @if (creating()) {
+                <svg class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+              }
+              Create Inquiry
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Toast -->
+    @if (toast()) {
+      <div
+        class="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-lg border px-4 py-3 text-sm font-medium shadow-lg"
+        [class]="toast()!.type === 'success'
+          ? 'border-green-200 bg-green-50 text-green-800'
+          : 'border-red-200 bg-red-50 text-red-800'"
+      >
+        {{ toast()!.message }}
+      </div>
+    }
+  `,
+})
+export class InquiriesListPageComponent implements OnInit, OnDestroy {
+  private readonly http = inject(HttpClient);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  private queryParamSub?: Subscription;
+
+  readonly Math = Math;
+
+  // ─── State ───────────────────────────────────────────────────────
+
+  readonly inquiries = signal<OrderListRowDto[]>([]);
+  readonly loading = signal(false);
+  readonly totalItems = signal(0);
+  readonly currentPage = signal(1);
+  readonly pageSize = signal(25);
+  readonly searchTerm = signal('');
+  readonly toast = signal<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // ─── New inquiry modal ────────────────────────────────────────────
+
+  readonly showNewInquiryModal = signal(false);
+  readonly creating = signal(false);
+  readonly clients = signal<CounterpartyDto[]>([]);
+  readonly vesselsList = signal<VesselDto[]>([]);
+  readonly placesList = signal<PlaceDto[]>([]);
+
+  readonly clientOptions = computed<DropdownOption[]>(() =>
+    this.clients().map((c) => ({ value: c.id, label: c.name })),
+  );
+  readonly vesselOptions = computed<DropdownOption[]>(() =>
+    this.vesselsList().map((v) => ({ value: v.id, label: v.name })),
+  );
+  readonly placeOptions = computed<DropdownOption[]>(() =>
+    this.placesList().map((p) => ({ value: p.id, label: p.name })),
+  );
+
+  readonly newClientId = signal('');
+  readonly newVesselId = signal('');
+  readonly newPlaceId = signal('');
+  readonly newEta = signal('');
+  readonly newEtd = signal('');
+
+  /** Today's date in YYYY-MM-DD format for min attribute */
+  readonly minDate = new Date().toISOString().split('T')[0];
+
+  /** ETD min is ETA if set, otherwise today */
+  readonly etdMinDate = computed(() => this.newEta() || this.minDate);
+
+  readonly canCreateInquiry = computed(
+    () => !!this.newClientId() && !!this.newVesselId() && !!this.newPlaceId(),
+  );
+
+  // ─── Lifecycle ────────────────────────────────────────────────────
+
+  ngOnInit(): void {
+    this.loadInquiries();
+    this.loadDropdownData();
+
+    // Auto-open modal when navigated with ?new=1 (e.g. from navbar button)
+    this.queryParamSub = this.route.queryParamMap.subscribe((params) => {
+      if (params.get('new') === '1') {
+        this.showNewInquiryModal.set(true);
+        this.router.navigate([], { queryParams: {}, replaceUrl: true });
+      }
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.queryParamSub?.unsubscribe();
+  }
+
+  // ─── Data loading ─────────────────────────────────────────────────
+
+  async loadInquiries(): Promise<void> {
+    this.loading.set(true);
+    try {
+      const params = new URLSearchParams();
+      params.set('statuses', 'INQUIRY,OFFER');
+      params.set('page', String(this.currentPage()));
+      params.set('limit', String(this.pageSize()));
+      if (this.searchTerm()) params.set('search', this.searchTerm());
+
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ items: OrderListRowDto[]; total: number }>>(
+          `${API}/orders?${params.toString()}`,
+        ),
+      );
+      if (res.success) {
+        this.inquiries.set(res.data.items);
+        this.totalItems.set(res.data.total);
+      }
+    } catch {
+      this.showToast('error', 'Failed to load inquiries.');
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  private async loadDropdownData(): Promise<void> {
+    try {
+      const [clientsRes, vesselsRes, placesRes] = await Promise.all([
+        firstValueFrom(this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(`${API}/companies/local?type=CLIENT&limit=500`)),
+        firstValueFrom(this.http.get<ApiResponse<{ vessels: VesselDto[]; total: number }>>(`${API}/vessels/local?limit=500`)),
+        firstValueFrom(this.http.get<ApiResponse<{ places: PlaceDto[]; total: number }>>(`${API}/lloyds/places/local?limit=500`)),
+      ]);
+      if (clientsRes.success) this.clients.set(clientsRes.data.companies);
+      if (vesselsRes.success) this.vesselsList.set(vesselsRes.data.vessels);
+      if (placesRes.success) this.placesList.set(placesRes.data.places);
+    } catch {
+      // silently ignore — dropdowns will be empty
+    }
+  }
+
+  // ─── Actions ──────────────────────────────────────────────────────
+
+  /** When ETA changes, clear ETD if it's now before the new ETA */
+  onEtaChange(value: string): void {
+    this.newEta.set(value);
+    // If ETD is before new ETA, reset it
+    if (this.newEtd() && value && this.newEtd() < value) {
+      this.newEtd.set('');
+    }
+  }
+
+  private searchTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  onSearch(term: string): void {
+    this.searchTerm.set(term);
+    if (this.searchTimeout) clearTimeout(this.searchTimeout);
+    this.searchTimeout = setTimeout(() => {
+      this.currentPage.set(1);
+      this.loadInquiries();
+    }, 300);
+  }
+
+  goToPage(page: number): void {
+    this.currentPage.set(page);
+    this.loadInquiries();
+  }
+
+  goToDetail(id: string): void {
+    this.router.navigate(['/trading/inquiries', id]);
+  }
+
+  async createInquiry(): Promise<void> {
+    if (!this.canCreateInquiry()) return;
+    this.creating.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<any>>(`${API}/orders`, {
+          clientId: this.newClientId(),
+          vesselId: this.newVesselId(),
+          placeId: this.newPlaceId(),
+          eta: this.newEta() || undefined,
+          etd: this.newEtd() || undefined,
+        }),
+      );
+      if (res.success) {
+        this.showNewInquiryModal.set(false);
+        this.newClientId.set('');
+        this.newVesselId.set('');
+        this.newPlaceId.set('');
+        this.newEta.set('');
+        this.newEtd.set('');
+        this.showToast('success', 'Inquiry created.');
+        // Navigate to the new inquiry detail (prefer order number)
+        this.router.navigate(['/trading/inquiries', res.data.orderNumber || res.data.id]);
+      } else {
+        this.showToast('error', res.message ?? 'Failed to create inquiry.');
+      }
+    } catch {
+      this.showToast('error', 'Failed to create inquiry.');
+    } finally {
+      this.creating.set(false);
+    }
+  }
+
+  // ─── Toast ─────────────────────────────────────────────────────────
+
+  private showToast(type: 'success' | 'error', message: string): void {
+    this.toast.set({ type, message });
+    setTimeout(() => this.toast.set(null), 4000);
+  }
+}

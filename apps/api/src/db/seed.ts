@@ -41,6 +41,20 @@ async function seed() {
 
   // ─── 2. Users ──────────────────────────────────────────────────────
   const defaultPassword = await hashPassword('password123');
+  const adminPassword = await hashPassword(process.env['ADMIN_PASSWORD'] ?? 'Pereira123');
+
+  // Production admin user
+  const [prodAdmin] = await db
+    .insert(schema.users)
+    .values({
+      tenantId: tenant.id,
+      email: 'admin@fueld.app',
+      name: 'Admin',
+      role: 'ADMIN',
+      passwordHash: adminPassword,
+    })
+    .returning();
+  console.log(`  ✓ Production admin: admin@fueld.app`);
 
   const [admin] = await db
     .insert(schema.users)
@@ -75,18 +89,18 @@ async function seed() {
     })
     .returning();
 
-  const [operator] = await db
+  const [finance] = await db
     .insert(schema.users)
     .values({
       tenantId: tenant.id,
       email: 'ops@fueld.io',
       name: 'Emily White',
-      role: 'OPERATOR',
+      role: 'FINANCE',
       passwordHash: defaultPassword,
     })
     .returning();
 
-  console.log(`  ✓ Users: ${[admin, trader1, trader2, operator].map((u) => u.name).join(', ')}`);
+  console.log(`  ✓ Users: ${[admin, trader1, trader2, finance].map((u) => u.name).join(', ')}`);
   console.log(`    → All passwords: password123`);
 
   // ─── 3. Places ─────────────────────────────────────────────────────
@@ -116,23 +130,23 @@ async function seed() {
 
   // ─── 5. Counterparties ─────────────────────────────────────────────
   const clientsData = [
-    { tenantId: tenant.id, name: 'Oceanic Logistics', type: 'CLIENT' as const, creditLimit: '500000', country: 'SG' },
-    { tenantId: tenant.id, name: 'Global Shipping Corp.', type: 'CLIENT' as const, creditLimit: '750000', country: 'US' },
-    { tenantId: tenant.id, name: 'Apex Maritime Solutions', type: 'CLIENT' as const, creditLimit: '1000000', country: 'GR' },
-    { tenantId: tenant.id, name: 'Nordic Tankers AS', type: 'CLIENT' as const, creditLimit: '350000', country: 'NO' },
+    { tenantId: tenant.id, name: 'Oceanic Logistics', type: 'CLIENT' as const, types: ['CLIENT'], creditLimit: '500000', country: 'SG' },
+    { tenantId: tenant.id, name: 'Global Shipping Corp.', type: 'CLIENT' as const, types: ['CLIENT'], creditLimit: '750000', country: 'US' },
+    { tenantId: tenant.id, name: 'Apex Maritime Solutions', type: 'CLIENT' as const, types: ['CLIENT'], creditLimit: '1000000', country: 'GR' },
+    { tenantId: tenant.id, name: 'Nordic Tankers AS', type: 'CLIENT' as const, types: ['CLIENT'], creditLimit: '350000', country: 'NO' },
   ];
   const clients = await db.insert(schema.counterparties).values(clientsData).returning();
 
   const suppliersData = [
-    { tenantId: tenant.id, name: 'Shell Marine Fuels', type: 'SUPPLIER' as const, country: 'NL' },
-    { tenantId: tenant.id, name: 'TotalEnergies Marine', type: 'SUPPLIER' as const, country: 'FR' },
-    { tenantId: tenant.id, name: 'Vitol Bunkers', type: 'SUPPLIER' as const, country: 'CH' },
+    { tenantId: tenant.id, name: 'Shell Marine Fuels', type: 'SUPPLIER' as const, types: ['SUPPLIER'], country: 'NL' },
+    { tenantId: tenant.id, name: 'TotalEnergies Marine', type: 'SUPPLIER' as const, types: ['SUPPLIER'], country: 'FR' },
+    { tenantId: tenant.id, name: 'Vitol Bunkers', type: 'SUPPLIER' as const, types: ['SUPPLIER'], country: 'CH' },
   ];
   const suppliers = await db.insert(schema.counterparties).values(suppliersData).returning();
 
   const bargesData = [
-    { tenantId: tenant.id, name: 'Barge Alpha', type: 'BARGE' as const, country: 'SG' },
-    { tenantId: tenant.id, name: 'Barge Bravo', type: 'BARGE' as const, country: 'AE' },
+    { tenantId: tenant.id, name: 'Barge Alpha', type: 'BARGE' as const, types: ['BARGE'], country: 'SG' },
+    { tenantId: tenant.id, name: 'Barge Bravo', type: 'BARGE' as const, types: ['BARGE'], country: 'AE' },
   ];
   const barges = await db.insert(schema.counterparties).values(bargesData).returning();
 

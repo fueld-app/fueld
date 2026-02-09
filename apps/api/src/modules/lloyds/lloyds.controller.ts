@@ -1,6 +1,10 @@
 import { Elysia, t } from 'elysia';
 import { authGuard } from '../auth/auth.guard';
-import { searchVessels, searchPlaces, searchCompanies, importPlaceFromLli, listPlaces, getPlaceById, getPlaceByLliId, getPlaceEnrichment, createPlace, deletePlace, syncPlaceFromSeasearcher, getOrdersForPlace, getPortFacilities } from './lli.service';
+import { searchVessels, searchPlaces, searchCompanies, importPlaceFromLli, listPlaces, getPlaceById, getPlaceByLliId, getPlaceEnrichment, createPlace, deletePlace, syncPlaceFromSeasearcher, getOrdersForPlace, getPortFacilities, getExpectedArrivals, getPortSuppliers, addPortSupplier, updatePortSupplier, deletePortSupplier, updateResponsibleUser, listActiveUsers, getSupplyPortsForCompany } from './lli.service';
+import { logActivity } from '../activity/activity.service';
+import { db } from '../../db';
+import { users, places } from '../../db/schema';
+import { eq } from 'drizzle-orm';
 import type { ApiResponse } from '@fueld/types';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -344,6 +348,243 @@ export const lloydsController = new Elysia({ prefix: '/lloyds' })
         description:
           'Search by company name, country code, or company IMO. ' +
           'Returns local counterparties first; falls back to Lloyd\'s List Intelligence if none found.',
+      },
+    },
+  )
+
+  // ─── Expected Arrivals (Seasearcher) ──────────────────────────────
+  .get(
+    '/places/arrivals/:seasearcherId',
+    async ({ params, query }) => {
+      try {
+        const daysAhead = query.days ? parseInt(query.days) : 7;
+        const arrivals = await getExpectedArrivals(params.seasearcherId, daysAhead);
+        return { success: true, data: arrivals } satisfies ApiResponse<typeof arrivals>;
+      } catch (err) {
+        console.error('[Seasearcher] Expected arrivals failed:', err);
+        return { success: false, data: [], message: 'Failed to load expected arrivals' };
+      }
+    },
+    {
+      params: t.Object({ seasearcherId: t.String() }),
+      query: t.Object({ days: t.Optional(t.String()) }),
+      detail: {
+        tags: ["Lloyd's"],
+        summary: 'Get expected vessel arrivals from Seasearcher',
+      },
+    },
+  )
+
+  // ─── Port Suppliers: List ─────────────────────────────────────────
+  .get(
+    '/places/local/:id/suppliers',
+    async ({ params }) => {
+      try {
+        const suppliers = await getPortSuppliers(params.id);
+        return { success: true, data: suppliers } satisfies ApiResponse<typeof suppliers>;
+      } catch (err) {
+        console.error('[Suppliers] List failed:', err);
+        return { success: false, data: [], message: 'Failed to load suppliers' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: {
+        tags: ["Lloyd's"],
+        summary: 'List port suppliers for a place',
+      },
+    },
+  )
+
+  // ─── Port Suppliers: Create ───────────────────────────────────────
+  .post(
+    '/places/local/:id/suppliers',
+    async ({ params, body, auth }) => {
+      try {
+        // Look up user name + place name for audit trail
+        const [[u], [pl]] = await Promise.all([
+          db.select({ name: users.name }).from(users).where(eq(users.id, auth.sub)).limit(1),
+          db.select({ name: places.name }).from(places).where(eq(places.id, params.id)).limit(1),
+        ]);
+        const supplier = await addPortSupplier(
+          params.id,
+          { companyId: body.companyId, contactId: body.contactId, products: body.products, note: body.note },
+          auth.sub,
+          u?.name ?? auth.email,
+        );
+
+        // Log activity with metadata
+        logActivity({
+          userId: auth.sub,
+          action: 'CREATE',
+          entityType: 'place',
+          entityId: params.id,
+          entityName: pl?.name ?? null,
+          httpMethod: 'POST',
+          httpPath: `/lloyds/places/local/${params.id}/suppliers`,
+          metadata: { supplier: supplier?.companyName, products: body.products, note: body.note },
+        }).catch(() => {});
+
+        return { success: true, data: supplier } satisfies ApiResponse<typeof supplier>;
+      } catch (err) {
+        console.error('[Suppliers] Create failed:', err);
+        return { success: false, data: null, message: 'Failed to add supplier' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({
+        companyId: t.String({ minLength: 1 }),
+        contactId: t.Optional(t.Union([t.String(), t.Null()])),
+        products: t.Optional(t.Array(t.String())),
+        note: t.Optional(t.String()),
+      }),
+      detail: {
+        tags: ["Lloyd's"],
+        summary: 'Add a supplier to a place',
+      },
+    },
+  )
+
+  // ─── Port Suppliers: Update ───────────────────────────────────────
+  .put(
+    '/places/suppliers/:supplierId',
+    async ({ params, body, auth }) => {
+      try {
+        const supplier = await updatePortSupplier(params.supplierId, body);
+        if (!supplier) {
+          return { success: false, data: null, message: 'Supplier not found' };
+        }
+
+        // Look up place name for audit trail
+        const [pl] = await db.select({ name: places.name }).from(places).where(eq(places.id, supplier.placeId)).limit(1);
+
+        // Log activity against the place with metadata
+        logActivity({
+          userId: auth.sub,
+          action: 'UPDATE',
+          entityType: 'place',
+          entityId: supplier.placeId,
+          entityName: pl?.name ?? null,
+          httpMethod: 'PUT',
+          httpPath: `/lloyds/places/suppliers/${params.supplierId}`,
+          metadata: { supplier: supplier.companyName, ...body },
+        }).catch(() => {});
+
+        return { success: true, data: supplier } satisfies ApiResponse<typeof supplier>;
+      } catch (err) {
+        console.error('[Suppliers] Update failed:', err);
+        return { success: false, data: null, message: 'Failed to update supplier' };
+      }
+    },
+    {
+      params: t.Object({ supplierId: t.String() }),
+      body: t.Object({
+        contactId: t.Optional(t.Union([t.String(), t.Null()])),
+        products: t.Optional(t.Array(t.String())),
+        note: t.Optional(t.String()),
+      }),
+      detail: {
+        tags: ["Lloyd's"],
+        summary: 'Update a port supplier',
+      },
+    },
+  )
+
+  // ─── Port Suppliers: Delete ───────────────────────────────────────
+  .delete(
+    '/places/suppliers/:supplierId',
+    async ({ params, auth }) => {
+      try {
+        const deleted = await deletePortSupplier(params.supplierId);
+        if (!deleted) {
+          return { success: false, data: null, message: 'Supplier not found' };
+        }
+
+        // Look up place name for audit trail
+        const [pl] = await db.select({ name: places.name }).from(places).where(eq(places.id, deleted.placeId)).limit(1);
+
+        // Log activity against the place
+        logActivity({
+          userId: auth.sub,
+          action: 'DELETE',
+          entityType: 'place',
+          entityId: deleted.placeId,
+          entityName: pl?.name ?? null,
+          httpMethod: 'DELETE',
+          httpPath: `/lloyds/places/suppliers/${params.supplierId}`,
+          metadata: { supplier: deleted.companyName, products: deleted.products },
+        }).catch(() => {});
+
+        return { success: true, data: { id: params.supplierId } } satisfies ApiResponse<{ id: string }>;
+      } catch (err) {
+        console.error('[Suppliers] Delete failed:', err);
+        return { success: false, data: null, message: 'Failed to delete supplier' };
+      }
+    },
+    {
+      params: t.Object({ supplierId: t.String() }),
+      detail: {
+        tags: ["Lloyd's"],
+        summary: 'Delete a port supplier',
+      },
+    },
+  )
+
+  // ─── Responsible User: Update ─────────────────────────────────────
+  .patch(
+    '/places/local/:id/responsible-user',
+    async ({ params, body, auth }) => {
+      try {
+        const updated = await updateResponsibleUser(params.id, body.userId);
+        if (!updated) {
+          return { success: false, data: null, message: 'Place not found' };
+        }
+
+        // Log activity
+        await logActivity({
+          userId: auth.sub,
+          action: 'UPDATE',
+          entityType: 'place',
+          entityId: params.id,
+          entityName: updated.name,
+          metadata: { field: 'responsibleUser', responsibleUserId: body.userId },
+        });
+
+        return { success: true, data: updated } satisfies ApiResponse<typeof updated>;
+      } catch (err) {
+        console.error('[ResponsibleUser] Update failed:', err);
+        return { success: false, data: null, message: 'Failed to update responsible user' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({
+        userId: t.Union([t.String(), t.Null()]),
+      }),
+      detail: {
+        tags: ["Lloyd's"],
+        summary: 'Set or clear the responsible user for a place',
+      },
+    },
+  )
+
+  // ─── Active Users (for dropdowns) ─────────────────────────────────
+  .get(
+    '/users',
+    async () => {
+      try {
+        const userList = await listActiveUsers();
+        return { success: true, data: userList } satisfies ApiResponse<typeof userList>;
+      } catch (err) {
+        console.error('[Users] List failed:', err);
+        return { success: false, data: [], message: 'Failed to load users' };
+      }
+    },
+    {
+      detail: {
+        tags: ["Lloyd's"],
+        summary: 'List active users for dropdowns',
       },
     },
   );

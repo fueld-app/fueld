@@ -408,3 +408,422 @@ function createPdfBuffer(docDefinition: TDocumentDefinitions): Promise<Buffer> {
   const pdf = pdfmake.createPdf(docDefinition);
   return pdf.getBuffer();
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Offer PDF
+// ═══════════════════════════════════════════════════════════════════════
+
+function buildOfferDocument(data: {
+  orderNumber: string | null;
+  clientName: string;
+  clientCountry: string | null;
+  vesselName: string;
+  vesselImo: string | null;
+  portName: string;
+  eta: string | null;
+  etd: string | null;
+  currency: string;
+  items: Array<{
+    productType: string;
+    quantity: string;
+    quantityMin: string | null;
+    quantityMax: string | null;
+    unit: string;
+    salesPrice: string | null;
+  }>;
+  createdAt: Date;
+}): TDocumentDefinitions {
+  const tableHeader: TableCell[] = [
+    { text: 'Product', style: 'tableHeader' },
+    { text: 'Quantity', style: 'tableHeader', alignment: 'right' },
+    { text: 'Unit', style: 'tableHeader' },
+    { text: `Price (${data.currency})`, style: 'tableHeader', alignment: 'right' },
+  ];
+
+  const tableRows: TableCell[][] = data.items.map((item) => {
+    const qty = item.quantityMin && item.quantityMax
+      ? `${formatNumber(item.quantityMin, 0)}-${formatNumber(item.quantityMax, 0)}`
+      : formatNumber(item.quantity, 0);
+    return [
+      { text: item.productType },
+      { text: qty, alignment: 'right' },
+      { text: item.unit },
+      { text: `${data.currency}/${item.unit} ${formatNumber(item.salesPrice)}`, alignment: 'right' },
+    ];
+  });
+
+  const refNum = data.orderNumber ?? 'DRAFT';
+
+  // Delivery dates
+  const deliveryLines: Content[] = [];
+  if (data.eta) {
+    deliveryLines.push({
+      columns: [
+        { width: '25%', text: 'Delivery date:', bold: true },
+        { width: '75%', text: data.eta.split('T')[0] },
+      ],
+      margin: [0, 2, 0, 0],
+    } as Content);
+  }
+  if (data.etd) {
+    deliveryLines.push({
+      columns: [
+        { width: '25%', text: 'ETD:', bold: true },
+        { width: '75%', text: data.etd.split('T')[0] },
+      ],
+      margin: [0, 2, 0, 0],
+    } as Content);
+  }
+
+  return {
+    pageSize: 'A4',
+    pageMargins: [40, 60, 40, 60],
+    content: [
+      // Header
+      {
+        columns: [
+          {
+            width: '*',
+            stack: [
+              { text: 'FUELD', style: 'brand' },
+              { text: 'Bunker Trading Solutions', style: 'brandSub' },
+            ],
+          },
+          {
+            width: 'auto',
+            stack: [
+              { text: `Date: ${data.createdAt.toISOString().split('T')[0]}`, alignment: 'right', fontSize: 9 },
+              { text: `Ref.: ${refNum}`, alignment: 'right', fontSize: 9 },
+            ],
+            alignment: 'right',
+          },
+        ],
+      } as Content,
+      { text: '', margin: [0, 10, 0, 0] } as Content,
+      { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 1, lineColor: '#1a56db' }] } as Content,
+      { text: '', margin: [0, 15, 0, 0] } as Content,
+
+      // Title
+      { text: 'OFFER', style: 'invoiceTitle', alignment: 'center' } as Content,
+      { text: '', margin: [0, 15, 0, 0] } as Content,
+
+      // Client
+      {
+        columns: [
+          {
+            width: '50%',
+            stack: [
+              { text: data.clientName, style: 'clientName' },
+              { text: data.clientCountry ?? '', color: '#666666' },
+            ],
+          },
+        ],
+      } as Content,
+      { text: '', margin: [0, 10, 0, 0] } as Content,
+
+      { text: 'With reference to our correspondence, we are pleased to offer to you the following:', margin: [0, 0, 0, 10] } as Content,
+
+      // Vessel / Port info
+      {
+        columns: [
+          { width: '25%', text: 'Vessel:', bold: true },
+          { width: '25%', text: `${data.vesselName}${data.vesselImo ? ` (IMO: ${data.vesselImo})` : ''}` },
+          { width: '25%', text: 'Delivery place:', bold: true },
+          { width: '25%', text: data.portName },
+        ],
+      } as Content,
+      ...deliveryLines,
+      { text: '', margin: [0, 15, 0, 0] } as Content,
+
+      // Items table
+      {
+        table: {
+          headerRows: 1,
+          widths: ['*', 80, 40, 120],
+          body: [tableHeader, ...tableRows],
+        },
+        layout: {
+          hLineWidth: (i: number, node: { table: { body: unknown[] } }) =>
+            i === 0 || i === 1 || i === node.table.body.length ? 1 : 0.5,
+          vLineWidth: () => 0,
+          hLineColor: (i: number) => (i <= 1 ? '#1a56db' : '#e5e7eb'),
+          paddingTop: () => 6,
+          paddingBottom: () => 6,
+        },
+      } as Content,
+
+      { text: '', margin: [0, 30, 0, 0] } as Content,
+      { text: 'Best regards,', margin: [0, 0, 0, 4] } as Content,
+      { text: 'Fueld Trading', bold: true } as Content,
+    ],
+    footer: (currentPage: number, pageCount: number) => ({
+      columns: [
+        { text: 'Generated by Fueld — Bunker Trading SaaS', fontSize: 8, color: '#9ca3af', margin: [40, 0, 0, 0] },
+        { text: `Page ${currentPage} of ${pageCount}`, fontSize: 8, color: '#9ca3af', alignment: 'right', margin: [0, 0, 40, 0] },
+      ],
+    }),
+    styles: {
+      brand: { fontSize: 22, bold: true, color: '#1a56db' },
+      brandSub: { fontSize: 9, color: '#6b7280', margin: [0, 2, 0, 0] },
+      invoiceTitle: { fontSize: 24, bold: true, color: '#1a56db' },
+      sectionLabel: { fontSize: 10, bold: true, color: '#1a56db', margin: [0, 0, 0, 4] },
+      clientName: { fontSize: 14, bold: true },
+      tableHeader: { fontSize: 9, bold: true, color: '#ffffff', fillColor: '#1a56db' },
+    },
+    defaultStyle: { fontSize: 10, font: 'Roboto' },
+  };
+}
+
+/**
+ * Generate an Offer PDF buffer for a given order ID.
+ */
+export async function generateOfferPdfBuffer(orderId: string): Promise<{
+  buffer: Buffer;
+  fileName: string;
+}> {
+  const order = await fetchOrderForInvoice(orderId);
+
+  const docData = {
+    orderNumber: order.orderNumber,
+    clientName: order.client.name,
+    clientCountry: order.client.country,
+    vesselName: order.vessel.name,
+    vesselImo: order.vessel.imo,
+    portName: order.place.name,
+    eta: order.eta?.toISOString() ?? null,
+    etd: order.etd?.toISOString() ?? null,
+    currency: order.currency ?? 'USD',
+    items: order.items.map((item) => ({
+      productType: item.productType,
+      quantity: item.quantity,
+      quantityMin: item.quantityMin,
+      quantityMax: item.quantityMax,
+      unit: item.unit,
+      salesPrice: item.salesPrice,
+    })),
+    createdAt: new Date(),
+  };
+
+  const docDefinition = buildOfferDocument(docData);
+  const buffer = await createPdfBuffer(docDefinition);
+  const fileName = `Fueld_Offer_${order.orderNumber ?? orderId.slice(0, 8)}.pdf`;
+
+  return { buffer, fileName };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Proforma Invoice PDF
+// ═══════════════════════════════════════════════════════════════════════
+
+function buildProformaDocument(data: {
+  orderNumber: string | null;
+  clientName: string;
+  clientCountry: string | null;
+  vesselName: string;
+  vesselImo: string | null;
+  portName: string;
+  eta: string | null;
+  etd: string | null;
+  currency: string;
+  paymentTerms: string | null;
+  items: Array<{
+    productType: string;
+    quantity: string;
+    unit: string;
+    salesPrice: string | null;
+  }>;
+  createdAt: Date;
+}): TDocumentDefinitions {
+  const tableHeader: TableCell[] = [
+    { text: 'Product', style: 'tableHeader' },
+    { text: 'Quantity', style: 'tableHeader', alignment: 'right' },
+    { text: 'Unit', style: 'tableHeader' },
+    { text: `Unit price`, style: 'tableHeader', alignment: 'right' },
+    { text: `Total amount`, style: 'tableHeader', alignment: 'right' },
+  ];
+
+  const tableRows: TableCell[][] = data.items.map((item) => {
+    const qty = parseFloat(item.quantity) || 0;
+    const price = parseFloat(item.salesPrice ?? '0') || 0;
+    const lineTotal = qty * price;
+    return [
+      { text: item.productType },
+      { text: formatNumber(item.quantity, 0), alignment: 'right' },
+      { text: item.unit },
+      { text: `${data.currency}/${item.unit} ${formatNumber(item.salesPrice)}`, alignment: 'right' },
+      { text: `${formatNumber(String(lineTotal))} ${data.currency}`, alignment: 'right' },
+    ];
+  });
+
+  const grandTotal = data.items.reduce((sum, item) => {
+    const qty = parseFloat(item.quantity) || 0;
+    const price = parseFloat(item.salesPrice ?? '0') || 0;
+    return sum + qty * price;
+  }, 0);
+
+  // Total row
+  tableRows.push([
+    { text: 'Total amount due', bold: true, colSpan: 4 } as TableCell,
+    {} as TableCell,
+    {} as TableCell,
+    {} as TableCell,
+    { text: `${formatNumber(String(grandTotal))} ${data.currency}`, alignment: 'right', bold: true },
+  ]);
+
+  const refNum = data.orderNumber ?? 'DRAFT';
+
+  const deliveryLines: Content[] = [];
+  if (data.eta) {
+    deliveryLines.push({
+      columns: [
+        { width: '25%', text: 'Delivery date:', bold: true },
+        { width: '75%', text: data.eta.split('T')[0] },
+      ],
+      margin: [0, 2, 0, 0],
+    } as Content);
+  }
+
+  return {
+    pageSize: 'A4',
+    pageMargins: [40, 60, 40, 60],
+    content: [
+      // Header
+      {
+        columns: [
+          {
+            width: '*',
+            stack: [
+              { text: 'FUELD', style: 'brand' },
+              { text: 'Bunker Trading Solutions', style: 'brandSub' },
+            ],
+          },
+          {
+            width: 'auto',
+            stack: [
+              { text: `Date: ${data.createdAt.toISOString().split('T')[0]}`, alignment: 'right', fontSize: 9 },
+              { text: `Ref.: ${refNum}`, alignment: 'right', fontSize: 9 },
+            ],
+            alignment: 'right',
+          },
+        ],
+      } as Content,
+      { text: '', margin: [0, 10, 0, 0] } as Content,
+      { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 1, lineColor: '#1a56db' }] } as Content,
+      { text: '', margin: [0, 15, 0, 0] } as Content,
+
+      // Title
+      { text: 'PROFORMA INVOICE', style: 'invoiceTitle', alignment: 'center' } as Content,
+      { text: '', margin: [0, 15, 0, 0] } as Content,
+
+      // Client
+      {
+        columns: [
+          {
+            width: '50%',
+            stack: [
+              { text: data.clientName, style: 'clientName' },
+              { text: data.clientCountry ?? '', color: '#666666' },
+            ],
+          },
+        ],
+      } as Content,
+      { text: '', margin: [0, 10, 0, 0] } as Content,
+
+      // Vessel / Port info
+      {
+        columns: [
+          { width: '25%', text: 'Vessel:', bold: true },
+          { width: '25%', text: `${data.vesselName}${data.vesselImo ? ` (IMO: ${data.vesselImo})` : ''}` },
+          { width: '25%', text: 'Delivery place:', bold: true },
+          { width: '25%', text: data.portName },
+        ],
+      } as Content,
+      ...deliveryLines,
+      { text: '', margin: [0, 15, 0, 0] } as Content,
+
+      // Items table
+      {
+        table: {
+          headerRows: 1,
+          widths: ['*', 60, 40, 100, 100],
+          body: [tableHeader, ...tableRows],
+        },
+        layout: {
+          hLineWidth: (i: number, node: { table: { body: unknown[] } }) =>
+            i === 0 || i === 1 || i === node.table.body.length ? 1 : 0.5,
+          vLineWidth: () => 0,
+          hLineColor: (i: number) => (i <= 1 ? '#1a56db' : '#e5e7eb'),
+          paddingTop: () => 6,
+          paddingBottom: () => 6,
+        },
+      } as Content,
+
+      { text: '', margin: [0, 20, 0, 0] } as Content,
+
+      // Payment terms
+      ...(data.paymentTerms
+        ? [
+            { text: `Payment terms: ${data.paymentTerms.replace(/_/g, ' ')}`, margin: [0, 0, 0, 10] } as Content,
+          ]
+        : []),
+
+      { text: '', margin: [0, 20, 0, 0] } as Content,
+      { text: 'Best regards,', margin: [0, 0, 0, 4] } as Content,
+      { text: 'Fueld Trading', bold: true } as Content,
+    ],
+    footer: (currentPage: number, pageCount: number) => ({
+      columns: [
+        { text: 'Generated by Fueld — Bunker Trading SaaS', fontSize: 8, color: '#9ca3af', margin: [40, 0, 0, 0] },
+        { text: `Page ${currentPage} of ${pageCount}`, fontSize: 8, color: '#9ca3af', alignment: 'right', margin: [0, 0, 40, 0] },
+      ],
+    }),
+    styles: {
+      brand: { fontSize: 22, bold: true, color: '#1a56db' },
+      brandSub: { fontSize: 9, color: '#6b7280', margin: [0, 2, 0, 0] },
+      invoiceTitle: { fontSize: 24, bold: true, color: '#1a56db' },
+      sectionLabel: { fontSize: 10, bold: true, color: '#1a56db', margin: [0, 0, 0, 4] },
+      clientName: { fontSize: 14, bold: true },
+      tableHeader: { fontSize: 9, bold: true, color: '#ffffff', fillColor: '#1a56db' },
+    },
+    defaultStyle: { fontSize: 10, font: 'Roboto' },
+  };
+}
+
+/**
+ * Generate a Proforma Invoice PDF buffer for a given order ID.
+ */
+export async function generateProformaInvoicePdfBuffer(orderId: string): Promise<{
+  buffer: Buffer;
+  fileName: string;
+}> {
+  const order = await fetchOrderForInvoice(orderId);
+
+  // Get payment terms from the first item (most orders have one main item)
+  const paymentTerms = order.items?.[0]?.paymentTerms ?? null;
+
+  const docData = {
+    orderNumber: order.orderNumber,
+    clientName: order.client.name,
+    clientCountry: order.client.country,
+    vesselName: order.vessel.name,
+    vesselImo: order.vessel.imo,
+    portName: order.place.name,
+    eta: order.eta?.toISOString() ?? null,
+    etd: order.etd?.toISOString() ?? null,
+    currency: order.currency ?? 'USD',
+    paymentTerms,
+    items: order.items.map((item) => ({
+      productType: item.productType,
+      quantity: item.quantity,
+      unit: item.unit,
+      salesPrice: item.salesPrice,
+    })),
+    createdAt: new Date(),
+  };
+
+  const docDefinition = buildProformaDocument(docData);
+  const buffer = await createPdfBuffer(docDefinition);
+  const fileName = `Fueld_Proforma_${order.orderNumber ?? orderId.slice(0, 8)}.pdf`;
+
+  return { buffer, fileName };
+}

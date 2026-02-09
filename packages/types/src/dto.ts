@@ -37,10 +37,49 @@ export interface UserDto {
   name: string;
   role: Role;
   tenantId: string | null;
+  teamId: string | null;
+  teamName?: string | null;
   is2faEnabled: boolean;
+  isActive: boolean;
   isOnLeave: boolean;
   leaveEndDate: string | null;
   delegateId: string | null;
+  avatarUrl?: string | null;
+  createdAt?: string;
+}
+
+/** Admin-facing user list item. */
+export interface AdminUserDto {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+  teamId: string | null;
+  teamName: string | null;
+  is2faEnabled: boolean;
+  isActive: boolean;
+  allowedIps: string[] | null;
+  createdAt: string;
+}
+
+/** Invite a new user via email. */
+export interface CreateInvitationDto {
+  email: string;
+  role: Role;
+  name: string;
+}
+
+/** Invitation record. */
+export interface InvitationDto {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+  invitedByName: string;
+  inviteLink: string;
+  expiresAt: string;
+  acceptedAt: string | null;
+  createdAt: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -63,16 +102,33 @@ export interface CounterpartyDto {
   tenantId: string;
   name: string;
   type: CounterpartyType;
+  types: string[];
   creditLimit: string;
   creditUsed: string;
   country: string | null;
+  isOwnCompany: boolean;
+  seasearcherId: string | null;
+  companyImo: string | null;
+  countryIso: string | null;
+  yearFormed: number | null;
+  companyRoles: string[] | null;
+  fleetSize: number | null;
+  headOfficeAddress: string | null;
+  headOfficePhone: string | null;
+  headOfficeEmail: string | null;
+  website: string | null;
+  isSanctioned: boolean;
+  lastSynced: string | null;
 }
 
 export interface CreateCounterpartyDto {
   name: string;
-  type: CounterpartyType;
+  types: string[];
   creditLimit?: string;
   country?: string;
+  countryIso?: string;
+  companyImo?: string;
+  seasearcherId?: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -97,6 +153,8 @@ export interface PlaceDto {
   admiraltyChart: string | null;
   parentPlaceId: string | null;
   parentPlaceName: string | null;
+  responsibleUserId: string | null;
+  responsibleUserName: string | null;
   lliLastUpdated: string | null;
   orderCount?: number;
   activeOrderCount?: number;
@@ -124,6 +182,129 @@ export type PortDto = PlaceDto;
 export type CreatePortDto = CreatePlaceDto;
 
 // ═══════════════════════════════════════════════════════════════════════
+//  PORT SUPPLIER
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface PortSupplierDto {
+  id: string;
+  placeId: string;
+  companyId: string;
+  companyName: string;
+  contactId: string | null;
+  contactName: string | null;
+  products: string[];
+  note: string | null;
+  addedById: string | null;
+  addedByName: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreatePortSupplierDto {
+  companyId: string;
+  contactId?: string | null;
+  products?: string[];
+  note?: string;
+}
+
+export interface SupplyPortDto {
+  id: string;
+  placeId: string;
+  placeName: string;
+  placeCountry: string | null;
+  products: string[];
+  note: string | null;
+  createdAt: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  VESSEL COMPANIES (associations between vessels and companies)
+// ═══════════════════════════════════════════════════════════════════════
+
+export type VesselCompanyRole = 'OWNER' | 'TIME_CHARTERER' | 'OPERATOR' | 'MANAGER';
+
+export interface VesselCompanyDto {
+  id: string;
+  vesselId: string;
+  companyId: string;
+  companyName: string;
+  role: VesselCompanyRole;
+  contactId: string | null;
+  contactName: string | null;
+  note: string | null;
+  addedById: string | null;
+  addedByName: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateVesselCompanyDto {
+  companyId: string;
+  role: VesselCompanyRole;
+  contactId?: string | null;
+  note?: string;
+}
+
+export interface UpdateVesselCompanyDto {
+  role?: VesselCompanyRole;
+  contactId?: string | null;
+  note?: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  COMPANY EMAILS (flexible email types per company)
+// ═══════════════════════════════════════════════════════════════════════
+
+export type CompanyEmailType = 'sales' | 'invoice' | 'inquiry' | 'general' | string;
+
+export interface CompanyEmailDto {
+  id: string;
+  counterpartyId: string;
+  emailType: CompanyEmailType;
+  email: string;
+  label: string | null;
+  isPrimary: boolean;
+  addedById: string | null;
+  addedByName: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateCompanyEmailDto {
+  emailType: CompanyEmailType;
+  email: string;
+  label?: string;
+  isPrimary?: boolean;
+}
+
+export interface UpdateCompanyEmailDto {
+  emailType?: CompanyEmailType;
+  email?: string;
+  label?: string;
+  isPrimary?: boolean;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  EXPECTED ARRIVALS
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface ExpectedArrivalDto {
+  id: string;
+  name: string;
+  imo: string | null;
+  mmsi: string | null;
+  flag: string | null;
+  flagCode: string | null;
+  vesselType: string | null;
+  dwt: number | null;
+  grossTonnage: number | null;
+  eta: string | null;
+  commercialOperator: string | null;
+  lastPort: string | null;
+  destination: string | null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 //  VESSEL
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -132,7 +313,21 @@ export interface VesselDto {
   name: string;
   imo: string | null;
   mmsi: string | null;
+  seasearcherId: string | null;
   flag: string | null;
+  flagCode: string | null;
+  type: string | null;
+  status: string | null;
+  loa: number | null;
+  breadth: number | null;
+  depth: number | null;
+  draught: number | null;
+  deadWeightTonnage: number | null;
+  grossTonnage: number | null;
+  buildYear: number | null;
+  builder: string | null;
+  classificationSociety: string | null;
+  lastSynced: string | null;
 }
 
 export interface CreateVesselDto {
@@ -140,6 +335,16 @@ export interface CreateVesselDto {
   imo?: string;
   mmsi?: string;
   flag?: string;
+  flagCode?: string;
+  type?: string;
+  status?: string;
+  loa?: number;
+  breadth?: number;
+  depth?: number;
+  draught?: number;
+  deadWeightTonnage?: number;
+  grossTonnage?: number;
+  buildYear?: number;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -148,11 +353,15 @@ export interface CreateVesselDto {
 
 export interface OrderDto {
   id: string;
+  orderNumber: string | null;
   tenantId: string;
   clientId: string;
   vesselId: string;
   placeId: string;
   salesRepId: string | null;
+  invoicingCompanyId: string | null;
+  invoicingCompanyName?: string | null;
+  currency: string;
   status: OrderStatus;
   eta: string | null;
   etd: string | null;
@@ -167,8 +376,57 @@ export interface CreateOrderDto {
   vesselId: string;
   placeId: string;
   salesRepId?: string;
+  invoicingCompanyId?: string;
+  currency?: string;
   eta?: string;
   etd?: string;
+}
+
+export interface UpdateOrderDto {
+  clientId?: string;
+  vesselId?: string;
+  placeId?: string;
+  salesRepId?: string | null;
+  invoicingCompanyId?: string | null;
+  currency?: string;
+  status?: OrderStatus;
+  eta?: string | null;
+  etd?: string | null;
+  lossReason?: string | null;
+}
+
+/** Order with joined relations — returned by GET /orders/:id */
+export interface OrderDetailDto extends OrderDto {
+  client: CounterpartyDto | null;
+  vessel: VesselDto | null;
+  place: PlaceDto | null;
+  salesRep: { id: string; name: string; email: string } | null;
+  invoicingCompany: CounterpartyDto | null;
+  items: OrderItemDto[];
+}
+
+/** Lightweight row for the orders/inquiries list */
+export interface OrderListRowDto {
+  id: string;
+  orderNumber: string | null;
+  status: OrderStatus;
+  clientName: string;
+  vesselName: string;
+  placeName: string;
+  salesRepName: string | null;
+  eta: string | null;
+  totalValue: number;
+  totalProfit: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Admin settings for order number template */
+export interface OrderNumberSettingsDto {
+  template: string;
+  prefix: string;
+  nextSeq: number;
+  preview: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -255,6 +513,63 @@ export interface AuditLogDto {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+//  ACTIVITY LOG (comprehensive user activity tracking)
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface ActivityLogDto {
+  id: string;
+  userId: string | null;
+  userName: string | null;
+  userEmail: string | null;
+  action: string; // VIEW, CREATE, UPDATE, DELETE
+  entityType: string;
+  entityId: string | null;
+  entityName: string | null;
+  httpMethod: string | null;
+  httpPath: string | null;
+  pageTitle: string | null;
+  clientIp: string | null;
+  userAgent: string | null;
+  platform: string | null;
+  timezone: string | null;
+  language: string | null;
+  country: string | null;
+  city: string | null;
+  metadata: unknown;
+  createdAt: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  USER SESSION (real-time WebSocket session)
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface UserSessionDto {
+  socketId: string;
+  userId: string;
+  userEmail: string;
+  userName: string;
+  clientIp: string | null;
+  userAgent: string | null;
+  platform: string | null;
+  timezone: string | null;
+  language: string | null;
+  country: string | null;
+  city: string | null;
+  currentUrl: string | null;
+  pageTitle: string | null;
+  connectedAt: string;
+  lastActivity: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  RETENTION SETTINGS
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface RetentionSettingsDto {
+  retentionDays: number;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 //  VACATION / DELEGATION
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -286,6 +601,8 @@ export interface LoginResponseDto {
 export interface Login2faPendingDto {
   requires2fa: true;
   tempToken: string;
+  /** Whether the user has registered passkeys (to show "Use Passkey" on 2FA page). */
+  hasPasskeys?: boolean;
 }
 
 /** Response after successful registration. */
@@ -299,6 +616,18 @@ export interface RegisterResponseDto {
 export interface TwoFactorSetupDto {
   secret: string;
   qrDataUrl: string;
+}
+
+/** Passkey credential record (returned from API). */
+export interface PasskeyDto {
+  id: string;
+  credentialId: string;
+  friendlyName: string;
+  deviceType: string | null;
+  backedUp: boolean;
+  transports: string | null;
+  lastUsedAt: string | null;
+  createdAt: string;
 }
 
 /** Request bodies */
@@ -390,4 +719,271 @@ export interface SendInvoiceRequestDto {
   recipientEmail: string;
   vesselName?: string;
   portName?: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  CREDIT LINES (supplier & customer credit)
+// ═══════════════════════════════════════════════════════════════════════
+
+export type CreditLineType = 'SUPPLIER' | 'CUSTOMER';
+
+export interface CreditLineDto {
+  id: string;
+  tenantId: string;
+  type: CreditLineType;
+  // Counterparties (external side: suppliers or customers)
+  counterpartyIds: string[];
+  counterpartyNames: string[];
+  // Our own companies on this credit line
+  ownCompanyIds: string[];
+  ownCompanyNames: string[];
+  creditAmount: string;
+  currency: string;
+  usedAmount: string;
+  availableAmount: string;
+  expires: string | null;
+  periodDays: number;
+  fromDelivery: boolean;
+  qualified: boolean;
+  performanceDays: number | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateCreditLineDto {
+  counterpartyIds: string[];
+  type: CreditLineType;
+  creditAmount: string;
+  currency: string;
+  expires?: string;
+  periodDays: number;
+  fromDelivery?: boolean;
+  qualified?: boolean;
+  notes?: string;
+  ownCompanyIds?: string[];
+}
+
+export interface UpdateCreditLineDto {
+  creditAmount?: string;
+  currency?: string;
+  expires?: string | null;
+  periodDays?: number;
+  fromDelivery?: boolean;
+  qualified?: boolean;
+  notes?: string | null;
+  counterpartyIds?: string[];
+  ownCompanyIds?: string[];
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  TEAMS
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface TeamDto {
+  id: string;
+  tenantId: string;
+  name: string;
+  companyIds: string[];
+  companyNames: string[];
+  memberCount: number;
+  memberIds: string[];
+  memberNames: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateTeamDto {
+  name: string;
+  companyIds: string[];
+}
+
+export interface UpdateTeamDto {
+  name?: string;
+  companyIds?: string[];
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  COMPANY GROUPS (named reusable groups of companies)
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface CompanyGroupDto {
+  id: string;
+  tenantId: string;
+  name: string;
+  companyIds: string[];
+  companyNames: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateCompanyGroupDto {
+  name: string;
+  companyIds: string[];
+}
+
+export interface UpdateCompanyGroupDto {
+  name?: string;
+  companyIds?: string[];
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  OWN COMPANY (simplified view of a counterparty marked as own)
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface OwnCompanyDto {
+  id: string;
+  name: string;
+  country: string | null;
+  countryIso: string | null;
+  logoUrl: string | null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  BANK ACCOUNTS
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface BankAccountDto {
+  id: string;
+  counterpartyId: string;
+  label: string;
+  bankName: string;
+  accountName: string | null;
+  accountNumber: string | null;
+  iban: string | null;
+  swiftBic: string | null;
+  currency: string;
+  branchAddress: string | null;
+  sortCode: string | null;
+  routingNumber: string | null;
+  isDefault: boolean;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateBankAccountDto {
+  label: string;
+  bankName: string;
+  accountName?: string | null;
+  accountNumber?: string | null;
+  iban?: string | null;
+  swiftBic?: string | null;
+  currency: string;
+  branchAddress?: string | null;
+  sortCode?: string | null;
+  routingNumber?: string | null;
+  isDefault?: boolean;
+  notes?: string | null;
+}
+
+export interface UpdateBankAccountDto extends Partial<CreateBankAccountDto> {}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  INTEGRATION CREDENTIALS
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface IntegrationStatusDto {
+  provider: string;
+  configured: boolean;
+  username: string | null;       // LLI: email, QB: company name
+  updatedAt: string | null;
+  updatedBy: string | null;      // user email
+
+  // QuickBooks-specific (optional, only present for QB provider)
+  connectionType?: 'online' | 'desktop' | null;
+  realmId?: string | null;
+  companyName?: string | null;
+  tokenExpiresAt?: string | null;
+}
+
+export interface SetIntegrationCredentialsDto {
+  provider: string;
+  username: string;
+  password: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  QUICKBOOKS
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface QuickBooksAuthUrlDto {
+  authUrl: string;
+}
+
+export interface QuickBooksDesktopConfigDto {
+  companyName: string;
+  username: string;
+  password: string;
+}
+
+export interface QuickBooksSyncStatusDto {
+  lastSyncAt: string | null;
+  syncDirection: 'bidirectional';
+  autoSyncEnabled: boolean;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  SECURITY SETTINGS
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface SecuritySettingsDto {
+  ssoProvider: 'microsoft' | 'google' | 'none';
+  ssoClientId: string;
+  ssoTenantId: string;           // Microsoft Entra tenant ID
+  ssoEnabled: boolean;
+  enforce2FA: boolean;
+  passkeyEnabled: boolean;
+  passkeyAllowPasswordless: boolean;
+  tokenExpirationMinutes: number;
+  sessionTimeoutMinutes: number;
+}
+
+export interface UpdateSecuritySettingsDto {
+  ssoProvider?: 'microsoft' | 'google' | 'none';
+  ssoClientId?: string;
+  ssoClientSecret?: string;      // write-only, never returned
+  ssoTenantId?: string;
+  ssoEnabled?: boolean;
+  enforce2FA?: boolean;
+  passkeyEnabled?: boolean;
+  passkeyAllowPasswordless?: boolean;
+  tokenExpirationMinutes?: number;
+  sessionTimeoutMinutes?: number;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  COMPANY CONTACTS
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface CompanyContactDto {
+  id: string;
+  counterpartyId: string;
+  name: string;
+  role: string | null;
+  phone: string | null;
+  fax: string | null;
+  email: string | null;
+  notes: string | null;
+  source: 'manual' | 'seasearcher';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateCompanyContactDto {
+  name: string;
+  role?: string;
+  phone?: string;
+  fax?: string;
+  email?: string;
+  notes?: string;
+}
+
+export interface UpdateCompanyContactDto {
+  name?: string;
+  role?: string;
+  phone?: string;
+  fax?: string;
+  email?: string;
+  notes?: string;
 }

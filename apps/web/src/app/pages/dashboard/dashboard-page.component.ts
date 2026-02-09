@@ -5,10 +5,16 @@ import {
   computed,
   inject,
   effect,
+  OnInit,
+  ElementRef,
+  ViewChild,
+  OnDestroy,
 } from '@angular/core';
-import { JsonPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import type { CollectionsResponseDto, OverdueInvoiceDto, TeamStatsResponseDto } from '@fueld/types';
+import type { EChartsOption } from 'echarts';
+import { NgxEchartsModule } from 'ngx-echarts';
 
 import { CollectionsWidgetComponent } from '../../features/dashboard/components/collections-widget/collections-widget.component';
 import { AuthService } from '../../core/auth/auth.service';
@@ -17,20 +23,89 @@ import { AuthService } from '../../core/auth/auth.service';
 //  Dashboard Page — Manager view with collections and team stats
 // ═══════════════════════════════════════════════════════════════════════
 
-const API_URL = 'http://localhost:3000';
+import { API_URL } from '@app/core/config/api';
 
 @Component({
   selector: 'app-dashboard-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [JsonPipe, RouterLink, CollectionsWidgetComponent],
+  imports: [RouterLink, FormsModule, CollectionsWidgetComponent, NgxEchartsModule],
   template: `
     <div>
-      <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
-      <p class="mt-1 text-sm text-gray-500">Overview of your bunker trading operations.</p>
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <p class="mt-1 text-sm text-gray-500">Overview of your bunker trading operations.</p>
+        </div>
+
+        <!-- Date Range Selector -->
+        <div class="flex items-center gap-3 flex-shrink-0">
+          <div class="relative" #dateDropdown>
+            <button
+              (click)="dateDropdownOpen.set(!dateDropdownOpen())"
+              class="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd" />
+              </svg>
+              {{ dateRangeLabel() }}
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 011.06 0L10 11.94l3.72-3.72a.75.75 0 111.06 1.06l-4.25 4.25a.75.75 0 01-1.06 0L5.22 9.28a.75.75 0 010-1.06z" clip-rule="evenodd" />
+              </svg>
+            </button>
+
+            @if (dateDropdownOpen()) {
+              <div class="absolute right-0 z-50 mt-1 w-64 origin-top-right rounded-lg border border-gray-200 bg-white shadow-lg ring-1 ring-black/5 max-h-[calc(100vh-120px)] overflow-y-auto">
+                <div class="py-1">
+                  @for (preset of datePresets; track preset.key) {
+                    <button
+                      (click)="selectDatePreset(preset.key)"
+                      class="flex w-full items-center justify-between px-4 py-2 text-sm transition-colors"
+                      [class]="selectedDatePreset() === preset.key
+                        ? 'bg-brand-50 text-brand-700 font-medium'
+                        : 'text-gray-700 hover:bg-gray-50'"
+                    >
+                      {{ preset.label }}
+                      @if (selectedDatePreset() === preset.key) {
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-brand-600" viewBox="0 0 20 20" fill="currentColor">
+                          <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                        </svg>
+                      }
+                    </button>
+                  }
+                </div>
+                <div class="border-t border-gray-100 px-4 py-3">
+                  <p class="mb-2 text-xs font-medium text-gray-500 uppercase tracking-wider">Custom Range</p>
+                  <div class="flex items-center gap-2">
+                    <input
+                      type="date"
+                      [ngModel]="customDateFrom()"
+                      (ngModelChange)="customDateFrom.set($event)"
+                      class="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                    />
+                    <span class="text-gray-400 text-xs flex-shrink-0">to</span>
+                    <input
+                      type="date"
+                      [ngModel]="customDateTo()"
+                      (ngModelChange)="customDateTo.set($event)"
+                      class="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                    />
+                  </div>
+                  <button
+                    (click)="applyCustomRange()"
+                    class="mt-2 w-full rounded-md bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 transition-colors"
+                  >
+                    Apply
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
 
       <!-- Team View Toggle -->
       @if (auth.isAdmin()) {
-        <div class="mt-6 flex items-center justify-end gap-3">
+        <div class="mt-4 flex items-center justify-end gap-3">
           <span class="text-sm font-medium text-gray-600">My Orders</span>
           <button
             (click)="toggleTeamView()"
@@ -67,24 +142,121 @@ const API_URL = 'http://localhost:3000';
         <app-collections-widget [overdueInvoices]="collections().items" />
       </div>
 
-      <!-- Pipeline & Team Stats (placeholders for now) -->
+      <!-- Pipeline & Loss Analysis -->
       <div class="mt-8 grid gap-6 lg:grid-cols-2">
         <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <h3 class="text-lg font-semibold text-gray-900 mb-4">Pipeline Summary</h3>
-          <p class="text-gray-500">[Funnel chart and pipeline stages will go here]</p>
-          <a routerLink="/analytics" class="mt-4 inline-block text-sm font-medium text-brand-600 hover:text-brand-700 transition-colors">View Analytics</a>
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">Sales Funnel</h3>
+            <a routerLink="/analytics" class="text-xs font-medium text-brand-600 hover:text-brand-700 transition-colors">View Analytics &rarr;</a>
+          </div>
+          <div echarts [options]="funnelChartOptions" class="h-[350px]"></div>
         </div>
         <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <h3 class="text-lg font-semibold text-gray-900 mb-4">Team Performance</h3>
-          <p class="text-gray-500">[Team stats, trader-specific metrics]</p>
-          <pre>{{ teamStats() | json }}</pre>
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">Loss Analysis</h3>
+          <div echarts [options]="lossAnalysisChartOptions" class="h-[350px]"></div>
         </div>
       </div>
     </div>
   `,
 })
-export class DashboardPageComponent {
+export class DashboardPageComponent implements OnInit, OnDestroy {
   readonly auth = inject(AuthService);
+  private readonly elRef = inject(ElementRef);
+
+  @ViewChild('dateDropdown') dateDropdownRef!: ElementRef;
+
+  // ─── Charts ──────────────────────────────────────────────────────
+  funnelChartOptions: EChartsOption = {};
+  lossAnalysisChartOptions: EChartsOption = {};
+
+  // ─── Date Range ──────────────────────────────────────────────────
+  readonly dateDropdownOpen = signal(false);
+  readonly selectedDatePreset = signal<string>('this_month');
+  readonly customDateFrom = signal('');
+  readonly customDateTo = signal('');
+
+  readonly datePresets = [
+    { key: 'today', label: 'Today' },
+    { key: 'yesterday', label: 'Yesterday' },
+    { key: 'this_week', label: 'This Week' },
+    { key: 'last_7_days', label: 'Last 7 Days' },
+    { key: 'this_month', label: 'This Month' },
+    { key: 'last_30_days', label: 'Last 30 Days' },
+    { key: 'this_quarter', label: 'This Quarter' },
+    { key: 'this_year', label: 'Year to Date' },
+  ];
+
+  readonly dateRangeLabel = computed(() => {
+    const preset = this.selectedDatePreset();
+    if (preset === 'custom') {
+      const from = this.customDateFrom();
+      const to = this.customDateTo();
+      if (from && to) return `${this.formatShortDate(from)} – ${this.formatShortDate(to)}`;
+      return 'Custom Range';
+    }
+    return this.datePresets.find((p) => p.key === preset)?.label ?? 'This Month';
+  });
+
+  readonly dateRange = computed(() => {
+    const preset = this.selectedDatePreset();
+    const now = new Date();
+    let from: Date;
+    let to: Date = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+    switch (preset) {
+      case 'today':
+        from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        break;
+      case 'yesterday': {
+        const y = new Date(now);
+        y.setDate(y.getDate() - 1);
+        from = new Date(y.getFullYear(), y.getMonth(), y.getDate());
+        to = new Date(y.getFullYear(), y.getMonth(), y.getDate(), 23, 59, 59);
+        break;
+      }
+      case 'this_week': {
+        const day = now.getDay();
+        from = new Date(now);
+        from.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+        from.setHours(0, 0, 0, 0);
+        break;
+      }
+      case 'last_7_days':
+        from = new Date(now);
+        from.setDate(now.getDate() - 6);
+        from.setHours(0, 0, 0, 0);
+        break;
+      case 'this_month':
+        from = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
+      case 'last_30_days':
+        from = new Date(now);
+        from.setDate(now.getDate() - 29);
+        from.setHours(0, 0, 0, 0);
+        break;
+      case 'this_quarter': {
+        const q = Math.floor(now.getMonth() / 3);
+        from = new Date(now.getFullYear(), q * 3, 1);
+        break;
+      }
+      case 'this_year':
+        from = new Date(now.getFullYear(), 0, 1);
+        break;
+      case 'custom':
+        from = this.customDateFrom() ? new Date(this.customDateFrom()) : new Date(now.getFullYear(), now.getMonth(), 1);
+        to = this.customDateTo() ? new Date(this.customDateTo() + 'T23:59:59') : to;
+        break;
+      default:
+        from = new Date(now.getFullYear(), now.getMonth(), 1);
+    }
+    return { from, to };
+  });
+
+  private clickOutsideHandler = (event: MouseEvent) => {
+    if (this.dateDropdownRef && !this.dateDropdownRef.nativeElement.contains(event.target)) {
+      this.dateDropdownOpen.set(false);
+    }
+  };
 
   // ─── State ───────────────────────────────────────────────────────
   readonly teamView = signal(false);
@@ -174,6 +346,18 @@ export class DashboardPageComponent {
     });
   }
 
+  // ─── Lifecycle ────────────────────────────────────────────────────
+
+  ngOnInit(): void {
+    this.initFunnelChart();
+    this.initLossAnalysisChart();
+    document.addEventListener('click', this.clickOutsideHandler);
+  }
+
+  ngOnDestroy(): void {
+    document.removeEventListener('click', this.clickOutsideHandler);
+  }
+
   // ─── Computed ────────────────────────────────────────────────────
 
   readonly kpiCards = computed(() => [
@@ -187,5 +371,89 @@ export class DashboardPageComponent {
 
   toggleTeamView(): void {
     this.teamView.update((current) => !current);
+  }
+
+  selectDatePreset(key: string): void {
+    this.selectedDatePreset.set(key);
+    this.dateDropdownOpen.set(false);
+  }
+
+  applyCustomRange(): void {
+    if (this.customDateFrom() && this.customDateTo()) {
+      this.selectedDatePreset.set('custom');
+      this.dateDropdownOpen.set(false);
+    }
+  }
+
+  private formatShortDate(dateStr: string): string {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+  }
+
+  // ─── Chart Initialisation ───────────────────────────────────────
+
+  private initFunnelChart(): void {
+    this.funnelChartOptions = {
+      tooltip: {
+        trigger: 'item',
+        formatter: '{a} <br/>{b} : {c} units',
+      },
+      legend: {
+        data: ['Inquiries', 'Offers', 'Orders'],
+      },
+      series: [
+        {
+          name: 'Sales Funnel',
+          type: 'funnel',
+          left: '10%',
+          top: 60,
+          bottom: 60,
+          width: '80%',
+          gap: 2,
+          label: { show: true, position: 'inside' },
+          labelLine: { length: 10, lineStyle: { width: 1, type: 'solid' } },
+          itemStyle: { borderColor: '#fff', borderWidth: 1 },
+          emphasis: { label: { fontSize: 20 } },
+          data: [
+            { value: 1000, name: 'Inquiries' },
+            { value: 600, name: 'Offers' },
+            { value: 300, name: 'Orders' },
+          ],
+        },
+      ],
+    };
+  }
+
+  private initLossAnalysisChart(): void {
+    this.lossAnalysisChartOptions = {
+      tooltip: {
+        trigger: 'item',
+        formatter: '{a} <br/>{b} : {c} ({d}%)',
+      },
+      legend: {
+        bottom: '1%',
+        left: 'center',
+        data: ['Price', 'Credit', 'Logistics', 'Other'],
+      },
+      series: [
+        {
+          name: 'Loss Reasons',
+          type: 'pie',
+          radius: ['40%', '70%'],
+          center: ['50%', '50%'],
+          avoidLabelOverlap: false,
+          itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
+          label: { show: false, position: 'center' },
+          emphasis: { label: { show: true, fontSize: 20, fontWeight: 'bold' } },
+          labelLine: { show: false },
+          data: [
+            { value: 150, name: 'Price', itemStyle: { color: '#ef4444' } },
+            { value: 80, name: 'Credit', itemStyle: { color: '#f97316' } },
+            { value: 40, name: 'Logistics', itemStyle: { color: '#facc15' } },
+            { value: 30, name: 'Other', itemStyle: { color: '#a3a3a3' } },
+          ],
+        },
+      ],
+    };
   }
 }

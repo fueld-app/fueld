@@ -1,0 +1,160 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  VPS_HOST: 139.162.157.31
+  VPS_USER: deploy
+  DOMAIN: riviera-marine.fueld.app
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Node.js (for Angular CLI)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # ─── Build API binary ─────────────────────────────────────────
+      - name: Build API (standalone binary)
+        run: |
+          cd apps/api
+          bun build src/index.ts --compile --minify --target=bun-linux-x64 --outfile app-release
+
+      # ─── Build Frontend ────────────────────────────────────────────
+      - name: Build Frontend
+        run: |
+          cd apps/web
+          npx ng build --configuration production
+
+      # ─── Upload artifacts ──────────────────────────────────────────
+      - name: Upload API binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-binary
+          path: apps/api/app-release
+          retention-days: 5
+
+      - name: Upload frontend dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: apps/web/dist/web/browser/
+          retention-days: 5
+
+      - name: Upload drizzle migrations
+        uses: actions/upload-artifact@v4
+        with:
+          name: drizzle-migrations
+          path: apps/api/drizzle/
+          retention-days: 5
+
+      - name: Upload deploy script
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-script
+          path: deploy/deploy.sh
+          retention-days: 5
+
+      - name: Upload seed script
+        uses: actions/upload-artifact@v4
+        with:
+          name: seed-files
+          path: |
+            apps/api/src/db/seed.ts
+            apps/api/src/db/schema.ts
+            apps/api/src/modules/auth/password.service.ts
+            apps/api/src/lib/crypto.ts
+          retention-days: 5
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: build
+    environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ env.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Create staging directory on VPS
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            ${{ env.VPS_USER }}@${{ env.VPS_HOST }} \
+            "mkdir -p /opt/fueld/staging/{web,drizzle}"
+
+      - name: Upload API binary
+        run: |
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            artifacts/api-binary/app-release \
+            ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/opt/fueld/staging/app-release
+
+      - name: Upload frontend
+        run: |
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r \
+            artifacts/frontend-dist/* \
+            ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/opt/fueld/staging/web/
+
+      - name: Upload drizzle migrations
+        run: |
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r \
+            artifacts/drizzle-migrations/* \
+            ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/opt/fueld/staging/drizzle/
+
+      - name: Upload deploy script
+        run: |
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            artifacts/deploy-script/deploy.sh \
+            ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/opt/fueld/staging/deploy.sh
+
+      - name: Execute deployment
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            ${{ env.VPS_USER }}@${{ env.VPS_HOST }} \
+            "chmod +x /opt/fueld/staging/deploy.sh && bash /opt/fueld/staging/deploy.sh"
+
+      - name: Verify deployment
+        run: |
+          sleep 3
+          STATUS=$(ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            ${{ env.VPS_USER }}@${{ env.VPS_HOST }} \
+            "curl -sf http://127.0.0.1:\$(cat /opt/fueld/active-slot | xargs -I{} sh -c 'if [ {} = blue ]; then echo 3000; else echo 3001; fi')/health | jq -r '.data.status'" 2>/dev/null || echo "failed")
+          if [ "$STATUS" = "ok" ]; then
+            echo "✅ Deployment verified — API health check passed"
+          else
+            echo "⚠️ Health check returned: $STATUS"
+            exit 1
+          fi
+
+      - name: Post-deploy cleanup
+        if: always()
+        run: |
+          rm -f ~/.ssh/deploy_key

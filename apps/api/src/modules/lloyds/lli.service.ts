@@ -5,8 +5,8 @@
 
 import { eq, ilike, or, and, sql } from 'drizzle-orm';
 import { db } from '../../db';
-import { vessels, places, counterparties, orders } from '../../db/schema';
-import { lliGet, seasearcherPlaceSearch, seasearcherPlaceDetail, seasearcherNearbyVessels, seasearcherPortFacilities } from './lli.client';
+import { vessels, places, counterparties, orders, portSuppliers, users, companyContacts } from '../../db/schema';
+import { lliGet, seasearcherPlaceSearch, seasearcherPlaceDetail, seasearcherNearbyVessels, seasearcherNearbyVesselsSpatial, seasearcherPortFacilities, seasearcherExpectedArrivals } from './lli.client';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Response types for LLI API
@@ -341,7 +341,7 @@ export async function searchPlaces(query: {
   // ── 2. Seasearcher search (always, to supplement local results) ────
   try {
     if (query.name) {
-      const ss = await seasearcherPlaceSearch<SeasearcherPlaceResponse>(query.name, 10);
+      const ss = await seasearcherPlaceSearch<SeasearcherPlaceResponse>(query.name, 50);
 
       if (ss.results?.length) {
         // Collect local LLI IDs to avoid duplicates
@@ -509,12 +509,18 @@ export async function listPlaces(query?: {
 
 export async function getPlaceById(id: string) {
   const rows = await db
-    .select()
+    .select({
+      place: places,
+      responsibleUserName: users.name,
+    })
     .from(places)
+    .leftJoin(users, eq(places.responsibleUserId, users.id))
     .where(eq(places.id, id))
     .limit(1);
 
-  return rows[0] ?? null;
+  if (!rows[0]) return null;
+  const { place, responsibleUserName } = rows[0];
+  return { ...place, responsibleUserName: responsibleUserName ?? null };
 }
 
 export async function getPlaceByLliId(lliPlaceId: string) {
@@ -539,16 +545,42 @@ export interface HierarchyNode {
   children: HierarchyNode[];
 }
 
+export interface ChildPlace {
+  id: string;
+  name: string;
+  type: string;
+  typeCode: string;
+  category: string;
+  lat: number | null;
+  lng: number | null;
+  geoJsonObject: unknown | null;
+  childrenData: { type: string; count: number }[];
+}
+
 export interface PlaceEnrichment {
   geoJsonObject: unknown | null;
   hierarchy: HierarchyNode[];
   parentPlaceId: string | null;
   parentPlaceName: string | null;
   childrenData: { type: string; count: number }[];
+  children: ChildPlace[];
 }
 
 export async function getPlaceEnrichment(seasearcherId: string): Promise<PlaceEnrichment> {
   const detail = await seasearcherPlaceDetail<Record<string, unknown>>(seasearcherId);
+
+  const rawChildren = (detail.children as any[]) ?? [];
+  const children: ChildPlace[] = rawChildren.map((c: any) => ({
+    id: String(c.id ?? ''),
+    name: String(c.name ?? ''),
+    type: c.type ? String(c.type) : '',
+    typeCode: c.typeCode ? String(c.typeCode) : '',
+    category: c.category ? String(c.category) : '',
+    lat: c.location?.lat != null ? Number(c.location.lat) : null,
+    lng: c.location?.lng != null ? Number(c.location.lng) : null,
+    geoJsonObject: c.geoJsonObject ?? null,
+    childrenData: (c.childrenData as { type: string; count: number }[]) ?? [],
+  }));
 
   return {
     geoJsonObject: (detail.geoJsonObject as unknown) ?? null,
@@ -556,6 +588,7 @@ export async function getPlaceEnrichment(seasearcherId: string): Promise<PlaceEn
     parentPlaceId: (detail.parentPlaceId as string) ?? null,
     parentPlaceName: (detail.parentPlaceName as string) ?? null,
     childrenData: (detail.childrenData as { type: string; count: number }[]) ?? [],
+    children,
   };
 }
 
@@ -586,13 +619,15 @@ export interface NearbyVessel {
 }
 
 export async function getNearbyVessels(seasearcherId: string): Promise<NearbyVessel[]> {
-  const data = await seasearcherNearbyVessels<{ results: Record<string, unknown>[]; totalMatches: number }>(
-    seasearcherId,
-  );
+  const data = await seasearcherNearbyVessels<{
+    totalMatches: number;
+    results?: Record<string, unknown>[];
+  }>(seasearcherId);
 
-  if (!data?.results?.length) return [];
+  const vessels: Record<string, unknown>[] = data?.results ?? [];
+  if (!vessels.length) return [];
 
-  return data.results.map((v: any) => {
+  return vessels.map((v: any) => {
     const info = v.latestInformation ?? {};
     const pos = info.position ?? {};
 
@@ -617,6 +652,51 @@ export async function getNearbyVessels(seasearcherId: string): Promise<NearbyVes
       distance: v.distance != null ? Number(v.distance) : null,
       status: info.status ? String(info.status) : null,
     };
+  });
+}
+
+/**
+ * Lightweight position-only fetch from spatial query.
+ * Returns id + position/heading/speed/distance for merging with full vessel data.
+ */
+export interface VesselPositionUpdate {
+  id: string;
+  lat: number;
+  lng: number;
+  heading: number | null;
+}
+
+export async function getNearbyVesselPositions(seasearcherId: string): Promise<VesselPositionUpdate[]> {
+  const data = await seasearcherNearbyVesselsSpatial<{
+    totalMatches: number;
+    clusters?: { relevantDocumentDetails: Record<string, unknown>[] }[];
+    nonClusteredRecords?: Record<string, unknown>[];
+  }>(seasearcherId);
+
+  const vessels: Record<string, unknown>[] = [];
+  if (data?.nonClusteredRecords?.length) {
+    vessels.push(...data.nonClusteredRecords);
+  }
+  if (data?.clusters?.length) {
+    for (const c of data.clusters) {
+      if (c.relevantDocumentDetails?.length) vessels.push(...c.relevantDocumentDetails);
+    }
+  }
+  if (!vessels.length) return [];
+
+  return vessels.map((v: any) => {
+    const info = v.latestInformation ?? {};
+    const pos = info.position ?? {};
+
+    const update: VesselPositionUpdate = {
+      id: String(v.id ?? ''),
+      lat: Number(pos.lat ?? 0),
+      lng: Number(pos.lng ?? 0),
+      heading: null,
+    };
+    if (info.trueHeading != null) update.heading = Number(info.trueHeading);
+    else delete (update as any).heading;
+    return update;
   });
 }
 
@@ -918,4 +998,211 @@ export async function getPortFacilities(seasearcherId: string) {
   }));
 
   return { facilities, companies };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  EXPECTED ARRIVALS (Seasearcher)
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface ExpectedArrival {
+  id: string;
+  name: string;
+  imo: string | null;
+  mmsi: string | null;
+  flag: string | null;
+  flagCode: string | null;
+  vesselType: string | null;
+  dwt: number | null;
+  grossTonnage: number | null;
+  eta: string | null;
+  commercialOperator: string | null;
+  lastPort: string | null;
+  destination: string | null;
+}
+
+export async function getExpectedArrivals(seasearcherId: string, daysAhead = 7): Promise<ExpectedArrival[]> {
+  const data = await seasearcherExpectedArrivals<{ results: Record<string, unknown>[]; totalMatches: number }>(
+    seasearcherId,
+    daysAhead,
+  );
+
+  if (!data?.results?.length) return [];
+
+  return data.results.map((v: any) => ({
+    id: String(v.id ?? ''),
+    name: String(v.name ?? ''),
+    imo: v.imo ? String(v.imo) : null,
+    mmsi: v.mmsi ? String(v.mmsi) : null,
+    flag: v.flag?.name ? String(v.flag.name) : null,
+    flagCode: v.flag?.code ? String(v.flag.code) : null,
+    vesselType: v.type ? String(v.type) : null,
+    dwt: v.deadWeightTonnage != null ? Number(v.deadWeightTonnage) : null,
+    grossTonnage: v.grossTonnage != null ? Number(v.grossTonnage) : null,
+    eta: v.eta ?? null,
+    commercialOperator: v.commercialOperator?.name ? String(v.commercialOperator.name) : null,
+    lastPort: v.lastPort?.name ? String(v.lastPort.name) : null,
+    destination: v.destination?.name ? String(v.destination.name) : null,
+  }));
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  PORT SUPPLIERS (CRUD) — linked to counterparties (companies)
+// ═══════════════════════════════════════════════════════════════════════
+
+export async function getPortSuppliers(placeId: string) {
+  return db
+    .select({
+      id: portSuppliers.id,
+      placeId: portSuppliers.placeId,
+      companyId: portSuppliers.companyId,
+      companyName: counterparties.name,
+      contactId: portSuppliers.contactId,
+      contactName: companyContacts.name,
+      products: portSuppliers.products,
+      note: portSuppliers.note,
+      addedById: portSuppliers.addedById,
+      addedByName: portSuppliers.addedByName,
+      createdAt: portSuppliers.createdAt,
+      updatedAt: portSuppliers.updatedAt,
+    })
+    .from(portSuppliers)
+    .innerJoin(counterparties, eq(portSuppliers.companyId, counterparties.id))
+    .leftJoin(companyContacts, eq(portSuppliers.contactId, companyContacts.id))
+    .where(eq(portSuppliers.placeId, placeId))
+    .orderBy(counterparties.name);
+}
+
+export async function addPortSupplier(placeId: string, data: { companyId: string; contactId?: string | null; products?: string[]; note?: string }, userId: string, userName: string) {
+  const [created] = await db
+    .insert(portSuppliers)
+    .values({
+      placeId,
+      companyId: data.companyId,
+      contactId: data.contactId ?? null,
+      products: data.products ?? [],
+      note: data.note ?? null,
+      addedById: userId,
+      addedByName: userName,
+    })
+    .returning();
+  // Re-fetch with company name + contact name
+  const [full] = await db
+    .select({
+      id: portSuppliers.id,
+      placeId: portSuppliers.placeId,
+      companyId: portSuppliers.companyId,
+      companyName: counterparties.name,
+      contactId: portSuppliers.contactId,
+      contactName: companyContacts.name,
+      products: portSuppliers.products,
+      note: portSuppliers.note,
+      addedById: portSuppliers.addedById,
+      addedByName: portSuppliers.addedByName,
+      createdAt: portSuppliers.createdAt,
+      updatedAt: portSuppliers.updatedAt,
+    })
+    .from(portSuppliers)
+    .innerJoin(counterparties, eq(portSuppliers.companyId, counterparties.id))
+    .leftJoin(companyContacts, eq(portSuppliers.contactId, companyContacts.id))
+    .where(eq(portSuppliers.id, created.id));
+  return full;
+}
+
+export async function updatePortSupplier(id: string, data: { contactId?: string | null; products?: string[]; note?: string }) {
+  const [updated] = await db
+    .update(portSuppliers)
+    .set({
+      ...(data.contactId !== undefined && { contactId: data.contactId }),
+      ...(data.products !== undefined && { products: data.products }),
+      ...(data.note !== undefined && { note: data.note }),
+      updatedAt: new Date(),
+    })
+    .where(eq(portSuppliers.id, id))
+    .returning();
+  if (!updated) return null;
+  // Re-fetch with company + contact name
+  const [full] = await db
+    .select({
+      id: portSuppliers.id,
+      placeId: portSuppliers.placeId,
+      companyId: portSuppliers.companyId,
+      companyName: counterparties.name,
+      contactId: portSuppliers.contactId,
+      contactName: companyContacts.name,
+      products: portSuppliers.products,
+      note: portSuppliers.note,
+      addedById: portSuppliers.addedById,
+      addedByName: portSuppliers.addedByName,
+      createdAt: portSuppliers.createdAt,
+      updatedAt: portSuppliers.updatedAt,
+    })
+    .from(portSuppliers)
+    .innerJoin(counterparties, eq(portSuppliers.companyId, counterparties.id))
+    .leftJoin(companyContacts, eq(portSuppliers.contactId, companyContacts.id))
+    .where(eq(portSuppliers.id, updated.id));
+  return full ?? null;
+}
+
+export async function deletePortSupplier(id: string) {
+  // Fetch company name before deletion
+  const [info] = await db
+    .select({
+      id: portSuppliers.id,
+      placeId: portSuppliers.placeId,
+      companyId: portSuppliers.companyId,
+      companyName: counterparties.name,
+      products: portSuppliers.products,
+    })
+    .from(portSuppliers)
+    .innerJoin(counterparties, eq(portSuppliers.companyId, counterparties.id))
+    .where(eq(portSuppliers.id, id));
+  if (!info) return null;
+  await db.delete(portSuppliers).where(eq(portSuppliers.id, id));
+  return info;
+}
+
+export async function getSupplyPortsForCompany(companyId: string) {
+  return db
+    .select({
+      id: portSuppliers.id,
+      placeId: portSuppliers.placeId,
+      placeName: places.name,
+      placeCountry: places.country,
+      products: portSuppliers.products,
+      note: portSuppliers.note,
+      createdAt: portSuppliers.createdAt,
+    })
+    .from(portSuppliers)
+    .innerJoin(places, eq(portSuppliers.placeId, places.id))
+    .where(eq(portSuppliers.companyId, companyId))
+    .orderBy(places.name);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  RESPONSIBLE USER
+// ═══════════════════════════════════════════════════════════════════════
+
+export async function updateResponsibleUser(placeId: string, userId: string | null) {
+  const [updated] = await db
+    .update(places)
+    .set({ responsibleUserId: userId, updatedAt: new Date() })
+    .where(eq(places.id, placeId))
+    .returning();
+  return updated ?? null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  TEAM USERS (light list for dropdowns)
+// ═══════════════════════════════════════════════════════════════════════
+
+export async function listActiveUsers() {
+  return db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+    })
+    .from(users)
+    .where(eq(users.isActive, true))
+    .orderBy(users.name);
 }

@@ -5,6 +5,9 @@ dist
 *.tsbuildinfo
 bun.lock
 
+# Compiled binaries
+app-release
+
 # Environment
 .env
 .env.local

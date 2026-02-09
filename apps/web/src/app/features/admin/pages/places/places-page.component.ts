@@ -7,7 +7,7 @@ import {
   OnDestroy,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subject, of } from 'rxjs';
 import { debounceTime, switchMap, tap, catchError, takeUntil } from 'rxjs/operators';
@@ -19,7 +19,7 @@ import { AREAS } from '../../../../shared/data/areas';
 //  Places Page — Browse local places + search & import from Lloyd's
 // ═══════════════════════════════════════════════════════════════════════
 
-const API = 'http://localhost:3000';
+import { API } from '@app/core/config/api';
 
 interface LliSearchResult {
   source: 'local' | 'lloyds';
@@ -57,7 +57,6 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
           <h1 class="text-2xl font-bold text-gray-900">Places</h1>
           <p class="mt-1 text-sm text-gray-500">
             Manage ports, terminals, anchorages and other places.
-            Import from Lloyd's List Intelligence.
           </p>
         </div>
       </div>
@@ -146,7 +145,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
         </div>
         <select
           [(ngModel)]="localTypeFilter"
-          (ngModelChange)="loadPlaces()"
+          (ngModelChange)="currentPage.set(1); loadPlaces(); updateUrlParams()"
           class="w-full sm:w-40 rounded-lg border border-gray-300 px-3 py-2 text-sm
                  focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
         >
@@ -181,6 +180,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
               <th class="px-4 py-3 text-left font-medium text-gray-600">Type</th>
               <th class="px-4 py-3 text-left font-medium text-gray-600">UNLOCODE</th>
               <th class="px-4 py-3 text-left font-medium text-gray-600">Area</th>
+              <th class="px-4 py-3 text-left font-medium text-gray-600">Source</th>
               <th class="px-4 py-3 text-center font-medium text-gray-600">Orders</th>
               <th class="px-4 py-3 text-right font-medium text-gray-600"></th>
             </tr>
@@ -205,6 +205,13 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
                 </td>
                 <td class="px-4 py-3 text-gray-500 font-mono text-xs">{{ place.unlocode ?? '—' }}</td>
                 <td class="px-4 py-3 text-gray-500">{{ place.area ?? '—' }}</td>
+                <td class="px-4 py-3">
+                  @if (place.lliPlaceId) {
+                    <span class="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">Seasearcher</span>
+                  } @else {
+                    <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">Manual</span>
+                  }
+                </td>
                 <td class="px-4 py-3 text-center">
                   @if (place.orderCount) {
                     <span class="inline-flex items-center gap-1 text-xs">
@@ -231,7 +238,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
               </tr>
             } @empty {
               <tr>
-                <td colspan="7" class="px-4 py-8 text-center text-sm text-gray-400 italic">
+                <td colspan="8" class="px-4 py-8 text-center text-sm text-gray-400 italic">
                   @if (loading()) {
                     Loading places…
                   } @else {
@@ -426,6 +433,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
 export class PlacesPageComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly searchSubject = new Subject<string>();
   private readonly destroy$ = new Subject<void>();
 
@@ -462,6 +470,13 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
   readonly deleteError = signal<string | null>(null);
 
   ngOnInit(): void {
+    // Restore page & filter from URL query params
+    const params = this.route.snapshot.queryParamMap;
+    const page = Number(params.get('page'));
+    if (page > 0) this.currentPage.set(page);
+    const type = params.get('type');
+    if (type) this.localTypeFilter = type;
+
     this.loadPlaces();
 
     // Set up debounced typeahead
@@ -585,7 +600,16 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
 
   goToPage(page: number): void {
     this.currentPage.set(page);
+    this.updateUrlParams();
     this.loadPlaces();
+  }
+
+  updateUrlParams(): void {
+    const queryParams: Record<string, string | null> = {
+      page: this.currentPage() > 1 ? String(this.currentPage()) : null,
+      type: this.localTypeFilter || null,
+    };
+    this.router.navigate([], { queryParams, queryParamsHandling: 'merge', replaceUrl: true });
   }
 
   // ─── Delete place ─────────────────────────────────────────────────

@@ -19,6 +19,7 @@ import {
   type VesselDto,
   type PlaceDto,
   type ApiResponse,
+  type OwnCompanyDto,
 } from '@fueld/types';
 
 import { StatusBadgeComponent } from '../../../../shared/components/status-badge/status-badge.component';
@@ -32,22 +33,29 @@ import {
 } from '../../components/header-actions/header-actions.component';
 import { SendEmailModalComponent } from '../../components/send-email-modal/send-email-modal.component';
 import type { DropdownOption } from '../../../../shared/components/searchable-dropdown/searchable-dropdown.component';
+import { FormsModule } from '@angular/forms';
+import { firstValueFrom } from 'rxjs';
+import { CommentsCardComponent } from '../../../../shared/components/comments-card/comments-card.component';
+import { PdfPreviewModalComponent } from '../../../../shared/components/pdf-preview-modal/pdf-preview-modal.component';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Order Detail Page — Full order view with editable items grid
 // ═══════════════════════════════════════════════════════════════════════
 
-const API_URL = 'http://localhost:3000';
+import { API_URL } from '@app/core/config/api';
 
 @Component({
   selector: 'app-order-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     RouterLink,
+    FormsModule,
     StatusBadgeComponent,
     OrderItemsComponent,
     HeaderActionsComponent,
     SendEmailModalComponent,
+    CommentsCardComponent,
+    PdfPreviewModalComponent,
   ],
   template: `
     <!-- ═════════════════════════════════════════════════════════════ -->
@@ -60,7 +68,7 @@ const API_URL = 'http://localhost:3000';
         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
         </svg>
-        <span class="text-gray-900 font-medium">{{ orderId().slice(0, 8) }}...</span>
+        <span class="text-gray-900 font-medium">{{ order()?.orderNumber ?? orderId().slice(0, 8) + '...' }}</span>
       </nav>
 
       <!-- Title row -->
@@ -71,6 +79,10 @@ const API_URL = 'http://localhost:3000';
             <app-status-badge [status]="order()?.status ?? 'INQUIRY'" />
           </div>
           <p class="mt-1 text-sm text-gray-500">
+            @if (order()?.orderNumber) {
+              <span class="font-mono text-gray-600">{{ order()!.orderNumber }}</span>
+              <span class="mx-1.5">·</span>
+            }
             {{ vesselName() }} · {{ portName() }} · {{ clientName() }}
           </p>
         </div>
@@ -107,7 +119,7 @@ const API_URL = 'http://localhost:3000';
     <!-- ═════════════════════════════════════════════════════════════ -->
     <!--  Order Meta Info Cards                                       -->
     <!-- ═════════════════════════════════════════════════════════════ -->
-    <div class="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
       <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <p class="text-xs font-medium uppercase tracking-wider text-gray-500">Client</p>
         <p class="mt-1 text-sm font-semibold text-gray-900">{{ clientName() }}</p>
@@ -117,12 +129,26 @@ const API_URL = 'http://localhost:3000';
         <p class="mt-1 text-sm font-semibold text-gray-900">{{ vesselName() }}</p>
       </div>
       <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <p class="text-xs font-medium uppercase tracking-wider text-gray-500">Port</p>
+        <p class="text-xs font-medium uppercase tracking-wider text-gray-500">Place</p>
         <p class="mt-1 text-sm font-semibold text-gray-900">{{ portName() }}</p>
       </div>
       <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <p class="text-xs font-medium uppercase tracking-wider text-gray-500">ETA</p>
         <p class="mt-1 text-sm font-semibold text-gray-900">{{ order()?.eta ?? '—' }}</p>
+      </div>
+      <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <p class="text-xs font-medium uppercase tracking-wider text-gray-500">Invoicing Company</p>
+        @if (isReadonly()) {
+          <p class="mt-1 text-sm font-semibold text-gray-900">{{ invoicingCompanyName() }}</p>
+        } @else {
+          <select [ngModel]="order()?.invoicingCompanyId ?? ''" (ngModelChange)="onInvoicingCompanyChange($event)"
+            class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm font-semibold text-gray-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white">
+            <option value="">— Select —</option>
+            @for (co of ownCompanies(); track co.id) {
+              <option [value]="co.id">{{ co.name }}</option>
+            }
+          </select>
+        }
       </div>
     </div>
 
@@ -135,6 +161,13 @@ const API_URL = 'http://localhost:3000';
       [readonly]="isReadonly()"
       (itemsChange)="onItemsChange($event)"
     />
+
+    <!-- Comments -->
+    @if (orderId()) {
+      <div class="mt-6">
+        <app-comments-card entityType="order" [entityId]="orderId()" />
+      </div>
+    }
 
     <!-- Toast notification -->
     @if (toast()) {
@@ -164,6 +197,9 @@ const API_URL = 'http://localhost:3000';
       [portName]="portName()"
       (sendEmail)="onSendEmail($event)"
     />
+
+    <!-- PDF Preview Modal -->
+    <app-pdf-preview-modal />
   `,
 })
 export class OrderDetailPageComponent {
@@ -172,6 +208,7 @@ export class OrderDetailPageComponent {
   private readonly router = inject(Router);
 
   readonly emailModal = viewChild(SendEmailModalComponent);
+  readonly pdfModal = viewChild(PdfPreviewModalComponent);
 
   // ─── Route param ─────────────────────────────────────────────────
 
@@ -191,12 +228,19 @@ export class OrderDetailPageComponent {
   readonly saving = signal(false);
   readonly toast = signal<{ type: 'success' | 'error'; message: string } | null>(null);
   readonly invoiceNumber = signal('');
+  readonly ownCompanies = signal<OwnCompanyDto[]>([]);
 
   // ─── Computed ────────────────────────────────────────────────────
 
   readonly clientName = computed(() => this.client()?.name ?? '—');
   readonly vesselName = computed(() => this.vessel()?.name ?? '—');
   readonly portName = computed(() => this.port()?.name ?? '—');
+  readonly invoicingCompanyName = computed(() => {
+    const id = this.order()?.invoicingCompanyId;
+    if (!id) return '—';
+    const co = this.ownCompanies().find((c) => c.id === id);
+    return co?.name ?? '—';
+  });
 
   readonly isReadonly = computed(() => {
     const status = this.order()?.status;
@@ -212,6 +256,18 @@ export class OrderDetailPageComponent {
   constructor() {
     // Load mock data for demo
     this.loadMockData();
+    this.loadOwnCompanies();
+  }
+
+  private async loadOwnCompanies(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<OwnCompanyDto[]>>(`${API_URL}/companies/own`),
+      );
+      if (res.success) this.ownCompanies.set(res.data);
+    } catch {
+      // silently ignore — dropdown will just be empty
+    }
   }
 
   private loadMockData(): void {
@@ -219,11 +275,14 @@ export class OrderDetailPageComponent {
 
     this.order.set({
       id: mockOrderId,
+      orderNumber: '20260201-000001',
       tenantId: 'tenant-1',
       clientId: 'cp-1',
       vesselId: 'v-1',
       placeId: 'p-1',
       salesRepId: 'u-1',
+      invoicingCompanyId: null,
+      currency: 'USD',
       status: OrderStatus.Confirmed,
       eta: '2026-02-15',
       etd: '2026-02-17',
@@ -238,9 +297,23 @@ export class OrderDetailPageComponent {
       tenantId: 'tenant-1',
       name: 'Pacific Shipping Co.',
       type: CounterpartyType.Client,
+      types: ['CLIENT'],
       creditLimit: '500000',
       creditUsed: '125000',
       country: 'Singapore',
+      isOwnCompany: false,
+      seasearcherId: null,
+      companyImo: null,
+      countryIso: null,
+      yearFormed: null,
+      companyRoles: null,
+      fleetSize: null,
+      headOfficeAddress: null,
+      headOfficePhone: null,
+      headOfficeEmail: null,
+      website: null,
+      isSanctioned: false,
+      lastSynced: null,
     });
 
     this.vessel.set({
@@ -249,6 +322,20 @@ export class OrderDetailPageComponent {
       imo: '9834567',
       mmsi: '234567890',
       flag: 'NO',
+      seasearcherId: null,
+      flagCode: null,
+      type: null,
+      status: null,
+      loa: null,
+      breadth: null,
+      depth: null,
+      draught: null,
+      deadWeightTonnage: null,
+      grossTonnage: null,
+      buildYear: null,
+      builder: null,
+      classificationSociety: null,
+      lastSynced: null,
     });
 
     this.port.set({
@@ -268,13 +355,15 @@ export class OrderDetailPageComponent {
       subRegion: null,
       timezone: null,
       lliLastUpdated: null,
+      responsibleUserId: null,
+      responsibleUserName: null,
     });
 
     this.suppliers.set([
-      { id: 'sp-1', tenantId: 'tenant-1', name: 'Shell Marine Products', type: CounterpartyType.Supplier, creditLimit: '0', creditUsed: '0', country: 'Netherlands' },
-      { id: 'sp-2', tenantId: 'tenant-1', name: 'TotalEnergies Marine', type: CounterpartyType.Supplier, creditLimit: '0', creditUsed: '0', country: 'France' },
-      { id: 'sp-3', tenantId: 'tenant-1', name: 'Vitol Bunkers', type: CounterpartyType.Supplier, creditLimit: '0', creditUsed: '0', country: 'Switzerland' },
-      { id: 'sp-4', tenantId: 'tenant-1', name: 'Trafigura Marine', type: CounterpartyType.Supplier, creditLimit: '0', creditUsed: '0', country: 'Singapore' },
+      { id: 'sp-1', tenantId: 'tenant-1', name: 'Shell Marine Products', type: CounterpartyType.Supplier, types: ['SUPPLIER'], creditLimit: '0', creditUsed: '0', country: 'Netherlands', isOwnCompany: false, seasearcherId: null, companyImo: null, countryIso: null, yearFormed: null, companyRoles: null, fleetSize: null, headOfficeAddress: null, headOfficePhone: null, headOfficeEmail: null, website: null, isSanctioned: false, lastSynced: null },
+      { id: 'sp-2', tenantId: 'tenant-1', name: 'TotalEnergies Marine', type: CounterpartyType.Supplier, types: ['SUPPLIER'], creditLimit: '0', creditUsed: '0', country: 'France', isOwnCompany: false, seasearcherId: null, companyImo: null, countryIso: null, yearFormed: null, companyRoles: null, fleetSize: null, headOfficeAddress: null, headOfficePhone: null, headOfficeEmail: null, website: null, isSanctioned: false, lastSynced: null },
+      { id: 'sp-3', tenantId: 'tenant-1', name: 'Vitol Bunkers', type: CounterpartyType.Supplier, types: ['SUPPLIER'], creditLimit: '0', creditUsed: '0', country: 'Switzerland', isOwnCompany: false, seasearcherId: null, companyImo: null, countryIso: null, yearFormed: null, companyRoles: null, fleetSize: null, headOfficeAddress: null, headOfficePhone: null, headOfficeEmail: null, website: null, isSanctioned: false, lastSynced: null },
+      { id: 'sp-4', tenantId: 'tenant-1', name: 'Trafigura Marine', type: CounterpartyType.Supplier, types: ['SUPPLIER'], creditLimit: '0', creditUsed: '0', country: 'Singapore', isOwnCompany: false, seasearcherId: null, companyImo: null, countryIso: null, yearFormed: null, companyRoles: null, fleetSize: null, headOfficeAddress: null, headOfficePhone: null, headOfficeEmail: null, website: null, isSanctioned: false, lastSynced: null },
     ]);
 
     this.itemRows.set([
@@ -283,6 +372,8 @@ export class OrderDetailPageComponent {
         productType: 'VLSFO',
         supplierId: 'sp-1',
         quantity: 500,
+        quantityMin: null,
+        quantityMax: null,
         unit: 'MT',
         costPrice: 585.50,
         salesPrice: 612.00,
@@ -294,6 +385,8 @@ export class OrderDetailPageComponent {
         productType: 'LSMGO',
         supplierId: 'sp-2',
         quantity: 150,
+        quantityMin: null,
+        quantityMax: null,
         unit: 'MT',
         costPrice: 780.25,
         salesPrice: 815.00,
@@ -311,12 +404,22 @@ export class OrderDetailPageComponent {
     this.itemRows.set(items);
   }
 
+  onInvoicingCompanyChange(companyId: string): void {
+    this.order.update((o) => o ? { ...o, invoicingCompanyId: companyId || null } : o);
+  }
+
   // ─── Actions ─────────────────────────────────────────────────────
 
   onAction(action: HeaderAction): void {
     switch (action) {
       case 'generate-invoice':
-        this.downloadInvoicePdf();
+        this.viewInvoicePdf();
+        break;
+      case 'view-offer':
+        this.viewOfferPdf();
+        break;
+      case 'view-proforma':
+        this.viewProformaPdf();
         break;
       case 'send-email':
         this.emailModal()?.show();
@@ -335,17 +438,55 @@ export class OrderDetailPageComponent {
     this.showToast('success', 'Order saved successfully.');
   }
 
-  private downloadInvoicePdf(): void {
+  private async viewInvoicePdf(): Promise<void> {
     const id = this.orderId();
     if (!id) return;
+    const modal = this.pdfModal();
+    if (!modal) return;
+    modal.showLoading('Invoice');
+    try {
+      const blob = await firstValueFrom(
+        this.http.get(`${API_URL}/orders/${id}/invoice/pdf`, { responseType: 'blob' }),
+      );
+      modal.setBlob(blob, `Fueld_Invoice_${this.invoiceNumber()}.pdf`);
+    } catch {
+      modal.showError();
+      this.showToast('error', 'Failed to generate invoice PDF.');
+    }
+  }
 
-    // Trigger browser download via API
-    const url = `${API_URL}/orders/${id}/invoice/pdf`;
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `Fueld_Invoice_${this.invoiceNumber()}.pdf`;
-    link.click();
-    this.showToast('success', 'Invoice PDF download started.');
+  private async viewOfferPdf(): Promise<void> {
+    const id = this.orderId();
+    if (!id) return;
+    const modal = this.pdfModal();
+    if (!modal) return;
+    modal.showLoading('Offer');
+    try {
+      const blob = await firstValueFrom(
+        this.http.get(`${API_URL}/orders/${id}/offer/pdf`, { responseType: 'blob' }),
+      );
+      modal.setBlob(blob, `Offer_${this.order()?.orderNumber ?? id}.pdf`);
+    } catch {
+      modal.showError();
+      this.showToast('error', 'Failed to generate offer PDF.');
+    }
+  }
+
+  private async viewProformaPdf(): Promise<void> {
+    const id = this.orderId();
+    if (!id) return;
+    const modal = this.pdfModal();
+    if (!modal) return;
+    modal.showLoading('Proforma Invoice');
+    try {
+      const blob = await firstValueFrom(
+        this.http.get(`${API_URL}/orders/${id}/proforma/pdf`, { responseType: 'blob' }),
+      );
+      modal.setBlob(blob, `Proforma_${this.order()?.orderNumber ?? id}.pdf`);
+    } catch {
+      modal.showError();
+      this.showToast('error', 'Failed to generate proforma invoice PDF.');
+    }
   }
 
   onSendEmail(recipientEmail: string): void {
