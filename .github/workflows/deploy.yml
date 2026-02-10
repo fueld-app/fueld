@@ -41,7 +41,7 @@ jobs:
       - name: Build Frontend
         run: |
           cd apps/web
-          npx ng build --configuration production
+          bunx ng build --configuration production
 
       # ─── Upload artifacts ──────────────────────────────────────────
       - name: Upload API binary
