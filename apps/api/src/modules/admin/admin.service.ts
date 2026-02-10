@@ -1,6 +1,6 @@
-import { eq, desc, and, isNull } from 'drizzle-orm';
+import { eq, desc, and, isNull, sql } from 'drizzle-orm';
 import { db } from '../../db';
-import { users, invitations, tenants, teams } from '../../db/schema';
+import { users, invitations, tenants, teams, passkeys } from '../../db/schema';
 import { hashPassword } from '../auth/password.service';
 
 // ─── Admin Service ───────────────────────────────────────────────────
@@ -28,21 +28,35 @@ export async function listUsers() {
       teamId: users.teamId,
       teamName: teams.name,
       is2faEnabled: users.is2faEnabled,
+      o365Id: users.o365Id,
+      passkeyCount: sql<number>`count(${passkeys.id})`,
       isActive: users.isActive,
       allowedIps: users.allowedIps,
       createdAt: users.createdAt,
     })
     .from(users)
     .leftJoin(teams, eq(users.teamId, teams.id))
+    .leftJoin(passkeys, eq(passkeys.userId, users.id))
     .where(eq(users.tenantId, tenantId))
+    .groupBy(users.id, teams.name)
     .orderBy(desc(users.createdAt));
 
   return rows.map((u) => ({
     ...u,
     teamName: u.teamName ?? null,
     allowedIps: u.allowedIps ? JSON.parse(u.allowedIps) as string[] : null,
+    hasPasskeys: Number(u.passkeyCount) > 0,
+    hasMicrosoftSso: !!u.o365Id,
     createdAt: u.createdAt.toISOString(),
   }));
+}
+
+async function getPasskeyCount(userId: string): Promise<number> {
+  const rows = await db
+    .select({ count: sql<number>`count(${passkeys.id})` })
+    .from(passkeys)
+    .where(eq(passkeys.userId, userId));
+  return Number(rows[0]?.count ?? 0);
 }
 
 // ── Invite User ──────────────────────────────────────────────────────
@@ -217,6 +231,8 @@ export async function updateUserRole(
     teamName = team?.name ?? null;
   }
 
+  const passkeyCount = await getPasskeyCount(updated.id);
+
   return {
     id: updated.id,
     email: updated.email,
@@ -225,6 +241,8 @@ export async function updateUserRole(
     teamId: updated.teamId,
     teamName,
     is2faEnabled: updated.is2faEnabled,
+    hasPasskeys: passkeyCount > 0,
+    hasMicrosoftSso: !!updated.o365Id,
     isActive: updated.isActive,
     allowedIps: updated.allowedIps ? JSON.parse(updated.allowedIps) as string[] : null,
     createdAt: updated.createdAt.toISOString(),
@@ -248,6 +266,8 @@ export async function toggleUserActive(userId: string, isActive: boolean) {
     teamName = team?.name ?? null;
   }
 
+  const passkeyCount = await getPasskeyCount(updated.id);
+
   return {
     id: updated.id,
     email: updated.email,
@@ -256,6 +276,8 @@ export async function toggleUserActive(userId: string, isActive: boolean) {
     teamId: updated.teamId,
     teamName,
     is2faEnabled: updated.is2faEnabled,
+    hasPasskeys: passkeyCount > 0,
+    hasMicrosoftSso: !!updated.o365Id,
     isActive: updated.isActive,
     allowedIps: updated.allowedIps ? JSON.parse(updated.allowedIps) as string[] : null,
     createdAt: updated.createdAt.toISOString(),

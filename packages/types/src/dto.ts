@@ -57,6 +57,8 @@ export interface AdminUserDto {
   teamId: string | null;
   teamName: string | null;
   is2faEnabled: boolean;
+  hasPasskeys: boolean;
+  hasMicrosoftSso: boolean;
   isActive: boolean;
   allowedIps: string[] | null;
   createdAt: string;

@@ -99,7 +99,7 @@ import { API } from '@app/core/config/api';
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Email</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Role</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Team</th>
-                <th class="px-4 py-3 text-center font-medium text-gray-600">2FA</th>
+                <th class="px-4 py-3 text-center font-medium text-gray-600">Auth</th>
                 <th class="px-4 py-3 text-center font-medium text-gray-600">Status</th>
                 <th class="px-4 py-3 text-center font-medium text-gray-600">IP Lock</th>
                 <th class="px-4 py-3 text-center font-medium text-gray-600">Sessions</th>
@@ -164,16 +164,20 @@ import { API } from '@app/core/config/api';
                     </select>
                   </td>
                   <td class="px-4 py-3 text-center">
-                    @if (user.is2faEnabled) {
-                      <span class="inline-flex items-center gap-0.5 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                          <path fill-rule="evenodd" d="M10 1a4.5 4.5 0 0 0-4.5 4.5V9H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-.5V5.5A4.5 4.5 0 0 0 10 1Zm3 8V5.5a3 3 0 1 0-6 0V9h6Z" clip-rule="evenodd" />
-                        </svg>
-                        On
-                      </span>
-                    } @else {
-                      <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">Off</span>
-                    }
+                    <div class="flex flex-wrap justify-center gap-1">
+                      @if (user.is2faEnabled) {
+                        <span class="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">2FA</span>
+                      }
+                      @if (user.hasPasskeys) {
+                        <span class="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">Passkey</span>
+                      }
+                      @if (user.hasMicrosoftSso) {
+                        <span class="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">Microsoft</span>
+                      }
+                      @if (!user.is2faEnabled && !user.hasPasskeys && !user.hasMicrosoftSso) {
+                        <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">None</span>
+                      }
+                    </div>
                   </td>
                   <td class="px-4 py-3 text-center">
                     @if (user.isActive) {
