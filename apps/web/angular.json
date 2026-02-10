@@ -19,7 +19,6 @@
             "outputPath": "dist/web/browser",
             "browser": "src/main.ts",
             "tsConfig": "tsconfig.app.json",
-            "ngswConfigPath": "ngsw-config.json",
             "assets": [
               {
                 "glob": "**/*",
@@ -33,7 +32,7 @@
           },
           "configurations": {
             "production": {
-              "serviceWorker": true,
+              "serviceWorker": "ngsw-config.json",
               "budgets": [
                 {
                   "type": "initial",

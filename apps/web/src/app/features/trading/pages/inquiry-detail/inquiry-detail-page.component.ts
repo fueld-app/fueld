@@ -48,6 +48,30 @@ import { DatePipe } from '@angular/common';
 
 import { API } from '@app/core/config/api';
 
+interface CompanySearchResult {
+  source: 'local' | 'seasearcher';
+  localId?: string;
+  seasearcherId?: string;
+  name: string;
+  country?: string;
+}
+
+interface VesselSearchResult {
+  source: 'local' | 'seasearcher';
+  localId?: string;
+  seasearcherId?: string;
+  name: string;
+  imo?: string;
+}
+
+interface LliSearchResult {
+  source: 'local' | 'lloyds';
+  localId?: string;
+  lliPlaceId?: string;
+  name: string;
+  country?: string;
+}
+
 @Component({
   selector: 'app-inquiry-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -563,6 +587,9 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   readonly vesselSearchLoading = signal(false);
   readonly placeSearchLoading = signal(false);
   readonly supplierSearchLoading = signal(false);
+  readonly clientImportOptions = signal<DropdownOption[]>([]);
+  readonly vesselImportOptions = signal<DropdownOption[]>([]);
+  readonly placeImportOptions = signal<DropdownOption[]>([]);
 
   // ─── Send Offer modal state ──────────────────────────────────────
 
@@ -592,15 +619,24 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   );
 
   readonly clientDropdownOptions = computed<DropdownOption[]>(() =>
-    this.clients().map((c) => ({ value: c.id, label: c.name })),
+    [
+      ...this.clients().map((c) => ({ value: c.id, label: c.name })),
+      ...this.clientImportOptions(),
+    ],
   );
 
   readonly vesselDropdownOptions = computed<DropdownOption[]>(() =>
-    this.vessels().map((v) => ({ value: v.id, label: v.name })),
+    [
+      ...this.vessels().map((v) => ({ value: v.id, label: v.name })),
+      ...this.vesselImportOptions(),
+    ],
   );
 
   readonly placeDropdownOptions = computed<DropdownOption[]>(() =>
-    this.places().map((p) => ({ value: p.id, label: p.name })),
+    [
+      ...this.places().map((p) => ({ value: p.id, label: p.name })),
+      ...this.placeImportOptions(),
+    ],
   );
 
   readonly hasInvoicingCompany = computed(() => !!this.order()?.invoicingCompanyId);
@@ -752,16 +788,26 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
           `${API}/companies/local?type=CLIENT&search=${encodeURIComponent(term)}&limit=20`,
         ),
       );
-      if (res.success) {
-        // Merge current selection so it stays visible
-        const current = this.client();
-        const results = res.data.companies;
-        if (current && !results.find((c) => c.id === current.id)) {
-          results.unshift(current);
-        }
-        this.clients.set(results);
+      const current = this.client();
+      const localResults = res.success ? res.data.companies : [];
+      const localMatches = current
+        ? localResults.filter((c) => c.id !== current.id)
+        : localResults;
+      const hasLocalMatches = localMatches.length > 0;
+      const mergedLocal = current && !localResults.find((c) => c.id === current.id)
+        ? [current, ...localResults]
+        : localResults;
+
+      if (hasLocalMatches) {
+        this.clients.set(mergedLocal);
+        this.clientImportOptions.set([]);
+      } else {
+        this.clients.set(current ? [current] : []);
+        this.clientImportOptions.set(await this.loadCompanyImportOptions(term));
       }
-    } catch { /* ignore */ } finally {
+    } catch {
+      this.clientImportOptions.set([]);
+    } finally {
       this.clientSearchLoading.set(false);
     }
   }
@@ -774,15 +820,26 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
           `${API}/vessels/local?search=${encodeURIComponent(term)}&limit=20`,
         ),
       );
-      if (res.success) {
-        const current = this.vessel();
-        const results = res.data.vessels;
-        if (current && !results.find((v) => v.id === current.id)) {
-          results.unshift(current);
-        }
-        this.vessels.set(results);
+      const current = this.vessel();
+      const localResults = res.success ? res.data.vessels : [];
+      const localMatches = current
+        ? localResults.filter((v) => v.id !== current.id)
+        : localResults;
+      const hasLocalMatches = localMatches.length > 0;
+      const mergedLocal = current && !localResults.find((v) => v.id === current.id)
+        ? [current, ...localResults]
+        : localResults;
+
+      if (hasLocalMatches) {
+        this.vessels.set(mergedLocal);
+        this.vesselImportOptions.set([]);
+      } else {
+        this.vessels.set(current ? [current] : []);
+        this.vesselImportOptions.set(await this.loadVesselImportOptions(term));
       }
-    } catch { /* ignore */ } finally {
+    } catch {
+      this.vesselImportOptions.set([]);
+    } finally {
       this.vesselSearchLoading.set(false);
     }
   }
@@ -795,15 +852,26 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
           `${API}/lloyds/places/local?search=${encodeURIComponent(term)}&limit=20`,
         ),
       );
-      if (res.success) {
-        const current = this.port();
-        const results = res.data.places;
-        if (current && !results.find((p) => p.id === current.id)) {
-          results.unshift(current);
-        }
-        this.places.set(results);
+      const current = this.port();
+      const localResults = res.success ? res.data.places : [];
+      const localMatches = current
+        ? localResults.filter((p) => p.id !== current.id)
+        : localResults;
+      const hasLocalMatches = localMatches.length > 0;
+      const mergedLocal = current && !localResults.find((p) => p.id === current.id)
+        ? [current, ...localResults]
+        : localResults;
+
+      if (hasLocalMatches) {
+        this.places.set(mergedLocal);
+        this.placeImportOptions.set([]);
+      } else {
+        this.places.set(current ? [current] : []);
+        this.placeImportOptions.set(await this.loadPlaceImportOptions(term));
       }
-    } catch { /* ignore */ } finally {
+    } catch {
+      this.placeImportOptions.set([]);
+    } finally {
       this.placeSearchLoading.set(false);
     }
   }
@@ -843,28 +911,163 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
     this.triggerAutosave();
   }
 
-  onClientChange(clientId: string): void {
+  async onClientChange(clientId: string): Promise<void> {
     if (!clientId) return; // Don't allow clearing required field
+    if (clientId.startsWith('seasearcher:')) {
+      await this.importClientFromSeasearcher(clientId.replace('seasearcher:', ''));
+      return;
+    }
     this.order.update((o) => (o ? { ...o, clientId } : o));
     const clientData = this.clients().find((c) => c.id === clientId);
     this.client.set(clientData ?? null);
     this.triggerAutosave();
   }
 
-  onVesselChange(vesselId: string): void {
+  async onVesselChange(vesselId: string): Promise<void> {
     if (!vesselId) return; // Don't allow clearing required field
+    if (vesselId.startsWith('seasearcher:')) {
+      await this.importVesselFromSeasearcher(vesselId.replace('seasearcher:', ''));
+      return;
+    }
     this.order.update((o) => (o ? { ...o, vesselId } : o));
     const vesselData = this.vessels().find((v) => v.id === vesselId);
     this.vessel.set(vesselData ?? null);
     this.triggerAutosave();
   }
 
-  onPortChange(placeId: string): void {
+  async onPortChange(placeId: string): Promise<void> {
     if (!placeId) return; // Don't allow clearing required field
+    if (placeId.startsWith('lli:')) {
+      await this.importPlaceFromLli(placeId.replace('lli:', ''));
+      return;
+    }
     this.order.update((o) => (o ? { ...o, placeId } : o));
     const placeData = this.places().find((p) => p.id === placeId);
     this.port.set(placeData ?? null);
     this.triggerAutosave();
+  }
+
+  private async loadCompanyImportOptions(term: string): Promise<DropdownOption[]> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<CompanySearchResult[]>>(
+          `${API}/companies/search?term=${encodeURIComponent(term)}`,
+        ),
+      );
+      if (!res.success || !res.data) return [];
+      return res.data
+        .filter((r) => r.source === 'seasearcher' && r.seasearcherId)
+        .map((r) => ({
+          value: `seasearcher:${r.seasearcherId}`,
+          label: `Seasearcher · ${r.name}${r.country ? ` (${r.country})` : ''}`,
+        }));
+    } catch {
+      return [];
+    }
+  }
+
+  private async loadVesselImportOptions(term: string): Promise<DropdownOption[]> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<VesselSearchResult[]>>(
+          `${API}/vessels/search?term=${encodeURIComponent(term)}`,
+        ),
+      );
+      if (!res.success || !res.data) return [];
+      return res.data
+        .filter((r) => r.source === 'seasearcher' && r.seasearcherId)
+        .map((r) => ({
+          value: `seasearcher:${r.seasearcherId}`,
+          label: `Seasearcher · ${r.name}${r.imo ? ` (IMO ${r.imo})` : ''}`,
+        }));
+    } catch {
+      return [];
+    }
+  }
+
+  private async loadPlaceImportOptions(term: string): Promise<DropdownOption[]> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<LliSearchResult[]>>(
+          `${API}/lloyds/places?name=${encodeURIComponent(term)}`,
+        ),
+      );
+      if (!res.success || !res.data) return [];
+      return res.data
+        .filter((r) => r.source === 'lloyds' && r.lliPlaceId)
+        .map((r) => ({
+          value: `lli:${r.lliPlaceId}`,
+          label: `Seasearcher · ${r.name}${r.country ? ` (${r.country})` : ''}`,
+        }));
+    } catch {
+      return [];
+    }
+  }
+
+  private async importClientFromSeasearcher(seasearcherId: string): Promise<void> {
+    this.clientSearchLoading.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<CounterpartyDto>>(`${API}/companies/import`, { seasearcherId }),
+      );
+      if (res.success && res.data) {
+        this.clients.set([res.data, ...this.clients().filter((c) => c.id !== res.data.id)]);
+        this.clientImportOptions.set([]);
+        this.order.update((o) => (o ? { ...o, clientId: res.data.id } : o));
+        this.client.set(res.data);
+        this.triggerAutosave();
+      } else {
+        this.showToast('error', res.message ?? 'Failed to import client.');
+      }
+    } catch {
+      this.showToast('error', 'Failed to import client.');
+    } finally {
+      this.clientSearchLoading.set(false);
+    }
+  }
+
+  private async importVesselFromSeasearcher(seasearcherId: string): Promise<void> {
+    this.vesselSearchLoading.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<VesselDto>>(`${API}/vessels/import`, { seasearcherId }),
+      );
+      if (res.success && res.data) {
+        this.vessels.set([res.data, ...this.vessels().filter((v) => v.id !== res.data.id)]);
+        this.vesselImportOptions.set([]);
+        this.order.update((o) => (o ? { ...o, vesselId: res.data.id } : o));
+        this.vessel.set(res.data);
+        this.triggerAutosave();
+      } else {
+        this.showToast('error', res.message ?? 'Failed to import vessel.');
+      }
+    } catch {
+      this.showToast('error', 'Failed to import vessel.');
+    } finally {
+      this.vesselSearchLoading.set(false);
+    }
+  }
+
+  private async importPlaceFromLli(lliPlaceId: string): Promise<void> {
+    this.placeSearchLoading.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<PlaceDto>>(`${API}/lloyds/places/import`, { lliPlaceId }),
+      );
+      if (res.success && res.data) {
+        this.places.set([res.data, ...this.places().filter((p) => p.id !== res.data.id)]);
+        this.placeImportOptions.set([]);
+        this.order.update((o) => (o ? { ...o, placeId: res.data.id } : o));
+        this.port.set(res.data);
+        this.triggerAutosave();
+      } else {
+        this.showToast('error', res.message ?? 'Failed to import place.');
+      }
+    } catch {
+      this.showToast('error', 'Failed to import place.');
+    } finally {
+      this.placeSearchLoading.set(false);
+    }
   }
 
   onEtaChange(eta: string): void {
