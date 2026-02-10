@@ -33,6 +33,7 @@ import {
   getIntegrationStatus,
   setLLICredentials,
   setSmtpCredentials,
+  setPushCredentials,
 } from './integrations.service';
 import {
   generateAuthUrl,
@@ -345,6 +346,29 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       secure: t.Boolean(),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Set SMTP credentials for invite emails' },
+  })
+
+  .put('/integrations/push', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      await setPushCredentials(
+        body.publicKey,
+        body.privateKey,
+        body.subject,
+        auth.sub,
+      );
+      return { success: true, data: { saved: true } } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      publicKey: t.String({ minLength: 1 }),
+      privateKey: t.String({ minLength: 1 }),
+      subject: t.String({ minLength: 1 }),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Set Web Push VAPID keys' },
   })
 
   // ═══════════════════════════════════════════════════════════════════

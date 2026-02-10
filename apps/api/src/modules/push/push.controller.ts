@@ -14,8 +14,8 @@ import {
 export const pushController = new Elysia({ prefix: '/push' })
   .get(
     '/public-key',
-    () => {
-      const publicKey = getVapidPublicKey();
+    async () => {
+      const publicKey = await getVapidPublicKey();
       if (!publicKey) {
         return { success: false, data: null, message: 'VAPID public key not configured' };
       }
@@ -69,7 +69,16 @@ export const pushController = new Elysia({ prefix: '/push' })
   .post(
     '/test',
     async ({ auth }) => {
-      const sent = await sendTestNotification(auth.sub);
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, auth.sub),
+        columns: { tenantId: true },
+      });
+
+      if (!user?.tenantId) {
+        return { success: false, data: { sent: 0 }, message: 'User tenant not found' };
+      }
+
+      const sent = await sendTestNotification(auth.sub, user.tenantId);
       return { success: true, data: { sent } } satisfies ApiResponse<{ sent: number }>;
     },
     {

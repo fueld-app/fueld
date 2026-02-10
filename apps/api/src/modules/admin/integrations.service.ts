@@ -158,6 +158,42 @@ export async function getIntegrationStatus(): Promise<IntegrationStatusDto[]> {
     });
   }
 
+  // Push provider (Web Push / VAPID)
+  const pushRows = providers.get('PUSH');
+  if (pushRows?.length) {
+    const values = decodeRows(pushRows);
+    const publicKey = values.get('publicKey') ?? null;
+    const subject = values.get('subject') ?? null;
+    const configured = !!(publicKey && values.get('privateKey'));
+
+    let updatedBy: string | null = null;
+    const updaterId = pushRows[0]?.updatedBy;
+    if (updaterId) {
+      const userRow = await db.query.users.findFirst({ where: eq(users.id, updaterId) });
+      updatedBy = userRow?.email ?? null;
+    }
+
+    results.push({
+      provider: 'PUSH',
+      configured,
+      username: null,
+      updatedAt: pushRows[0]?.updatedAt?.toISOString() ?? null,
+      updatedBy,
+      pushPublicKey: publicKey,
+      pushSubject: subject,
+    });
+  } else {
+    results.push({
+      provider: 'PUSH',
+      configured: false,
+      username: null,
+      updatedAt: null,
+      updatedBy: null,
+      pushPublicKey: null,
+      pushSubject: null,
+    });
+  }
+
   // QuickBooks provider
   try {
     const qbStatus = await getQuickBooksStatus();
@@ -228,6 +264,58 @@ export async function setSmtpCredentials(
       await db.insert(integrationCredentials).values({
         tenantId,
         provider: 'SMTP',
+        key,
+        encryptedValue: enc.encrypted,
+        iv: enc.iv,
+        authTag: enc.authTag,
+        updatedBy: userId,
+      });
+    }
+  }
+}
+
+export async function setPushCredentials(
+  publicKey: string,
+  privateKey: string,
+  subject: string,
+  userId: string,
+): Promise<void> {
+  const tenantId = await getTenantId();
+  const now = new Date();
+
+  const values: Record<string, string> = {
+    publicKey,
+    privateKey,
+    subject,
+  };
+
+  for (const [key, rawValue] of Object.entries(values)) {
+    const enc = encrypt(rawValue);
+    const existing = await db
+      .select({ id: integrationCredentials.id })
+      .from(integrationCredentials)
+      .where(and(
+        eq(integrationCredentials.tenantId, tenantId),
+        eq(integrationCredentials.provider, 'PUSH'),
+        eq(integrationCredentials.key, key),
+      ))
+      .limit(1);
+
+    if (existing.length) {
+      await db
+        .update(integrationCredentials)
+        .set({
+          encryptedValue: enc.encrypted,
+          iv: enc.iv,
+          authTag: enc.authTag,
+          updatedBy: userId,
+          updatedAt: now,
+        })
+        .where(eq(integrationCredentials.id, existing[0].id));
+    } else {
+      await db.insert(integrationCredentials).values({
+        tenantId,
+        provider: 'PUSH',
         key,
         encryptedValue: enc.encrypted,
         iv: enc.iv,

@@ -1,7 +1,8 @@
 import webpush from 'web-push';
 import { db } from '../../db';
-import { pushSubscriptions } from '../../db/schema';
+import { integrationCredentials, pushSubscriptions } from '../../db/schema';
 import { and, eq } from 'drizzle-orm';
+import { decrypt } from '../../lib/crypto';
 
 interface SubscriptionKeys {
   p256dh: string;
@@ -14,23 +15,58 @@ export interface PushSubscriptionInput {
   keys: SubscriptionKeys;
 }
 
-const VAPID_PUBLIC_KEY = process.env['VAPID_PUBLIC_KEY'] ?? '';
-const VAPID_PRIVATE_KEY = process.env['VAPID_PRIVATE_KEY'] ?? '';
-const VAPID_SUBJECT = process.env['VAPID_SUBJECT'] ?? 'mailto:support@fueld.app';
-
-let vapidConfigured = false;
-
-function ensureVapidConfigured(): boolean {
-  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return false;
-  if (!vapidConfigured) {
-    webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
-    vapidConfigured = true;
-  }
-  return true;
+interface VapidConfig {
+  publicKey: string;
+  privateKey: string;
+  subject: string;
 }
 
-export function getVapidPublicKey(): string | null {
-  return VAPID_PUBLIC_KEY || null;
+async function getTenantId(): Promise<string> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+  return tenant.id;
+}
+
+async function loadVapidConfig(tenantId: string): Promise<VapidConfig | null> {
+  const rows = await db
+    .select({
+      key: integrationCredentials.key,
+      encryptedValue: integrationCredentials.encryptedValue,
+      iv: integrationCredentials.iv,
+      authTag: integrationCredentials.authTag,
+    })
+    .from(integrationCredentials)
+    .where(and(
+      eq(integrationCredentials.tenantId, tenantId),
+      eq(integrationCredentials.provider, 'PUSH'),
+    ));
+
+  if (!rows.length) return null;
+
+  const map = new Map<string, string>();
+  for (const row of rows) {
+    map.set(row.key, decrypt(row.encryptedValue, row.iv, row.authTag));
+  }
+
+  const publicKey = map.get('publicKey') ?? '';
+  const privateKey = map.get('privateKey') ?? '';
+  const subject = map.get('subject') ?? 'mailto:support@fueld.app';
+  if (!publicKey || !privateKey) return null;
+
+  return { publicKey, privateKey, subject };
+}
+
+async function ensureVapidConfigured(tenantId: string): Promise<VapidConfig | null> {
+  const config = await loadVapidConfig(tenantId);
+  if (!config) return null;
+  webpush.setVapidDetails(config.subject, config.publicKey, config.privateKey);
+  return config;
+}
+
+export async function getVapidPublicKey(): Promise<string | null> {
+  const tenantId = await getTenantId();
+  const config = await loadVapidConfig(tenantId);
+  return config?.publicKey ?? null;
 }
 
 export async function upsertSubscription(
@@ -68,10 +104,9 @@ export async function removeSubscription(userId: string, endpoint: string): Prom
     .where(and(eq(pushSubscriptions.userId, userId), eq(pushSubscriptions.endpoint, endpoint)));
 }
 
-export async function sendTestNotification(userId: string): Promise<number> {
-  if (!ensureVapidConfigured()) {
-    return 0;
-  }
+export async function sendTestNotification(userId: string, tenantId: string): Promise<number> {
+  const config = await ensureVapidConfigured(tenantId);
+  if (!config) return 0;
 
   const subs = await db.query.pushSubscriptions.findMany({
     where: eq(pushSubscriptions.userId, userId),

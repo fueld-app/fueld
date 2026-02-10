@@ -290,6 +290,118 @@ import { API } from '@app/core/config/api';
           </div>
 
           <!-- ════════════════════════════════════════════════════════ -->
+          <!--  Web Push (VAPID)                                     -->
+          <!-- ════════════════════════════════════════════════════════ -->
+          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
+              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-50">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10 2a6 6 0 00-6 6v2.5c0 .67-.167 1.33-.486 1.92l-.91 1.67A1 1 0 004.5 16h11a1 1 0 00.896-1.41l-.91-1.67A4 4 0 0115 10.5V8a6 6 0 00-6-6zm0 16a2.5 2.5 0 002.45-2h-4.9A2.5 2.5 0 0010 18z" />
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-base font-semibold text-gray-900">Web Push Notifications</h3>
+                <p class="text-sm text-gray-500">Configure VAPID keys to enable browser push notifications.</p>
+              </div>
+              <div>
+                @if (pushStatus()?.configured) {
+                  <span class="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700 ring-1 ring-green-600/20">
+                    <span class="h-1.5 w-1.5 rounded-full bg-green-500"></span>
+                    Configured
+                  </span>
+                } @else {
+                  <span class="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-600 ring-1 ring-gray-500/10">
+                    <span class="h-1.5 w-1.5 rounded-full bg-gray-400"></span>
+                    Not Configured
+                  </span>
+                }
+              </div>
+            </div>
+
+            @if (pushStatus()?.configured) {
+              <div class="border-b border-gray-100 bg-gray-50/50 px-6 py-3">
+                <div class="flex flex-wrap items-center gap-4 text-sm">
+                  @if (pushStatus()!.pushPublicKey) {
+                    <div class="truncate">
+                      <span class="text-gray-500">Public key:</span>
+                      <span class="ml-1.5 font-medium text-gray-900">{{ pushStatus()!.pushPublicKey }}</span>
+                    </div>
+                  }
+                  @if (pushStatus()!.updatedAt) {
+                    <div>
+                      <span class="text-gray-500">Updated:</span>
+                      <span class="ml-1.5 text-gray-700">{{ formatDate(pushStatus()!.updatedAt!) }}</span>
+                    </div>
+                  }
+                  @if (pushStatus()!.updatedBy) {
+                    <div>
+                      <span class="text-gray-500">by</span>
+                      <span class="ml-1 text-gray-700">{{ pushStatus()!.updatedBy }}</span>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+
+            <div class="px-6 py-5">
+              @if (pushSaveSuccess()) {
+                <div class="mb-4 flex items-center gap-2 rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-700">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                  </svg>
+                  {{ pushSaveSuccess() }}
+                </div>
+              }
+              @if (pushSaveError()) {
+                <div class="mb-4 flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                  </svg>
+                  {{ pushSaveError() }}
+                </div>
+              }
+
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700">VAPID Public Key</label>
+                  <input type="text" [ngModel]="pushPublicKey()" (ngModelChange)="pushPublicKey.set($event)"
+                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                    placeholder="BGo..." autocomplete="off" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700">VAPID Private Key</label>
+                  <input type="password" [ngModel]="pushPrivateKey()" (ngModelChange)="pushPrivateKey.set($event)"
+                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                    [placeholder]="pushStatus()?.configured ? 'Enter new private key to update' : 'Enter VAPID private key'"
+                    autocomplete="new-password" />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700">VAPID Subject</label>
+                  <input type="text" [ngModel]="pushSubject()" (ngModelChange)="pushSubject.set($event)"
+                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                    placeholder="mailto:support@fueld.app" />
+                </div>
+              </div>
+
+              <div class="mt-5 flex items-center gap-3">
+                <button (click)="savePushCredentials()" [disabled]="pushSaving()"
+                  class="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-amber-700 disabled:opacity-50 transition-colors">
+                  @if (pushSaving()) {
+                    <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                    Saving…
+                  } @else {
+                    Save Push Settings
+                  }
+                </button>
+                <span class="text-xs text-gray-400">Keys are stored encrypted.</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ════════════════════════════════════════════════════════ -->
           <!--  QuickBooks Card                                       -->
           <!-- ════════════════════════════════════════════════════════ -->
           <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
@@ -542,10 +654,19 @@ export class IntegrationsPageComponent implements OnInit {
   readonly smtpTestSuccess = signal('');
   readonly smtpTestError = signal('');
 
+  // ── Web Push (VAPID) ─────────────────────────────────────────────
+  readonly pushPublicKey = signal('');
+  readonly pushPrivateKey = signal('');
+  readonly pushSubject = signal('mailto:support@fueld.app');
+  readonly pushSaving = signal(false);
+  readonly pushSaveSuccess = signal('');
+  readonly pushSaveError = signal('');
+
   // ── Computed status helpers ────────────────────────────────────────
   lliStatus = () => this.integrations().find((i) => i.provider.toUpperCase() === 'LLI') ?? null;
   qbStatus = () => this.integrations().find((i) => i.provider.toUpperCase() === 'QUICKBOOKS') ?? null;
   smtpStatus = () => this.integrations().find((i) => i.provider.toUpperCase() === 'SMTP') ?? null;
+  pushStatus = () => this.integrations().find((i) => i.provider.toUpperCase() === 'PUSH') ?? null;
 
   ngOnInit(): void {
     // Check for QB OAuth callback query params
@@ -584,6 +705,10 @@ export class IntegrationsPageComponent implements OnInit {
         if (smtp?.smtpUser) this.smtpUser.set(smtp.smtpUser);
         if (smtp?.smtpFrom) this.smtpFrom.set(smtp.smtpFrom);
         if (typeof smtp?.smtpSecure === 'boolean') this.smtpSecure.set(smtp.smtpSecure);
+
+        const push = res.data.find((i) => i.provider.toUpperCase() === 'PUSH');
+        if (push?.pushPublicKey) this.pushPublicKey.set(push.pushPublicKey);
+        if (push?.pushSubject) this.pushSubject.set(push.pushSubject);
       }
     } catch (err) {
       console.error('Failed to load integrations:', err);
@@ -781,6 +906,45 @@ export class IntegrationsPageComponent implements OnInit {
       this.smtpTestError.set(msg);
     } finally {
       this.smtpTestSending.set(false);
+    }
+  }
+
+  // ── Web Push (VAPID) ─────────────────────────────────────────────
+
+  async savePushCredentials(): Promise<void> {
+    const publicKey = this.pushPublicKey().trim();
+    const privateKey = this.pushPrivateKey().trim();
+    const subject = this.pushSubject().trim();
+
+    if (!publicKey) { this.pushSaveError.set('VAPID public key is required.'); return; }
+    if (!privateKey) { this.pushSaveError.set('VAPID private key is required.'); return; }
+    if (!subject) { this.pushSaveError.set('VAPID subject is required.'); return; }
+
+    this.pushSaving.set(true);
+    this.pushSaveSuccess.set('');
+    this.pushSaveError.set('');
+
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<{ saved: boolean }>>(`${API}/admin/settings/integrations/push`, {
+          publicKey,
+          privateKey,
+          subject,
+        }),
+      );
+
+      if (res.success) {
+        this.pushSaveSuccess.set('Push notification keys saved successfully.');
+        this.pushPrivateKey.set('');
+        await this.loadIntegrations();
+      } else {
+        this.pushSaveError.set(res.message ?? 'Failed to save push credentials.');
+      }
+    } catch (err: any) {
+      const msg = err?.error?.message ?? err?.message ?? 'Failed to save push credentials.';
+      this.pushSaveError.set(msg);
+    } finally {
+      this.pushSaving.set(false);
     }
   }
 

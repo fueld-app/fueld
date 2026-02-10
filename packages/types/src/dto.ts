@@ -902,6 +902,10 @@ export interface IntegrationStatusDto {
   realmId?: string | null;
   companyName?: string | null;
   tokenExpiresAt?: string | null;
+
+  // Push-specific (optional)
+  pushPublicKey?: string | null;
+  pushSubject?: string | null;
 }
 
 export interface SetIntegrationCredentialsDto {
