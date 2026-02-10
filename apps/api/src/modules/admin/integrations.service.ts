@@ -18,6 +18,33 @@ async function getTenantId(): Promise<string> {
   return tenant.id;
 }
 
+async function getProviderRows(provider: string) {
+  const tenantId = await getTenantId();
+  return db
+    .select({
+      provider: integrationCredentials.provider,
+      key: integrationCredentials.key,
+      encryptedValue: integrationCredentials.encryptedValue,
+      iv: integrationCredentials.iv,
+      authTag: integrationCredentials.authTag,
+      updatedAt: integrationCredentials.updatedAt,
+      updatedBy: integrationCredentials.updatedBy,
+    })
+    .from(integrationCredentials)
+    .where(and(
+      eq(integrationCredentials.tenantId, tenantId),
+      eq(integrationCredentials.provider, provider),
+    ));
+}
+
+function decodeRows(rows: Array<{ key: string; encryptedValue: string; iv: string; authTag: string }>) {
+  const map = new Map<string, string>();
+  for (const row of rows) {
+    map.set(row.key, decrypt(row.encryptedValue, row.iv, row.authTag));
+  }
+  return map;
+}
+
 // ─── Read ────────────────────────────────────────────────────────────
 
 /**
@@ -85,6 +112,52 @@ export async function getIntegrationStatus(): Promise<IntegrationStatusDto[]> {
     });
   }
 
+  // SMTP provider
+  const smtpRows = providers.get('SMTP');
+  if (smtpRows?.length) {
+    const values = decodeRows(smtpRows);
+    const host = values.get('host') ?? null;
+    const port = values.get('port') ? Number(values.get('port')) : null;
+    const user = values.get('user') ?? null;
+    const from = values.get('from') ?? null;
+    const secure = values.get('secure') === 'true';
+    const configured = !!(host && user && from && values.get('pass'));
+
+    let updatedBy: string | null = null;
+    const updaterId = smtpRows[0]?.updatedBy;
+    if (updaterId) {
+      const userRow = await db.query.users.findFirst({ where: eq(users.id, updaterId) });
+      updatedBy = userRow?.email ?? null;
+    }
+
+    results.push({
+      provider: 'SMTP',
+      configured,
+      username: user,
+      updatedAt: smtpRows[0]?.updatedAt?.toISOString() ?? null,
+      updatedBy,
+      smtpHost: host,
+      smtpPort: port,
+      smtpUser: user,
+      smtpFrom: from,
+      smtpSecure: secure,
+    });
+  } else {
+    const envConfigured = !!(process.env['SMTP_HOST'] && process.env['SMTP_USER'] && process.env['SMTP_PASS'] && process.env['SMTP_FROM']);
+    results.push({
+      provider: 'SMTP',
+      configured: envConfigured,
+      username: envConfigured ? process.env['SMTP_USER']! : null,
+      updatedAt: null,
+      updatedBy: envConfigured ? '(environment variable)' : null,
+      smtpHost: envConfigured ? process.env['SMTP_HOST']! : null,
+      smtpPort: envConfigured ? Number(process.env['SMTP_PORT'] ?? '587') : null,
+      smtpUser: envConfigured ? process.env['SMTP_USER']! : null,
+      smtpFrom: envConfigured ? process.env['SMTP_FROM']! : null,
+      smtpSecure: String(process.env['SMTP_SECURE'] ?? 'false') === 'true',
+    });
+  }
+
   // QuickBooks provider
   try {
     const qbStatus = await getQuickBooksStatus();
@@ -105,6 +178,64 @@ export async function getIntegrationStatus(): Promise<IntegrationStatusDto[]> {
   }
 
   return results;
+}
+
+export async function setSmtpCredentials(
+  host: string,
+  port: number,
+  user: string,
+  pass: string,
+  from: string,
+  secure: boolean,
+  userId: string,
+): Promise<void> {
+  const tenantId = await getTenantId();
+  const now = new Date();
+
+  const values: Record<string, string> = {
+    host,
+    port: String(port),
+    user,
+    pass,
+    from,
+    secure: secure ? 'true' : 'false',
+  };
+
+  for (const [key, rawValue] of Object.entries(values)) {
+    const enc = encrypt(rawValue);
+    const existing = await db
+      .select({ id: integrationCredentials.id })
+      .from(integrationCredentials)
+      .where(and(
+        eq(integrationCredentials.tenantId, tenantId),
+        eq(integrationCredentials.provider, 'SMTP'),
+        eq(integrationCredentials.key, key),
+      ))
+      .limit(1);
+
+    if (existing.length) {
+      await db
+        .update(integrationCredentials)
+        .set({
+          encryptedValue: enc.encrypted,
+          iv: enc.iv,
+          authTag: enc.authTag,
+          updatedBy: userId,
+          updatedAt: now,
+        })
+        .where(eq(integrationCredentials.id, existing[0].id));
+    } else {
+      await db.insert(integrationCredentials).values({
+        tenantId,
+        provider: 'SMTP',
+        key,
+        encryptedValue: enc.encrypted,
+        iv: enc.iv,
+        authTag: enc.authTag,
+        updatedBy: userId,
+      });
+    }
+  }
 }
 
 // ─── Write ───────────────────────────────────────────────────────────

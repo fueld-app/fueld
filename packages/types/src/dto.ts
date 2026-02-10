@@ -890,6 +890,13 @@ export interface IntegrationStatusDto {
   updatedAt: string | null;
   updatedBy: string | null;      // user email
 
+  // SMTP-specific (optional)
+  smtpHost?: string | null;
+  smtpPort?: number | null;
+  smtpUser?: string | null;
+  smtpFrom?: string | null;
+  smtpSecure?: boolean;
+
   // QuickBooks-specific (optional, only present for QB provider)
   connectionType?: 'online' | 'desktop' | null;
   realmId?: string | null;

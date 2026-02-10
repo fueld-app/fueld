@@ -1,4 +1,8 @@
 import nodemailer from 'nodemailer';
+import { and, eq } from 'drizzle-orm';
+import { db } from '../db';
+import { integrationCredentials } from '../db/schema';
+import { decrypt } from './crypto';
 
 type InviteEmailPayload = {
   to: string;
@@ -7,7 +11,16 @@ type InviteEmailPayload = {
   role: string;
 };
 
-function getSmtpConfig() {
+type SmtpConfig = {
+  host: string;
+  port: number;
+  user: string;
+  pass: string;
+  from: string;
+  secure: boolean;
+};
+
+function getSmtpConfigFromEnv(): SmtpConfig | null {
   const host = process.env['SMTP_HOST'];
   const port = Number(process.env['SMTP_PORT'] ?? '587');
   const user = process.env['SMTP_USER'];
@@ -20,8 +33,51 @@ function getSmtpConfig() {
   return { host, port, user, pass, from, secure };
 }
 
-function getTransporter() {
-  const cfg = getSmtpConfig();
+async function getSmtpConfigFromDb(): Promise<SmtpConfig | null> {
+  try {
+    const rows = await db
+      .select({
+        key: integrationCredentials.key,
+        encryptedValue: integrationCredentials.encryptedValue,
+        iv: integrationCredentials.iv,
+        authTag: integrationCredentials.authTag,
+      })
+      .from(integrationCredentials)
+      .where(and(
+        eq(integrationCredentials.provider, 'SMTP'),
+      ));
+
+    if (!rows.length) return null;
+
+    const values = new Map<string, string>();
+    for (const row of rows) {
+      values.set(row.key, decrypt(row.encryptedValue, row.iv, row.authTag));
+    }
+
+    const host = values.get('host');
+    const port = Number(values.get('port') ?? '587');
+    const user = values.get('user');
+    const pass = values.get('pass');
+    const from = values.get('from');
+    const secure = (values.get('secure') ?? 'false') === 'true';
+
+    if (!host || !user || !pass || !from) return null;
+
+    return { host, port, user, pass, from, secure };
+  } catch (err: any) {
+    console.warn('[Email] Failed to load SMTP config from DB:', err?.message ?? err);
+    return null;
+  }
+}
+
+async function getSmtpConfig(): Promise<SmtpConfig | null> {
+  const dbCfg = await getSmtpConfigFromDb();
+  if (dbCfg) return dbCfg;
+  return getSmtpConfigFromEnv();
+}
+
+async function getTransporter() {
+  const cfg = await getSmtpConfig();
   if (!cfg) return null;
 
   return nodemailer.createTransport({
@@ -36,13 +92,13 @@ function getTransporter() {
 }
 
 export async function sendInviteEmail(payload: InviteEmailPayload): Promise<boolean> {
-  const cfg = getSmtpConfig();
+  const cfg = await getSmtpConfig();
   if (!cfg) {
     console.warn('[Email] SMTP not configured, invite email skipped');
     return false;
   }
 
-  const transporter = getTransporter();
+  const transporter = await getTransporter();
   if (!transporter) return false;
 
   const subject = 'You have been invited to Fueld';
@@ -80,13 +136,13 @@ export async function sendInviteEmail(payload: InviteEmailPayload): Promise<bool
 }
 
 export async function sendTestEmail(to: string): Promise<boolean> {
-  const cfg = getSmtpConfig();
+  const cfg = await getSmtpConfig();
   if (!cfg) {
     console.warn('[Email] SMTP not configured, test email skipped');
     return false;
   }
 
-  const transporter = getTransporter();
+  const transporter = await getTransporter();
   if (!transporter) return false;
 
   const subject = 'Fueld SMTP test';

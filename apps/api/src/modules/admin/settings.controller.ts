@@ -32,6 +32,7 @@ import {
 import {
   getIntegrationStatus,
   setLLICredentials,
+  setSmtpCredentials,
 } from './integrations.service';
 import {
   generateAuthUrl,
@@ -315,6 +316,35 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   }, {
     body: t.Object({ username: t.String(), password: t.String() }),
     detail: { tags: ['Admin Settings'], summary: 'Set & verify LLI / Seasearcher credentials' },
+  })
+
+  .put('/integrations/smtp', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      await setSmtpCredentials(
+        body.host,
+        body.port,
+        body.user,
+        body.pass,
+        body.from,
+        body.secure,
+        auth.sub,
+      );
+      return { success: true, data: { saved: true } } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      host: t.String(),
+      port: t.Number(),
+      user: t.String(),
+      pass: t.String(),
+      from: t.String(),
+      secure: t.Boolean(),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Set SMTP credentials for invite emails' },
   })
 
   // ═══════════════════════════════════════════════════════════════════
