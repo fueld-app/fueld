@@ -1,6 +1,9 @@
 import {
   Component,
   ChangeDetectionStrategy,
+  OnDestroy,
+  OnInit,
+  inject,
   input,
   output,
   signal,
@@ -11,15 +14,17 @@ import {
 import { FormsModule } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
 import { ProductType, PaymentTerms } from '@fueld/types';
+import { Subscription } from 'rxjs';
 import {
   SearchableDropdownComponent,
   type DropdownOption,
 } from '../../../../shared/components/searchable-dropdown/searchable-dropdown.component';
+import { WebSocketService } from '../../../../core/websocket/websocket.service';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Order Items Grid — Desktop table / Mobile card layout
 //
-//  Uses linkedSignal for live Profit = (Sell - Cost) * Qty calculation
+//  Uses linkedSignal for live profit calculation with FX conversion
 // ═══════════════════════════════════════════════════════════════════════
 
 /** Local mutable model for an order item row. */
@@ -32,7 +37,9 @@ export interface OrderItemRow {
   quantityMax: number | null;
   unit: string;
   costPrice: number;
+  costCurrency: string;
   salesPrice: number;
+  salesCurrency: string;
   profit: number;
   paymentTerms: string;
 }
@@ -76,9 +83,9 @@ export interface OrderItemRow {
             <th class="px-4 py-3 text-left font-medium text-gray-600 min-w-[160px]">Supplier</th>
             <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Qty</th>
             <th class="px-4 py-3 text-left font-medium text-gray-600 w-16">Unit</th>
-            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[110px]">Cost ({{ currency() }})</th>
-            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[110px]">Sell ({{ currency() }})</th>
-            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Profit ({{ currency() }})</th>
+            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[140px]">Cost</th>
+            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[140px]">Sell</th>
+            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Profit ({{ baseCurrency }})</th>
             @if (!readonly()) {
               <th class="px-4 py-3 w-12"></th>
             }
@@ -191,40 +198,64 @@ export interface OrderItemRow {
               <!-- Cost -->
               <td class="px-4 py-2">
                 @if (readonly()) {
-                  <span class="block text-right tabular-nums">{{ row.costPrice | number:'1.2-4' }}</span>
+                  <span class="block text-right tabular-nums">{{ row.costCurrency }} {{ row.costPrice | number:'1.2-4' }}</span>
                 } @else {
-                  <input
-                    type="number" step="0.01" min="0"
-                    [ngModel]="row.costPrice"
-                    (ngModelChange)="updateField(i, 'costPrice', $event)"
-                    class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-right text-sm tabular-nums
-                           focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                  />
+                  <div class="flex items-center gap-2">
+                    <input
+                      type="number" step="0.01" min="0"
+                      [ngModel]="row.costPrice"
+                      (ngModelChange)="updateField(i, 'costPrice', $event)"
+                      class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-right text-sm tabular-nums
+                             focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                    />
+                    <select
+                      [ngModel]="row.costCurrency"
+                      (ngModelChange)="updateField(i, 'costCurrency', $event)"
+                      class="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-700
+                             focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                    >
+                      @for (c of currencyOptions; track c.value) {
+                        <option [value]="c.value">{{ c.label }}</option>
+                      }
+                    </select>
+                  </div>
                 }
               </td>
 
               <!-- Sell -->
               <td class="px-4 py-2">
                 @if (readonly()) {
-                  <span class="block text-right tabular-nums">{{ row.salesPrice | number:'1.2-4' }}</span>
+                  <span class="block text-right tabular-nums">{{ row.salesCurrency }} {{ row.salesPrice | number:'1.2-4' }}</span>
                 } @else {
-                  <input
-                    type="number" step="0.01" min="0"
-                    [ngModel]="row.salesPrice"
-                    (ngModelChange)="updateField(i, 'salesPrice', $event)"
-                    class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-right text-sm tabular-nums
-                           focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                  />
+                  <div class="flex items-center gap-2">
+                    <input
+                      type="number" step="0.01" min="0"
+                      [ngModel]="row.salesPrice"
+                      (ngModelChange)="updateField(i, 'salesPrice', $event)"
+                      class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-right text-sm tabular-nums
+                             focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                    />
+                    <select
+                      [ngModel]="row.salesCurrency"
+                      (ngModelChange)="updateField(i, 'salesCurrency', $event)"
+                      class="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-700
+                             focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                    >
+                      @for (c of currencyOptions; track c.value) {
+                        <option [value]="c.value">{{ c.label }}</option>
+                      }
+                    </select>
+                  </div>
                 }
               </td>
 
               <!-- Profit (auto-calculated) -->
               <td class="px-4 py-3 text-right tabular-nums"
-                [class.text-green-600]="row.profit > 0"
-                [class.text-red-600]="row.profit < 0"
-                [class.font-semibold]="row.profit !== 0"
+                [class.text-green-600]="profitForRow(row) > 0"
+                [class.text-red-600]="profitForRow(row) < 0"
+                [class.font-semibold]="profitForRow(row) !== 0"
               >
-                {{ row.profit | number:'1.2-2' }}
+                {{ profitForRow(row) | number:'1.2-2' }}
               </td>
 
               <!-- Delete -->
@@ -265,13 +296,13 @@ export interface OrderItemRow {
               <td [attr.colspan]="3" class="px-4 py-3 text-right text-gray-600">Totals</td>
               <td class="px-4 py-3 text-right tabular-nums text-gray-900">{{ totalQty() | number:'1.3-3' }}</td>
               <td></td>
-              <td class="px-4 py-3 text-right tabular-nums text-gray-600">{{ totalCost() | number:'1.2-2' }}</td>
-              <td class="px-4 py-3 text-right tabular-nums text-gray-600">{{ totalRevenue() | number:'1.2-2' }}</td>
+              <td class="px-4 py-3 text-right tabular-nums text-gray-600">{{ totalCost() | number:'1.2-2' }} {{ baseCurrency }}</td>
+              <td class="px-4 py-3 text-right tabular-nums text-gray-600">{{ totalRevenue() | number:'1.2-2' }} {{ baseCurrency }}</td>
               <td class="px-4 py-3 text-right tabular-nums"
                 [class.text-green-600]="totalProfit() > 0"
                 [class.text-red-600]="totalProfit() < 0"
               >
-                {{ totalProfit() | number:'1.2-2' }}
+                {{ totalProfit() | number:'1.2-2' }} {{ baseCurrency }}
               </td>
               @if (!readonly()) { <td></td> }
             </tr>
@@ -408,43 +439,67 @@ export interface OrderItemRow {
 
             <!-- Cost -->
             <div>
-              <label class="mb-1 block text-xs font-medium text-gray-500">Cost ({{ currency() }})</label>
+              <label class="mb-1 block text-xs font-medium text-gray-500">Cost</label>
               @if (readonly()) {
-                <span class="text-sm tabular-nums">{{ row.costPrice | number:'1.2-4' }}</span>
+                <span class="text-sm tabular-nums">{{ row.costCurrency }} {{ row.costPrice | number:'1.2-4' }}</span>
               } @else {
-                <input type="number" step="0.01" min="0"
-                  [ngModel]="row.costPrice"
-                  (ngModelChange)="updateField(i, 'costPrice', $event)"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
-                         focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                />
+                <div class="flex items-center gap-2">
+                  <input type="number" step="0.01" min="0"
+                    [ngModel]="row.costPrice"
+                    (ngModelChange)="updateField(i, 'costPrice', $event)"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
+                           focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  />
+                  <select
+                    [ngModel]="row.costCurrency"
+                    (ngModelChange)="updateField(i, 'costCurrency', $event)"
+                    class="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-700
+                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                  >
+                    @for (c of currencyOptions; track c.value) {
+                      <option [value]="c.value">{{ c.label }}</option>
+                    }
+                  </select>
+                </div>
               }
             </div>
 
             <!-- Sell -->
             <div>
-              <label class="mb-1 block text-xs font-medium text-gray-500">Sell ({{ currency() }})</label>
+              <label class="mb-1 block text-xs font-medium text-gray-500">Sell</label>
               @if (readonly()) {
-                <span class="text-sm tabular-nums">{{ row.salesPrice | number:'1.2-4' }}</span>
+                <span class="text-sm tabular-nums">{{ row.salesCurrency }} {{ row.salesPrice | number:'1.2-4' }}</span>
               } @else {
-                <input type="number" step="0.01" min="0"
-                  [ngModel]="row.salesPrice"
-                  (ngModelChange)="updateField(i, 'salesPrice', $event)"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
-                         focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                />
+                <div class="flex items-center gap-2">
+                  <input type="number" step="0.01" min="0"
+                    [ngModel]="row.salesPrice"
+                    (ngModelChange)="updateField(i, 'salesPrice', $event)"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
+                           focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  />
+                  <select
+                    [ngModel]="row.salesCurrency"
+                    (ngModelChange)="updateField(i, 'salesCurrency', $event)"
+                    class="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-700
+                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                  >
+                    @for (c of currencyOptions; track c.value) {
+                      <option [value]="c.value">{{ c.label }}</option>
+                    }
+                  </select>
+                </div>
               }
             </div>
 
             <!-- Profit -->
             <div>
-              <label class="mb-1 block text-xs font-medium text-gray-500">Profit ({{ currency() }})</label>
+              <label class="mb-1 block text-xs font-medium text-gray-500">Profit ({{ baseCurrency }})</label>
               <span
                 class="text-sm font-semibold tabular-nums"
-                [class.text-green-600]="row.profit > 0"
-                [class.text-red-600]="row.profit < 0"
+                [class.text-green-600]="profitForRow(row) > 0"
+                [class.text-red-600]="profitForRow(row) < 0"
               >
-                {{ row.profit | number:'1.2-2' }}
+                {{ profitForRow(row) | number:'1.2-2' }}
               </span>
             </div>
           </div>
@@ -470,19 +525,19 @@ export interface OrderItemRow {
               [class.text-green-600]="totalProfit() > 0"
               [class.text-red-600]="totalProfit() < 0"
             >
-              {{ totalProfit() | number:'1.2-2' }} {{ currency() }}
+              {{ totalProfit() | number:'1.2-2' }} {{ baseCurrency }}
             </span>
           </div>
           <div class="mt-1 flex items-center justify-between text-xs text-gray-400">
             <span>{{ rows().length }} item(s) · {{ totalQty() | number:'1.0-0' }} MT</span>
-            <span>Rev {{ totalRevenue() | number:'1.2-2' }}</span>
+            <span>Rev {{ totalRevenue() | number:'1.2-2' }} {{ baseCurrency }}</span>
           </div>
         </div>
       }
     </div>
   `,
 })
-export class OrderItemsComponent {
+export class OrderItemsComponent implements OnInit, OnDestroy {
   /** Items passed in from the order detail page. */
   readonly items = input<OrderItemRow[]>([]);
   readonly suppliers = input<DropdownOption[]>([]);
@@ -492,17 +547,45 @@ export class OrderItemsComponent {
   readonly itemsChange = output<OrderItemRow[]>();
   readonly supplierSearch = output<string>();
 
+  private readonly wsService = inject(WebSocketService);
+  private fxSub: Subscription | null = null;
+  readonly baseCurrency = 'USD';
+  private readonly fxRates = signal<Record<string, number>>({ USD: 1 });
+
+  readonly currencyOptions: DropdownOption[] = [
+    { value: 'USD', label: 'USD' },
+    { value: 'EUR', label: 'EUR' },
+    { value: 'DKK', label: 'DKK' },
+    { value: 'AED', label: 'AED' },
+  ];
+
   /** Internal mutable signal, linked to the input. */
   readonly rows = linkedSignal(() =>
     this.items().map((item) => ({
       ...item,
-      profit: (item.salesPrice - item.costPrice) * item.quantity,
+      costCurrency: item.costCurrency || this.currency(),
+      salesCurrency: item.salesCurrency || this.currency(),
+      profit: this.profitForRow(item),
     })),
   );
 
   /** Track which row IDs have the min-qty spread enabled */
   readonly spreadEnabled = signal<Set<string>>(new Set());
   private spreadInitialized = false;
+
+  ngOnInit(): void {
+    this.fxSub = this.wsService.onRaw('prices').subscribe((msg) => {
+      const data = msg.data as { fxRates?: { base?: string; rates?: Record<string, number> } } | undefined;
+      const rates = data?.fxRates?.rates;
+      if (!rates) return;
+      const base = (data?.fxRates?.base ?? this.baseCurrency).toUpperCase();
+      this.fxRates.set({ ...rates, [base]: 1 });
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.fxSub?.unsubscribe();
+  }
 
   constructor() {
     // Initialize spreadEnabled once from loaded items that already have quantityMin
@@ -545,15 +628,15 @@ export class OrderItemsComponent {
   );
 
   readonly totalCost = computed(() =>
-    this.rows().reduce((s, r) => s + (r.costPrice || 0) * (r.quantity || 0), 0),
+    this.rows().reduce((s, r) => s + this.computeCostBase(r), 0),
   );
 
   readonly totalRevenue = computed(() =>
-    this.rows().reduce((s, r) => s + (r.salesPrice || 0) * (r.quantity || 0), 0),
+    this.rows().reduce((s, r) => s + this.computeRevenueBase(r), 0),
   );
 
   readonly totalProfit = computed(() =>
-    this.rows().reduce((s, r) => s + r.profit, 0),
+    this.rows().reduce((s, r) => s + this.profitForRow(r), 0),
   );
 
   // ─── Actions ─────────────────────────────────────────────────────
@@ -572,7 +655,9 @@ export class OrderItemsComponent {
       quantityMax: null,
       unit: 'MT',
       costPrice: 0,
+      costCurrency: this.currency(),
       salesPrice: 0,
+      salesCurrency: this.currency(),
       profit: 0,
       paymentTerms: '',
     };
@@ -593,7 +678,7 @@ export class OrderItemsComponent {
       (row as Record<string, unknown>)[field] = value;
 
       // Auto-recalculate profit using main quantity
-      row.profit = (row.salesPrice - row.costPrice) * row.quantity;
+      row.profit = this.profitForRow(row);
       updated[index] = row;
       return updated;
     });
@@ -610,7 +695,7 @@ export class OrderItemsComponent {
       if (row.quantityMin !== null && row.quantityMin > value) {
         row.quantityMin = value;
       }
-      row.profit = (row.salesPrice - row.costPrice) * value;
+      row.profit = this.profitForRow(row);
       updated[index] = row;
       return updated;
     });
@@ -627,7 +712,7 @@ export class OrderItemsComponent {
         row.quantity = value;
       }
       // Profit always uses main qty
-      row.profit = (row.salesPrice - row.costPrice) * row.quantity;
+      row.profit = this.profitForRow(row);
       updated[index] = row;
       return updated;
     });
@@ -658,5 +743,25 @@ export class OrderItemsComponent {
 
   private emitChange(): void {
     this.itemsChange.emit(this.rows());
+  }
+
+  private getFxRate(currency: string): number {
+    const code = (currency || this.baseCurrency).toUpperCase();
+    if (code === this.baseCurrency) return 1;
+    return this.fxRates()[code] ?? 1;
+  }
+
+  private computeCostBase(row: OrderItemRow): number {
+    const qty = row.quantity || 0;
+    return (row.costPrice || 0) * qty * this.getFxRate(row.costCurrency);
+  }
+
+  private computeRevenueBase(row: OrderItemRow): number {
+    const qty = row.quantity || 0;
+    return (row.salesPrice || 0) * qty * this.getFxRate(row.salesCurrency);
+  }
+
+  profitForRow(row: OrderItemRow): number {
+    return this.computeRevenueBase(row) - this.computeCostBase(row);
   }
 }

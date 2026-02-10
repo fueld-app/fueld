@@ -10,6 +10,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import type { ApiResponse } from '@fueld/types';
+import { AuthService } from '../../core/auth/auth.service';
 
 import { API } from '@app/core/config/api';
 
@@ -133,6 +134,7 @@ import { API } from '@app/core/config/api';
 })
 export class InviteSignupPageComponent implements OnInit {
   private readonly http = inject(HttpClient);
+  private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
@@ -191,19 +193,12 @@ export class InviteSignupPageComponent implements OnInit {
     this.error.set('');
 
     try {
-      const res = await firstValueFrom(
-        this.http.post<ApiResponse<unknown>>(`${API}/invite/${this.token}/accept`, {
-          password: this.password,
-        }),
-      );
-
-      if (res.success) {
-        this.success.set(true);
-      } else {
-        this.error.set(res.message || 'Failed to create account');
-      }
+      await this.auth.acceptInvite(this.token, this.password);
+      this.success.set(true);
+      await this.router.navigate(['/account/security']);
     } catch (err: any) {
-      this.error.set(err?.error?.message || 'Failed to create account');
+      const msg = err instanceof Error ? err.message : err?.error?.message;
+      this.error.set(msg || 'Failed to create account');
     } finally {
       this.submitting.set(false);
     }

@@ -313,7 +313,9 @@ export class OrderDetailPageComponent implements OnInit {
             quantityMax: item.quantityMax ? parseFloat(item.quantityMax) : null,
             unit: item.unit ?? 'MT',
             costPrice: parseFloat(item.costPrice) || 0,
+            costCurrency: item.costCurrency ?? d.currency ?? 'USD',
             salesPrice: parseFloat(item.salesPrice) || 0,
+            salesCurrency: item.salesCurrency ?? d.currency ?? 'USD',
             profit: parseFloat(item.profit) || 0,
             paymentTerms: item.paymentTerms ?? '',
           })),
@@ -396,7 +398,9 @@ export class OrderDetailPageComponent implements OnInit {
         unit: r.unit,
         supplierId: r.supplierId || null,
         costPrice: r.costPrice ? String(r.costPrice) : null,
+        costCurrency: r.costCurrency ?? o.currency,
         salesPrice: r.salesPrice ? String(r.salesPrice) : null,
+        salesCurrency: r.salesCurrency ?? o.currency,
         paymentTerms: r.paymentTerms || null,
       }));
 

@@ -15,6 +15,13 @@
       "when": 1770828600000,
       "tag": "0001_push_subscriptions",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1771000000000,
+      "tag": "0002_order_item_currencies",
+      "breakpoints": true
     }
   ]
 }

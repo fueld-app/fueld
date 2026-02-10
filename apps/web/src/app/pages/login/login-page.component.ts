@@ -234,6 +234,13 @@ export class LoginPageComponent {
         return;
       }
 
+      if (result.requiresMfaSetup) {
+        await this.router.navigate(['/account/security'], {
+          state: { returnUrl: this.returnUrl },
+        });
+        return;
+      }
+
       await this.router.navigateByUrl(this.returnUrl);
     } catch (err: unknown) {
       const msg =

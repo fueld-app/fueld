@@ -84,6 +84,14 @@ export interface InvitationDto {
   createdAt: string;
 }
 
+/** Response when accepting an invitation. */
+export interface InviteAcceptResponseDto {
+  user: UserDto;
+  accessToken: string;
+  refreshToken: string;
+  requiresMfaSetup?: boolean;
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  TENANT
 // ═══════════════════════════════════════════════════════════════════════
@@ -443,7 +451,9 @@ export interface OrderItemDto {
   quantity: string;
   unit: string;
   costPrice: string | null;
+  costCurrency: string;
   salesPrice: string | null;
+  salesCurrency: string;
   profit: string | null;
   paymentTerms: PaymentTerms | null;
 }
@@ -454,7 +464,9 @@ export interface CreateOrderItemDto {
   unit?: string;
   supplierId?: string;
   costPrice?: string;
+  costCurrency?: string;
   salesPrice?: string;
+  salesCurrency?: string;
   paymentTerms?: PaymentTerms;
 }
 
@@ -597,6 +609,8 @@ export interface LoginResponseDto {
   user: UserDto;
   accessToken: string;
   refreshToken: string;
+  /** Indicates the user must set up 2FA or passkey before proceeding. */
+  requiresMfaSetup?: boolean;
 }
 
 /** Partial login response (when 2FA IS required). */

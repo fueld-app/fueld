@@ -18,13 +18,38 @@ export interface GeoInfo {
  * Look up geographic info for an IP address.
  * Returns null values for private/loopback/unresolvable IPs.
  */
-export function lookupIp(ip: string | null): GeoInfo {
-  if (!ip) return { country: null, city: null };
+function normalizeIp(input: string): string {
+  let normalized = input.trim();
 
-  let normalized = ip;
   if (normalized.startsWith('::ffff:')) {
     normalized = normalized.slice(7);
   }
+
+  // Strip IPv6 brackets + port, e.g. "[2001:db8::1]:443"
+  if (normalized.startsWith('[')) {
+    const end = normalized.indexOf(']');
+    if (end !== -1) {
+      normalized = normalized.slice(1, end);
+    }
+    return normalized;
+  }
+
+  // Strip port for IPv4, e.g. "203.0.113.5:52314"
+  const lastColon = normalized.lastIndexOf(':');
+  if (lastColon > -1 && normalized.indexOf(':') === lastColon) {
+    const port = normalized.slice(lastColon + 1);
+    if (/^\d+$/.test(port)) {
+      normalized = normalized.slice(0, lastColon);
+    }
+  }
+
+  return normalized;
+}
+
+export function lookupIp(ip: string | null): GeoInfo {
+  if (!ip) return { country: null, city: null };
+
+  const normalized = normalizeIp(ip);
 
   const octets = normalized.split('.').map((o) => Number(o));
   const isPrivateV4 =

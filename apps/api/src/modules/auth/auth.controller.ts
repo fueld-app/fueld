@@ -9,6 +9,7 @@ import {
   clearRefreshToken,
   findUserById,
   findUserByEmail,
+  getAuthEnforcement,
   generate2faSecret,
   enable2fa,
   disable2fa,
@@ -107,6 +108,7 @@ export const authController = new Elysia({ prefix: '/auth' })
             user: sanitiseUser(user),
             accessToken,
             refreshToken,
+            requiresMfaSetup: false,
           },
         } satisfies ApiResponse<unknown>;
       } catch (err) {
@@ -132,7 +134,7 @@ export const authController = new Elysia({ prefix: '/auth' })
     '/login',
     async ({ body, jwtAccess, jwtRefresh }) => {
       try {
-        const { user, requires2fa } = await loginWithPassword(
+        const { user } = await loginWithPassword(
           body.email,
           body.password,
         );
@@ -146,6 +148,12 @@ export const authController = new Elysia({ prefix: '/auth' })
           } satisfies ApiResponse<null>;
         }
 
+        const passkeyConfig = await isPasskeyEnabled();
+        const hasKeys = passkeyConfig.enabled && await userHasPasskeys(user.id);
+        const enforcement = await getAuthEnforcement();
+        const requires2fa = user.is2faEnabled && !hasKeys;
+        const requiresMfaSetup = enforcement.enforce2FA && !user.is2faEnabled && !hasKeys;
+
         // If 2FA is required, return a temporary token (sub only)
         // The client must call /auth/verify-2fa with this token + TOTP code
         if (requires2fa) {
@@ -157,15 +165,12 @@ export const authController = new Elysia({ prefix: '/auth' })
           } satisfies JwtPayload);
 
           // Check if the user has passkeys (so the 2FA page can show "Use Passkey")
-          const hasKeys = await userHasPasskeys(user.id);
-          const passkeyConfig = await isPasskeyEnabled();
-
           return {
             success: true,
             data: {
               requires2fa: true,
               tempToken,
-              hasPasskeys: passkeyConfig.enabled && hasKeys,
+              hasPasskeys: hasKeys,
             },
           } satisfies ApiResponse<unknown>;
         }
@@ -184,6 +189,7 @@ export const authController = new Elysia({ prefix: '/auth' })
             user: sanitiseUser(user),
             accessToken,
             refreshToken,
+            requiresMfaSetup,
           },
         } satisfies ApiResponse<unknown>;
       } catch (err) {
@@ -251,6 +257,7 @@ export const authController = new Elysia({ prefix: '/auth' })
             user: sanitiseUser(user),
             accessToken,
             refreshToken,
+            requiresMfaSetup: false,
           },
         } satisfies ApiResponse<unknown>;
       } catch (err) {
@@ -492,6 +499,7 @@ export const authController = new Elysia({ prefix: '/auth' })
             user: sanitiseUser(user),
             accessToken,
             refreshToken,
+            requiresMfaSetup: false,
           },
         } satisfies ApiResponse<unknown>;
       } catch (err) {

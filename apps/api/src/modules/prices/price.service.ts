@@ -25,11 +25,25 @@ export interface CommodityPrice {
 
 export interface PricesPayload {
   prices: CommodityPrice[];
+  fxRates?: FxRates;
+}
+
+export interface FxRates {
+  base: string;
+  rates: Record<string, number>;
+  updatedAt: string | null;
 }
 
 // ─── Config ──────────────────────────────────────────────────────────
 
 const GASOIL_POLL_INTERVAL_MS = 60_000; // 60 seconds
+const FX_POLL_INTERVAL_MS = 5 * 60_000; // 5 minutes
+const FX_BASE = 'USD';
+const FX_TICKERS: Record<string, string> = {
+  EUR: 'EURUSD=X',
+  DKK: 'DKKUSD=X',
+  AED: 'AEDUSD=X',
+};
 
 const UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -39,6 +53,12 @@ const UA =
 let brentPrice: CommodityPrice | null = null;
 let gasoilPrice: CommodityPrice | null = null;
 let gasoilTimer: ReturnType<typeof setInterval> | null = null;
+let fxTimer: ReturnType<typeof setInterval> | null = null;
+let fxRates: FxRates = {
+  base: FX_BASE,
+  rates: { [FX_BASE]: 1 },
+  updatedAt: null,
+};
 
 // Yahoo WS state
 let yahooWs: WebSocket | null = null;
@@ -249,6 +269,32 @@ async function fetchGasOilYahoo(): Promise<void> {
   }
 }
 
+// ─── FX Rates (Yahoo REST) ───────────────────────────────────────────
+
+async function fetchFxRates(): Promise<void> {
+  const nextRates: Record<string, number> = { [FX_BASE]: 1 };
+  let updated = false;
+
+  await Promise.all(
+    Object.entries(FX_TICKERS).map(async ([currency, ticker]) => {
+      const price = await fetchYahooChart(ticker, `${currency}/${FX_BASE}`);
+      if (price?.price) {
+        nextRates[currency] = price.price;
+        updated = true;
+      }
+    }),
+  );
+
+  if (updated) {
+    fxRates = {
+      base: FX_BASE,
+      rates: nextRates,
+      updatedAt: new Date().toISOString(),
+    };
+    broadcast();
+  }
+}
+
 async function fetchYahooChart(ticker: string, name: string): Promise<CommodityPrice | null> {
   try {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=1d&interval=1d`;
@@ -285,9 +331,9 @@ async function fetchYahooChart(ticker: string, name: string): Promise<CommodityP
 // ─── Broadcast ───────────────────────────────────────────────────────
 
 function broadcast(): void {
-  const prices = getLatestPrices();
-  if (prices.length > 0) {
-    broadcastToAll({ type: 'prices', data: { prices } });
+  const payload = getLatestPricePayload();
+  if (payload.prices.length > 0 || payload.fxRates) {
+    broadcastToAll({ type: 'prices', data: payload });
   }
 }
 
@@ -312,6 +358,10 @@ export function startPricePolling(): void {
   // Gas Oil: Investing.com scrape on interval
   fetchGasOil();
   gasoilTimer = setInterval(fetchGasOil, GASOIL_POLL_INTERVAL_MS);
+
+  // FX rates: Yahoo REST polling
+  fetchFxRates();
+  fxTimer = setInterval(fetchFxRates, FX_POLL_INTERVAL_MS);
 }
 
 /**
@@ -322,4 +372,17 @@ export function getLatestPrices(): CommodityPrice[] {
   if (brentPrice) prices.push(brentPrice);
   if (gasoilPrice) prices.push(gasoilPrice);
   return prices;
+}
+
+export function getLatestPricePayload(): PricesPayload {
+  return {
+    prices: getLatestPrices(),
+    fxRates,
+  };
+}
+
+export function getFxRate(currency: string): number {
+  const code = currency.toUpperCase();
+  if (code === FX_BASE) return 1;
+  return fxRates.rates[code] ?? 1;
 }

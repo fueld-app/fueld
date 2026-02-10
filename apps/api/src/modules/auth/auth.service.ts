@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { db } from '../../db';
-import { users, type NewUser, type User } from '../../db/schema';
+import { users, tenants, type NewUser, type User, type TenantSettings } from '../../db/schema';
 import { hashPassword, verifyPassword } from './password.service';
 import {
   generateTotpSecret,
@@ -35,6 +35,12 @@ export async function findUserByO365Id(o365Id: string): Promise<User | undefined
   return db.query.users.findFirst({
     where: eq(users.o365Id, o365Id),
   });
+}
+
+export async function getAuthEnforcement(): Promise<{ enforce2FA: boolean }> {
+  const tenant = await db.query.tenants.findFirst();
+  const s = (tenant?.settings ?? {}) as TenantSettings;
+  return { enforce2FA: s.enforce2FA ?? false };
 }
 
 // ── Registration ─────────────────────────────────────────────────────

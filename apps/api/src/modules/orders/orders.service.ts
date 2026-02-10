@@ -18,6 +18,7 @@ import {
 } from '../../db/schema';
 import type { TenantSettings } from '../../db/schema';
 import { logActivity } from '../activity/activity.service';
+import { getFxRate } from '../prices/price.service';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -63,7 +64,9 @@ interface SaveItemInput {
   unit?: string;
   supplierId?: string | null;
   costPrice?: string | null;
+  costCurrency?: string | null;
   salesPrice?: string | null;
+  salesCurrency?: string | null;
   paymentTerms?: string | null;
 }
 // ─── Generate next order number ───────────────────────────────────────
@@ -309,7 +312,9 @@ export async function getOrderById(idOrNumber: string) {
       quantityMax: i.quantityMax,
       unit: i.unit,
       costPrice: i.costPrice,
+      costCurrency: i.costCurrency,
       salesPrice: i.salesPrice,
+      salesCurrency: i.salesCurrency,
       profit: i.profit,
       paymentTerms: i.paymentTerms,
     })),
@@ -392,12 +397,25 @@ export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
 
   if (items.length === 0) return [];
 
-  // Insert new items with profit calculation
+  // Look up order currency for defaults
+  const [orderRow] = await db
+    .select({ currency: orders.currency })
+    .from(orders)
+    .where(eq(orders.id, orderId))
+    .limit(1);
+  const orderCurrency = orderRow?.currency ?? 'USD';
+
+  // Insert new items with profit calculation (base currency)
   const values = items.map((item) => {
     const cost = parseFloat(item.costPrice ?? '0') || 0;
     const sale = parseFloat(item.salesPrice ?? '0') || 0;
     const qty = parseFloat(item.quantity) || 0;
-    const profit = (sale - cost) * qty;
+
+    const costCurrency = (item.costCurrency ?? orderCurrency).toUpperCase();
+    const salesCurrency = (item.salesCurrency ?? orderCurrency).toUpperCase();
+    const costRate = getFxRate(costCurrency);
+    const salesRate = getFxRate(salesCurrency);
+    const profit = (sale * salesRate - cost * costRate) * qty;
 
     return {
       orderId,
@@ -408,7 +426,9 @@ export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
       unit: item.unit ?? 'MT',
       supplierId: item.supplierId ?? null,
       costPrice: item.costPrice ?? null,
+      costCurrency,
       salesPrice: item.salesPrice ?? null,
+      salesCurrency,
       profit: profit.toFixed(4),
       paymentTerms: item.paymentTerms as any ?? null,
     };

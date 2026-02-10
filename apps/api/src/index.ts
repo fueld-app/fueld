@@ -33,7 +33,7 @@ import {
 import { getNearbyVessels, getNearbyVesselPositions, syncPlaceFromSeasearcher } from './modules/lloyds/lli.service';
 import { syncVesselFromSeasearcher } from './modules/vessels/vessel.service';
 import { syncCompanyFromSeasearcher } from './modules/companies/company.service';
-import { startPricePolling, getLatestPrices } from './modules/prices/price.service';
+import { startPricePolling, getLatestPricePayload } from './modules/prices/price.service';
 import { jwtAccessPlugin } from './modules/auth/jwt.setup';
 import { db } from './db';
 import { users } from './db/schema';
@@ -226,9 +226,9 @@ const app = new Elysia()
         // the frontend components to set up their subscriptions first
         setTimeout(() => {
           try {
-            const prices = getLatestPrices();
-            if (prices.length > 0) {
-              ws.send(JSON.stringify({ type: 'prices', data: { prices } }));
+            const payload = getLatestPricePayload();
+            if (payload.prices.length > 0 || payload.fxRates) {
+              ws.send(JSON.stringify({ type: 'prices', data: payload }));
             }
           } catch { /* ws may have closed */ }
         }, 500);
@@ -355,9 +355,9 @@ const app = new Elysia()
           }
 
           case 'get-prices': {
-            const prices = getLatestPrices();
-            if (prices.length > 0) {
-              ws.send(JSON.stringify({ type: 'prices', data: { prices } }));
+            const payload = getLatestPricePayload();
+            if (payload.prices.length > 0 || payload.fxRates) {
+              ws.send(JSON.stringify({ type: 'prices', data: payload }));
             }
             break;
           }

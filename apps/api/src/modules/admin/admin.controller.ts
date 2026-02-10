@@ -12,6 +12,7 @@ import {
 import { disconnectUserSessions } from '../activity/session-tracker';
 import type { ApiResponse } from '@fueld/types';
 import { sendInviteEmail, sendTestEmail } from '../../lib/email';
+import { jwtAccessPlugin, jwtRefreshPlugin, type JwtPayload } from '../auth/jwt.setup';
 
 // ─── Admin Controller ────────────────────────────────────────────────
 // All endpoints require ADMIN role.
@@ -22,6 +23,40 @@ function requireAdmin(auth: { role: string } | undefined) {
   if (!auth || auth.role !== 'ADMIN') {
     throw new Error('Admin access required');
   }
+}
+
+function userToPayload(user: { id: string; email: string; name: string; role: string }): JwtPayload {
+  return { sub: user.id, email: user.email, name: user.name, role: user.role };
+}
+
+function sanitiseUser(user: {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  tenantId: string | null;
+  teamId: string | null;
+  is2faEnabled: boolean;
+  isActive: boolean;
+  isOnLeave: boolean;
+  leaveEndDate: string | null;
+  delegateId: string | null;
+  avatarUrl?: string | null;
+}) {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    tenantId: user.tenantId,
+    teamId: user.teamId,
+    is2faEnabled: user.is2faEnabled,
+    isActive: user.isActive,
+    isOnLeave: user.isOnLeave,
+    leaveEndDate: user.leaveEndDate,
+    delegateId: user.delegateId,
+    avatarUrl: user.avatarUrl ?? null,
+  };
 }
 
 export const adminController = new Elysia({ prefix: '/admin' })
@@ -248,6 +283,8 @@ function isValidIpOrCidr(value: string): boolean {
 // This is separate since it doesn't require admin auth.
 
 export const inviteController = new Elysia({ prefix: '/invite' })
+  .use(jwtAccessPlugin)
+  .use(jwtRefreshPlugin)
 
   // ── GET /invite/:token — validate invitation ─────────────────────
   .get('/:token', async ({ params }) => {
@@ -288,26 +325,24 @@ export const inviteController = new Elysia({ prefix: '/invite' })
   })
 
   // ── POST /invite/:token/accept — complete signup ─────────────────
-  .post('/:token/accept', async ({ params, body }) => {
+  .post('/:token/accept', async ({ params, body, jwtAccess, jwtRefresh }) => {
     try {
-      const { jwtAccessPlugin, jwtRefreshPlugin } = await import('../auth/jwt.setup');
       const { storeRefreshToken } = await import('../auth/auth.service');
 
-      // Create a temporary Elysia instance to get JWT signing
-      // Instead, we'll handle this directly
       const user = await acceptInvitation(params.token, body.password);
+
+      const payload = userToPayload(user);
+      const accessToken = await jwtAccess.sign(payload);
+      const refreshToken = await jwtRefresh.sign(payload);
+      await storeRefreshToken(user.id, refreshToken);
 
       return {
         success: true,
         data: {
-          user: {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            role: user.role,
-            is2faEnabled: user.is2faEnabled,
-          },
-          message: 'Account created successfully. Please log in.',
+          user: sanitiseUser(user),
+          accessToken,
+          refreshToken,
+          requiresMfaSetup: true,
         },
       } satisfies ApiResponse<unknown>;
     } catch (err) {

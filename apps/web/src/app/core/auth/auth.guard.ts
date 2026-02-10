@@ -16,10 +16,8 @@ export const authGuard: CanActivateFn = (route, state) => {
     });
   }
 
-  // Enforce mandatory 2FA — redirect to setup if not enabled
-  // (skip check if already navigating to the security page)
-  const user = authService.user();
-  if (user && !user.is2faEnabled && !state.url.startsWith('/account/security')) {
+  // Enforce MFA setup when required (skip check on the setup page itself)
+  if (authService.mfaSetupRequired() && !state.url.startsWith('/account/security')) {
     return router.createUrlTree(['/account/security']);
   }
 

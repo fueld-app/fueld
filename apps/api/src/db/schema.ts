@@ -424,7 +424,9 @@ export const orderItems = pgTable('order_items', {
   unit: text('unit').notNull().default('MT'),
 
   costPrice: numeric('cost_price', { precision: 12, scale: 4 }),
+  costCurrency: text('cost_currency').notNull().default('USD'),
   salesPrice: numeric('sales_price', { precision: 12, scale: 4 }),
+  salesCurrency: text('sales_currency').notNull().default('USD'),
   profit: numeric('profit', { precision: 12, scale: 4 }),
 
   paymentTerms: paymentTermsEnum('payment_terms'),

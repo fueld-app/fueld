@@ -10,6 +10,7 @@ import type {
   RegisterResponseDto,
   TwoFactorSetupDto,
   PasskeyDto,
+  InviteAcceptResponseDto,
   ApiResponse,
 } from '@fueld/types';
 import { firstValueFrom } from 'rxjs';
@@ -24,6 +25,7 @@ import { API_URL } from '@app/core/config/api';
 const ACCESS_TOKEN_KEY = 'fueld_access_token';
 const REFRESH_TOKEN_KEY = 'fueld_refresh_token';
 const USER_KEY = 'fueld_user';
+const MFA_SETUP_REQUIRED_KEY = 'fueld_mfa_setup_required';
 
 /** Refresh the access token 2 minutes before it expires (15m TTL → refresh at 13m). */
 const REFRESH_INTERVAL_MS = 13 * 60 * 1000;
@@ -49,6 +51,9 @@ function friendlyWebAuthnError(err: unknown, action: string): Error {
 export class AuthService {
   /** Current user signal (null when logged out). */
   readonly user = signal<UserDto | null>(this.loadUser());
+
+  /** Whether the user must complete MFA setup before accessing the app. */
+  readonly mfaSetupRequired = signal(this.loadMfaSetupRequired());
 
   /** Computed convenience signals. */
   readonly isAuthenticated = computed(() => !!this.user());
@@ -87,6 +92,9 @@ export class AuthService {
       localStorage.removeItem(USER_KEY);
       localStorage.removeItem(ACCESS_TOKEN_KEY);
       this.user.set(null);
+      this.setMfaSetupRequired(false);
+    } else if (!this.isAuthenticated()) {
+      this.setMfaSetupRequired(false);
     }
   }
 
@@ -130,6 +138,11 @@ export class AuthService {
     localStorage.setItem(USER_KEY, JSON.stringify(user));
   }
 
+  private setMfaSetupRequired(value: boolean): void {
+    this.mfaSetupRequired.set(value);
+    localStorage.setItem(MFA_SETUP_REQUIRED_KEY, value ? '1' : '0');
+  }
+
   private loadUser(): UserDto | null {
     try {
       const raw = localStorage.getItem(USER_KEY);
@@ -137,6 +150,10 @@ export class AuthService {
     } catch {
       return null;
     }
+  }
+
+  private loadMfaSetupRequired(): boolean {
+    return localStorage.getItem(MFA_SETUP_REQUIRED_KEY) === '1';
   }
 
   // ─── Proactive refresh timer ─────────────────────────────────────
@@ -176,6 +193,9 @@ export class AuthService {
     if (!data.requires2fa) {
       this.setTokens(data);
       this.setUser(data.user);
+      this.setMfaSetupRequired(!!data.requiresMfaSetup);
+    } else {
+      this.setMfaSetupRequired(false);
     }
 
     return data;
@@ -195,6 +215,24 @@ export class AuthService {
     return res.data;
   }
 
+  async acceptInvite(token: string, password: string): Promise<InviteAcceptResponseDto> {
+    const res = await firstValueFrom(
+      this.http.post<ApiResponse<InviteAcceptResponseDto>>(
+        `${API_URL}/invite/${token}/accept`,
+        { password },
+      ),
+    );
+
+    if (!res.success || !res.data) {
+      throw new Error(res.message ?? 'Failed to accept invitation');
+    }
+
+    this.setTokens(res.data);
+    this.setUser(res.data.user);
+    this.setMfaSetupRequired(!!res.data.requiresMfaSetup);
+    return res.data;
+  }
+
   async verify2fa(tempToken: string, code: string): Promise<LoginResponseDto> {
     const res = await firstValueFrom(
       this.http.post<ApiResponse<LoginResponseDto>>(`${API_URL}/auth/verify-2fa`, {
@@ -210,6 +248,7 @@ export class AuthService {
     const data = res.data as LoginResponseDto;
     this.setTokens(data);
     this.setUser(data.user);
+    this.setMfaSetupRequired(!!data.requiresMfaSetup);
     return data;
   }
 
@@ -288,6 +327,7 @@ export class AuthService {
     if (currentUser) {
       this.setUser({ ...currentUser, is2faEnabled: true });
     }
+    this.setMfaSetupRequired(false);
   }
 
   /** Verify a TOTP code and disable 2FA on the account. */
@@ -355,6 +395,7 @@ export class AuthService {
     const data = res.data as LoginResponseDto;
     this.setTokens(data);
     this.setUser(data.user);
+    this.setMfaSetupRequired(false);
     return data;
   }
 
@@ -395,6 +436,7 @@ export class AuthService {
     const data = res.data as LoginResponseDto;
     this.setTokens(data);
     this.setUser(data.user);
+    this.setMfaSetupRequired(false);
     return data;
   }
 
@@ -448,6 +490,7 @@ export class AuthService {
       ),
     );
     if (!res.success || !res.data) throw new Error(res.message ?? 'Failed to register passkey');
+    this.setMfaSetupRequired(false);
     return res.data;
   }
 
@@ -488,7 +531,9 @@ export class AuthService {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    localStorage.removeItem(MFA_SETUP_REQUIRED_KEY);
     this.user.set(null);
+    this.mfaSetupRequired.set(false);
     this.router.navigate(['/login']);
   }
 }
