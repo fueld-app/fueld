@@ -48,12 +48,59 @@ let yahooReconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
 // ─── Yahoo Finance WebSocket (Brent Oil) ─────────────────────────────
 
+const YAHOO_PROTO_FALLBACK = `syntax = "proto3";
+
+package yahoo.finance;
+
+message PricingData {
+  string id = 1;
+  float price = 2;
+  sint64 time = 3;
+  string currency = 4;
+  string exchange = 5;
+  int32 quoteType = 6;
+  int32 marketHours = 7;
+  float changePercent = 8;
+  sint64 dayVolume = 9;
+  float dayHigh = 10;
+  float dayLow = 11;
+  float change = 12;
+  string shortName = 13;
+  sint64 expireDate = 14;
+  float openPrice = 15;
+  float previousClose = 16;
+  string strikePrice = 17;
+  string underlyingSymbol = 18;
+  sint64 openInterest = 19;
+  string optionsType = 20;
+  sint64 miniOption = 21;
+  sint64 lastSize = 22;
+  float bid = 23;
+  float bidSize = 24;
+  float ask = 25;
+  float askSize = 26;
+  sint64 priceHint = 27;
+  sint64 vol_24hr = 28;
+  sint64 volAllCurrencies = 29;
+  string fromCurrency = 30;
+  string lastMarket = 31;
+  double circulatingSupply = 32;
+  double marketcap = 33;
+}
+`;
+
 async function initYahooWs(): Promise<void> {
   try {
     const protoPath = path.resolve(
       import.meta.dir, '..', '..', '..', 'yahoo_finance.proto',
     );
-    const protoText = await Bun.file(protoPath).text();
+    let protoText: string;
+    try {
+      protoText = await Bun.file(protoPath).text();
+    } catch {
+      console.warn('[Prices] Proto file not found, using embedded schema');
+      protoText = YAHOO_PROTO_FALLBACK;
+    }
     const root = protobuf.parse(protoText).root;
     PricingData = root.lookupType('yahoo.finance.PricingData');
     console.log('[Prices] Protobuf schema loaded');
