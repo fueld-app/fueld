@@ -5,7 +5,9 @@
 //  to resolve IPv4/IPv6 addresses to country, city, and region.
 // ═══════════════════════════════════════════════════════════════════════
 
-import geoip from 'geoip-lite';
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
 
 export interface GeoInfo {
   country: string | null;
@@ -25,6 +27,7 @@ export function lookupIp(ip: string | null): GeoInfo {
   }
 
   try {
+    const geoip = require('geoip-lite');
     const result = geoip.lookup(ip);
     if (!result) return { country: null, city: null };
 
