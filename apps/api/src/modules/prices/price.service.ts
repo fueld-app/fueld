@@ -53,7 +53,8 @@ async function initYahooWs(): Promise<void> {
     const protoPath = path.resolve(
       import.meta.dir, '..', '..', '..', 'yahoo_finance.proto',
     );
-    const root = await protobuf.load(protoPath);
+    const protoText = await Bun.file(protoPath).text();
+    const root = protobuf.parse(protoText).root;
     PricingData = root.lookupType('yahoo.finance.PricingData');
     console.log('[Prices] Protobuf schema loaded');
 
@@ -134,33 +135,11 @@ function connectYahooWs(): void {
 
 async function fetchBrentRest(): Promise<void> {
   try {
-    const url = 'https://query1.finance.yahoo.com/v8/finance/chart/BZ=F?range=1d&interval=1d';
-    const res = await fetch(url, { headers: { 'User-Agent': UA } });
-    if (!res.ok) {
-      console.warn(`[Prices] Yahoo BZ=F REST HTTP ${res.status}`);
-      return;
+    const price = await fetchYahooChart('BZ=F', 'Brent Oil');
+    if (price) {
+      brentPrice = price;
+      broadcast();
     }
-
-    const json: any = await res.json();
-    const meta = json?.chart?.result?.[0]?.meta;
-    if (!meta) return;
-
-    const price = meta.regularMarketPrice ?? 0;
-    const previousClose = meta.chartPreviousClose ?? meta.previousClose ?? price;
-    const change = price - previousClose;
-    const changePercent = previousClose !== 0 ? (change / previousClose) * 100 : 0;
-
-    brentPrice = {
-      ticker: 'BZ=F',
-      name: 'Brent Oil',
-      price: round2(price),
-      change: round2(change),
-      changePercent: round2(changePercent),
-      currency: meta.currency ?? 'USD',
-      updatedAt: new Date().toISOString(),
-    };
-
-    broadcast();
   } catch (err: any) {
     console.warn('[Prices] Failed to fetch Brent REST:', err.message);
   }
@@ -181,6 +160,7 @@ async function fetchGasOil(): Promise<void> {
     );
     if (!res.ok) {
       console.warn(`[Prices] Investing.com Gas Oil HTTP ${res.status}`);
+      await fetchGasOilYahoo();
       return;
     }
 
@@ -195,6 +175,7 @@ async function fetchGasOil(): Promise<void> {
 
     if (!priceMatch) {
       console.warn('[Prices] Investing.com Gas Oil: price not found in HTML');
+      await fetchGasOilYahoo();
       return;
     }
 
@@ -219,6 +200,49 @@ async function fetchGasOil(): Promise<void> {
     broadcast();
   } catch (err: any) {
     console.warn('[Prices] Failed to fetch Gas Oil:', err.message);
+    await fetchGasOilYahoo();
+  }
+}
+
+async function fetchGasOilYahoo(): Promise<void> {
+  const price = await fetchYahooChart('LGOc1', 'Gasoil');
+  if (price) {
+    price.ticker = 'LGO';
+    gasoilPrice = price;
+    broadcast();
+  }
+}
+
+async function fetchYahooChart(ticker: string, name: string): Promise<CommodityPrice | null> {
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=1d&interval=1d`;
+    const res = await fetch(url, { headers: { 'User-Agent': UA } });
+    if (!res.ok) {
+      console.warn(`[Prices] Yahoo ${ticker} REST HTTP ${res.status}`);
+      return null;
+    }
+
+    const json: any = await res.json();
+    const meta = json?.chart?.result?.[0]?.meta;
+    if (!meta) return null;
+
+    const price = meta.regularMarketPrice ?? 0;
+    const previousClose = meta.chartPreviousClose ?? meta.previousClose ?? price;
+    const change = price - previousClose;
+    const changePercent = previousClose !== 0 ? (change / previousClose) * 100 : 0;
+
+    return {
+      ticker,
+      name,
+      price: round2(price),
+      change: round2(change),
+      changePercent: round2(changePercent),
+      currency: meta.currency ?? 'USD',
+      updatedAt: new Date().toISOString(),
+    };
+  } catch (err: any) {
+    console.warn(`[Prices] Yahoo ${ticker} REST failed:`, err.message);
+    return null;
   }
 }
 
