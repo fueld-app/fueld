@@ -19,6 +19,23 @@ import type {
 
 import { API } from '@app/core/config/api';
 
+interface CompanySearchResult {
+  source: 'local' | 'seasearcher';
+  localId?: string;
+  seasearcherId?: string;
+  name: string;
+  country?: string | null;
+}
+
+interface CompanySearchResultOption {
+  key: string;
+  source: 'local' | 'seasearcher';
+  id?: string;
+  seasearcherId?: string;
+  name: string;
+  country?: string | null;
+}
+
 @Component({
   selector: 'app-customer-credit-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -204,13 +221,15 @@ import { API } from '@app/core/config/api';
                     class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
                   @if (companyDropdownOpen() && companySearchResults().length) {
                     <div class="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
-                      @for (c of companySearchResults(); track c.id) {
+                      @for (c of companySearchResults(); track c.key) {
                         <button (click)="addCounterparty(c)" class="flex w-full items-center gap-2 px-3 py-2 text-sm text-left hover:bg-gray-50">
                           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
                             <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
                           </svg>
                           <span class="font-medium text-gray-900">{{ c.name }}</span>
-                          @if (c.country) {
+                          @if (c.source === 'seasearcher') {
+                            <span class="text-[10px] font-semibold uppercase text-amber-600">Seasearcher</span>
+                          } @else if (c.country) {
                             <span class="text-xs text-gray-500">{{ c.country }}</span>
                           }
                         </button>
@@ -388,7 +407,7 @@ export class CustomerCreditPageComponent implements OnInit {
 
   // Company search
   readonly companySearch = signal('');
-  readonly companySearchResults = signal<CounterpartyDto[]>([]);
+  readonly companySearchResults = signal<CompanySearchResultOption[]>([]);
   readonly companyDropdownOpen = signal(false);
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -451,39 +470,106 @@ export class CustomerCreditPageComponent implements OnInit {
     }
     this.searchTimer = setTimeout(async () => {
       try {
+        const selected = new Set(this.selectedCounterparties().map((c) => c.id));
         const res = await firstValueFrom(
           this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
             `${API}/companies/local?search=${encodeURIComponent(term)}&limit=10&type=CLIENT`,
           ),
         );
-        if (res.success && res.data?.companies?.length) {
-          const selected = new Set(this.selectedCounterparties().map((c) => c.id));
-          this.companySearchResults.set(res.data.companies.filter((c) => !selected.has(c.id)));
+        const primaryLocal = res.success
+          ? res.data.companies.filter((c) => !selected.has(c.id))
+          : [];
+        if (primaryLocal.length) {
+          this.companySearchResults.set(
+            primaryLocal.map((c) => ({
+              key: c.id,
+              source: 'local',
+              id: c.id,
+              name: c.name,
+              country: c.country ?? null,
+            })),
+          );
           this.companyDropdownOpen.set(true);
-        } else {
+          return;
+        }
+
+        {
           const res2 = await firstValueFrom(
             this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
               `${API}/companies/local?search=${encodeURIComponent(term)}&limit=10`,
             ),
           );
-          if (res2.success) {
-            const selected = new Set(this.selectedCounterparties().map((c) => c.id));
-            this.companySearchResults.set(res2.data.companies.filter((c) => !selected.has(c.id)));
-          } else {
-            this.companySearchResults.set([]);
+          const fallbackLocal = res2.success
+            ? res2.data.companies.filter((c) => !selected.has(c.id))
+            : [];
+          if (fallbackLocal.length) {
+            this.companySearchResults.set(
+              fallbackLocal.map((c) => ({
+                key: c.id,
+                source: 'local',
+                id: c.id,
+                name: c.name,
+                country: c.country ?? null,
+              })),
+            );
+            this.companyDropdownOpen.set(true);
+            return;
           }
-          this.companyDropdownOpen.set(true);
         }
+
+        const importRes = await firstValueFrom(
+          this.http.get<ApiResponse<CompanySearchResult[]>>(
+            `${API}/companies/search?term=${encodeURIComponent(term)}`,
+          ),
+        );
+        if (importRes.success && importRes.data) {
+          this.companySearchResults.set(
+            importRes.data
+              .filter((r) => r.source === 'seasearcher' && r.seasearcherId)
+              .map((r) => ({
+                key: `seasearcher:${r.seasearcherId}`,
+                source: 'seasearcher',
+                seasearcherId: r.seasearcherId,
+                name: r.name,
+                country: r.country ?? null,
+              })),
+          );
+        } else {
+          this.companySearchResults.set([]);
+        }
+        this.companyDropdownOpen.set(true);
       } catch {
         this.companySearchResults.set([]);
       }
     }, 300);
   }
 
-  addCounterparty(company: CounterpartyDto): void {
+  async addCounterparty(company: CompanySearchResultOption): Promise<void> {
+    if (company.source === 'seasearcher' && company.seasearcherId) {
+      await this.importCounterpartyFromSeasearcher(company.seasearcherId);
+      return;
+    }
+    if (!company.id) return;
     this.selectedCounterparties.update((list) => [...list, { id: company.id, name: company.name }]);
-    this.companySearchResults.update((results) => results.filter((r) => r.id !== company.id));
+    this.companySearchResults.update((results) => results.filter((r) => r.key !== company.key));
     this.companySearch.set('');
+  }
+
+  private async importCounterpartyFromSeasearcher(seasearcherId: string): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<CounterpartyDto>>(`${API}/companies/import`, { seasearcherId }),
+      );
+      if (res.success && res.data) {
+        this.selectedCounterparties.update((list) => [...list, { id: res.data.id, name: res.data.name }]);
+        this.companySearchResults.set([]);
+        this.companySearch.set('');
+      } else {
+        this.formError.set(res.message ?? 'Failed to import company.');
+      }
+    } catch {
+      this.formError.set('Failed to import company.');
+    }
   }
 
   removeCounterparty(id: string): void {

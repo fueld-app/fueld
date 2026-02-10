@@ -63,6 +63,23 @@ const ROLE_BORDER_COLORS: Record<string, string> = {
 
 import { API } from '@app/core/config/api';
 
+interface CompanySearchResult {
+  source: 'local' | 'seasearcher';
+  localId?: string;
+  seasearcherId?: string;
+  name: string;
+  country?: string | null;
+}
+
+interface CompanySearchResultOption {
+  key: string;
+  source: 'local' | 'seasearcher';
+  id?: string;
+  seasearcherId?: string;
+  name: string;
+  country?: string | null;
+}
+
 function metersPerPx(lat: number, zoom: number): number {
   return (156543.03392 * Math.cos((lat * Math.PI) / 180)) / Math.pow(2, zoom);
 }
@@ -522,11 +539,13 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                         />
                         @if (companySearchResults().length) {
                           <div class="absolute z-10 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
-                            @for (c of companySearchResults(); track c.id) {
+                            @for (c of companySearchResults(); track c.key) {
                               <button (click)="selectCompany(c)"
                                 class="w-full px-3 py-2 text-left text-sm hover:bg-brand-50 transition-colors flex items-center justify-between">
                                 <span class="font-medium text-gray-900">{{ c.name }}</span>
-                                @if (c.country) {
+                                @if (c.source === 'seasearcher') {
+                                  <span class="text-[10px] font-semibold uppercase text-amber-600">Seasearcher</span>
+                                } @else if (c.country) {
                                   <span class="text-xs text-gray-400">{{ c.country }}</span>
                                 }
                               </button>
@@ -1111,7 +1130,7 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
   readonly editingCompanyId = signal<string | null>(null);
   readonly savingCompany = signal(false);
   readonly companySearch = signal('');
-  readonly companySearchResults = signal<{ id: string; name: string; country: string | null }[]>([]);
+  readonly companySearchResults = signal<CompanySearchResultOption[]>([]);
   readonly selectedCompany = signal<{ id: string; name: string } | null>(null);
   private companySearchTimeout: ReturnType<typeof setTimeout> | null = null;
   readonly companyContacts = signal<CompanyContactDto[]>([]);
@@ -1757,10 +1776,43 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
         const res = await firstValueFrom(
           this.http.get<ApiResponse<{ companies: { id: string; name: string; country: string | null }[] }>>(`${API}/companies/local?search=${encodeURIComponent(term)}&limit=15`),
         );
-        if (res.success && res.data) {
-          // filter out companies already added
-          const existingIds = new Set(this.vesselCompanies().map((vc) => vc.companyId));
-          this.companySearchResults.set(res.data.companies.filter((c) => !existingIds.has(c.id)));
+        const existingIds = new Set(this.vesselCompanies().map((vc) => vc.companyId));
+        const localResults = res.success && res.data
+          ? res.data.companies.filter((c) => !existingIds.has(c.id))
+          : [];
+
+        if (localResults.length) {
+          this.companySearchResults.set(
+            localResults.map((c) => ({
+              key: c.id,
+              source: 'local',
+              id: c.id,
+              name: c.name,
+              country: c.country,
+            })),
+          );
+          return;
+        }
+
+        const importRes = await firstValueFrom(
+          this.http.get<ApiResponse<CompanySearchResult[]>>(
+            `${API}/companies/search?term=${encodeURIComponent(term)}`,
+          ),
+        );
+        if (importRes.success && importRes.data) {
+          this.companySearchResults.set(
+            importRes.data
+              .filter((r) => r.source === 'seasearcher' && r.seasearcherId)
+              .map((r) => ({
+                key: `seasearcher:${r.seasearcherId}`,
+                source: 'seasearcher',
+                seasearcherId: r.seasearcherId,
+                name: r.name,
+                country: r.country ?? null,
+              })),
+          );
+        } else {
+          this.companySearchResults.set([]);
         }
       } catch {
         this.companySearchResults.set([]);
@@ -1768,12 +1820,36 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
     }, 250);
   }
 
-  selectCompany(c: { id: string; name: string }): void {
-    this.selectedCompany.set(c);
+  async selectCompany(c: CompanySearchResultOption): Promise<void> {
+    if (c.source === 'seasearcher' && c.seasearcherId) {
+      await this.importCompanyFromSeasearcher(c.seasearcherId);
+      return;
+    }
+    if (!c.id) return;
+    this.selectedCompany.set({ id: c.id, name: c.name });
     this.companyForm.set({ ...this.companyForm(), companyId: c.id });
     this.companySearch.set('');
     this.companySearchResults.set([]);
     this.loadCompanyContacts(c.id);
+  }
+
+  private async importCompanyFromSeasearcher(seasearcherId: string): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<CounterpartyDto>>(`${API}/companies/import`, { seasearcherId }),
+      );
+      if (res.success && res.data) {
+        this.selectedCompany.set({ id: res.data.id, name: res.data.name });
+        this.companyForm.set({ ...this.companyForm(), companyId: res.data.id });
+        this.companySearch.set('');
+        this.companySearchResults.set([]);
+        this.loadCompanyContacts(res.data.id);
+      } else {
+        console.error('Failed to import company:', res.message ?? 'Unknown error');
+      }
+    } catch {
+      console.error('Failed to import company.');
+    }
   }
 
   clearSelectedCompany(): void {

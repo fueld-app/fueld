@@ -590,6 +590,7 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   readonly clientImportOptions = signal<DropdownOption[]>([]);
   readonly vesselImportOptions = signal<DropdownOption[]>([]);
   readonly placeImportOptions = signal<DropdownOption[]>([]);
+  readonly supplierImportOptions = signal<DropdownOption[]>([]);
 
   // ─── Send Offer modal state ──────────────────────────────────────
 
@@ -615,7 +616,10 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   readonly portName = computed(() => this.port()?.name ?? '—');
 
   readonly supplierDropdownOptions = computed<DropdownOption[]>(() =>
-    this.suppliers().map((s) => ({ value: s.id, label: s.name })),
+    [
+      ...this.suppliers().map((s) => ({ value: s.id, label: s.name })),
+      ...this.supplierImportOptions(),
+    ],
   );
 
   readonly clientDropdownOptions = computed<DropdownOption[]>(() =>
@@ -655,6 +659,7 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   readonly lastSaved = signal<Date | null>(null);
   private autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
   private changeVersion = signal(0);
+  private readonly pendingSupplierImports = new Set<string>();
 
   constructor() {
     // Debounced autosave effect - reacts to changeVersion increments
@@ -884,17 +889,25 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
           `${API}/companies/local?search=${encodeURIComponent(term)}&limit=20`,
         ),
       );
-      if (res.success) {
-        // Keep any currently-selected suppliers visible
-        const currentIds = new Set(this.itemRows().map(r => r.supplierId).filter(Boolean));
-        const existing = this.suppliers().filter(s => currentIds.has(s.id));
-        const results = res.data.companies;
-        for (const e of existing) {
-          if (!results.find(r => r.id === e.id)) results.unshift(e);
-        }
-        this.suppliers.set(results);
+      const currentIds = new Set(this.itemRows().map(r => r.supplierId).filter(Boolean));
+      const existing = this.suppliers().filter((s) => currentIds.has(s.id));
+      const localResults = res.success ? res.data.companies : [];
+      const hasLocalMatches = localResults.some((c) => !currentIds.has(c.id));
+      const mergedLocal = [...existing];
+      for (const c of localResults) {
+        if (!mergedLocal.find((e) => e.id === c.id)) mergedLocal.push(c);
       }
-    } catch { /* ignore */ } finally {
+
+      if (hasLocalMatches) {
+        this.suppliers.set(mergedLocal);
+        this.supplierImportOptions.set([]);
+      } else {
+        this.suppliers.set(existing);
+        this.supplierImportOptions.set(await this.loadCompanyImportOptions(term));
+      }
+    } catch {
+      this.supplierImportOptions.set([]);
+    } finally {
       this.supplierSearchLoading.set(false);
     }
   }
@@ -903,6 +916,20 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
 
   onItemsChange(items: OrderItemRow[]): void {
     this.itemRows.set(items);
+    const importIds = Array.from(
+      new Set(
+        items
+          .map((r) => r.supplierId)
+          .filter((id) => id && id.startsWith('seasearcher:'))
+          .map((id) => id.replace('seasearcher:', '')),
+      ),
+    );
+    if (importIds.length) {
+      for (const id of importIds) {
+        void this.importSupplierFromSeasearcher(id);
+      }
+      return;
+    }
     this.triggerAutosave();
   }
 
@@ -1067,6 +1094,36 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
       this.showToast('error', 'Failed to import place.');
     } finally {
       this.placeSearchLoading.set(false);
+    }
+  }
+
+  private async importSupplierFromSeasearcher(seasearcherId: string): Promise<void> {
+    if (this.pendingSupplierImports.has(seasearcherId)) return;
+    this.pendingSupplierImports.add(seasearcherId);
+    this.supplierSearchLoading.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<CounterpartyDto>>(`${API}/companies/import`, { seasearcherId }),
+      );
+      if (res.success && res.data) {
+        this.suppliers.set([res.data, ...this.suppliers().filter((s) => s.id !== res.data.id)]);
+        this.supplierImportOptions.set([]);
+        this.itemRows.update((rows) =>
+          rows.map((row) =>
+            row.supplierId === `seasearcher:${seasearcherId}`
+              ? { ...row, supplierId: res.data.id }
+              : row,
+          ),
+        );
+        this.triggerAutosave();
+      } else {
+        this.showToast('error', res.message ?? 'Failed to import supplier.');
+      }
+    } catch {
+      this.showToast('error', 'Failed to import supplier.');
+    } finally {
+      this.pendingSupplierImports.delete(seasearcherId);
+      this.supplierSearchLoading.set(false);
     }
   }
 

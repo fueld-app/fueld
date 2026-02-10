@@ -13,6 +13,23 @@ import type { ApiResponse, OwnCompanyDto, CounterpartyDto, BankAccountDto } from
 
 import { API } from '@app/core/config/api';
 
+interface CompanySearchResult {
+  source: 'local' | 'seasearcher';
+  localId?: string;
+  seasearcherId?: string;
+  name: string;
+  country?: string | null;
+}
+
+interface CompanySearchResultOption {
+  key: string;
+  source: 'local' | 'seasearcher';
+  id?: string;
+  seasearcherId?: string;
+  name: string;
+  country?: string | null;
+}
+
 @Component({
   selector: 'app-our-companies-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -239,10 +256,12 @@ import { API } from '@app/core/config/api';
                   class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
                 @if (dropdownOpen() && searchResults().length) {
                   <div class="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
-                    @for (c of searchResults(); track c.id) {
+                    @for (c of searchResults(); track c.key) {
                       <button (click)="addCompany(c)" class="flex w-full items-center gap-2 px-3 py-2 text-sm text-left hover:bg-gray-50">
                         <span class="font-medium text-gray-900">{{ c.name }}</span>
-                        @if (c.country) {
+                        @if (c.source === 'seasearcher') {
+                          <span class="text-[10px] font-semibold uppercase text-amber-600">Seasearcher</span>
+                        } @else if (c.country) {
                           <span class="text-xs text-gray-500">{{ c.country }}</span>
                         }
                       </button>
@@ -401,7 +420,7 @@ export class OurCompaniesPageComponent implements OnInit {
   // Add company modal
   readonly showAddModal = signal(false);
   readonly searchTerm = signal('');
-  readonly searchResults = signal<CounterpartyDto[]>([]);
+  readonly searchResults = signal<CompanySearchResultOption[]>([]);
   readonly dropdownOpen = signal(false);
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -503,18 +522,57 @@ export class OurCompaniesPageComponent implements OnInit {
             API + '/companies/local?search=' + encodeURIComponent(term) + '&limit=10',
           ),
         );
-        if (res.success && res.data?.companies) {
-          const ownIds = new Set(this.companies().map((c) => c.id));
-          this.searchResults.set(res.data.companies.filter((c) => !ownIds.has(c.id)));
+        const ownIds = new Set(this.companies().map((c) => c.id));
+        const localResults = res.success && res.data?.companies
+          ? res.data.companies.filter((c) => !ownIds.has(c.id))
+          : [];
+        if (localResults.length) {
+          this.searchResults.set(
+            localResults.map((c) => ({
+              key: c.id,
+              source: 'local',
+              id: c.id,
+              name: c.name,
+              country: c.country ?? null,
+            })),
+          );
           this.dropdownOpen.set(true);
+          return;
         }
+
+        const importRes = await firstValueFrom(
+          this.http.get<ApiResponse<CompanySearchResult[]>>(
+            `${API}/companies/search?term=${encodeURIComponent(term)}`,
+          ),
+        );
+        if (importRes.success && importRes.data) {
+          this.searchResults.set(
+            importRes.data
+              .filter((r) => r.source === 'seasearcher' && r.seasearcherId)
+              .map((r) => ({
+                key: `seasearcher:${r.seasearcherId}`,
+                source: 'seasearcher',
+                seasearcherId: r.seasearcherId,
+                name: r.name,
+                country: r.country ?? null,
+              })),
+          );
+        } else {
+          this.searchResults.set([]);
+        }
+        this.dropdownOpen.set(true);
       } catch {
         this.searchResults.set([]);
       }
     }, 300);
   }
 
-  async addCompany(company: CounterpartyDto): Promise<void> {
+  async addCompany(company: CompanySearchResultOption): Promise<void> {
+    if (company.source === 'seasearcher' && company.seasearcherId) {
+      await this.importOwnCompany(company.seasearcherId);
+      return;
+    }
+    if (!company.id) return;
     try {
       await firstValueFrom(
         this.http.post<ApiResponse<unknown>>(API + '/admin/settings/own-companies', {
@@ -525,6 +583,27 @@ export class OurCompaniesPageComponent implements OnInit {
       await this.loadData();
     } catch (err) {
       console.error('Failed to add own company:', err);
+    }
+  }
+
+  private async importOwnCompany(seasearcherId: string): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<CounterpartyDto>>(`${API}/companies/import`, { seasearcherId }),
+      );
+      if (res.success && res.data) {
+        await this.addCompany({
+          key: res.data.id,
+          source: 'local',
+          id: res.data.id,
+          name: res.data.name,
+          country: res.data.country ?? null,
+        });
+      } else {
+        console.error('Failed to import own company:', res.message ?? 'Unknown error');
+      }
+    } catch (err) {
+      console.error('Failed to import own company:', err);
     }
   }
 

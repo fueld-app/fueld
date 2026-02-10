@@ -29,6 +29,23 @@ import { CommentsCardComponent } from '../../../../shared/components/comments-ca
 
 import { API } from '@app/core/config/api';
 
+interface CompanySearchResult {
+  source: 'local' | 'seasearcher';
+  localId?: string;
+  seasearcherId?: string;
+  name: string;
+  country?: string | null;
+}
+
+interface CompanySearchResultOption {
+  key: string;
+  source: 'local' | 'seasearcher';
+  id?: string;
+  seasearcherId?: string;
+  name: string;
+  country?: string | null;
+}
+
 const PRODUCT_OPTIONS = ['VLSFO', 'LSMGO', 'IFO380', 'MGO', 'LUBE'] as const;
 
 const PLACE_TYPE_LABELS: Record<string, string> = {
@@ -838,11 +855,13 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                           />
                           @if (supplierCompanyResults().length) {
                             <div class="absolute z-10 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
-                              @for (c of supplierCompanyResults(); track c.id) {
+                              @for (c of supplierCompanyResults(); track c.key) {
                                 <button (click)="selectSupplierCompany(c)"
                                   class="w-full px-3 py-2 text-left text-sm hover:bg-brand-50 transition-colors flex items-center justify-between">
                                   <span class="font-medium text-gray-900">{{ c.name }}</span>
-                                  @if (c.country) {
+                                  @if (c.source === 'seasearcher') {
+                                    <span class="text-[10px] font-semibold uppercase text-amber-600">Seasearcher</span>
+                                  } @else if (c.country) {
                                     <span class="text-xs text-gray-400">{{ c.country }}</span>
                                   }
                                 </button>
@@ -1141,7 +1160,7 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
   readonly editingSupplierId = signal<string | null>(null);
   readonly savingSupplier = signal(false);
   readonly supplierCompanySearch = signal('');
-  readonly supplierCompanyResults = signal<{ id: string; name: string; country: string | null }[]>([]);
+  readonly supplierCompanyResults = signal<CompanySearchResultOption[]>([]);
   readonly selectedSupplierCompany = signal<{ id: string; name: string } | null>(null);
   private supplierSearchTimeout: ReturnType<typeof setTimeout> | null = null;
   readonly supplierContacts = signal<CompanyContactDto[]>([]);
@@ -1905,10 +1924,43 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
         const res = await firstValueFrom(
           this.http.get<ApiResponse<{ companies: { id: string; name: string; country: string | null }[] }>>(`${API}/companies/local?search=${encodeURIComponent(term)}&limit=15`),
         );
-        if (res.success && res.data) {
-          // filter out companies already added as suppliers
-          const existingIds = new Set(this.portSuppliers().map(function(s) { return s.companyId; }));
-          this.supplierCompanyResults.set(res.data.companies.filter(function(c) { return !existingIds.has(c.id); }));
+        const existingIds = new Set(this.portSuppliers().map(function(s) { return s.companyId; }));
+        const localResults = res.success && res.data
+          ? res.data.companies.filter(function(c) { return !existingIds.has(c.id); })
+          : [];
+
+        if (localResults.length) {
+          this.supplierCompanyResults.set(
+            localResults.map((c) => ({
+              key: c.id,
+              source: 'local',
+              id: c.id,
+              name: c.name,
+              country: c.country,
+            })),
+          );
+          return;
+        }
+
+        const importRes = await firstValueFrom(
+          this.http.get<ApiResponse<CompanySearchResult[]>>(
+            `${API}/companies/search?term=${encodeURIComponent(term)}`,
+          ),
+        );
+        if (importRes.success && importRes.data) {
+          this.supplierCompanyResults.set(
+            importRes.data
+              .filter((r) => r.source === 'seasearcher' && r.seasearcherId)
+              .map((r) => ({
+                key: `seasearcher:${r.seasearcherId}`,
+                source: 'seasearcher',
+                seasearcherId: r.seasearcherId,
+                name: r.name,
+                country: r.country ?? null,
+              })),
+          );
+        } else {
+          this.supplierCompanyResults.set([]);
         }
       } catch {
         this.supplierCompanyResults.set([]);
@@ -1916,12 +1968,36 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
     }, 250);
   }
 
-  selectSupplierCompany(c: { id: string; name: string }): void {
-    this.selectedSupplierCompany.set(c);
+  async selectSupplierCompany(c: CompanySearchResultOption): Promise<void> {
+    if (c.source === 'seasearcher' && c.seasearcherId) {
+      await this.importSupplierCompanyFromSeasearcher(c.seasearcherId);
+      return;
+    }
+    if (!c.id) return;
+    this.selectedSupplierCompany.set({ id: c.id, name: c.name });
     this.supplierForm.set({ ...this.supplierForm(), companyId: c.id });
     this.supplierCompanySearch.set('');
     this.supplierCompanyResults.set([]);
     this.loadSupplierContacts(c.id);
+  }
+
+  private async importSupplierCompanyFromSeasearcher(seasearcherId: string): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<CounterpartyDto>>(`${API}/companies/import`, { seasearcherId }),
+      );
+      if (res.success && res.data) {
+        this.selectedSupplierCompany.set({ id: res.data.id, name: res.data.name });
+        this.supplierForm.set({ ...this.supplierForm(), companyId: res.data.id });
+        this.supplierCompanySearch.set('');
+        this.supplierCompanyResults.set([]);
+        this.loadSupplierContacts(res.data.id);
+      } else {
+        console.error('Failed to import company:', res.message ?? 'Unknown error');
+      }
+    } catch {
+      console.error('Failed to import company.');
+    }
   }
 
   clearSupplierCompany(): void {
