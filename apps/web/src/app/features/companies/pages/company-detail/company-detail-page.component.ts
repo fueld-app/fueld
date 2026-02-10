@@ -16,7 +16,7 @@ import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subscription, skip } from 'rxjs';
 import { Title } from '@angular/platform-browser';
-import * as L from 'leaflet';
+import * as L from 'leaflet/dist/leaflet-src.esm.js';
 import type { CounterpartyDto, VesselDto, ApiResponse, CompanyContactDto, SupplyPortDto, CompanyEmailDto, CompanyEmailType } from '@fueld/types';
 import { flagFromIso3 } from '../../../../shared/utils/flags';
 import { WebSocketService } from '../../../../core/websocket/websocket.service';

@@ -18,7 +18,7 @@ import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subscription, skip } from 'rxjs';
 import { Title } from '@angular/platform-browser';
 import type { VesselDto, CounterpartyDto, ApiResponse, VesselCompanyDto, VesselCompanyRole, CompanyContactDto } from '@fueld/types';
-import * as L from 'leaflet';
+import * as L from 'leaflet/dist/leaflet-src.esm.js';
 import { flagFromIso3 } from '../../../../shared/utils/flags';
 import { WebSocketService } from '../../../../core/websocket/websocket.service';
 import { ActivityTimelineComponent } from '../../../../shared/components/activity-timeline/activity-timeline.component';

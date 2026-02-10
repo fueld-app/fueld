@@ -100,7 +100,7 @@ fi
 
 # ─── 8. Create application directories ───────────────────────────────
 echo "▶ Creating application directories..."
-mkdir -p /opt/fueld/{blue,green,web,drizzle,uploads/avatars,uploads/logos}
+mkdir -p /opt/fueld/{blue,green,web,drizzle,geoip-data,uploads/avatars,uploads/logos}
 chown -R $DEPLOY_USER:$DEPLOY_USER /opt/fueld
 
 # Write active slot
@@ -141,6 +141,9 @@ ADMIN_PASSWORD=$ADMIN_PASSWORD
 
 # Drizzle migrations directory
 MIGRATIONS_DIR=/opt/fueld/drizzle
+
+# GeoIP data directory (geoip-lite)
+GEODATADIR=/opt/fueld/geoip-data
 
 # Lloyd's List Intelligence (optional)
 # LLI_USERNAME=
