@@ -5,16 +5,15 @@ import {
   computed,
   inject,
   viewChild,
+  OnInit,
 } from '@angular/core';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
 import {
   OrderStatus,
-  CounterpartyType,
   type OrderDto,
-  type OrderItemDto,
   type CounterpartyDto,
   type VesselDto,
   type PlaceDto,
@@ -202,10 +201,9 @@ import { API_URL } from '@app/core/config/api';
     <app-pdf-preview-modal />
   `,
 })
-export class OrderDetailPageComponent {
+export class OrderDetailPageComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly http = inject(HttpClient);
-  private readonly router = inject(Router);
 
   readonly emailModal = viewChild(SendEmailModalComponent);
   readonly pdfModal = viewChild(PdfPreviewModalComponent);
@@ -251,12 +249,12 @@ export class OrderDetailPageComponent {
     this.suppliers().map((s) => ({ value: s.id, label: s.name })),
   );
 
-  // ─── Mock data (will be replaced with API calls in Phase 7) ──────
-
   constructor() {
-    // Load mock data for demo
-    this.loadMockData();
     this.loadOwnCompanies();
+  }
+
+  ngOnInit(): void {
+    this.loadOrder();
   }
 
   private async loadOwnCompanies(): Promise<void> {
@@ -270,132 +268,77 @@ export class OrderDetailPageComponent {
     }
   }
 
-  private loadMockData(): void {
-    const mockOrderId = 'ord-001';
+  private async loadOrder(): Promise<void> {
+    const id = this.orderId();
+    if (!id) return;
 
-    this.order.set({
-      id: mockOrderId,
-      orderNumber: '20260201-000001',
-      tenantId: 'tenant-1',
-      clientId: 'cp-1',
-      vesselId: 'v-1',
-      placeId: 'p-1',
-      salesRepId: 'u-1',
-      invoicingCompanyId: null,
-      currency: 'USD',
-      status: OrderStatus.Confirmed,
-      eta: '2026-02-15',
-      etd: '2026-02-17',
-      lossReason: null,
-      closedAt: null,
-      createdAt: '2026-02-01T10:00:00Z',
-      updatedAt: '2026-02-06T08:00:00Z',
-    });
+    try {
+      const [orderRes, ownRes] = await Promise.all([
+        firstValueFrom(this.http.get<ApiResponse<any>>(`${API_URL}/orders/${id}`)),
+        firstValueFrom(this.http.get<ApiResponse<OwnCompanyDto[]>>(`${API_URL}/companies/own`)),
+      ]);
 
-    this.client.set({
-      id: 'cp-1',
-      tenantId: 'tenant-1',
-      name: 'Pacific Shipping Co.',
-      type: CounterpartyType.Client,
-      types: ['CLIENT'],
-      creditLimit: '500000',
-      creditUsed: '125000',
-      country: 'Singapore',
-      isOwnCompany: false,
-      seasearcherId: null,
-      companyImo: null,
-      countryIso: null,
-      yearFormed: null,
-      companyRoles: null,
-      fleetSize: null,
-      headOfficeAddress: null,
-      headOfficePhone: null,
-      headOfficeEmail: null,
-      website: null,
-      isSanctioned: false,
-      lastSynced: null,
-    });
+      if (orderRes.success && orderRes.data) {
+        const d = orderRes.data;
+        this.order.set({
+          id: d.id,
+          orderNumber: d.orderNumber ?? null,
+          tenantId: d.tenantId,
+          clientId: d.clientId,
+          vesselId: d.vesselId,
+          placeId: d.placeId,
+          salesRepId: d.salesRepId,
+          invoicingCompanyId: d.invoicingCompanyId,
+          currency: d.currency ?? 'USD',
+          status: d.status,
+          eta: d.eta,
+          etd: d.etd,
+          lossReason: d.lossReason,
+          closedAt: d.closedAt,
+          createdAt: d.createdAt,
+          updatedAt: d.updatedAt,
+        });
 
-    this.vessel.set({
-      id: 'v-1',
-      name: 'MV Nordic Star',
-      imo: '9834567',
-      mmsi: '234567890',
-      flag: 'NO',
-      seasearcherId: null,
-      flagCode: null,
-      type: null,
-      status: null,
-      loa: null,
-      breadth: null,
-      depth: null,
-      draught: null,
-      deadWeightTonnage: null,
-      grossTonnage: null,
-      buildYear: null,
-      builder: null,
-      classificationSociety: null,
-      lastSynced: null,
-    });
+        if (d.client) this.client.set(d.client);
+        if (d.vessel) this.vessel.set(d.vessel);
+        if (d.place) this.port.set(d.place);
 
-    this.port.set({
-      id: 'p-1',
-      lliPlaceId: null,
-      unlocode: 'NL RTM',
-      name: 'Rotterdam',
-      country: 'Netherlands',
-      countryIso: 'NLD',
-      area: 'N Cont Europe',
-      placeType: 'POR',
-      lat: 51.9225,
-      long: 4.4792,
-      admiraltyChart: null,
-      parentPlaceId: null,
-      parentPlaceName: null,
-      subRegion: null,
-      timezone: null,
-      lliLastUpdated: null,
-      responsibleUserId: null,
-      responsibleUserName: null,
-    });
+        this.itemRows.set(
+          (d.items ?? []).map((item: any) => ({
+            id: item.id,
+            productType: item.productType ?? '',
+            supplierId: item.supplierId ?? '',
+            quantity: parseFloat(item.quantity) || 0,
+            quantityMin: item.quantityMin ? parseFloat(item.quantityMin) : null,
+            quantityMax: item.quantityMax ? parseFloat(item.quantityMax) : null,
+            unit: item.unit ?? 'MT',
+            costPrice: parseFloat(item.costPrice) || 0,
+            salesPrice: parseFloat(item.salesPrice) || 0,
+            profit: parseFloat(item.profit) || 0,
+            paymentTerms: item.paymentTerms ?? '',
+          })),
+        );
 
-    this.suppliers.set([
-      { id: 'sp-1', tenantId: 'tenant-1', name: 'Shell Marine Products', type: CounterpartyType.Supplier, types: ['SUPPLIER'], creditLimit: '0', creditUsed: '0', country: 'Netherlands', isOwnCompany: false, seasearcherId: null, companyImo: null, countryIso: null, yearFormed: null, companyRoles: null, fleetSize: null, headOfficeAddress: null, headOfficePhone: null, headOfficeEmail: null, website: null, isSanctioned: false, lastSynced: null },
-      { id: 'sp-2', tenantId: 'tenant-1', name: 'TotalEnergies Marine', type: CounterpartyType.Supplier, types: ['SUPPLIER'], creditLimit: '0', creditUsed: '0', country: 'France', isOwnCompany: false, seasearcherId: null, companyImo: null, countryIso: null, yearFormed: null, companyRoles: null, fleetSize: null, headOfficeAddress: null, headOfficePhone: null, headOfficeEmail: null, website: null, isSanctioned: false, lastSynced: null },
-      { id: 'sp-3', tenantId: 'tenant-1', name: 'Vitol Bunkers', type: CounterpartyType.Supplier, types: ['SUPPLIER'], creditLimit: '0', creditUsed: '0', country: 'Switzerland', isOwnCompany: false, seasearcherId: null, companyImo: null, countryIso: null, yearFormed: null, companyRoles: null, fleetSize: null, headOfficeAddress: null, headOfficePhone: null, headOfficeEmail: null, website: null, isSanctioned: false, lastSynced: null },
-      { id: 'sp-4', tenantId: 'tenant-1', name: 'Trafigura Marine', type: CounterpartyType.Supplier, types: ['SUPPLIER'], creditLimit: '0', creditUsed: '0', country: 'Singapore', isOwnCompany: false, seasearcherId: null, companyImo: null, countryIso: null, yearFormed: null, companyRoles: null, fleetSize: null, headOfficeAddress: null, headOfficePhone: null, headOfficeEmail: null, website: null, isSanctioned: false, lastSynced: null },
-    ]);
+        await this.loadReferenceData();
+      }
 
-    this.itemRows.set([
-      {
-        id: 'item-1',
-        productType: 'VLSFO',
-        supplierId: 'sp-1',
-        quantity: 500,
-        quantityMin: null,
-        quantityMax: null,
-        unit: 'MT',
-        costPrice: 585.50,
-        salesPrice: 612.00,
-        profit: (612.00 - 585.50) * 500,
-        paymentTerms: 'CREDIT_30',
-      },
-      {
-        id: 'item-2',
-        productType: 'LSMGO',
-        supplierId: 'sp-2',
-        quantity: 150,
-        quantityMin: null,
-        quantityMax: null,
-        unit: 'MT',
-        costPrice: 780.25,
-        salesPrice: 815.00,
-        profit: (815.00 - 780.25) * 150,
-        paymentTerms: 'ON_RECEIPT',
-      },
-    ]);
+      if (ownRes.success) this.ownCompanies.set(ownRes.data);
+    } catch {
+      this.showToast('error', 'Failed to load order.');
+    }
+  }
 
-    this.invoiceNumber.set('INV-2026-0042');
+  private async loadReferenceData(): Promise<void> {
+    try {
+      const suppliersRes = await firstValueFrom(
+        this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
+          `${API_URL}/companies/local?limit=100`,
+        ),
+      );
+      if (suppliersRes.success) this.suppliers.set(suppliersRes.data.companies);
+    } catch {
+      // silently ignore
+    }
   }
 
   // ─── Item grid events ────────────────────────────────────────────
@@ -431,11 +374,42 @@ export class OrderDetailPageComponent {
   }
 
   async saveOrder(): Promise<void> {
+    const id = this.orderId();
+    const o = this.order();
+    if (!id || !o) return;
+
     this.saving.set(true);
-    // Simulate save
-    await new Promise((r) => setTimeout(r, 800));
-    this.saving.set(false);
-    this.showToast('success', 'Order saved successfully.');
+    try {
+      await firstValueFrom(
+        this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}`, {
+          invoicingCompanyId: o.invoicingCompanyId,
+          eta: o.eta,
+          etd: o.etd,
+        }),
+      );
+
+      const itemPayload = this.itemRows().map((r) => ({
+        productType: r.productType,
+        quantity: String(r.quantity),
+        quantityMin: r.quantityMin != null ? String(r.quantityMin) : null,
+        quantityMax: String(r.quantityMax ?? r.quantity),
+        unit: r.unit,
+        supplierId: r.supplierId || null,
+        costPrice: r.costPrice ? String(r.costPrice) : null,
+        salesPrice: r.salesPrice ? String(r.salesPrice) : null,
+        paymentTerms: r.paymentTerms || null,
+      }));
+
+      await firstValueFrom(
+        this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}/items`, { items: itemPayload }),
+      );
+
+      this.showToast('success', 'Order saved successfully.');
+    } catch {
+      this.showToast('error', 'Failed to save order.');
+    } finally {
+      this.saving.set(false);
+    }
   }
 
   private async viewInvoicePdf(): Promise<void> {
