@@ -142,6 +142,68 @@ import { API } from '@app/core/config/api';
           </div>
 
           <!-- ════════════════════════════════════════════════════════ -->
+          <!--  SMTP Test Card                                       -->
+          <!-- ════════════════════════════════════════════════════════ -->
+          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
+              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M2.94 6.34A2 2 0 0 1 4.8 5h10.4a2 2 0 0 1 1.86 1.34L10 10.8 2.94 6.34Z" />
+                  <path d="M18 8.08V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.08l7.4 4.44a1 1 0 0 0 1.2 0L18 8.08Z" />
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-base font-semibold text-gray-900">SMTP Test</h3>
+                <p class="text-sm text-gray-500">Send a test email to verify SMTP credentials.</p>
+              </div>
+            </div>
+
+            <div class="px-6 py-5">
+              @if (smtpTestSuccess()) {
+                <div class="mb-4 flex items-center gap-2 rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-700">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                  </svg>
+                  {{ smtpTestSuccess() }}
+                </div>
+              }
+              @if (smtpTestError()) {
+                <div class="mb-4 flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                  </svg>
+                  {{ smtpTestError() }}
+                </div>
+              }
+
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700">Test email address</label>
+                  <input type="email" [ngModel]="smtpTestEmail()" (ngModelChange)="smtpTestEmail.set($event)"
+                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                    placeholder="you@example.com" autocomplete="email" />
+                </div>
+              </div>
+
+              <div class="mt-5 flex items-center gap-3">
+                <button (click)="sendSmtpTest()" [disabled]="smtpTestSending()"
+                  class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+                  @if (smtpTestSending()) {
+                    <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                    Sending…
+                  } @else {
+                    Send Test Email
+                  }
+                </button>
+                <span class="text-xs text-gray-400">Uses SMTP settings from the server environment.</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ════════════════════════════════════════════════════════ -->
           <!--  QuickBooks Card                                       -->
           <!-- ════════════════════════════════════════════════════════ -->
           <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
@@ -377,6 +439,12 @@ export class IntegrationsPageComponent implements OnInit {
   readonly qbSuccessMessage = signal('');
   readonly qbErrorMessage = signal('');
 
+  // ── SMTP Test ────────────────────────────────────────────────────
+  readonly smtpTestEmail = signal('');
+  readonly smtpTestSending = signal(false);
+  readonly smtpTestSuccess = signal('');
+  readonly smtpTestError = signal('');
+
   // ── Computed status helpers ────────────────────────────────────────
   lliStatus = () => this.integrations().find((i) => i.provider.toUpperCase() === 'LLI') ?? null;
   qbStatus = () => this.integrations().find((i) => i.provider.toUpperCase() === 'QUICKBOOKS') ?? null;
@@ -532,6 +600,36 @@ export class IntegrationsPageComponent implements OnInit {
       this.qbErrorMessage.set(msg);
     } finally {
       this.qbSaving.set(false);
+    }
+  }
+
+  // ── SMTP Test ────────────────────────────────────────────────────
+
+  async sendSmtpTest(): Promise<void> {
+    const email = this.smtpTestEmail().trim();
+    if (!email) {
+      this.smtpTestError.set('Email is required.');
+      return;
+    }
+
+    this.smtpTestSending.set(true);
+    this.smtpTestSuccess.set('');
+    this.smtpTestError.set('');
+
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<{ email: string }>>(`${API}/admin/email/test`, { email }),
+      );
+      if (res.success) {
+        this.smtpTestSuccess.set(`Test email sent to ${email}.`);
+      } else {
+        this.smtpTestError.set(res.message ?? 'Failed to send test email.');
+      }
+    } catch (err: any) {
+      const msg = err?.error?.message ?? err?.message ?? 'Failed to send test email.';
+      this.smtpTestError.set(msg);
+    } finally {
+      this.smtpTestSending.set(false);
     }
   }
 
