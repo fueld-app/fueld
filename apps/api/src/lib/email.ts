@@ -78,3 +78,28 @@ export async function sendInviteEmail(payload: InviteEmailPayload): Promise<bool
 
   return true;
 }
+
+export async function sendTestEmail(to: string): Promise<boolean> {
+  const cfg = getSmtpConfig();
+  if (!cfg) {
+    console.warn('[Email] SMTP not configured, test email skipped');
+    return false;
+  }
+
+  const transporter = getTransporter();
+  if (!transporter) return false;
+
+  const subject = 'Fueld SMTP test';
+  const text = 'This is a test email from Fueld.';
+  const html = '<p>This is a test email from <strong>Fueld</strong>.</p>';
+
+  await transporter.sendMail({
+    from: cfg.from,
+    to,
+    subject,
+    text,
+    html,
+  });
+
+  return true;
+}

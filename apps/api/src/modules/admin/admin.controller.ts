@@ -11,7 +11,7 @@ import {
 } from './admin.service';
 import { disconnectUserSessions } from '../activity/session-tracker';
 import type { ApiResponse } from '@fueld/types';
-import { sendInviteEmail } from '../../lib/email';
+import { sendInviteEmail, sendTestEmail } from '../../lib/email';
 
 // ─── Admin Controller ────────────────────────────────────────────────
 // All endpoints require ADMIN role.
@@ -97,6 +97,32 @@ export const adminController = new Elysia({ prefix: '/admin' })
       role: t.String(),
     }),
     detail: { tags: ['Admin'], summary: 'Invite a new user via email', security: [{ bearerAuth: [] }] },
+  })
+
+  // ── POST /admin/email/test ─────────────────────────────────────
+  .post('/email/test', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const sent = await sendTestEmail(body.email);
+      if (!sent) {
+        return {
+          success: false,
+          data: null,
+          message: 'SMTP is not configured or test email failed to send',
+        } satisfies ApiResponse<null>;
+      }
+
+      return {
+        success: true,
+        data: { email: body.email },
+      } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to send test email';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({ email: t.String({ format: 'email' }) }),
+    detail: { tags: ['Admin'], summary: 'Send SMTP test email', security: [{ bearerAuth: [] }] },
   })
 
   // ── PATCH /admin/users/:id/role ──────────────────────────────────
