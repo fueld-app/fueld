@@ -21,14 +21,34 @@ export interface GeoInfo {
 export function lookupIp(ip: string | null): GeoInfo {
   if (!ip) return { country: null, city: null };
 
+  let normalized = ip;
+  if (normalized.startsWith('::ffff:')) {
+    normalized = normalized.slice(7);
+  }
+
+  const octets = normalized.split('.').map((o) => Number(o));
+  const isPrivateV4 =
+    octets.length === 4
+    && !octets.some((o) => Number.isNaN(o) || o < 0 || o > 255)
+    && (
+      octets[0] === 10
+      || (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31)
+      || (octets[0] === 192 && octets[1] === 168)
+      || (octets[0] === 169 && octets[1] === 254)
+    );
+
   // Skip loopback and local addresses
-  if (ip === '::1' || ip === '127.0.0.1' || ip.startsWith('192.168.') || ip.startsWith('10.')) {
+  if (
+    normalized === '::1'
+    || normalized === '127.0.0.1'
+    || isPrivateV4
+  ) {
     return { country: null, city: null };
   }
 
   try {
     const geoip = require('geoip-lite');
-    const result = geoip.lookup(ip);
+    const result = geoip.lookup(normalized);
     if (!result) return { country: null, city: null };
 
     return {

@@ -220,7 +220,7 @@ const TYPE_LABELS: Record<string, string> = {
                   <td class="px-4 py-3 text-gray-600">{{ company.fleetSize ?? '—' }}</td>
                   <td class="px-4 py-3">
                     @if (company.seasearcherId) {
-                      <span class="inline-flex rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">Seasearcher</span>
+                      <span class="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">Imported</span>
                     } @else {
                       <span class="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">Manual</span>
                     }

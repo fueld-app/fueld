@@ -330,7 +330,7 @@ import { API } from '@app/core/config/api';
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
                           <div>
                             <p class="font-medium text-gray-500 mb-0.5">User Agent</p>
-                            <p class="text-gray-700 break-all">{{ log.userAgent || '—' }}</p>
+                            <p class="text-gray-700 break-all">{{ formatUserAgent(log.userAgent) }}</p>
                           </div>
                           <div>
                             <p class="font-medium text-gray-500 mb-0.5">IP Address</p>
@@ -504,6 +504,60 @@ export class ActivityLogPageComponent implements OnInit, OnDestroy {
     if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
     if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
     return d.toLocaleDateString();
+  }
+
+  formatUserAgent(ua: string | null | undefined): string {
+    if (!ua) return '—';
+
+    const browser = this.parseBrowser(ua);
+    const os = this.parseOs(ua);
+    if (browser || os) {
+      return [browser, os].filter(Boolean).join(' · ');
+    }
+    return ua;
+  }
+
+  private parseBrowser(ua: string): string | null {
+    const edge = ua.match(/Edg\/(\d+)/);
+    if (edge) return `Edge ${edge[1]}`;
+
+    const opera = ua.match(/OPR\/(\d+)/);
+    if (opera) return `Opera ${opera[1]}`;
+
+    const chrome = ua.match(/Chrome\/(\d+)/);
+    if (chrome) return `Chrome ${chrome[1]}`;
+
+    const firefox = ua.match(/Firefox\/(\d+)/);
+    if (firefox) return `Firefox ${firefox[1]}`;
+
+    const safari = ua.match(/Version\/(\d+).*Safari/);
+    if (safari) return `Safari ${safari[1]}`;
+
+    return null;
+  }
+
+  private parseOs(ua: string): string | null {
+    const windows = ua.match(/Windows NT ([0-9.]+)/);
+    if (windows) {
+      const version = windows[1] === '10.0' ? '10/11' : windows[1];
+      return `Windows ${version}`;
+    }
+
+    const mac = ua.match(/Mac OS X ([0-9_]+)/);
+    if (mac) return `macOS ${mac[1].replace(/_/g, '.')}`;
+
+    const iphone = ua.match(/iPhone OS ([0-9_]+)/);
+    if (iphone) return `iOS ${iphone[1].replace(/_/g, '.')}`;
+
+    const ipad = ua.match(/iPad.*OS ([0-9_]+)/);
+    if (ipad) return `iPadOS ${ipad[1].replace(/_/g, '.')}`;
+
+    const android = ua.match(/Android ([0-9.]+)/);
+    if (android) return `Android ${android[1]}`;
+
+    if (ua.includes('Linux')) return 'Linux';
+
+    return null;
   }
 
   // ── Audit log methods ──

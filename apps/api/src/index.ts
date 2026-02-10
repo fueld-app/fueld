@@ -28,6 +28,7 @@ import {
   logScreenshotEvent,
   onEntityView,
   sendToSocket,
+  extractClientIp,
 } from './modules/activity/session-tracker';
 import { getNearbyVessels, getNearbyVesselPositions, syncPlaceFromSeasearcher } from './modules/lloyds/lli.service';
 import { syncVesselFromSeasearcher } from './modules/vessels/vessel.service';
@@ -203,10 +204,12 @@ const app = new Elysia()
           });
           userName = dbUser?.name ?? (raw['email'] as string);
         }
+        const request = (ws as any).data?.request as Request | undefined;
         const ip =
-          (ws as any).raw?.remoteAddress ??
-          (ws as any).remoteAddress ??
-          null;
+          (request ? extractClientIp(request) : null)
+          ?? (ws as any).raw?.remoteAddress
+          ?? (ws as any).remoteAddress
+          ?? null;
         addSession(socketId, ws, {
           userId: raw['sub'] as string,
           email: raw['email'] as string,
