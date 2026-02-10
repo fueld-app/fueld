@@ -90,7 +90,7 @@ log "Health check passed ✓"
 
 # ─── 6. Switch nginx upstream ────────────────────────────────────────
 log "Switching nginx upstream to port ${NEXT_PORT}..."
-cat > /etc/nginx/conf.d/fueld-upstream.conf <<EOF
+sudo tee /etc/nginx/conf.d/fueld-upstream.conf >/dev/null <<EOF
 upstream fueld_api {
     server 127.0.0.1:${NEXT_PORT};
 }
