@@ -29,12 +29,16 @@ const daysFromNow = (n: number) => new Date(Date.now() + n * 24 * 60 * 60 * 1000
 async function seed() {
   console.log('🌱 Seeding database...\n');
 
+  const seedMode = (process.env['SEED_MODE'] ?? 'full').toLowerCase();
+
   // ─── 1. Tenant ─────────────────────────────────────────────────────
+  const tenantName = process.env['TENANT_NAME'] ?? 'Fueld Trading';
+  const tenantDomain = process.env['TENANT_DOMAIN'] ?? 'fueld.io';
   const [tenant] = await db
     .insert(schema.tenants)
     .values({
-      name: 'Fueld Trading',
-      domain: 'fueld.io',
+      name: tenantName,
+      domain: tenantDomain,
     })
     .returning();
   console.log(`  ✓ Tenant: ${tenant.name} (${tenant.id})`);
@@ -62,6 +66,18 @@ async function seed() {
     })
     .returning();
   console.log(`  ✓ Production admin: admin@fueld.app`);
+
+  if (seedMode === 'admin') {
+    console.log('\n✅ Admin-only seed complete.');
+    console.log('  Login credentials:');
+    console.log('  ┌────────────────────────┬─────────────┬─────────┐');
+    console.log('  │ Email                  │ Password    │ Role    │');
+    console.log('  ├────────────────────────┼─────────────┼─────────┤');
+    console.log('  │ admin@fueld.app        │ (provided)  │ ADMIN   │');
+    console.log('  └────────────────────────┴─────────────┴─────────┘');
+    await sql.end();
+    process.exit(0);
+  }
 
   const [admin] = await db
     .insert(schema.users)
