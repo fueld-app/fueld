@@ -6,14 +6,17 @@
 set -euo pipefail
 
 DOMAIN="riviera-marine.fueld.app"
+BASE_DOMAIN="fueld.app"
+WILDCARD_DOMAIN="*.fueld.app"
 DEPLOY_USER="deploy"
 DB_NAME="fueld"
 DB_USER="fueld"
 DB_PASSWORD="${DB_PASSWORD:-$(openssl rand -base64 24)}"
 ADMIN_PASSWORD="$(openssl rand -base64 16 | tr -dc 'A-Za-z0-9' | head -c 20)"
+CF_API_TOKEN="${CF_API_TOKEN:-}"
 
 echo "═══════════════════════════════════════════════════════════"
-echo "  Fueld VPS Setup — $DOMAIN"
+echo "  Fueld VPS Setup — $DOMAIN ($WILDCARD_DOMAIN)"
 echo "═══════════════════════════════════════════════════════════"
 
 # ─── 1. System updates ───────────────────────────────────────────────
@@ -27,7 +30,7 @@ apt-get upgrade -y -qq
 echo "▶ Installing Nginx, Certbot, utilities..."
 apt-get install -y -qq \
   nginx \
-  certbot python3-certbot-nginx \
+  certbot python3-certbot-nginx python3-certbot-dns-cloudflare \
   postgresql postgresql-contrib \
   curl unzip jq git ufw fail2ban
 
@@ -221,7 +224,7 @@ cat > /etc/nginx/sites-available/$DOMAIN.conf <<'NGINX'
 server {
     listen 80;
     listen [::]:80;
-    server_name riviera-marine.fueld.app;
+    server_name *.fueld.app;
 
     # Allow ACME challenges for Certbot
     location /.well-known/acme-challenge/ {
@@ -237,11 +240,11 @@ server {
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
-    server_name riviera-marine.fueld.app;
+    server_name *.fueld.app;
 
     # SSL (managed by Certbot — placeholders until certs are issued)
-    ssl_certificate /etc/letsencrypt/live/riviera-marine.fueld.app/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/riviera-marine.fueld.app/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/fueld.app/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/fueld.app/privkey.pem;
     ssl_session_timeout 1d;
     ssl_session_cache shared:SSL:10m;
     ssl_session_tickets off;
@@ -328,38 +331,32 @@ ln -sf /etc/nginx/sites-available/$DOMAIN.conf /etc/nginx/sites-enabled/
 echo "  ✓ Nginx configured"
 
 # ─── 12. SSL Certificates ────────────────────────────────────────────
-echo "▶ Obtaining SSL certificate..."
+echo "▶ Obtaining wildcard SSL certificate ($WILDCARD_DOMAIN)..."
 
-# First, start nginx with just HTTP (comment out SSL server block temporarily)
-# Create a temporary HTTP-only config for certbot
-cat > /etc/nginx/sites-available/$DOMAIN-temp.conf <<EOF
-server {
-    listen 80;
-    listen [::]:80;
-    server_name $DOMAIN;
+if [ -z "$CF_API_TOKEN" ]; then
+  echo "❌ CF_API_TOKEN is required for wildcard certificates via Cloudflare DNS."
+  echo "   Export it before running:"
+  echo "   CF_API_TOKEN=your_cloudflare_token bash setup-vps.sh"
+  exit 1
+fi
 
-    location /.well-known/acme-challenge/ {
-        root /var/www/html;
-    }
-
-    location / {
-        return 200 'Setting up...';
-        add_header Content-Type text/plain;
-    }
-}
+mkdir -p /root/.secrets/certbot
+cat > /root/.secrets/certbot/cloudflare.ini <<EOF
+dns_cloudflare_api_token = $CF_API_TOKEN
 EOF
-ln -sf /etc/nginx/sites-available/$DOMAIN-temp.conf /etc/nginx/sites-enabled/
-rm -f /etc/nginx/sites-enabled/$DOMAIN.conf
+chmod 600 /root/.secrets/certbot/cloudflare.ini
 
-nginx -t && systemctl restart nginx
-
-# Get certificate
-certbot certonly --nginx -d $DOMAIN --non-interactive --agree-tos --email admin@fueld.app
+# Request wildcard cert via DNS-01 (Cloudflare)
+certbot certonly \
+  --dns-cloudflare \
+  --dns-cloudflare-credentials /root/.secrets/certbot/cloudflare.ini \
+  -d "$WILDCARD_DOMAIN" \
+  --cert-name "$BASE_DOMAIN" \
+  --non-interactive --agree-tos --email admin@fueld.app
 
 # Now enable the full config
-rm -f /etc/nginx/sites-enabled/$DOMAIN-temp.conf
 ln -sf /etc/nginx/sites-available/$DOMAIN.conf /etc/nginx/sites-enabled/
-nginx -t && systemctl reload nginx
+nginx -t && systemctl restart nginx
 
 # Auto-renewal
 systemctl enable certbot.timer
