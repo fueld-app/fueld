@@ -4,7 +4,6 @@ import {
   signal,
   computed,
   inject,
-  effect,
   OnInit,
   ElementRef,
   ViewChild,
@@ -12,9 +11,7 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import type { CollectionsResponseDto, OverdueInvoiceDto, TeamStatsResponseDto } from '@fueld/types';
-import type { EChartsOption } from 'echarts';
-import { NgxEchartsModule } from 'ngx-echarts';
+import type { CollectionsResponseDto, TeamStatsResponseDto } from '@fueld/types';
 
 import { CollectionsWidgetComponent } from '../../features/dashboard/components/collections-widget/collections-widget.component';
 import { AuthService } from '../../core/auth/auth.service';
@@ -23,12 +20,10 @@ import { AuthService } from '../../core/auth/auth.service';
 //  Dashboard Page — Manager view with collections and team stats
 // ═══════════════════════════════════════════════════════════════════════
 
-import { API_URL } from '@app/core/config/api';
-
 @Component({
   selector: 'app-dashboard-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, FormsModule, CollectionsWidgetComponent, NgxEchartsModule],
+  imports: [RouterLink, FormsModule, CollectionsWidgetComponent],
   template: `
     <div>
       <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -149,11 +144,11 @@ import { API_URL } from '@app/core/config/api';
             <h3 class="text-lg font-semibold text-gray-900">Sales Funnel</h3>
             <a routerLink="/analytics" class="text-xs font-medium text-brand-600 hover:text-brand-700 transition-colors">View Analytics &rarr;</a>
           </div>
-          <div echarts [options]="funnelChartOptions" class="h-[350px]"></div>
+          <p class="text-sm text-gray-500">No data available yet.</p>
         </div>
         <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
           <h3 class="text-lg font-semibold text-gray-900 mb-4">Loss Analysis</h3>
-          <div echarts [options]="lossAnalysisChartOptions" class="h-[350px]"></div>
+          <p class="text-sm text-gray-500">No data available yet.</p>
         </div>
       </div>
     </div>
@@ -164,10 +159,6 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   private readonly elRef = inject(ElementRef);
 
   @ViewChild('dateDropdown') dateDropdownRef!: ElementRef;
-
-  // ─── Charts ──────────────────────────────────────────────────────
-  funnelChartOptions: EChartsOption = {};
-  lossAnalysisChartOptions: EChartsOption = {};
 
   // ─── Date Range ──────────────────────────────────────────────────
   readonly dateDropdownOpen = signal(false);
@@ -269,88 +260,11 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     traderPerformance: [],
   });
 
-  // ─── Data fetches (will use a proper service in Phase 7) ────────
-
-  // Mock data for overdue invoices
-  private mockOverdueInvoices: OverdueInvoiceDto[] = [
-    {
-      invoiceId: 'inv-001',
-      invoiceNumber: 'INV-2026-0001',
-      orderId: 'ord-001',
-      clientName: 'Oceanic Logistics',
-      vesselName: 'MV Neptune',
-      amount: '125,000.00',
-      amountPaid: '0.00',
-      dueDate: '2026-01-15',
-      daysOverdue: 22,
-      status: 'OVERDUE',
-      comments: [
-        { id: 'cmt-1', invoiceId: 'inv-001', userId: 'u-2', comment: 'Followed up with client, awaiting payment approval.', nextActionDate: null, createdAt: '2026-02-01' }
-      ]
-    },
-    {
-      invoiceId: 'inv-002',
-      invoiceNumber: 'INV-2026-0005',
-      orderId: 'ord-002',
-      clientName: 'Global Shipping Corp.',
-      vesselName: 'MV Horizon',
-      amount: '75,500.00',
-      amountPaid: '0.00',
-      dueDate: '2026-01-20',
-      daysOverdue: 17,
-      status: 'OVERDUE',
-      comments: []
-    },
-    {
-      invoiceId: 'inv-003',
-      invoiceNumber: 'INV-2026-0012',
-      orderId: 'ord-003',
-      clientName: 'Apex Maritime Solutions',
-      vesselName: 'MV Voyager',
-      amount: '210,000.00',
-      amountPaid: '0.00',
-      dueDate: '2026-01-05',
-      daysOverdue: 32,
-      status: 'OVERDUE',
-      comments: [
-        { id: 'cmt-2', invoiceId: 'inv-003', userId: 'u-1', comment: 'Client requesting partial payment plan. Pending approval.', nextActionDate: null, createdAt: '2026-01-30' },
-        { id: 'cmt-3', invoiceId: 'inv-003', userId: 'u-1', comment: 'Sent reminder 3 days ago.', nextActionDate: null, createdAt: '2026-01-28' }
-      ]
-    },
-  ];
-
-  constructor() {
-    // Load mock data reactively when teamView changes
-    effect(() => {
-      const isTeamView = this.teamView();
-
-      this.collections.set({
-        items: this.mockOverdueInvoices,
-        count: this.mockOverdueInvoices.length,
-      });
-
-      this.teamStats.set({
-        totalTraders: isTeamView ? 4 : 1,
-        activeOrders: isTeamView ? 25 : 7,
-        totalRevenueYTD: isTeamView ? 'USD 12,345,678' : 'USD 3,210,987',
-        avgDealSize: isTeamView ? 'USD 250,000' : 'USD 180,000',
-        traderPerformance: isTeamView ? [
-          { name: 'Patrick Nielsen', orders: 7, revenue: '2.3M', margin: '3.1%' },
-          { name: 'Jane Smith', orders: 8, revenue: '3.5M', margin: '3.0%' },
-          { name: 'John Doe', orders: 6, revenue: '2.8M', margin: '3.2%' },
-          { name: 'Emily White', orders: 4, revenue: '3.7M', margin: '2.9%' },
-        ] : [
-          { name: 'Patrick Nielsen', orders: 7, revenue: '2.3M', margin: '3.1%' },
-        ],
-      });
-    });
-  }
+  constructor() {}
 
   // ─── Lifecycle ────────────────────────────────────────────────────
 
   ngOnInit(): void {
-    this.initFunnelChart();
-    this.initLossAnalysisChart();
     document.addEventListener('click', this.clickOutsideHandler);
   }
 
@@ -390,70 +304,4 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
   }
 
-  // ─── Chart Initialisation ───────────────────────────────────────
-
-  private initFunnelChart(): void {
-    this.funnelChartOptions = {
-      tooltip: {
-        trigger: 'item',
-        formatter: '{a} <br/>{b} : {c} units',
-      },
-      legend: {
-        data: ['Inquiries', 'Offers', 'Orders'],
-      },
-      series: [
-        {
-          name: 'Sales Funnel',
-          type: 'funnel',
-          left: '10%',
-          top: 60,
-          bottom: 60,
-          width: '80%',
-          gap: 2,
-          label: { show: true, position: 'inside' },
-          labelLine: { length: 10, lineStyle: { width: 1, type: 'solid' } },
-          itemStyle: { borderColor: '#fff', borderWidth: 1 },
-          emphasis: { label: { fontSize: 20 } },
-          data: [
-            { value: 1000, name: 'Inquiries' },
-            { value: 600, name: 'Offers' },
-            { value: 300, name: 'Orders' },
-          ],
-        },
-      ],
-    };
-  }
-
-  private initLossAnalysisChart(): void {
-    this.lossAnalysisChartOptions = {
-      tooltip: {
-        trigger: 'item',
-        formatter: '{a} <br/>{b} : {c} ({d}%)',
-      },
-      legend: {
-        bottom: '1%',
-        left: 'center',
-        data: ['Price', 'Credit', 'Logistics', 'Other'],
-      },
-      series: [
-        {
-          name: 'Loss Reasons',
-          type: 'pie',
-          radius: ['40%', '70%'],
-          center: ['50%', '50%'],
-          avoidLabelOverlap: false,
-          itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
-          label: { show: false, position: 'center' },
-          emphasis: { label: { show: true, fontSize: 20, fontWeight: 'bold' } },
-          labelLine: { show: false },
-          data: [
-            { value: 150, name: 'Price', itemStyle: { color: '#ef4444' } },
-            { value: 80, name: 'Credit', itemStyle: { color: '#f97316' } },
-            { value: 40, name: 'Logistics', itemStyle: { color: '#facc15' } },
-            { value: 30, name: 'Other', itemStyle: { color: '#a3a3a3' } },
-          ],
-        },
-      ],
-    };
-  }
 }
