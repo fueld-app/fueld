@@ -260,7 +260,7 @@ interface CompanySearchResultOption {
                       <button (click)="addCompany(c)" class="flex w-full items-center gap-2 px-3 py-2 text-sm text-left hover:bg-gray-50">
                         <span class="font-medium text-gray-900">{{ c.name }}</span>
                         @if (c.source === 'seasearcher') {
-                          <span class="text-[10px] font-semibold uppercase text-amber-600">Seasearcher</span>
+                          <span class="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">Import</span>
                         } @else if (c.country) {
                           <span class="text-xs text-gray-500">{{ c.country }}</span>
                         }

@@ -986,7 +986,8 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
         .filter((r) => r.source === 'seasearcher' && r.seasearcherId)
         .map((r) => ({
           value: `seasearcher:${r.seasearcherId}`,
-          label: `Seasearcher · ${r.name}${r.country ? ` (${r.country})` : ''}`,
+          label: `${r.name}${r.country ? ` (${r.country})` : ''}`,
+          actionLabel: 'Import',
         }));
     } catch {
       return [];
@@ -1005,7 +1006,8 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
         .filter((r) => r.source === 'seasearcher' && r.seasearcherId)
         .map((r) => ({
           value: `seasearcher:${r.seasearcherId}`,
-          label: `Seasearcher · ${r.name}${r.imo ? ` (IMO ${r.imo})` : ''}`,
+          label: `${r.name}${r.imo ? ` (IMO ${r.imo})` : ''}`,
+          actionLabel: 'Import',
         }));
     } catch {
       return [];
@@ -1024,7 +1026,8 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
         .filter((r) => r.source === 'lloyds' && r.lliPlaceId)
         .map((r) => ({
           value: `lli:${r.lliPlaceId}`,
-          label: `Seasearcher · ${r.name}${r.country ? ` (${r.country})` : ''}`,
+          label: `${r.name}${r.country ? ` (${r.country})` : ''}`,
+          actionLabel: 'Import',
         }));
     } catch {
       return [];

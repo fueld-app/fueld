@@ -202,7 +202,7 @@ interface CompanySearchResultOption {
                           </svg>
                           <span class="font-medium text-gray-900">{{ c.name }}</span>
                           @if (c.source === 'seasearcher') {
-                            <span class="text-[10px] font-semibold uppercase text-amber-600">Seasearcher</span>
+                            <span class="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">Import</span>
                           } @else if (c.country) {
                             <span class="text-xs text-gray-500">{{ c.country }}</span>
                           }
@@ -508,8 +508,9 @@ export class SupplierCreditPageComponent implements OnInit {
       await this.importCounterpartyFromSeasearcher(company.seasearcherId);
       return;
     }
-    if (!company.id) return;
-    this.selectedCounterparties.update((list) => [...list, { id: company.id, name: company.name }]);
+    const id = company.id;
+    if (!id) return;
+    this.selectedCounterparties.update((list) => [...list, { id, name: company.name }]);
     this.companySearchResults.update((results) => results.filter((r) => r.key !== company.key));
     this.companySearch.set('');
   }

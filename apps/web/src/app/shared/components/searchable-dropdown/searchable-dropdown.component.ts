@@ -20,6 +20,7 @@ import { FormsModule } from '@angular/forms';
 export interface DropdownOption {
   value: string;
   label: string;
+  actionLabel?: string;
 }
 
 @Component({
@@ -93,12 +94,21 @@ export interface DropdownOption {
             (click)="selectOption(opt)"
             (mouseenter)="highlightIndex.set(i)"
           >
-            {{ opt.label }}
-            @if (opt.value === selected()) {
-              <svg class="ml-auto inline h-4 w-4 text-brand-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" />
-              </svg>
-            }
+            <div class="flex items-center justify-between gap-3">
+              <span>{{ opt.label }}</span>
+              <div class="flex items-center gap-2">
+                @if (opt.actionLabel) {
+                  <span class="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                    {{ opt.actionLabel }}
+                  </span>
+                }
+                @if (opt.value === selected()) {
+                  <svg class="h-4 w-4 text-brand-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" />
+                  </svg>
+                }
+              </div>
+            </div>
           </li>
         } @empty {
           @if (loading()) {

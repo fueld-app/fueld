@@ -860,7 +860,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                                   class="w-full px-3 py-2 text-left text-sm hover:bg-brand-50 transition-colors flex items-center justify-between">
                                   <span class="font-medium text-gray-900">{{ c.name }}</span>
                                   @if (c.source === 'seasearcher') {
-                                    <span class="text-[10px] font-semibold uppercase text-amber-600">Seasearcher</span>
+                                    <span class="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">Import</span>
                                   } @else if (c.country) {
                                     <span class="text-xs text-gray-400">{{ c.country }}</span>
                                   }
