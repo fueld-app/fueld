@@ -10,7 +10,6 @@
 
 import { broadcastToAll } from '../activity/session-tracker';
 import * as protobuf from 'protobufjs';
-import * as path from 'path';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -91,17 +90,7 @@ message PricingData {
 
 async function initYahooWs(): Promise<void> {
   try {
-    const protoPath = path.resolve(
-      import.meta.dir, '..', '..', '..', 'yahoo_finance.proto',
-    );
-    let protoText: string;
-    try {
-      protoText = await Bun.file(protoPath).text();
-    } catch {
-      console.warn('[Prices] Proto file not found, using embedded schema');
-      protoText = YAHOO_PROTO_FALLBACK;
-    }
-    const root = protobuf.parse(protoText).root;
+    const root = protobuf.parse(YAHOO_PROTO_FALLBACK).root;
     PricingData = root.lookupType('yahoo.finance.PricingData');
     console.log('[Prices] Protobuf schema loaded');
 
