@@ -11,6 +11,7 @@ import {
 } from './admin.service';
 import { disconnectUserSessions } from '../activity/session-tracker';
 import type { ApiResponse } from '@fueld/types';
+import { sendInviteEmail } from '../../lib/email';
 
 // ─── Admin Controller ────────────────────────────────────────────────
 // All endpoints require ADMIN role.
@@ -69,9 +70,21 @@ export const adminController = new Elysia({ prefix: '/admin' })
       const baseUrl = process.env['APP_URL'] || 'http://localhost:4200';
       const inviteLink = `${baseUrl}/invite/${invite.token}`;
 
+      let emailSent = false;
+      try {
+        emailSent = await sendInviteEmail({
+          to: invite.email,
+          inviteLink,
+          invitedByName: invite.invitedByName,
+          role: invite.role,
+        });
+      } catch (err: any) {
+        console.warn('[Email] Invite send failed:', err?.message ?? err);
+      }
+
       return {
         success: true,
-        data: { ...invite, inviteLink },
+        data: { ...invite, inviteLink, emailSent },
       } satisfies ApiResponse<unknown>;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to invite user';
