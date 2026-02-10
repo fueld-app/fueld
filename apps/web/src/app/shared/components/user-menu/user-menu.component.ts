@@ -14,6 +14,7 @@ import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import type { ApiResponse } from '@fueld/types';
 import { AuthService } from '../../../core/auth/auth.service';
+import { PushService } from '../../../core/pwa/push.service';
 
 import { API } from '@app/core/config/api';
 
@@ -124,6 +125,35 @@ import { API } from '@app/core/config/api';
           </div>
         </div>
         <div class="py-1">
+          @if (notificationsSupported()) {
+            @if (notificationPermission() === 'granted') {
+              <button
+                (click)="disableNotifications()"
+                class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                role="menuitem"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M10 2a6 6 0 00-6 6v2.5c0 .67-.167 1.33-.486 1.92l-.91 1.67A1 1 0 004.5 16h11a1 1 0 00.896-1.41l-.91-1.67A4 4 0 0115 10.5V8a6 6 0 00-6-6zm0 16a2.5 2.5 0 002.45-2h-4.9A2.5 2.5 0 0010 18z" clip-rule="evenodd" />
+                </svg>
+                Disable notifications
+              </button>
+            } @else if (notificationPermission() === 'denied') {
+              <div class="px-4 py-2 text-xs text-gray-500">
+                Notifications are blocked in your browser settings.
+              </div>
+            } @else {
+              <button
+                (click)="enableNotifications()"
+                class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                role="menuitem"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M10 2a6 6 0 00-6 6v2.5c0 .67-.167 1.33-.486 1.92l-.91 1.67A1 1 0 004.5 16h11a1 1 0 00.896-1.41l-.91-1.67A4 4 0 0115 10.5V8a6 6 0 00-6-6zm0 16a2.5 2.5 0 002.45-2h-4.9A2.5 2.5 0 0010 18z" clip-rule="evenodd" />
+                </svg>
+                Enable notifications
+              </button>
+            }
+          }
           <button
             (click)="goToSecurity()"
             class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
@@ -155,6 +185,7 @@ export class UserMenuComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
   private readonly elRef = inject(ElementRef);
+  private readonly pushService = inject(PushService);
 
   @ViewChild('avatarInput') avatarInput!: ElementRef<HTMLInputElement>;
 
@@ -164,6 +195,8 @@ export class UserMenuComponent implements OnInit, OnDestroy {
   readonly userEmail = this.auth.userEmail;
   readonly initials = this.auth.userInitials;
   readonly avatarUrl = this.auth.avatarUrl;
+  readonly notificationsSupported = this.pushService.supported;
+  readonly notificationPermission = this.pushService.permission;
 
   private clickOutsideHandler = (event: MouseEvent) => {
     if (!this.elRef.nativeElement.contains(event.target)) {
@@ -191,6 +224,16 @@ export class UserMenuComponent implements OnInit, OnDestroy {
   handleLogout(): void {
     this.isOpen.set(false);
     this.auth.logout();
+  }
+
+  enableNotifications(): void {
+    this.isOpen.set(false);
+    void this.pushService.requestPermissionAndSubscribe();
+  }
+
+  disableNotifications(): void {
+    this.isOpen.set(false);
+    void this.pushService.unsubscribe();
   }
 
   triggerAvatarUpload(event: Event): void {

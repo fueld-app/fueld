@@ -4,6 +4,7 @@ import {
   signal,
   computed,
   inject,
+  effect,
   ElementRef,
   viewChild,
   HostListener,
@@ -19,6 +20,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { WebSocketService } from '../../core/websocket/websocket.service';
 import { UserMenuComponent } from '../../shared/components/user-menu/user-menu.component';
 import type { ApiResponse, PlaceDto, VesselDto } from '@fueld/types';
+import { AppUpdateService } from '../../core/pwa/app-update.service';
 
 import { API } from '@app/core/config/api';
 
@@ -213,6 +215,26 @@ const NAVIGATION: NavItem[] = [
     <!--  Main content area                                             -->
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <div class="flex min-h-screen flex-col lg:pl-64">
+      @if (showUpdateToast()) {
+        <div class="fixed right-4 top-4 z-50 w-80 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-lg">
+          <p class="text-sm font-semibold text-amber-900">Update available</p>
+          <p class="mt-1 text-xs text-amber-800">Reload to get the latest fixes and features.</p>
+          <div class="mt-3 flex items-center gap-2">
+            <button
+              class="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700"
+              (click)="reloadForUpdate()"
+            >
+              Reload
+            </button>
+            <button
+              class="rounded-md px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100"
+              (click)="dismissUpdateToast()"
+            >
+              Later
+            </button>
+          </div>
+        </div>
+      }
       <!-- Top bar -->
       <header class="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-gray-200 bg-white/80 px-4 backdrop-blur-md sm:px-6 lg:px-8">
         <!-- Hamburger (mobile only) -->
@@ -369,6 +391,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   private readonly router = inject(Router);
   private readonly wsService = inject(WebSocketService);
   private readonly titleService = inject(Title);
+  private readonly updateService = inject(AppUpdateService);
   private routerSub: Subscription | null = null;
   private priceSub: Subscription | null = null;
   private copyHandler: ((e: ClipboardEvent) => void) | null = null;
@@ -377,6 +400,16 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
   readonly sidebarOpen = signal(false);
   readonly commodityPrices = signal<CommodityPrice[]>([]);
+  readonly updateDismissed = signal(false);
+  readonly showUpdateToast = computed(() =>
+    this.updateService.updateAvailable() && !this.updateDismissed(),
+  );
+
+  private readonly updateReset = effect(() => {
+    if (this.updateService.updateAvailable()) {
+      this.updateDismissed.set(false);
+    }
+  });
 
   ngOnInit(): void {
     // Subscribe to commodity price updates from WebSocket
@@ -449,6 +482,14 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     if (this.screenshotHandler) {
       document.removeEventListener('keydown', this.screenshotHandler as EventListener);
     }
+  }
+
+  reloadForUpdate(): void {
+    void this.updateService.activateUpdateAndReload();
+  }
+
+  dismissUpdateToast(): void {
+    this.updateDismissed.set(true);
   }
 
   openNewInquiry(): void {

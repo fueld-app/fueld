@@ -38,6 +38,7 @@ import { db } from './db';
 import { users } from './db/schema';
 import { eq } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
+import { pushController } from './modules/push/push.controller';
 
 // ─── Run pending database migrations on startup ─────────────────────
 const MIGRATIONS_DIR = process.env['MIGRATIONS_DIR'] || './drizzle';
@@ -78,6 +79,7 @@ const app = new Elysia()
           { name: 'Documents', description: 'Invoice PDF generation & email' },
           { name: 'Dashboard', description: 'Collections, pipeline & team stats' },
           { name: 'Lloyd\'s', description: 'Lloyd\'s List Intelligence vessel, port & company lookup' },
+          { name: 'Push', description: 'Push notification subscriptions' },
         ],
         components: {
           securitySchemes: {
@@ -131,6 +133,7 @@ const app = new Elysia()
   .use(ordersController)
   .use(commentsController)
   .use(securityController)
+  .use(pushController)
 
   // ─── Static file serving for uploads ───────────────────────────────
   .get('/uploads/avatars/:filename', async ({ params, set }) => {

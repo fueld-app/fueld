@@ -156,6 +156,22 @@ export const users = pgTable('users', {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
+//  3b. PUSH NOTIFICATION SUBSCRIPTIONS
+// ═══════════════════════════════════════════════════════════════════════
+
+export const pushSubscriptions = pgTable('push_subscriptions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  endpoint: text('endpoint').notNull().unique(),
+  p256dh: text('p256dh').notNull(),
+  auth: text('auth').notNull(),
+  expirationTime: timestamp('expiration_time', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ═══════════════════════════════════════════════════════════════════════
 //  4. COUNTERPARTIES
 // ═══════════════════════════════════════════════════════════════════════
 

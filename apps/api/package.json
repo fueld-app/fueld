@@ -30,13 +30,15 @@
     "pdfmake": "^0.3.3",
     "postgres": "^3.4.8",
     "protobufjs": "^8.0.0",
-    "qrcode": "^1.5.4"
+    "qrcode": "^1.5.4",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@types/bun": "latest",
     "@types/geoip-lite": "^1.4.4",
     "@types/pdfmake": "^0.3.0",
     "@types/qrcode": "^1.5.6",
+    "@types/web-push": "^3.6.4",
     "drizzle-kit": "^0.31.8",
     "typescript": "^5.7.0"
   }

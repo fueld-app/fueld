@@ -145,6 +145,11 @@ MIGRATIONS_DIR=/opt/fueld/drizzle
 # GeoIP data directory (geoip-lite)
 GEODATADIR=/opt/fueld/geoip-data
 
+# Push notifications (Web Push / VAPID)
+# VAPID_PUBLIC_KEY=
+# VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=mailto:support@fueld.app
+
 # Lloyd's List Intelligence (optional)
 # LLI_USERNAME=
 # LLI_PASSWORD=

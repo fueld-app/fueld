@@ -1,0 +1,56 @@
+{
+  "$schema": "./node_modules/@angular/service-worker/config/schema.json",
+  "index": "/index.html",
+  "assetGroups": [
+    {
+      "name": "app",
+      "installMode": "prefetch",
+      "resources": {
+        "files": [
+          "/index.html",
+          "/*.css",
+          "/*.js"
+        ]
+      }
+    },
+    {
+      "name": "assets",
+      "installMode": "lazy",
+      "updateMode": "prefetch",
+      "resources": {
+        "files": [
+          "/favicon.ico",
+          "/favicon.svg",
+          "/manifest.webmanifest",
+          "/assets/**",
+          "/*.(png|jpg|jpeg|svg|webp|gif)"
+        ]
+      }
+    }
+  ],
+  "dataGroups": [
+    {
+      "name": "app-shell-routes",
+      "urls": [
+        "/",
+        "/dashboard",
+        "/trading/orders",
+        "/trading/inquiries",
+        "/trading/orders/**",
+        "/trading/inquiries/**"
+      ],
+      "cacheConfig": {
+        "strategy": "freshness",
+        "maxSize": 20,
+        "maxAge": "1d",
+        "timeout": "5s"
+      }
+    }
+  ],
+  "navigationUrls": [
+    "/**",
+    "!/api/**",
+    "!/uploads/**",
+    "!/**.*"
+  ]
+}
