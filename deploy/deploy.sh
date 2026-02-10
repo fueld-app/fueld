@@ -64,8 +64,16 @@ fi
 
 # ─── 4. Start new slot ───────────────────────────────────────────────
 log "Starting fueld-api@${NEXT_SLOT}..."
-sudo systemctl start "fueld-api@${NEXT_SLOT}" 2>/dev/null || true
+sudo systemctl stop "fueld-api@${NEXT_SLOT}" 2>/dev/null || true
+sudo systemctl reset-failed "fueld-api@${NEXT_SLOT}" 2>/dev/null || true
+sudo systemctl start "fueld-api@${NEXT_SLOT}"
 sleep 2
+
+if ! systemctl is-active --quiet "fueld-api@${NEXT_SLOT}"; then
+  err "${NEXT_SLOT} failed to start"
+  systemctl status "fueld-api@${NEXT_SLOT}" --no-pager || true
+  exit 1
+fi
 
 # ─── 5. Health check new slot ────────────────────────────────────────
 log "Health checking ${NEXT_SLOT} on port ${NEXT_PORT}..."
@@ -81,6 +89,7 @@ done
 
 if [ "$HEALTHY" = false ]; then
   err "Health check failed for ${NEXT_SLOT}! Rolling back..."
+  journalctl -u "fueld-api@${NEXT_SLOT}" -n 80 --no-pager || true
   sudo systemctl stop "fueld-api@${NEXT_SLOT}" 2>/dev/null || true
   err "Deploy aborted. Active slot (${ACTIVE_SLOT}) unchanged."
   exit 1
