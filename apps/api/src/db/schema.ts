@@ -213,6 +213,9 @@ export const counterparties = pgTable('counterparties', {
   isSanctioned: boolean('is_sanctioned').default(false),
   lastSynced: timestamp('last_synced', { withTimezone: true }),
 
+  // ── Responsible user ───────────────────────────────────────────────
+  responsibleUserId: uuid('responsible_user_id').references(() => users.id),
+
   // Company logo (for own companies — used in PDF generation)
   logoUrl: text('logo_url'),
 
@@ -763,6 +766,7 @@ export const passkeysRelations = relations(passkeys, ({ one }) => ({
 
 export const counterpartiesRelations = relations(counterparties, ({ one, many }) => ({
   tenant: one(tenants, { fields: [counterparties.tenantId], references: [tenants.id] }),
+  responsibleUser: one(users, { fields: [counterparties.responsibleUserId], references: [users.id] }),
   clientOrders: many(orders),
   suppliedItems: many(orderItems),
   teamCompanies: many(teamCompanies),

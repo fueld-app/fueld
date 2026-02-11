@@ -144,6 +144,12 @@ interface CompanyOrder {
   salesRepId: string | null;
 }
 
+interface UserOption {
+  id: string;
+  name: string;
+  email: string;
+}
+
 interface FleetVessel {
   id: string;
   imo: string;
@@ -363,6 +369,25 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 </svg>
                 Synced {{ company()!.lastSynced | date:'short' }}
               </span>
+            }
+            <span class="text-gray-300">|</span>
+            <span class="text-xs text-gray-500">Responsible:</span>
+            <select
+              [ngModel]="responsibleUserId() ?? ''"
+              (ngModelChange)="onResponsibleUserChange($event)"
+              [disabled]="savingResponsible()"
+              class="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
+            >
+              <option value="">— None —</option>
+              @for (u of teamUsers(); track u.id) {
+                <option [value]="u.id">{{ u.name }}</option>
+              }
+            </select>
+            @if (savingResponsible()) {
+              <svg class="h-3.5 w-3.5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+              </svg>
             }
           </div>
           <app-last-edited-badge entityType="company" [entityId]="company()!.id" />
@@ -1520,6 +1545,9 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly deleting = signal(false);
   readonly deleteError = signal('');
   readonly typeSaving = signal(false);
+  readonly teamUsers = signal<UserOption[]>([]);
+  readonly responsibleUserId = signal<string | null>(null);
+  readonly savingResponsible = signal(false);
 
   readonly allTypes = ALL_TYPES;
 
@@ -1594,6 +1622,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
+    this.loadUsers();
     if (id) this.loadCompany(id);
 
     // React to same-route navigation (e.g. clicking related company links)
@@ -1610,6 +1639,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
       const current = this.company();
       if (current && data.id === current.id) {
         this.company.set(data);
+        this.responsibleUserId.set(data.responsibleUserId ?? null);
         this.syncing.set(false);
         // Refresh enrichment & contacts after sync
         if (data.seasearcherId) {
@@ -1656,6 +1686,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
       );
       if (res.success && res.data) {
         this.company.set(res.data);
+        this.responsibleUserId.set(res.data.responsibleUserId ?? null);
         this.pageTitle.setTitle(`Fueld | Companies > ${res.data.name}`);
         this.wsService.sendPresence(this.router.url, this.pageTitle.getTitle());
         // Load orders & enrichment in parallel
@@ -2352,6 +2383,40 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
       this.loadCompanyEmails(c.id);
     } catch (err) {
       console.error('Failed to delete company email:', err);
+    }
+  }
+
+  // ─── Responsible User ─────────────────────────────────────────────────
+
+  private async loadUsers(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<UserOption[]>>(`${API}/lloyds/users`),
+      );
+      if (res.success && res.data) {
+        this.teamUsers.set(res.data);
+      }
+    } catch (err) {
+      console.error('Failed to load users:', err);
+    }
+  }
+
+  async onResponsibleUserChange(userId: string): Promise<void> {
+    const c = this.company();
+    if (!c) return;
+
+    this.savingResponsible.set(true);
+    try {
+      await firstValueFrom(
+        this.http.patch(`${API}/companies/local/${c.id}/responsible-user`, {
+          userId: userId || null,
+        }),
+      );
+      this.responsibleUserId.set(userId || null);
+    } catch (err) {
+      console.error('Failed to update responsible user:', err);
+    } finally {
+      this.savingResponsible.set(false);
     }
   }
 }

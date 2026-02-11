@@ -23,6 +23,7 @@ import {
   getCompanyBySeasearcherId,
   createCompany,
   updateCompany,
+  updateCompanyResponsibleUser,
   updateCompanyTypes,
   importCompanyFromSeasearcher,
   importCompanyByName,
@@ -430,6 +431,26 @@ export const companiesController = new Elysia({ prefix: '/companies' })
       detail: {
         tags: ['Companies'],
         summary: 'Update company fields (manual companies)',
+      },
+    },
+  )
+
+  // ─── Update Company Responsible User ─────────────────────────────
+  .patch(
+    '/local/:id/responsible-user',
+    async ({ params, body }) => {
+      const updated = await updateCompanyResponsibleUser(params.id, body.userId ?? null);
+      if (!updated) {
+        return { success: false, data: null, message: 'Company not found' };
+      }
+      return { success: true, data: updated } satisfies ApiResponse<typeof updated>;
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({ userId: t.Optional(t.Nullable(t.String())) }),
+      detail: {
+        tags: ['Companies'],
+        summary: 'Update responsible user for a company',
       },
     },
   )

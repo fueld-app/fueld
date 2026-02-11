@@ -131,6 +131,8 @@ export interface CounterpartyDto {
   website: string | null;
   isSanctioned: boolean;
   lastSynced: string | null;
+  responsibleUserId?: string | null;
+  responsibleUserName?: string | null;
 }
 
 export interface CreateCounterpartyDto {

@@ -57,6 +57,13 @@
       "when": 1771200003000,
       "tag": "0007_move_supplier_to_orders",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1771200004000,
+      "tag": "0008_company_responsible_user",
+      "breakpoints": true
     }
   ]
 }

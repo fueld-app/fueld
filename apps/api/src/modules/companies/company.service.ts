@@ -167,7 +167,19 @@ export async function getCompanyById(id: string) {
     .from(counterparties)
     .where(eq(counterparties.id, id))
     .limit(1);
-  return row ?? null;
+  if (!row) return null;
+
+  let responsibleUserName: string | null = null;
+  if (row.responsibleUserId) {
+    const [userRow] = await db
+      .select({ name: users.name })
+      .from(users)
+      .where(eq(users.id, row.responsibleUserId))
+      .limit(1);
+    responsibleUserName = userRow?.name ?? null;
+  }
+
+  return { ...row, responsibleUserName };
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -399,6 +411,22 @@ export async function updateCompanyTypes(companyId: string, types: string[]) {
     .set({
       type: primaryType as any,
       types,
+      updatedAt: new Date(),
+    })
+    .where(eq(counterparties.id, companyId))
+    .returning();
+  return updated ?? null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  UPDATE COMPANY RESPONSIBLE USER
+// ═══════════════════════════════════════════════════════════════════════
+
+export async function updateCompanyResponsibleUser(companyId: string, userId: string | null) {
+  const [updated] = await db
+    .update(counterparties)
+    .set({
+      responsibleUserId: userId,
       updatedAt: new Date(),
     })
     .where(eq(counterparties.id, companyId))
