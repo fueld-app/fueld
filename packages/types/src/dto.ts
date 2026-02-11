@@ -240,6 +240,8 @@ export type VesselCompanyRole = 'OWNER' | 'TIME_CHARTERER' | 'OPERATOR' | 'MANAG
 export interface VesselCompanyDto {
   id: string;
   vesselId: string;
+  vesselName?: string | null;
+  vesselImo?: string | null;
   companyId: string;
   companyName: string;
   role: VesselCompanyRole;

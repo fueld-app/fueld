@@ -17,7 +17,7 @@ import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subscription, skip } from 'rxjs';
 import { Title } from '@angular/platform-browser';
 import * as L from 'leaflet/dist/leaflet-src.esm.js';
-import type { CounterpartyDto, VesselDto, ApiResponse, CompanyContactDto, SupplyPortDto, CompanyEmailDto, CompanyEmailType } from '@fueld/types';
+import type { CounterpartyDto, VesselDto, ApiResponse, CompanyContactDto, SupplyPortDto, CompanyEmailDto, CompanyEmailType, VesselCompanyDto, VesselCompanyRole } from '@fueld/types';
 import { flagFromIso3 } from '../../../../shared/utils/flags';
 import { WebSocketService } from '../../../../core/websocket/websocket.service';
 import { ActivityTimelineComponent } from '../../../../shared/components/activity-timeline/activity-timeline.component';
@@ -128,6 +128,32 @@ interface CompanyEnrichment {
   companyNameHistory: Array<{ name: string; fromDate: string }>;
   builtVesselsCount: number;
   tier: number;
+}
+
+interface VesselSearchResult {
+  source: 'local' | 'seasearcher';
+  localId?: string;
+  seasearcherId?: string;
+  name: string;
+  imo?: string;
+  mmsi?: string;
+  flag?: string;
+  flagCode?: string;
+  type?: string;
+  status?: string;
+  dwt?: number;
+  gt?: number;
+  buildYear?: number;
+  isSanctioned?: boolean;
+}
+
+interface VesselSearchResultOption {
+  key: string;
+  source: 'local' | 'seasearcher';
+  id?: string;
+  seasearcherId?: string;
+  name: string;
+  imo?: string;
 }
 
 interface CompanyOrder {
@@ -983,6 +1009,170 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
               </div>
             }
 
+            <!-- Vessels -->
+            <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
+              <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
+                <h2 class="text-sm font-semibold text-gray-700">
+                  Vessels
+                  @if (companyVessels().length) {
+                    <span class="ml-1 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
+                      {{ companyVessels().length }}
+                    </span>
+                  }
+                </h2>
+                <button (click)="openAddVessel()"
+                  class="rounded-md bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 hover:bg-brand-100 transition-colors">
+                  + Add
+                </button>
+              </div>
+
+              @if (showAddVessel()) {
+                <div class="border-b border-gray-100 px-5 py-4 bg-gray-50/50">
+                  <div class="space-y-2">
+                    @if (!editingVesselAssocId()) {
+                      <div class="relative">
+                        @if (selectedVessel()) {
+                          <div class="flex items-center justify-between rounded-md border border-brand-300 bg-brand-50 px-3 py-1.5 text-sm">
+                            <span class="font-medium text-brand-800">{{ selectedVessel()!.name }}</span>
+                            <button (click)="clearSelectedVessel()"
+                              class="ml-2 text-brand-400 hover:text-brand-600 transition-colors">
+                              <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                              </svg>
+                            </button>
+                          </div>
+                        } @else {
+                          <input
+                            [ngModel]="vesselSearch()"
+                            (ngModelChange)="onVesselSearch($event)"
+                            placeholder="Search vessel..."
+                            class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                          />
+                          @if (vesselSearchResults().length) {
+                            <div class="absolute z-10 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
+                              @for (v of vesselSearchResults(); track v.key) {
+                                <button (click)="selectVessel(v)"
+                                  class="w-full px-3 py-2 text-left text-sm hover:bg-brand-50 transition-colors flex items-center justify-between">
+                                  <span class="font-medium text-gray-900">{{ v.name }}</span>
+                                  @if (v.source === 'seasearcher') {
+                                    <span class="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">Import</span>
+                                  } @else if (v.imo) {
+                                    <span class="text-xs text-gray-400">IMO {{ v.imo }}</span>
+                                  }
+                                </button>
+                              }
+                            </div>
+                          }
+                        }
+                      </div>
+                    }
+
+                    <div>
+                      <label class="block text-xs font-medium text-gray-500 mb-1">Role</label>
+                      <select
+                        [ngModel]="vesselForm().role"
+                        (ngModelChange)="vesselForm.set({ ...vesselForm(), role: $event })"
+                        class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
+                        @for (role of roleOptions; track role) {
+                          <option [ngValue]="role">{{ formatRole(role) }}</option>
+                        }
+                      </select>
+                    </div>
+
+                    <div>
+                      <label class="block text-xs font-medium text-gray-500 mb-1">Contact Person</label>
+                      @if (contactsLoading()) {
+                        <div class="text-xs text-gray-400 py-1">Loading contacts...</div>
+                      } @else if (contacts().length) {
+                        <select
+                          [ngModel]="vesselForm().contactId"
+                          (ngModelChange)="vesselForm.set({ ...vesselForm(), contactId: $event || null })"
+                          class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
+                          <option [ngValue]="null">— None —</option>
+                          @for (ct of contacts(); track ct.id) {
+                            <option [ngValue]="ct.id">{{ ct.name }}@if (ct.role) { ({{ ct.role }}) }</option>
+                          }
+                        </select>
+                      } @else {
+                        <div class="text-xs text-gray-400 py-1">No contacts on file</div>
+                      }
+                    </div>
+
+                    <textarea
+                      [ngModel]="vesselForm().note"
+                      (ngModelChange)="vesselForm.set({ ...vesselForm(), note: $event })"
+                      placeholder="Notes"
+                      rows="2"
+                      class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                    ></textarea>
+                    <div class="flex justify-end gap-2">
+                      <button (click)="cancelVesselForm()"
+                        class="rounded-md border border-gray-200 px-3 py-1 text-xs text-gray-600 hover:bg-gray-50 transition-colors">
+                        Cancel
+                      </button>
+                      <button (click)="saveCompanyVessel()"
+                        [disabled]="savingVessel() || (!editingVesselAssocId() && !selectedVessel())"
+                        class="rounded-md bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors">
+                        {{ editingVesselAssocId() ? 'Update' : 'Add' }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              }
+
+              @if (vesselsLoading()) {
+                <div class="flex items-center justify-center py-6">
+                  <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                  </svg>
+                </div>
+              } @else if (!companyVessels().length && !showAddVessel()) {
+                <div class="px-5 py-6 text-center text-sm text-gray-400">No vessels linked yet</div>
+              } @else {
+                <div class="divide-y divide-gray-50 max-h-[400px] overflow-y-auto">
+                  @for (vc of companyVessels(); track vc.id) {
+                    <div class="px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors group">
+                      <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                          <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">{{ formatRole(vc.role) }}</span>
+                          <a [routerLink]="['/vessels', vc.vesselId]" class="font-medium text-brand-700 hover:text-brand-900 hover:underline">
+                            {{ vc.vesselName ?? 'Unknown vessel' }}
+                          </a>
+                          @if (vc.vesselImo) {
+                            <span class="text-xs text-gray-400">IMO {{ vc.vesselImo }}</span>
+                          }
+                        </div>
+                        <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button (click)="openEditVessel(vc)"
+                            class="rounded p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors" title="Edit">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                            </svg>
+                          </button>
+                          <button (click)="deleteCompanyVessel(vc.id)"
+                            class="rounded p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Delete">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                              <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                      @if (vc.contactName) {
+                        <p class="text-xs text-gray-500 mt-0.5">{{ vc.contactName }}</p>
+                      }
+                      @if (vc.note) {
+                        <p class="text-xs text-gray-400 mt-0.5 italic">{{ vc.note }}</p>
+                      }
+                      <p class="text-[10px] text-gray-400 mt-1">
+                        Added by {{ vc.addedByName ?? 'Unknown' }} · {{ vc.createdAt | date:'mediumDate' }}
+                      </p>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+
             <!-- Orders -->
             <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
               <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
@@ -1549,6 +1739,19 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly responsibleUserId = signal<string | null>(null);
   readonly savingResponsible = signal(false);
 
+  // Company Vessels
+  readonly companyVessels = signal<VesselCompanyDto[]>([]);
+  readonly vesselsLoading = signal(false);
+  readonly showAddVessel = signal(false);
+  readonly vesselForm = signal<{ vesselId: string; role: VesselCompanyRole; contactId: string | null; note: string }>({ vesselId: '', role: 'OWNER', contactId: null, note: '' });
+  readonly editingVesselAssocId = signal<string | null>(null);
+  readonly savingVessel = signal(false);
+  readonly vesselSearch = signal('');
+  readonly vesselSearchResults = signal<VesselSearchResultOption[]>([]);
+  readonly selectedVessel = signal<{ id: string; name: string } | null>(null);
+  private vesselSearchTimeout: ReturnType<typeof setTimeout> | null = null;
+  readonly roleOptions: VesselCompanyRole[] = ['OWNER', 'TIME_CHARTERER', 'OPERATOR', 'MANAGER'];
+
   readonly allTypes = ALL_TYPES;
 
   // Inline editing state
@@ -1669,12 +1872,18 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     this.enrichment.set(null);
     this.loading.set(true);
     this.companyOrders.set([]);
+    this.companyVessels.set([]);
     this.fleet.set(null);
     this.hierarchy.set(null);
     this.seizures.set(null);
     this.sanctions.set(null);
     this.contacts.set([]);
     this.editing.set(false);
+    this.showAddVessel.set(false);
+    this.editingVesselAssocId.set(null);
+    this.selectedVessel.set(null);
+    this.vesselSearch.set('');
+    this.vesselSearchResults.set([]);
   }
 
   // ─── Data Loading ──────────────────────────────────────────────────
@@ -1691,6 +1900,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
         this.wsService.sendPresence(this.router.url, this.pageTitle.getTitle());
         // Load orders & enrichment in parallel
         this.loadOrders(id);
+        this.loadCompanyVessels(id);
         this.loadContacts(id);
         this.loadSupplyPorts(id);
         this.loadCompanyEmails(id);
@@ -1724,6 +1934,194 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
       // ignore
     } finally {
       this.ordersLoading.set(false);
+    }
+  }
+
+  // ─── Company Vessels ─────────────────────────────────────────────
+  private async loadCompanyVessels(companyId: string): Promise<void> {
+    this.vesselsLoading.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<VesselCompanyDto[]>>(`${API}/companies/local/${companyId}/vessels`),
+      );
+      if (res.success && res.data) {
+        this.companyVessels.set(res.data);
+      }
+    } catch (err) {
+      console.error('Failed to load company vessels:', err);
+    } finally {
+      this.vesselsLoading.set(false);
+    }
+  }
+
+  openAddVessel(): void {
+    this.vesselForm.set({ vesselId: '', role: 'OWNER', contactId: null, note: '' });
+    this.editingVesselAssocId.set(null);
+    this.selectedVessel.set(null);
+    this.vesselSearch.set('');
+    this.vesselSearchResults.set([]);
+    this.showAddVessel.set(true);
+  }
+
+  openEditVessel(vc: VesselCompanyDto): void {
+    this.vesselForm.set({ vesselId: vc.vesselId, role: vc.role, contactId: vc.contactId ?? null, note: vc.note ?? '' });
+    this.editingVesselAssocId.set(vc.id);
+    this.selectedVessel.set(null);
+    this.vesselSearch.set('');
+    this.vesselSearchResults.set([]);
+    this.showAddVessel.set(true);
+  }
+
+  cancelVesselForm(): void {
+    this.showAddVessel.set(false);
+    this.editingVesselAssocId.set(null);
+    this.selectedVessel.set(null);
+    this.vesselSearch.set('');
+    this.vesselSearchResults.set([]);
+  }
+
+  onVesselSearch(term: string): void {
+    this.vesselSearch.set(term);
+    if (this.vesselSearchTimeout) clearTimeout(this.vesselSearchTimeout);
+    if (term.length < 2) {
+      this.vesselSearchResults.set([]);
+      return;
+    }
+    this.vesselSearchTimeout = setTimeout(async () => {
+      try {
+        const res = await firstValueFrom(
+          this.http.get<ApiResponse<{ vessels: VesselDto[]; total: number }>>(
+            `${API}/vessels/local?search=${encodeURIComponent(term)}&limit=15`,
+          ),
+        );
+        const existingIds = new Set(this.companyVessels().map((vc) => vc.vesselId));
+        const localResults = res.success && res.data
+          ? res.data.vessels.filter((v) => !existingIds.has(v.id))
+          : [];
+
+        if (localResults.length) {
+          this.vesselSearchResults.set(
+            localResults.map((v) => ({
+              key: v.id,
+              source: 'local',
+              id: v.id,
+              name: v.name,
+              imo: v.imo ?? undefined,
+            })),
+          );
+          return;
+        }
+
+        const importRes = await firstValueFrom(
+          this.http.get<ApiResponse<VesselSearchResult[]>>(
+            `${API}/vessels/search?term=${encodeURIComponent(term)}`,
+          ),
+        );
+        if (importRes.success && importRes.data) {
+          this.vesselSearchResults.set(
+            importRes.data
+              .filter((r) => r.source === 'seasearcher' && r.seasearcherId)
+              .map((r) => ({
+                key: `seasearcher:${r.seasearcherId}`,
+                source: 'seasearcher',
+                seasearcherId: r.seasearcherId,
+                name: r.name,
+                imo: r.imo ?? undefined,
+              })),
+          );
+        } else {
+          this.vesselSearchResults.set([]);
+        }
+      } catch {
+        this.vesselSearchResults.set([]);
+      }
+    }, 250);
+  }
+
+  async selectVessel(v: VesselSearchResultOption): Promise<void> {
+    if (v.source === 'seasearcher' && v.seasearcherId) {
+      await this.importVesselFromSeasearcher(v.seasearcherId);
+      return;
+    }
+    if (!v.id) return;
+    this.selectedVessel.set({ id: v.id, name: v.name });
+    this.vesselForm.set({ ...this.vesselForm(), vesselId: v.id });
+    this.vesselSearch.set('');
+    this.vesselSearchResults.set([]);
+  }
+
+  private async importVesselFromSeasearcher(seasearcherId: string): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<VesselDto>>(`${API}/vessels/import`, { seasearcherId }),
+      );
+      if (res.success && res.data) {
+        this.selectedVessel.set({ id: res.data.id, name: res.data.name });
+        this.vesselForm.set({ ...this.vesselForm(), vesselId: res.data.id });
+        this.vesselSearch.set('');
+        this.vesselSearchResults.set([]);
+      } else {
+        console.error('Failed to import vessel:', res.message ?? 'Unknown error');
+      }
+    } catch {
+      console.error('Failed to import vessel.');
+    }
+  }
+
+  clearSelectedVessel(): void {
+    this.selectedVessel.set(null);
+    this.vesselForm.set({ ...this.vesselForm(), vesselId: '' });
+    this.vesselSearch.set('');
+  }
+
+  async saveCompanyVessel(): Promise<void> {
+    const c = this.company();
+    if (!c) return;
+    const form = this.vesselForm();
+
+    this.savingVessel.set(true);
+    try {
+      const editId = this.editingVesselAssocId();
+      if (editId) {
+        await firstValueFrom(
+          this.http.patch(`${API}/vessels/companies/${editId}`, {
+            role: form.role,
+            contactId: form.contactId,
+            note: form.note.trim() || undefined,
+          }),
+        );
+      } else {
+        if (!form.vesselId) return;
+        await firstValueFrom(
+          this.http.post(`${API}/vessels/local/${form.vesselId}/companies`, {
+            companyId: c.id,
+            role: form.role,
+            contactId: form.contactId,
+            note: form.note.trim() || undefined,
+          }),
+        );
+      }
+      this.showAddVessel.set(false);
+      this.editingVesselAssocId.set(null);
+      this.selectedVessel.set(null);
+      this.loadCompanyVessels(c.id);
+    } catch (err) {
+      console.error('Failed to save company vessel:', err);
+    } finally {
+      this.savingVessel.set(false);
+    }
+  }
+
+  async deleteCompanyVessel(assocId: string): Promise<void> {
+    const c = this.company();
+    if (!c) return;
+    try {
+      await firstValueFrom(
+        this.http.delete(`${API}/vessels/companies/${assocId}`),
+      );
+      this.loadCompanyVessels(c.id);
+    } catch (err) {
+      console.error('Failed to delete vessel association:', err);
     }
   }
 
@@ -2162,6 +2560,16 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
       case 'INVOICED': return 'bg-purple-100 text-purple-700';
       case 'CANCELLED': return 'bg-red-100 text-red-700';
       default: return 'bg-gray-100 text-gray-600';
+    }
+  }
+
+  formatRole(role: VesselCompanyRole): string {
+    switch (role) {
+      case 'OWNER': return 'Owner';
+      case 'TIME_CHARTERER': return 'Time Charterer';
+      case 'OPERATOR': return 'Operator';
+      case 'MANAGER': return 'Manager';
+      default: return role;
     }
   }
 

@@ -36,6 +36,7 @@ import {
   getCompanySeizures,
   getCompanySanctions,
   getOrdersForCompany,
+  getVesselsForCompany,
   getCompanyContacts,
   createCompanyContact,
   updateCompanyContact,
@@ -135,6 +136,27 @@ export const companiesController = new Elysia({ prefix: '/companies' })
       detail: {
         tags: ['Companies'],
         summary: 'Get all orders where this company is the client',
+      },
+    },
+  )
+
+  // ─── Vessels for a Company ───────────────────────────────────────
+  .get(
+    '/local/:id/vessels',
+    async ({ params }) => {
+      try {
+        const vessels = await getVesselsForCompany(params.id);
+        return { success: true, data: vessels } satisfies ApiResponse<typeof vessels>;
+      } catch (err) {
+        console.error('[Companies] Failed to load vessels for company:', err);
+        return { success: false, data: [], message: 'Failed to load vessels' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: {
+        tags: ['Companies'],
+        summary: 'Get vessels linked to a company',
       },
     },
   )

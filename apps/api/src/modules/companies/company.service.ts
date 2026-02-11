@@ -591,6 +591,36 @@ export async function getOrdersForCompany(companyId: string) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+//  GET VESSELS LINKED TO A COMPANY (via vessel_companies)
+// ═══════════════════════════════════════════════════════════════════════
+
+export async function getVesselsForCompany(companyId: string) {
+  return db
+    .select({
+      id: vesselCompanies.id,
+      vesselId: vesselCompanies.vesselId,
+      vesselName: vessels.name,
+      vesselImo: vessels.imo,
+      companyId: vesselCompanies.companyId,
+      companyName: counterparties.name,
+      role: vesselCompanies.role,
+      contactId: vesselCompanies.contactId,
+      contactName: companyContacts.name,
+      note: vesselCompanies.note,
+      addedById: vesselCompanies.addedById,
+      addedByName: vesselCompanies.addedByName,
+      createdAt: vesselCompanies.createdAt,
+      updatedAt: vesselCompanies.updatedAt,
+    })
+    .from(vesselCompanies)
+    .innerJoin(vessels, eq(vesselCompanies.vesselId, vessels.id))
+    .innerJoin(counterparties, eq(vesselCompanies.companyId, counterparties.id))
+    .leftJoin(companyContacts, eq(vesselCompanies.contactId, companyContacts.id))
+    .where(eq(vesselCompanies.companyId, companyId))
+    .orderBy(vesselCompanies.role, vessels.name);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 //  COMPANY CONTACTS CRUD
 // ═══════════════════════════════════════════════════════════════════════
 
