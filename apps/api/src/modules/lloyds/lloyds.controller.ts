@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia';
 import { authGuard } from '../auth/auth.guard';
-import { searchVessels, searchPlaces, searchCompanies, importPlaceFromLli, listPlaces, getPlaceById, getPlaceByLliId, getPlaceEnrichment, createPlace, deletePlace, syncPlaceFromSeasearcher, getOrdersForPlace, getPortFacilities, getExpectedArrivals, getPortSuppliers, addPortSupplier, updatePortSupplier, deletePortSupplier, updateResponsibleUser, listActiveUsers, getSupplyPortsForCompany } from './lli.service';
+import { searchVessels, searchPlaces, searchCompanies, importPlaceFromLli, listPlaces, getPlaceById, getPlaceByLliId, getPlaceEnrichment, createPlace, updateLocalPlace, deletePlace, syncPlaceFromSeasearcher, getOrdersForPlace, getPortFacilities, getExpectedArrivals, getPortSuppliers, addPortSupplier, updatePortSupplier, deletePortSupplier, updateResponsibleUser, listActiveUsers, getSupplyPortsForCompany } from './lli.service';
 import { logActivity } from '../activity/activity.service';
 import { db } from '../../db';
 import { users, places } from '../../db/schema';
@@ -204,6 +204,67 @@ export const lloydsController = new Elysia({ prefix: '/lloyds' })
       detail: {
         tags: ["Lloyd's"],
         summary: 'Create a place manually in local database',
+      },
+    },
+  )
+
+  // ─── Update Place (manual entry) ─────────────────────────────────
+  .put(
+    '/places/local/:id',
+    async ({ params, body, set }) => {
+      const existing = await getPlaceById(params.id);
+      if (!existing) {
+        set.status = 404;
+        return { success: false, data: null, message: 'Place not found' };
+      }
+
+      if (existing.lliPlaceId) {
+        set.status = 409;
+        return {
+          success: false,
+          data: null,
+          message: 'This place is synced from Seasearcher and cannot be edited manually.',
+        };
+      }
+
+      const updated = await updateLocalPlace(params.id, body);
+      if (!updated) {
+        set.status = 500;
+        return { success: false, data: null, message: 'Failed to update place' };
+      }
+
+      return { success: true, data: updated } satisfies ApiResponse<typeof updated>;
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({
+        name: t.Optional(t.String({ minLength: 1 })),
+        country: t.Optional(t.String({ minLength: 1 })),
+        countryIso: t.Optional(t.Nullable(t.String())),
+        area: t.Optional(t.Nullable(t.String())),
+        subRegion: t.Optional(t.Nullable(t.String())),
+        placeType: t.Optional(
+          t.Nullable(
+            t.Union([
+              t.Literal('POR'),
+              t.Literal('PSP'),
+              t.Literal('ANC'),
+              t.Literal('TER'),
+              t.Literal('FIL'),
+            ]),
+          ),
+        ),
+        timezone: t.Optional(t.Nullable(t.String())),
+        lat: t.Optional(t.Nullable(t.Number())),
+        long: t.Optional(t.Nullable(t.Number())),
+        unlocode: t.Optional(t.Nullable(t.String())),
+        admiraltyChart: t.Optional(t.Nullable(t.String())),
+        parentPlaceId: t.Optional(t.Nullable(t.String())),
+        parentPlaceName: t.Optional(t.Nullable(t.String())),
+      }),
+      detail: {
+        tags: ["Lloyd's"],
+        summary: 'Update a locally created place',
       },
     },
   )

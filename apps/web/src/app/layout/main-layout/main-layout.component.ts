@@ -34,6 +34,12 @@ interface CommodityPrice {
   updatedAt: string;
 }
 
+interface FxRatesPayload {
+  base: string;
+  rates: Record<string, number>;
+  updatedAt: string | null;
+}
+
 interface SearchResult {
   id: string;
   name: string;
@@ -322,6 +328,22 @@ const NAVIGATION: NavItem[] = [
         <div class="ml-auto flex items-center gap-3">
           <!-- Commodity Prices (shrinks / hides when search expands) -->
           <div class="hidden shrink items-center gap-3 overflow-hidden md:flex">
+            @if (eurRate() !== null) {
+              <div class="flex shrink-0 flex-col leading-tight">
+                <div class="flex items-center gap-1 text-xs">
+                  <span class="font-medium text-gray-500">1 USD =</span>
+                  <span class="font-semibold text-gray-900">{{ eurRate() | number:'1.2-2' }}</span>
+                  <span class="font-medium text-gray-500">EUR</span>
+                </div>
+                <span
+                  class="text-[11px] font-medium"
+                  [class]="eurChange() >= 0 ? 'text-emerald-600' : 'text-red-600'"
+                >
+                  {{ eurChange() >= 0 ? '+' : '' }}{{ eurChange() | number:'1.2-2' }}
+                  ({{ eurChangePercent() >= 0 ? '+' : '' }}{{ eurChangePercent() | number:'1.2-2' }}%)
+                </span>
+              </div>
+            }
             @for (p of commodityPrices(); track p.ticker) {
               <div class="flex shrink-0 flex-col leading-tight">
                 <div class="flex items-center gap-1 text-xs">
@@ -400,6 +422,9 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
   readonly sidebarOpen = signal(false);
   readonly commodityPrices = signal<CommodityPrice[]>([]);
+  readonly eurRate = signal<number | null>(null);
+  readonly eurChange = signal<number>(0);
+  readonly eurChangePercent = signal<number>(0);
   readonly updateDismissed = signal(false);
   readonly showUpdateToast = computed(() =>
     this.updateService.updateAvailable() && !this.updateDismissed(),
@@ -414,9 +439,23 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     // Subscribe to commodity price updates from WebSocket
     this.priceSub = this.wsService
-      .on<{ prices: CommodityPrice[] }>('prices')
+      .on<{ prices: CommodityPrice[]; fxRates?: FxRatesPayload }>('prices')
       .subscribe((data) => {
         this.commodityPrices.set(data.prices);
+        const eur = data.fxRates?.rates?.['EUR'];
+        if (typeof eur === 'number' && eur !== 0) {
+          const nextRate = 1 / eur;
+          const previous = this.eurRate();
+          const change = typeof previous === 'number' ? nextRate - previous : 0;
+          const percent = previous ? (change / previous) * 100 : 0;
+          this.eurRate.set(nextRate);
+          this.eurChange.set(change);
+          this.eurChangePercent.set(percent);
+        } else {
+          this.eurRate.set(null);
+          this.eurChange.set(0);
+          this.eurChangePercent.set(0);
+        }
       });
 
     // Request prices once WS is authenticated

@@ -1,0 +1,258 @@
+import {
+  Component,
+  ChangeDetectionStrategy,
+  input,
+  output,
+} from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import type { OwnCompanyDto } from '@fueld/types';
+import {
+  SearchableDropdownComponent,
+  type DropdownOption,
+} from '../../../../shared/components/searchable-dropdown/searchable-dropdown.component';
+
+@Component({
+  selector: 'app-trading-detail-meta-cards',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [SearchableDropdownComponent, FormsModule],
+  template: `
+    <div class="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
+      <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Client</p>
+        @if (canEditClient()) {
+          <app-searchable-dropdown
+            [options]="clientOptions()"
+            [selected]="clientId()"
+            [asyncSearch]="true"
+            [loading]="clientLoading()"
+            placeholder="Search clients..."
+            (searchChange)="clientSearch.emit($event)"
+            (selectionChange)="clientChange.emit($event)"
+          />
+        } @else {
+          <p class="mt-1 text-sm font-semibold text-gray-900">{{ clientName() }}</p>
+        }
+      </div>
+      <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Supplier</p>
+        @if (isReadonly()) {
+          <p class="mt-1 text-sm font-semibold text-gray-900">{{ supplierName() }}</p>
+        } @else {
+          <app-searchable-dropdown
+            [options]="supplierOptions()"
+            [selected]="supplierId()"
+            [asyncSearch]="true"
+            [loading]="supplierLoading()"
+            placeholder="Search suppliers..."
+            (searchChange)="supplierSearch.emit($event)"
+            (selectionChange)="supplierChange.emit($event)"
+          />
+        }
+      </div>
+      <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Vessel</p>
+        @if (isReadonly()) {
+          <p class="mt-1 text-sm font-semibold text-gray-900">{{ vesselName() }}</p>
+        } @else {
+          <app-searchable-dropdown
+            [options]="vesselOptions()"
+            [selected]="vesselId()"
+            [asyncSearch]="true"
+            [loading]="vesselLoading()"
+            placeholder="Search vessels..."
+            (searchChange)="vesselSearch.emit($event)"
+            (selectionChange)="vesselChange.emit($event)"
+          />
+        }
+      </div>
+      <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Place</p>
+        @if (isReadonly()) {
+          <p class="mt-1 text-sm font-semibold text-gray-900">{{ placeName() }}</p>
+        } @else {
+          <app-searchable-dropdown
+            [options]="placeOptions()"
+            [selected]="placeId()"
+            [asyncSearch]="true"
+            [loading]="placeLoading()"
+            placeholder="Search places..."
+            (searchChange)="placeSearch.emit($event)"
+            (selectionChange)="placeChange.emit($event)"
+          />
+        }
+      </div>
+      <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">ETA</p>
+        @if (isReadonly()) {
+          <p class="mt-1 text-sm font-semibold text-gray-900">
+            {{ formatDateTimeLabel(eta()) }}
+          </p>
+        } @else {
+          <input
+            type="datetime-local"
+            step="60"
+            [ngModel]="formatDateTimeForInput(eta())"
+            (ngModelChange)="etaChange.emit($event)"
+            [min]="minDateTime()"
+            class="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-900
+                   focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+          />
+        }
+      </div>
+      @if (showEtd()) {
+        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">ETD</p>
+          @if (isReadonly()) {
+            <p class="mt-1 text-sm font-semibold text-gray-900">
+              {{ formatDateTimeLabel(etd()) }}
+            </p>
+          } @else {
+            <input
+              type="datetime-local"
+              step="60"
+              [ngModel]="formatDateTimeForInput(etd())"
+              (ngModelChange)="etdChange.emit($event)"
+              [min]="etaMinDateTime() || minDateTime()"
+              class="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-900
+                     focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+            />
+          }
+        </div>
+      }
+      <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <p class="text-xs font-medium uppercase tracking-wider text-gray-500">Invoicing Company</p>
+        @if (isReadonly()) {
+          <p class="mt-1 text-sm font-semibold text-gray-900">{{ invoicingCompanyName() }}</p>
+        } @else {
+          <select
+            [ngModel]="invoicingCompanyId()"
+            (ngModelChange)="invoicingCompanyChange.emit($event)"
+            class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm font-semibold text-gray-900
+                   focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+          >
+            <option value="">- Select -</option>
+            @for (co of ownCompanies(); track co.id) {
+              <option [value]="co.id">{{ co.name }}</option>
+            }
+          </select>
+        }
+      </div>
+      <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <p class="text-xs font-medium uppercase tracking-wider text-gray-500">Responsible</p>
+        @if (isReadonly()) {
+          <p class="mt-1 text-sm font-semibold text-gray-900">{{ responsibleLabel() }}</p>
+        } @else {
+          <select
+            [ngModel]="responsibleUserId()"
+            (ngModelChange)="responsibleChange.emit($event)"
+            class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm font-semibold text-gray-900
+                   focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+          >
+            <option value="">- Select -</option>
+            @for (u of responsibleOptions(); track u.value) {
+              <option [value]="u.value">{{ u.label }}</option>
+            }
+          </select>
+        }
+      </div>
+      <ng-content></ng-content>
+    </div>
+  `,
+})
+export class TradingDetailMetaCardsComponent {
+  readonly clientName = input.required<string>();
+  readonly supplierName = input<string>('—');
+  readonly vesselName = input.required<string>();
+  readonly placeName = input.required<string>();
+
+  readonly clientId = input<string>('');
+  readonly supplierId = input<string>('');
+  readonly vesselId = input<string>('');
+  readonly placeId = input<string>('');
+
+  readonly clientOptions = input<DropdownOption[]>([]);
+  readonly supplierOptions = input<DropdownOption[]>([]);
+  readonly vesselOptions = input<DropdownOption[]>([]);
+  readonly placeOptions = input<DropdownOption[]>([]);
+
+  readonly clientLoading = input<boolean>(false);
+  readonly supplierLoading = input<boolean>(false);
+  readonly vesselLoading = input<boolean>(false);
+  readonly placeLoading = input<boolean>(false);
+
+  readonly canEditClient = input<boolean>(false);
+  readonly isReadonly = input<boolean>(false);
+
+  readonly eta = input<string | null>(null);
+  readonly etd = input<string | null>(null);
+  readonly minDateTime = input<string>('');
+  readonly etaMinDateTime = input<string>('');
+  readonly timezone = input<string>('UTC');
+  readonly showEtd = input<boolean>(true);
+
+  readonly invoicingCompanyId = input<string>('');
+  readonly invoicingCompanyName = input<string>('-');
+  readonly ownCompanies = input<OwnCompanyDto[]>([]);
+  readonly responsibleUserId = input<string>('');
+  readonly responsibleOptions = input<DropdownOption[]>([]);
+
+  readonly clientSearch = output<string>();
+  readonly supplierSearch = output<string>();
+  readonly vesselSearch = output<string>();
+  readonly placeSearch = output<string>();
+
+  readonly clientChange = output<string>();
+  readonly supplierChange = output<string>();
+  readonly vesselChange = output<string>();
+  readonly placeChange = output<string>();
+  readonly etaChange = output<string>();
+  readonly etdChange = output<string>();
+  readonly invoicingCompanyChange = output<string>();
+  readonly responsibleChange = output<string>();
+
+  formatDateTimeForInput(dateStr: string | null | undefined): string {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return this.formatDateTimeParts(date);
+  }
+
+  formatDateTimeLabel(dateStr: string | null | undefined): string {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr);
+    return new Intl.DateTimeFormat('en-GB', {
+      timeZone: this.timezone(),
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(date);
+  }
+
+  private formatDateTimeParts(date: Date): string {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: this.timezone(),
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(date);
+    const map = new Map(parts.map((p) => [p.type, p.value]));
+    const year = map.get('year') ?? '0000';
+    const month = map.get('month') ?? '01';
+    const day = map.get('day') ?? '01';
+    const hour = map.get('hour') ?? '00';
+    const minute = map.get('minute') ?? '00';
+    return `${year}-${month}-${day}T${hour}:${minute}`;
+  }
+
+  responsibleLabel(): string {
+    const id = this.responsibleUserId();
+    if (!id) return '-';
+    const match = this.responsibleOptions().find((u) => u.value === id);
+    return match?.label ?? '-';
+  }
+}

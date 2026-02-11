@@ -48,6 +48,17 @@ export const paymentTermsEnum = pgEnum('payment_terms', [
   'CREDIT_30',
 ]);
 
+export const paymentTermTypeEnum = pgEnum('payment_term_type', [
+  'CREDIT',
+  'COD',
+  'PREPAY',
+]);
+
+export const orderAttachmentTypeEnum = pgEnum('order_attachment_type', [
+  'BDR',
+  'OTHER',
+]);
+
 export const counterpartyTypeEnum = pgEnum('counterparty_type', [
   'SUPPLIER',
   'CLIENT',
@@ -400,6 +411,15 @@ export const orders = pgTable('orders', {
   eta: timestamp('eta', { withTimezone: true }),
   etd: timestamp('etd', { withTimezone: true }),
 
+  customerPaymentTermType: paymentTermTypeEnum('customer_payment_term_type'),
+  customerCreditDays: integer('customer_credit_days'),
+  customerNote: text('customer_note'),
+
+  supplierId: uuid('supplier_id').references(() => counterparties.id),
+  supplierPaymentTermType: paymentTermTypeEnum('supplier_payment_term_type'),
+  supplierCreditDays: integer('supplier_credit_days'),
+  supplierNote: text('supplier_note'),
+
   // Analytics
   lossReason: text('loss_reason'),
   closedAt: timestamp('closed_at', { withTimezone: true }),
@@ -415,7 +435,6 @@ export const orders = pgTable('orders', {
 export const orderItems = pgTable('order_items', {
   id: uuid('id').defaultRandom().primaryKey(),
   orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
-  supplierId: uuid('supplier_id').references(() => counterparties.id),
 
   productType: productTypeEnum('product_type').notNull(),
   quantity: numeric('quantity', { precision: 12, scale: 3 }).notNull(),
@@ -431,8 +450,26 @@ export const orderItems = pgTable('order_items', {
 
   paymentTerms: paymentTermsEnum('payment_terms'),
 
+  customerNote: text('customer_note'),
+
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+//  11b. ORDER ATTACHMENTS
+// ═══════════════════════════════════════════════════════════════════════
+
+export const orderAttachments = pgTable('order_attachments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
+  type: orderAttachmentTypeEnum('type').notNull().default('OTHER'),
+  fileName: text('file_name').notNull(),
+  filePath: text('file_path').notNull(),
+  mimeType: text('mime_type').notNull(),
+  fileSize: integer('file_size').notNull(),
+  uploadedBy: uuid('uploaded_by').references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -452,6 +489,25 @@ export const invoices = pgTable('invoices', {
 
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+//  12b. CUSTOMER PAYMENTS (ledger entries)
+// ═══════════════════════════════════════════════════════════════════════
+
+export const customerPayments = pgTable('customer_payments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  customerId: uuid('customer_id').notNull().references(() => counterparties.id),
+  orderId: uuid('order_id').references(() => orders.id),
+  invoiceId: uuid('invoice_id').references(() => invoices.id),
+  amount: numeric('amount', { precision: 14, scale: 2 }).notNull(),
+  currency: text('currency').notNull().default('USD'),
+  receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
+  method: text('method'),
+  note: text('note'),
+  createdBy: uuid('created_by').references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -778,6 +834,7 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
   vessel: one(vessels, { fields: [orders.vesselId], references: [vessels.id] }),
   place: one(places, { fields: [orders.placeId], references: [places.id] }),
   salesRep: one(users, { fields: [orders.salesRepId], references: [users.id] }),
+  supplier: one(counterparties, { fields: [orders.supplierId], references: [counterparties.id] }),
   invoicingCompany: one(counterparties, {
     fields: [orders.invoicingCompanyId],
     references: [counterparties.id],
@@ -785,11 +842,16 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
   }),
   items: many(orderItems),
   invoices: many(invoices),
+  attachments: many(orderAttachments),
 }));
 
 export const orderItemsRelations = relations(orderItems, ({ one }) => ({
   order: one(orders, { fields: [orderItems.orderId], references: [orders.id] }),
-  supplier: one(counterparties, { fields: [orderItems.supplierId], references: [counterparties.id] }),
+}));
+
+export const orderAttachmentsRelations = relations(orderAttachments, ({ one }) => ({
+  order: one(orders, { fields: [orderAttachments.orderId], references: [orders.id] }),
+  uploader: one(users, { fields: [orderAttachments.uploadedBy], references: [users.id] }),
 }));
 
 export const invoicesRelations = relations(invoices, ({ one, many }) => ({

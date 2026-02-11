@@ -9,12 +9,15 @@ import { db } from '../../db';
 import {
   orders,
   orderItems,
+  orderAttachments,
   counterparties,
   vessels,
   places,
   users,
   orderNumberSequences,
   tenants,
+  customerPayments,
+  invoices,
 } from '../../db/schema';
 import type { TenantSettings } from '../../db/schema';
 import { logActivity } from '../activity/activity.service';
@@ -40,6 +43,13 @@ interface CreateOrderInput {
   currency?: string;
   eta?: string | null;
   etd?: string | null;
+  customerPaymentTermType?: string | null;
+  customerCreditDays?: number | null;
+  customerNote?: string | null;
+  supplierId?: string | null;
+  supplierPaymentTermType?: string | null;
+  supplierCreditDays?: number | null;
+  supplierNote?: string | null;
 }
 
 interface UpdateOrderInput {
@@ -52,6 +62,13 @@ interface UpdateOrderInput {
   status?: string;
   eta?: string | null;
   etd?: string | null;
+  customerPaymentTermType?: string | null;
+  customerCreditDays?: number | null;
+  customerNote?: string | null;
+  supplierId?: string | null;
+  supplierPaymentTermType?: string | null;
+  supplierCreditDays?: number | null;
+  supplierNote?: string | null;
   lossReason?: string | null;
 }
 
@@ -62,12 +79,12 @@ interface SaveItemInput {
   quantityMin?: string | null;
   quantityMax?: string | null;
   unit?: string;
-  supplierId?: string | null;
   costPrice?: string | null;
   costCurrency?: string | null;
   salesPrice?: string | null;
   salesCurrency?: string | null;
   paymentTerms?: string | null;
+  customerNote?: string | null;
 }
 // ─── Generate next order number ───────────────────────────────────────
 
@@ -297,6 +314,13 @@ export async function getOrderById(idOrNumber: string) {
     closedAt: row.closedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+    customerPaymentTermType: row.customerPaymentTermType ?? null,
+    customerCreditDays: row.customerCreditDays ?? null,
+    customerNote: row.customerNote ?? null,
+    supplierId: row.supplierId ?? null,
+    supplierPaymentTermType: row.supplierPaymentTermType ?? null,
+    supplierCreditDays: row.supplierCreditDays ?? null,
+    supplierNote: row.supplierNote ?? null,
     client,
     vessel,
     place,
@@ -305,7 +329,6 @@ export async function getOrderById(idOrNumber: string) {
     items: items.map((i) => ({
       id: i.id,
       orderId: i.orderId,
-      supplierId: i.supplierId,
       productType: i.productType,
       quantity: i.quantity,
       quantityMin: i.quantityMin,
@@ -317,6 +340,7 @@ export async function getOrderById(idOrNumber: string) {
       salesCurrency: i.salesCurrency,
       profit: i.profit,
       paymentTerms: i.paymentTerms,
+      customerNote: i.customerNote,
     })),
   };
 }
@@ -340,6 +364,13 @@ export async function createOrder(input: CreateOrderInput) {
       currency: input.currency ?? 'USD',
       eta: input.eta ? new Date(input.eta) : null,
       etd: input.etd ? new Date(input.etd) : null,
+      customerPaymentTermType: input.customerPaymentTermType ?? null,
+      customerCreditDays: input.customerCreditDays ?? null,
+      customerNote: input.customerNote ?? null,
+      supplierId: input.supplierId ?? null,
+      supplierPaymentTermType: input.supplierPaymentTermType ?? null,
+      supplierCreditDays: input.supplierCreditDays ?? null,
+      supplierNote: input.supplierNote ?? null,
     })
     .returning();
 
@@ -360,6 +391,21 @@ export async function updateOrder(id: string, input: UpdateOrderInput) {
   if (input.status !== undefined) setData.status = input.status;
   if (input.eta !== undefined) setData.eta = input.eta ? new Date(input.eta) : null;
   if (input.etd !== undefined) setData.etd = input.etd ? new Date(input.etd) : null;
+  if (input.customerPaymentTermType !== undefined) {
+    setData.customerPaymentTermType = input.customerPaymentTermType;
+  }
+  if (input.customerCreditDays !== undefined) {
+    setData.customerCreditDays = input.customerCreditDays;
+  }
+  if (input.customerNote !== undefined) setData.customerNote = input.customerNote;
+  if (input.supplierId !== undefined) setData.supplierId = input.supplierId;
+  if (input.supplierPaymentTermType !== undefined) {
+    setData.supplierPaymentTermType = input.supplierPaymentTermType;
+  }
+  if (input.supplierCreditDays !== undefined) {
+    setData.supplierCreditDays = input.supplierCreditDays;
+  }
+  if (input.supplierNote !== undefined) setData.supplierNote = input.supplierNote;
   if (input.lossReason !== undefined) setData.lossReason = input.lossReason;
 
   // Auto-set closedAt when status moves to CANCELLED or PAID
@@ -424,18 +470,151 @@ export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
       quantityMin: item.quantityMin ?? null,
       quantityMax: item.quantityMax ?? null,
       unit: item.unit ?? 'MT',
-      supplierId: item.supplierId ?? null,
       costPrice: item.costPrice ?? null,
       costCurrency,
       salesPrice: item.salesPrice ?? null,
       salesCurrency,
       profit: profit.toFixed(4),
       paymentTerms: item.paymentTerms as any ?? null,
+      customerNote: item.customerNote ?? null,
     };
   });
 
   const inserted = await db.insert(orderItems).values(values).returning();
   return inserted;
+}
+
+// ─── Order Attachments ─────────────────────────────────────────────
+
+export async function listOrderAttachments(orderId: string) {
+  const rows = await db
+    .select()
+    .from(orderAttachments)
+    .where(eq(orderAttachments.orderId, orderId));
+
+  return rows.map((row) => ({
+    id: row.id,
+    orderId: row.orderId,
+    type: row.type,
+    fileName: row.fileName,
+    filePath: row.filePath,
+    mimeType: row.mimeType,
+    fileSize: row.fileSize,
+    uploadedBy: row.uploadedBy,
+    createdAt: row.createdAt.toISOString(),
+  }));
+}
+
+export async function createOrderAttachment(input: {
+  orderId: string;
+  type: string;
+  fileName: string;
+  filePath: string;
+  mimeType: string;
+  fileSize: number;
+  uploadedBy?: string | null;
+}) {
+  const [created] = await db
+    .insert(orderAttachments)
+    .values({
+      orderId: input.orderId,
+      type: input.type as any,
+      fileName: input.fileName,
+      filePath: input.filePath,
+      mimeType: input.mimeType,
+      fileSize: input.fileSize,
+      uploadedBy: input.uploadedBy ?? null,
+    })
+    .returning();
+
+  return created ?? null;
+}
+
+// ─── Customer Payments (ledger) ───────────────────────────────────
+
+function mapPaymentRow(row: typeof customerPayments.$inferSelect) {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    customerId: row.customerId,
+    orderId: row.orderId,
+    invoiceId: row.invoiceId,
+    amount: String(row.amount),
+    currency: row.currency,
+    receivedAt: row.receivedAt.toISOString(),
+    method: row.method ?? null,
+    note: row.note ?? null,
+    createdBy: row.createdBy ?? null,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+export async function listOrderPayments(orderId: string) {
+  const rows = await db
+    .select()
+    .from(customerPayments)
+    .where(eq(customerPayments.orderId, orderId))
+    .orderBy(desc(customerPayments.receivedAt));
+
+  return rows.map(mapPaymentRow);
+}
+
+async function updateInvoiceAmountPaid(orderId: string): Promise<void> {
+  const [{ total }] = await db
+    .select({ total: sql<number>`COALESCE(SUM(${customerPayments.amount}), 0)::float` })
+    .from(customerPayments)
+    .where(eq(customerPayments.orderId, orderId));
+
+  await db
+    .update(invoices)
+    .set({ amountPaid: total.toFixed(2), updatedAt: new Date() })
+    .where(eq(invoices.orderId, orderId));
+}
+
+export async function createOrderPayment(orderId: string, input: {
+  amount: string;
+  currency: string;
+  receivedAt?: string | null;
+  method?: string | null;
+  note?: string | null;
+  createdBy?: string | null;
+}) {
+  const [orderRow] = await db
+    .select({ tenantId: orders.tenantId, clientId: orders.clientId })
+    .from(orders)
+    .where(eq(orders.id, orderId))
+    .limit(1);
+
+  if (!orderRow) return null;
+
+  const [invoice] = await db
+    .select({ id: invoices.id })
+    .from(invoices)
+    .where(eq(invoices.orderId, orderId))
+    .orderBy(desc(invoices.createdAt))
+    .limit(1);
+
+  const [created] = await db
+    .insert(customerPayments)
+    .values({
+      tenantId: orderRow.tenantId,
+      customerId: orderRow.clientId,
+      orderId,
+      invoiceId: invoice?.id ?? null,
+      amount: input.amount,
+      currency: input.currency || 'USD',
+      receivedAt: input.receivedAt ? new Date(input.receivedAt) : new Date(),
+      method: input.method ?? null,
+      note: input.note ?? null,
+      createdBy: input.createdBy ?? null,
+    })
+    .returning();
+
+  if (invoice?.id) {
+    await updateInvoiceAmountPaid(orderId);
+  }
+
+  return created ? mapPaymentRow(created) : null;
 }
 
 // ─── Update Order Status ────────────────────────────────────────────

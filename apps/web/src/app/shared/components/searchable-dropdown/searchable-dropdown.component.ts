@@ -10,6 +10,7 @@ import {
   inject,
   OnInit,
   OnDestroy,
+  effect,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
@@ -156,6 +157,7 @@ export class SearchableDropdownComponent implements OnInit, OnDestroy {
   readonly dropdownTop = signal(0);
   readonly dropdownLeft = signal(0);
   readonly dropdownWidth = signal(0);
+  private readonly minDropdownWidth = 320;
 
   readonly filteredOptions = computed(() => {
     const term = this.searchText().toLowerCase();
@@ -169,13 +171,16 @@ export class SearchableDropdownComponent implements OnInit, OnDestroy {
     if (!this.elRef.nativeElement.contains(e.target)) this.close();
   };
 
-  ngOnInit(): void {
-    // Set initial display text from selected value
-    const sel = this.selected();
-    if (sel) {
+  constructor() {
+    effect(() => {
+      if (this.isOpen()) return;
+      const sel = this.selected();
       const match = this.options().find((o) => o.value === sel);
-      if (match) this.searchText.set(match.label);
-    }
+      this.searchText.set(match?.label ?? '');
+    });
+  }
+
+  ngOnInit(): void {
     document.addEventListener('click', this.clickOutside);
   }
 
@@ -195,7 +200,7 @@ export class SearchableDropdownComponent implements OnInit, OnDestroy {
     const rect = this.triggerRef.nativeElement.getBoundingClientRect();
     this.dropdownTop.set(rect.bottom + 4); // 4px gap
     this.dropdownLeft.set(rect.left);
-    this.dropdownWidth.set(rect.width);
+    this.dropdownWidth.set(Math.max(rect.width, this.minDropdownWidth));
   }
 
   close(): void {

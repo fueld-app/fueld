@@ -6,6 +6,7 @@ import {
   OnInit,
   OnDestroy,
   computed,
+  input,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { RouterLink, Router, ActivatedRoute } from '@angular/router';
@@ -55,8 +56,8 @@ interface LliSearchResult {
     <div>
       <!-- Header -->
       <div class="mb-6">
-        <h1 class="text-2xl font-bold text-gray-900">Inquiries</h1>
-        <p class="mt-1 text-sm text-gray-500">Manage bunker inquiries and offers before confirmation.</p>
+        <h1 class="text-2xl font-bold text-gray-900">{{ titleText() }}</h1>
+        <p class="mt-1 text-sm text-gray-500">{{ subtitleText() }}</p>
       </div>
 
       <!-- Search bar -->
@@ -65,7 +66,7 @@ interface LliSearchResult {
           type="text"
           [ngModel]="searchTerm()"
           (ngModelChange)="onSearch($event)"
-          placeholder="Search by client, vessel or port..."
+          [placeholder]="searchPlaceholder()"
           class="w-full max-w-md rounded-lg border border-gray-300 px-4 py-2.5 text-sm shadow-sm
                  placeholder:text-gray-400 focus:border-brand-500 focus:outline-none
                  focus:ring-2 focus:ring-brand-500/20"
@@ -91,6 +92,7 @@ interface LliSearchResult {
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Vessel</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Port</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Status</th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600">Responsible</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600">ETA</th>
                 <th class="px-4 py-3 text-right font-medium text-gray-600">Value (USD)</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Created</th>
@@ -107,6 +109,7 @@ interface LliSearchResult {
                   <td class="px-4 py-3">
                     <app-status-badge [status]="inq.status" />
                   </td>
+                  <td class="px-4 py-3 text-gray-600">{{ inq.salesRepName || '—' }}</td>
                   <td class="px-4 py-3 text-gray-500">{{ inq.eta ? (inq.eta | date:'mediumDate') : '—' }}</td>
                   <td class="px-4 py-3 text-right tabular-nums text-gray-900">
                     @if (inq.totalValue > 0) {
@@ -118,9 +121,9 @@ interface LliSearchResult {
                   <td class="px-4 py-3 text-gray-500">{{ inq.createdAt | date:'mediumDate' }}</td>
                   <td class="px-4 py-3">
                     <a
-                      [routerLink]="['/trading/inquiries', inq.orderNumber || inq.id]"
+                      [routerLink]="[baseRoute(), inq.orderNumber || inq.id]"
                       class="rounded-md p-1 text-gray-400 hover:text-brand-600 transition-colors"
-                      aria-label="View inquiry"
+                      [attr.aria-label]="isOrders() ? 'View order' : 'View inquiry'"
                       (click)="$event.stopPropagation()"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -131,14 +134,16 @@ interface LliSearchResult {
                 </tr>
               } @empty {
                 <tr>
-                  <td colspan="9" class="px-4 py-12 text-center">
-                    <p class="text-sm text-gray-400">No inquiries found.</p>
-                    <button
-                      (click)="showNewInquiryModal.set(true)"
-                      class="mt-2 text-sm font-medium text-brand-600 hover:text-brand-700"
-                    >
-                      + Create your first inquiry
-                    </button>
+                  <td colspan="10" class="px-4 py-12 text-center">
+                    <p class="text-sm text-gray-400">{{ isOrders() ? 'No orders found.' : 'No inquiries found.' }}</p>
+                    @if (!isOrders()) {
+                      <button
+                        (click)="showNewInquiryModal.set(true)"
+                        class="mt-2 text-sm font-medium text-brand-600 hover:text-brand-700"
+                      >
+                        + Create your first inquiry
+                      </button>
+                    }
                   </td>
                 </tr>
               }
@@ -178,7 +183,7 @@ interface LliSearchResult {
         <div class="space-y-3 md:hidden">
           @for (inq of inquiries(); track inq.id) {
             <a
-              [routerLink]="['/trading/inquiries', inq.orderNumber || inq.id]"
+              [routerLink]="[baseRoute(), inq.orderNumber || inq.id]"
               class="block rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
             >
               <div class="flex items-center justify-between mb-2">
@@ -192,18 +197,21 @@ interface LliSearchResult {
                 <span>{{ inq.vesselName }}</span>
                 <span>{{ inq.placeName }}</span>
                 <span>ETA {{ inq.eta ? (inq.eta | date:'mediumDate') : '—' }}</span>
+                <span>Resp {{ inq.salesRepName || '—' }}</span>
                 <span>{{ inq.createdAt | date:'mediumDate' }}</span>
               </div>
             </a>
           } @empty {
             <div class="rounded-xl border-2 border-dashed border-gray-300 bg-white p-8 text-center">
-              <p class="text-sm text-gray-400">No inquiries yet.</p>
-              <button
-                (click)="showNewInquiryModal.set(true)"
-                class="mt-2 text-sm font-medium text-brand-600 hover:text-brand-700"
-              >
-                + Create your first inquiry
-              </button>
+              <p class="text-sm text-gray-400">{{ isOrders() ? 'No orders yet.' : 'No inquiries yet.' }}</p>
+              @if (!isOrders()) {
+                <button
+                  (click)="showNewInquiryModal.set(true)"
+                  class="mt-2 text-sm font-medium text-brand-600 hover:text-brand-700"
+                >
+                  + Create your first inquiry
+                </button>
+              }
             </div>
           }
         </div>
@@ -213,7 +221,7 @@ interface LliSearchResult {
     <!-- ═════════════════════════════════════════════════════════════ -->
     <!--  New Inquiry Modal                                           -->
     <!-- ═════════════════════════════════════════════════════════════ -->
-    @if (showNewInquiryModal()) {
+    @if (showNewInquiryModal() && !isOrders()) {
       <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
         <div class="w-full max-w-lg rounded-2xl bg-white shadow-2xl" role="dialog" aria-modal="true">
           <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
@@ -350,6 +358,22 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
 
   readonly Math = Math;
 
+  readonly mode = input<'inquiries' | 'orders'>('inquiries');
+
+  readonly isOrders = computed(() => this.mode() === 'orders');
+  readonly baseRoute = computed(() => (this.isOrders() ? '/trading/orders' : '/trading/inquiries'));
+  readonly titleText = computed(() => (this.isOrders() ? 'Orders' : 'Inquiries'));
+  readonly subtitleText = computed(() =>
+    this.isOrders()
+      ? 'Manage your bunker trading orders.'
+      : 'Manage bunker inquiries and offers before confirmation.',
+  );
+  readonly searchPlaceholder = computed(() =>
+    this.isOrders()
+      ? 'Search by client, vessel or port...'
+      : 'Search by client, vessel or port...',
+  );
+
   // ─── State ───────────────────────────────────────────────────────
 
   readonly inquiries = signal<OrderListRowDto[]>([]);
@@ -416,15 +440,17 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.loadInquiries();
-    this.loadDropdownData();
+    if (!this.isOrders()) {
+      this.loadDropdownData();
 
-    // Auto-open modal when navigated with ?new=1 (e.g. from navbar button)
-    this.queryParamSub = this.route.queryParamMap.subscribe((params) => {
-      if (params.get('new') === '1') {
-        this.showNewInquiryModal.set(true);
-        this.router.navigate([], { queryParams: {}, replaceUrl: true });
-      }
-    });
+      // Auto-open modal when navigated with ?new=1 (e.g. from navbar button)
+      this.queryParamSub = this.route.queryParamMap.subscribe((params) => {
+        if (params.get('new') === '1') {
+          this.showNewInquiryModal.set(true);
+          this.router.navigate([], { queryParams: {}, replaceUrl: true });
+        }
+      });
+    }
   }
 
   ngOnDestroy(): void {
@@ -437,7 +463,9 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
     this.loading.set(true);
     try {
       const params = new URLSearchParams();
-      params.set('statuses', 'INQUIRY,OFFER');
+      if (!this.isOrders()) {
+        params.set('statuses', 'INQUIRY,OFFER');
+      }
       params.set('page', String(this.currentPage()));
       params.set('limit', String(this.pageSize()));
       if (this.searchTerm()) params.set('search', this.searchTerm());
@@ -755,7 +783,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   }
 
   goToDetail(id: string): void {
-    this.router.navigate(['/trading/inquiries', id]);
+    this.router.navigate([this.baseRoute(), id]);
   }
 
   async createInquiry(): Promise<void> {

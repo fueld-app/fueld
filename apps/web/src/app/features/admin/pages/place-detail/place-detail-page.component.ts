@@ -85,6 +85,22 @@ interface PlaceEnrichment {
   children: ChildPlace[];
 }
 
+interface PlaceEditForm {
+  name: string;
+  country: string;
+  countryIso: string;
+  area: string;
+  subRegion: string;
+  placeType: string;
+  timezone: string;
+  unlocode: string;
+  admiraltyChart: string;
+  lat: number | null;
+  long: number | null;
+  parentPlaceId: string;
+  parentPlaceName: string;
+}
+
 interface NearbyVessel {
   id: string;
   name: string;
@@ -418,28 +434,174 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
 
             <!-- General info -->
             <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
-              <div class="border-b border-gray-100 px-5 py-3">
-                <h2 class="text-sm font-semibold text-gray-700">General Information</h2>
+              <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <h2 class="text-sm font-semibold text-gray-700">General Information</h2>
+                  @if (isManualPlace()) {
+                    <span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">Manual</span>
+                  }
+                </div>
+                @if (isManualPlace()) {
+                  <div class="flex items-center gap-2">
+                    @if (!editingPlace()) {
+                      <button
+                        (click)="startEditPlace()"
+                        class="rounded-md border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                      >
+                        Edit
+                      </button>
+                    } @else {
+                      <button
+                        (click)="savePlaceEdits()"
+                        [disabled]="savingPlace()"
+                        class="rounded-md bg-brand-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
+                      >
+                        {{ savingPlace() ? 'Saving…' : 'Save' }}
+                      </button>
+                      <button
+                        (click)="cancelEditPlace()"
+                        [disabled]="savingPlace()"
+                        class="rounded-md border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                      >
+                        Cancel
+                      </button>
+                    }
+                  </div>
+                }
               </div>
               <div class="p-5">
-                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
-                  <div>
-                    <dt class="text-gray-500">UNLOCODE</dt>
-                    <dd class="mt-0.5 font-medium text-gray-900 font-mono">{{ place()!.unlocode ?? '—' }}</dd>
+                @if (!editingPlace()) {
+                  <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
+                    <div>
+                      <dt class="text-gray-500">UNLOCODE</dt>
+                      <dd class="mt-0.5 font-medium text-gray-900 font-mono">{{ place()!.unlocode ?? '—' }}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-gray-500">Area</dt>
+                      <dd class="mt-0.5 font-medium text-gray-900">{{ place()!.area ?? '—' }}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-gray-500">Sub Region</dt>
+                      <dd class="mt-0.5 font-medium text-gray-900">{{ place()!.subRegion ?? '—' }}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-gray-500">Timezone</dt>
+                      <dd class="mt-0.5 font-medium text-gray-900">{{ place()!.timezone ?? '—' }}</dd>
+                    </div>
+                  </dl>
+                } @else {
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                    <label class="space-y-1">
+                      <span class="text-gray-500">Name</span>
+                      <input
+                        [ngModel]="placeForm().name"
+                        (ngModelChange)="updatePlaceForm('name', $event)"
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
+                               focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                      />
+                    </label>
+                    <label class="space-y-1">
+                      <span class="text-gray-500">Country</span>
+                      <input
+                        [ngModel]="placeForm().country"
+                        (ngModelChange)="updatePlaceForm('country', $event)"
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
+                               focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                      />
+                    </label>
+                    <label class="space-y-1">
+                      <span class="text-gray-500">Country ISO</span>
+                      <input
+                        [ngModel]="placeForm().countryIso"
+                        (ngModelChange)="updatePlaceForm('countryIso', $event)"
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
+                               focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                      />
+                    </label>
+                    <label class="space-y-1">
+                      <span class="text-gray-500">Place Type</span>
+                      <select
+                        [ngModel]="placeForm().placeType"
+                        (ngModelChange)="updatePlaceForm('placeType', $event)"
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
+                               focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                      >
+                        <option value="">Select</option>
+                        @for (opt of placeTypeOptions; track opt.value) {
+                          <option [value]="opt.value">{{ opt.label }}</option>
+                        }
+                      </select>
+                    </label>
+                    <label class="space-y-1">
+                      <span class="text-gray-500">Area</span>
+                      <input
+                        [ngModel]="placeForm().area"
+                        (ngModelChange)="updatePlaceForm('area', $event)"
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
+                               focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                      />
+                    </label>
+                    <label class="space-y-1">
+                      <span class="text-gray-500">Sub Region</span>
+                      <input
+                        [ngModel]="placeForm().subRegion"
+                        (ngModelChange)="updatePlaceForm('subRegion', $event)"
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
+                               focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                      />
+                    </label>
+                    <label class="space-y-1">
+                      <span class="text-gray-500">Timezone</span>
+                      <input
+                        [ngModel]="placeForm().timezone"
+                        (ngModelChange)="updatePlaceForm('timezone', $event)"
+                        placeholder="GMT +04H"
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
+                               focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                      />
+                    </label>
+                    <label class="space-y-1">
+                      <span class="text-gray-500">UNLOCODE</span>
+                      <input
+                        [ngModel]="placeForm().unlocode"
+                        (ngModelChange)="updatePlaceForm('unlocode', $event)"
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 font-mono
+                               focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                      />
+                    </label>
+                    <label class="space-y-1">
+                      <span class="text-gray-500">Admiralty Chart</span>
+                      <input
+                        [ngModel]="placeForm().admiraltyChart"
+                        (ngModelChange)="updatePlaceForm('admiraltyChart', $event)"
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
+                               focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                      />
+                    </label>
+                    <label class="space-y-1">
+                      <span class="text-gray-500">Latitude</span>
+                      <input
+                        type="number"
+                        step="0.000001"
+                        [ngModel]="placeForm().lat"
+                        (ngModelChange)="onLatChange($event)"
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
+                               focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                      />
+                    </label>
+                    <label class="space-y-1">
+                      <span class="text-gray-500">Longitude</span>
+                      <input
+                        type="number"
+                        step="0.000001"
+                        [ngModel]="placeForm().long"
+                        (ngModelChange)="onLongChange($event)"
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
+                               focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                      />
+                    </label>
                   </div>
-                  <div>
-                    <dt class="text-gray-500">Area</dt>
-                    <dd class="mt-0.5 font-medium text-gray-900">{{ place()!.area ?? '—' }}</dd>
-                  </div>
-                  <div>
-                    <dt class="text-gray-500">Sub Region</dt>
-                    <dd class="mt-0.5 font-medium text-gray-900">{{ place()!.subRegion ?? '—' }}</dd>
-                  </div>
-                  <div>
-                    <dt class="text-gray-500">Timezone</dt>
-                    <dd class="mt-0.5 font-medium text-gray-900">{{ place()!.timezone ?? '—' }}</dd>
-                  </div>
-                </dl>
+                }
               </div>
             </div>
 
@@ -1125,6 +1287,23 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
   readonly showDeleteModal = signal(false);
   readonly deletingPlace = signal(false);
   readonly mapFullscreen = signal(false);
+  readonly editingPlace = signal(false);
+  readonly savingPlace = signal(false);
+  readonly placeForm = signal<PlaceEditForm>({
+    name: '',
+    country: '',
+    countryIso: '',
+    area: '',
+    subRegion: '',
+    placeType: '',
+    timezone: '',
+    unlocode: '',
+    admiraltyChart: '',
+    lat: null,
+    long: null,
+    parentPlaceId: '',
+    parentPlaceName: '',
+  });
 
   // Parent place navigation
   readonly navigatingParentId = signal<boolean>(false);
@@ -1175,6 +1354,12 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
   readonly teamUsers = signal<UserOption[]>([]);
   readonly responsibleUserId = signal<string | null>(null);
   readonly savingResponsible = signal(false);
+
+  readonly isManualPlace = computed(() => !this.place()?.lliPlaceId);
+  readonly placeTypeOptions = Object.entries(PLACE_TYPE_LABELS).map(([value, label]) => ({
+    value,
+    label,
+  }));
 
   // Grouped hierarchy — terminals vs anchorages
   readonly terminals = computed(() =>
@@ -1253,6 +1438,89 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
     this.responsibleUserId.set(null);
     this.showAddSupplier.set(false);
     this.editingSupplierId.set(null);
+    this.editingPlace.set(false);
+    this.savingPlace.set(false);
+  }
+
+  startEditPlace(): void {
+    const current = this.place();
+    if (!current) return;
+    this.placeForm.set({
+      name: current.name ?? '',
+      country: current.country ?? '',
+      countryIso: current.countryIso ?? '',
+      area: current.area ?? '',
+      subRegion: current.subRegion ?? '',
+      placeType: current.placeType ?? '',
+      timezone: current.timezone ?? '',
+      unlocode: current.unlocode ?? '',
+      admiraltyChart: current.admiraltyChart ?? '',
+      lat: current.lat ?? null,
+      long: current.long ?? null,
+      parentPlaceId: current.parentPlaceId ?? '',
+      parentPlaceName: current.parentPlaceName ?? '',
+    });
+    this.editingPlace.set(true);
+  }
+
+  cancelEditPlace(): void {
+    this.editingPlace.set(false);
+  }
+
+  updatePlaceForm<K extends keyof PlaceEditForm>(key: K, value: PlaceEditForm[K]): void {
+    this.placeForm.set({ ...this.placeForm(), [key]: value });
+  }
+
+  onLatChange(value: number | string): void {
+    const numeric = typeof value === 'string' ? Number(value) : value;
+    this.updatePlaceForm('lat', Number.isFinite(numeric) ? numeric : null);
+  }
+
+  onLongChange(value: number | string): void {
+    const numeric = typeof value === 'string' ? Number(value) : value;
+    this.updatePlaceForm('long', Number.isFinite(numeric) ? numeric : null);
+  }
+
+  async savePlaceEdits(): Promise<void> {
+    const current = this.place();
+    if (!current) return;
+    const form = this.placeForm();
+    this.savingPlace.set(true);
+
+    try {
+      const payload = {
+        name: form.name.trim(),
+        country: form.country.trim(),
+        countryIso: form.countryIso.trim() || null,
+        area: form.area.trim() || null,
+        subRegion: form.subRegion.trim() || null,
+        placeType: form.placeType || null,
+        timezone: form.timezone.trim() || null,
+        unlocode: form.unlocode.trim() || null,
+        admiraltyChart: form.admiraltyChart.trim() || null,
+        lat: form.lat,
+        long: form.long,
+        parentPlaceId: form.parentPlaceId.trim() || null,
+        parentPlaceName: form.parentPlaceName.trim() || null,
+      };
+
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<PlaceDto>>(
+          `${API}/lloyds/places/local/${current.id}`,
+          payload,
+        ),
+      );
+
+      if (res.success && res.data) {
+        this.place.set(res.data);
+        this.startLocalTime(res.data.timezone);
+        this.editingPlace.set(false);
+      }
+    } catch (err) {
+      console.error('Failed to update place:', err);
+    } finally {
+      this.savingPlace.set(false);
+    }
   }
 
   async loadPlace(id: string): Promise<void> {

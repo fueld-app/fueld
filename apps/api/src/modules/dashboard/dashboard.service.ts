@@ -1,4 +1,4 @@
-import { eq, and, lt, sql, inArray, ne, isNotNull } from 'drizzle-orm';
+import { eq, and, lt, sql, inArray, ne, isNotNull, gte, lte } from 'drizzle-orm';
 import { db } from '../../db';
 import {
   invoices,
@@ -33,8 +33,20 @@ export interface OverdueInvoice {
  * Returns all invoices that are past their due date and not fully paid.
  * Ordered by most overdue first.
  */
-export async function getCollections(tenantId: string): Promise<OverdueInvoice[]> {
+export async function getCollections(
+  tenantId: string,
+  from?: string,
+  to?: string,
+): Promise<OverdueInvoice[]> {
   const today = new Date().toISOString().split('T')[0]!;
+  const conditions = [
+    eq(orders.tenantId, tenantId),
+    lt(invoices.dueDate, today),
+    ne(invoices.status, 'PAID'),
+    ne(invoices.status, 'VOID'),
+  ];
+  if (from) conditions.push(gte(invoices.dueDate, from));
+  if (to) conditions.push(lte(invoices.dueDate, to));
 
   const results = await db
     .select({
@@ -52,14 +64,7 @@ export async function getCollections(tenantId: string): Promise<OverdueInvoice[]
     .innerJoin(orders, eq(invoices.orderId, orders.id))
     .innerJoin(counterparties, eq(orders.clientId, counterparties.id))
     .innerJoin(vessels, eq(orders.vesselId, vessels.id))
-    .where(
-      and(
-        eq(orders.tenantId, tenantId),
-        lt(invoices.dueDate, today),
-        ne(invoices.status, 'PAID'),
-        ne(invoices.status, 'VOID'),
-      ),
-    )
+    .where(and(...conditions))
     .orderBy(invoices.dueDate);
 
   return results.map((r) => {
@@ -104,6 +109,8 @@ export interface TraderStat {
 export async function getTeamStats(
   tenantId: string,
   requestingUserId: string,
+  from?: string,
+  to?: string,
 ): Promise<TraderStat[]> {
   // 1. Find which trader IDs the requesting user can see
   const visibleTraderIds = await resolveVisibleTraderIds(tenantId, requestingUserId);
@@ -113,6 +120,16 @@ export async function getTeamStats(
   }
 
   // 2. Aggregate order items grouped by sales rep
+  const fromDate = from ? new Date(`${from}T00:00:00`) : null;
+  const toDate = to ? new Date(`${to}T23:59:59`) : null;
+  const baseConditions = [
+    eq(orders.tenantId, tenantId),
+    isNotNull(orders.salesRepId),
+    inArray(orders.salesRepId, visibleTraderIds),
+  ];
+  if (fromDate) baseConditions.push(gte(orders.createdAt, fromDate));
+  if (toDate) baseConditions.push(lte(orders.createdAt, toDate));
+
   const stats = await db
     .select({
       traderId: orders.salesRepId,
@@ -127,13 +144,7 @@ export async function getTeamStats(
     .from(orders)
     .innerJoin(users, eq(orders.salesRepId, users.id))
     .leftJoin(orderItems, eq(orderItems.orderId, orders.id))
-    .where(
-      and(
-        eq(orders.tenantId, tenantId),
-        isNotNull(orders.salesRepId),
-        inArray(orders.salesRepId, visibleTraderIds),
-      ),
-    )
+    .where(and(...baseConditions))
     .groupBy(orders.salesRepId, users.name, users.email);
 
   return stats.map((s) => ({

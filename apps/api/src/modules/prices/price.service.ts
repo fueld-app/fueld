@@ -44,6 +44,10 @@ const FX_TICKERS: Record<string, string> = {
   DKK: 'DKKUSD=X',
   AED: 'AEDUSD=X',
 };
+const FX_WS_TICKERS = Object.values(FX_TICKERS);
+const FX_TICKER_TO_CURRENCY: Record<string, string> = Object.fromEntries(
+  Object.entries(FX_TICKERS).map(([currency, ticker]) => [ticker, currency]),
+);
 
 const UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -139,8 +143,9 @@ function connectYahooWs(): void {
 
   yahooWs.onopen = () => {
     console.log('[Prices] Yahoo WebSocket connected');
-    yahooWs!.send(JSON.stringify({ subscribe: ['BZ=F'] }));
-    console.log('[Prices] Subscribed to BZ=F');
+    const subscribeTickers = ['BZ=F', ...FX_WS_TICKERS];
+    yahooWs!.send(JSON.stringify({ subscribe: subscribeTickers }));
+    console.log(`[Prices] Subscribed to ${subscribeTickers.join(', ')}`);
   };
 
   yahooWs.onmessage = (event) => {
@@ -172,6 +177,17 @@ function connectYahooWs(): void {
           updatedAt: new Date().toISOString(),
         };
 
+        broadcast();
+      } else if (obj.id && obj.price && FX_TICKER_TO_CURRENCY[obj.id]) {
+        const currency = FX_TICKER_TO_CURRENCY[obj.id];
+        fxRates = {
+          base: FX_BASE,
+          rates: {
+            ...fxRates.rates,
+            [currency]: round2(obj.price),
+          },
+          updatedAt: new Date().toISOString(),
+        };
         broadcast();
       }
     } catch (err: any) {
@@ -359,7 +375,7 @@ export function startPricePolling(): void {
   fetchGasOil();
   gasoilTimer = setInterval(fetchGasOil, GASOIL_POLL_INTERVAL_MS);
 
-  // FX rates: Yahoo REST polling
+  // FX rates: Yahoo WebSocket streaming with REST fallback
   fetchFxRates();
   fxTimer = setInterval(fetchFxRates, FX_POLL_INTERVAL_MS);
 }

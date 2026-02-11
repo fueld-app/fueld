@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 //  Credit Controller
 //
-//  GET    /credit/lines?type=SUPPLIER|CUSTOMER&page=&limit=
+//  GET    /credit/lines?type=SUPPLIER|CUSTOMER&counterpartyId=&page=&limit=
 //  GET    /credit/lines/:id
 //  POST   /credit/lines
 //  PATCH  /credit/lines/:id
@@ -28,6 +28,7 @@ export const creditController = new Elysia({ prefix: '/credit' })
     async ({ query }) => {
       const results = await listCreditLines({
         type: query.type as 'SUPPLIER' | 'CUSTOMER' | undefined,
+        counterpartyId: query.counterpartyId,
         page: query.page ? parseInt(query.page) : undefined,
         limit: query.limit ? parseInt(query.limit) : undefined,
       });
@@ -36,6 +37,7 @@ export const creditController = new Elysia({ prefix: '/credit' })
     {
       query: t.Object({
         type: t.Optional(t.String()),
+        counterpartyId: t.Optional(t.String()),
         page: t.Optional(t.String()),
         limit: t.Optional(t.String()),
       }),

@@ -9,22 +9,23 @@ import {
   effect,
   viewChild,
 } from '@angular/core';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
+import { DecimalPipe } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map, firstValueFrom } from 'rxjs';
 import {
   OrderStatus,
+  PaymentTermType,
   type OrderDto,
   type CounterpartyDto,
   type VesselDto,
   type PlaceDto,
   type ApiResponse,
   type OwnCompanyDto,
-  type ActivityLogDto,
+  type CreditLineDto,
 } from '@fueld/types';
 
-import { StatusBadgeComponent } from '../../../../shared/components/status-badge/status-badge.component';
 import {
   OrderItemsComponent,
   type OrderItemRow,
@@ -35,8 +36,11 @@ import {
 } from '../../../../shared/components/searchable-dropdown/searchable-dropdown.component';
 import { CommentsCardComponent } from '../../../../shared/components/comments-card/comments-card.component';
 import { PdfPreviewModalComponent } from '../../../../shared/components/pdf-preview-modal/pdf-preview-modal.component';
+import { ActivityTimelineComponent } from '../../../../shared/components/activity-timeline/activity-timeline.component';
 import { FormsModule } from '@angular/forms';
-import { DatePipe } from '@angular/common';
+import { TradingDetailHeaderComponent } from '../../components/detail-header/detail-header.component';
+import { TradingDetailMetaCardsComponent } from '../../components/detail-meta-cards/detail-meta-cards.component';
+import { AuthService } from '../../../../core/auth/auth.service';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Inquiry Detail Page
@@ -47,6 +51,12 @@ import { DatePipe } from '@angular/common';
 // ═══════════════════════════════════════════════════════════════════════
 
 import { API } from '@app/core/config/api';
+
+interface TeamUserOption {
+  id: string;
+  name: string;
+  email: string;
+}
 
 interface CompanySearchResult {
   source: 'local' | 'seasearcher';
@@ -76,13 +86,14 @@ interface LliSearchResult {
   selector: 'app-inquiry-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    RouterLink,
     FormsModule,
-    DatePipe,
-    StatusBadgeComponent,
+    DecimalPipe,
+    TradingDetailHeaderComponent,
+    TradingDetailMetaCardsComponent,
     OrderItemsComponent,
     SearchableDropdownComponent,
     CommentsCardComponent,
+    ActivityTimelineComponent,
     PdfPreviewModalComponent,
   ],
   template: `
@@ -94,301 +105,315 @@ interface LliSearchResult {
         </svg>
       </div>
     } @else {
-      <!-- ═══════════════════════════════════════════════════════════ -->
-      <!--  Page Header                                               -->
-      <!-- ═══════════════════════════════════════════════════════════ -->
-      <div class="mb-6">
-        <nav class="mb-4 flex items-center gap-1.5 text-sm text-gray-500">
-          <a routerLink="/trading/inquiries" class="hover:text-brand-600 transition-colors">Inquiries</a>
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-            <path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
-          </svg>
-          <span class="text-gray-900 font-medium">{{ order()?.orderNumber ?? inquiryId().slice(0, 8) + '...' }}</span>
-        </nav>
+      <app-trading-detail-header
+        title="Inquiry Detail"
+        breadcrumbLabel="Inquiries"
+        breadcrumbLink="/trading/inquiries"
+        [entityNumber]="order()?.orderNumber ?? null"
+        [fallbackId]="inquiryId()"
+        [status]="order()?.status ?? 'INQUIRY'"
+        [subtitle]="subtitle()"
+        [showAutosave]="true"
+        [autoSaving]="autoSaving()"
+        [lastSaved]="lastSaved()"
+      >
+        <div detail-actions class="flex flex-wrap items-center gap-2">
+          <!-- Actions dropdown -->
+          <div class="relative">
+            <button
+              (click)="actionsOpen.set(!actionsOpen())"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm
+                     font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors"
+            >
+              Actions
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+              </svg>
+            </button>
 
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div class="flex items-center gap-3">
-              <h1 class="text-2xl font-bold text-gray-900">Inquiry Detail</h1>
-              <app-status-badge [status]="order()?.status ?? 'INQUIRY'" />
-            </div>
-            <p class="mt-1 text-sm text-gray-500">
-              @if (order()?.orderNumber) {
-                <span class="font-mono text-gray-600">{{ order()!.orderNumber }}</span>
-                <span class="mx-1.5">·</span>
-              }
-              {{ vesselName() }} · {{ portName() }} · {{ clientName() }}
-            </p>
-          </div>
-
-          <div class="flex flex-wrap items-center gap-2">
-            <!-- Autosave indicator -->
-            <div class="flex items-center gap-2 text-sm text-gray-500">
-              @if (autoSaving()) {
-                <svg class="h-4 w-4 animate-spin text-brand-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                </svg>
-                <span>Saving...</span>
-              } @else if (lastSaved()) {
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd" />
-                </svg>
-                <span>Saved</span>
-              }
-            </div>
-
-            <!-- Actions dropdown -->
-            <div class="relative">
-              <button
-                (click)="actionsOpen.set(!actionsOpen())"
-                class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm
-                       font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors"
-              >
-                Actions
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
-                </svg>
-              </button>
-
-              @if (actionsOpen()) {
-                <!-- Backdrop to close -->
-                <div class="fixed inset-0 z-40" (click)="actionsOpen.set(false)"></div>
-                <div class="absolute right-0 z-50 mt-1 w-56 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
-                  @if (!hasInvoicingCompany()) {
-                    <div class="px-4 py-2 text-xs text-amber-700 bg-amber-50 border-b border-amber-100">
-                      Select an invoicing company to send emails
-                    </div>
-                  }
-                  <button
-                    (click)="openSendOfferModal(); actionsOpen.set(false)"
-                    [disabled]="!hasInvoicingCompany()"
-                    class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-blue-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                      <path d="M3.105 2.288a.75.75 0 0 0-.826.95l1.414 4.926A1.5 1.5 0 0 0 5.135 9.25h6.115a.75.75 0 0 1 0 1.5H5.135a1.5 1.5 0 0 0-1.442 1.086l-1.414 4.926a.75.75 0 0 0 .826.95 28.897 28.897 0 0 0 15.293-7.154.75.75 0 0 0 0-1.114A28.897 28.897 0 0 0 3.105 2.288Z" />
-                    </svg>
-                    Send Offer to Customer
-                  </button>
-                  <button
-                    (click)="openSendInquiryModal(); actionsOpen.set(false)"
-                    [disabled]="!hasInvoicingCompany()"
-                    class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-purple-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                      <path fill-rule="evenodd" d="M2 3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v11.75A2.75 2.75 0 0 0 16.75 18h-12A2.75 2.75 0 0 1 2 15.25V3.5Zm3.75 7a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-4.5Zm0 3a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-4.5ZM5 5.75A.75.75 0 0 1 5.75 5h4.5a.75.75 0 0 1 .75.75v2.5a.75.75 0 0 1-.75.75h-4.5A.75.75 0 0 1 5 8.25v-2.5Z" clip-rule="evenodd" />
-                    </svg>
-                    Send Inquiry to Supplier
-                  </button>
-                  <hr class="my-1 border-gray-100">
-                  <button
-                    (click)="viewOfferPdf(); actionsOpen.set(false)"
-                    class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                      <path d="M10.75 2.75a.75.75 0 0 0-1.5 0v8.614L6.295 8.235a.75.75 0 1 0-1.09 1.03l4.25 4.5a.75.75 0 0 0 1.09 0l4.25-4.5a.75.75 0 0 0-1.09-1.03l-2.955 3.129V2.75Z" />
-                      <path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z" />
-                    </svg>
-                    View Offer PDF
-                  </button>
-                  <button
-                    (click)="viewProformaPdf(); actionsOpen.set(false)"
-                    class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                      <path fill-rule="evenodd" d="M4.5 2A1.5 1.5 0 0 0 3 3.5v13A1.5 1.5 0 0 0 4.5 18h11a1.5 1.5 0 0 0 1.5-1.5V7.621a1.5 1.5 0 0 0-.44-1.06l-4.12-4.122A1.5 1.5 0 0 0 11.378 2H4.5Zm2.25 8.5a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5h-6.5Zm0 3a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5h-6.5ZM6.75 6a.75.75 0 0 0 0 1.5h3.5a.75.75 0 0 0 0-1.5h-3.5Z" clip-rule="evenodd" />
-                    </svg>
-                    View Proforma Invoice
-                  </button>
-                  <hr class="my-1 border-gray-100">
-                  <button
-                    (click)="convertToOrder(); actionsOpen.set(false)"
-                    class="flex w-full items-center gap-2 px-4 py-2 text-sm text-green-700 hover:bg-green-50"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                      <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd" />
-                    </svg>
-                    Convert to Order
-                  </button>
-                  <button
-                    (click)="cancelInquiry(); actionsOpen.set(false)"
-                    class="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-700 hover:bg-red-50"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-red-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                      <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
-                    </svg>
-                    Cancel Inquiry
-                  </button>
-                </div>
-              }
-            </div>
-
-            <!-- Settings dropdown -->
-            <div class="relative">
-              <button
-                (click)="settingsOpen.set(!settingsOpen())"
-                class="inline-flex items-center rounded-lg border border-gray-300 bg-white p-2 text-sm
-                       text-gray-500 shadow-sm hover:bg-gray-50 hover:text-gray-700 transition-colors"
-                title="Settings"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path fill-rule="evenodd" d="M7.84 1.804A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.804l.331 1.652a6.993 6.993 0 0 1 1.929 1.115l1.598-.54a1 1 0 0 1 1.186.447l1.18 2.044a1 1 0 0 1-.205 1.251l-1.267 1.113a7.047 7.047 0 0 1 0 2.228l1.267 1.113a1 1 0 0 1 .206 1.25l-1.18 2.045a1 1 0 0 1-1.187.447l-1.598-.54a6.993 6.993 0 0 1-1.929 1.115l-.33 1.652a1 1 0 0 1-.98.804H8.82a1 1 0 0 1-.98-.804l-.331-1.652a6.993 6.993 0 0 1-1.929-1.115l-1.598.54a1 1 0 0 1-1.186-.447l-1.18-2.044a1 1 0 0 1 .205-1.251l1.267-1.114a7.05 7.05 0 0 1 0-2.227L1.821 7.773a1 1 0 0 1-.206-1.25l1.18-2.045a1 1 0 0 1 1.187-.447l1.598.54A6.993 6.993 0 0 1 7.51 3.456l.33-1.652ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd" />
-                </svg>
-              </button>
-
-              @if (settingsOpen()) {
-                <div class="fixed inset-0 z-40" (click)="settingsOpen.set(false)"></div>
-                <div class="absolute right-0 z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
-                  <label class="block text-xs font-medium text-gray-500 mb-1">Currency</label>
-                  <select [ngModel]="order()?.currency ?? 'USD'" (ngModelChange)="onCurrencyChange($event); settingsOpen.set(false)"
-                    class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-900
-                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white">
-                    <option value="USD">USD</option>
-                    <option value="EUR">EUR</option>
-                    <option value="GBP">GBP</option>
-                    <option value="SGD">SGD</option>
-                    <option value="AED">AED</option>
-                  </select>
-                </div>
-              }
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ═══════════════════════════════════════════════════════════ -->
-      <!--  Meta Info Cards                                           -->
-      <!-- ═══════════════════════════════════════════════════════════ -->
-      <!--  Meta Info Cards (Editable)                                -->
-      <!-- ═══════════════════════════════════════════════════════════ -->
-      <div class="mb-8 grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
-        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Client</p>
-          <app-searchable-dropdown
-            [options]="clientDropdownOptions()"
-            [selected]="order()?.clientId ?? ''"
-            [asyncSearch]="true"
-            [loading]="clientSearchLoading()"
-            placeholder="Search clients..."
-            (searchChange)="searchClients($event)"
-            (selectionChange)="onClientChange($event)"
-          />
-        </div>
-        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Vessel</p>
-          <app-searchable-dropdown
-            [options]="vesselDropdownOptions()"
-            [selected]="order()?.vesselId ?? ''"
-            [asyncSearch]="true"
-            [loading]="vesselSearchLoading()"
-            placeholder="Search vessels..."
-            (searchChange)="searchVessels($event)"
-            (selectionChange)="onVesselChange($event)"
-          />
-        </div>
-        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Place</p>
-          <app-searchable-dropdown
-            [options]="placeDropdownOptions()"
-            [selected]="order()?.placeId ?? ''"
-            [asyncSearch]="true"
-            [loading]="placeSearchLoading()"
-            placeholder="Search places..."
-            (searchChange)="searchPlaces($event)"
-            (selectionChange)="onPortChange($event)"
-          />
-        </div>
-        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">ETA</p>
-          <input
-            type="date"
-            [ngModel]="formatDateForInput(order()?.eta)"
-            (ngModelChange)="onEtaChange($event)"
-            [min]="minDate"
-            class="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-900
-                   focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
-          />
-        </div>
-        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">ETD</p>
-          <input
-            type="date"
-            [ngModel]="formatDateForInput(order()?.etd)"
-            (ngModelChange)="onEtdChange($event)"
-            [min]="formatDateForInput(order()?.eta) || minDate"
-            class="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-900
-                   focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
-          />
-        </div>
-        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Invoicing Company</p>
-          <select [ngModel]="order()?.invoicingCompanyId ?? ''" (ngModelChange)="onInvoicingCompanyChange($event)"
-            class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-900
-                   focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white">
-            <option value="">— Select —</option>
-            @for (co of ownCompanies(); track co.id) {
-              <option [value]="co.id">{{ co.name }}</option>
+            @if (actionsOpen()) {
+              <!-- Backdrop to close -->
+              <div class="fixed inset-0 z-40" (click)="actionsOpen.set(false)"></div>
+              <div class="absolute right-0 z-50 mt-1 w-56 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                @if (!hasInvoicingCompany()) {
+                  <div class="px-4 py-2 text-xs text-amber-700 bg-amber-50 border-b border-amber-100">
+                    Select an invoicing company to send emails
+                  </div>
+                }
+                <button
+                  (click)="openSendOfferModal(); actionsOpen.set(false)"
+                  [disabled]="!hasInvoicingCompany()"
+                  class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-blue-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path d="M3.105 2.288a.75.75 0 0 0-.826.95l1.414 4.926A1.5 1.5 0 0 0 5.135 9.25h6.115a.75.75 0 0 1 0 1.5H5.135a1.5 1.5 0 0 0-1.442 1.086l-1.414 4.926a.75.75 0 0 0 .826.95 28.897 28.897 0 0 0 15.293-7.154.75.75 0 0 0 0-1.114A28.897 28.897 0 0 0 3.105 2.288Z" />
+                  </svg>
+                  Send Offer to Customer
+                </button>
+                <button
+                  (click)="openSendInquiryModal(); actionsOpen.set(false)"
+                  [disabled]="!hasInvoicingCompany()"
+                  class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-purple-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M2 3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v11.75A2.75 2.75 0 0 0 16.75 18h-12A2.75 2.75 0 0 1 2 15.25V3.5Zm3.75 7a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-4.5Zm0 3a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-4.5ZM5 5.75A.75.75 0 0 1 5.75 5h4.5a.75.75 0 0 1 .75.75v2.5a.75.75 0 0 1-.75.75h-4.5A.75.75 0 0 1 5 8.25v-2.5Z" clip-rule="evenodd" />
+                  </svg>
+                  Send Inquiry to Supplier
+                </button>
+                <hr class="my-1 border-gray-100">
+                <button
+                  (click)="viewOfferPdf(); actionsOpen.set(false)"
+                  class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path d="M10.75 2.75a.75.75 0 0 0-1.5 0v8.614L6.295 8.235a.75.75 0 1 0-1.09 1.03l4.25 4.5a.75.75 0 0 0 1.09 0l4.25-4.5a.75.75 0 0 0-1.09-1.03l-2.955 3.129V2.75Z" />
+                    <path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z" />
+                  </svg>
+                  View Offer PDF
+                </button>
+                <button
+                  (click)="viewProformaPdf(); actionsOpen.set(false)"
+                  class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M4.5 2A1.5 1.5 0 0 0 3 3.5v13A1.5 1.5 0 0 0 4.5 18h11a1.5 1.5 0 0 0 1.5-1.5V7.621a1.5 1.5 0 0 0-.44-1.06l-4.12-4.122A1.5 1.5 0 0 0 11.378 2H4.5Zm2.25 8.5a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5h-6.5Zm0 3a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5h-6.5ZM6.75 6a.75.75 0 0 0 0 1.5h3.5a.75.75 0 0 0 0-1.5h-3.5Z" clip-rule="evenodd" />
+                  </svg>
+                  View Proforma Invoice
+                </button>
+                <hr class="my-1 border-gray-100">
+                <button
+                  (click)="convertToOrder(); actionsOpen.set(false)"
+                  class="flex w-full items-center gap-2 px-4 py-2 text-sm text-green-700 hover:bg-green-50"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd" />
+                  </svg>
+                  Convert to Order
+                </button>
+                <button
+                  (click)="cancelInquiry(); actionsOpen.set(false)"
+                  class="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-700 hover:bg-red-50"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-red-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+                  </svg>
+                  Cancel Inquiry
+                </button>
+              </div>
             }
-          </select>
+          </div>
+
+          <!-- Settings dropdown -->
+          <div class="relative">
+            <button
+              (click)="settingsOpen.set(!settingsOpen())"
+              class="inline-flex items-center rounded-lg border border-gray-300 bg-white p-2 text-sm
+                     text-gray-500 shadow-sm hover:bg-gray-50 hover:text-gray-700 transition-colors"
+              title="Settings"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path fill-rule="evenodd" d="M7.84 1.804A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.804l.331 1.652a6.993 6.993 0 0 1 1.929 1.115l1.598-.54a1 1 0 0 1 1.186.447l1.18 2.044a1 1 0 0 1-.205 1.251l-1.267 1.113a7.047 7.047 0 0 1 0 2.228l1.267 1.113a1 1 0 0 1 .206 1.25l-1.18 2.045a1 1 0 0 1-1.187.447l-1.598-.54a6.993 6.993 0 0 1-1.929 1.115l-.33 1.652a1 1 0 0 1-.98.804H8.82a1 1 0 0 1-.98-.804l-.331-1.652a6.993 6.993 0 0 1-1.929-1.115l-1.598.54a1 1 0 0 1-1.186-.447l-1.18-2.044a1 1 0 0 1 .205-1.251l1.267-1.114a7.05 7.05 0 0 1 0-2.227L1.821 7.773a1 1 0 0 1-.206-1.25l1.18-2.045a1 1 0 0 1 1.187-.447l1.598.54A6.993 6.993 0 0 1 7.51 3.456l.33-1.652ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd" />
+              </svg>
+            </button>
+
+            @if (settingsOpen()) {
+              <div class="fixed inset-0 z-40" (click)="settingsOpen.set(false)"></div>
+              <div class="absolute right-0 z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
+                <label class="block text-xs font-medium text-gray-500 mb-1">Currency</label>
+                <select [ngModel]="order()?.currency ?? 'USD'" (ngModelChange)="onCurrencyChange($event); settingsOpen.set(false)"
+                  class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-900
+                         focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white">
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                  <option value="GBP">GBP</option>
+                  <option value="SGD">SGD</option>
+                  <option value="AED">AED</option>
+                </select>
+              </div>
+            }
+          </div>
         </div>
-      </div>
+      </app-trading-detail-header>
+
+      <app-trading-detail-meta-cards
+        [clientName]="clientName()"
+        [supplierName]="supplierName()"
+        [vesselName]="vesselName()"
+        [placeName]="portName()"
+        [clientId]="order()?.clientId ?? ''"
+        [supplierId]="order()?.supplierId ?? ''"
+        [vesselId]="order()?.vesselId ?? ''"
+        [placeId]="order()?.placeId ?? ''"
+        [clientOptions]="clientDropdownOptions()"
+        [supplierOptions]="supplierDropdownOptions()"
+        [vesselOptions]="vesselDropdownOptions()"
+        [placeOptions]="placeDropdownOptions()"
+        [clientLoading]="clientSearchLoading()"
+        [supplierLoading]="supplierSearchLoading()"
+        [vesselLoading]="vesselSearchLoading()"
+        [placeLoading]="placeSearchLoading()"
+        [canEditClient]="true"
+        [isReadonly]="false"
+        [eta]="order()?.eta ?? null"
+        [etd]="order()?.etd ?? null"
+        [minDateTime]="minDateTime()"
+        [etaMinDateTime]="etaMinDateTime()"
+        [timezone]="placeTimezone()"
+        [invoicingCompanyId]="order()?.invoicingCompanyId ?? ''"
+        [invoicingCompanyName]="invoicingCompanyName()"
+        [ownCompanies]="ownCompanies()"
+        [responsibleUserId]="order()?.salesRepId ?? ''"
+        [responsibleOptions]="responsibleUserOptions()"
+        (clientSearch)="searchClients($event)"
+        (clientChange)="onClientChange($event)"
+        (supplierSearch)="searchSuppliers($event)"
+        (supplierChange)="onSupplierChange($event)"
+        (vesselSearch)="searchVessels($event)"
+        (vesselChange)="onVesselChange($event)"
+        (placeSearch)="searchPlaces($event)"
+        (placeChange)="onPortChange($event)"
+        (etaChange)="onEtaChange($event)"
+        (etdChange)="onEtdChange($event)"
+        (invoicingCompanyChange)="onInvoicingCompanyChange($event)"
+        (responsibleChange)="onResponsibleUserChange($event)"
+      >
+        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[260px]">
+          <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Customer Payment</p>
+          <div class="flex items-center gap-2">
+            <select
+              [ngModel]="order()?.customerPaymentTermType ?? ''"
+              (ngModelChange)="onCustomerPaymentTermChange($event)"
+              class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                     focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+            >
+              <option value="">Select</option>
+              @for (opt of paymentTermOptions; track opt.value) {
+                <option
+                  [value]="opt.value"
+                  [disabled]="opt.value === 'CREDIT' && !canUseCustomerCredit()"
+                >
+                  {{ opt.value === 'CREDIT' && !canUseCustomerCredit() ? 'Credit (no line)' : opt.label }}
+                </option>
+              }
+            </select>
+            @if (order()?.customerPaymentTermType === 'CREDIT') {
+              <input
+                type="number"
+                min="0"
+                [attr.max]="customerCreditSummary()?.maxDays ?? null"
+                [ngModel]="order()?.customerCreditDays ?? ''"
+                (ngModelChange)="onCustomerCreditDaysChange($event)"
+                placeholder="Days"
+                class="w-24 rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm
+                       focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+              />
+            }
+          </div>
+          <div class="mt-2 text-xs text-gray-500">
+            @if (customerCreditLoading()) {
+              <span>Loading credit line...</span>
+            } @else if (customerCreditSummary()) {
+              <span>
+                Available: {{ customerCreditSummary()!.available | number : '1.2-2' }}
+                {{ customerCreditSummary()!.currency }} · Max {{ customerCreditSummary()!.maxDays }} days
+              </span>
+            } @else {
+              <span>No credit line on file.</span>
+            }
+          </div>
+        </div>
+        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[260px]">
+          <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Supplier Payment</p>
+          <div class="flex items-center gap-2">
+            <select
+              [ngModel]="order()?.supplierPaymentTermType ?? ''"
+              (ngModelChange)="onSupplierPaymentTermChange($event)"
+              class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                     focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+            >
+              <option value="">Select</option>
+              @for (opt of paymentTermOptions; track opt.value) {
+                <option
+                  [value]="opt.value"
+                  [disabled]="opt.value === 'CREDIT' && !canUseSupplierCredit()"
+                >
+                  {{ opt.value === 'CREDIT' && !canUseSupplierCredit() ? 'Credit (no line)' : opt.label }}
+                </option>
+              }
+            </select>
+            @if (order()?.supplierPaymentTermType === 'CREDIT') {
+              <input
+                type="number"
+                min="0"
+                [attr.max]="supplierCreditSummary()?.maxDays ?? null"
+                [ngModel]="order()?.supplierCreditDays ?? ''"
+                (ngModelChange)="onSupplierCreditDaysChange($event)"
+                placeholder="Days"
+                class="w-24 rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm
+                       focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+              />
+            }
+          </div>
+          <div class="mt-2 text-xs text-gray-500">
+            @if (supplierCreditLoading()) {
+              <span>Loading credit line...</span>
+            } @else if (supplierCreditSummary()) {
+              <span>
+                Available: {{ supplierCreditSummary()!.available | number : '1.2-2' }}
+                {{ supplierCreditSummary()!.currency }} · Max {{ supplierCreditSummary()!.maxDays }} days
+              </span>
+            } @else {
+              <span>No credit line on file.</span>
+            }
+          </div>
+        </div>
+        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[260px] overflow-auto">
+          <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Customer Note</p>
+          <textarea
+            rows="3"
+            [ngModel]="order()?.customerNote ?? ''"
+            (ngModelChange)="onCustomerNoteChange($event)"
+            placeholder="Customer note to include in PDFs and emails"
+            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
+                   focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+          ></textarea>
+        </div>
+        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[260px] overflow-auto">
+          <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Supplier Note</p>
+          <textarea
+            rows="3"
+            [ngModel]="order()?.supplierNote ?? ''"
+            (ngModelChange)="onSupplierNoteChange($event)"
+            placeholder="Supplier note"
+            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
+                   focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+          ></textarea>
+        </div>
+      </app-trading-detail-meta-cards>
 
       <!-- ═══════════════════════════════════════════════════════════ -->
       <!--  Editable Items Grid                                       -->
       <!-- ═══════════════════════════════════════════════════════════ -->
       <app-order-items
         [items]="itemRows()"
-        [suppliers]="supplierDropdownOptions()"
         [readonly]="false"
+        [allowDeliveredEdit]="false"
         [currency]="order()?.currency ?? 'USD'"
-        [supplierSearchLoading]="supplierSearchLoading()"
-        (supplierSearch)="searchSuppliers($event)"
         (itemsChange)="onItemsChange($event)"
       />
 
-      <!-- ═══════════════════════════════════════════════════════════ -->
-      <!--  Comments Card                                             -->
-      <!-- ═══════════════════════════════════════════════════════════ -->
-      <div class="mt-8">
+      <!-- Comments + Activity (side-by-side on desktop) -->
+      <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
         @if (order()?.id) {
-          <app-comments-card entityType="ORDER" [entityId]="order()!.id" />
+          <div class="h-full max-h-[520px] overflow-auto">
+            <app-comments-card entityType="ORDER" [entityId]="order()!.id" />
+          </div>
         }
-      </div>
-
-      <!-- ═══════════════════════════════════════════════════════════ -->
-      <!--  Activity History                                          -->
-      <!-- ═══════════════════════════════════════════════════════════ -->
-      <div class="mt-10">
-        <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Activity History</h3>
-        <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden max-h-[500px] overflow-y-auto">
-          @if (activityLogs().length > 0) {
-            <ul class="divide-y divide-gray-100">
-              @for (log of activityLogs(); track log.id) {
-                <li class="flex items-start gap-3 px-5 py-3.5">
-                  <!-- Timeline dot -->
-                  <div class="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full"
-                    [class]="getActivityDotClass(log.action)"></div>
-                  <div class="flex-1 min-w-0">
-                    <p class="text-sm text-gray-900">
-                      <span class="font-medium">{{ log.userName ?? 'System' }}</span>
-                      <span class="text-gray-500 ml-1">{{ getActivityLabel(log.action) }}</span>
-                    </p>
-                    @if (log.metadata) {
-                      <p class="mt-0.5 text-xs text-gray-400 truncate">{{ formatMetadata(log.metadata) }}</p>
-                    }
-                  </div>
-                  <span class="flex-shrink-0 text-xs text-gray-400 tabular-nums">
-                    {{ log.createdAt | date:'short' }}
-                  </span>
-                </li>
-              }
-            </ul>
-          } @else {
-            <div class="px-5 py-8 text-center">
-              <p class="text-sm text-gray-400">No activity recorded yet.</p>
-            </div>
-          }
-        </div>
+        @if (order()?.id) {
+          <div class="h-full max-h-[520px] overflow-auto">
+            <app-activity-timeline entityType="order" [entityId]="order()!.id" />
+          </div>
+        }
       </div>
     }
 
@@ -557,6 +582,7 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
+  private readonly auth = inject(AuthService);
 
   // ─── Route param ─────────────────────────────────────────────────
 
@@ -578,7 +604,7 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   readonly places = signal<PlaceDto[]>([]);
   readonly itemRows = signal<OrderItemRow[]>([]);
   readonly ownCompanies = signal<OwnCompanyDto[]>([]);
-  readonly activityLogs = signal<ActivityLogDto[]>([]);
+  readonly teamUsers = signal<TeamUserOption[]>([]);
   readonly saving = signal(false);
   readonly toast = signal<{ type: 'success' | 'error'; message: string } | null>(null);
   readonly actionsOpen = signal(false);
@@ -587,10 +613,13 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   readonly vesselSearchLoading = signal(false);
   readonly placeSearchLoading = signal(false);
   readonly supplierSearchLoading = signal(false);
+  readonly customerCreditLines = signal<CreditLineDto[]>([]);
+  readonly customerCreditLoading = signal(false);
+  readonly supplierCreditLines = signal<CreditLineDto[]>([]);
+  readonly supplierCreditLoading = signal(false);
   readonly clientImportOptions = signal<DropdownOption[]>([]);
   readonly vesselImportOptions = signal<DropdownOption[]>([]);
   readonly placeImportOptions = signal<DropdownOption[]>([]);
-  readonly supplierImportOptions = signal<DropdownOption[]>([]);
 
   // ─── Send Offer modal state ──────────────────────────────────────
 
@@ -612,14 +641,25 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   // ─── Computed ────────────────────────────────────────────────────
 
   readonly clientName = computed(() => this.client()?.name ?? '—');
+  readonly supplierName = computed(() => {
+    const id = this.order()?.supplierId;
+    if (!id) return '—';
+    return this.suppliers().find((s) => s.id === id)?.name ?? '—';
+  });
   readonly vesselName = computed(() => this.vessel()?.name ?? '—');
   readonly portName = computed(() => this.port()?.name ?? '—');
+  readonly subtitle = computed(
+    () => `${this.vesselName()} · ${this.portName()} · ${this.clientName()}`,
+  );
+  readonly invoicingCompanyName = computed(() => {
+    const id = this.order()?.invoicingCompanyId;
+    if (!id) return '—';
+    const co = this.ownCompanies().find((company) => company.id === id);
+    return co?.name ?? '—';
+  });
 
   readonly supplierDropdownOptions = computed<DropdownOption[]>(() =>
-    [
-      ...this.suppliers().map((s) => ({ value: s.id, label: s.name })),
-      ...this.supplierImportOptions(),
-    ],
+    this.suppliers().map((s) => ({ value: s.id, label: s.name })),
   );
 
   readonly clientDropdownOptions = computed<DropdownOption[]>(() =>
@@ -643,14 +683,103 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
     ],
   );
 
+  readonly responsibleUserOptions = computed<DropdownOption[]>(() =>
+    this.teamUsers().map((u) => ({ value: u.id, label: u.name })),
+  );
+
   readonly hasInvoicingCompany = computed(() => !!this.order()?.invoicingCompanyId);
+  readonly isResponsibleUser = computed(() => {
+    const currentUserId = this.auth.user()?.id ?? '';
+    return !!currentUserId && this.order()?.salesRepId === currentUserId;
+  });
 
-  // Minimum date for ETA (today)
-  readonly minDate = new Date().toISOString().split('T')[0];
+  readonly placeTimezone = computed(() => this.port()?.timezone ?? 'UTC');
+  readonly minDateTime = computed(() =>
+    this.formatDateTimeForInput(new Date(), this.placeTimezone()),
+  );
+  readonly etaMinDateTime = computed(() => {
+    const eta = this.order()?.eta;
+    if (eta) return this.formatDateTimeForInput(new Date(eta), this.placeTimezone());
+    return this.minDateTime();
+  });
 
-  formatDateForInput(dateStr: string | null | undefined): string {
-    if (!dateStr) return '';
-    return dateStr.split('T')[0];
+  readonly customerCreditSummary = computed(() => {
+    const currency = this.order()?.currency ?? 'USD';
+    const lines = this.customerCreditLines().filter((line) => line.currency === currency);
+    if (!lines.length) return null;
+    const available = lines.reduce((sum, line) => sum + (parseFloat(line.availableAmount) || 0), 0);
+    const maxDays = Math.max(...lines.map((line) => line.periodDays));
+    return { currency, available, maxDays };
+  });
+
+  readonly canUseCustomerCredit = computed(() => !!this.customerCreditSummary());
+
+  readonly supplierCreditSummary = computed(() => {
+    const currency = this.order()?.currency ?? 'USD';
+    const lines = this.supplierCreditLines().filter((line) => line.currency === currency);
+    if (!lines.length) return null;
+    const available = lines.reduce((sum, line) => sum + (parseFloat(line.availableAmount) || 0), 0);
+    const maxDays = Math.max(...lines.map((line) => line.periodDays));
+    return { currency, available, maxDays };
+  });
+
+  readonly canUseSupplierCredit = computed(() => !!this.supplierCreditSummary());
+
+  formatDateTimeForInput(date: Date, timeZone: string): string {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(date);
+    const map = new Map(parts.map((p) => [p.type, p.value]));
+    const year = map.get('year') ?? '0000';
+    const month = map.get('month') ?? '01';
+    const day = map.get('day') ?? '01';
+    const hour = map.get('hour') ?? '00';
+    const minute = map.get('minute') ?? '00';
+    return `${year}-${month}-${day}T${hour}:${minute}`;
+  }
+
+  formatDateTimeForEmail(value: string): string {
+    const timeZone = this.placeTimezone();
+    const formatted = this.formatDateTimeForInput(new Date(value), timeZone).replace('T', ' ');
+    return `${formatted} ${timeZone}`;
+  }
+
+  private getTimeZoneOffset(date: Date, timeZone: string): number {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }).formatToParts(date);
+    const map = new Map(parts.map((p) => [p.type, p.value]));
+    const year = Number(map.get('year') ?? 0);
+    const month = Number(map.get('month') ?? 1) - 1;
+    const day = Number(map.get('day') ?? 1);
+    const hour = Number(map.get('hour') ?? 0);
+    const minute = Number(map.get('minute') ?? 0);
+    const second = Number(map.get('second') ?? 0);
+    const asUtc = Date.UTC(year, month, day, hour, minute, second);
+    return (asUtc - date.getTime()) / 60000;
+  }
+
+  private toUtcIsoFromZonedInput(value: string, timeZone: string): string {
+    const [datePart, timePart] = value.split('T');
+    const [year, month, day] = datePart.split('-').map(Number);
+    const [hour, minute] = timePart.split(':').map(Number);
+    const utcGuess = Date.UTC(year, month - 1, day, hour, minute, 0);
+    const offset = this.getTimeZoneOffset(new Date(utcGuess), timeZone);
+    const utcTime = utcGuess - offset * 60_000;
+    return new Date(utcTime).toISOString();
   }
 
   // ─── Autosave ────────────────────────────────────────────────────
@@ -659,7 +788,6 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   readonly lastSaved = signal<Date | null>(null);
   private autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
   private changeVersion = signal(0);
-  private readonly pendingSupplierImports = new Set<string>();
 
   constructor() {
     // Debounced autosave effect - reacts to changeVersion increments
@@ -699,10 +827,9 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
 
     this.pageLoading.set(true);
     try {
-      const [orderRes, ownRes, activityRes] = await Promise.all([
+      const [orderRes, ownRes] = await Promise.all([
         firstValueFrom(this.http.get<ApiResponse<any>>(`${API}/orders/${id}`)),
         firstValueFrom(this.http.get<ApiResponse<OwnCompanyDto[]>>(`${API}/companies/own`)),
-        firstValueFrom(this.http.get<ApiResponse<ActivityLogDto[]>>(`${API}/orders/${id}/activity`)),
       ]);
 
       if (orderRes.success && orderRes.data) {
@@ -720,11 +847,24 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
           status: d.status,
           eta: d.eta,
           etd: d.etd,
+          customerPaymentTermType: d.customerPaymentTermType ?? null,
+          customerCreditDays: d.customerCreditDays ?? null,
+          customerNote: d.customerNote ?? null,
+          supplierId: d.supplierId ?? null,
+          supplierPaymentTermType: d.supplierPaymentTermType ?? null,
+          supplierCreditDays: d.supplierCreditDays ?? null,
+          supplierNote: d.supplierNote ?? null,
           lossReason: d.lossReason,
           closedAt: d.closedAt,
           createdAt: d.createdAt,
           updatedAt: d.updatedAt,
         });
+
+        if (d.status !== OrderStatus.Inquiry && d.status !== OrderStatus.Offer) {
+          this.pageLoading.set(false);
+          void this.router.navigate(['/trading/orders', d.orderNumber ?? d.id]);
+          return;
+        }
 
         if (d.client) {
           this.client.set(d.client);
@@ -739,12 +879,14 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
           this.places.set([d.place]);
         }
 
+        await this.loadCustomerCreditLines(d.clientId);
+        await this.loadSupplierCreditLines(d.supplierId);
+
         // Load suppliers from items or from API
         this.itemRows.set(
           (d.items ?? []).map((item: any) => ({
             id: item.id,
             productType: item.productType ?? '',
-            supplierId: item.supplierId ?? '',
             quantity: parseFloat(item.quantity) || 0,
             quantityMin: item.quantityMin ? parseFloat(item.quantityMin) : null,
             quantityMax: item.quantityMax ? parseFloat(item.quantityMax) : null,
@@ -755,6 +897,7 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
             salesCurrency: item.salesCurrency ?? d.currency ?? 'USD',
             profit: parseFloat(item.profit) || 0,
             paymentTerms: item.paymentTerms ?? '',
+            customerNote: item.customerNote ?? '',
           })),
         );
 
@@ -763,7 +906,6 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
       }
 
       if (ownRes.success) this.ownCompanies.set(ownRes.data);
-      if (activityRes.success) this.activityLogs.set(activityRes.data);
     } catch {
       this.showToast('error', 'Failed to load inquiry.');
     } finally {
@@ -773,16 +915,151 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
 
   private async loadReferenceData(): Promise<void> {
     try {
-      // Load initial suppliers list (all companies can be suppliers)
-      const suppliersRes = await firstValueFrom(
-        this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
-          `${API}/companies/local?limit=100`,
+      // Load initial suppliers list
+      const [suppliersRes, usersRes] = await Promise.all([
+        firstValueFrom(
+          this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
+            `${API}/companies/local?type=SUPPLIER&limit=100`,
+          ),
         ),
-      );
+        firstValueFrom(
+          this.http.get<ApiResponse<TeamUserOption[]>>(`${API}/lloyds/users`),
+        ),
+      ]);
       if (suppliersRes.success) this.suppliers.set(suppliersRes.data.companies);
+      if (usersRes.success) this.teamUsers.set(usersRes.data ?? []);
     } catch {
       // silently ignore
     }
+  }
+
+  private async loadCustomerCreditLines(counterpartyId: string | null | undefined): Promise<void> {
+    if (!counterpartyId) return;
+    this.customerCreditLoading.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ items: CreditLineDto[]; total: number }>>(
+          `${API}/credit/lines?type=CUSTOMER&counterpartyId=${encodeURIComponent(counterpartyId)}&limit=50`,
+        ),
+      );
+      if (res.success) {
+        this.customerCreditLines.set(res.data.items ?? []);
+      } else {
+        this.customerCreditLines.set([]);
+      }
+    } catch {
+      this.customerCreditLines.set([]);
+    } finally {
+      this.customerCreditLoading.set(false);
+    }
+  }
+
+  private async loadSupplierCreditLines(counterpartyId: string | null | undefined): Promise<void> {
+    if (!counterpartyId) return;
+    this.supplierCreditLoading.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ items: CreditLineDto[]; total: number }>>(
+          `${API}/credit/lines?type=SUPPLIER&counterpartyId=${encodeURIComponent(counterpartyId)}&limit=50`,
+        ),
+      );
+      if (res.success) {
+        this.supplierCreditLines.set(res.data.items ?? []);
+      } else {
+        this.supplierCreditLines.set([]);
+      }
+    } catch {
+      this.supplierCreditLines.set([]);
+    } finally {
+      this.supplierCreditLoading.set(false);
+    }
+  }
+
+  readonly paymentTermOptions: DropdownOption[] = [
+    { value: 'CREDIT', label: 'Credit' },
+    { value: 'COD', label: 'Cash on Delivery' },
+    { value: 'PREPAY', label: 'Cash in advance' },
+  ];
+
+  formatCustomerPaymentTerms(): string {
+    const type = this.order()?.customerPaymentTermType;
+    if (!type) return '-';
+    if (type === 'CREDIT') {
+      const days = this.order()?.customerCreditDays ?? 0;
+      return `Credit ${days} days`;
+    }
+    if (type === 'COD') return 'Cash on Delivery';
+    if (type === 'PREPAY') return 'Cash in advance';
+    return type;
+  }
+
+  onCustomerPaymentTermChange(value: PaymentTermType | ''): void {
+    if (value === 'CREDIT' && !this.canUseCustomerCredit()) {
+      this.showToast('error', 'No customer credit line is available.');
+      return;
+    }
+    this.order.update((o) => {
+      if (!o) return o;
+      const next = { ...o, customerPaymentTermType: value || null };
+      if (value !== 'CREDIT') next.customerCreditDays = null;
+      return next;
+    });
+    this.triggerAutosave();
+  }
+
+  onCustomerCreditDaysChange(value: number | string): void {
+    const days = typeof value === 'string' ? Number(value) : value;
+    const maxDays = this.customerCreditSummary()?.maxDays ?? null;
+    const nextDays = Number.isFinite(days) ? days : null;
+    if (maxDays !== null && nextDays !== null && nextDays > maxDays) {
+      this.order.update((o) => (o ? { ...o, customerCreditDays: maxDays } : o));
+      this.showToast('error', `Max credit is ${maxDays} days.`);
+    } else {
+      this.order.update((o) => (o ? { ...o, customerCreditDays: nextDays } : o));
+    }
+    this.triggerAutosave();
+  }
+
+  onSupplierPaymentTermChange(value: PaymentTermType | ''): void {
+    if (value === 'CREDIT' && !this.canUseSupplierCredit()) {
+      this.showToast('error', 'No supplier credit line is available.');
+      return;
+    }
+    this.order.update((o) => {
+      if (!o) return o;
+      const next = { ...o, supplierPaymentTermType: value || null };
+      if (value !== 'CREDIT') next.supplierCreditDays = null;
+      return next;
+    });
+    this.triggerAutosave();
+  }
+
+  onSupplierCreditDaysChange(value: number | string): void {
+    const days = typeof value === 'string' ? Number(value) : value;
+    const maxDays = this.supplierCreditSummary()?.maxDays ?? null;
+    const nextDays = Number.isFinite(days) ? days : null;
+    if (maxDays !== null && nextDays !== null && nextDays > maxDays) {
+      this.order.update((o) => (o ? { ...o, supplierCreditDays: maxDays } : o));
+      this.showToast('error', `Max credit is ${maxDays} days.`);
+    } else {
+      this.order.update((o) => (o ? { ...o, supplierCreditDays: nextDays } : o));
+    }
+    this.triggerAutosave();
+  }
+
+  onSupplierNoteChange(value: string): void {
+    this.order.update((o) => (o ? { ...o, supplierNote: value } : o));
+    this.triggerAutosave();
+  }
+
+  onCustomerNoteChange(value: string): void {
+    this.order.update((o) => (o ? { ...o, customerNote: value } : o));
+    this.triggerAutosave();
+  }
+
+  onResponsibleUserChange(userId: string): void {
+    this.order.update((o) => (o ? { ...o, salesRepId: userId || null } : o));
+    this.triggerAutosave();
   }
 
   // ─── Typeahead search methods ────────────────────────────────────
@@ -888,27 +1165,17 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
     try {
       const res = await firstValueFrom(
         this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
-          `${API}/companies/local?search=${encodeURIComponent(term)}&limit=20`,
+          `${API}/companies/local?type=SUPPLIER&search=${encodeURIComponent(term)}&limit=20`,
         ),
       );
-      const currentIds = new Set(this.itemRows().map(r => r.supplierId).filter(Boolean));
-      const existing = this.suppliers().filter((s) => currentIds.has(s.id));
+      const currentId = this.order()?.supplierId ?? '';
       const localResults = res.success ? res.data.companies : [];
-      const hasLocalMatches = localResults.some((c) => !currentIds.has(c.id));
-      const mergedLocal = [...existing];
-      for (const c of localResults) {
-        if (!mergedLocal.find((e) => e.id === c.id)) mergedLocal.push(c);
-      }
-
-      if (hasLocalMatches) {
-        this.suppliers.set(mergedLocal);
-        this.supplierImportOptions.set([]);
-      } else {
-        this.suppliers.set(existing);
-        this.supplierImportOptions.set(await this.loadCompanyImportOptions(term));
-      }
+      const mergedLocal = currentId && !localResults.find((c) => c.id === currentId)
+        ? [this.suppliers().find((s) => s.id === currentId) ?? null, ...localResults].filter(Boolean)
+        : localResults;
+      this.suppliers.set(mergedLocal as CounterpartyDto[]);
     } catch {
-      this.supplierImportOptions.set([]);
+      // silently ignore
     } finally {
       this.supplierSearchLoading.set(false);
     }
@@ -918,20 +1185,6 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
 
   onItemsChange(items: OrderItemRow[]): void {
     this.itemRows.set(items);
-    const importIds = Array.from(
-      new Set(
-        items
-          .map((r) => r.supplierId)
-          .filter((id) => id && id.startsWith('seasearcher:'))
-          .map((id) => id.replace('seasearcher:', '')),
-      ),
-    );
-    if (importIds.length) {
-      for (const id of importIds) {
-        void this.importSupplierFromSeasearcher(id);
-      }
-      return;
-    }
     this.triggerAutosave();
   }
 
@@ -949,6 +1202,14 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
     this.order.update((o) => (o ? { ...o, clientId } : o));
     const clientData = this.clients().find((c) => c.id === clientId);
     this.client.set(clientData ?? null);
+    await this.loadCustomerCreditLines(clientId);
+    this.triggerAutosave();
+  }
+
+  async onSupplierChange(supplierId: string): Promise<void> {
+    if (!supplierId) return;
+    this.order.update((o) => (o ? { ...o, supplierId } : o));
+    await this.loadSupplierCreditLines(supplierId);
     this.triggerAutosave();
   }
 
@@ -1102,43 +1363,17 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  private async importSupplierFromSeasearcher(seasearcherId: string): Promise<void> {
-    if (this.pendingSupplierImports.has(seasearcherId)) return;
-    this.pendingSupplierImports.add(seasearcherId);
-    this.supplierSearchLoading.set(true);
-    try {
-      const res = await firstValueFrom(
-        this.http.post<ApiResponse<CounterpartyDto>>(`${API}/companies/import`, { seasearcherId }),
-      );
-      if (res.success && res.data) {
-        this.suppliers.set([res.data, ...this.suppliers().filter((s) => s.id !== res.data.id)]);
-        this.supplierImportOptions.set([]);
-        this.itemRows.update((rows) =>
-          rows.map((row) =>
-            row.supplierId === `seasearcher:${seasearcherId}`
-              ? { ...row, supplierId: res.data.id }
-              : row,
-          ),
-        );
-        this.triggerAutosave();
-      } else {
-        this.showToast('error', res.message ?? 'Failed to import supplier.');
-      }
-    } catch {
-      this.showToast('error', 'Failed to import supplier.');
-    } finally {
-      this.pendingSupplierImports.delete(seasearcherId);
-      this.supplierSearchLoading.set(false);
-    }
-  }
-
   onEtaChange(eta: string): void {
-    this.order.update((o) => (o ? { ...o, eta: eta || null } : o));
+    const timeZone = this.placeTimezone();
+    const iso = eta ? this.toUtcIsoFromZonedInput(eta, timeZone) : null;
+    this.order.update((o) => (o ? { ...o, eta: iso } : o));
     this.triggerAutosave();
   }
 
   onEtdChange(etd: string): void {
-    this.order.update((o) => (o ? { ...o, etd: etd || null } : o));
+    const timeZone = this.placeTimezone();
+    const iso = etd ? this.toUtcIsoFromZonedInput(etd, timeZone) : null;
+    this.order.update((o) => (o ? { ...o, etd: iso } : o));
     this.triggerAutosave();
   }
 
@@ -1164,8 +1399,16 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
           clientId: o.clientId,
           vesselId: o.vesselId,
           placeId: o.placeId,
+          salesRepId: o.salesRepId ?? null,
           invoicingCompanyId: o.invoicingCompanyId,
           currency: o.currency,
+          customerPaymentTermType: o.customerPaymentTermType ?? null,
+          customerCreditDays: o.customerCreditDays ?? null,
+          customerNote: o.customerNote ?? null,
+          supplierId: o.supplierId ?? null,
+          supplierPaymentTermType: o.supplierPaymentTermType ?? null,
+          supplierCreditDays: o.supplierCreditDays ?? null,
+          supplierNote: o.supplierNote ?? null,
           eta: o.eta,
           etd: o.etd,
         }),
@@ -1178,18 +1421,20 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
         quantityMin: r.quantityMin != null ? String(r.quantityMin) : null,
         quantityMax: String(r.quantity),
         unit: r.unit,
-        supplierId: r.supplierId || null,
         costPrice: r.costPrice ? String(r.costPrice) : null,
         costCurrency: r.costCurrency ?? o.currency,
         salesPrice: r.salesPrice ? String(r.salesPrice) : null,
         salesCurrency: r.salesCurrency ?? o.currency,
         paymentTerms: r.paymentTerms || null,
+        customerNote: r.customerNote ?? null,
       }));
 
       await firstValueFrom(
         this.http.put<ApiResponse<any>>(`${API}/orders/${id}/items`, { items: itemPayload }),
       );
 
+      await this.loadCustomerCreditLines(o.clientId);
+      await this.loadSupplierCreditLines(o.supplierId);
       this.lastSaved.set(new Date());
     } catch {
       // Quietly fail - could show subtle error indicator
@@ -1211,6 +1456,14 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
       await firstValueFrom(
         this.http.put<ApiResponse<any>>(`${API}/orders/${id}`, {
           invoicingCompanyId: o.invoicingCompanyId,
+          salesRepId: o.salesRepId ?? null,
+          customerPaymentTermType: o.customerPaymentTermType ?? null,
+          customerCreditDays: o.customerCreditDays ?? null,
+          customerNote: o.customerNote ?? null,
+          supplierId: o.supplierId ?? null,
+          supplierPaymentTermType: o.supplierPaymentTermType ?? null,
+          supplierCreditDays: o.supplierCreditDays ?? null,
+          supplierNote: o.supplierNote ?? null,
           eta: o.eta,
           etd: o.etd,
         }),
@@ -1223,19 +1476,21 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
         quantityMin: r.quantityMin != null ? String(r.quantityMin) : null,
         quantityMax: String(r.quantity),
         unit: r.unit,
-        supplierId: r.supplierId || null,
         costPrice: r.costPrice ? String(r.costPrice) : null,
+        costCurrency: r.costCurrency ?? o.currency,
         salesPrice: r.salesPrice ? String(r.salesPrice) : null,
+        salesCurrency: r.salesCurrency ?? o.currency,
         paymentTerms: r.paymentTerms || null,
+        customerNote: r.customerNote ?? null,
       }));
 
       await firstValueFrom(
         this.http.put<ApiResponse<any>>(`${API}/orders/${id}/items`, { items: itemPayload }),
       );
 
+      await this.loadCustomerCreditLines(o.clientId);
+      await this.loadSupplierCreditLines(o.supplierId);
       this.showToast('success', 'Inquiry saved successfully.');
-      // Refresh activity
-      this.loadActivity();
     } catch {
       this.showToast('error', 'Failed to save inquiry.');
     } finally {
@@ -1252,8 +1507,8 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
     const items = this.itemRows();
     const currency = o?.currency ?? 'USD';
     let body = `Dear Customer,\n\nPlease find our offer for bunker supply to ${this.vesselName()} at ${this.portName()}.\n`;
-    if (o?.eta) body += `\nETA: ${this.formatDateForInput(o.eta)}`;
-    if (o?.etd) body += `\nETD: ${this.formatDateForInput(o.etd)}`;
+    if (o?.eta) body += `\nETA: ${this.formatDateTimeForEmail(o.eta)}`;
+    if (o?.etd) body += `\nETD: ${this.formatDateTimeForEmail(o.etd)}`;
     if (items.length) {
       body += `\n\nLine Items:\n`;
       items.forEach((item, i) => {
@@ -1272,6 +1527,10 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
     if (!this.offerEmail) return;
     const id = this.inquiryId();
     if (!id) return;
+    if (!this.isResponsibleUser()) {
+      this.showToast('error', 'Only the responsible user can send this offer.');
+      return;
+    }
 
     this.sendingOffer.set(true);
     try {
@@ -1288,7 +1547,6 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
       this.order.update((o) => (o ? { ...o, status: OrderStatus.Offer } : o));
       this.showSendOfferModal.set(false);
       this.showToast('success', `Offer sent to ${this.offerEmail}. Status updated to OFFER.`);
-      this.loadActivity();
     } catch {
       this.showToast('error', 'Failed to send offer.');
     } finally {
@@ -1306,8 +1564,8 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
     const items = this.itemRows();
     const currency = o?.currency ?? 'USD';
     let body = `Dear Supplier,\n\nWe would like to request a quote for bunker supply to ${this.vesselName()} at ${this.portName()}.\n`;
-    if (o?.eta) body += `\nETA: ${this.formatDateForInput(o.eta)}`;
-    if (o?.etd) body += `\nETD: ${this.formatDateForInput(o.etd)}`;
+    if (o?.eta) body += `\nETA: ${this.formatDateTimeForEmail(o.eta)}`;
+    if (o?.etd) body += `\nETD: ${this.formatDateTimeForEmail(o.etd)}`;
     if (items.length) {
       body += `\n\nProducts required:\n`;
       items.forEach((item, i) => {
@@ -1324,6 +1582,10 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
 
   async sendInquiryToSupplier(): Promise<void> {
     if (!this.inquiryEmail) return;
+    if (!this.isResponsibleUser()) {
+      this.showToast('error', 'Only the responsible user can send this inquiry.');
+      return;
+    }
 
     this.sendingInquiry.set(true);
     try {
@@ -1331,7 +1593,6 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
       // In production this would also send an email via O365
       this.showSendInquiryModal.set(false);
       this.showToast('success', `Inquiry sent to supplier at ${this.inquiryEmail}.`);
-      this.loadActivity();
     } catch {
       this.showToast('error', 'Failed to send inquiry.');
     } finally {
@@ -1386,68 +1647,9 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
       if (res.success) {
         this.order.update((o) => (o ? { ...o, status: OrderStatus.Cancelled } : o));
         this.showToast('success', 'Inquiry cancelled.');
-        this.loadActivity();
       }
     } catch {
       this.showToast('error', 'Failed to cancel inquiry.');
-    }
-  }
-
-  // ─── Activity ────────────────────────────────────────────────────
-
-  private async loadActivity(): Promise<void> {
-    const id = this.inquiryId();
-    if (!id) return;
-    try {
-      const res = await firstValueFrom(
-        this.http.get<ApiResponse<ActivityLogDto[]>>(`${API}/orders/${id}/activity`),
-      );
-      if (res.success) this.activityLogs.set(res.data);
-    } catch {
-      // silently ignore
-    }
-  }
-
-  getActivityDotClass(action: string): string {
-    switch (action) {
-      case 'CREATE':
-        return 'bg-green-500';
-      case 'STATUS_CHANGE':
-        return 'bg-blue-500';
-      case 'UPDATE':
-        return 'bg-amber-500';
-      case 'DELETE':
-        return 'bg-red-500';
-      default:
-        return 'bg-gray-400';
-    }
-  }
-
-  getActivityLabel(action: string): string {
-    switch (action) {
-      case 'CREATE':
-        return 'created this inquiry';
-      case 'STATUS_CHANGE':
-        return 'changed the status';
-      case 'UPDATE':
-        return 'updated this inquiry';
-      case 'DELETE':
-        return 'deleted this inquiry';
-      default:
-        return action.toLowerCase();
-    }
-  }
-
-  formatMetadata(metadata: unknown): string {
-    if (!metadata) return '';
-    if (typeof metadata === 'string') return metadata;
-    try {
-      const obj = metadata as Record<string, unknown>;
-      if (obj['newStatus']) return `Status → ${obj['newStatus']}`;
-      if (obj['action'] === 'save_items') return `Saved ${obj['itemCount']} line item(s)`;
-      return JSON.stringify(metadata);
-    } catch {
-      return '';
     }
   }
 

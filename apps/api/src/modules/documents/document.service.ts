@@ -91,6 +91,71 @@ function formatNumber(val: string | null | undefined, decimals = 2): string {
   return isNaN(n) ? '—' : n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
+function formatCustomerPaymentTerms(
+  type: string | null | undefined,
+  creditDays: number | null | undefined,
+): string | null {
+  if (!type) return null;
+  if (type === 'CREDIT') {
+    const days = creditDays ?? 0;
+    return `Credit ${days} days`;
+  }
+  if (type === 'COD') return 'Cash on Delivery';
+  if (type === 'PREPAY') return 'Cash in advance';
+  return type;
+}
+
+function parseTimezoneOffset(tz: string | null | undefined): number | null {
+  if (!tz) return null;
+  const match = tz.match(/([+-])\s*(\d{1,2})(?::(\d{2}))?/);
+  if (!match) {
+    if (/^(GMT|UTC)$/i.test(tz.trim())) return 0;
+    return null;
+  }
+  const sign = match[1] === '+' ? 1 : -1;
+  const hours = parseInt(match[2], 10);
+  const minutes = match[3] ? parseInt(match[3], 10) : 0;
+  return sign * (hours * 60 + minutes);
+}
+
+function formatDateTimeForDisplay(value: string | null, tz: string | null | undefined): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  const offset = parseTimezoneOffset(tz ?? null);
+  const local = offset === null ? date : new Date(date.getTime() + offset * 60_000);
+  const year = String(local.getUTCFullYear()).padStart(4, '0');
+  const month = String(local.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(local.getUTCDate()).padStart(2, '0');
+  const hour = String(local.getUTCHours()).padStart(2, '0');
+  const minute = String(local.getUTCMinutes()).padStart(2, '0');
+  const formatted = `${year}-${month}-${day} ${hour}:${minute}`;
+  return tz ? `${formatted} ${tz}` : formatted;
+}
+
+function buildNotesSection(params: {
+  customerNote?: string | null;
+  itemNotes?: Array<{ label: string; note: string }>;
+}): Content[] {
+  const customerNote = params.customerNote?.trim();
+  const itemNotes = params.itemNotes ?? [];
+  if (!customerNote && itemNotes.length === 0) return [];
+
+  const notes: Content[] = [{ text: 'Notes', style: 'sectionLabel' } as Content];
+
+  if (customerNote) {
+    notes.push({ text: customerNote, margin: [0, 0, 0, 6] } as Content);
+  }
+
+  if (itemNotes.length) {
+    notes.push({
+      ul: itemNotes.map((entry) => `${entry.label}: ${entry.note}`),
+      margin: [0, 0, 0, 6],
+    } as Content);
+  }
+
+  return notes;
+}
+
 function buildInvoiceDocument(data: {
   invoiceNumber: string;
   dueDate: string;
@@ -100,6 +165,9 @@ function buildInvoiceDocument(data: {
   vesselImo: string | null;
   portName: string;
   salesRepName: string | null;
+  paymentTerms: string | null;
+  customerNote: string | null;
+  itemNotes: Array<{ label: string; note: string }>;
   items: Array<{
     productType: string;
     quantity: string;
@@ -244,8 +312,17 @@ function buildInvoiceDocument(data: {
         ],
       } as Content,
 
+      // ── Notes / Payment Terms ──
+      ...(data.paymentTerms
+        ? [{ text: `Payment terms: ${data.paymentTerms}`, margin: [0, 10, 0, 0] } as Content]
+        : []),
+      ...buildNotesSection({
+        customerNote: data.customerNote,
+        itemNotes: data.itemNotes,
+      }),
+
       // ── Divider ──
-      { text: '', margin: [0, 20, 0, 0] } as Content,
+      { text: '', margin: [0, 14, 0, 0] } as Content,
       {
         canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 0.5, lineColor: '#e5e7eb' }],
       } as Content,
@@ -341,6 +418,14 @@ export async function generateInvoicePdfBuffer(invoiceId: string): Promise<Buffe
     vesselImo: order.vessel.imo,
     portName: order.place.name,
     salesRepName: order.salesRep?.name ?? null,
+    paymentTerms: formatCustomerPaymentTerms(order.customerPaymentTermType, order.customerCreditDays),
+    customerNote: order.customerNote ?? null,
+    itemNotes: order.items
+      .filter((item) => item.customerNote)
+      .map((item) => ({
+        label: item.productType,
+        note: String(item.customerNote),
+      })),
     items: order.items.map((item) => ({
       productType: item.productType,
       quantity: item.quantity,
@@ -383,6 +468,14 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
     vesselImo: order.vessel.imo,
     portName: order.place.name,
     salesRepName: order.salesRep?.name ?? null,
+    paymentTerms: formatCustomerPaymentTerms(order.customerPaymentTermType, order.customerCreditDays),
+    customerNote: order.customerNote ?? null,
+    itemNotes: order.items
+      .filter((item) => item.customerNote)
+      .map((item) => ({
+        label: item.productType,
+        note: String(item.customerNote),
+      })),
     items: order.items.map((item) => ({
       productType: item.productType,
       quantity: item.quantity,
@@ -422,6 +515,10 @@ function buildOfferDocument(data: {
   portName: string;
   eta: string | null;
   etd: string | null;
+  timezone: string | null;
+  paymentTerms: string | null;
+  customerNote: string | null;
+  itemNotes: Array<{ label: string; note: string }>;
   currency: string;
   items: Array<{
     productType: string;
@@ -457,19 +554,21 @@ function buildOfferDocument(data: {
   // Delivery dates
   const deliveryLines: Content[] = [];
   if (data.eta) {
+    const formatted = formatDateTimeForDisplay(data.eta, data.timezone) ?? data.eta;
     deliveryLines.push({
       columns: [
         { width: '25%', text: 'Delivery date:', bold: true },
-        { width: '75%', text: data.eta.split('T')[0] },
+        { width: '75%', text: formatted },
       ],
       margin: [0, 2, 0, 0],
     } as Content);
   }
   if (data.etd) {
+    const formatted = formatDateTimeForDisplay(data.etd, data.timezone) ?? data.etd;
     deliveryLines.push({
       columns: [
         { width: '25%', text: 'ETD:', bold: true },
-        { width: '75%', text: data.etd.split('T')[0] },
+        { width: '75%', text: formatted },
       ],
       margin: [0, 2, 0, 0],
     } as Content);
@@ -552,7 +651,14 @@ function buildOfferDocument(data: {
         },
       } as Content,
 
-      { text: '', margin: [0, 30, 0, 0] } as Content,
+      ...(data.paymentTerms
+        ? [{ text: `Payment terms: ${data.paymentTerms}`, margin: [0, 20, 0, 0] } as Content]
+        : []),
+      ...buildNotesSection({
+        customerNote: data.customerNote,
+        itemNotes: data.itemNotes,
+      }),
+      { text: '', margin: [0, 20, 0, 0] } as Content,
       { text: 'Best regards,', margin: [0, 0, 0, 4] } as Content,
       { text: 'Fueld Trading', bold: true } as Content,
     ],
@@ -592,6 +698,15 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
     portName: order.place.name,
     eta: order.eta?.toISOString() ?? null,
     etd: order.etd?.toISOString() ?? null,
+    timezone: order.place.timezone ?? null,
+    paymentTerms: formatCustomerPaymentTerms(order.customerPaymentTermType, order.customerCreditDays),
+    customerNote: order.customerNote ?? null,
+    itemNotes: order.items
+      .filter((item) => item.customerNote)
+      .map((item) => ({
+        label: item.productType,
+        note: String(item.customerNote),
+      })),
     currency: order.currency ?? 'USD',
     items: order.items.map((item) => ({
       productType: item.productType,
@@ -624,8 +739,11 @@ function buildProformaDocument(data: {
   portName: string;
   eta: string | null;
   etd: string | null;
+  timezone: string | null;
   currency: string;
   paymentTerms: string | null;
+  customerNote: string | null;
+  itemNotes: Array<{ label: string; note: string }>;
   items: Array<{
     productType: string;
     quantity: string;
@@ -674,10 +792,21 @@ function buildProformaDocument(data: {
 
   const deliveryLines: Content[] = [];
   if (data.eta) {
+    const formatted = formatDateTimeForDisplay(data.eta, data.timezone) ?? data.eta;
     deliveryLines.push({
       columns: [
         { width: '25%', text: 'Delivery date:', bold: true },
-        { width: '75%', text: data.eta.split('T')[0] },
+        { width: '75%', text: formatted },
+      ],
+      margin: [0, 2, 0, 0],
+    } as Content);
+  }
+  if (data.etd) {
+    const formatted = formatDateTimeForDisplay(data.etd, data.timezone) ?? data.etd;
+    deliveryLines.push({
+      columns: [
+        { width: '25%', text: 'ETD:', bold: true },
+        { width: '75%', text: formatted },
       ],
       margin: [0, 2, 0, 0],
     } as Content);
@@ -767,6 +896,11 @@ function buildProformaDocument(data: {
           ]
         : []),
 
+      ...buildNotesSection({
+        customerNote: data.customerNote,
+        itemNotes: data.itemNotes,
+      }),
+
       { text: '', margin: [0, 20, 0, 0] } as Content,
       { text: 'Best regards,', margin: [0, 0, 0, 4] } as Content,
       { text: 'Fueld Trading', bold: true } as Content,
@@ -798,8 +932,10 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
 }> {
   const order = await fetchOrderForInvoice(orderId);
 
-  // Get payment terms from the first item (most orders have one main item)
-  const paymentTerms = order.items?.[0]?.paymentTerms ?? null;
+  const paymentTerms = formatCustomerPaymentTerms(
+    order.customerPaymentTermType,
+    order.customerCreditDays,
+  );
 
   const docData = {
     orderNumber: order.orderNumber,
@@ -810,8 +946,16 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
     portName: order.place.name,
     eta: order.eta?.toISOString() ?? null,
     etd: order.etd?.toISOString() ?? null,
+    timezone: order.place.timezone ?? null,
     currency: order.currency ?? 'USD',
     paymentTerms,
+    customerNote: order.customerNote ?? null,
+    itemNotes: order.items
+      .filter((item) => item.customerNote)
+      .map((item) => ({
+        label: item.productType,
+        note: String(item.customerNote),
+      })),
     items: order.items.map((item) => ({
       productType: item.productType,
       quantity: item.quantity,

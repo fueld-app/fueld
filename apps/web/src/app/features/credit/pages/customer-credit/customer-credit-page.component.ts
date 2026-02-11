@@ -640,11 +640,12 @@ export class CustomerCreditPageComponent implements OnInit {
     try {
       const counterpartyIds = this.selectedCounterparties().map((c) => c.id);
       const ownCompanyIds = Array.from(this.selectedOwnCompanyIds());
+      const creditAmount = String(f.creditAmount ?? '').trim();
 
       if (this.editingId()) {
         await firstValueFrom(
           this.http.patch<ApiResponse<CreditLineDto>>(`${API}/credit/lines/${this.editingId()}`, {
-            creditAmount: f.creditAmount,
+            creditAmount,
             currency: f.currency,
             expires: f.expires || null,
             periodDays: f.periodDays,
@@ -660,7 +661,7 @@ export class CustomerCreditPageComponent implements OnInit {
           this.http.post<ApiResponse<CreditLineDto>>(`${API}/credit/lines`, {
             counterpartyIds,
             type: 'CUSTOMER',
-            creditAmount: f.creditAmount,
+            creditAmount,
             currency: f.currency,
             expires: f.expires || undefined,
             periodDays: f.periodDays,

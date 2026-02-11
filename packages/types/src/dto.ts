@@ -2,9 +2,11 @@ import type {
   OrderStatus,
   ProductType,
   PaymentTerms,
+  PaymentTermType,
   CounterpartyType,
   InvoiceStatus,
   Role,
+  OrderAttachmentType,
 } from './enums';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -375,6 +377,13 @@ export interface OrderDto {
   status: OrderStatus;
   eta: string | null;
   etd: string | null;
+  customerPaymentTermType?: PaymentTermType | null;
+  customerCreditDays?: number | null;
+  customerNote?: string | null;
+  supplierId?: string | null;
+  supplierPaymentTermType?: PaymentTermType | null;
+  supplierCreditDays?: number | null;
+  supplierNote?: string | null;
   lossReason: string | null;
   closedAt: string | null;
   createdAt: string;
@@ -390,6 +399,13 @@ export interface CreateOrderDto {
   currency?: string;
   eta?: string;
   etd?: string;
+  customerPaymentTermType?: PaymentTermType;
+  customerCreditDays?: number;
+  customerNote?: string;
+  supplierId?: string;
+  supplierPaymentTermType?: PaymentTermType;
+  supplierCreditDays?: number;
+  supplierNote?: string;
 }
 
 export interface UpdateOrderDto {
@@ -402,6 +418,13 @@ export interface UpdateOrderDto {
   status?: OrderStatus;
   eta?: string | null;
   etd?: string | null;
+  customerPaymentTermType?: PaymentTermType | null;
+  customerCreditDays?: number | null;
+  customerNote?: string | null;
+  supplierId?: string | null;
+  supplierPaymentTermType?: PaymentTermType | null;
+  supplierCreditDays?: number | null;
+  supplierNote?: string | null;
   lossReason?: string | null;
 }
 
@@ -413,6 +436,7 @@ export interface OrderDetailDto extends OrderDto {
   salesRep: { id: string; name: string; email: string } | null;
   invoicingCompany: CounterpartyDto | null;
   items: OrderItemDto[];
+  attachments?: OrderAttachmentDto[];
 }
 
 /** Lightweight row for the orders/inquiries list */
@@ -446,7 +470,6 @@ export interface OrderNumberSettingsDto {
 export interface OrderItemDto {
   id: string;
   orderId: string;
-  supplierId: string | null;
   productType: ProductType;
   quantity: string;
   unit: string;
@@ -456,18 +479,31 @@ export interface OrderItemDto {
   salesCurrency: string;
   profit: string | null;
   paymentTerms: PaymentTerms | null;
+  customerNote?: string | null;
 }
 
 export interface CreateOrderItemDto {
   productType: ProductType;
   quantity: string;
   unit?: string;
-  supplierId?: string;
   costPrice?: string;
   costCurrency?: string;
   salesPrice?: string;
   salesCurrency?: string;
   paymentTerms?: PaymentTerms;
+  customerNote?: string;
+}
+
+export interface OrderAttachmentDto {
+  id: string;
+  orderId: string;
+  type: OrderAttachmentType;
+  fileName: string;
+  filePath: string;
+  mimeType: string;
+  fileSize: number;
+  uploadedBy: string | null;
+  createdAt: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -492,6 +528,33 @@ export interface CreateInvoiceDto {
   invoiceNumber: string;
   dueDate: string;
   amount?: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  CUSTOMER PAYMENTS (ledger entries)
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface CustomerPaymentDto {
+  id: string;
+  tenantId: string;
+  customerId: string;
+  orderId: string | null;
+  invoiceId: string | null;
+  amount: string;
+  currency: string;
+  receivedAt: string;
+  method: string | null;
+  note: string | null;
+  createdBy: string | null;
+  createdAt: string;
+}
+
+export interface CreateCustomerPaymentDto {
+  amount: string;
+  currency: string;
+  receivedAt?: string;
+  method?: string | null;
+  note?: string | null;
 }
 
 // ═══════════════════════════════════════════════════════════════════════

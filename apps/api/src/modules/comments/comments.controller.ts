@@ -17,9 +17,9 @@ import { users } from '../../db/schema';
 import { eq } from 'drizzle-orm';
 import type { ApiResponse } from '@fueld/types';
 
-/** Resolve entityId to a UUID when entityType is ORDER (supports order numbers). */
+/** Resolve entityId to a UUID when entityType is order (supports order numbers). */
 async function resolveEntityId(entityType: string, entityId: string): Promise<string> {
-  if (entityType === 'ORDER') {
+  if (entityType.toLowerCase() === 'order') {
     return (await resolveOrderId(entityId)) ?? entityId;
   }
   return entityId;
@@ -32,8 +32,9 @@ export const commentsController = new Elysia({ prefix: '/comments' })
   .get(
     '/:entityType/:entityId',
     async ({ params }): Promise<ApiResponse<any>> => {
-      const entityId = await resolveEntityId(params.entityType, params.entityId);
-      const comments = await listComments(params.entityType, entityId);
+      const entityType = params.entityType.toLowerCase();
+      const entityId = await resolveEntityId(entityType, params.entityId);
+      const comments = await listComments(entityType, entityId);
       return { success: true, data: comments };
     },
     {
@@ -48,7 +49,8 @@ export const commentsController = new Elysia({ prefix: '/comments' })
   .post(
     '/:entityType/:entityId',
     async ({ params, body, auth }): Promise<ApiResponse<any>> => {
-      const entityId = await resolveEntityId(params.entityType, params.entityId);
+      const entityType = params.entityType.toLowerCase();
+      const entityId = await resolveEntityId(entityType, params.entityId);
 
       // Look up user name
       const [u] = await db
@@ -58,7 +60,7 @@ export const commentsController = new Elysia({ prefix: '/comments' })
         .limit(1);
 
       const comment = await createComment({
-        entityType: params.entityType,
+        entityType,
         entityId,
         userId: auth.sub,
         userName: u?.name ?? auth.email,

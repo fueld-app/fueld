@@ -27,6 +27,17 @@ export enum PaymentTerms {
   Credit30 = 'CREDIT_30',
 }
 
+export enum PaymentTermType {
+  Credit = 'CREDIT',
+  CashOnDelivery = 'COD',
+  Prepayment = 'PREPAY',
+}
+
+export enum OrderAttachmentType {
+  Bdr = 'BDR',
+  Other = 'OTHER',
+}
+
 /** Counterparty classification. */
 export enum CounterpartyType {
   Supplier = 'SUPPLIER',

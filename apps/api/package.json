@@ -8,6 +8,7 @@
     "build": "bun build src/index.ts --outdir ./dist --target bun",
     "build:release": "bun build src/index.ts --compile --minify --target=bun-linux-x64 --outfile app-release",
     "start": "bun run dist/index.js",
+    "test": "bun test",
     "typecheck": "tsc --noEmit",
     "db:generate": "bunx drizzle-kit generate",
     "db:migrate": "bunx drizzle-kit migrate",

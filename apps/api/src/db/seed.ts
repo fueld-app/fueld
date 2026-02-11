@@ -6,6 +6,9 @@
 
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
+      supplierId: suppliers[0].id,
+      supplierPaymentTermType: 'CREDIT' as const,
+      supplierCreditDays: 30,
 import * as schema from './schema';
 import { hashPassword } from '../modules/auth/password.service';
 
@@ -186,6 +189,9 @@ async function seed() {
       salesRepId: admin.id,
       status: 'INQUIRY' as const,
       eta: daysFromNow(10),
+      supplierId: suppliers[1].id,
+      supplierPaymentTermType: 'CREDIT' as const,
+      supplierCreditDays: 30,
     },
     {
       tenantId: tenant.id,
@@ -195,6 +201,8 @@ async function seed() {
       salesRepId: trader1.id,
       status: 'OFFER' as const,
       eta: daysFromNow(7),
+      supplierId: suppliers[2].id,
+      supplierPaymentTermType: 'COD' as const,
     },
     {
       tenantId: tenant.id,
@@ -204,6 +212,9 @@ async function seed() {
       salesRepId: trader2.id,
       status: 'CONFIRMED' as const,
       eta: daysFromNow(3),
+      supplierId: suppliers[1].id,
+      supplierPaymentTermType: 'CREDIT' as const,
+      supplierCreditDays: 15,
     },
     {
       tenantId: tenant.id,
@@ -213,6 +224,8 @@ async function seed() {
       salesRepId: admin.id,
       status: 'DELIVERED' as const,
       eta: daysAgo(2),
+      supplierId: suppliers[0].id,
+      supplierPaymentTermType: 'PREPAY' as const,
     },
     {
       tenantId: tenant.id,
@@ -223,6 +236,9 @@ async function seed() {
       status: 'INVOICED' as const,
       eta: daysAgo(10),
     },
+      supplierId: suppliers[2].id,
+      supplierPaymentTermType: 'CREDIT' as const,
+      supplierCreditDays: 30,
     {
       tenantId: tenant.id,
       clientId: clients[1].id,
@@ -243,6 +259,8 @@ async function seed() {
       status: 'CANCELLED' as const,
       lossReason: 'Price too high — client went with competitor',
       closedAt: daysAgo(15),
+      supplierId: suppliers[0].id,
+      supplierPaymentTermType: 'COD' as const,
     },
   ];
   const orders = await db.insert(schema.orders).values(ordersData).returning();
@@ -251,18 +269,18 @@ async function seed() {
   // ─── 7. Order Items ────────────────────────────────────────────────
   const orderItemsData = [
     // Order 0 — Inquiry
-    { orderId: orders[0].id, supplierId: suppliers[0].id, productType: 'VLSFO' as const, quantity: '500.000', costPrice: '580.0000', salesPrice: '610.0000', profit: '15000.0000', paymentTerms: 'CREDIT_30' as const },
+    { orderId: orders[0].id, productType: 'VLSFO' as const, quantity: '500.000', costPrice: '580.0000', salesPrice: '610.0000', profit: '15000.0000', paymentTerms: 'CREDIT_30' as const },
     // Order 1 — Offer
-    { orderId: orders[1].id, supplierId: suppliers[1].id, productType: 'LSMGO' as const, quantity: '200.000', costPrice: '820.0000', salesPrice: '860.0000', profit: '8000.0000', paymentTerms: 'CREDIT_30' as const },
+    { orderId: orders[1].id, productType: 'LSMGO' as const, quantity: '200.000', costPrice: '820.0000', salesPrice: '860.0000', profit: '8000.0000', paymentTerms: 'CREDIT_30' as const },
     // Order 2 — Confirmed
-    { orderId: orders[2].id, supplierId: suppliers[2].id, productType: 'IFO380' as const, quantity: '1200.000', costPrice: '450.0000', salesPrice: '485.0000', profit: '42000.0000', paymentTerms: 'ON_RECEIPT' as const },
-    { orderId: orders[2].id, supplierId: suppliers[0].id, productType: 'LSMGO' as const, quantity: '100.000', costPrice: '810.0000', salesPrice: '850.0000', profit: '4000.0000', paymentTerms: 'ON_RECEIPT' as const },
+    { orderId: orders[2].id, productType: 'IFO380' as const, quantity: '1200.000', costPrice: '450.0000', salesPrice: '485.0000', profit: '42000.0000', paymentTerms: 'ON_RECEIPT' as const },
+    { orderId: orders[2].id, productType: 'LSMGO' as const, quantity: '100.000', costPrice: '810.0000', salesPrice: '850.0000', profit: '4000.0000', paymentTerms: 'ON_RECEIPT' as const },
     // Order 3 — Delivered
-    { orderId: orders[3].id, supplierId: suppliers[1].id, productType: 'VLSFO' as const, quantity: '800.000', costPrice: '575.0000', salesPrice: '605.0000', profit: '24000.0000', paymentTerms: 'CREDIT_30' as const },
+    { orderId: orders[3].id, productType: 'VLSFO' as const, quantity: '800.000', costPrice: '575.0000', salesPrice: '605.0000', profit: '24000.0000', paymentTerms: 'CREDIT_30' as const },
     // Order 4 — Invoiced
-    { orderId: orders[4].id, supplierId: suppliers[0].id, productType: 'MGO' as const, quantity: '300.000', costPrice: '890.0000', salesPrice: '940.0000', profit: '15000.0000', paymentTerms: 'CASH_ADVANCE' as const },
+    { orderId: orders[4].id, productType: 'MGO' as const, quantity: '300.000', costPrice: '890.0000', salesPrice: '940.0000', profit: '15000.0000', paymentTerms: 'CASH_ADVANCE' as const },
     // Order 5 — Paid
-    { orderId: orders[5].id, supplierId: suppliers[2].id, productType: 'VLSFO' as const, quantity: '650.000', costPrice: '570.0000', salesPrice: '600.0000', profit: '19500.0000', paymentTerms: 'CREDIT_30' as const },
+    { orderId: orders[5].id, productType: 'VLSFO' as const, quantity: '650.000', costPrice: '570.0000', salesPrice: '600.0000', profit: '19500.0000', paymentTerms: 'CREDIT_30' as const },
   ];
   const items = await db.insert(schema.orderItems).values(orderItemsData).returning();
   console.log(`  ✓ Order Items: ${items.length}`);

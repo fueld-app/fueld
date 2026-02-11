@@ -742,6 +742,55 @@ export async function createPlace(data: {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+//  UPDATE LOCAL PLACE (manual entry)
+// ═══════════════════════════════════════════════════════════════════════
+
+export async function updateLocalPlace(
+  id: string,
+  data: {
+    name?: string;
+    country?: string;
+    countryIso?: string | null;
+    area?: string | null;
+    subRegion?: string | null;
+    placeType?: 'POR' | 'PSP' | 'ANC' | 'TER' | 'FIL' | null;
+    timezone?: string | null;
+    lat?: number | null;
+    long?: number | null;
+    unlocode?: string | null;
+    admiraltyChart?: string | null;
+    parentPlaceId?: string | null;
+    parentPlaceName?: string | null;
+  },
+) {
+  const patch: Partial<typeof places.$inferInsert> = {
+    updatedAt: new Date(),
+  };
+
+  if (data.name !== undefined) patch.name = data.name;
+  if (data.country !== undefined) patch.country = data.country;
+  if (data.countryIso !== undefined) patch.countryIso = data.countryIso;
+  if (data.area !== undefined) patch.area = data.area;
+  if (data.subRegion !== undefined) patch.subRegion = data.subRegion;
+  if (data.placeType !== undefined) patch.placeType = data.placeType;
+  if (data.timezone !== undefined) patch.timezone = data.timezone;
+  if (data.lat !== undefined) patch.lat = data.lat;
+  if (data.long !== undefined) patch.long = data.long;
+  if (data.unlocode !== undefined) patch.unlocode = data.unlocode;
+  if (data.admiraltyChart !== undefined) patch.admiraltyChart = data.admiraltyChart;
+  if (data.parentPlaceId !== undefined) patch.parentPlaceId = data.parentPlaceId;
+  if (data.parentPlaceName !== undefined) patch.parentPlaceName = data.parentPlaceName;
+
+  const [updated] = await db
+    .update(places)
+    .set(patch)
+    .where(eq(places.id, id))
+    .returning();
+
+  return updated ?? null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 //  DELETE LOCAL PLACE
 // ═══════════════════════════════════════════════════════════════════════
 

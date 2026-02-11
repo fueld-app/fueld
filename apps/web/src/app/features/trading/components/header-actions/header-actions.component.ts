@@ -9,6 +9,7 @@ import {
   OnInit,
   OnDestroy,
 } from '@angular/core';
+import { OrderStatus } from '@fueld/types';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Header Actions — Workflow dropdown for order operations
@@ -23,18 +24,19 @@ interface ActionItem {
   label: string;
   icon: string;
   color: string;
+  disabled?: boolean;
 }
 
 const ACTIONS: ActionItem[] = [
   {
     key: 'view-offer',
-    label: 'View Offer PDF',
+    label: 'View Confirmation',
     icon: 'M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z',
     color: 'text-blue-600',
   },
   {
     key: 'view-proforma',
-    label: 'View Proforma Invoice',
+    label: 'View Nomination',
     icon: 'M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z',
     color: 'text-purple-600',
   },
@@ -87,9 +89,9 @@ const ACTIONS: ActionItem[] = [
         @for (action of actions; track action.key) {
           <button
             (click)="onAction(action.key)"
-            class="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-gray-700 transition-colors hover:bg-gray-50"
+            class="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
             role="menuitem"
-            [disabled]="loading()"
+            [disabled]="loading() || action.disabled"
           >
             <svg xmlns="http://www.w3.org/2000/svg" [class]="'h-5 w-5 ' + action.color" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" [attr.d]="action.icon" />
@@ -103,12 +105,14 @@ const ACTIONS: ActionItem[] = [
 })
 export class HeaderActionsComponent implements OnInit, OnDestroy {
   readonly orderId = input.required<string>();
+  readonly status = input<OrderStatus | null>(null);
   readonly actionTriggered = output<HeaderAction>();
 
   readonly isOpen = signal(false);
   readonly loading = signal(false);
 
   readonly actions = ACTIONS;
+  readonly displayActions = signal<ActionItem[]>(ACTIONS);
 
   private readonly elRef = inject(ElementRef);
   private clickOutside = (e: MouseEvent) => {
@@ -117,6 +121,7 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     document.addEventListener('click', this.clickOutside);
+    this.updateActions();
   }
 
   ngOnDestroy(): void {
@@ -125,8 +130,30 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
 
   toggleMenu(): void {
     this.isOpen.update((v) => !v);
+    this.updateActions();
   }
 
+  private updateActions(): void {
+    const status = this.status();
+    const canGenerateInvoice =
+      status === OrderStatus.Delivered
+      || status === OrderStatus.Invoiced
+      || status === OrderStatus.Paid;
+    const canMarkPaid = status !== OrderStatus.Paid;
+
+    const nextActions = ACTIONS
+      .filter((action) => action.key !== 'generate-invoice' || canGenerateInvoice)
+      .filter((action) => action.key !== 'mark-paid' || canMarkPaid)
+      .map((action) =>
+        action.key === 'generate-invoice'
+          ? { ...action, disabled: !canGenerateInvoice }
+          : action.key === 'mark-paid'
+            ? { ...action, disabled: !canMarkPaid }
+          : action,
+      );
+
+    this.displayActions.set(nextActions);
+  }
   onAction(key: HeaderAction): void {
     this.isOpen.set(false);
     this.actionTriggered.emit(key);

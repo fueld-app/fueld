@@ -2,7 +2,7 @@ import { Elysia, t } from 'elysia';
 import { authGuard } from '../auth/auth.guard';
 import { generateOrderInvoicePdfBuffer, generateOfferPdfBuffer, generateProformaInvoicePdfBuffer } from './document.service';
 import { sendInvoiceEmail } from './mail.service';
-import { resolveOrderId } from '../orders/orders.service';
+import { resolveOrderId, getOrderById } from '../orders/orders.service';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Documents Controller
@@ -94,6 +94,26 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       // Generate the PDF
       const { buffer, invoiceNumber, fileName } = await generateOrderInvoicePdfBuffer(orderId);
 
+      const order = await getOrderById(orderId);
+      const vesselName = order?.vessel?.name ?? body.vesselName ?? 'Vessel';
+      const portName = order?.place?.name ?? body.portName ?? 'Port';
+      const paymentTerms = order?.customerPaymentTermType
+        ? order.customerPaymentTermType === 'CREDIT'
+          ? `Credit ${order.customerCreditDays ?? 0} days`
+          : order.customerPaymentTermType === 'COD'
+            ? 'Cash on Delivery'
+            : order.customerPaymentTermType === 'PREPAY'
+              ? 'Cash in advance'
+              : order.customerPaymentTermType
+        : null;
+      const customerNote = order?.customerNote ?? null;
+      const itemNotes = order?.items
+        ?.filter((item) => item.customerNote)
+        .map((item) => ({
+          label: item.productType,
+          note: String(item.customerNote),
+        })) ?? [];
+
       // We need the user's O365 token to send via Graph.
       // The token is expected to be passed in the request body.
       await sendInvoiceEmail({
@@ -102,8 +122,11 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         invoiceNumber,
         pdfBuffer: buffer,
         pdfFileName: fileName,
-        vesselName: body.vesselName ?? 'Vessel',
-        portName: body.portName ?? 'Port',
+        vesselName,
+        portName,
+        paymentTerms,
+        customerNote,
+        itemNotes,
       });
 
       return { success: true, message: `Invoice ${invoiceNumber} sent to ${body.recipientEmail}` };

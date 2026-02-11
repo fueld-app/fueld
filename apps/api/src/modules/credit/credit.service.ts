@@ -17,7 +17,8 @@ import {
 import type { CreditLineDto, CreditLineType } from '@fueld/types';
 
 // Active statuses that count towards "used" credit
-const ACTIVE_STATUSES = ['CONFIRMED', 'DELIVERED', 'INVOICED'] as const;
+const SUPPLIER_ACTIVE_STATUSES = ['CONFIRMED', 'DELIVERED', 'INVOICED'] as const;
+const CUSTOMER_ACTIVE_STATUSES = ['INQUIRY', 'OFFER', 'CONFIRMED', 'DELIVERED', 'INVOICED'] as const;
 
 // ═══════════════════════════════════════════════════════════════════════
 //  CALCULATE USED AMOUNT (supports multiple counterparty IDs)
@@ -38,8 +39,9 @@ async function calcUsedAmountForSupplier(counterpartyIds: string[]): Promise<str
     .innerJoin(orders, eq(orderItems.orderId, orders.id))
     .where(
       and(
-        inArray(orderItems.supplierId, counterpartyIds),
-        inArray(orders.status, [...ACTIVE_STATUSES]),
+        inArray(orders.supplierId, counterpartyIds),
+        eq(orders.supplierPaymentTermType, 'CREDIT'),
+        inArray(orders.status, [...CUSTOMER_ACTIVE_STATUSES]),
       ),
     );
   return row?.total ?? '0';
@@ -56,7 +58,8 @@ async function calcUsedAmountForCustomer(counterpartyIds: string[]): Promise<str
     .where(
       and(
         inArray(orders.clientId, counterpartyIds),
-        inArray(orders.status, [...ACTIVE_STATUSES]),
+        eq(orders.customerPaymentTermType, 'CREDIT'),
+        inArray(orders.status, [...CUSTOMER_ACTIVE_STATUSES]),
       ),
     );
   return row?.total ?? '0';
@@ -173,11 +176,15 @@ async function enrichCreditLine(row: RawCreditLine): Promise<CreditLineDto> {
 
 export async function listCreditLines(query?: {
   type?: CreditLineType;
+  counterpartyId?: string;
   page?: number;
   limit?: number;
 }) {
   const conditions = [];
   if (query?.type) conditions.push(eq(creditLines.type, query.type));
+  if (query?.counterpartyId) {
+    conditions.push(eq(creditLineCounterparties.counterpartyId, query.counterpartyId));
+  }
 
   const where = conditions.length === 1 ? conditions[0] : conditions.length > 1 ? and(...conditions) : undefined;
 
@@ -185,31 +192,45 @@ export async function listCreditLines(query?: {
   const page = query?.page ?? 1;
   const offset = (page - 1) * limit;
 
+  let listQuery = db
+    .select({
+      id: creditLines.id,
+      tenantId: creditLines.tenantId,
+      type: creditLines.type,
+      creditAmount: creditLines.creditAmount,
+      currency: creditLines.currency,
+      expires: creditLines.expires,
+      periodDays: creditLines.periodDays,
+      fromDelivery: creditLines.fromDelivery,
+      qualified: creditLines.qualified,
+      notes: creditLines.notes,
+      createdAt: creditLines.createdAt,
+      updatedAt: creditLines.updatedAt,
+    })
+    .from(creditLines);
+
+  let countQuery = db
+    .select({ count: sql<number>`count(distinct ${creditLines.id})::int` })
+    .from(creditLines);
+
+  if (query?.counterpartyId) {
+    listQuery = listQuery.innerJoin(
+      creditLineCounterparties,
+      eq(creditLineCounterparties.creditLineId, creditLines.id),
+    );
+    countQuery = countQuery.innerJoin(
+      creditLineCounterparties,
+      eq(creditLineCounterparties.creditLineId, creditLines.id),
+    );
+  }
+
   const [rows, countResult] = await Promise.all([
-    db
-      .select({
-        id: creditLines.id,
-        tenantId: creditLines.tenantId,
-        type: creditLines.type,
-        creditAmount: creditLines.creditAmount,
-        currency: creditLines.currency,
-        expires: creditLines.expires,
-        periodDays: creditLines.periodDays,
-        fromDelivery: creditLines.fromDelivery,
-        qualified: creditLines.qualified,
-        notes: creditLines.notes,
-        createdAt: creditLines.createdAt,
-        updatedAt: creditLines.updatedAt,
-      })
-      .from(creditLines)
+    listQuery
       .where(where)
       .limit(limit)
       .offset(offset)
       .orderBy(creditLines.createdAt),
-    db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(creditLines)
-      .where(where),
+    countQuery.where(where),
   ]);
 
   const items = await Promise.all(rows.map((r) => enrichCreditLine(r)));

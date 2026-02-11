@@ -13,7 +13,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
-import { ProductType, PaymentTerms } from '@fueld/types';
+import { ProductType } from '@fueld/types';
 import { Subscription } from 'rxjs';
 import {
   SearchableDropdownComponent,
@@ -31,7 +31,6 @@ import { WebSocketService } from '../../../../core/websocket/websocket.service';
 export interface OrderItemRow {
   id: string;
   productType: string;
-  supplierId: string;
   quantity: number;
   quantityMin: number | null;
   quantityMax: number | null;
@@ -42,6 +41,7 @@ export interface OrderItemRow {
   salesCurrency: string;
   profit: number;
   paymentTerms: string;
+  customerNote?: string | null;
 }
 
 @Component({
@@ -78,9 +78,7 @@ export interface OrderItemRow {
       <table class="w-full text-sm">
         <thead>
           <tr class="border-b border-gray-200 bg-gray-50/80">
-            <th class="px-4 py-3 text-left font-medium text-gray-600">#</th>
             <th class="px-4 py-3 text-left font-medium text-gray-600 min-w-[140px]">Product</th>
-            <th class="px-4 py-3 text-left font-medium text-gray-600 min-w-[160px]">Supplier</th>
             <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Qty</th>
             <th class="px-4 py-3 text-left font-medium text-gray-600 w-16">Unit</th>
             <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[140px]">Cost</th>
@@ -94,8 +92,6 @@ export interface OrderItemRow {
         <tbody class="divide-y divide-gray-100">
           @for (row of rows(); track row.id; let i = $index) {
             <tr class="group transition-colors hover:bg-gray-50/50">
-              <td class="px-4 py-3 text-gray-400 tabular-nums">{{ i + 1 }}</td>
-
               <!-- Product -->
               <td class="px-4 py-2">
                 @if (readonly()) {
@@ -106,24 +102,6 @@ export interface OrderItemRow {
                     [selected]="row.productType"
                     placeholder="Product..."
                     (selectionChange)="updateField(i, 'productType', $event)"
-                  />
-                }
-              </td>
-
-              <!-- Supplier -->
-              <td class="px-4 py-2">
-                @if (readonly()) {
-                  <span>{{ getSupplierLabel(row.supplierId) }}</span>
-                } @else {
-                  <app-searchable-dropdown
-                    [options]="supplierOptions()"
-                    [selected]="row.supplierId"
-                    [asyncSearch]="true"
-                    [loading]="supplierSearchLoading()"
-                    placeholder="Supplier..."
-                    [clearable]="true"
-                    (searchChange)="supplierSearch.emit($event)"
-                    (selectionChange)="updateField(i, 'supplierId', $event)"
                   />
                 }
               </td>
@@ -275,7 +253,7 @@ export interface OrderItemRow {
             </tr>
           } @empty {
             <tr>
-              <td [attr.colspan]="readonly() ? 8 : 9" class="px-4 py-12 text-center">
+              <td [attr.colspan]="readonly() ? 6 : 7" class="px-4 py-12 text-center">
                 <p class="text-sm text-gray-400">No line items yet.</p>
                 @if (!readonly()) {
                   <button
@@ -293,7 +271,7 @@ export interface OrderItemRow {
         @if (rows().length > 0) {
           <tfoot>
             <tr class="border-t-2 border-gray-200 bg-gray-50/50 font-semibold">
-              <td [attr.colspan]="3" class="px-4 py-3 text-right text-gray-600">Totals</td>
+              <td class="px-4 py-3 text-right text-gray-600">Totals</td>
               <td class="px-4 py-3 text-right tabular-nums text-gray-900">{{ totalQty() | number:'1.3-3' }}</td>
               <td></td>
               <td class="px-4 py-3 text-right tabular-nums text-gray-600">{{ totalCost() | number:'1.2-2' }} {{ baseCurrency }}</td>
@@ -348,25 +326,6 @@ export interface OrderItemRow {
                   [selected]="row.productType"
                   placeholder="Product..."
                   (selectionChange)="updateField(i, 'productType', $event)"
-                />
-              }
-            </div>
-
-            <!-- Supplier -->
-            <div class="col-span-2">
-              <label class="mb-1 block text-xs font-medium text-gray-500">Supplier</label>
-              @if (readonly()) {
-                <span class="text-sm">{{ getSupplierLabel(row.supplierId) }}</span>
-              } @else {
-                <app-searchable-dropdown
-                  [options]="supplierOptions()"
-                  [selected]="row.supplierId"
-                  [asyncSearch]="true"
-                  [loading]="supplierSearchLoading()"
-                  placeholder="Supplier..."
-                  [clearable]="true"
-                  (searchChange)="supplierSearch.emit($event)"
-                  (selectionChange)="updateField(i, 'supplierId', $event)"
                 />
               }
             </div>
@@ -502,6 +461,7 @@ export interface OrderItemRow {
                 {{ profitForRow(row) | number:'1.2-2' }}
               </span>
             </div>
+
           </div>
         </div>
       } @empty {
@@ -538,14 +498,13 @@ export interface OrderItemRow {
   `,
 })
 export class OrderItemsComponent implements OnInit, OnDestroy {
+  readonly Number = Number;
   /** Items passed in from the order detail page. */
   readonly items = input<OrderItemRow[]>([]);
-  readonly suppliers = input<DropdownOption[]>([]);
   readonly readonly = input(false);
+  readonly allowDeliveredEdit = input(false);
   readonly currency = input('USD');
-  readonly supplierSearchLoading = input(false);
   readonly itemsChange = output<OrderItemRow[]>();
-  readonly supplierSearch = output<string>();
 
   private readonly wsService = inject(WebSocketService);
   private fxSub: Subscription | null = null;
@@ -618,9 +577,6 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
     { value: 'GAL', label: 'GAL' },
     { value: 'KG', label: 'KG' },
   ];
-
-  readonly supplierOptions = computed(() => this.suppliers());
-
   // ─── Computed totals ─────────────────────────────────────────────
 
   readonly totalQty = computed(() =>
@@ -641,15 +597,10 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
 
   // ─── Actions ─────────────────────────────────────────────────────
 
-  getSupplierLabel(supplierId: string): string {
-    return this.supplierOptions().find((o) => o.value === supplierId)?.label ?? (supplierId || '—');
-  }
-
   addRow(): void {
     const newRow: OrderItemRow = {
       id: crypto.randomUUID(),
       productType: '',
-      supplierId: '',
       quantity: 0,
       quantityMin: null,
       quantityMax: null,
@@ -660,6 +611,7 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
       salesCurrency: this.currency(),
       profit: 0,
       paymentTerms: '',
+      customerNote: '',
     };
     this.rows.update((prev) => [...prev, newRow]);
     this.emitChange();

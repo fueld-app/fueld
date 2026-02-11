@@ -23,6 +23,10 @@ import {
   updateOrderStatus,
   getOrderActivity,
   resolveOrderId,
+  listOrderAttachments,
+  createOrderAttachment,
+  listOrderPayments,
+  createOrderPayment,
 } from './orders.service';
 import { logActivity } from '../activity/activity.service';
 import type { ApiResponse } from '@fueld/types';
@@ -81,7 +85,8 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         return { success: true, data: order } satisfies ApiResponse<typeof order>;
       } catch (err) {
         console.error('[Orders] GetById failed:', err);
-        return { success: false, data: null, message: 'Failed to fetch order' };
+        const message = err instanceof Error ? err.message : 'Failed to fetch order';
+        return { success: false, data: null, message };
       }
     },
     {
@@ -140,6 +145,13 @@ export const ordersController = new Elysia({ prefix: '/orders' })
           salesRepId: body.salesRepId ?? auth.sub,
           invoicingCompanyId: body.invoicingCompanyId,
           currency: body.currency,
+          customerPaymentTermType: body.customerPaymentTermType ?? null,
+          customerCreditDays: body.customerCreditDays ?? null,
+          customerNote: body.customerNote ?? null,
+          supplierId: body.supplierId ?? null,
+          supplierPaymentTermType: body.supplierPaymentTermType ?? null,
+          supplierCreditDays: body.supplierCreditDays ?? null,
+          supplierNote: body.supplierNote ?? null,
           eta: body.eta,
           etd: body.etd,
         });
@@ -167,6 +179,13 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         salesRepId: t.Optional(t.String()),
         invoicingCompanyId: t.Optional(t.String()),
         currency: t.Optional(t.String()),
+        customerPaymentTermType: t.Optional(t.Nullable(t.String())),
+        customerCreditDays: t.Optional(t.Nullable(t.Number())),
+        customerNote: t.Optional(t.Nullable(t.String())),
+        supplierId: t.Optional(t.Nullable(t.String())),
+        supplierPaymentTermType: t.Optional(t.Nullable(t.String())),
+        supplierCreditDays: t.Optional(t.Nullable(t.Number())),
+        supplierNote: t.Optional(t.Nullable(t.String())),
         eta: t.Optional(t.String()),
         etd: t.Optional(t.String()),
       }),
@@ -212,6 +231,13 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         salesRepId: t.Optional(t.Nullable(t.String())),
         invoicingCompanyId: t.Optional(t.Nullable(t.String())),
         currency: t.Optional(t.String()),
+        customerPaymentTermType: t.Optional(t.Nullable(t.String())),
+        customerCreditDays: t.Optional(t.Nullable(t.Number())),
+        customerNote: t.Optional(t.Nullable(t.String())),
+        supplierId: t.Optional(t.Nullable(t.String())),
+        supplierPaymentTermType: t.Optional(t.Nullable(t.String())),
+        supplierCreditDays: t.Optional(t.Nullable(t.Number())),
+        supplierNote: t.Optional(t.Nullable(t.String())),
         status: t.Optional(t.String()),
         eta: t.Optional(t.Nullable(t.String())),
         etd: t.Optional(t.Nullable(t.String())),
@@ -293,18 +319,162 @@ export const ordersController = new Elysia({ prefix: '/orders' })
             quantityMin: t.Optional(t.Nullable(t.String())),
             quantityMax: t.Optional(t.Nullable(t.String())),
             unit: t.Optional(t.String()),
-            supplierId: t.Optional(t.Nullable(t.String())),
             costPrice: t.Optional(t.Nullable(t.String())),
             costCurrency: t.Optional(t.Nullable(t.String())),
             salesPrice: t.Optional(t.Nullable(t.String())),
             salesCurrency: t.Optional(t.Nullable(t.String())),
             paymentTerms: t.Optional(t.Nullable(t.String())),
+            customerNote: t.Optional(t.Nullable(t.String())),
           }),
         ),
       }),
       detail: {
         tags: ['Orders'],
         summary: 'Replace all line items for an order',
+      },
+    },
+  )
+
+  // ─── Order Attachments ───────────────────────────────────────────
+  .get(
+    '/:id/attachments',
+    async ({ params }) => {
+      try {
+        const orderId = await resolveOrderId(params.id);
+        if (!orderId) return { success: false, data: [], message: 'Order not found' };
+        const attachments = await listOrderAttachments(orderId);
+        return { success: true, data: attachments } satisfies ApiResponse<typeof attachments>;
+      } catch (err) {
+        console.error('[Orders] List attachments failed:', err);
+        return { success: false, data: [], message: 'Failed to load attachments' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: {
+        tags: ['Orders'],
+        summary: 'List attachments for an order',
+      },
+    },
+  )
+
+  // ─── Order Payments (ledger) ─────────────────────────────────────
+  .get(
+    '/:id/payments',
+    async ({ params }) => {
+      try {
+        const orderId = await resolveOrderId(params.id);
+        if (!orderId) return { success: false, data: [], message: 'Order not found' };
+        const payments = await listOrderPayments(orderId);
+        return { success: true, data: payments } satisfies ApiResponse<typeof payments>;
+      } catch (err) {
+        console.error('[Orders] List payments failed:', err);
+        return { success: false, data: [], message: 'Failed to load payments' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: {
+        tags: ['Orders'],
+        summary: 'List payments for an order',
+      },
+    },
+  )
+  .post(
+    '/:id/payments',
+    async ({ params, body, auth }) => {
+      try {
+        const orderId = await resolveOrderId(params.id);
+        if (!orderId) return { success: false, data: null, message: 'Order not found' };
+        const created = await createOrderPayment(orderId, {
+          amount: body.amount,
+          currency: body.currency,
+          receivedAt: body.receivedAt ?? null,
+          method: body.method ?? null,
+          note: body.note ?? null,
+          createdBy: auth.sub,
+        });
+        if (!created) return { success: false, data: null, message: 'Order not found' };
+        return { success: true, data: created } satisfies ApiResponse<typeof created>;
+      } catch (err) {
+        console.error('[Orders] Create payment failed:', err);
+        return { success: false, data: null, message: 'Failed to add payment' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({
+        amount: t.String(),
+        currency: t.String(),
+        receivedAt: t.Optional(t.String()),
+        method: t.Optional(t.Nullable(t.String())),
+        note: t.Optional(t.Nullable(t.String())),
+      }),
+      detail: {
+        tags: ['Orders'],
+        summary: 'Create a payment ledger entry for an order',
+      },
+    },
+  )
+  .post(
+    '/:id/attachments',
+    async ({ params, body, auth }) => {
+      try {
+        const orderId = await resolveOrderId(params.id);
+        if (!orderId) return { success: false, data: null, message: 'Order not found' };
+
+        const file = body.file;
+        const allowed = [
+          'application/pdf',
+          'image/jpeg',
+          'image/png',
+          'image/webp',
+          'image/heic',
+        ];
+        if (!allowed.includes(file.type)) {
+          return { success: false, data: null, message: 'Only PDF or image files are allowed' };
+        }
+        if (file.size > 10 * 1024 * 1024) {
+          return { success: false, data: null, message: 'Attachment must be under 10 MB' };
+        }
+
+        const ext = file.name.split('.').pop() ?? 'bin';
+        const filename = `${orderId}-${crypto.randomUUID()}.${ext}`;
+        const { join } = await import('path');
+        const { mkdir } = await import('fs/promises');
+        const dir = join(import.meta.dir, '../../../uploads/attachments');
+        await mkdir(dir, { recursive: true });
+        await Bun.write(join(dir, filename), file);
+
+        const record = await createOrderAttachment({
+          orderId,
+          type: body.type,
+          fileName: file.name,
+          filePath: `/uploads/attachments/${filename}`,
+          mimeType: file.type,
+          fileSize: file.size,
+          uploadedBy: auth.sub,
+        });
+
+        if (!record) {
+          return { success: false, data: null, message: 'Failed to save attachment' };
+        }
+
+        return { success: true, data: record } satisfies ApiResponse<typeof record>;
+      } catch (err) {
+        console.error('[Orders] Upload attachment failed:', err);
+        return { success: false, data: null, message: 'Failed to upload attachment' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({
+        file: t.File(),
+        type: t.String(),
+      }),
+      detail: {
+        tags: ['Orders'],
+        summary: 'Upload an attachment for an order',
       },
     },
   )

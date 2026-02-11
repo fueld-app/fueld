@@ -104,7 +104,20 @@ export async function sendInvoiceEmail(params: {
   pdfFileName: string;
   vesselName: string;
   portName: string;
+  paymentTerms?: string | null;
+  customerNote?: string | null;
+  itemNotes?: Array<{ label: string; note: string }>;
 }): Promise<void> {
+  const paymentTerms = params.paymentTerms ? `<tr><td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Payment terms:</td><td style="padding: 4px 0; font-weight: 600;">${params.paymentTerms}</td></tr>` : '';
+  const customerNote = params.customerNote?.trim()
+    ? `<p style="margin-top: 12px; white-space: pre-line;">${params.customerNote}</p>`
+    : '';
+  const itemNotes = params.itemNotes?.length
+    ? `<ul style="margin: 8px 0 0 18px; padding: 0; color: #374151;">${params.itemNotes
+        .map((note) => `<li>${note.label}: ${note.note}</li>`)
+        .join('')}</ul>`
+    : '';
+
   const htmlBody = `
     <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: #1a56db; padding: 24px 32px; border-radius: 8px 8px 0 0;">
@@ -123,7 +136,10 @@ export async function sendInvoiceEmail(params: {
             <td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Port:</td>
             <td style="padding: 4px 0; font-weight: 600;">${params.portName}</td>
           </tr>
+          ${paymentTerms}
         </table>
+        ${customerNote}
+        ${itemNotes}
         <p>If you have any questions regarding this invoice, please don't hesitate to reach out.</p>
         <p style="margin-top: 24px;">Best regards,<br/><strong>Fueld Trading</strong></p>
       </div>

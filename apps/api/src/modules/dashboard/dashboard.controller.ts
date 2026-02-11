@@ -13,12 +13,9 @@ export const dashboardController = new Elysia({ prefix: '/dashboard' })
   // ── GET /dashboard/collections ─────────────────────────────────────
   .get(
     '/collections',
-    async ({ store }) => {
-      const auth = (store as Record<string, unknown>).auth as {
-        userId: string;
-        tenantId: string;
-      };
-      const items = await getCollections(auth.tenantId);
+    async ({ auth, query }) => {
+      const params = query as { from?: string; to?: string };
+      const items = await getCollections(auth.tenantId, params.from, params.to);
       return { items, count: items.length };
     },
     {
@@ -35,12 +32,9 @@ export const dashboardController = new Elysia({ prefix: '/dashboard' })
   // ── GET /dashboard/team-stats ──────────────────────────────────────
   .get(
     '/team-stats',
-    async ({ store }) => {
-      const auth = (store as Record<string, unknown>).auth as {
-        userId: string;
-        tenantId: string;
-      };
-      const stats = await getTeamStats(auth.tenantId, auth.userId);
+    async ({ auth, query }) => {
+      const params = query as { from?: string; to?: string };
+      const stats = await getTeamStats(auth.tenantId, auth.userId, params.from, params.to);
       return { traders: stats };
     },
     {
@@ -57,11 +51,7 @@ export const dashboardController = new Elysia({ prefix: '/dashboard' })
   // ── GET /dashboard/pipeline ────────────────────────────────────────
   .get(
     '/pipeline',
-    async ({ store }) => {
-      const auth = (store as Record<string, unknown>).auth as {
-        userId: string;
-        tenantId: string;
-      };
+    async ({ auth }) => {
       const pipeline = await getPipelineSummary(auth.tenantId);
       return { stages: pipeline };
     },

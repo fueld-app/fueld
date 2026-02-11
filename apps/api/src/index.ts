@@ -161,6 +161,18 @@ const app = new Elysia()
     set.headers['cache-control'] = 'public, max-age=3600';
     return file;
   })
+  .get('/uploads/attachments/:filename', async ({ params, set }) => {
+    const { join } = await import('path');
+    const path = join(import.meta.dir, '../uploads/attachments', params.filename);
+    const file = Bun.file(path);
+    if (!(await file.exists())) {
+      set.status = 404;
+      return 'Not found';
+    }
+    set.headers['content-type'] = file.type;
+    set.headers['cache-control'] = 'public, max-age=3600';
+    return file;
+  })
 
   // ─── Authenticated WebSocket — persistent session ──────────────────
   // Client connects with ?token=<JWT> query parameter.

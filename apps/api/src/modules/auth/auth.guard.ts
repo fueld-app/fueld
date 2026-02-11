@@ -1,5 +1,8 @@
 import { Elysia } from 'elysia';
+import { eq } from 'drizzle-orm';
 import { jwtAccessPlugin, type JwtPayload } from './jwt.setup';
+import { db } from '../../db';
+import { users } from '../../db/schema';
 
 // ─── Auth Guard ──────────────────────────────────────────────────────
 // Reusable Elysia plugin that protects routes.
@@ -100,11 +103,24 @@ export const authGuard = new Elysia({ name: 'auth-guard' })
       // If getUserAllowedIps fails (e.g. user deleted), let it through to fail on other checks
     }
 
+    const [user] = await db
+      .select({ tenantId: users.tenantId })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (!user?.tenantId) {
+      set.status = 401;
+      throw new Error('User has no tenant');
+    }
+
     return {
       auth: {
         sub: decoded['sub'] as string,
+        userId,
+        tenantId: user.tenantId,
         email: decoded['email'] as string,
         role: decoded['role'] as string,
-      } satisfies JwtPayload,
+      } satisfies JwtPayload & { userId: string; tenantId: string },
     };
   });

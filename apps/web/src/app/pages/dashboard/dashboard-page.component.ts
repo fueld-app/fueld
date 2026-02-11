@@ -10,11 +10,14 @@ import {
   OnDestroy,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
-import type { CollectionsResponseDto, TeamStatsResponseDto } from '@fueld/types';
+import type { CollectionsResponseDto, TeamStatsResponseDto, TraderStatsDto } from '@fueld/types';
+import { firstValueFrom } from 'rxjs';
 
 import { CollectionsWidgetComponent } from '../../features/dashboard/components/collections-widget/collections-widget.component';
 import { AuthService } from '../../core/auth/auth.service';
+import { API } from '@app/core/config/api';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Dashboard Page — Manager view with collections and team stats
@@ -156,7 +159,7 @@ import { AuthService } from '../../core/auth/auth.service';
 })
 export class DashboardPageComponent implements OnInit, OnDestroy {
   readonly auth = inject(AuthService);
-  private readonly elRef = inject(ElementRef);
+  private readonly http = inject(HttpClient);
 
   @ViewChild('dateDropdown') dateDropdownRef!: ElementRef;
 
@@ -252,6 +255,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   // ─── State ───────────────────────────────────────────────────────
   readonly teamView = signal(false);
   readonly collections = signal<CollectionsResponseDto>({ items: [], count: 0 });
+  readonly rawTraderStats = signal<TraderStatsDto[]>([]);
   readonly teamStats = signal<TeamStatsResponseDto>({
     totalTraders: 0,
     activeOrders: 0,
@@ -266,6 +270,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     document.addEventListener('click', this.clickOutsideHandler);
+    void this.loadDashboardData();
   }
 
   ngOnDestroy(): void {
@@ -285,23 +290,121 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
 
   toggleTeamView(): void {
     this.teamView.update((current) => !current);
+    this.applyTeamStats();
   }
 
   selectDatePreset(key: string): void {
     this.selectedDatePreset.set(key);
     this.dateDropdownOpen.set(false);
+    void this.loadDashboardData();
   }
 
   applyCustomRange(): void {
-    if (this.customDateFrom() && this.customDateTo()) {
-      this.selectedDatePreset.set('custom');
-      this.dateDropdownOpen.set(false);
-    }
+    if (!this.customDateFrom() && !this.customDateTo()) return;
+    this.selectedDatePreset.set('custom');
+    this.dateDropdownOpen.set(false);
+    void this.loadDashboardData();
   }
 
   private formatShortDate(dateStr: string): string {
     const d = new Date(dateStr);
     return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+  }
+
+  private formatDateForQuery(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  private buildDateQuery(): string {
+    const params = new URLSearchParams();
+    if (this.selectedDatePreset() === 'custom') {
+      const from = this.customDateFrom();
+      const to = this.customDateTo();
+      if (from) params.set('from', from);
+      if (to) params.set('to', to);
+    } else {
+      const range = this.dateRange();
+      params.set('from', this.formatDateForQuery(range.from));
+      params.set('to', this.formatDateForQuery(range.to));
+    }
+    return params.toString();
+  }
+
+  private async loadDashboardData(): Promise<void> {
+    try {
+      const query = this.buildDateQuery();
+      const suffix = query ? `?${query}` : '';
+      const [collectionsRes, teamRes] = await Promise.all([
+        firstValueFrom(this.http.get<CollectionsResponseDto>(`${API}/dashboard/collections${suffix}`)),
+        firstValueFrom(this.http.get<{ traders: TraderStatsDto[] }>(`${API}/dashboard/team-stats${suffix}`)),
+      ]);
+
+      const itemsWithComments = (collectionsRes.items ?? []).map((item) => ({
+        ...item,
+        comments: item.comments ?? [],
+      }));
+      this.collections.set({ items: itemsWithComments, count: collectionsRes.count ?? itemsWithComments.length });
+      this.rawTraderStats.set(teamRes.traders ?? []);
+      this.applyTeamStats();
+    } catch {
+      this.collections.set({ items: [], count: 0 });
+      this.teamStats.set({
+        totalTraders: 0,
+        activeOrders: 0,
+        totalRevenueYTD: '—',
+        avgDealSize: '—',
+        traderPerformance: [],
+      });
+    }
+  }
+
+  private applyTeamStats(): void {
+    const traders = this.rawTraderStats();
+    const userId = this.auth.user()?.id ?? null;
+    const filtered = this.auth.isAdmin() && !this.teamView() && userId
+      ? traders.filter((trader) => trader.traderId === userId)
+      : traders;
+
+    const totalOrders = filtered.reduce((sum, trader) => sum + trader.orderCount, 0);
+    const totalRevenue = filtered.reduce(
+      (sum, trader) => sum + this.parseNumber(trader.totalRevenue),
+      0,
+    );
+    const totalProfit = filtered.reduce(
+      (sum, trader) => sum + this.parseNumber(trader.totalProfit),
+      0,
+    );
+    const avgDealSize = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+    this.teamStats.set({
+      totalTraders: filtered.length,
+      activeOrders: totalOrders,
+      totalRevenueYTD: totalRevenue > 0 ? this.formatUsd(totalRevenue) : '—',
+      avgDealSize: avgDealSize > 0 ? this.formatUsd(avgDealSize) : '—',
+      traderPerformance: filtered.map((trader) => ({
+        name: trader.traderName,
+        orders: trader.orderCount,
+        revenue: this.formatUsd(this.parseNumber(trader.totalRevenue)),
+        margin: this.formatUsd(this.parseNumber(trader.totalProfit)),
+      })),
+    });
+  }
+
+  private parseNumber(value: string | null | undefined): number {
+    if (value === null || value === undefined) return 0;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  private formatUsd(value: number): string {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 2,
+    }).format(value);
   }
 
 }
