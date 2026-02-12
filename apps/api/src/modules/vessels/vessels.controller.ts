@@ -4,6 +4,7 @@
 //  GET    /vessels/local?search=...&page=...&limit=...
 //  GET    /vessels/local/:id
 //  GET    /vessels/local/:id/orders
+//  POST   /vessels/local/match
 //  GET    /vessels/search?term=...
 //  GET    /vessels/enrichment/:seasearcherId
 //  GET    /vessels/by-seasearcher/:seasearcherId
@@ -23,6 +24,7 @@ import {
   listVessels,
   getVesselById,
   getVesselBySeasearcherId,
+  matchLocalVessels,
   createVessel,
   updateVessel,
   importVesselFromSeasearcher,
@@ -165,6 +167,28 @@ export const vesselsController = new Elysia({ prefix: '/vessels' })
     },
   )
 
+  // ─── Match Local Vessels (batch) ───────────────────────────────────
+  .post(
+    '/local/match',
+    async ({ body }) => {
+      const vessels = await matchLocalVessels({
+        seasearcherIds: body.seasearcherIds,
+        imos: body.imos,
+      });
+      return { success: true, data: vessels } satisfies ApiResponse<typeof vessels>;
+    },
+    {
+      body: t.Object({
+        seasearcherIds: t.Optional(t.Array(t.String())),
+        imos: t.Optional(t.Array(t.String())),
+      }),
+      detail: {
+        tags: ['Vessels'],
+        summary: 'Match local vessels by Seasearcher ID or IMO',
+      },
+    },
+  )
+
   // ─── Create Vessel (manual) ────────────────────────────────────────
   .post(
     '/local',
@@ -292,7 +316,11 @@ export const vesselsController = new Elysia({ prefix: '/vessels' })
   // ─── Delete Vessel ─────────────────────────────────────────────────
   .delete(
     '/local/:id',
-    async ({ params }) => {
+    async ({ params, auth, set }) => {
+      if (auth.role !== 'ADMIN') {
+        set.status = 403;
+        return { success: false, data: null, message: 'Only admins can delete vessels' };
+      }
       try {
         const deleted = await deleteVessel(params.id);
         if (!deleted) {
@@ -379,6 +407,7 @@ export const vesselsController = new Elysia({ prefix: '/vessels' })
             role: body.role as VesselCompanyRole,
             contactId: body.contactId,
             note: body.note,
+            replaceExistingRole: body.replaceExistingRole,
           },
           auth.sub,
           u?.name ?? auth.email,
@@ -396,6 +425,7 @@ export const vesselsController = new Elysia({ prefix: '/vessels' })
         role: t.String(), // 'OWNER' | 'TIME_CHARTERER' | 'OPERATOR' | 'MANAGER'
         contactId: t.Optional(t.Nullable(t.String())),
         note: t.Optional(t.String()),
+        replaceExistingRole: t.Optional(t.Boolean()),
       }),
       detail: {
         tags: ['Vessels'],

@@ -4,7 +4,7 @@
 
 import { eq, ilike, or, and, sql } from 'drizzle-orm';
 import { db } from '../../db';
-import { counterparties, companyContacts, companyEmails, orders, vessels, places, users } from '../../db/schema';
+import { counterparties, companyContacts, companyEmails, orders, vessels, places, users, vesselCompanies } from '../../db/schema';
 import type { CompanyEmailType } from '@fueld/types';
 import {
   seasearcherCompanyDetail,

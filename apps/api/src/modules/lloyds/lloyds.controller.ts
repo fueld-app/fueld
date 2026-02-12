@@ -292,7 +292,11 @@ export const lloydsController = new Elysia({ prefix: '/lloyds' })
   // ─── Delete Place (local DB) ───────────────────────────────────────
   .delete(
     '/places/local/:id',
-    async ({ params, set }) => {
+    async ({ params, auth, set }) => {
+      if (auth.role !== 'ADMIN') {
+        set.status = 403;
+        return { success: false, data: null, message: 'Only admins can delete places' };
+      }
       try {
         const deleted = await deletePlace(params.id);
         if (!deleted) {

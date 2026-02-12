@@ -480,7 +480,11 @@ export const companiesController = new Elysia({ prefix: '/companies' })
   // ─── Delete Company ───────────────────────────────────────────────
   .delete(
     '/local/:id',
-    async ({ params }) => {
+    async ({ params, auth, set }) => {
+      if (auth.role !== 'ADMIN') {
+        set.status = 403;
+        return { success: false, data: null, message: 'Only admins can delete companies' };
+      }
       try {
         const deleted = await deleteCompany(params.id);
         if (!deleted) {

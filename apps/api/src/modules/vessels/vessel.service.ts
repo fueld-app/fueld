@@ -2,7 +2,7 @@
 //  Vessel Service — CRUD + Seasearcher sync for vessels
 // ═══════════════════════════════════════════════════════════════════════
 
-import { eq, ilike, or, and, sql } from 'drizzle-orm';
+import { eq, ilike, or, and, sql, inArray } from 'drizzle-orm';
 import { db } from '../../db';
 import { vessels, orders, counterparties, places, vesselCompanies, companyContacts, users } from '../../db/schema';
 import type { VesselCompanyRole } from '@fueld/types';
@@ -136,6 +136,31 @@ export async function getVesselBySeasearcherId(seasearcherId: string) {
     .where(eq(vessels.seasearcherId, seasearcherId))
     .limit(1);
   return row ?? null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  MATCH LOCAL VESSELS BY SEASEARCHER ID / IMO
+// ═══════════════════════════════════════════════════════════════════════
+
+export async function matchLocalVessels(input: {
+  seasearcherIds?: string[];
+  imos?: string[];
+}) {
+  const seasearcherIds = (input.seasearcherIds ?? []).filter(Boolean);
+  const imos = (input.imos ?? []).filter(Boolean);
+
+  if (!seasearcherIds.length && !imos.length) return [];
+
+  const conditions = [];
+  if (seasearcherIds.length) {
+    conditions.push(inArray(vessels.seasearcherId, seasearcherIds));
+  }
+  if (imos.length) {
+    conditions.push(inArray(vessels.imo, imos));
+  }
+
+  const where = conditions.length === 1 ? conditions[0] : or(...conditions);
+  return db.select().from(vessels).where(where);
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -474,10 +499,66 @@ export async function getVesselCompanies(vesselId: string) {
 
 export async function addVesselCompany(
   vesselId: string,
-  data: { companyId: string; role: VesselCompanyRole; contactId?: string | null; note?: string },
+  data: { companyId: string; role: VesselCompanyRole; contactId?: string | null; note?: string; replaceExistingRole?: boolean },
   userId: string,
   userName: string
 ) {
+  const [existing] = await db
+    .select({ id: vesselCompanies.id })
+    .from(vesselCompanies)
+    .where(
+      and(
+        eq(vesselCompanies.vesselId, vesselId),
+        eq(vesselCompanies.role, data.role),
+      ),
+    )
+    .limit(1);
+
+  if (existing) {
+    if (!data.replaceExistingRole) {
+      throw new Error('Role already exists for this vessel');
+    }
+
+    const [updated] = await db
+      .update(vesselCompanies)
+      .set({
+        companyId: data.companyId,
+        contactId: data.contactId ?? null,
+        note: data.note ?? null,
+        addedById: userId,
+        addedByName: userName,
+        updatedAt: new Date(),
+      })
+      .where(eq(vesselCompanies.id, existing.id))
+      .returning();
+
+    if (!updated) {
+      throw new Error('Failed to replace vessel role');
+    }
+
+    const [fullUpdated] = await db
+      .select({
+        id: vesselCompanies.id,
+        vesselId: vesselCompanies.vesselId,
+        companyId: vesselCompanies.companyId,
+        companyName: counterparties.name,
+        role: vesselCompanies.role,
+        contactId: vesselCompanies.contactId,
+        contactName: companyContacts.name,
+        note: vesselCompanies.note,
+        addedById: vesselCompanies.addedById,
+        addedByName: vesselCompanies.addedByName,
+        createdAt: vesselCompanies.createdAt,
+        updatedAt: vesselCompanies.updatedAt,
+      })
+      .from(vesselCompanies)
+      .innerJoin(counterparties, eq(vesselCompanies.companyId, counterparties.id))
+      .leftJoin(companyContacts, eq(vesselCompanies.contactId, companyContacts.id))
+      .where(eq(vesselCompanies.id, existing.id));
+
+    return fullUpdated;
+  }
+
   const [created] = await db
     .insert(vesselCompanies)
     .values({
@@ -517,6 +598,31 @@ export async function updateVesselCompany(
   id: string,
   data: { role?: VesselCompanyRole; contactId?: string | null; note?: string }
 ) {
+  if (data.role) {
+    const [current] = await db
+      .select({ vesselId: vesselCompanies.vesselId, companyId: vesselCompanies.companyId })
+      .from(vesselCompanies)
+      .where(eq(vesselCompanies.id, id))
+      .limit(1);
+
+    if (current) {
+      const [dup] = await db
+        .select({ id: vesselCompanies.id })
+        .from(vesselCompanies)
+        .where(
+          and(
+            eq(vesselCompanies.vesselId, current.vesselId),
+            eq(vesselCompanies.role, data.role),
+            sql`${vesselCompanies.id} <> ${id}`,
+          ),
+        )
+        .limit(1);
+      if (dup) {
+        throw new Error('Role already exists for this vessel');
+      }
+    }
+  }
+
   const [updated] = await db
     .update(vesselCompanies)
     .set({

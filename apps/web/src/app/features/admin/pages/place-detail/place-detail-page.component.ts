@@ -18,6 +18,7 @@ import { Title } from '@angular/platform-browser';
 import type { PlaceDto, VesselDto, CounterpartyDto, ApiResponse, PortSupplierDto, ExpectedArrivalDto, CompanyContactDto } from '@fueld/types';
 import * as L from 'leaflet/dist/leaflet-src.esm.js';
 import { WebSocketService } from '../../../../core/websocket/websocket.service';
+import { AuthService } from '../../../../core/auth/auth.service';
 import { ActivityTimelineComponent } from '../../../../shared/components/activity-timeline/activity-timeline.component';
 import { LastEditedBadgeComponent } from '../../../../shared/components/last-edited-badge/last-edited-badge.component';
 import { CommentsCardComponent } from '../../../../shared/components/comments-card/comments-card.component';
@@ -309,12 +310,14 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                   Seasearcher
                 </a>
               }
-              <button
-                (click)="confirmDeletePlace()"
-                class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
-              >
-                Delete
-              </button>
+              @if (canDeleteEntity()) {
+                <button
+                  (click)="confirmDeletePlace()"
+                  class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+                >
+                  Delete
+                </button>
+              }
             </div>
           </div>
           <div class="flex items-center gap-3">
@@ -386,14 +389,14 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
           }
         </div>
 
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-4">
+        <div class="grid grid-cols-1 gap-6 min-[900px]:grid-cols-2 min-[1600px]:grid-cols-3 min-[2000px]:grid-cols-4">
           <!-- Left column: map + info -->
           <div class="contents">
 
             <!-- Map -->
             @if (place()!.lat && place()!.long) {
-                  <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden lg:order-5"
-                   [class]="mapFullscreen() ? 'fixed inset-0 z-50 rounded-none border-0' : ''">
+                       <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden flex flex-col"
+                     [class]="mapFullscreen() ? 'fixed inset-0 z-[70] rounded-none border-0 h-screen' : 'lg:order-5 lg:h-[449px]'">
                 <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
                   <h2 class="text-sm font-semibold text-gray-700">
                     Location
@@ -428,12 +431,12 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                     </button>
                   </div>
                 </div>
-                <div [class]="mapFullscreen() ? 'h-[calc(100vh-49px)]' : 'h-[400px]'" #mapContainer></div>
+                <div [class]="mapFullscreen() ? 'h-[calc(100dvh-49px)]' : 'h-[400px]'" #mapContainer></div>
               </div>
             }
 
             <!-- General info -->
-            <div class="rounded-xl border border-gray-200 bg-white shadow-sm lg:order-1">
+            <div class="rounded-xl border border-gray-200 bg-white shadow-sm lg:order-1 lg:h-[449px] lg:flex lg:flex-col overflow-hidden">
               <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
                 <div class="flex items-center gap-2">
                   <h2 class="text-sm font-semibold text-gray-700">General Information</h2>
@@ -469,7 +472,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                   </div>
                 }
               </div>
-              <div class="p-5">
+              <div class="p-5 max-h-[400px] overflow-y-auto">
                 @if (!editingPlace()) {
                   <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
                     <div>
@@ -610,7 +613,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
           <div class="contents">
             <!-- Terminals + Anchorages -->
             @if (terminals().length || anchorages().length) {
-              <div class="rounded-xl border border-gray-200 bg-white shadow-sm lg:order-7">
+              <div class="rounded-xl border border-gray-200 bg-white shadow-sm lg:order-7 lg:h-[449px] lg:flex lg:flex-col overflow-hidden">
                 <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
                   <h2 class="text-sm font-semibold text-gray-700">
                     🏭 Terminals & ⚓ Anchorages
@@ -619,7 +622,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                     {{ terminals().length + anchorages().length }}
                   </span>
                 </div>
-                <div class="p-5 space-y-4">
+                <div class="p-5 space-y-4 max-h-[400px] overflow-y-auto">
                   @if (terminals().length) {
                     <div>
                       <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Terminals</h3>
@@ -697,7 +700,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
 
             <!-- Facilities (from Seasearcher) -->
             @if (place()!.lliPlaceId) {
-              <div class="rounded-xl border border-gray-200 bg-white shadow-sm lg:order-8">
+              <div class="rounded-xl border border-gray-200 bg-white shadow-sm lg:order-8 lg:h-[449px] lg:flex lg:flex-col overflow-hidden">
                 <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
                   <h2 class="text-sm font-semibold text-gray-700">
                     Port Facilities
@@ -730,7 +733,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                   @if (!facilities().length && !facilitiesLoading()) {
                     <div class="px-5 py-6 text-center text-sm text-gray-400">No facility data available</div>
                   } @else {
-                    <div class="divide-y divide-gray-50 max-h-[600px] overflow-y-auto">
+                    <div class="divide-y divide-gray-50 max-h-[400px] overflow-y-auto">
                       @for (f of facilities(); track f.id) {
                         <div class="px-5 py-3">
                           <div class="flex items-center gap-2 mb-1">
@@ -746,7 +749,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                   @if (!facilityCompanies().length && !facilitiesLoading()) {
                     <div class="px-5 py-6 text-center text-sm text-gray-400">No company data available</div>
                   } @else {
-                    <div class="divide-y divide-gray-100 max-h-[600px] overflow-y-auto">
+                    <div class="divide-y divide-gray-100 max-h-[400px] overflow-y-auto">
                       @for (group of facilityCompanies(); track group.type) {
                         <div class="px-5 py-3">
                           <h4 class="text-xs font-semibold text-gray-700 mb-2">{{ group.label }}</h4>
@@ -799,7 +802,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
           <div class="contents">
 
             <!-- Orders at this place -->
-            <div class="rounded-xl border border-gray-200 bg-white shadow-sm lg:order-3">
+            <div class="rounded-xl border border-gray-200 bg-white shadow-sm lg:order-3 lg:h-[449px] lg:flex lg:flex-col overflow-hidden">
               <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
                 <h2 class="text-sm font-semibold text-gray-700">Orders</h2>
                 @if (placeOrders().length) {
@@ -818,7 +821,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
               } @else if (!placeOrders().length) {
                 <div class="px-5 py-6 text-center text-sm text-gray-400">No orders at this place</div>
               } @else {
-                <div class="divide-y divide-gray-50 max-h-[320px] overflow-y-auto">
+                <div class="divide-y divide-gray-50 max-h-[400px] overflow-y-auto">
                   @for (o of placeOrders(); track o.id) {
                     <div class="px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors">
                       <div class="flex items-center justify-between">
@@ -848,7 +851,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
             </div>
 
             <!-- Port Suppliers -->
-            <div class="rounded-xl border border-gray-200 bg-white shadow-sm lg:order-2">
+            <div class="rounded-xl border border-gray-200 bg-white shadow-sm lg:order-2 lg:h-[449px] lg:flex lg:flex-col overflow-hidden">
               <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
                 <h2 class="text-sm font-semibold text-gray-700">
                   Port Suppliers
@@ -864,6 +867,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 </button>
               </div>
 
+              <div class="min-h-0 overflow-y-auto">
               @if (showAddSupplier()) {
                 <div class="border-b border-gray-100 px-5 py-4 bg-gray-50/50">
                   <div class="space-y-2">
@@ -1014,10 +1018,11 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                   }
                 </div>
               }
+              </div>
             </div>
 
             <!-- Expected Arrivals + Nearby Vessels -->
-            <div class="rounded-xl border border-gray-200 bg-white shadow-sm lg:order-6">
+            <div class="rounded-xl border border-gray-200 bg-white shadow-sm lg:order-6 lg:h-[449px] lg:flex lg:flex-col overflow-hidden">
               <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
                 <h2 class="text-sm font-semibold text-gray-700">
                   @if (trafficTab() === 'arrivals') {
@@ -1167,14 +1172,14 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
 
             <!-- Comments -->
             @if (place()) {
-              <div class="lg:order-4">
-                <app-comments-card entityType="place" [entityId]="place()!.id" />
+              <div class="lg:order-4 lg:h-[449px] overflow-hidden">
+                <app-comments-card class="block h-full" entityType="place" [entityId]="place()!.id" />
               </div>
             }
 
             <!-- Activity History -->
             @if (place()) {
-              <div class="lg:order-9 lg:col-span-4">
+              <div class="lg:order-9 min-[900px]:col-span-2 min-[1600px]:col-span-3 min-[2000px]:col-span-4">
                 <app-activity-timeline entityType="place" [entityId]="place()!.id" />
               </div>
             }
@@ -1189,7 +1194,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
       }
 
       <!-- Delete confirmation modal -->
-      @if (showDeleteModal()) {
+      @if (showDeleteModal() && canDeleteEntity()) {
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div class="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
             <h3 class="text-lg font-semibold text-gray-900">Delete Place</h3>
@@ -1223,11 +1228,13 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
   private readonly router = inject(Router);
   private readonly http = inject(HttpClient);
   private readonly wsService = inject(WebSocketService);
+  private readonly authService = inject(AuthService);
   private readonly pageTitle = inject(Title);
 
   readonly mapContainer = viewChild<ElementRef<HTMLDivElement>>('mapContainer');
 
   readonly place = signal<PlaceDto | null>(null);
+  readonly canDeleteEntity = computed(() => this.authService.isAdmin());
   readonly enrichment = signal<PlaceEnrichment | null>(null);
   readonly loading = signal(true);
   readonly parentLocalId = signal<string | null>(null);
@@ -1857,10 +1864,12 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
   // ─── Delete place ─────────────────────────────────────────────────────
 
   confirmDeletePlace(): void {
+    if (!this.canDeleteEntity()) return;
     this.showDeleteModal.set(true);
   }
 
   async executeDeletePlace(): Promise<void> {
+    if (!this.canDeleteEntity()) return;
     const p = this.place();
     if (!p) return;
 

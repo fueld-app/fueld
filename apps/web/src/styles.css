@@ -44,6 +44,8 @@ html,
 body {
   @apply h-full m-0 p-0 bg-gray-50 text-gray-900 antialiased;
   font-family: var(--font-sans);
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
 }
 
 /* ─── Scrollbar styling ───────────────────────────────────────────── */

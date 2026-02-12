@@ -33,7 +33,7 @@ interface Comment {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, DatePipe],
   template: `
-    <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
+    <div class="h-full rounded-xl border border-gray-200 bg-white shadow-sm flex flex-col overflow-hidden">
       <!-- Header -->
       <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
         <h2 class="text-sm font-semibold text-gray-700">Comments</h2>
@@ -45,7 +45,7 @@ interface Comment {
       </div>
 
       <!-- Comment input -->
-      <div class="border-b border-gray-50 px-5 py-3">
+      <div class="border-b border-gray-50 px-5 py-3 shrink-0">
         <div class="flex gap-3">
           <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-medium text-brand-700">
             {{ currentUserInitials() }}
@@ -78,14 +78,14 @@ interface Comment {
 
       <!-- Comments list -->
       @if (loading()) {
-        <div class="flex items-center justify-center py-8">
+        <div class="flex-1 min-h-0 flex items-center justify-center py-8">
           <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
           </svg>
         </div>
       } @else if (comments().length) {
-        <div class="divide-y divide-gray-50 max-h-96 overflow-y-auto">
+        <div class="divide-y divide-gray-50 flex-1 min-h-0 overflow-y-auto">
           @for (c of comments(); track c.id) {
             <div class="px-5 py-3 group hover:bg-gray-50/50 transition-colors">
               <div class="flex items-start gap-3">
@@ -160,7 +160,7 @@ interface Comment {
           }
         </div>
       } @else {
-        <div class="px-5 py-8 text-center text-sm text-gray-400">
+        <div class="flex-1 min-h-0 px-5 py-8 text-center text-sm text-gray-400">
           No comments yet — be the first to add one.
         </div>
       }
