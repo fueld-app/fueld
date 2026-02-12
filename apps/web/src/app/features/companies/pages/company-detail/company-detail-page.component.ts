@@ -1284,16 +1284,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                               <div class="flex items-center gap-2">
                                 @if (isFleetAutoMatch(v)) {
                                   <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">Owner</span>
-                                  <button
-                                    (click)="linkFleetVessel(v)"
-                                    [disabled]="linkingFleetKey() === fleetRowKey(v)"
-                                    class="rounded-md bg-brand-600 px-2 py-1 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50">
-                                    @if (linkingFleetKey() === fleetRowKey(v)) {
-                                      Linking…
-                                    } @else {
-                                      {{ fleetLinkLabel(v) }}
-                                    }
-                                  </button>
+                                  <span class="ml-2 inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">Auto</span>
                                 } @else {
                                   <select
                                     [ngModel]="fleetRoleFor(v)"
@@ -1347,8 +1338,8 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                                   <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
                                 </svg>
                               </button>
-                              <button (click)="deleteCompanyVessel(vc.id)"
-                                class="rounded p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Delete">
+                              <button (click)="deleteCompanyVessel(vc.vesselId, vc.id)"
+                                class="rounded p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Delete Association">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
                                   <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
                                 </svg>
@@ -2258,13 +2249,26 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  async deleteCompanyVessel(assocId: string): Promise<void> {
+  async deleteCompanyVessel(vesselId: string | null | undefined, assocId: string): Promise<void> {
     const c = this.company();
     if (!c) return;
+    if (!vesselId) {
+      // association references no local vessel — delete by assoc only
+      try {
+        await firstValueFrom(this.http.delete(`${API}/vessels/companies/${assocId}`));
+        this.loadCompanyVessels(c.id);
+        if (this.fleet()?.results?.length) {
+          this.loadFleetLocalMatches(this.fleet()!.results);
+        }
+        return;
+      } catch (err) {
+        console.error('Failed to delete vessel association (assoc-only):', err);
+        return;
+      }
+    }
+
     try {
-      await firstValueFrom(
-        this.http.delete(`${API}/vessels/companies/${assocId}`),
-      );
+      await firstValueFrom(this.http.delete(`${API}/vessels/local/${vesselId}/companies/${assocId}`));
       this.loadCompanyVessels(c.id);
       if (this.fleet()?.results?.length) {
         this.loadFleetLocalMatches(this.fleet()!.results);
