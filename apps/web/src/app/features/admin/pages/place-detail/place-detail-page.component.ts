@@ -386,13 +386,13 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
           }
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-4">
           <!-- Left column: map + info -->
-          <div class="lg:col-span-2 space-y-6">
+          <div class="contents">
 
             <!-- Map -->
             @if (place()!.lat && place()!.long) {
-              <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden"
+                  <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden lg:order-5"
                    [class]="mapFullscreen() ? 'fixed inset-0 z-50 rounded-none border-0' : ''">
                 <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
                   <h2 class="text-sm font-semibold text-gray-700">
@@ -433,7 +433,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
             }
 
             <!-- General info -->
-            <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div class="rounded-xl border border-gray-200 bg-white shadow-sm lg:order-1">
               <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
                 <div class="flex items-center gap-2">
                   <h2 class="text-sm font-semibold text-gray-700">General Information</h2>
@@ -605,89 +605,89 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
               </div>
             </div>
 
-            <!-- Terminals -->
-            @if (terminals().length) {
-              <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
+          </div>
+
+          <div class="contents">
+            <!-- Terminals + Anchorages -->
+            @if (terminals().length || anchorages().length) {
+              <div class="rounded-xl border border-gray-200 bg-white shadow-sm lg:order-7">
                 <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
                   <h2 class="text-sm font-semibold text-gray-700">
-                    🏭 Terminals
+                    🏭 Terminals & ⚓ Anchorages
                   </h2>
                   <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
-                    {{ terminals().length }}
+                    {{ terminals().length + anchorages().length }}
                   </span>
                 </div>
-                <div class="p-5">
-                  <div class="space-y-1">
-                    @for (node of terminals(); track node.id) {
-                      <div>
-                        <button
-                          (click)="toggleNode(node.id)"
-                          class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors"
-                        >
-                          <span class="text-base">🏭</span>
-                          @if (node.children.length) {
-                            <svg class="h-3.5 w-3.5 text-gray-400 transition-transform"
-                                 [class.rotate-90]="expandedNodes().has(node.id)"
-                                 xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                              <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
-                            </svg>
-                          } @else {
-                            <span class="w-3.5"></span>
-                          }
-                          <span>{{ node.name }}</span>
-                          <span class="ml-auto text-xs text-gray-400">{{ node.type }}</span>
-                          @if (node.children.length) {
-                            <span class="text-[10px] text-gray-400">({{ node.children.length }})</span>
-                          }
-                        </button>
-                        @if (node.children.length && expandedNodes().has(node.id)) {
-                          <div class="ml-10 border-l border-gray-100 pl-3 space-y-0.5 mb-1">
-                            @for (child of node.children; track child.id) {
-                              <div class="flex items-center gap-2 px-2 py-1.5 text-sm text-gray-600">
-                                <span class="text-xs">{{ categoryIcon(child.category) }}</span>
-                                <span>{{ child.name }}</span>
-                                <span class="ml-auto text-[10px] text-gray-400">{{ child.type }}</span>
+                <div class="p-5 space-y-4">
+                  @if (terminals().length) {
+                    <div>
+                      <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Terminals</h3>
+                      <div class="space-y-1">
+                        @for (node of terminals(); track node.id) {
+                          <div>
+                            <button
+                              (click)="toggleNode(node.id)"
+                              class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors"
+                            >
+                              <span class="text-base">🏭</span>
+                              @if (node.children.length) {
+                                <svg class="h-3.5 w-3.5 text-gray-400 transition-transform"
+                                     [class.rotate-90]="expandedNodes().has(node.id)"
+                                     xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
+                                </svg>
+                              } @else {
+                                <span class="w-3.5"></span>
+                              }
+                              <span>{{ node.name }}</span>
+                              <span class="ml-auto text-xs text-gray-400">{{ node.type }}</span>
+                              @if (node.children.length) {
+                                <span class="text-[10px] text-gray-400">({{ node.children.length }})</span>
+                              }
+                            </button>
+                            @if (node.children.length && expandedNodes().has(node.id)) {
+                              <div class="ml-10 border-l border-gray-100 pl-3 space-y-0.5 mb-1">
+                                @for (child of node.children; track child.id) {
+                                  <div class="flex items-center gap-2 px-2 py-1.5 text-sm text-gray-600">
+                                    <span class="text-xs">{{ categoryIcon(child.category) }}</span>
+                                    <span>{{ child.name }}</span>
+                                    <span class="ml-auto text-[10px] text-gray-400">{{ child.type }}</span>
+                                  </div>
+                                }
                               </div>
                             }
                           </div>
                         }
                       </div>
-                    }
-                  </div>
-                </div>
-              </div>
-            }
+                    </div>
+                  }
 
-            <!-- Anchorages -->
-            @if (anchorages().length) {
-              <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
-                <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
-                  <h2 class="text-sm font-semibold text-gray-700">
-                    ⚓ Anchorages
-                  </h2>
-                  <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
-                    {{ anchorages().length }}
-                  </span>
-                </div>
-                <div class="divide-y divide-gray-50">
-                  @for (node of anchorages(); track node.id) {
-                    <div class="px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors">
-                      <div class="flex items-center gap-2">
-                        <span class="text-base">⚓</span>
-                        <button
-                          (click)="navigateToChildPlace(node.id)"
-                          [disabled]="navigatingChildId() === node.id"
-                          class="font-medium text-brand-600 hover:text-brand-800 hover:underline text-left disabled:opacity-50"
-                        >
-                          @if (navigatingChildId() === node.id) {
-                            <svg class="inline h-3.5 w-3.5 animate-spin mr-1" viewBox="0 0 24 24" fill="none">
-                              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                            </svg>
-                          }
-                          {{ node.name }}
-                        </button>
-                        <span class="ml-auto text-xs text-gray-400">{{ node.type }}</span>
+                  @if (anchorages().length) {
+                    <div>
+                      <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Anchorages</h3>
+                      <div class="divide-y divide-gray-50 rounded-lg border border-gray-100">
+                        @for (node of anchorages(); track node.id) {
+                          <div class="px-3 py-2.5 text-sm hover:bg-gray-50/50 transition-colors">
+                            <div class="flex items-center gap-2">
+                              <span class="text-base">⚓</span>
+                              <button
+                                (click)="navigateToChildPlace(node.id)"
+                                [disabled]="navigatingChildId() === node.id"
+                                class="font-medium text-brand-600 hover:text-brand-800 hover:underline text-left disabled:opacity-50"
+                              >
+                                @if (navigatingChildId() === node.id) {
+                                  <svg class="inline h-3.5 w-3.5 animate-spin mr-1" viewBox="0 0 24 24" fill="none">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                  </svg>
+                                }
+                                {{ node.name }}
+                              </button>
+                              <span class="ml-auto text-xs text-gray-400">{{ node.type }}</span>
+                            </div>
+                          </div>
+                        }
                       </div>
                     </div>
                   }
@@ -697,7 +697,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
 
             <!-- Facilities (from Seasearcher) -->
             @if (place()!.lliPlaceId) {
-              <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
+              <div class="rounded-xl border border-gray-200 bg-white shadow-sm lg:order-8">
                 <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
                   <h2 class="text-sm font-semibold text-gray-700">
                     Port Facilities
@@ -795,73 +795,11 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
             }
           </div>
 
-          <!-- Right column -->
-          <div class="space-y-6">
-            <!-- Children summary -->
-            @if (enrichment()?.childrenData?.length) {
-              <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
-                <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
-                  <h2 class="text-sm font-semibold text-gray-700">Children Summary</h2>
-                  <div class="flex gap-1.5">
-                    @for (c of enrichment()!.childrenData; track c.type) {
-                      <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
-                        {{ c.count }} {{ c.type }}{{ c.count !== 1 ? 's' : '' }}
-                      </span>
-                    }
-                  </div>
-                </div>
-
-                @if (enrichment()!.children.length) {
-                  <div class="divide-y divide-gray-50 max-h-[400px] overflow-y-auto">
-                    @for (child of enrichment()!.children; track child.id) {
-                      <div class="px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors">
-                        <div class="flex items-center gap-2">
-                          <span class="text-base">{{ childTypeIcon(child.typeCode) }}</span>
-                          <button
-                            (click)="navigateToChildPlace(child.id)"
-                            [disabled]="navigatingChildId() === child.id"
-                            class="font-medium text-brand-600 hover:text-brand-800 hover:underline text-left disabled:opacity-50"
-                          >
-                            @if (navigatingChildId() === child.id) {
-                              <svg class="inline h-3.5 w-3.5 animate-spin mr-1" viewBox="0 0 24 24" fill="none">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                              </svg>
-                            }
-                            {{ child.name }}
-                          </button>
-                          <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
-                                [class]="placeTypeBadgeClass(child.typeCode)">
-                            {{ child.type }}
-                          </span>
-                          @if (child.childrenData.length) {
-                            <div class="ml-auto flex gap-1">
-                              @for (cd of child.childrenData; track cd.type) {
-                                <span class="text-[10px] text-gray-400">
-                                  {{ cd.count }} {{ cd.type }}{{ cd.count !== 1 ? 's' : '' }}
-                                </span>
-                              }
-                            </div>
-                          }
-                        </div>
-                      </div>
-                    }
-                  </div>
-                } @else {
-                  <div class="divide-y divide-gray-50">
-                    @for (c of enrichment()!.childrenData; track c.type) {
-                      <div class="flex items-center justify-between px-5 py-2.5 text-sm">
-                        <span class="text-gray-600">{{ c.type }}s</span>
-                        <span class="font-semibold text-gray-900">{{ c.count }}</span>
-                      </div>
-                    }
-                  </div>
-                }
-              </div>
-            }
+          <!-- Summary cards grid -->
+          <div class="contents">
 
             <!-- Orders at this place -->
-            <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div class="rounded-xl border border-gray-200 bg-white shadow-sm lg:order-3">
               <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
                 <h2 class="text-sm font-semibold text-gray-700">Orders</h2>
                 @if (placeOrders().length) {
@@ -909,74 +847,8 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
               }
             </div>
 
-            <!-- Nearby vessels list -->
-            @if (nearbyVessels().length) {
-              <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
-                <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
-                  <h2 class="text-sm font-semibold text-gray-700">
-                    Nearby Vessels
-                    <span class="ml-1 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
-                      {{ nearbyVessels().length }}
-                    </span>
-                  </h2>
-                </div>
-                <div class="divide-y divide-gray-50 max-h-[400px] overflow-y-auto">
-                  @for (v of nearbyVessels(); track v.id) {
-                    <div class="px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors">
-                      <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-1.5 min-w-0">
-                          @if (v.flagCode) {
-                            <span class="text-sm">{{ vesselFlag(v.flagCode) }}</span>
-                          }
-                          <button
-                            (click)="navigateToVessel(v.id)"
-                            [disabled]="navigatingVesselId() === v.id"
-                            class="font-medium text-brand-600 hover:text-brand-800 hover:underline truncate text-left disabled:opacity-50"
-                          >
-                            @if (navigatingVesselId() === v.id) {
-                              <svg class="inline h-3.5 w-3.5 animate-spin mr-1" viewBox="0 0 24 24" fill="none">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                              </svg>
-                            }
-                            {{ v.name }}
-                          </button>
-                          @if (v.status) {
-                            <span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-medium"
-                                  [class]="v.status === 'stopped' || v.status === 'moored' ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700'">
-                              {{ v.status }}
-                            </span>
-                          }
-                        </div>
-                        <span class="text-[10px] text-gray-500 whitespace-nowrap ml-2">
-                          @if (v.distance != null) { {{ v.distance | number:'1.1-1' }} nm }
-                          @if (v.speed != null) { · {{ v.speed | number:'1.1-1' }} kn }
-                          @if (v.heading != null) { · {{ v.heading }}° }
-                        </span>
-                      </div>
-                      <div class="flex items-center gap-2 text-[10px] text-gray-400 mt-0.5">
-                        @if (v.imo) { <span>IMO {{ v.imo }}</span> }
-                        @if (v.vesselType) { <span>&middot; {{ v.vesselType }}</span> }
-                        @if (v.dwt) { <span>&middot; {{ v.dwt | number:'1.0-0' }} DWT</span> }
-                      </div>
-                      @if (v.lengthOverall || v.breadth || v.draught) {
-                        <div class="flex items-center gap-2 text-[10px] text-gray-400 mt-0.5">
-                          @if (v.lengthOverall || v.breadth) {
-                            <span>{{ v.lengthOverall ?? '?' }}m × {{ v.breadth ?? '?' }}m</span>
-                          }
-                          @if (v.draught) {
-                            <span>&middot; {{ v.draught | number:'1.1-1' }}m draft</span>
-                          }
-                        </div>
-                      }
-                    </div>
-                  }
-                </div>
-              </div>
-            }
-
             <!-- Port Suppliers -->
-            <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div class="rounded-xl border border-gray-200 bg-white shadow-sm lg:order-2">
               <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
                 <h2 class="text-sm font-semibold text-gray-700">
                   Port Suppliers
@@ -1144,74 +1016,168 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
               }
             </div>
 
-            <!-- Expected Arrivals -->
-            <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
+            <!-- Expected Arrivals + Nearby Vessels -->
+            <div class="rounded-xl border border-gray-200 bg-white shadow-sm lg:order-6">
               <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
                 <h2 class="text-sm font-semibold text-gray-700">
-                  Expected Arrivals
-                  @if (expectedArrivals().length) {
+                  @if (trafficTab() === 'arrivals') {
+                    Expected Arrivals
+                    @if (expectedArrivals().length) {
+                      <span class="ml-1 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
+                        {{ expectedArrivals().length }}
+                      </span>
+                    }
+                  } @else {
+                    Nearby Vessels
                     <span class="ml-1 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
-                      {{ expectedArrivals().length }}
+                      {{ nearbyVessels().length }}
                     </span>
                   }
                 </h2>
-                @if (arrivalsLoading()) {
-                  <span class="inline-flex items-center gap-1 text-xs text-gray-400">
-                    <svg class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                    </svg>
-                    Loading…
-                  </span>
-                }
+                <div class="flex items-center gap-2">
+                  @if (trafficTab() === 'arrivals' && arrivalsLoading()) {
+                    <span class="inline-flex items-center gap-1 text-xs text-gray-400">
+                      <svg class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                      </svg>
+                      Loading…
+                    </span>
+                  }
+                  <div class="flex gap-1">
+                    <button (click)="trafficTab.set('arrivals')"
+                      class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
+                      [class]="trafficTab() === 'arrivals' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'">
+                      Arrivals
+                    </button>
+                    <button (click)="trafficTab.set('nearby')"
+                      class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
+                      [class]="trafficTab() === 'nearby' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'">
+                      Nearby
+                    </button>
+                  </div>
+                </div>
               </div>
-              @if (!arrivalsLoading() && !expectedArrivals().length) {
-                <div class="px-5 py-6 text-center text-sm text-gray-400">No expected arrivals in the next 7 days</div>
-              } @else if (expectedArrivals().length) {
-                <div class="divide-y divide-gray-50 max-h-[400px] overflow-y-auto">
-                  @for (a of expectedArrivals(); track a.id) {
-                    <div class="px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors">
-                      <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-1.5 min-w-0">
-                          @if (a.flagCode) {
-                            <span class="text-sm">{{ vesselFlag(a.flagCode) }}</span>
-                          }
-                          <button
-                            (click)="navigateToVessel(a.id)"
-                            [disabled]="navigatingVesselId() === a.id"
-                            class="font-medium text-brand-600 hover:text-brand-800 hover:underline truncate text-left disabled:opacity-50"
-                          >
-                            @if (navigatingVesselId() === a.id) {
-                              <svg class="inline h-3.5 w-3.5 animate-spin mr-1" viewBox="0 0 24 24" fill="none">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                              </svg>
+              @if (trafficTab() === 'arrivals') {
+                @if (!arrivalsLoading() && !expectedArrivals().length) {
+                  <div class="px-5 py-6 text-center text-sm text-gray-400">No expected arrivals in the next 7 days</div>
+                } @else if (expectedArrivals().length) {
+                  <div class="divide-y divide-gray-50 max-h-[400px] overflow-y-auto">
+                    @for (a of expectedArrivals(); track a.id) {
+                      <div class="px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors">
+                        <div class="flex items-center justify-between">
+                          <div class="flex items-center gap-1.5 min-w-0">
+                            @if (a.flagCode) {
+                              <span class="text-sm">{{ vesselFlag(a.flagCode) }}</span>
                             }
-                            {{ a.name }}
-                          </button>
+                            <button
+                              (click)="navigateToVessel(a.id)"
+                              [disabled]="navigatingVesselId() === a.id"
+                              class="font-medium text-brand-600 hover:text-brand-800 hover:underline truncate text-left disabled:opacity-50"
+                            >
+                              @if (navigatingVesselId() === a.id) {
+                                <svg class="inline h-3.5 w-3.5 animate-spin mr-1" viewBox="0 0 24 24" fill="none">
+                                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                </svg>
+                              }
+                              {{ a.name }}
+                            </button>
+                          </div>
+                          @if (a.eta) {
+                            <span class="text-[10px] text-gray-500 whitespace-nowrap ml-2">
+                              ETA {{ a.eta | date:'MMM d, HH:mm' }}
+                            </span>
+                          }
                         </div>
-                        @if (a.eta) {
-                          <span class="text-[10px] text-gray-500 whitespace-nowrap ml-2">
-                            ETA {{ a.eta | date:'MMM d, HH:mm' }}
-                          </span>
+                        <div class="flex items-center gap-2 text-[10px] text-gray-400 mt-0.5">
+                          @if (a.imo) { <span>IMO {{ a.imo }}</span> }
+                          @if (a.vesselType) { <span>&middot; {{ a.vesselType }}</span> }
+                          @if (a.dwt) { <span>&middot; {{ a.dwt | number:'1.0-0' }} DWT</span> }
+                        </div>
+                        @if (a.commercialOperator || a.lastPort) {
+                          <div class="flex items-center gap-2 text-[10px] text-gray-400 mt-0.5">
+                            @if (a.commercialOperator) { <span>Op: {{ a.commercialOperator }}</span> }
+                            @if (a.lastPort) { <span>&middot; From: {{ a.lastPort }}</span> }
+                          </div>
                         }
                       </div>
-                      <div class="flex items-center gap-2 text-[10px] text-gray-400 mt-0.5">
-                        @if (a.imo) { <span>IMO {{ a.imo }}</span> }
-                        @if (a.vesselType) { <span>&middot; {{ a.vesselType }}</span> }
-                        @if (a.dwt) { <span>&middot; {{ a.dwt | number:'1.0-0' }} DWT</span> }
-                      </div>
-                      @if (a.commercialOperator || a.lastPort) {
-                        <div class="flex items-center gap-2 text-[10px] text-gray-400 mt-0.5">
-                          @if (a.commercialOperator) { <span>Op: {{ a.commercialOperator }}</span> }
-                          @if (a.lastPort) { <span>&middot; From: {{ a.lastPort }}</span> }
+                    }
+                  </div>
+                }
+              } @else {
+                @if (!nearbyVessels().length) {
+                  <div class="px-5 py-6 text-center text-sm text-gray-400">No nearby vessels</div>
+                } @else {
+                  <div class="divide-y divide-gray-50 max-h-[400px] overflow-y-auto">
+                    @for (v of nearbyVessels(); track v.id) {
+                      <div class="px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors">
+                        <div class="flex items-center justify-between">
+                          <div class="flex items-center gap-1.5 min-w-0">
+                            @if (v.flagCode) {
+                              <span class="text-sm">{{ vesselFlag(v.flagCode) }}</span>
+                            }
+                            <button
+                              (click)="navigateToVessel(v.id)"
+                              [disabled]="navigatingVesselId() === v.id"
+                              class="font-medium text-brand-600 hover:text-brand-800 hover:underline truncate text-left disabled:opacity-50"
+                            >
+                              @if (navigatingVesselId() === v.id) {
+                                <svg class="inline h-3.5 w-3.5 animate-spin mr-1" viewBox="0 0 24 24" fill="none">
+                                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                </svg>
+                              }
+                              {{ v.name }}
+                            </button>
+                            @if (v.status) {
+                              <span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-medium"
+                                    [class]="v.status === 'stopped' || v.status === 'moored' ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700'">
+                                {{ v.status }}
+                              </span>
+                            }
+                          </div>
+                          <span class="text-[10px] text-gray-500 whitespace-nowrap ml-2">
+                            @if (v.distance != null) { {{ v.distance | number:'1.1-1' }} nm }
+                            @if (v.speed != null) { · {{ v.speed | number:'1.1-1' }} kn }
+                            @if (v.heading != null) { · {{ v.heading }}° }
+                          </span>
                         </div>
-                      }
-                    </div>
-                  }
-                </div>
+                        <div class="flex items-center gap-2 text-[10px] text-gray-400 mt-0.5">
+                          @if (v.imo) { <span>IMO {{ v.imo }}</span> }
+                          @if (v.vesselType) { <span>&middot; {{ v.vesselType }}</span> }
+                          @if (v.dwt) { <span>&middot; {{ v.dwt | number:'1.0-0' }} DWT</span> }
+                        </div>
+                        @if (v.lengthOverall || v.breadth || v.draught) {
+                          <div class="flex items-center gap-2 text-[10px] text-gray-400 mt-0.5">
+                            @if (v.lengthOverall || v.breadth) {
+                              <span>{{ v.lengthOverall ?? '?' }}m × {{ v.breadth ?? '?' }}m</span>
+                            }
+                            @if (v.draught) {
+                              <span>&middot; {{ v.draught | number:'1.1-1' }}m draft</span>
+                            }
+                          </div>
+                        }
+                      </div>
+                    }
+                  </div>
+                }
               }
             </div>
+
+            <!-- Comments -->
+            @if (place()) {
+              <div class="lg:order-4">
+                <app-comments-card entityType="place" [entityId]="place()!.id" />
+              </div>
+            }
+
+            <!-- Activity History -->
+            @if (place()) {
+              <div class="lg:order-9 lg:col-span-4">
+                <app-activity-timeline entityType="place" [entityId]="place()!.id" />
+              </div>
+            }
 
           </div>
         </div>
@@ -1219,20 +1185,6 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
         <div class="text-center py-20">
           <h2 class="text-lg font-semibold text-gray-900">Place not found</h2>
           <p class="mt-1 text-sm text-gray-500">The place you're looking for doesn't exist or has been removed.</p>
-        </div>
-      }
-
-      <!-- Activity History -->
-      @if (place()) {
-        <div class="mt-6">
-          <app-activity-timeline entityType="place" [entityId]="place()!.id" />
-        </div>
-      }
-
-      <!-- Comments -->
-      @if (place()) {
-        <div class="mt-6">
-          <app-comments-card entityType="place" [entityId]="place()!.id" />
         </div>
       }
 
@@ -1349,6 +1301,7 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
   // Expected arrivals
   readonly expectedArrivals = signal<ExpectedArrivalDto[]>([]);
   readonly arrivalsLoading = signal(false);
+  readonly trafficTab = signal<'arrivals' | 'nearby'>('arrivals');
 
   // Responsible user
   readonly teamUsers = signal<UserOption[]>([]);
