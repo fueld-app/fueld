@@ -2201,7 +2201,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
       const editId = this.editingVesselAssocId();
       if (editId) {
         const res = await firstValueFrom(
-          this.http.patch<ApiResponse<VesselCompanyDto>>(`${API}/vessels/companies/${editId}`, {
+          this.http.patch<ApiResponse<VesselCompanyDto>>(`${API}/vessels/local/${form.vesselId}/companies/${editId}`, {
             role: form.role,
             contactId: form.contactId,
             note: form.note.trim() || undefined,

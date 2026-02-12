@@ -21,6 +21,7 @@ import type { VesselDto, CounterpartyDto, ApiResponse, VesselCompanyDto, VesselC
 import * as L from 'leaflet/dist/leaflet-src.esm.js';
 import { flagFromIso3 } from '../../../../shared/utils/flags';
 import { WebSocketService } from '../../../../core/websocket/websocket.service';
+import { AuthService } from '../../../../core/auth/auth.service';
 import { ActivityTimelineComponent } from '../../../../shared/components/activity-timeline/activity-timeline.component';
 import { LastEditedBadgeComponent } from '../../../../shared/components/last-edited-badge/last-edited-badge.component';
 import { CommentsCardComponent } from '../../../../shared/components/comments-card/comments-card.component';
@@ -168,12 +169,14 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 Seasearcher
               </a>
             }
-            <button
-              (click)="confirmDeleteOpen.set(true)"
-              class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
-            >
-              Delete
-            </button>
+            @if (canDeleteEntity()) {
+              <button
+                (click)="confirmDeleteOpen.set(true)"
+                class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+              >
+                Delete
+              </button>
+            }
           </div>
         </div>
         <div class="flex items-center gap-3">
@@ -568,6 +571,10 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                       }
                     </select>
                   </div>
+
+                  @if (!editingCompanyId() && selectedCompany() && selectedCompanyRoleExists()) {
+                    <div class="text-[11px] text-amber-600">This company already has that role.</div>
+                  }
 
                   <!-- Contact person (shown after company selected or when editing) -->
                   @if (selectedCompany() || editingCompanyId()) {
@@ -1038,7 +1045,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
       </div>
 
       <!-- Delete Confirmation -->
-      @if (confirmDeleteOpen()) {
+      @if (confirmDeleteOpen() && canDeleteEntity()) {
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div class="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
             <h3 class="text-lg font-semibold text-gray-900">Delete Vessel</h3>
@@ -1057,6 +1064,26 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
           </div>
         </div>
       }
+
+      @if (toast()) {
+        <div
+          class="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-lg border px-4 py-3 text-sm font-medium shadow-lg transition-all"
+          [class]="toast()!.type === 'success'
+            ? 'border-green-200 bg-green-50 text-green-800'
+            : 'border-red-200 bg-red-50 text-red-800'"
+        >
+          @if (toast()!.type === 'success') {
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd" />
+            </svg>
+          } @else {
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd" />
+            </svg>
+          }
+          {{ toast()!.message }}
+        </div>
+      }
     } @else {
       <div class="text-center py-20 text-gray-400">Vessel not found</div>
     }
@@ -1068,8 +1095,10 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
   private readonly router = inject(Router);
   private readonly pageTitle = inject(Title);
   private readonly wsService = inject(WebSocketService);
+  private readonly authService = inject(AuthService);
 
   readonly loading = signal(true);
+  readonly canDeleteEntity = computed(() => this.authService.isAdmin());
   readonly vessel = signal<VesselDto | null>(null);
   readonly syncing = signal(false);
 
@@ -1121,6 +1150,7 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
   readonly confirmDeleteOpen = signal(false);
   readonly deleting = signal(false);
   readonly deleteError = signal('');
+  readonly toast = signal<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Vessel Companies
   readonly vesselCompanies = signal<VesselCompanyDto[]>([]);
@@ -1680,6 +1710,10 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
 
   // ─── Delete ────────────────────────────────────────────────────────
   async executeDelete(): Promise<void> {
+    if (!this.canDeleteEntity()) {
+      this.deleteError.set('Only admins can delete vessels');
+      return;
+    }
     const v = this.vessel()!;
     this.deleting.set(true);
     try {
@@ -1716,6 +1750,11 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
       case 'CANCELLED': case 'LOST': return 'bg-red-100 text-red-700';
       default: return 'bg-gray-100 text-gray-600';
     }
+  }
+
+  private showToast(type: 'success' | 'error', message: string): void {
+    this.toast.set({ type, message });
+    setTimeout(() => this.toast.set(null), 4000);
   }
 
   // ─── Vessel Companies ──────────────────────────────────────────────
@@ -1776,10 +1815,7 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
         const res = await firstValueFrom(
           this.http.get<ApiResponse<{ companies: { id: string; name: string; country: string | null }[] }>>(`${API}/companies/local?search=${encodeURIComponent(term)}&limit=15`),
         );
-        const existingIds = new Set(this.vesselCompanies().map((vc) => vc.companyId));
-        const localResults = res.success && res.data
-          ? res.data.companies.filter((c) => !existingIds.has(c.id))
-          : [];
+        const localResults = res.success && res.data ? res.data.companies : [];
 
         if (localResults.length) {
           this.companySearchResults.set(
@@ -1859,6 +1895,13 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
     this.companyContacts.set([]);
   }
 
+  selectedCompanyRoleExists(): boolean {
+    const selected = this.selectedCompany();
+    if (!selected) return false;
+    const role = this.companyForm().role;
+    return this.vesselCompanies().some((vc) => vc.companyId === selected.id && vc.role === role);
+  }
+
   private async loadCompanyContacts(companyId: string): Promise<void> {
     this.companyContactsLoading.set(true);
     try {
@@ -1894,23 +1937,61 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
     try {
       const editId = this.editingCompanyId();
       if (editId) {
-        await firstValueFrom(
-          this.http.patch(`${API}/vessels/companies/${editId}`, {
+        const res = await firstValueFrom(
+          this.http.patch<ApiResponse<VesselCompanyDto>>(`${API}/vessels/local/${v.id}/companies/${editId}`, {
             role: form.role,
             contactId: form.contactId,
             note: form.note.trim() || undefined,
           }),
         );
+        if (res && res.success === false) {
+          this.showToast('error', res.message ?? 'Failed to update company role.');
+          return;
+        }
       } else {
         if (!form.companyId) return;
-        await firstValueFrom(
-          this.http.post(`${API}/vessels/local/${v.id}/companies`, {
+        const replaceExistingRole = this.selectedCompanyRoleExists()
+          ? window.confirm('This role already exists for this vessel. Replace the existing one?')
+          : false;
+        if (this.selectedCompanyRoleExists() && !replaceExistingRole) {
+          this.showToast('error', 'Role already exists for this vessel.');
+          return;
+        }
+        const res = await firstValueFrom(
+          this.http.post<ApiResponse<VesselCompanyDto>>(`${API}/vessels/local/${v.id}/companies`, {
             companyId: form.companyId,
             role: form.role,
             contactId: form.contactId,
             note: form.note.trim() || undefined,
+            replaceExistingRole: replaceExistingRole || undefined,
           }),
         );
+        if (res && res.success === false) {
+          if ((res.message ?? '').includes('Role already exists for this vessel')) {
+            const confirmReplace = window.confirm('This role already exists for this vessel. Replace the existing one?');
+            if (confirmReplace) {
+              const retry = await firstValueFrom(
+                this.http.post<ApiResponse<VesselCompanyDto>>(`${API}/vessels/local/${v.id}/companies`, {
+                  companyId: form.companyId,
+                  role: form.role,
+                  contactId: form.contactId,
+                  note: form.note.trim() || undefined,
+                  replaceExistingRole: true,
+                }),
+              );
+              if (retry && retry.success === false) {
+                this.showToast('error', retry.message ?? 'Failed to replace company role.');
+                return;
+              }
+            } else {
+              this.showToast('error', 'Role already exists for this vessel.');
+              return;
+            }
+          } else {
+            this.showToast('error', res.message ?? 'Failed to add company role.');
+            return;
+          }
+        }
       }
       this.showAddCompany.set(false);
       this.editingCompanyId.set(null);
@@ -1919,6 +2000,7 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
       this.loadVesselCompanies(v.id);
     } catch (err) {
       console.error('Failed to save vessel company:', err);
+      this.showToast('error', 'Failed to save company role.');
     } finally {
       this.savingCompany.set(false);
     }
