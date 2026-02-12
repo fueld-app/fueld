@@ -17,18 +17,13 @@ import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subscription, skip } from 'rxjs';
 import { Title } from '@angular/platform-browser';
 import * as L from 'leaflet/dist/leaflet-src.esm.js';
-import type { CounterpartyDto, VesselDto, ApiResponse, CompanyContactDto, SupplyPortDto, CompanyEmailDto, CompanyEmailType, VesselCompanyDto, VesselCompanyRole } from '@fueld/types';
+import type { ApiResponse, CompanyContactDto, CompanyEmailDto, CompanyEmailType, CounterpartyDto, SupplyPortDto, VesselCompanyDto, VesselCompanyRole, VesselDto } from '@fueld/types';
 import { flagFromIso3 } from '../../../../shared/utils/flags';
 import { WebSocketService } from '../../../../core/websocket/websocket.service';
+import { AuthService } from '../../../../core/auth/auth.service';
 import { ActivityTimelineComponent } from '../../../../shared/components/activity-timeline/activity-timeline.component';
 import { LastEditedBadgeComponent } from '../../../../shared/components/last-edited-badge/last-edited-badge.component';
 import { CommentsCardComponent } from '../../../../shared/components/comments-card/comments-card.component';
-
-// ═══════════════════════════════════════════════════════════════════════
-//  Company Detail Page — Overview, enrichment from Seasearcher,
-//  orders, sync, external link
-// ═══════════════════════════════════════════════════════════════════════
-
 import { API } from '@app/core/config/api';
 
 const TYPE_LABELS: Record<string, string> = {
@@ -312,6 +307,15 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
     .fleet-map-fullscreen .fleet-map-container {
       border-radius: 0 !important;
     }
+    @media (min-width: 900px) {
+      .company-card-grid > div > .rounded-xl,
+      .company-card-grid > div > app-comments-card {
+        height: 449px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+    }
   `],
   template: `
     <div>
@@ -374,12 +378,14 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                   Seasearcher
                 </a>
               }
-              <button
-                (click)="confirmDeleteOpen.set(true)"
-                class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
-              >
-                Delete
-              </button>
+              @if (canDeleteEntity()) {
+                <button
+                  (click)="confirmDeleteOpen.set(true)"
+                  class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+                >
+                  Delete
+                </button>
+              }
             </div>
           </div>
           <div class="flex items-center gap-3">
@@ -419,217 +425,219 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
           <app-last-edited-badge entityType="company" [entityId]="company()!.id" />
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="company-card-grid grid grid-cols-1 gap-6 min-[900px]:grid-cols-2 min-[1600px]:grid-cols-3 min-[2000px]:grid-cols-4">
           <!-- Left column -->
-          <div class="lg:col-span-2 space-y-6">
+          <div class="contents">
 
-            <!-- Company Info -->
-            <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
+            <!-- Company Info + Head Office -->
+            <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-1 flex flex-col overflow-hidden">
               <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
                 <h2 class="text-sm font-semibold text-gray-700">Company Information</h2>
-                @if (!company()!.seasearcherId && !editing()) {
+                <div class="flex gap-1">
                   <button
-                    (click)="startEditing()"
-                    class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                    type="button"
+                    class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
+                    [class]="companyInfoTab() === 'info' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
+                    (click)="companyInfoTab.set('info')"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                    </svg>
-                    Edit
+                    Company Info
                   </button>
-                }
-                @if (editing()) {
-                  <div class="flex items-center gap-2">
-                    <button
-                      (click)="cancelEditing()"
-                      [disabled]="editSaving()"
-                      class="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
-                    >Cancel</button>
-                    <button
-                      (click)="saveEditing()"
-                      [disabled]="editSaving()"
-                      class="rounded-md bg-brand-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-brand-700 transition-colors disabled:opacity-50"
-                    >
-                      @if (editSaving()) { Saving… } @else { Save }
-                    </button>
-                  </div>
-                }
+                  <button
+                    type="button"
+                    class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
+                    [class]="companyInfoTab() === 'headOffice' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
+                    (click)="companyInfoTab.set('headOffice')"
+                  >
+                    Head Office
+                  </button>
+                </div>
               </div>
-              <div class="p-5">
-                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
-                  <div>
-                    <dt class="text-gray-500">Company Name</dt>
-                    @if (editing()) {
-                      <dd class="mt-0.5">
-                        <input
-                          type="text"
-                          [value]="editName()"
-                          (input)="editName.set($any($event.target).value)"
-                          class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                        />
-                      </dd>
-                    } @else {
-                      <dd class="mt-0.5 font-medium text-gray-900">{{ company()!.name }}</dd>
-                    }
-                  </div>
-                  <div>
-                    <dt class="text-gray-500">Type</dt>
-                    <dd class="mt-0.5 flex flex-wrap gap-1.5">
-                      @for (t of allTypes; track t) {
-                        <button
-                          (click)="toggleType(t)"
-                          [disabled]="typeSaving()"
-                          class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition-all cursor-pointer"
-                          [class]="companyTypes().includes(t)
-                            ? typeBadgeClass(t)
-                            : 'bg-gray-50 text-gray-400 border border-dashed border-gray-300 hover:border-gray-400 hover:text-gray-500'"
-                        >
-                          {{ typeLabel(t) }}
-                        </button>
-                      }
-                      @if (typeSaving()) {
-                        <svg class="h-4 w-4 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
-                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                        </svg>
-                      }
-                    </dd>
-                  </div>
-                  <div>
-                    <dt class="text-gray-500">Country</dt>
-                    @if (editing()) {
-                      <dd class="mt-0.5">
-                        <input
-                          type="text"
-                          [value]="editCountry()"
-                          (input)="editCountry.set($any($event.target).value)"
-                          class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                        />
-                      </dd>
-                    } @else {
-                      <dd class="mt-0.5 font-medium text-gray-900">{{ company()!.country ?? '—' }}</dd>
-                    }
-                  </div>
-                  <div>
-                    <dt class="text-gray-500">Country Code</dt>
-                    @if (editing()) {
-                      <dd class="mt-0.5">
-                        <input
-                          type="text"
-                          [value]="editCountryIso()"
-                          (input)="editCountryIso.set($any($event.target).value)"
-                          maxlength="3"
-                          class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium font-mono text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                        />
-                      </dd>
-                    } @else {
-                      <dd class="mt-0.5 font-medium text-gray-900 font-mono">{{ company()!.countryIso ?? '—' }}</dd>
-                    }
-                  </div>
-                  <div>
-                    <dt class="text-gray-500">Year Formed</dt>
-                    <dd class="mt-0.5 font-medium text-gray-900">{{ company()!.yearFormed ?? '—' }}</dd>
-                  </div>
-                  <div>
-                    <dt class="text-gray-500">Fleet Size</dt>
-                    <dd class="mt-0.5 font-medium text-gray-900">{{ company()!.fleetSize ?? '—' }}</dd>
-                  </div>
-                  <div>
-                    <dt class="text-gray-500">Credit Limit</dt>
-                    <dd class="mt-0.5 font-medium text-gray-900">\${{ company()!.creditLimit }}</dd>
-                  </div>
-                  <div>
-                    <dt class="text-gray-500">Seasearcher ID</dt>
-                    <dd class="mt-0.5 font-medium text-gray-900">{{ company()!.seasearcherId ?? '—' }}</dd>
-                  </div>
-                  <div>
-                    <dt class="text-gray-500">Sanctioned</dt>
-                    <dd class="mt-0.5">
-                      @if (company()!.isSanctioned) {
-                        <span class="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Yes</span>
+              <div class="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-4 text-sm">
+                @if (companyInfoTab() === 'info') {
+                  <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
+                    <div>
+                      <dt class="text-gray-500">Company Name</dt>
+                      @if (editing()) {
+                        <dd class="mt-0.5">
+                          <input
+                            type="text"
+                            [value]="editName()"
+                            (input)="editName.set($any($event.target).value)"
+                            class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
+                          />
+                        </dd>
                       } @else {
-                        <span class="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">No</span>
+                        <dd class="mt-0.5 font-medium text-gray-900">{{ company()!.name }}</dd>
                       }
-                    </dd>
+                    </div>
+                    <div>
+                      <dt class="text-gray-500">Type</dt>
+                      <dd class="mt-0.5 flex flex-wrap gap-1.5">
+                        @for (t of allTypes; track t) {
+                          <button
+                            (click)="toggleType(t)"
+                            [disabled]="typeSaving()"
+                            class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition-all cursor-pointer"
+                            [class]="companyTypes().includes(t)
+                              ? typeBadgeClass(t)
+                              : 'bg-gray-50 text-gray-400 border border-dashed border-gray-300 hover:border-gray-400 hover:text-gray-500'"
+                          >
+                            {{ typeLabel(t) }}
+                          </button>
+                        }
+                        @if (typeSaving()) {
+                          <svg class="h-4 w-4 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                          </svg>
+                        }
+                      </dd>
+                    </div>
+                    <div>
+                      <dt class="text-gray-500">Country</dt>
+                      @if (editing()) {
+                        <dd class="mt-0.5">
+                          <input
+                            type="text"
+                            [value]="editCountry()"
+                            (input)="editCountry.set($any($event.target).value)"
+                            class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
+                          />
+                        </dd>
+                      } @else {
+                        <dd class="mt-0.5 font-medium text-gray-900">{{ company()!.country ?? '—' }}</dd>
+                      }
+                    </div>
+                    <div>
+                      <dt class="text-gray-500">Country Code</dt>
+                      @if (editing()) {
+                        <dd class="mt-0.5">
+                          <input
+                            type="text"
+                            [value]="editCountryIso()"
+                            (input)="editCountryIso.set($any($event.target).value)"
+                            maxlength="3"
+                            class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium font-mono text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
+                          />
+                        </dd>
+                      } @else {
+                        <dd class="mt-0.5 font-medium text-gray-900 font-mono">{{ company()!.countryIso ?? '—' }}</dd>
+                      }
+                    </div>
+                    <div>
+                      <dt class="text-gray-500">Year Formed</dt>
+                      <dd class="mt-0.5 font-medium text-gray-900">{{ company()!.yearFormed ?? '—' }}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-gray-500">Fleet Size</dt>
+                      <dd class="mt-0.5 font-medium text-gray-900">{{ company()!.fleetSize ?? '—' }}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-gray-500">Credit Limit</dt>
+                      <dd class="mt-0.5 font-medium text-gray-900">\${{ company()!.creditLimit }}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-gray-500">Seasearcher ID</dt>
+                      <dd class="mt-0.5 font-medium text-gray-900">{{ company()!.seasearcherId ?? '—' }}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-gray-500">Sanctioned</dt>
+                      <dd class="mt-0.5">
+                        @if (company()!.isSanctioned) {
+                          <span class="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Yes</span>
+                        } @else {
+                          <span class="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">No</span>
+                        }
+                      </dd>
+                    </div>
+                  </dl>
+                } @else {
+                  <div class="space-y-4">
+                    @if (
+                      company()!.headOfficeAddress ||
+                      company()!.headOfficePhone ||
+                      company()!.headOfficeEmail ||
+                      company()!.website ||
+                      enrichment()?.headOffice?.faxNumbers?.length
+                    ) {
+                      <dl class="grid grid-cols-1 gap-y-3 text-sm">
+                        @if (company()!.headOfficeAddress) {
+                          <div>
+                            <dt class="text-gray-500">Address</dt>
+                            <dd class="mt-0.5 font-medium text-gray-900">{{ company()!.headOfficeAddress }}</dd>
+                          </div>
+                        }
+                        @if (company()!.headOfficePhone) {
+                          <div>
+                            <dt class="text-gray-500">Phone</dt>
+                            <dd class="mt-0.5 font-medium text-gray-900">{{ company()!.headOfficePhone }}</dd>
+                          </div>
+                        }
+                        @if (company()!.headOfficeEmail) {
+                          <div>
+                            <dt class="text-gray-500">Email</dt>
+                            <dd class="mt-0.5">
+                              <a [href]="'mailto:' + company()!.headOfficeEmail" class="font-medium text-brand-600 hover:text-brand-800">
+                                {{ company()!.headOfficeEmail }}
+                              </a>
+                            </dd>
+                          </div>
+                        }
+                        @if (company()!.website) {
+                          <div>
+                            <dt class="text-gray-500">Website</dt>
+                            <dd class="mt-0.5">
+                              <a [href]="websiteUrl()" target="_blank" rel="noopener noreferrer" class="font-medium text-brand-600 hover:text-brand-800">
+                                {{ company()!.website }}
+                              </a>
+                            </dd>
+                          </div>
+                        }
+                        @if (enrichment()?.headOffice?.faxNumbers?.length) {
+                          <div>
+                            <dt class="text-gray-500">Fax</dt>
+                            <dd class="mt-0.5 font-medium text-gray-900">{{ formatPhone(enrichment()!.headOffice!.faxNumbers!) }}</dd>
+                          </div>
+                        }
+                      </dl>
+                    }
+                    @if (enrichment()?.headOffice?.personnel?.length) {
+                      <div class="border-t border-gray-100 px-5 py-4">
+                        <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">Contact Persons</h3>
+                        <div class="space-y-2">
+                          @for (c of enrichment()!.headOffice!.personnel!; track c.name) {
+                            <div class="flex items-center gap-3">
+                              <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-600">
+                                {{ c.name.charAt(0) }}
+                              </div>
+                              <div>
+                                <span class="text-sm font-medium text-gray-900">{{ c.name }}</span>
+                                @if (c.jobTitle) {
+                                  <span class="ml-1.5 text-xs text-gray-500">{{ c.jobTitle }}</span>
+                                }
+                              </div>
+                            </div>
+                          }
+                        </div>
+                      </div>
+                    }
+                    @if (
+                      !company()!.headOfficeAddress &&
+                      !company()!.headOfficePhone &&
+                      !company()!.headOfficeEmail &&
+                      !company()!.website &&
+                      !enrichment()?.headOffice?.faxNumbers?.length &&
+                      !enrichment()?.headOffice?.personnel?.length
+                    ) {
+                      <div class="text-xs text-gray-500 text-center">Head office data unavailable</div>
+                    }
                   </div>
-                </dl>
+                }
               </div>
             </div>
 
-            <!-- Head Office -->
-            @if (company()!.headOfficeAddress || company()!.headOfficePhone || company()!.headOfficeEmail || company()!.website) {
-              <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
-                <div class="border-b border-gray-100 px-5 py-3">
-                  <h2 class="text-sm font-semibold text-gray-700">Head Office</h2>
-                </div>
-                <div class="p-5">
-                  <dl class="grid grid-cols-1 gap-y-3 text-sm">
-                    @if (company()!.headOfficeAddress) {
-                      <div>
-                        <dt class="text-gray-500">Address</dt>
-                        <dd class="mt-0.5 font-medium text-gray-900">{{ company()!.headOfficeAddress }}</dd>
-                      </div>
-                    }
-                    @if (company()!.headOfficePhone) {
-                      <div>
-                        <dt class="text-gray-500">Phone</dt>
-                        <dd class="mt-0.5 font-medium text-gray-900">{{ company()!.headOfficePhone }}</dd>
-                      </div>
-                    }
-                    @if (company()!.headOfficeEmail) {
-                      <div>
-                        <dt class="text-gray-500">Email</dt>
-                        <dd class="mt-0.5">
-                          <a [href]="'mailto:' + company()!.headOfficeEmail" class="font-medium text-brand-600 hover:text-brand-800">
-                            {{ company()!.headOfficeEmail }}
-                          </a>
-                        </dd>
-                      </div>
-                    }
-                    @if (company()!.website) {
-                      <div>
-                        <dt class="text-gray-500">Website</dt>
-                        <dd class="mt-0.5">
-                          <a [href]="websiteUrl()" target="_blank" rel="noopener noreferrer" class="font-medium text-brand-600 hover:text-brand-800">
-                            {{ company()!.website }}
-                          </a>
-                        </dd>
-                      </div>
-                    }
-                    @if (enrichment()?.headOffice?.faxNumbers?.length) {
-                      <div>
-                        <dt class="text-gray-500">Fax</dt>
-                        <dd class="mt-0.5 font-medium text-gray-900">{{ formatPhone(enrichment()!.headOffice!.faxNumbers!) }}</dd>
-                      </div>
-                    }
-                  </dl>
-                </div>
-                <!-- Head Office Contact Persons (from Seasearcher) -->
-                @if (enrichment()?.headOffice?.personnel?.length) {
-                  <div class="border-t border-gray-100 px-5 py-4">
-                    <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">Contact Persons</h3>
-                    <div class="space-y-2">
-                      @for (c of enrichment()!.headOffice!.personnel!; track c.name) {
-                        <div class="flex items-center gap-3">
-                          <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-600">
-                            {{ c.name.charAt(0) }}
-                          </div>
-                          <div>
-                            <span class="text-sm font-medium text-gray-900">{{ c.name }}</span>
-                            @if (c.jobTitle) {
-                              <span class="ml-1.5 text-xs text-gray-500">{{ c.jobTitle }}</span>
-                            }
-                          </div>
-                        </div>
-                      }
-                    </div>
-                  </div>
-                }
-              </div>
-            }
-
             <!-- Contacts -->
-            <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-5">
               <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
                 <div class="flex items-center gap-2">
                   <h2 class="text-sm font-semibold text-gray-700">Contacts</h2>
@@ -641,7 +649,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 </div>
                 <button
                   (click)="openAddContact()"
-                  class="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                  class="inline-flex items-center gap-1 rounded-md bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 hover:bg-brand-100 transition-colors"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
                     <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
@@ -818,7 +826,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
             }
 
             <!-- Company Emails -->
-            <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-7">
               <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
                 <h2 class="text-sm font-semibold text-gray-700">
                   Emails
@@ -944,27 +952,9 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
               }
             </div>
 
-            <!-- Company Roles -->
-            @if (company()!.companyRoles?.length) {
-              <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
-                <div class="border-b border-gray-100 px-5 py-3">
-                  <h2 class="text-sm font-semibold text-gray-700">Company Roles</h2>
-                </div>
-                <div class="p-5">
-                  <div class="flex flex-wrap gap-2">
-                    @for (role of company()!.companyRoles!; track role) {
-                      <span class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700">
-                        {{ role }}
-                      </span>
-                    }
-                  </div>
-                </div>
-              </div>
-            }
-
             <!-- Supplies At (ports where this company is a supplier) -->
             @if (supplyPortsLoading() || supplyPorts().length) {
-              <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
+              <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-11">
                 <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
                   <h2 class="text-sm font-semibold text-gray-700">
                     Supplies At
@@ -1009,172 +999,8 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
               </div>
             }
 
-            <!-- Vessels -->
-            <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
-              <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
-                <h2 class="text-sm font-semibold text-gray-700">
-                  Vessels
-                  @if (companyVessels().length) {
-                    <span class="ml-1 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
-                      {{ companyVessels().length }}
-                    </span>
-                  }
-                </h2>
-                <button (click)="openAddVessel()"
-                  class="rounded-md bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 hover:bg-brand-100 transition-colors">
-                  + Add
-                </button>
-              </div>
-
-              @if (showAddVessel()) {
-                <div class="border-b border-gray-100 px-5 py-4 bg-gray-50/50">
-                  <div class="space-y-2">
-                    @if (!editingVesselAssocId()) {
-                      <div class="relative">
-                        @if (selectedVessel()) {
-                          <div class="flex items-center justify-between rounded-md border border-brand-300 bg-brand-50 px-3 py-1.5 text-sm">
-                            <span class="font-medium text-brand-800">{{ selectedVessel()!.name }}</span>
-                            <button (click)="clearSelectedVessel()"
-                              class="ml-2 text-brand-400 hover:text-brand-600 transition-colors">
-                              <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-                              </svg>
-                            </button>
-                          </div>
-                        } @else {
-                          <input
-                            [ngModel]="vesselSearch()"
-                            (ngModelChange)="onVesselSearch($event)"
-                            placeholder="Search vessel..."
-                            class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                          />
-                          @if (vesselSearchResults().length) {
-                            <div class="absolute z-10 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
-                              @for (v of vesselSearchResults(); track v.key) {
-                                <button (click)="selectVessel(v)"
-                                  class="w-full px-3 py-2 text-left text-sm hover:bg-brand-50 transition-colors flex items-center justify-between">
-                                  <span class="font-medium text-gray-900">{{ v.name }}</span>
-                                  @if (v.source === 'seasearcher') {
-                                    <span class="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">Import</span>
-                                  } @else if (v.imo) {
-                                    <span class="text-xs text-gray-400">IMO {{ v.imo }}</span>
-                                  }
-                                </button>
-                              }
-                            </div>
-                          }
-                        }
-                      </div>
-                    }
-
-                    <div>
-                      <label class="block text-xs font-medium text-gray-500 mb-1">Role</label>
-                      <select
-                        [ngModel]="vesselForm().role"
-                        (ngModelChange)="vesselForm.set({ ...vesselForm(), role: $event })"
-                        class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
-                        @for (role of roleOptions; track role) {
-                          <option [ngValue]="role">{{ formatRole(role) }}</option>
-                        }
-                      </select>
-                    </div>
-
-                    <div>
-                      <label class="block text-xs font-medium text-gray-500 mb-1">Contact Person</label>
-                      @if (contactsLoading()) {
-                        <div class="text-xs text-gray-400 py-1">Loading contacts...</div>
-                      } @else if (contacts().length) {
-                        <select
-                          [ngModel]="vesselForm().contactId"
-                          (ngModelChange)="vesselForm.set({ ...vesselForm(), contactId: $event || null })"
-                          class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
-                          <option [ngValue]="null">— None —</option>
-                          @for (ct of contacts(); track ct.id) {
-                            <option [ngValue]="ct.id">{{ ct.name }}@if (ct.role) { ({{ ct.role }}) }</option>
-                          }
-                        </select>
-                      } @else {
-                        <div class="text-xs text-gray-400 py-1">No contacts on file</div>
-                      }
-                    </div>
-
-                    <textarea
-                      [ngModel]="vesselForm().note"
-                      (ngModelChange)="vesselForm.set({ ...vesselForm(), note: $event })"
-                      placeholder="Notes"
-                      rows="2"
-                      class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                    ></textarea>
-                    <div class="flex justify-end gap-2">
-                      <button (click)="cancelVesselForm()"
-                        class="rounded-md border border-gray-200 px-3 py-1 text-xs text-gray-600 hover:bg-gray-50 transition-colors">
-                        Cancel
-                      </button>
-                      <button (click)="saveCompanyVessel()"
-                        [disabled]="savingVessel() || (!editingVesselAssocId() && !selectedVessel())"
-                        class="rounded-md bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors">
-                        {{ editingVesselAssocId() ? 'Update' : 'Add' }}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              }
-
-              @if (vesselsLoading()) {
-                <div class="flex items-center justify-center py-6">
-                  <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                  </svg>
-                </div>
-              } @else if (!companyVessels().length && !showAddVessel()) {
-                <div class="px-5 py-6 text-center text-sm text-gray-400">No vessels linked yet</div>
-              } @else {
-                <div class="divide-y divide-gray-50 max-h-[400px] overflow-y-auto">
-                  @for (vc of companyVessels(); track vc.id) {
-                    <div class="px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors group">
-                      <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-2">
-                          <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">{{ formatRole(vc.role) }}</span>
-                          <a [routerLink]="['/vessels', vc.vesselId]" class="font-medium text-brand-700 hover:text-brand-900 hover:underline">
-                            {{ vc.vesselName ?? 'Unknown vessel' }}
-                          </a>
-                          @if (vc.vesselImo) {
-                            <span class="text-xs text-gray-400">IMO {{ vc.vesselImo }}</span>
-                          }
-                        </div>
-                        <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button (click)="openEditVessel(vc)"
-                            class="rounded p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors" title="Edit">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                            </svg>
-                          </button>
-                          <button (click)="deleteCompanyVessel(vc.id)"
-                            class="rounded p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Delete">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                              <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-                      @if (vc.contactName) {
-                        <p class="text-xs text-gray-500 mt-0.5">{{ vc.contactName }}</p>
-                      }
-                      @if (vc.note) {
-                        <p class="text-xs text-gray-400 mt-0.5 italic">{{ vc.note }}</p>
-                      }
-                      <p class="text-[10px] text-gray-400 mt-1">
-                        Added by {{ vc.addedByName ?? 'Unknown' }} · {{ vc.createdAt | date:'mediumDate' }}
-                      </p>
-                    </div>
-                  }
-                </div>
-              }
-            </div>
-
             <!-- Orders -->
-            <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-[13]">
               <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
                 <h2 class="text-sm font-semibold text-gray-700">Orders</h2>
                 @if (companyOrders().length) {
@@ -1235,7 +1061,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
 
             <!-- Fleet Map -->
             @if (fleetVesselsWithPosition().length) {
-              <div class="rounded-xl border border-gray-200 bg-white shadow-sm transition-all"
+              <div class="rounded-xl border border-gray-200 bg-white shadow-sm transition-all min-[900px]:order-[15]"
                    [class.fleet-map-fullscreen]="fleetMapFullscreen()">
                 <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between"
                      [class.hidden]="fleetMapFullscreen()">
@@ -1268,40 +1094,146 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
               </div>
             }
 
-            <!-- Fleet -->
-            @if (company()!.seasearcherId) {
-              <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
-                <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
-                  <h2 class="text-sm font-semibold text-gray-700">Fleet</h2>
+            <!-- Fleet (Seasearcher + Manual) -->
+            <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-[17] min-[900px]:col-span-2">
+              <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
+                <h2 class="text-sm font-semibold text-gray-700">Fleet</h2>
+                <div class="flex items-center gap-2">
                   @if (fleet()) {
                     <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
                       {{ fleet()!.totalMatches }} vessels
                     </span>
                   }
+                  <button (click)="openAddVessel()"
+                    class="rounded-md bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 hover:bg-brand-100 transition-colors">
+                    + Add manual
+                  </button>
                 </div>
-                @if (fleetLoading()) {
-                  <div class="flex items-center justify-center py-8">
-                    <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                    </svg>
+              </div>
+
+              @if (showAddVessel()) {
+                <div class="border-b border-gray-100 px-5 py-4 bg-gray-50/50">
+                  <div class="space-y-2">
+                    @if (!editingVesselAssocId()) {
+                      <div class="relative">
+                        @if (selectedVessel()) {
+                          <div class="flex items-center justify-between rounded-md border border-brand-300 bg-brand-50 px-3 py-1.5 text-sm">
+                            <span class="font-medium text-brand-800">{{ selectedVessel()!.name }}</span>
+                            <button (click)="clearSelectedVessel()"
+                              class="ml-2 text-brand-400 hover:text-brand-600 transition-colors">
+                              <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                              </svg>
+                            </button>
+                          </div>
+                        } @else {
+                          <input
+                            [ngModel]="vesselSearch()"
+                            (ngModelChange)="onVesselSearch($event)"
+                            placeholder="Search vessel..."
+                            class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                          />
+                          @if (vesselSearchResults().length) {
+                            <div class="absolute z-10 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
+                              @for (v of vesselSearchResults(); track v.key) {
+                                <button (click)="selectVessel(v)"
+                                  class="w-full px-3 py-2 text-left text-sm hover:bg-brand-50 transition-colors flex items-center justify-between">
+                                  <span class="font-medium text-gray-900">{{ v.name }}</span>
+                                  @if (v.source === 'seasearcher') {
+                                    <span class="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">Import</span>
+                                  } @else if (v.imo) {
+                                    <span class="text-xs text-gray-400">IMO {{ v.imo }}</span>
+                                  }
+                                </button>
+                              }
+                            </div>
+                          }
+                        }
+                      </div>
+                    }
+
+                    <div>
+                      <label class="block text-xs font-medium text-gray-500 mb-1">Role</label>
+                      <select
+                        [ngModel]="vesselForm().role"
+                        (ngModelChange)="vesselForm.set({ ...vesselForm(), role: $event })"
+                        class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
+                        @for (role of roleOptions; track role) {
+                          <option [ngValue]="role">{{ formatRole(role) }}</option>
+                        }
+                      </select>
+                    </div>
+
+                    @if (!editingVesselAssocId() && selectedVessel() && selectedVesselRoleExists()) {
+                      <div class="text-[11px] text-amber-600">This vessel already has that role.</div>
+                    }
+
+                    <div>
+                      <label class="block text-xs font-medium text-gray-500 mb-1">Contact Person</label>
+                      @if (contactsLoading()) {
+                        <div class="text-xs text-gray-400 py-1">Loading contacts...</div>
+                      } @else if (contacts().length) {
+                        <select
+                          [ngModel]="vesselForm().contactId"
+                          (ngModelChange)="vesselForm.set({ ...vesselForm(), contactId: $event || null })"
+                          class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
+                          <option [ngValue]="null">— None —</option>
+                          @for (ct of contacts(); track ct.id) {
+                            <option [ngValue]="ct.id">{{ ct.name }}@if (ct.role) { ({{ ct.role }}) }</option>
+                          }
+                        </select>
+                      } @else {
+                        <div class="text-xs text-gray-400 py-1">No contacts on file</div>
+                      }
+                    </div>
+
+                    <textarea
+                      [ngModel]="vesselForm().note"
+                      (ngModelChange)="vesselForm.set({ ...vesselForm(), note: $event })"
+                      placeholder="Notes"
+                      rows="2"
+                      class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                    ></textarea>
+                    <div class="flex justify-end gap-2">
+                      <button (click)="cancelVesselForm()"
+                        class="rounded-md border border-gray-200 px-3 py-1 text-xs text-gray-600 hover:bg-gray-50 transition-colors">
+                        Cancel
+                      </button>
+                      <button (click)="saveCompanyVessel()"
+                        [disabled]="savingVessel() || (!editingVesselAssocId() && !selectedVessel())"
+                        class="rounded-md bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors">
+                        {{ editingVesselAssocId() ? 'Update' : 'Add' }}
+                      </button>
+                    </div>
                   </div>
-                } @else if (fleet()?.results?.length) {
-                  <div class="overflow-auto max-h-[500px]">
-                    <table class="w-full text-sm">
-                      <thead class="sticky top-0 z-10">
-                        <tr class="border-b border-gray-100 bg-gray-50">
-                          <th class="px-5 py-2 text-left font-medium text-gray-500">Vessel</th>
-                          <th class="px-5 py-2 text-left font-medium text-gray-500">Type</th>
-                          <th class="px-5 py-2 text-left font-medium text-gray-500">Flag</th>
-                          <th class="px-5 py-2 text-right font-medium text-gray-500">DWT</th>
-                          <th class="px-5 py-2 text-right font-medium text-gray-500">GT</th>
-                          <th class="px-5 py-2 text-left font-medium text-gray-500">Built</th>
-                          <th class="px-5 py-2 text-left font-medium text-gray-500">Destination</th>
-                          <th class="px-5 py-2 text-left font-medium text-gray-500">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody class="divide-y divide-gray-50">
+                </div>
+              }
+
+              @if (fleetLoading() || vesselsLoading()) {
+                <div class="flex items-center justify-center py-8">
+                  <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                  </svg>
+                </div>
+              } @else if ((fleet()?.results?.length || manualFleetRows().length)) {
+                <div class="overflow-auto max-h-[500px]">
+                  <table class="w-full text-sm">
+                    <thead class="sticky top-0 z-10">
+                      <tr class="border-b border-gray-100 bg-gray-50">
+                        <th class="px-5 py-2 text-left font-medium text-gray-500">Vessel</th>
+                        <th class="px-5 py-2 text-left font-medium text-gray-500">Type</th>
+                        <th class="px-5 py-2 text-left font-medium text-gray-500">Flag</th>
+                        <th class="px-5 py-2 text-right font-medium text-gray-500">DWT</th>
+                        <th class="px-5 py-2 text-right font-medium text-gray-500">GT</th>
+                        <th class="px-5 py-2 text-left font-medium text-gray-500">Built</th>
+                        <th class="px-5 py-2 text-left font-medium text-gray-500">Destination</th>
+                        <th class="px-5 py-2 text-left font-medium text-gray-500">Status</th>
+                        <th class="px-5 py-2 text-left font-medium text-gray-500">Link</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-50">
+                      @if (fleet()?.results?.length) {
                         @for (v of fleet()!.results; track v.id) {
                           <tr class="hover:bg-gray-50/50 transition-colors">
                             <td class="px-5 py-2.5">
@@ -1322,6 +1254,13 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                               @if (v.hasSanctions) {
                                 <span class="ml-1 text-xs text-red-600">⚠️</span>
                               }
+                              @if (fleetLinkedRoles(v).length) {
+                                <div class="mt-1 flex flex-wrap gap-1">
+                                  @for (role of fleetLinkedRoles(v); track role) {
+                                    <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">{{ formatRole(role) }}</span>
+                                  }
+                                </div>
+                              }
                             </td>
                             <td class="px-5 py-2.5 text-gray-600 capitalize">{{ v.type || '—' }}</td>
                             <td class="px-5 py-2.5 text-gray-600">{{ v.flag?.name ?? '—' }}</td>
@@ -1341,22 +1280,99 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                                 {{ v.status }}
                               </span>
                             </td>
+                            <td class="px-5 py-2.5">
+                              <div class="flex items-center gap-2">
+                                @if (isFleetAutoMatch(v)) {
+                                  <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">Owner</span>
+                                  <button
+                                    (click)="linkFleetVessel(v)"
+                                    [disabled]="linkingFleetKey() === fleetRowKey(v)"
+                                    class="rounded-md bg-brand-600 px-2 py-1 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+                                    @if (linkingFleetKey() === fleetRowKey(v)) {
+                                      Linking…
+                                    } @else {
+                                      {{ fleetLinkLabel(v) }}
+                                    }
+                                  </button>
+                                } @else {
+                                  <select
+                                    [ngModel]="fleetRoleFor(v)"
+                                    (ngModelChange)="onFleetRoleChange(v, $event)"
+                                    class="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
+                                    @for (role of roleOptions; track role) {
+                                      <option [ngValue]="role">{{ formatRole(role) }}</option>
+                                    }
+                                  </select>
+                                  <span class="text-[11px] text-gray-400">
+                                    @if (linkingFleetKey() === fleetRowKey(v)) {
+                                      Linking…
+                                    } @else {
+                                      {{ fleetLinkLabel(v) }}
+                                    }
+                                  </span>
+                                }
+                              </div>
+                            </td>
                           </tr>
                         }
-                      </tbody>
-                    </table>
-                  </div>
-                } @else {
-                  <div class="px-5 py-6 text-center text-sm text-gray-400">No fleet data available</div>
-                }
-              </div>
-            }
+                      }
+                      @for (vc of manualFleetRows(); track vc.id) {
+                        <tr class="hover:bg-gray-50/50 transition-colors">
+                          <td class="px-5 py-2.5">
+                            <a [routerLink]="['/vessels', vc.vesselId]" class="font-medium text-brand-700 hover:text-brand-900 hover:underline">
+                              {{ vc.vesselName ?? 'Unknown vessel' }}
+                            </a>
+                            @if (vc.vesselImo) {
+                              <span class="ml-1 text-xs text-gray-400">{{ vc.vesselImo }}</span>
+                            }
+                            <div class="mt-1 flex flex-wrap gap-1">
+                              <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">{{ formatRole(vc.role) }}</span>
+                              <span class="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">Manual</span>
+                            </div>
+                          </td>
+                          <td class="px-5 py-2.5 text-gray-600">—</td>
+                          <td class="px-5 py-2.5 text-gray-600">—</td>
+                          <td class="px-5 py-2.5 text-right text-gray-600 font-mono text-xs">—</td>
+                          <td class="px-5 py-2.5 text-right text-gray-600 font-mono text-xs">—</td>
+                          <td class="px-5 py-2.5 text-gray-600">—</td>
+                          <td class="px-5 py-2.5 text-gray-600">—</td>
+                          <td class="px-5 py-2.5">
+                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600">Manual</span>
+                          </td>
+                          <td class="px-5 py-2.5">
+                            <div class="flex items-center gap-1">
+                              <button (click)="openEditVessel(vc)"
+                                class="rounded p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors" title="Edit">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                </svg>
+                              </button>
+                              <button (click)="deleteCompanyVessel(vc.id)"
+                                class="rounded p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Delete">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                </svg>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              } @else {
+                <div class="px-5 py-6 text-center text-sm text-gray-400">No vessels added yet</div>
+              }
+            </div>
           </div>
 
           <!-- Right column — Enrichment from Seasearcher -->
-          <div class="space-y-6">
+          <div class="contents">
+            <!-- Comments -->
+            <app-comments-card entityType="company" [entityId]="company()!.id" class="block min-[900px]:order-4" />
+
             @if (enrichmentLoading()) {
-              <div class="rounded-xl border border-gray-200 bg-white shadow-sm p-6 flex items-center justify-center">
+              <div class="rounded-xl border border-gray-200 bg-white shadow-sm p-6 flex items-center justify-center min-[900px]:order-2">
                 <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
@@ -1365,7 +1381,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
             } @else if (enrichment()) {
               <!-- Counterparty Risk -->
               @if (enrichment()!.counterpartyRiskReportMetadata) {
-                <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
+                <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-2">
                   <div class="border-b border-gray-100 px-5 py-3">
                     <h2 class="text-sm font-semibold text-gray-700">Counterparty Risk</h2>
                   </div>
@@ -1407,78 +1423,190 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 </div>
               }
 
-              <!-- Fleet Stats -->
-              @if (enrichment()!.companyFleetStats) {
-                <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
-                  <div class="border-b border-gray-100 px-5 py-3">
-                    <h2 class="text-sm font-semibold text-gray-700">Fleet Statistics</h2>
+              <!-- Fleet Stats & Company Roles -->
+              @if (enrichment()!.companyFleetStats || company()!.companyRoles?.length) {
+                <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-6 flex flex-col overflow-hidden">
+                  <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
+                    <h2 class="text-sm font-semibold text-gray-700">Fleet & Roles</h2>
+                    <div class="flex gap-1">
+                      <button
+                        type="button"
+                        class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
+                        [class]="fleetRolesTab() === 'fleet' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
+                        (click)="fleetRolesTab.set('fleet')"
+                      >
+                        Fleet Statistics
+                      </button>
+                      <button
+                        type="button"
+                        class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
+                        [class]="fleetRolesTab() === 'roles' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
+                        (click)="fleetRolesTab.set('roles')"
+                      >
+                        Company Roles
+                      </button>
+                    </div>
                   </div>
-                  <div class="p-5 space-y-3 text-sm">
-                    <div class="flex justify-between">
-                      <span class="text-gray-500">Total Fleet</span>
-                      <span class="font-medium text-gray-900">{{ enrichment()!.companyFleetStats!.totalFleetSize }} vessels</span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-gray-500">Most Common Type</span>
-                      <span class="font-medium text-gray-900">{{ enrichment()!.companyFleetStats!.mostFrequentVesselType }}</span>
-                    </div>
-                    @if (enrichment()!.companyFleetStats!.fleetStatsBreakdown.length) {
-                      <div class="pt-2 border-t border-gray-100">
-                        <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Breakdown</span>
-                        <div class="mt-2 space-y-2">
-                          @for (stat of enrichment()!.companyFleetStats!.fleetStatsBreakdown; track stat.key) {
-                            <div class="flex justify-between text-xs">
-                              <span class="text-gray-600">{{ stat.key }}</span>
-                              <span class="text-gray-900 font-medium">{{ stat.vesselCount }}</span>
+                  <div class="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3 text-sm">
+                    @if (fleetRolesTab() === 'fleet') {
+                      @if (enrichment()!.companyFleetStats) {
+                        <div class="space-y-3">
+                          <div class="flex justify-between">
+                            <span class="text-gray-500">Total Fleet</span>
+                            <span class="font-medium text-gray-900">{{ enrichment()!.companyFleetStats!.totalFleetSize }} vessels</span>
+                          </div>
+                          <div class="flex justify-between">
+                            <span class="text-gray-500">Most Common Type</span>
+                            <span class="font-medium text-gray-900">{{ enrichment()!.companyFleetStats!.mostFrequentVesselType }}</span>
+                          </div>
+                          @if (enrichment()!.companyFleetStats!.fleetStatsBreakdown.length) {
+                            <div class="pt-2 border-t border-gray-100">
+                              <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Breakdown</span>
+                              <div class="mt-2 space-y-2">
+                                @for (stat of enrichment()!.companyFleetStats!.fleetStatsBreakdown; track stat.key) {
+                                  <div class="flex justify-between text-xs">
+                                    <span class="text-gray-600">{{ stat.key }}</span>
+                                    <span class="text-gray-900 font-medium">{{ stat.vesselCount }}</span>
+                                  </div>
+                                }
+                              </div>
                             </div>
                           }
                         </div>
-                      </div>
-                    }
-                  </div>
-                </div>
-              }
-
-              <!-- Registration -->
-              @if (enrichment()!.companyRegistration) {
-                <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
-                  <div class="border-b border-gray-100 px-5 py-3">
-                    <h2 class="text-sm font-semibold text-gray-700">Company Registration</h2>
-                  </div>
-                  <div class="p-5 space-y-2 text-sm">
-                    @if (enrichment()!.companyRegistration!.localName) {
-                      <div class="flex justify-between">
-                        <span class="text-gray-500">Local Name</span>
-                        <span class="font-medium text-gray-900">{{ enrichment()!.companyRegistration!.localName }}</span>
-                      </div>
-                    }
-                    @if (enrichment()!.companyRegistration!.registryName) {
-                      <div class="flex justify-between">
-                        <span class="text-gray-500">Registry</span>
-                        <span class="font-medium text-gray-900">{{ enrichment()!.companyRegistration!.registryName }}</span>
-                      </div>
-                    }
-                    @if (enrichment()!.companyRegistration!.incorporationDate) {
-                      <div class="flex justify-between">
-                        <span class="text-gray-500">Incorporated</span>
-                        <span class="font-medium text-gray-900">{{ enrichment()!.companyRegistration!.incorporationDate | date:'mediumDate' }}</span>
-                      </div>
-                    }
-                    @for (reg of enrichment()!.companyRegistration!.registrationNumbers; track $index) {
-                      @if (reg.value) {
-                        <div class="flex justify-between">
-                          <span class="text-gray-500">{{ reg.typeDescription ?? 'Reg #' }}</span>
-                          <span class="font-medium text-gray-900 font-mono text-xs">{{ reg.value }}</span>
+                      } @else {
+                        <div class="text-xs text-gray-500 text-center">Fleet statistics unavailable</div>
+                      }
+                    } @else {
+                      @if (company()!.companyRoles?.length) {
+                        <div class="flex flex-wrap gap-2">
+                          @for (role of company()!.companyRoles!; track role) {
+                            <span class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700">
+                              {{ role }}
+                            </span>
+                          }
                         </div>
+                      } @else {
+                        <div class="text-xs text-gray-500 text-center">Company roles unavailable</div>
                       }
                     }
                   </div>
                 </div>
               }
 
+              <!-- Registration + Ownership -->
+              <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-8 flex flex-col overflow-hidden">
+                <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
+                  <h2 class="text-sm font-semibold text-gray-700">Registration & Ownership</h2>
+                  <div class="flex gap-1">
+                    <button
+                      type="button"
+                      class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
+                      [class]="registrationTab() === 'registration' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
+                      (click)="registrationTab.set('registration')"
+                    >
+                      Registration
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
+                      [class]="registrationTab() === 'ownership' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
+                      (click)="registrationTab.set('ownership')"
+                    >
+                      Ownership Structure
+                    </button>
+                  </div>
+                </div>
+                <div class="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3 text-sm">
+                  @if (registrationTab() === 'registration') {
+                    @if (enrichment()!.companyRegistration) {
+                      <div class="space-y-2">
+                        @if (enrichment()!.companyRegistration!.localName) {
+                          <div class="flex justify-between">
+                            <span class="text-gray-500">Local Name</span>
+                            <span class="font-medium text-gray-900">{{ enrichment()!.companyRegistration!.localName }}</span>
+                          </div>
+                        }
+                        @if (enrichment()!.companyRegistration!.registryName) {
+                          <div class="flex justify-between">
+                            <span class="text-gray-500">Registry</span>
+                            <span class="font-medium text-gray-900">{{ enrichment()!.companyRegistration!.registryName }}</span>
+                          </div>
+                        }
+                        @if (enrichment()!.companyRegistration!.incorporationDate) {
+                          <div class="flex justify-between">
+                            <span class="text-gray-500">Incorporated</span>
+                            <span class="font-medium text-gray-900">{{ enrichment()!.companyRegistration!.incorporationDate | date:'mediumDate' }}</span>
+                          </div>
+                        }
+                        @for (reg of enrichment()!.companyRegistration!.registrationNumbers; track $index) {
+                          @if (reg.value) {
+                            <div class="flex justify-between">
+                              <span class="text-gray-500">{{ reg.typeDescription ?? 'Reg #' }}</span>
+                              <span class="font-medium text-gray-900 font-mono text-xs">{{ reg.value }}</span>
+                            </div>
+                          }
+                        }
+                      </div>
+                    } @else {
+                      <div class="text-xs text-gray-500 text-center">Registration data unavailable</div>
+                    }
+                  } @else {
+                    @if (hierarchy()) {
+                      <div class="p-5 max-h-[500px] overflow-y-auto">
+                        @if (flatHierarchy().length) {
+                          <div class="space-y-1">
+                            @for (node of flatHierarchy(); track $index) {
+                              <div class="flex items-center gap-2 text-sm" [style.padding-left.px]="(node.level - 1) * 20">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-gray-300 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                                  @if (node.level === 1) {
+                                    <path fill-rule="evenodd" d="M4.083 9h1.946c.089-1.546.383-2.97.837-4.118A6.004 6.004 0 004.083 9zM10 2a8 8 0 100 16 8 8 0 000-16zm0 2c-.076 0-.232.032-.465.262-.238.234-.497.623-.737 1.182-.389.907-.673 2.142-.766 3.556h3.936c-.093-1.414-.377-2.649-.766-3.556-.24-.56-.5-.948-.737-1.182C10.232 4.032 10.076 4 10 4zm3.971 5c-.089-1.546-.383-2.97-.837-4.118A6.004 6.004 0 0115.917 9h-1.946zm-2.003 2H8.032c.093 1.414.377 2.649.766 3.556.24.56.5.948.737 1.182.233.23.389.262.465.262.076 0 .232-.032.465-.262.238-.234.497-.623.737-1.182.389-.907.673-2.142.766-3.556zm1.166 4.118c.454-1.147.748-2.572.837-4.118h1.946a6.004 6.004 0 01-2.783 4.118zm-6.268 0C6.412 13.97 6.118 12.546 6.029 11H4.083a6.004 6.004 0 002.783 4.118z" clip-rule="evenodd" />
+                                  } @else {
+                                    <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-2a1 1 0 00-1-1H9a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clip-rule="evenodd" />
+                                  }
+                                </svg>
+                                @if (node.companyId === company()!.seasearcherId) {
+                                  <span class="font-medium text-brand-600">{{ node.companyName }}</span>
+                                } @else {
+                                  <button
+                                    (click)="navigateToCompany(node.companyId)"
+                                    [disabled]="navigatingCompanyId() === node.companyId"
+                                    class="font-medium text-gray-900 hover:text-brand-600 hover:underline text-left disabled:opacity-50"
+                                  >
+                                    @if (navigatingCompanyId() === node.companyId) {
+                                      <svg class="inline h-3 w-3 animate-spin mr-0.5" viewBox="0 0 24 24" fill="none">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                      </svg>
+                                    }
+                                    {{ node.companyName }}
+                                  </button>
+                                }
+                                @if (node.isSanctioned) {
+                                  <span class="text-xs text-red-600">⚠️</span>
+                                }
+                                @if (!node.active) {
+                                  <span class="text-xs text-gray-400">(inactive)</span>
+                                }
+                                <span class="text-xs text-gray-400 ml-auto">
+                                  {{ hierarchyRoles(node) }}
+                                </span>
+                              </div>
+                            }
+                          </div>
+                        } @else {
+                          <p class="text-sm text-gray-400 text-center">No hierarchy data</p>
+                        }
+                      </div>
+                    } @else {
+                      <div class="text-xs text-gray-500 text-center">Ownership data unavailable</div>
+                    }
+                  }
+                </div>
+              </div>
+
               <!-- Offices -->
               @if (enrichment()!.offices.length > 1) {
-                <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
+                <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-10">
                   <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
                     <h2 class="text-sm font-semibold text-gray-700">Offices</h2>
                     <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
@@ -1501,7 +1629,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
 
               <!-- Name History -->
               @if (enrichment()!.companyNameHistory.length) {
-                <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
+                <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-12">
                   <div class="border-b border-gray-100 px-5 py-3">
                     <h2 class="text-sm font-semibold text-gray-700">Name History</h2>
                   </div>
@@ -1516,155 +1644,112 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 </div>
               }
 
-              <!-- Sanctions -->
-              <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
-                <div class="border-b border-gray-100 px-5 py-3">
-                  <h2 class="text-sm font-semibold text-gray-700">Sanctions</h2>
-                </div>
-                @if (sanctionsLoading()) {
-                  <div class="flex items-center justify-center py-6">
-                    <svg class="h-4 w-4 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                    </svg>
-                  </div>
-                } @else if (sanctions()?.length) {
-                  <div class="divide-y divide-gray-50">
-                    @for (s of sanctions()!; track $index) {
-                      <div class="px-5 py-3 text-sm">
-                        <div class="flex items-center gap-2">
-                          <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
-                            {{ s.sanctionSource ?? s.source ?? 'Sanction' }}
-                          </span>
-                          @if (s.listedDate ?? s.startDate) {
-                            <span class="text-xs text-gray-400">{{ (s.listedDate ?? s.startDate) | date:'mediumDate' }}</span>
-                          }
-                        </div>
-                        @if (s.sanctionType ?? s.type ?? s.description) {
-                          <p class="mt-1 text-xs text-gray-600">{{ s.sanctionType ?? s.type ?? s.description }}</p>
-                        }
-                      </div>
-                    }
-                  </div>
-                } @else {
-                  <div class="px-5 py-5 text-center">
-                    <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">
-                      No sanctions on record
-                    </span>
-                  </div>
-                }
-              </div>
-
-              <!-- Seizures / Arrests -->
-              <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
+              <!-- Sanctions + Seizures -->
+              <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-[14] flex flex-col overflow-hidden">
                 <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
-                  <h2 class="text-sm font-semibold text-gray-700">Seizures / Arrests</h2>
-                  @if (seizures()?.totalMatches) {
-                    <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
-                      {{ seizures()!.totalMatches }}
-                    </span>
-                  }
+                  <h2 class="text-sm font-semibold text-gray-700">Sanctions & Seizures</h2>
+                  <div class="flex gap-1">
+                    <button
+                      type="button"
+                      class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
+                      [class]="sanctionsTab() === 'sanctions' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
+                      (click)="sanctionsTab.set('sanctions')"
+                    >
+                      Sanctions
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
+                      [class]="sanctionsTab() === 'seizures' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
+                      (click)="sanctionsTab.set('seizures')"
+                    >
+                      Seizures / Arrests
+                    </button>
+                  </div>
                 </div>
-                @if (seizuresLoading()) {
-                  <div class="flex items-center justify-center py-6">
-                    <svg class="h-4 w-4 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                    </svg>
-                  </div>
-                } @else if (seizures()?.results?.length) {
-                  <div class="divide-y divide-gray-50">
-                    @for (s of seizures()!.results; track $index) {
-                      <div class="px-5 py-3 text-sm">
-                        <div class="flex items-center justify-between">
-                          <span class="font-medium text-gray-900">{{ s.vesselName ?? s.name ?? 'Unknown vessel' }}</span>
-                          @if (s.imo) {
-                            <span class="text-xs text-gray-400 font-mono">{{ s.imo }}</span>
-                          }
-                        </div>
-                        <div class="flex items-center gap-2 mt-1 text-xs text-gray-500">
-                          @if (s.port ?? s.location) {
-                            <span>{{ s.port ?? s.location }}</span>
-                          }
-                          @if (s.seizureDate ?? s.date) {
-                            <span>&middot; {{ (s.seizureDate ?? s.date) | date:'mediumDate' }}</span>
-                          }
-                          @if (s.releaseDate) {
-                            <span>&middot; Released {{ s.releaseDate | date:'mediumDate' }}</span>
-                          }
-                        </div>
+                <div class="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3 text-sm">
+                  @if (sanctionsTab() === 'sanctions') {
+                    @if (sanctionsLoading()) {
+                      <div class="flex items-center justify-center py-6">
+                        <svg class="h-4 w-4 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
                       </div>
-                    }
-                  </div>
-                } @else {
-                  <div class="px-5 py-5 text-center">
-                    <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">
-                      No seizures on record
-                    </span>
-                  </div>
-                }
-              </div>
-
-              <!-- Ownership Hierarchy -->
-              @if (hierarchy()) {
-                <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
-                  <div class="border-b border-gray-100 px-5 py-3">
-                    <h2 class="text-sm font-semibold text-gray-700">Ownership Structure</h2>
-                  </div>
-                  <div class="p-5 max-h-[500px] overflow-y-auto">
-                    @if (flatHierarchy().length) {
-                      <div class="space-y-1">
-                        @for (node of flatHierarchy(); track $index) {
-                          <div class="flex items-center gap-2 text-sm"
-                            [style.padding-left.px]="(node.level - 1) * 20">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-gray-300 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                              @if (node.level === 1) {
-                                <path fill-rule="evenodd" d="M4.083 9h1.946c.089-1.546.383-2.97.837-4.118A6.004 6.004 0 004.083 9zM10 2a8 8 0 100 16 8 8 0 000-16zm0 2c-.076 0-.232.032-.465.262-.238.234-.497.623-.737 1.182-.389.907-.673 2.142-.766 3.556h3.936c-.093-1.414-.377-2.649-.766-3.556-.24-.56-.5-.948-.737-1.182C10.232 4.032 10.076 4 10 4zm3.971 5c-.089-1.546-.383-2.97-.837-4.118A6.004 6.004 0 0115.917 9h-1.946zm-2.003 2H8.032c.093 1.414.377 2.649.766 3.556.24.56.5.948.737 1.182.233.23.389.262.465.262.076 0 .232-.032.465-.262.238-.234.497-.623.737-1.182.389-.907.673-2.142.766-3.556zm1.166 4.118c.454-1.147.748-2.572.837-4.118h1.946a6.004 6.004 0 01-2.783 4.118zm-6.268 0C6.412 13.97 6.118 12.546 6.029 11H4.083a6.004 6.004 0 002.783 4.118z" clip-rule="evenodd" />
-                              } @else {
-                                <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-2a1 1 0 00-1-1H9a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clip-rule="evenodd" />
+                    } @else if (sanctions()?.length) {
+                      <div class="divide-y divide-gray-50">
+                        @for (s of sanctions()!; track $index) {
+                          <div class="px-5 py-3 text-sm">
+                            <div class="flex items-center gap-2">
+                              <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                                {{ s.sanctionSource ?? s.source ?? 'Sanction' }}
+                              </span>
+                              @if (s.listedDate ?? s.startDate) {
+                                <span class="text-xs text-gray-400">{{ (s.listedDate ?? s.startDate) | date:'mediumDate' }}</span>
                               }
-                            </svg>
-                            @if (node.companyId === company()!.seasearcherId) {
-                              <span class="font-medium text-brand-600">{{ node.companyName }}</span>
-                            } @else {
-                              <button
-                                (click)="navigateToCompany(node.companyId)"
-                                [disabled]="navigatingCompanyId() === node.companyId"
-                                class="font-medium text-gray-900 hover:text-brand-600 hover:underline text-left disabled:opacity-50"
-                              >
-                                @if (navigatingCompanyId() === node.companyId) {
-                                  <svg class="inline h-3 w-3 animate-spin mr-0.5" viewBox="0 0 24 24" fill="none">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                                  </svg>
-                                }
-                                {{ node.companyName }}
-                              </button>
+                            </div>
+                            @if (s.sanctionType ?? s.type ?? s.description) {
+                              <p class="mt-1 text-xs text-gray-600">{{ s.sanctionType ?? s.type ?? s.description }}</p>
                             }
-                            @if (node.isSanctioned) {
-                              <span class="text-xs text-red-600">⚠️</span>
-                            }
-                            @if (!node.active) {
-                              <span class="text-xs text-gray-400">(inactive)</span>
-                            }
-                            <span class="text-xs text-gray-400 ml-auto">
-                              {{ hierarchyRoles(node) }}
-                            </span>
                           </div>
                         }
                       </div>
                     } @else {
-                      <p class="text-sm text-gray-400 text-center">No hierarchy data</p>
+                      <div class="px-5 py-5 text-center">
+                        <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">
+                          No sanctions on record
+                        </span>
+                      </div>
                     }
-                  </div>
+                  } @else {
+                    @if (seizuresLoading()) {
+                      <div class="flex items-center justify-center py-6">
+                        <svg class="h-4 w-4 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                      </div>
+                    } @else if (seizures()?.results?.length) {
+                      <div class="divide-y divide-gray-50">
+                        @for (s of seizures()!.results; track $index) {
+                          <div class="px-5 py-3 text-sm">
+                            <div class="flex items-center justify-between">
+                              <span class="font-medium text-gray-900">{{ s.vesselName ?? s.name ?? 'Unknown vessel' }}</span>
+                              @if (s.imo) {
+                                <span class="text-xs text-gray-400 font-mono">{{ s.imo }}</span>
+                              }
+                            </div>
+                            <div class="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                              @if (s.port ?? s.location) {
+                                <span>{{ s.port ?? s.location }}</span>
+                              }
+                              @if (s.seizureDate ?? s.date) {
+                                <span>&middot; {{ (s.seizureDate ?? s.date) | date:'mediumDate' }}</span>
+                              }
+                              @if (s.releaseDate) {
+                                <span>&middot; Released {{ s.releaseDate | date:'mediumDate' }}</span>
+                              }
+                            </div>
+                          </div>
+                        }
+                      </div>
+                    } @else {
+                      <div class="px-5 py-5 text-center">
+                        <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">
+                          No seizures on record
+                        </span>
+                      </div>
+                    }
+                  }
                 </div>
-              }
+              </div>
+
             } @else if (company()!.seasearcherId) {
-              <div class="rounded-xl border border-gray-200 bg-white shadow-sm p-5 text-center">
+              <div class="rounded-xl border border-gray-200 bg-white shadow-sm p-5 text-center min-[900px]:order-2">
                 <p class="text-sm text-gray-400">Enrichment data unavailable</p>
               </div>
             } @else {
-              <div class="rounded-xl border border-gray-200 bg-white shadow-sm p-5 text-center">
+              <div class="rounded-xl border border-gray-200 bg-white shadow-sm p-5 text-center min-[900px]:order-2">
                 <p class="text-sm text-gray-400">Manually created — no enrichment data</p>
                 <p class="text-xs text-gray-300 mt-1">Import from Seasearcher to get detailed company data</p>
               </div>
@@ -1677,16 +1762,13 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
           <app-activity-timeline entityType="company" [entityId]="company()!.id" />
         </div>
 
-        <!-- Comments -->
-        <div class="mt-6">
-          <app-comments-card entityType="company" [entityId]="company()!.id" />
-        </div>
+
       } @else {
         <div class="text-center py-20 text-gray-400">Company not found</div>
       }
 
       <!-- Delete confirmation modal -->
-      @if (confirmDeleteOpen()) {
+      @if (confirmDeleteOpen() && canDeleteEntity()) {
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" (click)="confirmDeleteOpen.set(false)">
           <div class="rounded-xl bg-white p-6 shadow-xl max-w-sm mx-4" (click)="$event.stopPropagation()">
             <h3 class="text-lg font-semibold text-gray-900">Delete company?</h3>
@@ -1713,6 +1795,26 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
           </div>
         </div>
       }
+
+      @if (toast()) {
+        <div
+          class="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-lg border px-4 py-3 text-sm font-medium shadow-lg transition-all"
+          [class]="toast()!.type === 'success'
+            ? 'border-green-200 bg-green-50 text-green-800'
+            : 'border-red-200 bg-red-50 text-red-800'"
+        >
+          @if (toast()!.type === 'success') {
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd" />
+            </svg>
+          } @else {
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd" />
+            </svg>
+          }
+          {{ toast()!.message }}
+        </div>
+      }
     </div>
   `,
 })
@@ -1722,9 +1824,11 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly pageTitle = inject(Title);
   private readonly wsService = inject(WebSocketService);
+  private readonly authService = inject(AuthService);
 
   // ─── State ──────────────────────────────────────────────────────────
   readonly loading = signal(true);
+  readonly canDeleteEntity = computed(() => this.authService.isAdmin());
   readonly company = signal<CounterpartyDto | null>(null);
   readonly enrichment = signal<CompanyEnrichment | null>(null);
   readonly enrichmentLoading = signal(false);
@@ -1738,6 +1842,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly teamUsers = signal<UserOption[]>([]);
   readonly responsibleUserId = signal<string | null>(null);
   readonly savingResponsible = signal(false);
+  readonly toast = signal<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Company Vessels
   readonly companyVessels = signal<VesselCompanyDto[]>([]);
@@ -1764,11 +1869,19 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   // New data signals
   readonly fleet = signal<FleetResponse | null>(null);
   readonly fleetLoading = signal(false);
+  readonly fleetMatchBySeasearcherId = signal<Record<string, VesselDto>>({});
+  readonly fleetMatchByImo = signal<Record<string, VesselDto>>({});
+  readonly fleetRoleSelections = signal<Record<string, VesselCompanyRole>>({});
+  readonly linkingFleetKey = signal<string | null>(null);
   readonly hierarchy = signal<HierarchyResponse | null>(null);
   readonly seizures = signal<SeizuresResponse | null>(null);
   readonly seizuresLoading = signal(false);
   readonly sanctions = signal<any[] | null>(null);
   readonly sanctionsLoading = signal(false);
+  readonly registrationTab = signal<'registration' | 'ownership'>('registration');
+  readonly sanctionsTab = signal<'sanctions' | 'seizures'>('sanctions');
+  readonly companyInfoTab = signal<'info' | 'headOffice'>('info');
+  readonly fleetRolesTab = signal<'fleet' | 'roles'>('fleet');
 
   // Contacts
   readonly contacts = signal<CompanyContactDto[]>([]);
@@ -1810,6 +1923,16 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     const f = this.fleet();
     if (!f?.results) return [];
     return f.results.filter(v => v.latestInformation?.position?.lat && v.latestInformation?.position?.lng);
+  });
+
+  readonly manualFleetRows = computed(() => {
+    const fleetResults = this.fleet()?.results ?? [];
+    const matchedIds = new Set(
+      fleetResults
+        .map((v) => this.fleetLocalMatch(v)?.id)
+        .filter((id): id is string => Boolean(id)),
+    );
+    return this.companyVessels().filter((vc) => !matchedIds.has(vc.vesselId));
   });
 
   constructor() {
@@ -1874,6 +1997,10 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     this.companyOrders.set([]);
     this.companyVessels.set([]);
     this.fleet.set(null);
+    this.fleetMatchBySeasearcherId.set({});
+    this.fleetMatchByImo.set({});
+    this.fleetRoleSelections.set({});
+    this.linkingFleetKey.set(null);
     this.hierarchy.set(null);
     this.seizures.set(null);
     this.sanctions.set(null);
@@ -1884,6 +2011,8 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     this.selectedVessel.set(null);
     this.vesselSearch.set('');
     this.vesselSearchResults.set([]);
+    this.companyInfoTab.set('info');
+    this.fleetRolesTab.set('fleet');
   }
 
   // ─── Data Loading ──────────────────────────────────────────────────
@@ -1994,10 +2123,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
             `${API}/vessels/local?search=${encodeURIComponent(term)}&limit=15`,
           ),
         );
-        const existingIds = new Set(this.companyVessels().map((vc) => vc.vesselId));
-        const localResults = res.success && res.data
-          ? res.data.vessels.filter((v) => !existingIds.has(v.id))
-          : [];
+        const localResults = res.success && res.data ? res.data.vessels : [];
 
         if (localResults.length) {
           this.vesselSearchResults.set(
@@ -2083,30 +2209,50 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     try {
       const editId = this.editingVesselAssocId();
       if (editId) {
-        await firstValueFrom(
-          this.http.patch(`${API}/vessels/companies/${editId}`, {
+        const res = await firstValueFrom(
+          this.http.patch<ApiResponse<VesselCompanyDto>>(`${API}/vessels/companies/${editId}`, {
             role: form.role,
             contactId: form.contactId,
             note: form.note.trim() || undefined,
           }),
         );
+        if (res && res.success === false) {
+          this.showToast('error', res.message ?? 'Failed to update vessel role.');
+          return;
+        }
       } else {
         if (!form.vesselId) return;
-        await firstValueFrom(
-          this.http.post(`${API}/vessels/local/${form.vesselId}/companies`, {
+        const replaceExistingRole = this.selectedVesselRoleExists()
+          ? window.confirm('This role already exists for this vessel. Replace the existing one?')
+          : false;
+        if (this.selectedVesselRoleExists() && !replaceExistingRole) {
+          this.showToast('error', 'Role already exists for this vessel.');
+          return;
+        }
+        const res = await firstValueFrom(
+          this.http.post<ApiResponse<VesselCompanyDto>>(`${API}/vessels/local/${form.vesselId}/companies`, {
             companyId: c.id,
             role: form.role,
             contactId: form.contactId,
             note: form.note.trim() || undefined,
+            replaceExistingRole: replaceExistingRole || undefined,
           }),
         );
+        if (res && res.success === false) {
+          this.showToast('error', res.message ?? 'Failed to add vessel role.');
+          return;
+        }
       }
       this.showAddVessel.set(false);
       this.editingVesselAssocId.set(null);
       this.selectedVessel.set(null);
       this.loadCompanyVessels(c.id);
+      if (this.fleet()?.results?.length) {
+        this.loadFleetLocalMatches(this.fleet()!.results);
+      }
     } catch (err) {
       console.error('Failed to save company vessel:', err);
+      this.showToast('error', 'Failed to save vessel role.');
     } finally {
       this.savingVessel.set(false);
     }
@@ -2120,6 +2266,9 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
         this.http.delete(`${API}/vessels/companies/${assocId}`),
       );
       this.loadCompanyVessels(c.id);
+      if (this.fleet()?.results?.length) {
+        this.loadFleetLocalMatches(this.fleet()!.results);
+      }
     } catch (err) {
       console.error('Failed to delete vessel association:', err);
     }
@@ -2149,11 +2298,52 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
       );
       if (res.success && res.data) {
         this.fleet.set(res.data);
+        this.loadFleetLocalMatches(res.data.results);
       }
     } catch {
       // ignore
     } finally {
       this.fleetLoading.set(false);
+    }
+  }
+
+  private async loadFleetLocalMatches(results: FleetVessel[]): Promise<void> {
+    const seasearcherIds = results
+      .map((v) => (v.id ? String(v.id) : ''))
+      .filter(Boolean);
+    const imos = results
+      .map((v) => (v.imo ? String(v.imo) : ''))
+      .filter(Boolean);
+
+    if (!seasearcherIds.length && !imos.length) {
+      this.fleetMatchBySeasearcherId.set({});
+      this.fleetMatchByImo.set({});
+      return;
+    }
+
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<VesselDto[]>>(`${API}/vessels/local/match`, {
+          seasearcherIds,
+          imos,
+        }),
+      );
+      if (res.success && res.data) {
+        const bySeasearcherId: Record<string, VesselDto> = {};
+        const byImo: Record<string, VesselDto> = {};
+        res.data.forEach((v) => {
+          if (v.seasearcherId) bySeasearcherId[v.seasearcherId] = v;
+          if (v.imo) byImo[v.imo] = v;
+        });
+        this.fleetMatchBySeasearcherId.set(bySeasearcherId);
+        this.fleetMatchByImo.set(byImo);
+      } else {
+        this.fleetMatchBySeasearcherId.set({});
+        this.fleetMatchByImo.set({});
+      }
+    } catch {
+      this.fleetMatchBySeasearcherId.set({});
+      this.fleetMatchByImo.set({});
     }
   }
 
@@ -2202,6 +2392,11 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     }
   }
 
+  private showToast(type: 'success' | 'error', message: string): void {
+    this.toast.set({ type, message });
+    setTimeout(() => this.toast.set(null), 4000);
+  }
+
   // ─── Actions ───────────────────────────────────────────────────────
 
   toggleFleetMapFullscreen(): void {
@@ -2212,6 +2407,164 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
         this.fleetMap.invalidateSize();
       }
     }, 50);
+  }
+
+  fleetRowKey(v: FleetVessel): string {
+    if (v.id) return `sea:${v.id}`;
+    if (v.imo) return `imo:${v.imo}`;
+    return `name:${v.name}`;
+  }
+
+  fleetRoleFor(v: FleetVessel): VesselCompanyRole {
+    const key = this.fleetRowKey(v);
+    return this.fleetRoleSelections()[key] ?? 'OWNER';
+  }
+
+  isFleetAutoMatch(v: FleetVessel): boolean {
+    return Boolean(this.company()?.seasearcherId);
+  }
+
+  fleetEffectiveRole(v: FleetVessel): VesselCompanyRole {
+    return this.isFleetAutoMatch(v) ? 'OWNER' : this.fleetRoleFor(v);
+  }
+
+  setFleetRoleFor(v: FleetVessel, role: VesselCompanyRole): void {
+    const key = this.fleetRowKey(v);
+    this.fleetRoleSelections.set({
+      ...this.fleetRoleSelections(),
+      [key]: role,
+    });
+  }
+
+  onFleetRoleChange(v: FleetVessel, role: VesselCompanyRole): void {
+    const matchedBySeasearcher = v.id && this.fleetMatchBySeasearcherId()[String(v.id)];
+    if (matchedBySeasearcher && role !== 'OWNER') {
+      this.showToast('error', 'Auto-matched vessels must be Owner.');
+      this.setFleetRoleFor(v, 'OWNER');
+      this.linkFleetVessel(v);
+      return;
+    }
+    this.setFleetRoleFor(v, role);
+    this.linkFleetVessel(v);
+  }
+
+  fleetLocalMatch(v: FleetVessel): VesselDto | null {
+    if (v.id) {
+      const bySea = this.fleetMatchBySeasearcherId()[String(v.id)];
+      if (bySea) return bySea;
+    }
+    if (v.imo) {
+      const byImo = this.fleetMatchByImo()[String(v.imo)];
+      if (byImo) return byImo;
+    }
+    return null;
+  }
+
+  fleetLinkedRoles(v: FleetVessel): VesselCompanyRole[] {
+    const match = this.fleetLocalMatch(v);
+    if (!match) return [];
+    const roles = this.companyVessels()
+      .filter((vc) => vc.vesselId === match.id)
+      .map((vc) => vc.role);
+    return Array.from(new Set(roles));
+  }
+
+  fleetRoleExists(v: FleetVessel): boolean {
+    const match = this.fleetLocalMatch(v);
+    if (!match) return false;
+    const role = this.fleetEffectiveRole(v);
+    return this.companyVessels().some((vc) => vc.vesselId === match.id && vc.role === role);
+  }
+
+  fleetLinkLabel(v: FleetVessel): string {
+    const match = this.fleetLocalMatch(v);
+    const role = this.fleetEffectiveRole(v);
+    if (match && this.companyVessels().some((vc) => vc.vesselId === match.id && vc.role === role)) {
+      return this.isFleetAutoMatch(v) ? 'Replace Owner' : 'Linked';
+    }
+    if (!match) return 'Import + Link';
+    const hasRole = this.companyVessels().some((vc) => vc.vesselId === match.id);
+    return hasRole ? 'Add Role' : 'Link';
+  }
+
+  async linkFleetVessel(v: FleetVessel): Promise<void> {
+    const c = this.company();
+    if (!c) return;
+
+    const key = this.fleetRowKey(v);
+    const role = this.fleetEffectiveRole(v);
+    this.linkingFleetKey.set(key);
+
+    try {
+      const shouldReplace = this.isFleetAutoMatch(v) && role === 'OWNER';
+      if (this.fleetRoleExists(v) && !shouldReplace) {
+        this.showToast('error', 'Role already exists for this vessel.');
+        return;
+      }
+      let vesselId = this.fleetLocalMatch(v)?.id;
+
+      if (!vesselId) {
+        if (!v.id) return;
+        const importRes = await firstValueFrom(
+          this.http.post<ApiResponse<VesselDto>>(`${API}/vessels/import`, { seasearcherId: String(v.id) }),
+        );
+        if (!importRes.success || !importRes.data) {
+          this.showToast('error', importRes.message ?? 'Failed to import vessel.');
+          return;
+        }
+        vesselId = importRes.data.id;
+        this.fleetMatchBySeasearcherId.set({
+          ...this.fleetMatchBySeasearcherId(),
+          [importRes.data.seasearcherId ?? String(v.id)]: importRes.data,
+        });
+        if (importRes.data.imo) {
+          this.fleetMatchByImo.set({
+            ...this.fleetMatchByImo(),
+            [importRes.data.imo]: importRes.data,
+          });
+        }
+      }
+
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<VesselCompanyDto>>(`${API}/vessels/local/${vesselId}/companies`, {
+          companyId: c.id,
+          role,
+          replaceExistingRole: shouldReplace || undefined,
+        }),
+      );
+      if (res && res.success === false) {
+        if ((res.message ?? '').includes('Role already exists for this vessel') && shouldReplace) {
+          const retry = await firstValueFrom(
+            this.http.post<ApiResponse<VesselCompanyDto>>(`${API}/vessels/local/${vesselId}/companies`, {
+              companyId: c.id,
+              role,
+              replaceExistingRole: true,
+            }),
+          );
+          if (retry && retry.success === false) {
+            this.showToast('error', retry.message ?? 'Failed to replace vessel role.');
+            return;
+          }
+        } else {
+          this.showToast('error', res.message ?? 'Failed to link vessel.');
+          return;
+        }
+        return;
+      }
+      this.loadCompanyVessels(c.id);
+    } catch (err) {
+      console.error('Failed to link fleet vessel:', err);
+      this.showToast('error', 'Failed to link vessel.');
+    } finally {
+      this.linkingFleetKey.set(null);
+    }
+  }
+
+  selectedVesselRoleExists(): boolean {
+    const selected = this.selectedVessel();
+    if (!selected) return false;
+    const role = this.vesselForm().role;
+    return this.companyVessels().some((vc) => vc.vesselId === selected.id && vc.role === role);
   }
 
   private initFleetMap(): void {
@@ -2340,6 +2693,10 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   }
 
   async executeDelete(): Promise<void> {
+    if (!this.canDeleteEntity()) {
+      this.deleteError.set('Only admins can delete companies');
+      return;
+    }
     const c = this.company();
     if (!c) return;
 
