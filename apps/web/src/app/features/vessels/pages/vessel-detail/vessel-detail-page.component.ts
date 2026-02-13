@@ -584,12 +584,48 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                   </div>
 
                   @if (!editingCompanyId() && selectedCompany() && selectedCompanyRoleExists()) {
-                    <div class="text-[11px] text-amber-600">This company already has that role.</div>
+                    <div class="text-[11px] text-amber-600">This role is already assigned to another company on this vessel. Adding will replace it.</div>
                   }
 
                   @if (selectedCompany() || editingCompanyId()) {
                     <div>
-                      <label class="block text-xs font-medium text-gray-500 mb-1">Contact Person</label>
+                      <div class="flex items-center justify-between mb-1">
+                        <label class="block text-xs font-medium text-gray-500">Contact Person</label>
+                        @if (!addingNewContact()) {
+                          <button (click)="addingNewContact.set(true)" class="text-[10px] font-medium text-brand-600 hover:text-brand-700 transition-colors">+ New</button>
+                        }
+                      </div>
+                      @if (addingNewContact()) {
+                        <div class="space-y-1.5 rounded-md border border-brand-200 bg-brand-50/30 p-2 mb-1">
+                          <input
+                            [ngModel]="newContactName()"
+                            (ngModelChange)="newContactName.set($event)"
+                            placeholder="Contact name *"
+                            class="w-full rounded-md border border-gray-200 px-2.5 py-1 text-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                          />
+                          <div class="flex gap-1.5">
+                            <input
+                              [ngModel]="newContactRole()"
+                              (ngModelChange)="newContactRole.set($event)"
+                              placeholder="Role (e.g. Bunker Manager)"
+                              class="flex-1 rounded-md border border-gray-200 px-2.5 py-1 text-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                            />
+                            <input
+                              [ngModel]="newContactEmail()"
+                              (ngModelChange)="newContactEmail.set($event)"
+                              placeholder="Email"
+                              class="flex-1 rounded-md border border-gray-200 px-2.5 py-1 text-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                            />
+                          </div>
+                          <div class="flex justify-end gap-1.5">
+                            <button (click)="cancelNewContact()" class="rounded px-2 py-0.5 text-[10px] text-gray-500 hover:bg-gray-100 transition-colors">Cancel</button>
+                            <button (click)="createNewContact()" [disabled]="!newContactName().trim() || creatingContact()"
+                              class="rounded bg-brand-600 px-2 py-0.5 text-[10px] font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors">
+                              {{ creatingContact() ? 'Adding...' : 'Add Contact' }}
+                            </button>
+                          </div>
+                        </div>
+                      }
                       @if (companyContactsLoading()) {
                         <div class="text-xs text-gray-400 py-1">Loading contacts...</div>
                       } @else if (companyContacts().length) {
@@ -602,7 +638,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                             <option [ngValue]="ct.id">{{ ct.name }}@if (ct.role) { ({{ ct.role }}) }</option>
                           }
                         </select>
-                      } @else {
+                      } @else if (!addingNewContact()) {
                         <div class="text-xs text-gray-400 py-1">No contacts on file</div>
                       }
                     </div>
@@ -1251,6 +1287,11 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
   private companySearchTimeout: ReturnType<typeof setTimeout> | null = null;
   readonly companyContacts = signal<CompanyContactDto[]>([]);
   readonly companyContactsLoading = signal(false);
+  readonly addingNewContact = signal(false);
+  readonly newContactName = signal('');
+  readonly newContactRole = signal('');
+  readonly newContactEmail = signal('');
+  readonly creatingContact = signal(false);
   readonly roleOptions = signal<VesselCompanyRoleOption[]>([
     { key: 'REGISTERED_OWNER', label: 'Registered Owner', group: 'Legal & Financial' },
     { key: 'NOMINAL_OWNER', label: 'Nominal Owner', group: 'Legal & Financial' },
@@ -2102,10 +2143,9 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
   }
 
   selectedCompanyRoleExists(): boolean {
-    const selected = this.selectedCompany();
-    if (!selected) return false;
     const role = this.companyForm().role;
-    return this.vesselCompanies().some((vc) => vc.companyId === selected.id && vc.role === role);
+    const editId = this.editingCompanyId();
+    return this.vesselCompanies().some((vc) => vc.role === role && vc.id !== editId);
   }
 
   private async loadCompanyContacts(companyId: string): Promise<void> {
@@ -2149,6 +2189,45 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
     const s = new Set(this.expandedNotes());
     if (s.has(id)) s.delete(id); else s.add(id);
     this.expandedNotes.set(s);
+  }
+
+  cancelNewContact(): void {
+    this.addingNewContact.set(false);
+    this.newContactName.set('');
+    this.newContactRole.set('');
+    this.newContactEmail.set('');
+  }
+
+  async createNewContact(): Promise<void> {
+    const companyId = this.selectedCompany()?.id ?? this.editingCompanyId();
+    // When editing, get the companyId from the existing association
+    let resolvedCompanyId = companyId;
+    if (this.editingCompanyId() && !this.selectedCompany()) {
+      const vc = this.vesselCompanies().find(v => v.id === this.editingCompanyId());
+      resolvedCompanyId = vc?.companyId ?? null;
+    }
+    if (!resolvedCompanyId || !this.newContactName().trim()) return;
+
+    this.creatingContact.set(true);
+    try {
+      const body: Record<string, string> = { name: this.newContactName().trim() };
+      if (this.newContactRole().trim()) body['role'] = this.newContactRole().trim();
+      if (this.newContactEmail().trim()) body['email'] = this.newContactEmail().trim();
+
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<CompanyContactDto>>(`${API}/companies/local/${resolvedCompanyId}/contacts`, body),
+      );
+      if (res.success && res.data) {
+        // Reload contacts and select the new one
+        await this.loadCompanyContacts(resolvedCompanyId);
+        this.companyForm.set({ ...this.companyForm(), contactId: res.data.id });
+        this.cancelNewContact();
+      }
+    } catch (err) {
+      console.error('Failed to create contact:', err);
+    } finally {
+      this.creatingContact.set(false);
+    }
   }
 
   async saveVesselCompany(): Promise<void> {
