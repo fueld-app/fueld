@@ -17,8 +17,9 @@ import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subscription, skip } from 'rxjs';
 import { Title } from '@angular/platform-browser';
 import * as L from 'leaflet/dist/leaflet-src.esm.js';
-import type { ApiResponse, CompanyContactDto, CompanyEmailDto, CompanyEmailType, CounterpartyDto, SupplyPortDto, VesselCompanyDto, VesselCompanyRole, VesselDto } from '@fueld/types';
+import type { ApiResponse, CompanyContactDto, CompanyEmailDto, CompanyEmailType, CounterpartyDto, SupplyPortDto, VesselCompanyDto, VesselCompanyRole, VesselCompanyRoleOption, VesselDto } from '@fueld/types';
 import { flagFromIso3 } from '../../../../shared/utils/flags';
+import { COUNTRIES, type Country } from '../../../../shared/data/countries';
 import { WebSocketService } from '../../../../core/websocket/websocket.service';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { ActivityTimelineComponent } from '../../../../shared/components/activity-timeline/activity-timeline.component';
@@ -433,7 +434,32 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
             <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-1 flex flex-col overflow-hidden">
               <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
                 <h2 class="text-sm font-semibold text-gray-700">Company Information</h2>
-                <div class="flex gap-1">
+                <div class="flex items-center gap-2">
+                  @if (!company()!.seasearcherId && !editing()) {
+                    <button
+                      (click)="startEditing()"
+                      class="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-600 hover:bg-gray-100 transition-colors"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
+                      </svg>
+                      Edit
+                    </button>
+                  }
+                  @if (editing()) {
+                    <button
+                      (click)="cancelEditing()"
+                      class="rounded-md px-2 py-1 text-[11px] font-medium text-gray-500 hover:bg-gray-50 transition-colors"
+                    >Cancel</button>
+                    <button
+                      (click)="saveEditing()"
+                      [disabled]="editSaving()"
+                      class="rounded-md bg-brand-600 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                    >
+                      @if (editSaving()) { Saving… } @else { Save }
+                    </button>
+                  }
+                  <div class="flex gap-1">
                   <button
                     type="button"
                     class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
@@ -450,6 +476,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                   >
                     Head Office
                   </button>
+                </div>
                 </div>
               </div>
               <div class="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-4 text-sm">
@@ -496,33 +523,54 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                     <div>
                       <dt class="text-gray-500">Country</dt>
                       @if (editing()) {
-                        <dd class="mt-0.5">
-                          <input
-                            type="text"
-                            [value]="editCountry()"
-                            (input)="editCountry.set($any($event.target).value)"
-                            class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                          />
+                        <dd class="mt-0.5 relative">
+                          <div class="flex items-center gap-2">
+                            @if (editCountryIso()) {
+                              <span class="text-lg">{{ countryFlag(editCountryIso()) }}</span>
+                            }
+                            <input
+                              type="text"
+                              [value]="countrySearchQuery()"
+                              (input)="onCountrySearch($any($event.target).value)"
+                              (focus)="showCountryDropdown.set(true)"
+                              placeholder="Search country…"
+                              class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
+                            />
+                          </div>
+                          @if (showCountryDropdown() && filteredCountries().length) {
+                            <div class="absolute z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                              @for (c of filteredCountries(); track c.code) {
+                                <button
+                                  type="button"
+                                  (mousedown)="selectCountry(c)"
+                                  class="flex w-full items-center gap-2 px-3 py-2 text-sm text-left hover:bg-gray-50 transition-colors"
+                                >
+                                  <span>{{ countryFlag(c.code) }}</span>
+                                  <span class="font-medium text-gray-900">{{ c.name }}</span>
+                                  <span class="ml-auto text-xs text-gray-400 font-mono">{{ c.code }}</span>
+                                </button>
+                              }
+                            </div>
+                          }
                         </dd>
                       } @else {
-                        <dd class="mt-0.5 font-medium text-gray-900">{{ company()!.country ?? '—' }}</dd>
+                        <dd class="mt-0.5 font-medium text-gray-900">
+                          @if (company()!.countryIso) {
+                            <span class="mr-1">{{ countryFlag(company()!.countryIso) }}</span>
+                          }
+                          {{ company()!.country ?? '—' }}
+                        </dd>
                       }
                     </div>
                     <div>
                       <dt class="text-gray-500">Country Code</dt>
-                      @if (editing()) {
-                        <dd class="mt-0.5">
-                          <input
-                            type="text"
-                            [value]="editCountryIso()"
-                            (input)="editCountryIso.set($any($event.target).value)"
-                            maxlength="3"
-                            class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium font-mono text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                          />
-                        </dd>
-                      } @else {
-                        <dd class="mt-0.5 font-medium text-gray-900 font-mono">{{ company()!.countryIso ?? '—' }}</dd>
-                      }
+                      <dd class="mt-0.5 font-medium text-gray-900 font-mono">
+                        @if (editing()) {
+                          {{ editCountryIso() || '—' }}
+                        } @else {
+                          {{ company()!.countryIso ?? '—' }}
+                        }
+                      </dd>
                     </div>
                     <div>
                       <dt class="text-gray-500">Year Formed</dt>
@@ -1177,8 +1225,8 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                         [ngModel]="vesselForm().role"
                         (ngModelChange)="vesselForm.set({ ...vesselForm(), role: $event })"
                         class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
-                        @for (role of roleOptions; track role) {
-                          <option [ngValue]="role">{{ formatRole(role) }}</option>
+                        @for (role of roleOptions(); track role.key) {
+                          <option [ngValue]="role.key">{{ role.label }}</option>
                         }
                       </select>
                     </div>
@@ -1309,8 +1357,8 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                                     [ngModel]="fleetRoleFor(v)"
                                     (ngModelChange)="onFleetRoleChange(v, $event)"
                                     class="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
-                                    @for (role of roleOptions; track role) {
-                                      <option [ngValue]="role">{{ formatRole(role) }}</option>
+                                    @for (role of roleOptions(); track role.key) {
+                                      <option [ngValue]="role.key">{{ role.label }}</option>
                                     }
                                   </select>
                                   <span class="text-[11px] text-gray-400">
@@ -1866,7 +1914,12 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly vesselSearchResults = signal<VesselSearchResultOption[]>([]);
   readonly selectedVessel = signal<{ id: string; name: string } | null>(null);
   private vesselSearchTimeout: ReturnType<typeof setTimeout> | null = null;
-  readonly roleOptions: VesselCompanyRole[] = ['OWNER', 'TIME_CHARTERER', 'OPERATOR', 'MANAGER'];
+  readonly roleOptions = signal<VesselCompanyRoleOption[]>([
+    { key: 'OWNER', label: 'Owner' },
+    { key: 'TIME_CHARTERER', label: 'Time Charterer' },
+    { key: 'OPERATOR', label: 'Operator' },
+    { key: 'MANAGER', label: 'Manager' },
+  ]);
 
   readonly allTypes = ALL_TYPES;
 
@@ -1877,6 +1930,16 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly editCountry = signal('');
   readonly editCountryIso = signal('');
 
+  // Country typeahead
+  readonly countrySearchQuery = signal('');
+  readonly showCountryDropdown = signal(false);
+  readonly filteredCountries = computed(() => {
+    const q = this.countrySearchQuery().toLowerCase().trim();
+    if (!q) return COUNTRIES.slice(0, 20);
+    return COUNTRIES.filter(c =>
+      c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q)
+    ).slice(0, 20);
+  });
   // New data signals
   readonly fleet = signal<FleetResponse | null>(null);
   readonly fleetLoading = signal(false);
@@ -1960,6 +2023,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
     this.loadUsers();
+    this.loadRoleOptions();
     if (id) this.loadCompany(id);
 
     // React to same-route navigation (e.g. clicking related company links)
@@ -2805,11 +2869,14 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     this.editName.set(c.name);
     this.editCountry.set(c.country ?? '');
     this.editCountryIso.set(c.countryIso ?? '');
+    this.countrySearchQuery.set(c.country ?? '');
+    this.showCountryDropdown.set(false);
     this.editing.set(true);
   }
 
   cancelEditing(): void {
     this.editing.set(false);
+    this.showCountryDropdown.set(false);
   }
 
   async saveEditing(): Promise<void> {
@@ -2875,6 +2942,22 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     if (!c?.countryIso) return '';
     return flagFromIso3(c.countryIso);
   });
+
+  countryFlag(iso3: string | null | undefined): string {
+    return flagFromIso3(iso3 ?? null);
+  }
+
+  onCountrySearch(value: string): void {
+    this.countrySearchQuery.set(value);
+    this.showCountryDropdown.set(true);
+  }
+
+  selectCountry(country: Country): void {
+    this.editCountry.set(country.name);
+    this.editCountryIso.set(country.code);
+    this.countrySearchQuery.set(country.name);
+    this.showCountryDropdown.set(false);
+  }
 
   // ─── Entity navigation ──────────────────────────────────────────────
 
@@ -2973,14 +3056,11 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  formatRole(role: VesselCompanyRole): string {
-    switch (role) {
-      case 'OWNER': return 'Owner';
-      case 'TIME_CHARTERER': return 'Time Charterer';
-      case 'OPERATOR': return 'Operator';
-      case 'MANAGER': return 'Manager';
-      default: return role;
-    }
+  formatRole(role: string): string {
+    const found = this.roleOptions().find(r => r.key === role);
+    if (found) return found.label;
+    // Fallback: convert KEY_NAME to Title Case
+    return role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\B\w+/g, w => w.toLowerCase());
   }
 
   // ─── Contacts ───────────────────────────────────────────────────────
@@ -3216,6 +3296,19 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
       }
     } catch (err) {
       console.error('Failed to load users:', err);
+    }
+  }
+
+  private async loadRoleOptions(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ roles: VesselCompanyRoleOption[] }>>(`${API}/admin/settings/vessel-company-roles/options`),
+      );
+      if (res.success && res.data?.roles?.length) {
+        this.roleOptions.set(res.data.roles);
+      }
+    } catch {
+      // Keep defaults if fetch fails
     }
   }
 

@@ -17,7 +17,7 @@ import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subscription, skip } from 'rxjs';
 import { Title } from '@angular/platform-browser';
-import type { VesselDto, CounterpartyDto, ApiResponse, VesselCompanyDto, VesselCompanyRole, CompanyContactDto } from '@fueld/types';
+import type { VesselDto, CounterpartyDto, ApiResponse, VesselCompanyDto, VesselCompanyRole, CompanyContactDto, VesselCompanyRoleOption } from '@fueld/types';
 import * as L from 'leaflet/dist/leaflet-src.esm.js';
 import { flagFromIso3 } from '../../../../shared/utils/flags';
 import { WebSocketService } from '../../../../core/websocket/websocket.service';
@@ -566,8 +566,8 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                       [ngModel]="companyForm().role"
                       (ngModelChange)="companyForm.set({ ...companyForm(), role: $event })"
                       class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
-                      @for (role of roleOptions; track role) {
-                        <option [ngValue]="role">{{ formatRole(role) }}</option>
+                      @for (role of roleOptions(); track role.key) {
+                        <option [ngValue]="role.key">{{ role.label }}</option>
                       }
                     </select>
                   </div>
@@ -1165,7 +1165,12 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
   private companySearchTimeout: ReturnType<typeof setTimeout> | null = null;
   readonly companyContacts = signal<CompanyContactDto[]>([]);
   readonly companyContactsLoading = signal(false);
-  readonly roleOptions: VesselCompanyRole[] = ['OWNER', 'TIME_CHARTERER', 'OPERATOR', 'MANAGER'];
+  readonly roleOptions = signal<VesselCompanyRoleOption[]>([
+    { key: 'OWNER', label: 'Owner' },
+    { key: 'TIME_CHARTERER', label: 'Time Charterer' },
+    { key: 'OPERATOR', label: 'Operator' },
+    { key: 'MANAGER', label: 'Manager' },
+  ]);
 
   // Flag emoji
   readonly vesselFlag = computed(() => {
@@ -1322,6 +1327,7 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
+    this.loadRoleOptions();
     if (id) this.loadVessel(id);
 
     // React to same-route navigation (e.g. clicking related vessel links)
@@ -1355,6 +1361,19 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
     this.vesselOrders.set([]);
     this.movements.set([]);
     this.editing.set(false);
+  }
+
+  private async loadRoleOptions(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ roles: VesselCompanyRoleOption[] }>>(`${API}/admin/settings/vessel-company-roles/options`),
+      );
+      if (res.success && res.data?.roles?.length) {
+        this.roleOptions.set(res.data.roles);
+      }
+    } catch {
+      // Keep defaults if fetch fails
+    }
   }
 
   async loadVessel(id: string): Promise<void> {
@@ -1918,14 +1937,10 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  formatRole(role: VesselCompanyRole): string {
-    switch (role) {
-      case 'OWNER': return 'Owner';
-      case 'TIME_CHARTERER': return 'Time Charterer';
-      case 'OPERATOR': return 'Operator';
-      case 'MANAGER': return 'Manager';
-      default: return role;
-    }
+  formatRole(role: string): string {
+    const found = this.roleOptions().find(r => r.key === role);
+    if (found) return found.label;
+    return role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\B\w+/g, w => w.toLowerCase());
   }
 
   async saveVesselCompany(): Promise<void> {

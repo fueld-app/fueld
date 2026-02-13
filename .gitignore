@@ -22,8 +22,3 @@ app-release
 # OS
 .DS_Store
 Thumbs.db
-
-# Runtime uploads (keep out of git)
-apps/api/uploads/**
-!apps/api/uploads/.gitkeep
-!apps/api/uploads/**/.gitkeep

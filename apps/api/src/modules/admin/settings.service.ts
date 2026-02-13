@@ -549,3 +549,39 @@ export async function updateOrderNumberSettings(data: {
 
   return getOrderNumberSettings();
 }
+// ═══════════════════════════════════════════════════════════════════════
+//  VESSEL COMPANY ROLE SETTINGS
+// ═══════════════════════════════════════════════════════════════════════
+
+const DEFAULT_VESSEL_COMPANY_ROLES = [
+  { key: 'OWNER', label: 'Owner' },
+  { key: 'TIME_CHARTERER', label: 'Time Charterer' },
+  { key: 'OPERATOR', label: 'Operator' },
+  { key: 'MANAGER', label: 'Manager' },
+];
+
+export async function getVesselCompanyRoleSettings(): Promise<{ roles: { key: string; label: string }[] }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  const roles = settings.vesselCompanyRoles ?? DEFAULT_VESSEL_COMPANY_ROLES;
+  return { roles };
+}
+
+export async function updateVesselCompanyRoleSettings(
+  roles: { key: string; label: string }[],
+): Promise<{ roles: { key: string; label: string }[] }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = { ...(tenant.settings as any) };
+  settings.vesselCompanyRoles = roles;
+
+  await db
+    .update(tenants)
+    .set({ settings, updatedAt: new Date() })
+    .where(eq(tenants.id, tenant.id));
+
+  return getVesselCompanyRoleSettings();
+}

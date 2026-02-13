@@ -28,6 +28,8 @@ import {
   setDefaultLogo,
   getOrderNumberSettings,
   updateOrderNumberSettings,
+  getVesselCompanyRoleSettings,
+  updateVesselCompanyRoleSettings,
 } from './settings.service';
 import {
   getIntegrationStatus,
@@ -53,6 +55,20 @@ function requireAdmin(auth: { role: string } | undefined) {
 
 export const settingsController = new Elysia({ prefix: '/admin/settings' })
   .use(authGuard)
+
+  // ─── Public: any authenticated user can fetch role options ─────────
+  .get('/vessel-company-roles/options', async ({ auth }) => {
+    try {
+      if (!auth) throw new Error('Authentication required');
+      const data = await getVesselCompanyRoleSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get vessel-company role options (any user)' },
+  })
 
   // ═══════════════════════════════════════════════════════════════════
   //  OWN COMPANIES
@@ -754,4 +770,37 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       prefix: t.Optional(t.String()),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update order number template settings' },
+  })
+
+  // ═════════════════════════════════════════════════════════════════
+  //  VESSEL COMPANY ROLE SETTINGS
+  // ═════════════════════════════════════════════════════════════════
+
+  .get('/vessel-company-roles', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getVesselCompanyRoleSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get vessel-company role options' },
+  })
+
+  .put('/vessel-company-roles', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateVesselCompanyRoleSettings(body.roles);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      roles: t.Array(t.Object({ key: t.String({ minLength: 1 }), label: t.String({ minLength: 1 }) })),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update vessel-company role options' },
   });

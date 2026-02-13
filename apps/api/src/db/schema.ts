@@ -96,6 +96,8 @@ export interface TenantSettings {
   // Order numbering
   orderNumberTemplate?: string;  // e.g. '{PREFIX}{YYYY}{MM}{DD}-{SEQ:6}', default '{YYYY}{MM}{DD}-{SEQ:6}'
   orderNumberPrefix?: string;    // optional prefix, e.g. 'FU-'
+  // Vessel-company roles (configurable from admin)
+  vesselCompanyRoles?: { key: string; label: string }[];
 }
 
 export const tenants = pgTable('tenants', {
@@ -341,7 +343,7 @@ export const vesselCompanies = pgTable('vessel_companies', {
   id: uuid('id').defaultRandom().primaryKey(),
   vesselId: uuid('vessel_id').notNull().references(() => vessels.id, { onDelete: 'cascade' }),
   companyId: uuid('company_id').notNull().references(() => counterparties.id, { onDelete: 'cascade' }),
-  role: vesselCompanyRoleEnum('role').notNull(),
+  role: text('role').notNull(),
   contactId: uuid('contact_id').references(() => companyContacts.id, { onDelete: 'set null' }),
   note: text('note'),
   addedById: uuid('added_by_id').references(() => users.id),

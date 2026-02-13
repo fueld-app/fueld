@@ -235,7 +235,7 @@ export interface SupplyPortDto {
 //  VESSEL COMPANIES (associations between vessels and companies)
 // ═══════════════════════════════════════════════════════════════════════
 
-export type VesselCompanyRole = 'OWNER' | 'TIME_CHARTERER' | 'OPERATOR' | 'MANAGER';
+export type VesselCompanyRole = 'OWNER' | 'TIME_CHARTERER' | 'OPERATOR' | 'MANAGER' | (string & {});
 
 export interface VesselCompanyDto {
   id: string;
@@ -465,6 +465,16 @@ export interface OrderNumberSettingsDto {
   prefix: string;
   nextSeq: number;
   preview: string;
+}
+
+/** Admin settings for configurable vessel-company roles */
+export interface VesselCompanyRoleOption {
+  key: string;   // e.g. 'OWNER', 'TIME_CHARTERER', or any custom key
+  label: string; // Human-readable label, e.g. 'Owner', 'Time Charterer'
+}
+
+export interface VesselCompanyRoleSettingsDto {
+  roles: VesselCompanyRoleOption[];
 }
 
 // ═══════════════════════════════════════════════════════════════════════
