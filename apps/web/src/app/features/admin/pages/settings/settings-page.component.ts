@@ -9,7 +9,7 @@ import {
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
-import type { ApiResponse, OrderNumberSettingsDto, VesselCompanyRoleSettingsDto, VesselCompanyRoleOption, ProductSettingsDto, UnitSettingsDto } from '@fueld/types';
+import type { ApiResponse, OrderNumberSettingsDto, VesselCompanyRoleSettingsDto, VesselCompanyRoleOption, ProductSettingsDto, UnitSettingsDto, CurrencySettingsDto } from '@fueld/types';
 
 import { API } from '@app/core/config/api';
 
@@ -402,6 +402,76 @@ import { API } from '@app/core/config/api';
             </div>
           </div>
 
+          <!-- ════════════════════════════════════════════════════════ -->
+          <!--  Currency Options                                       -->
+          <!-- ════════════════════════════════════════════════════════ -->
+          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
+              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-cyan-50">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-cyan-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10.75 10.818v2.614A3.13 3.13 0 0011.888 13c.482-.315.612-.648.612-.875 0-.227-.13-.56-.612-.875a3.13 3.13 0 00-1.138-.432zM8.33 8.62c.053.055.115.11.184.164.208.16.46.284.736.363V6.603a2.45 2.45 0 00-.92.363c-.293.18-.42.403-.42.56 0 .159.127.382.42.56.08.05.164.092.25.128z" />
+                  <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-6a.75.75 0 01.75.75v.316a3.78 3.78 0 011.653.713c.426.33.744.74.925 1.2a.75.75 0 01-1.395.55 1.35 1.35 0 00-.447-.563 2.187 2.187 0 00-.736-.363V9.3c.514.082 1.006.234 1.438.467.669.36 1.115.86 1.115 1.608 0 .746-.446 1.245-1.115 1.607a3.78 3.78 0 01-1.438.467v.316a.75.75 0 01-1.5 0v-.316a3.78 3.78 0 01-1.653-.713 2.72 2.72 0 01-.925-1.2.75.75 0 011.395-.55c.12.3.272.492.447.563.243.098.5.163.736.363v-2.697a3.78 3.78 0 01-1.438-.467C5.446 8.87 5 8.37 5 7.625c0-.746.446-1.245 1.115-1.607a3.78 3.78 0 011.438-.467V5.25A.75.75 0 018.25 4.5h.08z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-semibold text-gray-900">Currencies</h3>
+                <p class="text-xs text-gray-500">Configure which currencies appear in order line item dropdowns and are tracked via Yahoo Finance.</p>
+              </div>
+            </div>
+
+            <div class="p-6 space-y-3">
+              @for (c of currencies(); track $index; let i = $index) {
+                <div class="flex items-center gap-2">
+                  <input
+                    type="text"
+                    [value]="c"
+                    (input)="updateCurrency(i, $any($event.target).value)"
+                    class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono uppercase
+                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                  />
+                  <button
+                    (click)="removeCurrency(i)"
+                    [disabled]="currencies().length <= 1"
+                    class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 transition-colors shrink-0"
+                    title="Remove currency"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              }
+              <button
+                (click)="addCurrency()"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-xs font-medium text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+                </svg>
+                Add Currency
+              </button>
+
+              <div class="flex items-center gap-3 pt-2">
+                <button
+                  (click)="saveCurrencies()"
+                  [disabled]="currenciesSaving()"
+                  class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm
+                         hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                >
+                  @if (currenciesSaving()) { Saving… } @else { Save Currencies }
+                </button>
+                @if (currenciesSaved()) {
+                  <span class="text-sm text-green-600 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                    </svg>
+                    Saved
+                  </span>
+                }
+              </div>
+            </div>
+          </div>
+
         </div>
       }
 
@@ -447,6 +517,11 @@ export class SettingsPageComponent implements OnInit {
   readonly unitsSaving = signal(false);
   readonly unitsSaved = signal(false);
 
+  // Currencies
+  readonly currencies = signal<string[]>([]);
+  readonly currenciesSaving = signal(false);
+  readonly currenciesSaved = signal(false);
+
   readonly livePreview = computed(() => {
     const tmpl = this.template();
     const pfx = this.prefix();
@@ -476,6 +551,7 @@ export class SettingsPageComponent implements OnInit {
     this.loadRoles();
     this.loadProducts();
     this.loadUnits();
+    this.loadCurrencies();
   }
 
   private async loadSettings(): Promise<void> {
@@ -724,6 +800,59 @@ export class SettingsPageComponent implements OnInit {
       this.showToast('error', 'Failed to save units.');
     } finally {
       this.unitsSaving.set(false);
+    }
+  }
+
+  // ─── Currencies ────────────────────────────────────────────────────
+
+  private async loadCurrencies(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<CurrencySettingsDto>>(`${API}/admin/settings/currencies`),
+      );
+      if (res.success) this.currencies.set(res.data.currencies);
+    } catch {
+      this.showToast('error', 'Failed to load currencies.');
+    }
+  }
+
+  updateCurrency(index: number, value: string): void {
+    const updated = [...this.currencies()];
+    updated[index] = value.toUpperCase();
+    this.currencies.set(updated);
+  }
+
+  addCurrency(): void {
+    this.currencies.set([...this.currencies(), '']);
+  }
+
+  removeCurrency(index: number): void {
+    this.currencies.set(this.currencies().filter((_, i) => i !== index));
+  }
+
+  async saveCurrencies(): Promise<void> {
+    const valid = this.currencies().filter(c => c.trim());
+    if (valid.length === 0) {
+      this.showToast('error', 'At least one currency is required.');
+      return;
+    }
+    this.currenciesSaving.set(true);
+    this.currenciesSaved.set(false);
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<CurrencySettingsDto>>(`${API}/admin/settings/currencies`, { currencies: valid }),
+      );
+      if (res.success) {
+        this.currencies.set(res.data.currencies);
+        this.currenciesSaved.set(true);
+        setTimeout(() => this.currenciesSaved.set(false), 3000);
+      } else {
+        this.showToast('error', (res as any).message ?? 'Failed to save.');
+      }
+    } catch {
+      this.showToast('error', 'Failed to save currencies.');
+    } finally {
+      this.currenciesSaving.set(false);
     }
   }
 }

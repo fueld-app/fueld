@@ -102,6 +102,8 @@ export interface TenantSettings {
   // Configurable product and unit options for order line items
   products?: string[];
   units?: string[];
+  // Configurable currency options for order line items
+  currencies?: string[];
 }
 
 export const tenants = pgTable('tenants', {

@@ -192,7 +192,7 @@ export interface OrderItemRow {
                       class="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-700
                              focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
                     >
-                      @for (c of currencyOptions; track c.value) {
+                      @for (c of currencyOptions(); track c.value) {
                         <option [value]="c.value">{{ c.label }}</option>
                       }
                     </select>
@@ -219,7 +219,7 @@ export interface OrderItemRow {
                       class="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-700
                              focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
                     >
-                      @for (c of currencyOptions; track c.value) {
+                      @for (c of currencyOptions(); track c.value) {
                         <option [value]="c.value">{{ c.label }}</option>
                       }
                     </select>
@@ -415,7 +415,7 @@ export interface OrderItemRow {
                     class="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-700
                            focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
                   >
-                    @for (c of currencyOptions; track c.value) {
+                    @for (c of currencyOptions(); track c.value) {
                       <option [value]="c.value">{{ c.label }}</option>
                     }
                   </select>
@@ -442,7 +442,7 @@ export interface OrderItemRow {
                     class="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-700
                            focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
                   >
-                    @for (c of currencyOptions; track c.value) {
+                    @for (c of currencyOptions(); track c.value) {
                       <option [value]="c.value">{{ c.label }}</option>
                     }
                   </select>
@@ -506,6 +506,7 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   readonly currency = input('USD');
   readonly productOptionsInput = input<DropdownOption[]>([]);
   readonly unitOptionsInput = input<DropdownOption[]>([]);
+  readonly currencyOptionsInput = input<DropdownOption[]>([]);
   readonly itemsChange = output<OrderItemRow[]>();
 
   private readonly wsService = inject(WebSocketService);
@@ -513,12 +514,17 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   readonly baseCurrency = 'USD';
   private readonly fxRates = signal<Record<string, number>>({ USD: 1 });
 
-  readonly currencyOptions: DropdownOption[] = [
+  private static readonly DEFAULT_CURRENCIES: DropdownOption[] = [
     { value: 'USD', label: 'USD' },
     { value: 'EUR', label: 'EUR' },
     { value: 'DKK', label: 'DKK' },
     { value: 'AED', label: 'AED' },
   ];
+
+  readonly currencyOptions = computed(() => {
+    const input = this.currencyOptionsInput();
+    return input.length > 0 ? input : OrderItemsComponent.DEFAULT_CURRENCIES;
+  });
 
   /** Internal mutable signal, linked to the input. */
   readonly rows = linkedSignal(() =>

@@ -9,6 +9,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import { broadcastToAll } from '../activity/session-tracker';
+import { getCurrencySettings } from '../admin/settings.service';
 import * as protobuf from 'protobufjs';
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -39,15 +40,35 @@ export interface FxRates {
 const GASOIL_POLL_INTERVAL_MS = 60_000; // 60 seconds
 const FX_POLL_INTERVAL_MS = 5 * 60_000; // 5 minutes
 const FX_BASE = 'USD';
-const FX_TICKERS: Record<string, string> = {
-  EUR: 'EURUSD=X',
-  DKK: 'DKKUSD=X',
-  AED: 'AEDUSD=X',
-};
-const FX_WS_TICKERS = Object.values(FX_TICKERS);
-const FX_TICKER_TO_CURRENCY: Record<string, string> = Object.fromEntries(
-  Object.entries(FX_TICKERS).map(([currency, ticker]) => [ticker, currency]),
-);
+
+// Dynamic FX ticker maps — rebuilt from tenant currency settings
+let FX_TICKERS: Record<string, string> = {};
+let FX_WS_TICKERS: string[] = [];
+let FX_TICKER_TO_CURRENCY: Record<string, string> = {};
+
+function buildFxTickerMaps(currencies: string[]): void {
+  FX_TICKERS = {};
+  for (const c of currencies) {
+    const code = c.toUpperCase();
+    if (code === FX_BASE) continue; // skip base currency
+    FX_TICKERS[code] = `${code}${FX_BASE}=X`;
+  }
+  FX_WS_TICKERS = Object.values(FX_TICKERS);
+  FX_TICKER_TO_CURRENCY = Object.fromEntries(
+    Object.entries(FX_TICKERS).map(([currency, ticker]) => [ticker, currency]),
+  );
+}
+
+async function loadCurrencyConfig(): Promise<void> {
+  try {
+    const { currencies } = await getCurrencySettings();
+    buildFxTickerMaps(currencies);
+    console.log(`[Prices] Loaded ${Object.keys(FX_TICKERS).length} FX currencies: ${Object.keys(FX_TICKERS).join(', ')}`);
+  } catch (err: any) {
+    console.warn('[Prices] Failed to load currency settings, using defaults:', err.message);
+    buildFxTickerMaps(['EUR', 'DKK', 'AED']);
+  }
+}
 
 const UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -363,10 +384,13 @@ function round2(n: number): number {
  * Start price feeds: Yahoo WS for Brent, polling for Gas Oil.
  * Called once on server startup.
  */
-export function startPricePolling(): void {
+export async function startPricePolling(): Promise<void> {
   if (gasoilTimer) return;
 
   console.log('[Prices] Starting commodity price feeds');
+
+  // Load currency config from tenant settings
+  await loadCurrencyConfig();
 
   // Brent Oil: Yahoo Finance WebSocket + REST initial
   initYahooWs();
@@ -401,4 +425,24 @@ export function getFxRate(currency: string): number {
   const code = currency.toUpperCase();
   if (code === FX_BASE) return 1;
   return fxRates.rates[code] ?? 1;
+}
+
+/**
+ * Reload currency configuration from tenant settings, then
+ * reconnect the Yahoo WS and re-fetch FX rates so new
+ * currencies are picked up immediately.
+ */
+export async function reloadCurrencies(): Promise<void> {
+  await loadCurrencyConfig();
+
+  // Reconnect WS with new tickers
+  if (yahooWs) {
+    yahooWs.onclose = null; // prevent auto-reconnect loop
+    yahooWs.close();
+    yahooWs = null;
+  }
+  connectYahooWs();
+
+  // Immediately fetch REST rates for new currencies
+  await fetchFxRates();
 }

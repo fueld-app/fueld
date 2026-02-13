@@ -34,7 +34,10 @@ import {
   updateProductSettings,
   getUnitSettings,
   updateUnitSettings,
+  getCurrencySettings,
+  updateCurrencySettings,
 } from './settings.service';
+import { reloadCurrencies } from '../prices/price.service';
 import {
   getIntegrationStatus,
   setLLICredentials,
@@ -335,6 +338,18 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     }
   }, {
     detail: { tags: ['Admin Settings'], summary: 'Get unit options for current tenant' },
+  })
+
+  .get('/my-currencies', async () => {
+    try {
+      const data = await getCurrencySettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get currency options for current tenant' },
   })
 
   // ── Integrations ────────────────────────────────────────────────
@@ -904,4 +919,39 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       units: t.Array(t.String({ minLength: 1 })),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update configurable unit options' },
+  })
+
+  // ═════════════════════════════════════════════════════════════════
+  //  CURRENCY SETTINGS
+  // ═════════════════════════════════════════════════════════════════
+
+  .get('/currencies', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getCurrencySettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get configurable currency options' },
+  })
+
+  .put('/currencies', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateCurrencySettings(body.currencies);
+      // Reload Yahoo Finance subscriptions with new currencies
+      reloadCurrencies().catch(err => console.warn('[Settings] Failed to reload currencies:', err));
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      currencies: t.Array(t.String({ minLength: 1 })),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update configurable currency options' },
   });

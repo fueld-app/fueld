@@ -507,6 +507,11 @@ export interface UnitSettingsDto {
   units: string[];
 }
 
+/** Admin settings for configurable currency options */
+export interface CurrencySettingsDto {
+  currencies: string[];
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  ORDER ITEM (line items)
 // ═══════════════════════════════════════════════════════════════════════

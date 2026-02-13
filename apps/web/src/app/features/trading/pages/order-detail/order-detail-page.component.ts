@@ -305,6 +305,7 @@ interface TeamUserOption {
       [allowDeliveredEdit]="allowDeliveredEdit()"
       [productOptionsInput]="configuredProducts()"
       [unitOptionsInput]="configuredUnits()"
+      [currencyOptionsInput]="configuredCurrencies()"
       (itemsChange)="onItemsChange($event)"
     />
 
@@ -600,6 +601,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   readonly noteTab = signal<'customer' | 'supplier'>('customer');
   readonly configuredProducts = signal<DropdownOption[]>([]);
   readonly configuredUnits = signal<DropdownOption[]>([]);
+  readonly configuredCurrencies = signal<DropdownOption[]>([]);
 
   // ─── Autosave ────────────────────────────────────────────────────
 
@@ -976,7 +978,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
 
   private async loadReferenceData(): Promise<void> {
     try {
-      const [suppliersRes, usersRes, productsRes, unitsRes] = await Promise.all([
+      const [suppliersRes, usersRes, productsRes, unitsRes, currenciesRes] = await Promise.all([
         firstValueFrom(
           this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
             `${API_URL}/companies/local?type=SUPPLIER&limit=100`,
@@ -991,6 +993,9 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
         firstValueFrom(
           this.http.get<ApiResponse<{ units: string[] }>>(`${API_URL}/admin/settings/my-units`),
         ),
+        firstValueFrom(
+          this.http.get<ApiResponse<{ currencies: string[] }>>(`${API_URL}/admin/settings/my-currencies`),
+        ),
       ]);
       if (suppliersRes.success) this.suppliers.set(suppliersRes.data.companies);
       if (usersRes.success) this.teamUsers.set(usersRes.data ?? []);
@@ -999,6 +1004,9 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
       );
       if (unitsRes.success) this.configuredUnits.set(
         unitsRes.data.units.map((u) => ({ value: u, label: u })),
+      );
+      if (currenciesRes.success) this.configuredCurrencies.set(
+        currenciesRes.data.currencies.map((c) => ({ value: c, label: c })),
       );
     } catch {
       // silently ignore

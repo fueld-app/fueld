@@ -653,3 +653,32 @@ export async function updateUnitSettings(units: string[]): Promise<{ units: stri
 
   return getUnitSettings();
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+//  CURRENCY SETTINGS
+// ═══════════════════════════════════════════════════════════════════════
+
+const DEFAULT_CURRENCIES = ['USD', 'EUR', 'DKK', 'AED'];
+
+export async function getCurrencySettings(): Promise<{ currencies: string[] }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  return { currencies: settings.currencies ?? DEFAULT_CURRENCIES };
+}
+
+export async function updateCurrencySettings(currencies: string[]): Promise<{ currencies: string[] }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = { ...(tenant.settings as any) };
+  settings.currencies = currencies;
+
+  await db
+    .update(tenants)
+    .set({ settings, updatedAt: new Date() })
+    .where(eq(tenants.id, tenant.id));
+
+  return getCurrencySettings();
+}
