@@ -64,6 +64,41 @@
       "when": 1771200004000,
       "tag": "0008_company_responsible_user",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1771200005000,
+      "tag": "0009_vessel_company_role_to_text",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1771200006000,
+      "tag": "0010_vessel_company_roles_update",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1771200007000,
+      "tag": "0011_add_creditmanager_role",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1771200008000,
+      "tag": "0012_vessel_company_roles_seed",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1771200009000,
+      "tag": "0013_fix_creditmanager_enum",
+      "breakpoints": true
     }
   ]
 }
