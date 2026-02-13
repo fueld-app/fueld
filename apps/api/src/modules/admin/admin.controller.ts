@@ -162,12 +162,13 @@ export const adminController = new Elysia({ prefix: '/admin' })
   })
 
   // ── PATCH /admin/users/:id/role ──────────────────────────────────
-  .patch('/users/:id/role', async ({ auth, params, body }) => {
+  .patch('/users/:id/role', async ({ auth, params, body, set }) => {
     try {
       requireAdmin(auth);
 
       // Prevent self-demotion
       if (params.id === auth.sub) {
+        set.status = 400;
         return {
           success: false,
           data: null,
@@ -182,6 +183,7 @@ export const adminController = new Elysia({ prefix: '/admin' })
       return { success: true, data } satisfies ApiResponse<unknown>;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to update role';
+      set.status = 500;
       return { success: false, data: null, message } satisfies ApiResponse<null>;
     }
   }, {
