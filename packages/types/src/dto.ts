@@ -258,6 +258,7 @@ export interface VesselCompanyDto {
   vesselImo?: string | null;
   companyId: string;
   companyName: string;
+  companyCountryIso?: string | null;
   role: VesselCompanyRole;
   source: VesselCompanySource;
   contactId: string | null;

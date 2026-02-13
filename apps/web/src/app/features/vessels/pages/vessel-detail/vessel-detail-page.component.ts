@@ -652,7 +652,12 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                             <span class="inline-flex items-center rounded-full bg-blue-50 border border-blue-100 px-1.5 py-0.5 text-[9px] font-medium text-blue-600">SS</span>
                           }
                         </div>
-                        <a [routerLink]="['/companies', vc.companyId]" class="mt-1 block font-medium text-brand-700 hover:text-brand-900 hover:underline leading-snug break-words">{{ vc.companyName }}</a>
+                        <a [routerLink]="['/companies', vc.companyId]" class="mt-1 block font-medium text-brand-700 hover:text-brand-900 hover:underline leading-snug break-words">
+                          @if (vc.companyCountryIso) {
+                            <span class="mr-1">{{ companyFlag(vc.companyCountryIso) }}</span>
+                          }
+                          {{ vc.companyName }}
+                        </a>
                         @if (vc.contactName) {
                           <p class="text-xs text-gray-500 mt-0.5">{{ vc.contactName }}</p>
                         }
@@ -703,13 +708,18 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                                 <button (click)="navigateToCompany(entry)"
                                   [disabled]="navigatingCompanyId() === entry.companyId"
                                   class="text-left font-medium text-brand-700 hover:text-brand-900 hover:underline transition-colors">
+                                  @if (entry.country.code) {
+                                    <span class="mr-1">{{ ownerFlag(entry) }}</span>
+                                  }
                                   {{ entry.companyName }}
                                 </button>
                               } @else {
-                                <span class="text-gray-700">{{ entry.companyName }}</span>
-                              }
-                              @if (entry.country.code) {
-                                <span class="text-xs ml-1">{{ ownerFlag(entry) }}</span>
+                                <span class="text-gray-700">
+                                  @if (entry.country.code) {
+                                    <span class="mr-1">{{ ownerFlag(entry) }}</span>
+                                  }
+                                  {{ entry.companyName }}
+                                </span>
                               }
                             </div>
                           </div>
@@ -1636,6 +1646,10 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
     if (days === 0) return `in ${hrs}h`;
     if (days === 1) return hrs > 0 ? `in 1 day ${hrs}h` : 'in 1 day';
     return `in ${days} days`;
+  }
+
+  companyFlag(iso3: string | null | undefined): string {
+    return flagFromIso3(iso3 ?? null);
   }
 
   ownerFlag(entry: OwnershipEntry): string {

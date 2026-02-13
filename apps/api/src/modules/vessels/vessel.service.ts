@@ -576,6 +576,7 @@ const vesselCompanySelectFields = {
   vesselId: vesselCompanies.vesselId,
   companyId: vesselCompanies.companyId,
   companyName: counterparties.name,
+  companyCountryIso: counterparties.countryIso,
   role: vesselCompanies.role,
   source: vesselCompanies.source,
   contactId: vesselCompanies.contactId,

@@ -153,9 +153,18 @@ import { API } from '@app/core/config/api';
                 </div>
               } @else {
                 <div class="space-y-2">
+                  <!-- Header row -->
+                  <div class="flex items-center gap-3 text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    <div class="w-[22px] shrink-0"></div>
+                    <div class="flex-1 min-w-0 px-1">Key</div>
+                    <div class="flex-1 min-w-0 px-1">Label</div>
+                    <div class="flex-1 min-w-0 px-1">Group</div>
+                    <div class="w-[30px] shrink-0"></div>
+                  </div>
+
                   @for (role of roles(); track role.key; let i = $index) {
                     <div class="flex items-center gap-3">
-                      <div class="flex flex-col gap-0.5">
+                      <div class="flex flex-col gap-0.5 shrink-0">
                         <button
                           (click)="moveRoleUp(i)"
                           [disabled]="i === 0"
@@ -182,7 +191,7 @@ import { API } from '@app/core/config/api';
                         [value]="role.key"
                         (input)="updateRoleKey(i, $any($event.target).value)"
                         placeholder="KEY"
-                        class="w-32 rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono uppercase
+                        class="flex-1 min-w-0 rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono uppercase
                                focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
                       />
                       <input
@@ -190,13 +199,13 @@ import { API } from '@app/core/config/api';
                         [value]="role.label"
                         (input)="updateRoleLabel(i, $any($event.target).value)"
                         placeholder="Label"
-                        class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm
+                        class="flex-1 min-w-0 rounded-lg border border-gray-300 px-3 py-2 text-sm
                                focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
                       />
                       <select
                         [value]="role.group"
                         (change)="updateRoleGroup(i, $any($event.target).value)"
-                        class="w-48 rounded-lg border border-gray-300 px-3 py-2 text-sm
+                        class="flex-1 min-w-0 rounded-lg border border-gray-300 px-3 py-2 text-sm
                                focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
                       >
                         <option value="Legal & Financial">Legal & Financial</option>
@@ -207,7 +216,7 @@ import { API } from '@app/core/config/api';
                       <button
                         (click)="removeRole(i)"
                         [disabled]="roles().length <= 1"
-                        class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 transition-colors"
+                        class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 transition-colors shrink-0"
                         title="Remove role"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
