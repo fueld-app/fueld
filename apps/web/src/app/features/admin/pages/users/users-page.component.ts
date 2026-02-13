@@ -86,7 +86,15 @@ import { API } from '@app/core/config/api';
               <option [value]="team.id">{{ team.name }}</option>
             }
           </select>
-          @if (searchQuery() || filterTeam()) {
+          <select
+            [ngModel]="filterStatus()"
+            (ngModelChange)="filterStatus.set($event)"
+            class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
+            <option value="active">Active</option>
+            <option value="deactivated">Deactivated</option>
+            <option value="">All</option>
+          </select>
+          @if (searchQuery() || filterTeam() || filterStatus()) {
             <span class="text-xs text-gray-400">{{ filteredUsers().length }} of {{ users().length }} users</span>
           }
         </div>
@@ -568,6 +576,7 @@ export class UsersPageComponent implements OnInit, OnDestroy {
   // Filters
   readonly searchQuery = signal('');
   readonly filterTeam = signal('');
+  readonly filterStatus = signal<'active' | 'deactivated' | ''>('active');
 
   readonly filteredUsers = computed(() => {
     let result = this.users();
@@ -582,6 +591,12 @@ export class UsersPageComponent implements OnInit, OnDestroy {
       result = result.filter((u) => !u.teamId);
     } else if (team) {
       result = result.filter((u) => u.teamId === team);
+    }
+    const status = this.filterStatus();
+    if (status === 'active') {
+      result = result.filter((u) => u.isActive);
+    } else if (status === 'deactivated') {
+      result = result.filter((u) => !u.isActive);
     }
     return result;
   });
