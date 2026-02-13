@@ -35,7 +35,7 @@ import { API } from '@app/core/config/api';
           </svg>
         </div>
       } @else {
-        <div class="grid gap-6 grid-cols-1 lg:grid-cols-2">
+        <div class="grid gap-6 grid-cols-1 lg:grid-cols-2 xl:grid-cols-4">
 
           <!-- ════════════════════════════════════════════════════════ -->
           <!--  Order Number Template                                   -->
@@ -128,9 +128,244 @@ import { API } from '@app/core/config/api';
           </div>
 
           <!-- ════════════════════════════════════════════════════════ -->
-          <!--  Vessel–Company Role Options                            -->
+          <!--  Product Options                                        -->
           <!-- ════════════════════════════════════════════════════════ -->
           <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
+              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5zm4.707 3.707a1 1 0 00-1.414-1.414l-3 3a1 1 0 000 1.414l3 3a1 1 0 001.414-1.414L8.414 9H10a3 3 0 013 3v1a1 1 0 102 0v-1a5 5 0 00-5-5H8.414l1.293-1.293z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-semibold text-gray-900">Products</h3>
+                <p class="text-xs text-gray-500">Configure which products appear in order line item dropdowns.</p>
+              </div>
+            </div>
+
+            <div class="p-6 space-y-3">
+              @for (p of products(); track $index; let i = $index) {
+                <div class="flex items-center gap-2">
+                  <div class="flex flex-col gap-0.5 shrink-0">
+                    <button (click)="moveProductUp(i)" [disabled]="i === 0" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move up">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
+                    </button>
+                    <button (click)="moveProductDown(i)" [disabled]="i === products().length - 1" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move down">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    [value]="p"
+                    (input)="updateProduct(i, $any($event.target).value)"
+                    class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono uppercase
+                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                  />
+                  <button
+                    (click)="removeProduct(i)"
+                    [disabled]="products().length <= 1"
+                    class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 transition-colors shrink-0"
+                    title="Remove product"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              }
+              <button
+                (click)="addProduct()"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-xs font-medium text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+                </svg>
+                Add Product
+              </button>
+
+              <div class="flex items-center gap-3 pt-2">
+                <button
+                  (click)="saveProducts()"
+                  [disabled]="productsSaving()"
+                  class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm
+                         hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                >
+                  @if (productsSaving()) { Saving… } @else { Save Products }
+                </button>
+                @if (productsSaved()) {
+                  <span class="text-sm text-green-600 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                    </svg>
+                    Saved
+                  </span>
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- ════════════════════════════════════════════════════════ -->
+          <!--  Unit Options                                           -->
+          <!-- ════════════════════════════════════════════════════════ -->
+          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
+              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-50">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 2a.75.75 0 01.75.75v.258a33.186 33.186 0 016.668.83.75.75 0 01-.336 1.461 31.28 31.28 0 00-1.103-.232l1.702 7.545a.75.75 0 01-.387.832A4.981 4.981 0 0115 14c-.825 0-1.606-.2-2.294-.556a.75.75 0 01-.387-.832l1.77-7.849a31.743 31.743 0 00-3.339-.254v11.505a20.01 20.01 0 013.78.501.75.75 0 11-.339 1.462A18.558 18.558 0 0010 17.5c-1.442 0-2.845.165-4.191.477a.75.75 0 01-.338-1.462 20.01 20.01 0 013.779-.501V4.509c-1.129.026-2.243.112-3.34.254l1.771 7.85a.75.75 0 01-.387.83A4.981 4.981 0 015 14c-.825 0-1.606-.2-2.294-.556a.75.75 0 01-.387-.832l1.702-7.545c-.372.06-.742.126-1.103.232a.75.75 0 11-.336-1.462 33.186 33.186 0 016.668-.829V2.75A.75.75 0 0110 2zM5 12.662l-1.395-6.177C4.6 6.327 5.597 6.2 6 6.2c.404 0 1.4.127 2.395.285L5 12.662zm8.395-6.177L15 12.662l1.395-6.177C14.6 6.327 13.597 6.2 13.2 6.2c-.404 0-1.4.127-2.395.285z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-semibold text-gray-900">Units</h3>
+                <p class="text-xs text-gray-500">Configure which measurement units appear in order line item dropdowns.</p>
+              </div>
+            </div>
+
+            <div class="p-6 space-y-3">
+              @for (u of units(); track $index; let i = $index) {
+                <div class="flex items-center gap-2">
+                  <div class="flex flex-col gap-0.5 shrink-0">
+                    <button (click)="moveUnitUp(i)" [disabled]="i === 0" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move up">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
+                    </button>
+                    <button (click)="moveUnitDown(i)" [disabled]="i === units().length - 1" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move down">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    [value]="u"
+                    (input)="updateUnit(i, $any($event.target).value)"
+                    class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono uppercase
+                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                  />
+                  <button
+                    (click)="removeUnit(i)"
+                    [disabled]="units().length <= 1"
+                    class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 transition-colors shrink-0"
+                    title="Remove unit"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              }
+              <button
+                (click)="addUnit()"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-xs font-medium text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+                </svg>
+                Add Unit
+              </button>
+
+              <div class="flex items-center gap-3 pt-2">
+                <button
+                  (click)="saveUnits()"
+                  [disabled]="unitsSaving()"
+                  class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm
+                         hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                >
+                  @if (unitsSaving()) { Saving… } @else { Save Units }
+                </button>
+                @if (unitsSaved()) {
+                  <span class="text-sm text-green-600 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                    </svg>
+                    Saved
+                  </span>
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- ════════════════════════════════════════════════════════ -->
+          <!--  Currency Options                                       -->
+          <!-- ════════════════════════════════════════════════════════ -->
+          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
+              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-cyan-50">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-cyan-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10.75 10.818v2.614A3.13 3.13 0 0011.888 13c.482-.315.612-.648.612-.875 0-.227-.13-.56-.612-.875a3.13 3.13 0 00-1.138-.432zM8.33 8.62c.053.055.115.11.184.164.208.16.46.284.736.363V6.603a2.45 2.45 0 00-.92.363c-.293.18-.42.403-.42.56 0 .159.127.382.42.56.08.05.164.092.25.128z" />
+                  <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-6a.75.75 0 01.75.75v.316a3.78 3.78 0 011.653.713c.426.33.744.74.925 1.2a.75.75 0 01-1.395.55 1.35 1.35 0 00-.447-.563 2.187 2.187 0 00-.736-.363V9.3c.514.082 1.006.234 1.438.467.669.36 1.115.86 1.115 1.608 0 .746-.446 1.245-1.115 1.607a3.78 3.78 0 01-1.438.467v.316a.75.75 0 01-1.5 0v-.316a3.78 3.78 0 01-1.653-.713 2.72 2.72 0 01-.925-1.2.75.75 0 011.395-.55c.12.3.272.492.447.563.243.098.5.163.736.363v-2.697a3.78 3.78 0 01-1.438-.467C5.446 8.87 5 8.37 5 7.625c0-.746.446-1.245 1.115-1.607a3.78 3.78 0 011.438-.467V5.25A.75.75 0 018.25 4.5h.08z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-semibold text-gray-900">Currencies</h3>
+                <p class="text-xs text-gray-500">Configure which currencies appear in order line item dropdowns and are tracked via Yahoo Finance.</p>
+              </div>
+            </div>
+
+            <div class="p-6 space-y-3">
+              @for (c of currencies(); track $index; let i = $index) {
+                <div class="flex items-center gap-2">
+                  <div class="flex flex-col gap-0.5 shrink-0">
+                    <button (click)="moveCurrencyUp(i)" [disabled]="i === 0" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move up">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
+                    </button>
+                    <button (click)="moveCurrencyDown(i)" [disabled]="i === currencies().length - 1" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move down">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                    </button>
+                  </div>
+                  <select
+                    [value]="c"
+                    (change)="updateCurrency(i, $any($event.target).value)"
+                    class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono
+                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                  >
+                    @for (opt of availableCurrencyOptions(); track opt.code) {
+                      <option [value]="opt.code" [selected]="opt.code === c" [disabled]="opt.code !== c && currencies().includes(opt.code)">{{ opt.code }} — {{ opt.name }}</option>
+                    }
+                  </select>
+                  <button
+                    (click)="removeCurrency(i)"
+                    [disabled]="currencies().length <= 1"
+                    class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 transition-colors shrink-0"
+                    title="Remove currency"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              }
+              <button
+                (click)="addCurrency()"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-xs font-medium text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+                </svg>
+                Add Currency
+              </button>
+
+              <div class="flex items-center gap-3 pt-2">
+                <button
+                  (click)="saveCurrencies()"
+                  [disabled]="currenciesSaving()"
+                  class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm
+                         hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                >
+                  @if (currenciesSaving()) { Saving… } @else { Save Currencies }
+                </button>
+                @if (currenciesSaved()) {
+                  <span class="text-sm text-green-600 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                    </svg>
+                    Saved
+                  </span>
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- ════════════════════════════════════════════════════════ -->
+          <!--  Vessel–Company Role Options                            -->
+          <!-- ════════════════════════════════════════════════════════ -->
+          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden xl:col-span-2">
             <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
               <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-purple-50">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-purple-600" viewBox="0 0 20 20" fill="currentColor">
@@ -261,214 +496,6 @@ import { API } from '@app/core/config/api';
                   }
                 </div>
               }
-            </div>
-          </div>
-
-          <!-- ════════════════════════════════════════════════════════ -->
-          <!--  Product Options                                        -->
-          <!-- ════════════════════════════════════════════════════════ -->
-          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5zm4.707 3.707a1 1 0 00-1.414-1.414l-3 3a1 1 0 000 1.414l3 3a1 1 0 001.414-1.414L8.414 9H10a3 3 0 013 3v1a1 1 0 102 0v-1a5 5 0 00-5-5H8.414l1.293-1.293z" clip-rule="evenodd" />
-                </svg>
-              </div>
-              <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-semibold text-gray-900">Products</h3>
-                <p class="text-xs text-gray-500">Configure which products appear in order line item dropdowns.</p>
-              </div>
-            </div>
-
-            <div class="p-6 space-y-3">
-              @for (p of products(); track $index; let i = $index) {
-                <div class="flex items-center gap-2">
-                  <input
-                    type="text"
-                    [value]="p"
-                    (input)="updateProduct(i, $any($event.target).value)"
-                    class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono uppercase
-                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
-                  />
-                  <button
-                    (click)="removeProduct(i)"
-                    [disabled]="products().length <= 1"
-                    class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 transition-colors shrink-0"
-                    title="Remove product"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-                    </svg>
-                  </button>
-                </div>
-              }
-              <button
-                (click)="addProduct()"
-                class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-xs font-medium text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
-                </svg>
-                Add Product
-              </button>
-
-              <div class="flex items-center gap-3 pt-2">
-                <button
-                  (click)="saveProducts()"
-                  [disabled]="productsSaving()"
-                  class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm
-                         hover:bg-brand-700 disabled:opacity-50 transition-colors"
-                >
-                  @if (productsSaving()) { Saving… } @else { Save Products }
-                </button>
-                @if (productsSaved()) {
-                  <span class="text-sm text-green-600 flex items-center gap-1">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
-                    </svg>
-                    Saved
-                  </span>
-                }
-              </div>
-            </div>
-          </div>
-
-          <!-- ════════════════════════════════════════════════════════ -->
-          <!--  Unit Options                                           -->
-          <!-- ════════════════════════════════════════════════════════ -->
-          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-50">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M10 2a.75.75 0 01.75.75v.258a33.186 33.186 0 016.668.83.75.75 0 01-.336 1.461 31.28 31.28 0 00-1.103-.232l1.702 7.545a.75.75 0 01-.387.832A4.981 4.981 0 0115 14c-.825 0-1.606-.2-2.294-.556a.75.75 0 01-.387-.832l1.77-7.849a31.743 31.743 0 00-3.339-.254v11.505a20.01 20.01 0 013.78.501.75.75 0 11-.339 1.462A18.558 18.558 0 0010 17.5c-1.442 0-2.845.165-4.191.477a.75.75 0 01-.338-1.462 20.01 20.01 0 013.779-.501V4.509c-1.129.026-2.243.112-3.34.254l1.771 7.85a.75.75 0 01-.387.83A4.981 4.981 0 015 14c-.825 0-1.606-.2-2.294-.556a.75.75 0 01-.387-.832l1.702-7.545c-.372.06-.742.126-1.103.232a.75.75 0 11-.336-1.462 33.186 33.186 0 016.668-.829V2.75A.75.75 0 0110 2zM5 12.662l-1.395-6.177C4.6 6.327 5.597 6.2 6 6.2c.404 0 1.4.127 2.395.285L5 12.662zm8.395-6.177L15 12.662l1.395-6.177C14.6 6.327 13.597 6.2 13.2 6.2c-.404 0-1.4.127-2.395.285z" clip-rule="evenodd" />
-                </svg>
-              </div>
-              <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-semibold text-gray-900">Units</h3>
-                <p class="text-xs text-gray-500">Configure which measurement units appear in order line item dropdowns.</p>
-              </div>
-            </div>
-
-            <div class="p-6 space-y-3">
-              @for (u of units(); track $index; let i = $index) {
-                <div class="flex items-center gap-2">
-                  <input
-                    type="text"
-                    [value]="u"
-                    (input)="updateUnit(i, $any($event.target).value)"
-                    class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono uppercase
-                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
-                  />
-                  <button
-                    (click)="removeUnit(i)"
-                    [disabled]="units().length <= 1"
-                    class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 transition-colors shrink-0"
-                    title="Remove unit"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-                    </svg>
-                  </button>
-                </div>
-              }
-              <button
-                (click)="addUnit()"
-                class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-xs font-medium text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
-                </svg>
-                Add Unit
-              </button>
-
-              <div class="flex items-center gap-3 pt-2">
-                <button
-                  (click)="saveUnits()"
-                  [disabled]="unitsSaving()"
-                  class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm
-                         hover:bg-brand-700 disabled:opacity-50 transition-colors"
-                >
-                  @if (unitsSaving()) { Saving… } @else { Save Units }
-                </button>
-                @if (unitsSaved()) {
-                  <span class="text-sm text-green-600 flex items-center gap-1">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
-                    </svg>
-                    Saved
-                  </span>
-                }
-              </div>
-            </div>
-          </div>
-
-          <!-- ════════════════════════════════════════════════════════ -->
-          <!--  Currency Options                                       -->
-          <!-- ════════════════════════════════════════════════════════ -->
-          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-cyan-50">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-cyan-600" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M10.75 10.818v2.614A3.13 3.13 0 0011.888 13c.482-.315.612-.648.612-.875 0-.227-.13-.56-.612-.875a3.13 3.13 0 00-1.138-.432zM8.33 8.62c.053.055.115.11.184.164.208.16.46.284.736.363V6.603a2.45 2.45 0 00-.92.363c-.293.18-.42.403-.42.56 0 .159.127.382.42.56.08.05.164.092.25.128z" />
-                  <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-6a.75.75 0 01.75.75v.316a3.78 3.78 0 011.653.713c.426.33.744.74.925 1.2a.75.75 0 01-1.395.55 1.35 1.35 0 00-.447-.563 2.187 2.187 0 00-.736-.363V9.3c.514.082 1.006.234 1.438.467.669.36 1.115.86 1.115 1.608 0 .746-.446 1.245-1.115 1.607a3.78 3.78 0 01-1.438.467v.316a.75.75 0 01-1.5 0v-.316a3.78 3.78 0 01-1.653-.713 2.72 2.72 0 01-.925-1.2.75.75 0 011.395-.55c.12.3.272.492.447.563.243.098.5.163.736.363v-2.697a3.78 3.78 0 01-1.438-.467C5.446 8.87 5 8.37 5 7.625c0-.746.446-1.245 1.115-1.607a3.78 3.78 0 011.438-.467V5.25A.75.75 0 018.25 4.5h.08z" clip-rule="evenodd" />
-                </svg>
-              </div>
-              <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-semibold text-gray-900">Currencies</h3>
-                <p class="text-xs text-gray-500">Configure which currencies appear in order line item dropdowns and are tracked via Yahoo Finance.</p>
-              </div>
-            </div>
-
-            <div class="p-6 space-y-3">
-              @for (c of currencies(); track $index; let i = $index) {
-                <div class="flex items-center gap-2">
-                  <input
-                    type="text"
-                    [value]="c"
-                    (input)="updateCurrency(i, $any($event.target).value)"
-                    class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono uppercase
-                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
-                  />
-                  <button
-                    (click)="removeCurrency(i)"
-                    [disabled]="currencies().length <= 1"
-                    class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 transition-colors shrink-0"
-                    title="Remove currency"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-                    </svg>
-                  </button>
-                </div>
-              }
-              <button
-                (click)="addCurrency()"
-                class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-xs font-medium text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
-                </svg>
-                Add Currency
-              </button>
-
-              <div class="flex items-center gap-3 pt-2">
-                <button
-                  (click)="saveCurrencies()"
-                  [disabled]="currenciesSaving()"
-                  class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm
-                         hover:bg-brand-700 disabled:opacity-50 transition-colors"
-                >
-                  @if (currenciesSaving()) { Saving… } @else { Save Currencies }
-                </button>
-                @if (currenciesSaved()) {
-                  <span class="text-sm text-green-600 flex items-center gap-1">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
-                    </svg>
-                    Saved
-                  </span>
-                }
-              </div>
             </div>
           </div>
 
@@ -724,6 +751,21 @@ export class SettingsPageComponent implements OnInit {
     this.products.set(this.products().filter((_, i) => i !== index));
   }
 
+  moveProductUp(index: number): void {
+    if (index <= 0) return;
+    const updated = [...this.products()];
+    [updated[index - 1], updated[index]] = [updated[index], updated[index - 1]];
+    this.products.set(updated);
+  }
+
+  moveProductDown(index: number): void {
+    const arr = this.products();
+    if (index >= arr.length - 1) return;
+    const updated = [...arr];
+    [updated[index], updated[index + 1]] = [updated[index + 1], updated[index]];
+    this.products.set(updated);
+  }
+
   async saveProducts(): Promise<void> {
     const valid = this.products().filter(p => p.trim());
     if (valid.length === 0) {
@@ -777,6 +819,21 @@ export class SettingsPageComponent implements OnInit {
     this.units.set(this.units().filter((_, i) => i !== index));
   }
 
+  moveUnitUp(index: number): void {
+    if (index <= 0) return;
+    const updated = [...this.units()];
+    [updated[index - 1], updated[index]] = [updated[index], updated[index - 1]];
+    this.units.set(updated);
+  }
+
+  moveUnitDown(index: number): void {
+    const arr = this.units();
+    if (index >= arr.length - 1) return;
+    const updated = [...arr];
+    [updated[index], updated[index + 1]] = [updated[index + 1], updated[index]];
+    this.units.set(updated);
+  }
+
   async saveUnits(): Promise<void> {
     const valid = this.units().filter(u => u.trim());
     if (valid.length === 0) {
@@ -816,18 +873,83 @@ export class SettingsPageComponent implements OnInit {
     }
   }
 
+  // All ISO currencies available for selection
+  readonly allCurrencies: { code: string; name: string }[] = [
+    { code: 'USD', name: 'US Dollar' },
+    { code: 'EUR', name: 'Euro' },
+    { code: 'GBP', name: 'British Pound' },
+    { code: 'DKK', name: 'Danish Krone' },
+    { code: 'NOK', name: 'Norwegian Krone' },
+    { code: 'SEK', name: 'Swedish Krona' },
+    { code: 'CHF', name: 'Swiss Franc' },
+    { code: 'AED', name: 'UAE Dirham' },
+    { code: 'SAR', name: 'Saudi Riyal' },
+    { code: 'QAR', name: 'Qatari Riyal' },
+    { code: 'KWD', name: 'Kuwaiti Dinar' },
+    { code: 'BHD', name: 'Bahraini Dinar' },
+    { code: 'OMR', name: 'Omani Rial' },
+    { code: 'SGD', name: 'Singapore Dollar' },
+    { code: 'HKD', name: 'Hong Kong Dollar' },
+    { code: 'JPY', name: 'Japanese Yen' },
+    { code: 'CNY', name: 'Chinese Yuan' },
+    { code: 'INR', name: 'Indian Rupee' },
+    { code: 'KRW', name: 'South Korean Won' },
+    { code: 'AUD', name: 'Australian Dollar' },
+    { code: 'NZD', name: 'New Zealand Dollar' },
+    { code: 'CAD', name: 'Canadian Dollar' },
+    { code: 'BRL', name: 'Brazilian Real' },
+    { code: 'MXN', name: 'Mexican Peso' },
+    { code: 'ZAR', name: 'South African Rand' },
+    { code: 'TRY', name: 'Turkish Lira' },
+    { code: 'PLN', name: 'Polish Zloty' },
+    { code: 'CZK', name: 'Czech Koruna' },
+    { code: 'HUF', name: 'Hungarian Forint' },
+    { code: 'RON', name: 'Romanian Leu' },
+    { code: 'THB', name: 'Thai Baht' },
+    { code: 'MYR', name: 'Malaysian Ringgit' },
+    { code: 'IDR', name: 'Indonesian Rupiah' },
+    { code: 'PHP', name: 'Philippine Peso' },
+    { code: 'TWD', name: 'Taiwan Dollar' },
+    { code: 'ILS', name: 'Israeli Shekel' },
+    { code: 'EGP', name: 'Egyptian Pound' },
+    { code: 'NGN', name: 'Nigerian Naira' },
+    { code: 'KES', name: 'Kenyan Shilling' },
+  ];
+
+  readonly availableCurrencyOptions = computed(() => {
+    // Return all currencies — disabled state handled in template
+    return this.allCurrencies;
+  });
+
   updateCurrency(index: number, value: string): void {
     const updated = [...this.currencies()];
-    updated[index] = value.toUpperCase();
+    updated[index] = value;
     this.currencies.set(updated);
   }
 
   addCurrency(): void {
-    this.currencies.set([...this.currencies(), '']);
+    const current = new Set(this.currencies());
+    const next = this.allCurrencies.find(c => !current.has(c.code));
+    this.currencies.set([...this.currencies(), next?.code ?? '']);
   }
 
   removeCurrency(index: number): void {
     this.currencies.set(this.currencies().filter((_, i) => i !== index));
+  }
+
+  moveCurrencyUp(index: number): void {
+    if (index <= 0) return;
+    const updated = [...this.currencies()];
+    [updated[index - 1], updated[index]] = [updated[index], updated[index - 1]];
+    this.currencies.set(updated);
+  }
+
+  moveCurrencyDown(index: number): void {
+    const arr = this.currencies();
+    if (index >= arr.length - 1) return;
+    const updated = [...arr];
+    [updated[index], updated[index + 1]] = [updated[index + 1], updated[index]];
+    this.currencies.set(updated);
   }
 
   async saveCurrencies(): Promise<void> {
