@@ -60,12 +60,14 @@ function handle401(
           refreshSubject.next(newToken);
           return next(addToken(req, newToken));
         }
-        // Refresh failed → user will be logged out by AuthService
+        // Refresh failed → AuthService already called logout()
+        // Emit empty string so queued requests unblock and fail cleanly
+        refreshSubject.next('');
         return throwError(() => new HttpErrorResponse({ status: 401 }));
       }),
       catchError((err) => {
         isRefreshing = false;
-        refreshSubject.next(null);
+        refreshSubject.next('');
         return throwError(() => err);
       }),
     );
@@ -75,6 +77,12 @@ function handle401(
   return refreshSubject.pipe(
     filter((token) => token !== null),
     take(1),
-    switchMap((token) => next(addToken(req, token!))),
+    switchMap((token) => {
+      if (!token) {
+        // Refresh failed — don't retry, let it error out
+        return throwError(() => new HttpErrorResponse({ status: 401 }));
+      }
+      return next(addToken(req, token));
+    }),
   );
 }

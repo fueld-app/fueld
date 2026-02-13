@@ -254,7 +254,10 @@ export class AuthService {
 
   async refreshToken(): Promise<boolean> {
     const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-    if (!refreshToken) return false;
+    if (!refreshToken) {
+      this.logout();
+      return false;
+    }
 
     try {
       const res = await firstValueFrom(
@@ -262,6 +265,13 @@ export class AuthService {
           refreshToken,
         }),
       );
+
+      if (!res.success || !res.data) {
+        // Server said the refresh token is invalid/expired (HTTP 200, success: false)
+        console.warn('[Auth] Refresh token rejected by server, logging out');
+        this.logout();
+        return false;
+      }
 
       this.setTokens(res.data);
       return true;
