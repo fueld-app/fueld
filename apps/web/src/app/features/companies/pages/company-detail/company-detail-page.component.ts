@@ -1445,49 +1445,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 </svg>
               </div>
             } @else if (enrichment()) {
-              <!-- Counterparty Risk -->
-              @if (enrichment()!.counterpartyRiskReportMetadata) {
-                <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-2">
-                  <div class="border-b border-gray-100 px-5 py-3">
-                    <h2 class="text-sm font-semibold text-gray-700">Counterparty Risk</h2>
-                  </div>
-                  <div class="p-5 space-y-3 text-sm">
-                    <div class="flex justify-between">
-                      <span class="text-gray-500">Overall Rating</span>
-                      <span class="font-medium text-gray-900">{{ enrichment()!.counterpartyRiskReportMetadata!.overallRating?.text ?? '—' }}</span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-gray-500">Overall Performance</span>
-                      <span class="font-medium text-gray-900">{{ enrichment()!.counterpartyRiskReportMetadata!.overallPerformance?.text ?? '—' }}</span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-gray-500">Payment Performance</span>
-                      <span class="font-medium text-gray-900">{{ enrichment()!.counterpartyRiskReportMetadata!.paymentPerformance?.text ?? '—' }}</span>
-                    </div>
-                    @if (enrichment()!.counterpartyRiskReportMetadata!.creditOpinion) {
-                      <div>
-                        <span class="text-gray-500">Credit Opinion</span>
-                        <p class="mt-1 text-gray-700">{{ enrichment()!.counterpartyRiskReportMetadata!.creditOpinion }}</p>
-                      </div>
-                    }
-                    <div class="text-xs text-gray-400">
-                      Rated {{ enrichment()!.counterpartyRiskReportMetadata!.ratingDate | date:'mediumDate' }}
-                    </div>
-                    <a
-                      [href]="'https://www.seasearcher.com/company/' + company()!.seasearcherId + '/counterparty-risk-report'"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      class="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-brand-600" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
-                        <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
-                      </svg>
-                      View Full Report
-                    </a>
-                  </div>
-                </div>
-              }
+
 
               <!-- Fleet Stats & Company Roles -->
               @if (enrichment()!.companyFleetStats || company()!.companyRoles?.length) {
@@ -1710,11 +1668,21 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 </div>
               }
 
-              <!-- Sanctions + Seizures -->
-              <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-[14] flex flex-col overflow-hidden">
+              <!-- Counterparty Risk + Sanctions + Seizures -->
+              <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-2 flex flex-col overflow-hidden">
                 <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
-                  <h2 class="text-sm font-semibold text-gray-700">Sanctions & Seizures</h2>
+                  <h2 class="text-sm font-semibold text-gray-700">Risk & Compliance</h2>
                   <div class="flex gap-1">
+                    @if (enrichment()!.counterpartyRiskReportMetadata) {
+                      <button
+                        type="button"
+                        class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
+                        [class]="sanctionsTab() === 'risk' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
+                        (click)="sanctionsTab.set('risk')"
+                      >
+                        Counterparty Risk
+                      </button>
+                    }
                     <button
                       type="button"
                       class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
@@ -1734,7 +1702,45 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                   </div>
                 </div>
                 <div class="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3 text-sm">
-                  @if (sanctionsTab() === 'sanctions') {
+                  @if (sanctionsTab() === 'risk') {
+                    @if (enrichment()!.counterpartyRiskReportMetadata) {
+                      <div class="space-y-3">
+                        <div class="flex justify-between">
+                          <span class="text-gray-500">Overall Rating</span>
+                          <span class="font-medium text-gray-900">{{ enrichment()!.counterpartyRiskReportMetadata!.overallRating?.text ?? '—' }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                          <span class="text-gray-500">Overall Performance</span>
+                          <span class="font-medium text-gray-900">{{ enrichment()!.counterpartyRiskReportMetadata!.overallPerformance?.text ?? '—' }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                          <span class="text-gray-500">Payment Performance</span>
+                          <span class="font-medium text-gray-900">{{ enrichment()!.counterpartyRiskReportMetadata!.paymentPerformance?.text ?? '—' }}</span>
+                        </div>
+                        @if (enrichment()!.counterpartyRiskReportMetadata!.creditOpinion) {
+                          <div>
+                            <span class="text-gray-500">Credit Opinion</span>
+                            <p class="mt-1 text-gray-700">{{ enrichment()!.counterpartyRiskReportMetadata!.creditOpinion }}</p>
+                          </div>
+                        }
+                        <div class="text-xs text-gray-400">
+                          Rated {{ enrichment()!.counterpartyRiskReportMetadata!.ratingDate | date:'mediumDate' }}
+                        </div>
+                        <a
+                          [href]="'https://www.seasearcher.com/company/' + company()!.seasearcherId + '/counterparty-risk-report'"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-brand-600" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
+                            <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
+                          </svg>
+                          View Full Report
+                        </a>
+                      </div>
+                    }
+                  } @else if (sanctionsTab() === 'sanctions') {
                     @if (sanctionsLoading()) {
                       <div class="flex items-center justify-center py-6">
                         <svg class="h-4 w-4 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
@@ -1979,7 +1985,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly sanctions = signal<any[] | null>(null);
   readonly sanctionsLoading = signal(false);
   readonly registrationTab = signal<'registration' | 'ownership'>('registration');
-  readonly sanctionsTab = signal<'sanctions' | 'seizures'>('sanctions');
+  readonly sanctionsTab = signal<'risk' | 'sanctions' | 'seizures'>('risk');
   readonly companyInfoTab = signal<'info' | 'headOffice'>('info');
   readonly fleetRolesTab = signal<'fleet' | 'roles'>('fleet');
 
