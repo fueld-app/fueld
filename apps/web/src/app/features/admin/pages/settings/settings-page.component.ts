@@ -35,7 +35,7 @@ import { API } from '@app/core/config/api';
           </svg>
         </div>
       } @else {
-        <div class="grid gap-6 grid-cols-1 max-w-2xl">
+        <div class="grid gap-6 grid-cols-1 lg:grid-cols-2">
 
           <!-- ════════════════════════════════════════════════════════ -->
           <!--  Order Number Template                                   -->
