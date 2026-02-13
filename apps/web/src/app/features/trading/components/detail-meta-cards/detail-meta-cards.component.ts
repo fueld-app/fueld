@@ -137,24 +137,6 @@ import {
           </select>
         }
       </div>
-      <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <p class="text-xs font-medium uppercase tracking-wider text-gray-500">Responsible</p>
-        @if (isReadonly()) {
-          <p class="mt-1 text-sm font-semibold text-gray-900">{{ responsibleLabel() }}</p>
-        } @else {
-          <select
-            [ngModel]="responsibleUserId()"
-            (ngModelChange)="responsibleChange.emit($event)"
-            class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm font-semibold text-gray-900
-                   focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
-          >
-            <option value="">- Select -</option>
-            @for (u of responsibleOptions(); track u.value) {
-              <option [value]="u.value">{{ u.label }}</option>
-            }
-          </select>
-        }
-      </div>
       <ng-content></ng-content>
     </div>
   `,

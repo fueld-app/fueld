@@ -30,6 +30,10 @@ import {
   updateOrderNumberSettings,
   getVesselCompanyRoleSettings,
   updateVesselCompanyRoleSettings,
+  getProductSettings,
+  updateProductSettings,
+  getUnitSettings,
+  updateUnitSettings,
 } from './settings.service';
 import {
   getIntegrationStatus,
@@ -306,6 +310,31 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     }
   }, {
     detail: { tags: ['Admin Settings'], summary: 'Get own companies accessible to current user' },
+  })
+
+  // ── Tenant product & unit options (any authenticated user) ──────
+  .get('/my-products', async () => {
+    try {
+      const data = await getProductSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get product options for current tenant' },
+  })
+
+  .get('/my-units', async () => {
+    try {
+      const data = await getUnitSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get unit options for current tenant' },
   })
 
   // ── Integrations ────────────────────────────────────────────────
@@ -809,4 +838,70 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       })),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update vessel-company role options' },
+  })
+
+  // ═════════════════════════════════════════════════════════════════
+  //  PRODUCT SETTINGS
+  // ═════════════════════════════════════════════════════════════════
+
+  .get('/products', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getProductSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get configurable product options' },
+  })
+
+  .put('/products', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateProductSettings(body.products);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      products: t.Array(t.String({ minLength: 1 })),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update configurable product options' },
+  })
+
+  // ═════════════════════════════════════════════════════════════════
+  //  UNIT SETTINGS
+  // ═════════════════════════════════════════════════════════════════
+
+  .get('/units', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getUnitSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get configurable unit options' },
+  })
+
+  .put('/units', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateUnitSettings(body.units);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      units: t.Array(t.String({ minLength: 1 })),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update configurable unit options' },
   });

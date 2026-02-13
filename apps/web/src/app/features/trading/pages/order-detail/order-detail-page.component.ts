@@ -303,6 +303,8 @@ interface TeamUserOption {
       [items]="itemRows()"
       [readonly]="isReadonly()"
       [allowDeliveredEdit]="allowDeliveredEdit()"
+      [productOptionsInput]="configuredProducts()"
+      [unitOptionsInput]="configuredUnits()"
       (itemsChange)="onItemsChange($event)"
     />
 
@@ -596,6 +598,8 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   readonly paymentMethod = signal('');
   readonly paymentNote = signal('');
   readonly noteTab = signal<'customer' | 'supplier'>('customer');
+  readonly configuredProducts = signal<DropdownOption[]>([]);
+  readonly configuredUnits = signal<DropdownOption[]>([]);
 
   // ─── Autosave ────────────────────────────────────────────────────
 
@@ -614,9 +618,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   });
   readonly vesselName = computed(() => this.vessel()?.name ?? '—');
   readonly portName = computed(() => this.port()?.name ?? '—');
-  readonly subtitle = computed(
-    () => `${this.vesselName()} · ${this.portName()} · ${this.clientName()}`,
-  );
+  readonly subtitle = computed(() => '');
   readonly invoicingCompanyName = computed(() => {
     const id = this.order()?.invoicingCompanyId;
     if (!id) return '—';
@@ -974,7 +976,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
 
   private async loadReferenceData(): Promise<void> {
     try {
-      const [suppliersRes, usersRes] = await Promise.all([
+      const [suppliersRes, usersRes, productsRes, unitsRes] = await Promise.all([
         firstValueFrom(
           this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
             `${API_URL}/companies/local?type=SUPPLIER&limit=100`,
@@ -983,9 +985,21 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
         firstValueFrom(
           this.http.get<ApiResponse<TeamUserOption[]>>(`${API_URL}/lloyds/users`),
         ),
+        firstValueFrom(
+          this.http.get<ApiResponse<{ products: string[] }>>(`${API_URL}/admin/settings/my-products`),
+        ),
+        firstValueFrom(
+          this.http.get<ApiResponse<{ units: string[] }>>(`${API_URL}/admin/settings/my-units`),
+        ),
       ]);
       if (suppliersRes.success) this.suppliers.set(suppliersRes.data.companies);
       if (usersRes.success) this.teamUsers.set(usersRes.data ?? []);
+      if (productsRes.success) this.configuredProducts.set(
+        productsRes.data.products.map((p) => ({ value: p, label: p })),
+      );
+      if (unitsRes.success) this.configuredUnits.set(
+        unitsRes.data.units.map((u) => ({ value: u, label: u })),
+      );
     } catch {
       // silently ignore
     }
@@ -1200,13 +1214,22 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   async searchClients(term: string): Promise<void> {
     this.clientSearchLoading.set(true);
     try {
-      const res = await firstValueFrom(
+      let res = await firstValueFrom(
         this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
           `${API_URL}/companies/local?type=CLIENT&search=${encodeURIComponent(term)}&limit=20`,
         ),
       );
+      let localResults = res.success ? res.data.companies : [];
+      // Fallback: if no results with type filter, retry without type
+      if (localResults.length === 0 && term.trim()) {
+        res = await firstValueFrom(
+          this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
+            `${API_URL}/companies/local?search=${encodeURIComponent(term)}&limit=20`,
+          ),
+        );
+        localResults = res.success ? res.data.companies : [];
+      }
       const current = this.client();
-      const localResults = res.success ? res.data.companies : [];
       const mergedLocal = current && !localResults.find((c) => c.id === current.id)
         ? [current, ...localResults]
         : localResults;
@@ -1221,13 +1244,22 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   async searchSuppliers(term: string): Promise<void> {
     this.supplierSearchLoading.set(true);
     try {
-      const res = await firstValueFrom(
+      let res = await firstValueFrom(
         this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
           `${API_URL}/companies/local?type=SUPPLIER&search=${encodeURIComponent(term)}&limit=20`,
         ),
       );
+      let localResults = res.success ? res.data.companies : [];
+      // Fallback: if no results with type filter, retry without type
+      if (localResults.length === 0 && term.trim()) {
+        res = await firstValueFrom(
+          this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
+            `${API_URL}/companies/local?search=${encodeURIComponent(term)}&limit=20`,
+          ),
+        );
+        localResults = res.success ? res.data.companies : [];
+      }
       const currentId = this.order()?.supplierId ?? '';
-      const localResults = res.success ? res.data.companies : [];
       const mergedLocal = currentId && !localResults.find((c) => c.id === currentId)
         ? [this.suppliers().find((s) => s.id === currentId) ?? null, ...localResults].filter(Boolean)
         : localResults;

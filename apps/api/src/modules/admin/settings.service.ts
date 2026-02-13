@@ -595,3 +595,61 @@ export async function updateVesselCompanyRoleSettings(
 
   return getVesselCompanyRoleSettings();
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+//  PRODUCT SETTINGS
+// ═══════════════════════════════════════════════════════════════════════
+
+const DEFAULT_PRODUCTS = ['VLSFO', 'LSMGO', 'IFO380', 'MGO', 'LUBE'];
+
+export async function getProductSettings(): Promise<{ products: string[] }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  return { products: settings.products ?? DEFAULT_PRODUCTS };
+}
+
+export async function updateProductSettings(products: string[]): Promise<{ products: string[] }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = { ...(tenant.settings as any) };
+  settings.products = products;
+
+  await db
+    .update(tenants)
+    .set({ settings, updatedAt: new Date() })
+    .where(eq(tenants.id, tenant.id));
+
+  return getProductSettings();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  UNIT SETTINGS
+// ═══════════════════════════════════════════════════════════════════════
+
+const DEFAULT_UNITS = ['MT', 'CBM', 'LT', 'BBL', 'GAL', 'KG'];
+
+export async function getUnitSettings(): Promise<{ units: string[] }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  return { units: settings.units ?? DEFAULT_UNITS };
+}
+
+export async function updateUnitSettings(units: string[]): Promise<{ units: string[] }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = { ...(tenant.settings as any) };
+  settings.units = units;
+
+  await db
+    .update(tenants)
+    .set({ settings, updatedAt: new Date() })
+    .where(eq(tenants.id, tenant.id));
+
+  return getUnitSettings();
+}

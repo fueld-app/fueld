@@ -497,6 +497,16 @@ export interface VesselCompanyRoleSettingsDto {
   roles: VesselCompanyRoleOption[];
 }
 
+/** Admin settings for configurable product options */
+export interface ProductSettingsDto {
+  products: string[];
+}
+
+/** Admin settings for configurable unit options */
+export interface UnitSettingsDto {
+  units: string[];
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  ORDER ITEM (line items)
 // ═══════════════════════════════════════════════════════════════════════

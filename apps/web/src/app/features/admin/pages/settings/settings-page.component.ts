@@ -9,7 +9,7 @@ import {
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
-import type { ApiResponse, OrderNumberSettingsDto, VesselCompanyRoleSettingsDto, VesselCompanyRoleOption } from '@fueld/types';
+import type { ApiResponse, OrderNumberSettingsDto, VesselCompanyRoleSettingsDto, VesselCompanyRoleOption, ProductSettingsDto, UnitSettingsDto } from '@fueld/types';
 
 import { API } from '@app/core/config/api';
 
@@ -264,6 +264,144 @@ import { API } from '@app/core/config/api';
             </div>
           </div>
 
+          <!-- ════════════════════════════════════════════════════════ -->
+          <!--  Product Options                                        -->
+          <!-- ════════════════════════════════════════════════════════ -->
+          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
+              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5zm4.707 3.707a1 1 0 00-1.414-1.414l-3 3a1 1 0 000 1.414l3 3a1 1 0 001.414-1.414L8.414 9H10a3 3 0 013 3v1a1 1 0 102 0v-1a5 5 0 00-5-5H8.414l1.293-1.293z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-semibold text-gray-900">Products</h3>
+                <p class="text-xs text-gray-500">Configure which products appear in order line item dropdowns.</p>
+              </div>
+            </div>
+
+            <div class="p-6 space-y-3">
+              @for (p of products(); track $index; let i = $index) {
+                <div class="flex items-center gap-2">
+                  <input
+                    type="text"
+                    [value]="p"
+                    (input)="updateProduct(i, $any($event.target).value)"
+                    class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono uppercase
+                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                  />
+                  <button
+                    (click)="removeProduct(i)"
+                    [disabled]="products().length <= 1"
+                    class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 transition-colors shrink-0"
+                    title="Remove product"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              }
+              <button
+                (click)="addProduct()"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-xs font-medium text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+                </svg>
+                Add Product
+              </button>
+
+              <div class="flex items-center gap-3 pt-2">
+                <button
+                  (click)="saveProducts()"
+                  [disabled]="productsSaving()"
+                  class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm
+                         hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                >
+                  @if (productsSaving()) { Saving… } @else { Save Products }
+                </button>
+                @if (productsSaved()) {
+                  <span class="text-sm text-green-600 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                    </svg>
+                    Saved
+                  </span>
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- ════════════════════════════════════════════════════════ -->
+          <!--  Unit Options                                           -->
+          <!-- ════════════════════════════════════════════════════════ -->
+          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
+              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-50">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 2a.75.75 0 01.75.75v.258a33.186 33.186 0 016.668.83.75.75 0 01-.336 1.461 31.28 31.28 0 00-1.103-.232l1.702 7.545a.75.75 0 01-.387.832A4.981 4.981 0 0115 14c-.825 0-1.606-.2-2.294-.556a.75.75 0 01-.387-.832l1.77-7.849a31.743 31.743 0 00-3.339-.254v11.505a20.01 20.01 0 013.78.501.75.75 0 11-.339 1.462A18.558 18.558 0 0010 17.5c-1.442 0-2.845.165-4.191.477a.75.75 0 01-.338-1.462 20.01 20.01 0 013.779-.501V4.509c-1.129.026-2.243.112-3.34.254l1.771 7.85a.75.75 0 01-.387.83A4.981 4.981 0 015 14c-.825 0-1.606-.2-2.294-.556a.75.75 0 01-.387-.832l1.702-7.545c-.372.06-.742.126-1.103.232a.75.75 0 11-.336-1.462 33.186 33.186 0 016.668-.829V2.75A.75.75 0 0110 2zM5 12.662l-1.395-6.177C4.6 6.327 5.597 6.2 6 6.2c.404 0 1.4.127 2.395.285L5 12.662zm8.395-6.177L15 12.662l1.395-6.177C14.6 6.327 13.597 6.2 13.2 6.2c-.404 0-1.4.127-2.395.285z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-semibold text-gray-900">Units</h3>
+                <p class="text-xs text-gray-500">Configure which measurement units appear in order line item dropdowns.</p>
+              </div>
+            </div>
+
+            <div class="p-6 space-y-3">
+              @for (u of units(); track $index; let i = $index) {
+                <div class="flex items-center gap-2">
+                  <input
+                    type="text"
+                    [value]="u"
+                    (input)="updateUnit(i, $any($event.target).value)"
+                    class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono uppercase
+                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                  />
+                  <button
+                    (click)="removeUnit(i)"
+                    [disabled]="units().length <= 1"
+                    class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 transition-colors shrink-0"
+                    title="Remove unit"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              }
+              <button
+                (click)="addUnit()"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-xs font-medium text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+                </svg>
+                Add Unit
+              </button>
+
+              <div class="flex items-center gap-3 pt-2">
+                <button
+                  (click)="saveUnits()"
+                  [disabled]="unitsSaving()"
+                  class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm
+                         hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                >
+                  @if (unitsSaving()) { Saving… } @else { Save Units }
+                </button>
+                @if (unitsSaved()) {
+                  <span class="text-sm text-green-600 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                    </svg>
+                    Saved
+                  </span>
+                }
+              </div>
+            </div>
+          </div>
+
         </div>
       }
 
@@ -299,6 +437,16 @@ export class SettingsPageComponent implements OnInit {
   readonly rolesSaved = signal(false);
   readonly roles = signal<VesselCompanyRoleOption[]>([]);
 
+  // Products
+  readonly products = signal<string[]>([]);
+  readonly productsSaving = signal(false);
+  readonly productsSaved = signal(false);
+
+  // Units
+  readonly units = signal<string[]>([]);
+  readonly unitsSaving = signal(false);
+  readonly unitsSaved = signal(false);
+
   readonly livePreview = computed(() => {
     const tmpl = this.template();
     const pfx = this.prefix();
@@ -326,6 +474,8 @@ export class SettingsPageComponent implements OnInit {
   ngOnInit(): void {
     this.loadSettings();
     this.loadRoles();
+    this.loadProducts();
+    this.loadUnits();
   }
 
   private async loadSettings(): Promise<void> {
@@ -468,6 +618,112 @@ export class SettingsPageComponent implements OnInit {
       this.showToast('error', 'Failed to save vessel-company roles.');
     } finally {
       this.rolesSaving.set(false);
+    }
+  }
+
+  // ─── Products ───────────────────────────────────────────────────────
+
+  private async loadProducts(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<ProductSettingsDto>>(`${API}/admin/settings/products`),
+      );
+      if (res.success) this.products.set(res.data.products);
+    } catch {
+      this.showToast('error', 'Failed to load products.');
+    }
+  }
+
+  updateProduct(index: number, value: string): void {
+    const updated = [...this.products()];
+    updated[index] = value.toUpperCase();
+    this.products.set(updated);
+  }
+
+  addProduct(): void {
+    this.products.set([...this.products(), '']);
+  }
+
+  removeProduct(index: number): void {
+    this.products.set(this.products().filter((_, i) => i !== index));
+  }
+
+  async saveProducts(): Promise<void> {
+    const valid = this.products().filter(p => p.trim());
+    if (valid.length === 0) {
+      this.showToast('error', 'At least one product is required.');
+      return;
+    }
+    this.productsSaving.set(true);
+    this.productsSaved.set(false);
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<ProductSettingsDto>>(`${API}/admin/settings/products`, { products: valid }),
+      );
+      if (res.success) {
+        this.products.set(res.data.products);
+        this.productsSaved.set(true);
+        setTimeout(() => this.productsSaved.set(false), 3000);
+      } else {
+        this.showToast('error', (res as any).message ?? 'Failed to save.');
+      }
+    } catch {
+      this.showToast('error', 'Failed to save products.');
+    } finally {
+      this.productsSaving.set(false);
+    }
+  }
+
+  // ─── Units ─────────────────────────────────────────────────────────
+
+  private async loadUnits(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<UnitSettingsDto>>(`${API}/admin/settings/units`),
+      );
+      if (res.success) this.units.set(res.data.units);
+    } catch {
+      this.showToast('error', 'Failed to load units.');
+    }
+  }
+
+  updateUnit(index: number, value: string): void {
+    const updated = [...this.units()];
+    updated[index] = value.toUpperCase();
+    this.units.set(updated);
+  }
+
+  addUnit(): void {
+    this.units.set([...this.units(), '']);
+  }
+
+  removeUnit(index: number): void {
+    this.units.set(this.units().filter((_, i) => i !== index));
+  }
+
+  async saveUnits(): Promise<void> {
+    const valid = this.units().filter(u => u.trim());
+    if (valid.length === 0) {
+      this.showToast('error', 'At least one unit is required.');
+      return;
+    }
+    this.unitsSaving.set(true);
+    this.unitsSaved.set(false);
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<UnitSettingsDto>>(`${API}/admin/settings/units`, { units: valid }),
+      );
+      if (res.success) {
+        this.units.set(res.data.units);
+        this.unitsSaved.set(true);
+        setTimeout(() => this.unitsSaved.set(false), 3000);
+      } else {
+        this.showToast('error', (res as any).message ?? 'Failed to save.');
+      }
+    } catch {
+      this.showToast('error', 'Failed to save units.');
+    } finally {
+      this.unitsSaving.set(false);
     }
   }
 }

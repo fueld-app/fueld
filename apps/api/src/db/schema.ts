@@ -99,6 +99,9 @@ export interface TenantSettings {
   orderNumberPrefix?: string;    // optional prefix, e.g. 'FU-'
   // Vessel-company roles (configurable from admin)
   vesselCompanyRoles?: { key: string; label: string; group: string; description?: string; seasearcherCode?: string }[];
+  // Configurable product and unit options for order line items
+  products?: string[];
+  units?: string[];
 }
 
 export const tenants = pgTable('tenants', {

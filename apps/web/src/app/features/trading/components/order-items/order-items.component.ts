@@ -98,7 +98,7 @@ export interface OrderItemRow {
                   <span>{{ row.productType }}</span>
                 } @else {
                   <app-searchable-dropdown
-                    [options]="productOptions"
+                    [options]="productOptions()"
                     [selected]="row.productType"
                     placeholder="Product..."
                     (selectionChange)="updateField(i, 'productType', $event)"
@@ -166,7 +166,7 @@ export interface OrderItemRow {
                     class="rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
                            focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
                   >
-                    @for (u of unitOptions; track u.value) {
+                    @for (u of unitOptions(); track u.value) {
                       <option [value]="u.value">{{ u.label }}</option>
                     }
                   </select>
@@ -322,7 +322,7 @@ export interface OrderItemRow {
                 <span class="text-sm">{{ row.productType }}</span>
               } @else {
                 <app-searchable-dropdown
-                  [options]="productOptions"
+                  [options]="productOptions()"
                   [selected]="row.productType"
                   placeholder="Product..."
                   (selectionChange)="updateField(i, 'productType', $event)"
@@ -389,7 +389,7 @@ export interface OrderItemRow {
                   class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
                          focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
                 >
-                  @for (u of unitOptions; track u.value) {
+                  @for (u of unitOptions(); track u.value) {
                     <option [value]="u.value">{{ u.label }}</option>
                   }
                 </select>
@@ -504,6 +504,8 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   readonly readonly = input(false);
   readonly allowDeliveredEdit = input(false);
   readonly currency = input('USD');
+  readonly productOptionsInput = input<DropdownOption[]>([]);
+  readonly unitOptionsInput = input<DropdownOption[]>([]);
   readonly itemsChange = output<OrderItemRow[]>();
 
   private readonly wsService = inject(WebSocketService);
@@ -564,12 +566,12 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
 
   // ─── Dropdown options ────────────────────────────────────────────
 
-  readonly productOptions: DropdownOption[] = Object.values(ProductType).map((v) => ({
+  private static readonly DEFAULT_PRODUCTS: DropdownOption[] = Object.values(ProductType).map((v) => ({
     value: v,
     label: v,
   }));
 
-  readonly unitOptions: DropdownOption[] = [
+  private static readonly DEFAULT_UNITS: DropdownOption[] = [
     { value: 'MT', label: 'MT' },
     { value: 'CBM', label: 'CBM' },
     { value: 'LT', label: 'LT' },
@@ -577,6 +579,16 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
     { value: 'GAL', label: 'GAL' },
     { value: 'KG', label: 'KG' },
   ];
+
+  readonly productOptions = computed(() => {
+    const fromInput = this.productOptionsInput();
+    return fromInput.length > 0 ? fromInput : OrderItemsComponent.DEFAULT_PRODUCTS;
+  });
+
+  readonly unitOptions = computed(() => {
+    const fromInput = this.unitOptionsInput();
+    return fromInput.length > 0 ? fromInput : OrderItemsComponent.DEFAULT_UNITS;
+  });
   // ─── Computed totals ─────────────────────────────────────────────
 
   readonly totalQty = computed(() =>
