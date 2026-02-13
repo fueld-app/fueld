@@ -616,6 +616,12 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                               placeholder="Email"
                               class="flex-1 rounded-md border border-gray-200 px-2.5 py-1 text-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                             />
+                            <input
+                              [ngModel]="newContactPhone()"
+                              (ngModelChange)="newContactPhone.set($event)"
+                              placeholder="Phone"
+                              class="flex-1 rounded-md border border-gray-200 px-2.5 py-1 text-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                            />
                           </div>
                           <div class="flex justify-end gap-1.5">
                             <button (click)="cancelNewContact()" class="rounded px-2 py-0.5 text-[10px] text-gray-500 hover:bg-gray-100 transition-colors">Cancel</button>
@@ -1291,6 +1297,7 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
   readonly newContactName = signal('');
   readonly newContactRole = signal('');
   readonly newContactEmail = signal('');
+  readonly newContactPhone = signal('');
   readonly creatingContact = signal(false);
   readonly roleOptions = signal<VesselCompanyRoleOption[]>([
     { key: 'REGISTERED_OWNER', label: 'Registered Owner', group: 'Legal & Financial' },
@@ -2196,6 +2203,7 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
     this.newContactName.set('');
     this.newContactRole.set('');
     this.newContactEmail.set('');
+    this.newContactPhone.set('');
   }
 
   async createNewContact(): Promise<void> {
@@ -2213,6 +2221,7 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
       const body: Record<string, string> = { name: this.newContactName().trim() };
       if (this.newContactRole().trim()) body['role'] = this.newContactRole().trim();
       if (this.newContactEmail().trim()) body['email'] = this.newContactEmail().trim();
+      if (this.newContactPhone().trim()) body['phone'] = this.newContactPhone().trim();
 
       const res = await firstValueFrom(
         this.http.post<ApiResponse<CompanyContactDto>>(`${API}/companies/local/${resolvedCompanyId}/contacts`, body),
