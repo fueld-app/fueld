@@ -433,7 +433,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
             <!-- Company Info + Head Office -->
             <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-1 flex flex-col overflow-hidden">
               <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
-                <h2 class="text-sm font-semibold text-gray-700">Company Information</h2>
+                <h2 class="text-sm font-semibold text-gray-700">Info</h2>
                 <div class="flex items-center gap-2">
                   @if (!editing()) {
                     @if (!company()!.seasearcherId && companyInfoTab() === 'info') {
