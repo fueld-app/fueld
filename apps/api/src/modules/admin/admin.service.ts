@@ -64,7 +64,7 @@ async function getPasskeyCount(userId: string): Promise<number> {
 export async function inviteUser(data: {
   email: string;
   name: string;
-  role: 'ADMIN' | 'TRADER' | 'FINANCE' | 'TEAMLEAD';
+  role: 'ADMIN' | 'TRADER' | 'FINANCE' | 'TEAMLEAD' | 'CREDITMANAGER';
   invitedBy: string;
 }) {
   const tenantId = await getTenantId();
@@ -214,7 +214,7 @@ export async function listInvitations() {
 
 export async function updateUserRole(
   userId: string,
-  role: 'ADMIN' | 'TRADER' | 'FINANCE' | 'TEAMLEAD',
+  role: 'ADMIN' | 'TRADER' | 'FINANCE' | 'TEAMLEAD' | 'CREDITMANAGER',
 ) {
   const [updated] = await db
     .update(users)
@@ -316,6 +316,22 @@ export async function updateUserTeam(userId: string, teamId: string | null) {
 }
 
 // ── Update User Allowed IPs ──────────────────────────────────────────
+
+// ── Admin Reset 2FA ──────────────────────────────────────────────────
+
+export async function adminReset2fa(userId: string) {
+  const [updated] = await db
+    .update(users)
+    .set({ is2faEnabled: false, twoFactorSecret: null, updatedAt: new Date() })
+    .where(eq(users.id, userId))
+    .returning();
+
+  if (!updated) throw new Error('User not found');
+
+  return { id: updated.id, is2faEnabled: updated.is2faEnabled };
+}
+
+// ── Update User Allowed IPs (original) ───────────────────────────────
 
 export async function updateUserAllowedIps(userId: string, allowedIps: string[] | null) {
   const value = allowedIps && allowedIps.length > 0 ? JSON.stringify(allowedIps) : null;

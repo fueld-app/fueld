@@ -21,6 +21,13 @@ import type { ApiResponse } from '@fueld/types';
 
 export const creditController = new Elysia({ prefix: '/credit' })
   .use(authGuard)
+  // Only ADMIN and CREDITMANAGER may access credit endpoints
+  .onBeforeHandle(({ auth, set }) => {
+    if (auth.role !== 'ADMIN' && auth.role !== 'CREDITMANAGER') {
+      set.status = 403;
+      return { success: false, error: 'Forbidden: insufficient role' };
+    }
+  })
 
   // ─── List Credit Lines ──────────────────────────────────────────
   .get(

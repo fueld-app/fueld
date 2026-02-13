@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/auth/auth.guard';
 import { adminGuard } from './core/auth/admin.guard';
+import { creditGuard } from './core/auth/credit.guard';
 
 export const routes: Routes = [
   // ─── Public routes ──────────────────────────────────────────────
@@ -104,6 +105,7 @@ export const routes: Routes = [
       // ── Credit ──
       {
         path: 'credit',
+        canActivate: [creditGuard],
         children: [
           { path: '', redirectTo: 'suppliers', pathMatch: 'full' as const },
           {

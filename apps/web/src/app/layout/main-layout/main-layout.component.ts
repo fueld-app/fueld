@@ -60,6 +60,8 @@ interface NavItem {
   route?: string;
   children?: { label: string; route: string }[];
   adminOnly?: boolean;
+  /** When set, item is visible to these roles (and always to ADMIN). */
+  allowedRoles?: string[];
 }
 
 const NAVIGATION: NavItem[] = [
@@ -79,7 +81,7 @@ const NAVIGATION: NavItem[] = [
   {
     label: 'Credit',
     icon: 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z',
-    adminOnly: true,
+    allowedRoles: ['ADMIN', 'CREDITMANAGER'],
     children: [
       { label: 'Suppliers', route: '/credit/suppliers' },
       { label: 'Customers', route: '/credit/customers' },
@@ -536,9 +538,14 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   }
 
   readonly openGroups = signal<Set<string>>(new Set());
-  readonly navItems = computed(() =>
-    NAVIGATION.filter((item) => !item.adminOnly || this.auth.isAdmin()),
-  );
+  readonly navItems = computed(() => {
+    const role = this.auth.user()?.role;
+    return NAVIGATION.filter((item) => {
+      if (item.adminOnly) return this.auth.isAdmin();
+      if (item.allowedRoles) return role ? item.allowedRoles.includes(role) : false;
+      return true;
+    });
+  });
 
   // ─── Global search ──────────────────────────────────────────────
   readonly searchTerm = signal('');

@@ -22,6 +22,7 @@ export const roleEnum = pgEnum('role', [
   'TRADER',
   'FINANCE',
   'TEAMLEAD',
+  'CREDITMANAGER',
 ]);
 
 export const orderStatusEnum = pgEnum('order_status', [

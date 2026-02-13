@@ -235,15 +235,26 @@ import { API } from '@app/core/config/api';
                   <td class="px-4 py-3 text-xs text-gray-500">{{ formatDate(user.createdAt) }}</td>
                   <td class="px-4 py-3 text-right">
                     @if (user.id !== currentUserId()) {
-                      <button
-                        (click)="toggleActive(user)"
-                        class="rounded-md px-2 py-1 text-xs font-medium transition-colors"
-                        [class]="user.isActive
-                          ? 'text-red-600 hover:bg-red-50'
-                          : 'text-green-600 hover:bg-green-50'"
-                      >
-                        {{ user.isActive ? 'Deactivate' : 'Activate' }}
-                      </button>
+                      <div class="flex items-center justify-end gap-1">
+                        @if (user.is2faEnabled) {
+                          <button
+                            (click)="reset2fa(user)"
+                            class="rounded-md px-2 py-1 text-xs font-medium text-amber-600 hover:bg-amber-50 transition-colors"
+                            title="Force-reset this user's 2FA so they can set it up again"
+                          >
+                            Reset 2FA
+                          </button>
+                        }
+                        <button
+                          (click)="toggleActive(user)"
+                          class="rounded-md px-2 py-1 text-xs font-medium transition-colors"
+                          [class]="user.isActive
+                            ? 'text-red-600 hover:bg-red-50'
+                            : 'text-green-600 hover:bg-green-50'"
+                        >
+                          {{ user.isActive ? 'Deactivate' : 'Activate' }}
+                        </button>
+                      </div>
                     }
                   </td>
                 </tr>
@@ -610,6 +621,7 @@ export class UsersPageComponent implements OnInit, OnDestroy {
     { value: 'TRADER', label: 'Trader' },
     { value: 'FINANCE', label: 'Finance' },
     { value: 'TEAMLEAD', label: 'Teamlead' },
+    { value: 'CREDITMANAGER', label: 'Credit Manager' },
   ];
 
   ngOnInit() {
@@ -677,6 +689,8 @@ export class UsersPageComponent implements OnInit, OnDestroy {
         return 'bg-amber-50 text-amber-700 ring-1 ring-amber-200';
       case 'TEAMLEAD':
         return 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200';
+      case 'CREDITMANAGER':
+        return 'bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200';
       default:
         return 'bg-gray-100 text-gray-600 ring-1 ring-gray-200';
     }
@@ -753,6 +767,28 @@ export class UsersPageComponent implements OnInit, OnDestroy {
       }
     } catch (err) {
       console.error('Failed to toggle user status:', err);
+    }
+  }
+
+  // ── Admin Reset 2FA ─────────────────────────────────────────────
+
+  async reset2fa(user: AdminUserDto) {
+    if (!confirm(`Reset 2FA for ${user.name || user.email}? They will need to set it up again on next login.`)) {
+      return;
+    }
+
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<{ id: string; is2faEnabled: boolean }>>(`${API}/admin/users/${user.id}/reset-2fa`, {}),
+      );
+
+      if (res.success) {
+        this.users.update((list) =>
+          list.map((u) => (u.id === user.id ? { ...u, is2faEnabled: false } : u)),
+        );
+      }
+    } catch (err) {
+      console.error('Failed to reset 2FA:', err);
     }
   }
 

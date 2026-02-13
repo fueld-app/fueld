@@ -61,4 +61,5 @@ export enum Role {
   Trader = 'TRADER',
   Finance = 'FINANCE',
   Teamlead = 'TEAMLEAD',
+  CreditManager = 'CREDITMANAGER',
 }

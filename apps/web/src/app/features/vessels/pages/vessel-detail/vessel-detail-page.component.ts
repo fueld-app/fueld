@@ -643,15 +643,32 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
               <div class="flex-1 min-h-0 divide-y divide-gray-50 overflow-y-auto">
                 @for (vc of vesselCompanies(); track vc.id) {
                   <div class="px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors group">
-                    <div class="flex items-center justify-between">
-                      <div class="flex items-center gap-2">
-                        <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">{{ formatRole(vc.role) }}</span>
-                        @if (vc.source === 'seasearcher') {
-                          <span class="inline-flex items-center rounded-full bg-blue-50 border border-blue-100 px-1.5 py-0.5 text-[9px] font-medium text-blue-600">SS</span>
+                    <div class="flex items-start justify-between gap-2">
+                      <div class="min-w-0">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                          <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600 cursor-help"
+                            [title]="getRoleDescription(vc.role)">{{ formatRole(vc.role) }}</span>
+                          @if (vc.source === 'seasearcher') {
+                            <span class="inline-flex items-center rounded-full bg-blue-50 border border-blue-100 px-1.5 py-0.5 text-[9px] font-medium text-blue-600">SS</span>
+                          }
+                        </div>
+                        <a [routerLink]="['/companies', vc.companyId]" class="mt-1 block font-medium text-brand-700 hover:text-brand-900 hover:underline leading-snug break-words">{{ vc.companyName }}</a>
+                        @if (vc.contactName) {
+                          <p class="text-xs text-gray-500 mt-0.5">{{ vc.contactName }}</p>
                         }
-                        <a [routerLink]="['/companies', vc.companyId]" class="font-medium text-brand-700 hover:text-brand-900 hover:underline">{{ vc.companyName }}</a>
+                        @if (vc.note) {
+                          <button (click)="toggleNote(vc.id)" class="mt-1 flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-600 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                              <path fill-rule="evenodd" d="M18 13V5a2 2 0 00-2-2H4a2 2 0 00-2 2v8a2 2 0 002 2h3l3 3 3-3h3a2 2 0 002-2zM5 7a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1zm1 3a1 1 0 100 2h3a1 1 0 100-2H6z" clip-rule="evenodd" />
+                            </svg>
+                            Note
+                          </button>
+                          @if (expandedNotes().has(vc.id)) {
+                            <p class="text-xs text-gray-400 mt-1 italic bg-gray-50 rounded px-2 py-1">{{ vc.note }}</p>
+                          }
+                        }
                       </div>
-                      <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 pt-0.5">
                         <button (click)="openEditCompany(vc)"
                           class="rounded p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors" title="Edit">
                           <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -666,12 +683,6 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                         </button>
                       </div>
                     </div>
-                    @if (vc.contactName) {
-                      <p class="text-xs text-gray-500 mt-0.5">{{ vc.contactName }}</p>
-                    }
-                    @if (vc.note) {
-                      <p class="text-xs text-gray-400 mt-0.5 italic">{{ vc.note }}</p>
-                    }
                     <p class="text-[10px] text-gray-400 mt-1">
                       Added by {{ vc.addedByName ?? 'Unknown' }} · {{ vc.createdAt | date:'mediumDate' }}
                     </p>
@@ -682,25 +693,38 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                   <div class="border-t border-gray-100 px-5 py-3">
                     <div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Seasearcher Ownership</div>
                     @for (entry of seasearcherSuggestions(); track entry.typeCode + (entry.companyId ?? entry.companyName)) {
-                      <div class="flex items-center justify-between py-2 text-sm">
-                        <div class="flex items-center gap-2 min-w-0">
-                          <span class="inline-flex items-center rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 text-[10px] font-medium text-blue-700 whitespace-nowrap">{{ entry.type }}</span>
-                          <span class="text-gray-700 truncate">{{ entry.companyName }}</span>
-                          @if (entry.country.code) {
-                            <span class="text-xs flex-shrink-0">{{ ownerFlag(entry) }}</span>
+                      <div class="py-2 text-sm">
+                        <div class="flex items-start justify-between gap-2">
+                          <div class="min-w-0">
+                            <span class="inline-flex items-center rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 text-[10px] font-medium text-blue-700 whitespace-nowrap cursor-help"
+                              [title]="getSeasearcherTypeDescription(entry.typeCode)">{{ entry.type }}</span>
+                            <div class="mt-1 leading-snug break-words">
+                              @if (entry.companyId) {
+                                <button (click)="navigateToCompany(entry)"
+                                  [disabled]="navigatingCompanyId() === entry.companyId"
+                                  class="text-left font-medium text-brand-700 hover:text-brand-900 hover:underline transition-colors">
+                                  {{ entry.companyName }}
+                                </button>
+                              } @else {
+                                <span class="text-gray-700">{{ entry.companyName }}</span>
+                              }
+                              @if (entry.country.code) {
+                                <span class="text-xs ml-1">{{ ownerFlag(entry) }}</span>
+                              }
+                            </div>
+                          </div>
+                          @if (entry.companyId) {
+                            <button (click)="linkSeasearcherCompany(entry)"
+                              [disabled]="navigatingCompanyId() === entry.companyId"
+                              class="flex-shrink-0 mt-0.5 rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50 transition-colors">
+                              @if (navigatingCompanyId() === entry.companyId) {
+                                <span class="inline-flex items-center gap-1"><svg class="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Linking…</span>
+                              } @else {
+                                Link
+                              }
+                            </button>
                           }
                         </div>
-                        @if (entry.companyId) {
-                          <button (click)="linkSeasearcherCompany(entry)"
-                            [disabled]="navigatingCompanyId() === entry.companyId"
-                            class="flex-shrink-0 ml-2 rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50 transition-colors">
-                            @if (navigatingCompanyId() === entry.companyId) {
-                              <span class="inline-flex items-center gap-1"><svg class="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Linking…</span>
-                            } @else {
-                              Link
-                            }
-                          </button>
-                        }
                       </div>
                     }
                   </div>
@@ -2090,6 +2114,27 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
     const found = this.roleOptions().find(r => r.key === role);
     if (found) return found.label;
     return role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/\B\w+/g, w => w.toLowerCase());
+  }
+
+  getRoleDescription(role: string): string {
+    const found = this.roleOptions().find(r => r.key === role);
+    return found?.description ?? '';
+  }
+
+  /** Map Seasearcher typeCode (e.g. 'BO') → local role key, then get its description */
+  getSeasearcherTypeDescription(typeCode: string): string {
+    const mappedRole = SS_CODE_TO_ROLE[typeCode];
+    if (!mappedRole) return '';
+    return this.getRoleDescription(mappedRole);
+  }
+
+  /** Track which note IDs are expanded */
+  readonly expandedNotes = signal<Set<string>>(new Set());
+
+  toggleNote(id: string): void {
+    const s = new Set(this.expandedNotes());
+    if (s.has(id)) s.delete(id); else s.add(id);
+    this.expandedNotes.set(s);
   }
 
   async saveVesselCompany(): Promise<void> {

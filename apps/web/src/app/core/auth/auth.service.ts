@@ -61,6 +61,8 @@ export class AuthService {
   readonly userEmail = computed(() => this.user()?.email ?? '');
   readonly userRole = computed(() => this.user()?.role ?? '');
   readonly isAdmin = computed(() => this.user()?.role === Role.Admin);
+  readonly isCreditManager = computed(() => this.user()?.role === Role.CreditManager);
+  readonly canAccessCredit = computed(() => this.isAdmin() || this.isCreditManager());
   readonly avatarUrl = computed(() => {
     const url = this.user()?.avatarUrl;
     if (!url) return null;

@@ -217,7 +217,7 @@ async function resolveVisibleTraderIds(
       .where(
         and(
           eq(users.tenantId, tenantId),
-          inArray(users.role, ['TRADER', 'ADMIN']),
+          inArray(users.role, ['TRADER', 'ADMIN', 'CREDITMANAGER']),
         ),
       );
     return allTraders.map((u) => u.id);

@@ -8,6 +8,7 @@ import {
   toggleUserActive,
   acceptInvitation,
   updateUserAllowedIps,
+  adminReset2fa,
 } from './admin.service';
 import { disconnectUserSessions } from '../activity/session-tracker';
 import type { ApiResponse } from '@fueld/types';
@@ -97,7 +98,7 @@ export const adminController = new Elysia({ prefix: '/admin' })
       const invite = await inviteUser({
         email: body.email,
         name: body.name,
-        role: body.role as 'ADMIN' | 'TRADER' | 'FINANCE' | 'TEAMLEAD',
+        role: body.role as 'ADMIN' | 'TRADER' | 'FINANCE' | 'TEAMLEAD' | 'CREDITMANAGER',
         invitedBy: auth.sub,
       });
 
@@ -176,7 +177,7 @@ export const adminController = new Elysia({ prefix: '/admin' })
 
       const data = await updateUserRole(
         params.id,
-        body.role as 'ADMIN' | 'TRADER' | 'FINANCE' | 'TEAMLEAD',
+        body.role as 'ADMIN' | 'TRADER' | 'FINANCE' | 'TEAMLEAD' | 'CREDITMANAGER',
       );
       return { success: true, data } satisfies ApiResponse<unknown>;
     } catch (err) {
@@ -258,6 +259,30 @@ export const adminController = new Elysia({ prefix: '/admin' })
     params: t.Object({ id: t.String() }),
     body: t.Object({ allowedIps: t.Union([t.Array(t.String()), t.Null()]) }),
     detail: { tags: ['Admin'], summary: 'Set allowed IP addresses for a user', security: [{ bearerAuth: [] }] },
+  })
+
+  // ── POST /admin/users/:id/reset-2fa ──────────────────────────────
+  .post('/users/:id/reset-2fa', async ({ auth, params }) => {
+    try {
+      requireAdmin(auth);
+
+      if (params.id === auth.sub) {
+        return {
+          success: false,
+          data: null,
+          message: 'You cannot reset your own 2FA from the admin panel',
+        } satisfies ApiResponse<null>;
+      }
+
+      const data = await adminReset2fa(params.id);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to reset 2FA';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    params: t.Object({ id: t.String() }),
+    detail: { tags: ['Admin'], summary: 'Admin force-reset a user\'s 2FA', security: [{ bearerAuth: [] }] },
   });
 
 /** Validate an IP address or CIDR notation */
