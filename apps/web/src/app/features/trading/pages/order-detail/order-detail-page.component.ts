@@ -89,6 +89,21 @@ interface TeamUserOption {
       [autoSaving]="autoSaving()"
       [lastSaved]="lastSaved()"
     >
+      <span subtitle-extra class="flex items-center gap-2">
+        <span class="text-gray-300">|</span>
+        <span class="text-xs text-gray-500">Responsible:</span>
+        <select
+          [ngModel]="order()?.salesRepId ?? ''"
+          (ngModelChange)="onResponsibleUserChange($event)"
+          [disabled]="isReadonly()"
+          class="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
+        >
+          <option value="">— None —</option>
+          @for (u of teamUsers(); track u.id) {
+            <option [value]="u.id">{{ u.name }}</option>
+          }
+        </select>
+      </span>
       <div detail-actions class="flex items-center gap-3">
         <app-header-actions
           [orderId]="orderId()"
@@ -239,33 +254,44 @@ interface TeamUserOption {
         }
       </div>
       <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[260px] overflow-auto">
-        <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Customer Note</p>
-        @if (isReadonly()) {
-          <p class="mt-1 text-sm text-gray-700 whitespace-pre-line">{{ order()?.customerNote || '-' }}</p>
+        <div class="flex items-center gap-3 mb-1.5">
+          <button
+            (click)="noteTab.set('customer')"
+            class="text-xs font-medium uppercase tracking-wider transition-colors"
+            [class]="noteTab() === 'customer' ? 'text-brand-600' : 'text-gray-400 hover:text-gray-600'"
+          >Customer Note</button>
+          <button
+            (click)="noteTab.set('supplier')"
+            class="text-xs font-medium uppercase tracking-wider transition-colors"
+            [class]="noteTab() === 'supplier' ? 'text-brand-600' : 'text-gray-400 hover:text-gray-600'"
+          >Supplier Note</button>
+        </div>
+        @if (noteTab() === 'customer') {
+          @if (isReadonly()) {
+            <p class="mt-1 text-sm text-gray-700 whitespace-pre-line">{{ order()?.customerNote || '-' }}</p>
+          } @else {
+            <textarea
+              rows="3"
+              [ngModel]="order()?.customerNote ?? ''"
+              (ngModelChange)="onCustomerNoteChange($event)"
+              placeholder="Customer note to include in PDFs and emails"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
+                     focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            ></textarea>
+          }
         } @else {
-          <textarea
-            rows="3"
-            [ngModel]="order()?.customerNote ?? ''"
-            (ngModelChange)="onCustomerNoteChange($event)"
-            placeholder="Customer note to include in PDFs and emails"
-            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
-                   focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-          ></textarea>
-        }
-      </div>
-      <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[260px] overflow-auto">
-        <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Supplier Note</p>
-        @if (isReadonly()) {
-          <p class="mt-1 text-sm text-gray-700 whitespace-pre-line">{{ order()?.supplierNote || '-' }}</p>
-        } @else {
-          <textarea
-            rows="3"
-            [ngModel]="order()?.supplierNote ?? ''"
-            (ngModelChange)="onSupplierNoteChange($event)"
-            placeholder="Supplier note"
-            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
-                   focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-          ></textarea>
+          @if (isReadonly()) {
+            <p class="mt-1 text-sm text-gray-700 whitespace-pre-line">{{ order()?.supplierNote || '-' }}</p>
+          } @else {
+            <textarea
+              rows="3"
+              [ngModel]="order()?.supplierNote ?? ''"
+              (ngModelChange)="onSupplierNoteChange($event)"
+              placeholder="Supplier note"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
+                     focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            ></textarea>
+          }
         }
       </div>
     </app-trading-detail-meta-cards>
@@ -280,54 +306,53 @@ interface TeamUserOption {
       (itemsChange)="onItemsChange($event)"
     />
 
-    <div class="mt-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-      <div class="flex items-center justify-between gap-4">
-        <div>
-          <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Payments</h3>
-          <p class="mt-1 text-xs text-gray-500">Total paid: {{ paymentsTotal() | number : '1.2-2' }} {{ order()?.currency ?? 'USD' }}</p>
-        </div>
-        <button
-          type="button"
-          (click)="openPaymentModal()"
-          [disabled]="!canRecordPayment()"
-          class="inline-flex items-center justify-center rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold
-                 text-white shadow-sm transition-colors hover:bg-brand-700 disabled:opacity-50"
-        >
-          Add payment
-        </button>
-      </div>
-      <div class="mt-4">
-        @if (paymentsLoading()) {
-          <p class="text-sm text-gray-400">Loading payments...</p>
-        } @else if (payments().length === 0) {
-          <p class="text-sm text-gray-400">No payments recorded yet.</p>
-        } @else {
-          <ul class="divide-y divide-gray-100">
-            @for (payment of payments(); track payment.id) {
-              <li class="flex items-start justify-between gap-4 py-3 text-sm">
-                <div>
-                  <div class="font-semibold text-gray-900">
-                    {{ payment.amount }} {{ payment.currency }}
-                  </div>
-                  <div class="mt-0.5 text-xs text-gray-500">
-                    {{ payment.receivedAt | date : 'mediumDate' }}
-                    @if (payment.method) { · {{ payment.method }} }
-                  </div>
-                  @if (payment.note) {
-                    <div class="mt-1 text-xs text-gray-600 whitespace-pre-line">{{ payment.note }}</div>
-                  }
-                </div>
-                <div class="text-xs text-gray-400">{{ payment.createdAt | date : 'short' }}</div>
-              </li>
-            }
-          </ul>
-        }
-      </div>
-    </div>
-
-    <!-- Attachments + Comments + Activity (same row on desktop) -->
+    <!-- Payments + Attachments + Comments + Activity (same row on desktop) -->
     @if (orderId() || order()?.id) {
-      <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div class="mt-6 grid grid-cols-1 gap-6 min-[900px]:grid-cols-2 min-[1600px]:grid-cols-4">
+        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[520px] flex flex-col">
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Payments</h3>
+              <p class="mt-1 text-xs text-gray-500">Total paid: {{ paymentsTotal() | number : '1.2-2' }} {{ order()?.currency ?? 'USD' }}</p>
+            </div>
+            <button
+              type="button"
+              (click)="openPaymentModal()"
+              [disabled]="!canRecordPayment()"
+              class="inline-flex items-center justify-center rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold
+                     text-white shadow-sm transition-colors hover:bg-brand-700 disabled:opacity-50"
+            >
+              Add payment
+            </button>
+          </div>
+          <div class="mt-4 flex-1 overflow-auto">
+            @if (paymentsLoading()) {
+              <p class="text-sm text-gray-400">Loading payments...</p>
+            } @else if (payments().length === 0) {
+              <p class="text-sm text-gray-400">No payments recorded yet.</p>
+            } @else {
+              <ul class="divide-y divide-gray-100">
+                @for (payment of payments(); track payment.id) {
+                  <li class="flex items-start justify-between gap-4 py-3 text-sm">
+                    <div>
+                      <div class="font-semibold text-gray-900">
+                        {{ payment.amount }} {{ payment.currency }}
+                      </div>
+                      <div class="mt-0.5 text-xs text-gray-500">
+                        {{ payment.receivedAt | date : 'mediumDate' }}
+                        @if (payment.method) { · {{ payment.method }} }
+                      </div>
+                      @if (payment.note) {
+                        <div class="mt-1 text-xs text-gray-600 whitespace-pre-line">{{ payment.note }}</div>
+                      }
+                    </div>
+                    <div class="text-xs text-gray-400">{{ payment.createdAt | date : 'short' }}</div>
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+        </div>
         <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[520px] flex flex-col">
           <div class="flex items-center justify-between">
             <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Attachments</h3>
@@ -570,6 +595,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   readonly paymentReceivedAt = signal('');
   readonly paymentMethod = signal('');
   readonly paymentNote = signal('');
+  readonly noteTab = signal<'customer' | 'supplier'>('customer');
 
   // ─── Autosave ────────────────────────────────────────────────────
 
