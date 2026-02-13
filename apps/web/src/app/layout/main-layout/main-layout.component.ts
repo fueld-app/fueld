@@ -44,7 +44,7 @@ interface SearchResult {
   id: string;
   name: string;
   subtitle: string;
-  kind: 'place' | 'company' | 'vessel';
+  kind: 'place' | 'company' | 'vessel' | 'order';
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -296,7 +296,11 @@ const NAVIGATION: NavItem[] = [
                     class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50"
                     (click)="goToResult(result)"
                   >
-                    @if (result.kind === 'company') {
+                    @if (result.kind === 'order') {
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-amber-500" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd" />
+                      </svg>
+                    } @else if (result.kind === 'company') {
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-2a1 1 0 00-1-1H9a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clip-rule="evenodd" />
                       </svg>
@@ -314,8 +318,8 @@ const NAVIGATION: NavItem[] = [
                       <p class="truncate text-xs text-gray-500">{{ result.subtitle }}</p>
                     </div>
                     <span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium"
-                      [class]="result.kind === 'company' ? 'bg-blue-50 text-blue-600' : result.kind === 'vessel' ? 'bg-teal-50 text-teal-600' : 'bg-gray-100 text-gray-500'">
-                      {{ result.kind === 'company' ? 'Company' : result.kind === 'vessel' ? 'Vessel' : 'Place' }}
+                      [class]="result.kind === 'order' ? 'bg-amber-50 text-amber-600' : result.kind === 'company' ? 'bg-blue-50 text-blue-600' : result.kind === 'vessel' ? 'bg-teal-50 text-teal-600' : 'bg-gray-100 text-gray-500'">
+                      {{ result.kind === 'order' ? 'Order' : result.kind === 'company' ? 'Company' : result.kind === 'vessel' ? 'Vessel' : 'Place' }}
                     </span>
                   </button>
                 }
@@ -601,7 +605,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
   async executeSearch(term: string): Promise<void> {
     try {
-      const [placesRes, companiesRes, vesselsRes] = await Promise.all([
+      const [placesRes, companiesRes, vesselsRes, ordersRes] = await Promise.all([
         firstValueFrom(
           this.http.get<ApiResponse<{ places: PlaceDto[]; total: number }>>(
             `${API}/lloyds/places/local?search=${encodeURIComponent(term)}&limit=5`,
@@ -615,6 +619,11 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
         firstValueFrom(
           this.http.get<ApiResponse<{ vessels: VesselDto[]; total: number }>>(
             `${API}/vessels/local?search=${encodeURIComponent(term)}&limit=5`,
+          ),
+        ),
+        firstValueFrom(
+          this.http.get<ApiResponse<{ items: any[]; total: number }>>(
+            `${API}/orders?search=${encodeURIComponent(term)}&limit=5`,
           ),
         ),
       ]);
@@ -654,6 +663,17 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
         }
       }
 
+      if (ordersRes.success && ordersRes.data?.items?.length) {
+        for (const o of ordersRes.data.items) {
+          results.push({
+            id: o.orderNumber,
+            name: o.orderNumber,
+            subtitle: [o.status, o.clientName, o.vesselName, o.placeName].filter(Boolean).join(' · '),
+            kind: 'order',
+          });
+        }
+      }
+
       this.searchResults.set(results);
     } catch {
       this.searchResults.set([]);
@@ -683,8 +703,17 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     this.router.navigate(['/vessels', id]);
   }
 
+  goToOrder(orderNumber: string): void {
+    this.searchOpen.set(false);
+    this.searchTerm.set('');
+    this.searchResults.set([]);
+    this.router.navigate(['/trading/orders', orderNumber]);
+  }
+
   goToResult(result: SearchResult): void {
-    if (result.kind === 'company') {
+    if (result.kind === 'order') {
+      this.goToOrder(result.id);
+    } else if (result.kind === 'company') {
       this.goToCompany(result.id);
     } else if (result.kind === 'vessel') {
       this.goToVessel(result.id);
