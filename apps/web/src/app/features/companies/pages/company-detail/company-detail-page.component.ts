@@ -502,6 +502,24 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                   >
                     Emails
                   </button>
+                  @if (enrichment()?.companyFleetStats || company()?.companyRoles?.length) {
+                    <button
+                      type="button"
+                      class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
+                      [class]="companyInfoTab() === 'fleet' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
+                      (click)="companyInfoTab.set('fleet')"
+                    >
+                      Fleet
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
+                      [class]="companyInfoTab() === 'roles' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
+                      (click)="companyInfoTab.set('roles')"
+                    >
+                      Roles
+                    </button>
+                  }
                 </div>
                 </div>
               </div>
@@ -832,6 +850,46 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                         </div>
                       }
                     </div>
+                  }
+                } @else if (companyInfoTab() === 'fleet') {
+                  @if (enrichment()?.companyFleetStats) {
+                    <div class="space-y-3">
+                      <div class="flex justify-between">
+                        <span class="text-gray-500">Total Fleet</span>
+                        <span class="font-medium text-gray-900">{{ enrichment()!.companyFleetStats!.totalFleetSize }} vessels</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-gray-500">Most Common Type</span>
+                        <span class="font-medium text-gray-900">{{ enrichment()!.companyFleetStats!.mostFrequentVesselType }}</span>
+                      </div>
+                      @if (enrichment()!.companyFleetStats!.fleetStatsBreakdown.length) {
+                        <div class="pt-2 border-t border-gray-100">
+                          <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Breakdown</span>
+                          <div class="mt-2 space-y-2">
+                            @for (stat of enrichment()!.companyFleetStats!.fleetStatsBreakdown; track stat.key) {
+                              <div class="flex justify-between text-xs">
+                                <span class="text-gray-600">{{ stat.key }}</span>
+                                <span class="text-gray-900 font-medium">{{ stat.vesselCount }}</span>
+                              </div>
+                            }
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  } @else {
+                    <div class="text-xs text-gray-500 text-center">Fleet statistics unavailable</div>
+                  }
+                } @else if (companyInfoTab() === 'roles') {
+                  @if (company()?.companyRoles?.length) {
+                    <div class="flex flex-wrap gap-2">
+                      @for (role of company()!.companyRoles!; track role) {
+                        <span class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700">
+                          {{ role }}
+                        </span>
+                      }
+                    </div>
+                  } @else {
+                    <div class="text-xs text-gray-500 text-center">Company roles unavailable</div>
                   }
                 }
               </div>
@@ -1473,76 +1531,6 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
             } @else if (enrichment()) {
 
 
-              <!-- Fleet Stats & Company Roles -->
-              @if (enrichment()!.companyFleetStats || company()!.companyRoles?.length) {
-                <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-6 flex flex-col overflow-hidden">
-                  <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
-                    <h2 class="text-sm font-semibold text-gray-700">Fleet & Roles</h2>
-                    <div class="flex gap-1">
-                      <button
-                        type="button"
-                        class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
-                        [class]="fleetRolesTab() === 'fleet' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
-                        (click)="fleetRolesTab.set('fleet')"
-                      >
-                        Fleet Statistics
-                      </button>
-                      <button
-                        type="button"
-                        class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
-                        [class]="fleetRolesTab() === 'roles' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
-                        (click)="fleetRolesTab.set('roles')"
-                      >
-                        Company Roles
-                      </button>
-                    </div>
-                  </div>
-                  <div class="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3 text-sm">
-                    @if (fleetRolesTab() === 'fleet') {
-                      @if (enrichment()!.companyFleetStats) {
-                        <div class="space-y-3">
-                          <div class="flex justify-between">
-                            <span class="text-gray-500">Total Fleet</span>
-                            <span class="font-medium text-gray-900">{{ enrichment()!.companyFleetStats!.totalFleetSize }} vessels</span>
-                          </div>
-                          <div class="flex justify-between">
-                            <span class="text-gray-500">Most Common Type</span>
-                            <span class="font-medium text-gray-900">{{ enrichment()!.companyFleetStats!.mostFrequentVesselType }}</span>
-                          </div>
-                          @if (enrichment()!.companyFleetStats!.fleetStatsBreakdown.length) {
-                            <div class="pt-2 border-t border-gray-100">
-                              <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Breakdown</span>
-                              <div class="mt-2 space-y-2">
-                                @for (stat of enrichment()!.companyFleetStats!.fleetStatsBreakdown; track stat.key) {
-                                  <div class="flex justify-between text-xs">
-                                    <span class="text-gray-600">{{ stat.key }}</span>
-                                    <span class="text-gray-900 font-medium">{{ stat.vesselCount }}</span>
-                                  </div>
-                                }
-                              </div>
-                            </div>
-                          }
-                        </div>
-                      } @else {
-                        <div class="text-xs text-gray-500 text-center">Fleet statistics unavailable</div>
-                      }
-                    } @else {
-                      @if (company()!.companyRoles?.length) {
-                        <div class="flex flex-wrap gap-2">
-                          @for (role of company()!.companyRoles!; track role) {
-                            <span class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700">
-                              {{ role }}
-                            </span>
-                          }
-                        </div>
-                      } @else {
-                        <div class="text-xs text-gray-500 text-center">Company roles unavailable</div>
-                      }
-                    }
-                  </div>
-                </div>
-              }
-
               <!-- Registration + Ownership -->
               <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-8 flex flex-col overflow-hidden">
                 <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
@@ -1989,7 +1977,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly sanctionsLoading = signal(false);
   readonly registrationTab = signal<'registration' | 'ownership'>('registration');
   readonly sanctionsTab = signal<'risk' | 'sanctions' | 'seizures'>('risk');
-  readonly companyInfoTab = signal<'info' | 'headOffice' | 'offices' | 'emails'>('info');
+  readonly companyInfoTab = signal<'info' | 'headOffice' | 'offices' | 'emails' | 'fleet' | 'roles'>('info');
   readonly fleetRolesTab = signal<'fleet' | 'roles'>('fleet');
 
   // Contacts
