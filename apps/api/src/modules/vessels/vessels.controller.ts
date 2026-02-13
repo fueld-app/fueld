@@ -11,6 +11,8 @@
 //  POST   /vessels/local
 //  POST   /vessels/import  { seasearcherId }
 //  POST   /vessels/local/:id/sync
+//  POST   /vessels/local/:id/merge  { seasearcherId }
+//  GET    /vessels/seasearcher-lookup?imo=...
 //  PATCH  /vessels/local/:id
 //  DELETE /vessels/local/:id
 // ═══════════════════════════════════════════════════════════════════════
@@ -30,6 +32,8 @@ import {
   importVesselFromSeasearcher,
   syncVesselFromSeasearcher,
   deleteVessel,
+  lookupSeasearcherByImo,
+  mergeWithSeasearcher,
   searchVesselsTypeahead,
   getVesselEnrichment,
   getOrdersForVessel,
@@ -268,6 +272,58 @@ export const vesselsController = new Elysia({ prefix: '/vessels' })
       detail: {
         tags: ['Vessels'],
         summary: 'Sync vessel data from Seasearcher',
+      },
+    },
+  )
+
+  // ─── Lookup Seasearcher by IMO ──────────────────────────────────────
+  .get(
+    '/seasearcher-lookup',
+    async ({ query }) => {
+      if (!query.imo || query.imo.length < 5) {
+        return { success: false, data: null, message: 'IMO is required (min 5 chars)' };
+      }
+      try {
+        const match = await lookupSeasearcherByImo(query.imo);
+        return { success: true, data: match } satisfies ApiResponse<typeof match>;
+      } catch (err: any) {
+        return { success: false, data: null, message: err.message ?? 'Lookup failed' };
+      }
+    },
+    {
+      query: t.Object({
+        imo: t.String(),
+      }),
+      detail: {
+        tags: ['Vessels'],
+        summary: 'Check if a vessel exists in Seasearcher by IMO',
+      },
+    },
+  )
+
+  // ─── Merge Manual Vessel with Seasearcher ──────────────────────────
+  .post(
+    '/local/:id/merge',
+    async ({ params, body }) => {
+      try {
+        const merged = await mergeWithSeasearcher(params.id, body.seasearcherId);
+        if (!merged) {
+          return { success: false, data: null, message: 'Vessel not found' };
+        }
+        return { success: true, data: merged } satisfies ApiResponse<typeof merged>;
+      } catch (err: any) {
+        console.error('[Vessels] Merge failed:', err);
+        return { success: false, data: null, message: err.message ?? 'Merge failed' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({
+        seasearcherId: t.String(),
+      }),
+      detail: {
+        tags: ['Vessels'],
+        summary: 'Link a manually-created vessel to Seasearcher and sync data',
       },
     },
   )

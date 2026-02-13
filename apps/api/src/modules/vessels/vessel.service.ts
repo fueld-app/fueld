@@ -333,6 +333,103 @@ export async function deleteVessel(id: string) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+//  LOOKUP VESSEL BY IMO IN SEASEARCHER
+//  Returns the first Seasearcher match for an IMO, or null.
+// ═══════════════════════════════════════════════════════════════════════
+
+export async function lookupSeasearcherByImo(imo: string) {
+  try {
+    const ss = await seasearcherVesselSearch<SeasearcherVesselSearchResponse>(imo, 10);
+    if (!ss.results?.length) return null;
+
+    // Find exact IMO match
+    const match = ss.results.find((r) => String(r.imo) === imo);
+    if (!match) return null;
+
+    // Check if already imported by another local vessel
+    const existing = await getVesselBySeasearcherId(String(match.id));
+
+    return {
+      seasearcherId: String(match.id),
+      name: match.name,
+      imo: match.imo ? String(match.imo) : null,
+      mmsi: match.mmsi ? String(match.mmsi) : null,
+      flag: match.flag?.name ?? null,
+      flagCode: match.flag?.code ?? null,
+      type: match.type ?? null,
+      status: match.status ?? null,
+      dwt: match.deadWeightTonnage ?? null,
+      grossTonnage: match.grossTonnage ?? null,
+      buildYear: match.buildYear ?? null,
+      isSanctioned: match.isSanctioned,
+      alreadyImportedByVesselId: existing?.id ?? null,
+    };
+  } catch (err) {
+    console.error('[Vessels] Seasearcher IMO lookup failed:', err);
+    return null;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  MERGE MANUAL VESSEL WITH SEASEARCHER
+//  Links an existing manual vessel to Seasearcher by setting the
+//  seasearcherId and syncing enrichment data. Preserves the local
+//  vessel ID so all company relations, orders, comments etc. persist.
+// ═══════════════════════════════════════════════════════════════════════
+
+export async function mergeWithSeasearcher(vesselId: string, seasearcherId: string) {
+  const local = await getVesselById(vesselId);
+  if (!local) return null;
+
+  // Don't merge if already linked
+  if (local.seasearcherId) {
+    throw new Error('Vessel is already linked to Seasearcher');
+  }
+
+  // Ensure no other local vessel is using this seasearcherId
+  const conflict = await getVesselBySeasearcherId(seasearcherId);
+  if (conflict) {
+    throw new Error(`Another vessel (${conflict.name}) is already linked to this Seasearcher record`);
+  }
+
+  // Fetch full detail from Seasearcher
+  const detail = await seasearcherVesselDetail<SeasearcherVesselDetailResponse>(seasearcherId);
+
+  // Merge: Seasearcher data wins for enrichment fields, keep local vessel ID
+  const [updated] = await db
+    .update(vessels)
+    .set({
+      seasearcherId: String(detail.id),
+      name: detail.name || local.name,
+      imo: detail.imo ? String(detail.imo) : local.imo,
+      mmsi: detail.mmsi ? String(detail.mmsi) : local.mmsi,
+      flag: detail.flag?.name ?? local.flag,
+      flagCode: detail.flag?.code ?? null,
+      type: detail.type ?? local.type,
+      status: detail.status ?? local.status,
+      loa: detail.lengthOverall ? parseFloat(detail.lengthOverall) : local.loa,
+      breadth: detail.breadthExtreme
+        ? parseFloat(detail.breadthExtreme)
+        : detail.breadthMoulded
+          ? parseFloat(detail.breadthMoulded)
+          : local.breadth,
+      depth: detail.depth ? parseFloat(detail.depth) : local.depth,
+      draught: detail.latestInformation?.draught ?? local.draught,
+      deadWeightTonnage: detail.deadWeightTonnage ?? local.deadWeightTonnage,
+      grossTonnage: detail.grossTonnage ?? local.grossTonnage,
+      buildYear: detail.buildYear ?? local.buildYear,
+      builder: detail.builtBy ?? local.builder,
+      classificationSociety: detail.currentClassName ?? local.classificationSociety,
+      lastSynced: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(vessels.id, vesselId))
+    .returning();
+
+  return updated ?? null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 //  SEARCH VESSELS (local + Seasearcher typeahead)
 // ═══════════════════════════════════════════════════════════════════════
 

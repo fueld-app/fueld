@@ -13,7 +13,7 @@ import {
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { DatePipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subscription, skip } from 'rxjs';
 import { Title } from '@angular/platform-browser';
@@ -110,7 +110,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
 @Component({
   selector: 'app-vessel-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, FormsModule, RouterLink, ActivityTimelineComponent, LastEditedBadgeComponent, CommentsCardComponent],
+  imports: [DatePipe, DecimalPipe, FormsModule, RouterLink, ActivityTimelineComponent, LastEditedBadgeComponent, CommentsCardComponent],
   styles: [`
     :host ::ng-deep .leaflet-container { font-family: inherit; }
   `],
@@ -1074,6 +1074,76 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
         </div>
       }
 
+      <!-- Seasearcher Merge Prompt -->
+      @if (showMergePrompt() && seasearcherMatch()) {
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
+                  <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
+                </svg>
+              </div>
+              <h3 class="text-lg font-semibold text-gray-900">Seasearcher Match Found</h3>
+            </div>
+            <p class="text-sm text-gray-600 mb-4">
+              A vessel matching IMO <strong>{{ seasearcherMatch()!.imo }}</strong> was found in Seasearcher.
+              Would you like to link this vessel to sync data automatically?
+            </p>
+            <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 mb-4">
+              <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                <div>
+                  <span class="text-gray-500">Name</span>
+                  <div class="font-medium text-gray-900">{{ seasearcherMatch()!.name }}</div>
+                </div>
+                @if (seasearcherMatch()!.type) {
+                  <div>
+                    <span class="text-gray-500">Type</span>
+                    <div class="font-medium text-gray-900">{{ seasearcherMatch()!.type }}</div>
+                  </div>
+                }
+                @if (seasearcherMatch()!.flag) {
+                  <div>
+                    <span class="text-gray-500">Flag</span>
+                    <div class="font-medium text-gray-900">{{ seasearcherMatch()!.flag }}</div>
+                  </div>
+                }
+                @if (seasearcherMatch()!.dwt) {
+                  <div>
+                    <span class="text-gray-500">DWT</span>
+                    <div class="font-medium text-gray-900">{{ seasearcherMatch()!.dwt | number }}</div>
+                  </div>
+                }
+                @if (seasearcherMatch()!.grossTonnage) {
+                  <div>
+                    <span class="text-gray-500">Gross Tonnage</span>
+                    <div class="font-medium text-gray-900">{{ seasearcherMatch()!.grossTonnage | number }}</div>
+                  </div>
+                }
+                @if (seasearcherMatch()!.buildYear) {
+                  <div>
+                    <span class="text-gray-500">Build Year</span>
+                    <div class="font-medium text-gray-900">{{ seasearcherMatch()!.buildYear }}</div>
+                  </div>
+                }
+              </div>
+            </div>
+            <p class="text-xs text-gray-500 mb-4">
+              Company associations, orders and comments will be preserved. Vessel details will be updated from Seasearcher.
+            </p>
+            <div class="flex justify-end gap-3">
+              <button (click)="dismissMerge()" class="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                Dismiss
+              </button>
+              <button (click)="confirmMerge()" [disabled]="merging()" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                @if (merging()) { Merging… } @else { Merge &amp; Sync }
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
       @if (toast()) {
         <div
           class="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-lg border px-4 py-3 text-sm font-medium shadow-lg transition-all"
@@ -1158,6 +1228,25 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
 
   // Place navigation
   readonly navigatingPlaceId = signal<string | null>(null);
+
+  // Seasearcher merge prompt
+  readonly seasearcherMatch = signal<{
+    seasearcherId: string;
+    name: string;
+    imo: string | null;
+    mmsi: string | null;
+    flag: string | null;
+    flagCode: string | null;
+    type: string | null;
+    status: string | null;
+    dwt: number | null;
+    grossTonnage: number | null;
+    buildYear: number | null;
+    isSanctioned: boolean;
+    alreadyImportedByVesselId: string | null;
+  } | null>(null);
+  readonly showMergePrompt = signal(false);
+  readonly merging = signal(false);
 
   // Delete
   readonly confirmDeleteOpen = signal(false);
@@ -1738,11 +1827,69 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
         }
       }
       this.editing.set(false);
+
+      // After saving, check Seasearcher for IMO match on manual vessels
+      const savedVessel = this.vessel()!;
+      const currentImo = savedVessel.imo;
+      if (currentImo && !savedVessel.seasearcherId) {
+        this.checkSeasearcherByImo(currentImo);
+      }
     } catch (err) {
       console.error('Save failed:', err);
     } finally {
       this.editSaving.set(false);
     }
+  }
+
+  // ─── Seasearcher IMO merge ─────────────────────────────────────────
+  private async checkSeasearcherByImo(imo: string): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<any>>(`${API}/vessels/seasearcher-lookup`, { params: { imo } }),
+      );
+      if (res.success && res.data && !res.data.alreadyImportedByVesselId) {
+        this.seasearcherMatch.set(res.data);
+        this.showMergePrompt.set(true);
+      }
+    } catch {
+      // Lookup is best-effort — don't block the user
+    }
+  }
+
+  async confirmMerge(): Promise<void> {
+    const match = this.seasearcherMatch();
+    const v = this.vessel();
+    if (!match || !v) return;
+
+    this.merging.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<VesselDto>>(`${API}/vessels/local/${v.id}/merge`, {
+          seasearcherId: match.seasearcherId,
+        }),
+      );
+      if (res.success && res.data) {
+        this.vessel.set(res.data);
+        this.toast.set({ type: 'success', message: 'Vessel merged with Seasearcher — data will now sync automatically' });
+        setTimeout(() => this.toast.set(null), 5000);
+        // Load enrichment & movements now that we have a seasearcherId
+        this.loadEnrichment(res.data.seasearcherId);
+        this.loadMovements(res.data.seasearcherId);
+      }
+    } catch (err: any) {
+      const msg = err?.error?.message ?? 'Failed to merge with Seasearcher';
+      this.toast.set({ type: 'error', message: msg });
+      setTimeout(() => this.toast.set(null), 5000);
+    } finally {
+      this.merging.set(false);
+      this.showMergePrompt.set(false);
+      this.seasearcherMatch.set(null);
+    }
+  }
+
+  dismissMerge(): void {
+    this.showMergePrompt.set(false);
+    this.seasearcherMatch.set(null);
   }
 
   // ─── Delete ────────────────────────────────────────────────────────
