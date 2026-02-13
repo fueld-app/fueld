@@ -1006,7 +1006,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
 
         <!-- Port Call History -->
         @if (vessel()!.seasearcherId) {
-          <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-[21] min-[900px]:col-span-2 min-[1600px]:col-span-3 min-[2000px]:col-span-4">
+          <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-[21] min-[900px]:col-span-2">
             <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
               <h2 class="text-sm font-semibold text-gray-700">Port Call History</h2>
               @if (movements().length) {
