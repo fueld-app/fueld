@@ -476,6 +476,16 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                   >
                     Head Office
                   </button>
+                  @if (enrichment()?.offices?.length) {
+                    <button
+                      type="button"
+                      class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
+                      [class]="companyInfoTab() === 'offices' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
+                      (click)="companyInfoTab.set('offices')"
+                    >
+                      Offices
+                    </button>
+                  }
                 </div>
                 </div>
               </div>
@@ -599,7 +609,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                       </dd>
                     </div>
                   </dl>
-                } @else {
+                } @else if (companyInfoTab() === 'headOffice') {
                   <div class="space-y-4">
                     @if (
                       company()!.headOfficeAddress ||
@@ -680,6 +690,22 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                       <div class="text-xs text-gray-500 text-center">Head office data unavailable</div>
                     }
                   </div>
+                } @else if (companyInfoTab() === 'offices') {
+                  @if (enrichment()?.offices?.length) {
+                    <div class="divide-y divide-gray-50 -mx-5 -mt-4">
+                      @for (office of enrichment()!.offices; track office.officeId) {
+                        <div class="px-5 py-3 text-sm">
+                          <span class="font-medium text-gray-900">{{ office.town }}</span>
+                          <span class="text-gray-400 ml-1">{{ office.country }}</span>
+                          @if (office.addressLine1) {
+                            <p class="text-xs text-gray-500 mt-0.5">{{ office.addressLine1 }}</p>
+                          }
+                        </div>
+                      }
+                    </div>
+                  } @else {
+                    <div class="text-xs text-gray-500 text-center">No offices on file</div>
+                  }
                 }
               </div>
             </div>
@@ -1628,29 +1654,6 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 </div>
               </div>
 
-              <!-- Offices -->
-              @if (enrichment()!.offices.length > 1) {
-                <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-10">
-                  <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
-                    <h2 class="text-sm font-semibold text-gray-700">Offices</h2>
-                    <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
-                      {{ enrichment()!.offices.length }}
-                    </span>
-                  </div>
-                  <div class="divide-y divide-gray-50">
-                    @for (office of enrichment()!.offices; track office.officeId) {
-                      <div class="px-5 py-3 text-sm">
-                        <span class="font-medium text-gray-900">{{ office.town }}</span>
-                        <span class="text-gray-400 ml-1">{{ office.country }}</span>
-                        @if (office.addressLine1) {
-                          <p class="text-xs text-gray-500 mt-0.5">{{ office.addressLine1 }}</p>
-                        }
-                      </div>
-                    }
-                  </div>
-                </div>
-              }
-
               <!-- Name History -->
               @if (enrichment()!.companyNameHistory.length) {
                 <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-12">
@@ -1986,7 +1989,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly sanctionsLoading = signal(false);
   readonly registrationTab = signal<'registration' | 'ownership'>('registration');
   readonly sanctionsTab = signal<'risk' | 'sanctions' | 'seizures'>('risk');
-  readonly companyInfoTab = signal<'info' | 'headOffice'>('info');
+  readonly companyInfoTab = signal<'info' | 'headOffice' | 'offices'>('info');
   readonly fleetRolesTab = signal<'fleet' | 'roles'>('fleet');
 
   // Contacts
