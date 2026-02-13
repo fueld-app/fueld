@@ -133,6 +133,7 @@ export interface CounterpartyDto {
   lastSynced: string | null;
   responsibleUserId?: string | null;
   responsibleUserName?: string | null;
+  contactsCount?: number | null;
 }
 
 export interface CreateCounterpartyDto {

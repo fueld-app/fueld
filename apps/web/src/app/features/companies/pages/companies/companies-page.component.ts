@@ -183,22 +183,19 @@ const TYPE_LABELS: Record<string, string> = {
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Name</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Type</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Country</th>
-                <th class="px-4 py-3 text-left font-medium text-gray-600">IMO</th>
-                <th class="px-4 py-3 text-left font-medium text-gray-600">Fleet</th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600">Sanctioned</th>
+                <th class="px-4 py-3 text-right font-medium text-gray-600">Credit Limit</th>
+                <th class="px-4 py-3 text-center font-medium text-gray-600">Contacts</th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600">Responsible</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Source</th>
-                <th class="px-4 py-3 w-20"></th>
+                <th class="px-4 py-3 w-10"></th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
               @for (company of companies(); track company.id) {
                 <tr class="transition-colors hover:bg-gray-50/50 cursor-pointer" (click)="goToCompany(company.id)">
                   <td class="px-4 py-3">
-                    <div class="flex items-center gap-2">
-                      <span class="font-medium text-gray-900">{{ company.name }}</span>
-                      @if (company.isSanctioned) {
-                        <span class="inline-flex rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700">Sanctioned</span>
-                      }
-                    </div>
+                    <span class="font-medium text-gray-900">{{ company.name }}</span>
                   </td>
                   <td class="px-4 py-3">
                     <div class="flex flex-wrap gap-1">
@@ -216,8 +213,31 @@ const TYPE_LABELS: Record<string, string> = {
                       <span class="text-gray-400 text-xs ml-1">({{ company.countryIso }})</span>
                     }
                   </td>
-                  <td class="px-4 py-3 text-gray-500 font-mono text-xs">{{ company.companyImo ?? '—' }}</td>
-                  <td class="px-4 py-3 text-gray-600">{{ company.fleetSize ?? '—' }}</td>
+                  <td class="px-4 py-3">
+                    @if (company.isSanctioned) {
+                      <span class="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                          <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                        </svg>
+                        Yes
+                      </span>
+                    } @else {
+                      <span class="text-xs text-gray-400">No</span>
+                    }
+                  </td>
+                  <td class="px-4 py-3 text-right text-gray-700 font-medium tabular-nums">
+                    @if (company.creditLimit && +company.creditLimit > 0) {
+                      {{ formatCreditLimit(+company.creditLimit) }}
+                    } @else {
+                      <span class="text-gray-400">—</span>
+                    }
+                  </td>
+                  <td class="px-4 py-3 text-center text-gray-600">
+                    {{ company.contactsCount ?? 0 }}
+                  </td>
+                  <td class="px-4 py-3 text-sm text-gray-600">
+                    {{ company.responsibleUserName ?? '—' }}
+                  </td>
                   <td class="px-4 py-3">
                     @if (company.seasearcherId) {
                       <span class="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">Imported</span>
@@ -239,7 +259,7 @@ const TYPE_LABELS: Record<string, string> = {
                 </tr>
               } @empty {
                 <tr>
-                  <td colspan="7" class="px-4 py-8 text-center text-gray-400">No companies found</td>
+                  <td colspan="9" class="px-4 py-8 text-center text-gray-400">No companies found</td>
                 </tr>
               }
             </tbody>
@@ -648,5 +668,11 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
       case 'BARGE': return 'bg-amber-100 text-amber-700';
       default: return 'bg-gray-100 text-gray-700';
     }
+  }
+
+  formatCreditLimit(amount: number): string {
+    if (amount >= 1_000_000) return `$${(amount / 1_000_000).toFixed(1)}M`;
+    if (amount >= 1_000) return `$${(amount / 1_000).toFixed(0)}K`;
+    return `$${amount.toFixed(0)}`;
   }
 }

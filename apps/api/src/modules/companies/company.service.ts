@@ -142,8 +142,29 @@ export async function listCompanies(query?: {
 
   const [rows, countResult] = await Promise.all([
     db
-      .select()
+      .select({
+        id: counterparties.id,
+        tenantId: counterparties.tenantId,
+        name: counterparties.name,
+        type: counterparties.type,
+        types: counterparties.types,
+        creditLimit: counterparties.creditLimit,
+        creditUsed: counterparties.creditUsed,
+        country: counterparties.country,
+        isOwnCompany: counterparties.isOwnCompany,
+        seasearcherId: counterparties.seasearcherId,
+        companyImo: counterparties.companyImo,
+        countryIso: counterparties.countryIso,
+        fleetSize: counterparties.fleetSize,
+        isSanctioned: counterparties.isSanctioned,
+        responsibleUserId: counterparties.responsibleUserId,
+        responsibleUserName: users.name,
+        contactsCount: sql<number>`(SELECT count(*)::int FROM company_contacts cc WHERE cc.counterparty_id = ${counterparties.id})`,
+        createdAt: counterparties.createdAt,
+        updatedAt: counterparties.updatedAt,
+      })
       .from(counterparties)
+      .leftJoin(users, eq(counterparties.responsibleUserId, users.id))
       .where(where)
       .limit(limit)
       .offset(offset)
