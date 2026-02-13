@@ -435,16 +435,24 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
               <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
                 <h2 class="text-sm font-semibold text-gray-700">Company Information</h2>
                 <div class="flex items-center gap-2">
-                  @if (!company()!.seasearcherId && !editing()) {
-                    <button
-                      (click)="startEditing()"
-                      class="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-600 hover:bg-gray-100 transition-colors"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
-                      </svg>
-                      Edit
-                    </button>
+                  @if (!editing()) {
+                    @if (!company()!.seasearcherId && companyInfoTab() === 'info') {
+                      <button
+                        (click)="startEditing()"
+                        class="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-600 hover:bg-gray-100 transition-colors"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
+                        </svg>
+                        Edit
+                      </button>
+                    }
+                    @if (companyInfoTab() === 'emails') {
+                      <button (click)="openAddEmail()"
+                        class="rounded-md bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 hover:bg-brand-100 transition-colors">
+                        + Add
+                      </button>
+                    }
                   }
                   @if (editing()) {
                     <button
@@ -466,7 +474,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                     [class]="companyInfoTab() === 'info' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
                     (click)="companyInfoTab.set('info')"
                   >
-                    Company Info
+                    Info
                   </button>
                   <button
                     type="button"
@@ -486,6 +494,14 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                       Offices
                     </button>
                   }
+                  <button
+                    type="button"
+                    class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
+                    [class]="companyInfoTab() === 'emails' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
+                    (click)="companyInfoTab.set('emails')"
+                  >
+                    Emails
+                  </button>
                 </div>
                 </div>
               </div>
@@ -706,6 +722,117 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                   } @else {
                     <div class="text-xs text-gray-500 text-center">No offices on file</div>
                   }
+                } @else if (companyInfoTab() === 'emails') {
+                  @if (showAddEmail()) {
+                    <div class="-mx-5 -mt-4 border-b border-gray-100 px-5 py-4 bg-gray-50/50">
+                      <div class="space-y-2">
+                        <div class="grid grid-cols-2 gap-2">
+                          <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Type</label>
+                            <select
+                              [ngModel]="emailForm().emailType"
+                              (ngModelChange)="emailForm.set({ ...emailForm(), emailType: $event })"
+                              class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
+                              @for (type of emailTypeOptions; track type) {
+                                <option [ngValue]="type">{{ formatEmailType(type) }}</option>
+                              }
+                            </select>
+                          </div>
+                          <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Label (optional)</label>
+                            <input
+                              [ngModel]="emailForm().label"
+                              (ngModelChange)="emailForm.set({ ...emailForm(), label: $event })"
+                              placeholder="e.g. Main office"
+                              class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label class="block text-xs font-medium text-gray-500 mb-1">Email Address</label>
+                          <input
+                            type="email"
+                            [ngModel]="emailForm().email"
+                            (ngModelChange)="emailForm.set({ ...emailForm(), email: $event })"
+                            placeholder="email@example.com"
+                            class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                          />
+                        </div>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            [ngModel]="emailForm().isPrimary"
+                            (ngModelChange)="emailForm.set({ ...emailForm(), isPrimary: $event })"
+                            class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                          />
+                          <span class="text-xs text-gray-600">Set as primary for this type</span>
+                        </label>
+                        <div class="flex justify-end gap-2">
+                          <button (click)="cancelEmailForm()"
+                            class="rounded-md border border-gray-200 px-3 py-1 text-xs text-gray-600 hover:bg-gray-50 transition-colors">
+                            Cancel
+                          </button>
+                          <button (click)="saveCompanyEmail()"
+                            [disabled]="savingEmail() || !emailForm().email.trim()"
+                            class="rounded-md bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors">
+                            {{ editingEmailId() ? 'Update' : 'Add' }}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  }
+                  @if (emailsLoading()) {
+                    <div class="flex items-center justify-center py-6">
+                      <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                      </svg>
+                    </div>
+                  } @else if (!companyEmails().length && !showAddEmail()) {
+                    <div class="text-center text-gray-400">
+                      No emails added yet.
+                      <button (click)="openAddEmail()" class="text-brand-600 hover:text-brand-700 font-medium">Add one</button>
+                    </div>
+                  } @else {
+                    <div class="divide-y divide-gray-50 -mx-5">
+                      @for (e of companyEmails(); track e.id) {
+                        <div class="px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors group">
+                          <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                              <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
+                                [class]="emailTypeBadgeClass(e.emailType)">
+                                {{ formatEmailType(e.emailType) }}
+                              </span>
+                              <a [href]="'mailto:' + e.email" class="font-medium text-brand-700 hover:text-brand-900 hover:underline">{{ e.email }}</a>
+                              @if (e.isPrimary) {
+                                <span class="inline-flex items-center rounded-full bg-green-50 px-1.5 py-0.5 text-[10px] font-medium text-green-600">Primary</span>
+                              }
+                            </div>
+                            <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button (click)="openEditEmail(e)"
+                                class="rounded p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors" title="Edit">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                </svg>
+                              </button>
+                              <button (click)="deleteCompanyEmail(e.id)"
+                                class="rounded p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Delete">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                          @if (e.label) {
+                            <p class="text-xs text-gray-500 mt-0.5">{{ e.label }}</p>
+                          }
+                          <p class="text-[10px] text-gray-400 mt-1">
+                            Added by {{ e.addedByName ?? 'Unknown' }} · {{ e.createdAt | date:'mediumDate' }}
+                          </p>
+                        </div>
+                      }
+                    </div>
+                  }
                 }
               </div>
             </div>
@@ -917,133 +1044,6 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 </div>
               </div>
             }
-
-            <!-- Company Emails -->
-            <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-7">
-              <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
-                <h2 class="text-sm font-semibold text-gray-700">
-                  Emails
-                  @if (companyEmails().length) {
-                    <span class="ml-1 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
-                      {{ companyEmails().length }}
-                    </span>
-                  }
-                </h2>
-                <button (click)="openAddEmail()"
-                  class="rounded-md bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 hover:bg-brand-100 transition-colors">
-                  + Add
-                </button>
-              </div>
-
-              @if (showAddEmail()) {
-                <div class="border-b border-gray-100 px-5 py-4 bg-gray-50/50">
-                  <div class="space-y-2">
-                    <div class="grid grid-cols-2 gap-2">
-                      <div>
-                        <label class="block text-xs font-medium text-gray-500 mb-1">Type</label>
-                        <select
-                          [ngModel]="emailForm().emailType"
-                          (ngModelChange)="emailForm.set({ ...emailForm(), emailType: $event })"
-                          class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
-                          @for (type of emailTypeOptions; track type) {
-                            <option [ngValue]="type">{{ formatEmailType(type) }}</option>
-                          }
-                        </select>
-                      </div>
-                      <div>
-                        <label class="block text-xs font-medium text-gray-500 mb-1">Label (optional)</label>
-                        <input
-                          [ngModel]="emailForm().label"
-                          (ngModelChange)="emailForm.set({ ...emailForm(), label: $event })"
-                          placeholder="e.g. Main office"
-                          class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label class="block text-xs font-medium text-gray-500 mb-1">Email Address</label>
-                      <input
-                        type="email"
-                        [ngModel]="emailForm().email"
-                        (ngModelChange)="emailForm.set({ ...emailForm(), email: $event })"
-                        placeholder="email@example.com"
-                        class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                      />
-                    </div>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        [ngModel]="emailForm().isPrimary"
-                        (ngModelChange)="emailForm.set({ ...emailForm(), isPrimary: $event })"
-                        class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
-                      />
-                      <span class="text-xs text-gray-600">Set as primary for this type</span>
-                    </label>
-                    <div class="flex justify-end gap-2">
-                      <button (click)="cancelEmailForm()"
-                        class="rounded-md border border-gray-200 px-3 py-1 text-xs text-gray-600 hover:bg-gray-50 transition-colors">
-                        Cancel
-                      </button>
-                      <button (click)="saveCompanyEmail()"
-                        [disabled]="savingEmail() || !emailForm().email.trim()"
-                        class="rounded-md bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors">
-                        {{ editingEmailId() ? 'Update' : 'Add' }}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              }
-
-              @if (emailsLoading()) {
-                <div class="flex items-center justify-center py-6">
-                  <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                  </svg>
-                </div>
-              } @else if (!companyEmails().length && !showAddEmail()) {
-                <div class="px-5 py-6 text-center text-sm text-gray-400">No emails added yet</div>
-              } @else {
-                <div class="divide-y divide-gray-50 max-h-[300px] overflow-y-auto">
-                  @for (e of companyEmails(); track e.id) {
-                    <div class="px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors group">
-                      <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-2">
-                          <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
-                            [class]="emailTypeBadgeClass(e.emailType)">
-                            {{ formatEmailType(e.emailType) }}
-                          </span>
-                          <a [href]="'mailto:' + e.email" class="font-medium text-brand-700 hover:text-brand-900 hover:underline">{{ e.email }}</a>
-                          @if (e.isPrimary) {
-                            <span class="inline-flex items-center rounded-full bg-green-50 px-1.5 py-0.5 text-[10px] font-medium text-green-600">Primary</span>
-                          }
-                        </div>
-                        <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button (click)="openEditEmail(e)"
-                            class="rounded p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors" title="Edit">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                            </svg>
-                          </button>
-                          <button (click)="deleteCompanyEmail(e.id)"
-                            class="rounded p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Delete">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                              <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-                      @if (e.label) {
-                        <p class="text-xs text-gray-500 mt-0.5">{{ e.label }}</p>
-                      }
-                      <p class="text-[10px] text-gray-400 mt-1">
-                        Added by {{ e.addedByName ?? 'Unknown' }} · {{ e.createdAt | date:'mediumDate' }}
-                      </p>
-                    </div>
-                  }
-                </div>
-              }
-            </div>
 
             <!-- Supplies At (ports where this company is a supplier) -->
             @if (supplyPortsLoading() || supplyPorts().length) {
@@ -1989,7 +1989,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly sanctionsLoading = signal(false);
   readonly registrationTab = signal<'registration' | 'ownership'>('registration');
   readonly sanctionsTab = signal<'risk' | 'sanctions' | 'seizures'>('risk');
-  readonly companyInfoTab = signal<'info' | 'headOffice' | 'offices'>('info');
+  readonly companyInfoTab = signal<'info' | 'headOffice' | 'offices' | 'emails'>('info');
   readonly fleetRolesTab = signal<'fleet' | 'roles'>('fleet');
 
   // Contacts
