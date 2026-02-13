@@ -112,21 +112,31 @@ export function addSession(
   },
 ): void {
   const now = new Date().toISOString();
-  const geo = lookupIp(info.ip);
   sessions.set(socketId, {
     socketId,
     ...info,
     platform: parsePlatform(info.userAgent),
     timezone: null,
     language: null,
-    country: geo.country,
-    city: geo.city,
+    country: null,
+    city: null,
     currentUrl: null,
     pageTitle: null,
     connectedAt: now,
     lastActivity: now,
   });
   wsConnections.set(socketId, ws);
+
+  // Async geo lookup — updates session + broadcasts once resolved
+  lookupIp(info.ip).then((geo) => {
+    const session = sessions.get(socketId);
+    if (session && (geo.country || geo.city)) {
+      session.country = geo.country;
+      session.city = geo.city;
+      scheduleBroadcast();
+    }
+  }).catch(() => {});
+
   scheduleBroadcast();
 }
 

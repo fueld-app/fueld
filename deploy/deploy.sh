@@ -50,20 +50,6 @@ if [ -d "$APP_DIR/staging/drizzle" ]; then
   log "Migration files updated"
 fi
 
-# ─── 2b. Deploy GeoIP data ───────────────────────────────────────────
-if [ -d "$APP_DIR/staging/geoip-data" ]; then
-  log "Deploying GeoIP data..."
-  rm -rf "$APP_DIR/geoip-data"
-  mv "$APP_DIR/staging/geoip-data" "$APP_DIR/geoip-data"
-  chmod -R 755 "$APP_DIR/geoip-data"
-  log "GeoIP data deployed"
-
-  if [ -f "$APP_DIR/.env" ] && ! grep -q '^GEODATADIR=' "$APP_DIR/.env"; then
-    echo "GEODATADIR=$APP_DIR/geoip-data" >> "$APP_DIR/.env"
-    log "GEODATADIR added to .env"
-  fi
-fi
-
 # ─── 3. Deploy backend binary ────────────────────────────────────────
 if [ -f "$APP_DIR/staging/app-release" ]; then
   log "Deploying backend binary to ${NEXT_SLOT}..."

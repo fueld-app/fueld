@@ -1,23 +1,43 @@
 // ═══════════════════════════════════════════════════════════════════════
-//  GeoIP — IP address to location resolution using geoip-lite
+//  GeoIP — IP address to location resolution via HTTP API
 //
-//  Uses the MaxMind GeoLite2 database (bundled with geoip-lite)
-//  to resolve IPv4/IPv6 addresses to country, city, and region.
+//  Uses ip-api.com (free, 45 req/min) with in-memory caching.
+//  Falls back gracefully — geo info is never blocking.
 // ═══════════════════════════════════════════════════════════════════════
-
-import { createRequire } from 'module';
-
-const require = createRequire(import.meta.url);
 
 export interface GeoInfo {
   country: string | null;
   city: string | null;
 }
 
-/**
- * Look up geographic info for an IP address.
- * Returns null values for private/loopback/unresolvable IPs.
- */
+const EMPTY: GeoInfo = { country: null, city: null };
+
+// ─── Cache (IP → GeoInfo, TTL 24h) ──────────────────────────────────
+
+const cache = new Map<string, { geo: GeoInfo; ts: number }>();
+const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+function getCached(ip: string): GeoInfo | null {
+  const entry = cache.get(ip);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > CACHE_TTL) {
+    cache.delete(ip);
+    return null;
+  }
+  return entry.geo;
+}
+
+function setCache(ip: string, geo: GeoInfo): void {
+  // Evict old entries if cache grows too large
+  if (cache.size > 10_000) {
+    const oldest = cache.keys().next().value;
+    if (oldest) cache.delete(oldest);
+  }
+  cache.set(ip, { geo, ts: Date.now() });
+}
+
+// ─── IP normalisation ────────────────────────────────────────────────
+
 function normalizeIp(input: string): string {
   let normalized = input.trim();
 
@@ -46,41 +66,77 @@ function normalizeIp(input: string): string {
   return normalized;
 }
 
-export function lookupIp(ip: string | null): GeoInfo {
-  if (!ip) return { country: null, city: null };
+function isPrivateIp(ip: string): boolean {
+  if (ip === '::1' || ip === '127.0.0.1') return true;
+
+  const octets = ip.split('.').map((o) => Number(o));
+  if (octets.length !== 4 || octets.some((o) => Number.isNaN(o) || o < 0 || o > 255)) {
+    return false;
+  }
+
+  return (
+    octets[0] === 10
+    || (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31)
+    || (octets[0] === 192 && octets[1] === 168)
+    || (octets[0] === 169 && octets[1] === 254)
+  );
+}
+
+// ─── HTTP lookup ─────────────────────────────────────────────────────
+
+/**
+ * Async IP geolocation lookup via ip-api.com.
+ * Results are cached for 24 hours. Returns EMPTY for private/loopback IPs.
+ */
+export async function lookupIp(ip: string | null): Promise<GeoInfo> {
+  if (!ip) return EMPTY;
 
   const normalized = normalizeIp(ip);
+  if (isPrivateIp(normalized)) return EMPTY;
 
-  const octets = normalized.split('.').map((o) => Number(o));
-  const isPrivateV4 =
-    octets.length === 4
-    && !octets.some((o) => Number.isNaN(o) || o < 0 || o > 255)
-    && (
-      octets[0] === 10
-      || (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31)
-      || (octets[0] === 192 && octets[1] === 168)
-      || (octets[0] === 169 && octets[1] === 254)
-    );
-
-  // Skip loopback and local addresses
-  if (
-    normalized === '::1'
-    || normalized === '127.0.0.1'
-    || isPrivateV4
-  ) {
-    return { country: null, city: null };
-  }
+  // Check cache first
+  const cached = getCached(normalized);
+  if (cached) return cached;
 
   try {
-    const geoip = require('geoip-lite');
-    const result = geoip.lookup(normalized);
-    if (!result) return { country: null, city: null };
+    const res = await fetch(
+      `http://ip-api.com/json/${normalized}?fields=status,country,countryCode,city`,
+      { signal: AbortSignal.timeout(3000) },
+    );
+    if (!res.ok) return EMPTY;
 
-    return {
-      country: result.country ?? null,  // ISO 3166-1 alpha-2 (e.g. 'GB', 'US')
-      city: result.city || null,
+    const data = await res.json() as { status: string; countryCode?: string; city?: string };
+    if (data.status !== 'success') {
+      setCache(normalized, EMPTY);
+      return EMPTY;
+    }
+
+    const geo: GeoInfo = {
+      country: data.countryCode ?? null,
+      city: data.city || null,
     };
+    setCache(normalized, geo);
+    return geo;
   } catch {
-    return { country: null, city: null };
+    // Network/timeout — don't cache failures
+    return EMPTY;
   }
+}
+
+/**
+ * Synchronous version — returns cached result or EMPTY.
+ * Kicks off an async lookup in the background if not cached.
+ */
+export function lookupIpSync(ip: string | null): GeoInfo {
+  if (!ip) return EMPTY;
+
+  const normalized = normalizeIp(ip);
+  if (isPrivateIp(normalized)) return EMPTY;
+
+  const cached = getCached(normalized);
+  if (cached) return cached;
+
+  // Fire-and-forget background lookup (will be cached for next time)
+  lookupIp(ip).catch(() => {});
+  return EMPTY;
 }

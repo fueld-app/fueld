@@ -37,15 +37,6 @@ jobs:
           cd apps/api
           bun build src/index.ts --compile --bytecode --minify --production --format=esm --target=bun-linux-x64 --outfile app-release
 
-      - name: Prepare GeoIP data
-        run: |
-          mkdir -p apps/api/geoip-data
-          if [ -d apps/api/node_modules/geoip-lite/data ]; then
-            cp -R apps/api/node_modules/geoip-lite/data/* apps/api/geoip-data/
-          else
-            cp -R node_modules/geoip-lite/data/* apps/api/geoip-data/
-          fi
-
       # ─── Build Frontend ────────────────────────────────────────────
       - name: Build Frontend
         run: |
@@ -72,13 +63,6 @@ jobs:
         with:
           name: drizzle-migrations
           path: apps/api/drizzle/
-          retention-days: 5
-
-      - name: Upload GeoIP data
-        uses: actions/upload-artifact@v4
-        with:
-          name: geoip-data
-          path: apps/api/geoip-data/
           retention-days: 5
 
       - name: Upload deploy script
@@ -125,7 +109,7 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             ${{ env.VPS_USER }}@${{ env.VPS_HOST }} \
-            "mkdir -p /opt/fueld/staging/{web,drizzle,geoip-data}"
+            "mkdir -p /opt/fueld/staging/{web,drizzle}"
 
       - name: Upload API binary
         run: |
@@ -144,12 +128,6 @@ jobs:
           scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r \
             artifacts/drizzle-migrations/* \
             ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/opt/fueld/staging/drizzle/
-
-      - name: Upload GeoIP data
-        run: |
-          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r \
-            artifacts/geoip-data/* \
-            ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/opt/fueld/staging/geoip-data/
 
       - name: Upload deploy script
         run: |

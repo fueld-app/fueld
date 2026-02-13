@@ -214,7 +214,7 @@ export async function logFromRequest(request: Request, statusCode: number, reque
   const userAgent = request.headers.get('user-agent') ?? null;
   const acceptLanguage = request.headers.get('accept-language');
   const language = acceptLanguage?.split(',')[0]?.split(';')[0]?.trim() ?? null;
-  const geo = lookupIp(ip);
+  const geo = await lookupIp(ip);
 
   // Fire-and-forget
   logActivity({
