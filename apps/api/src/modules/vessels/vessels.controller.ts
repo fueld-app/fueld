@@ -463,6 +463,7 @@ export const vesselsController = new Elysia({ prefix: '/vessels' })
             role: body.role as VesselCompanyRole,
             contactId: body.contactId,
             note: body.note,
+            source: body.source,
             replaceExistingRole: body.replaceExistingRole,
           },
           auth.sub,
@@ -478,7 +479,8 @@ export const vesselsController = new Elysia({ prefix: '/vessels' })
       params: t.Object({ id: t.String() }),
       body: t.Object({
         companyId: t.String(),
-        role: t.String(), // 'OWNER' | 'TIME_CHARTERER' | 'OPERATOR' | 'MANAGER'
+        role: t.String(),
+        source: t.Optional(t.String()),
         contactId: t.Optional(t.Nullable(t.String())),
         note: t.Optional(t.String()),
         replaceExistingRole: t.Optional(t.Boolean()),

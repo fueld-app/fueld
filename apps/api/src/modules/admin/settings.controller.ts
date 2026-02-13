@@ -800,7 +800,13 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     }
   }, {
     body: t.Object({
-      roles: t.Array(t.Object({ key: t.String({ minLength: 1 }), label: t.String({ minLength: 1 }) })),
+      roles: t.Array(t.Object({
+        key: t.String({ minLength: 1 }),
+        label: t.String({ minLength: 1 }),
+        group: t.String({ minLength: 1 }),
+        description: t.Optional(t.String()),
+        seasearcherCode: t.Optional(t.String()),
+      })),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update vessel-company role options' },
   });

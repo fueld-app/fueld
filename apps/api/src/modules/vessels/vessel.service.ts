@@ -571,22 +571,25 @@ export async function getVesselMovements(seasearcherId: string) {
 //  VESSEL COMPANIES (user-managed company associations)
 // ═══════════════════════════════════════════════════════════════════════
 
+const vesselCompanySelectFields = {
+  id: vesselCompanies.id,
+  vesselId: vesselCompanies.vesselId,
+  companyId: vesselCompanies.companyId,
+  companyName: counterparties.name,
+  role: vesselCompanies.role,
+  source: vesselCompanies.source,
+  contactId: vesselCompanies.contactId,
+  contactName: companyContacts.name,
+  note: vesselCompanies.note,
+  addedById: vesselCompanies.addedById,
+  addedByName: vesselCompanies.addedByName,
+  createdAt: vesselCompanies.createdAt,
+  updatedAt: vesselCompanies.updatedAt,
+} as const;
+
 export async function getVesselCompanies(vesselId: string) {
   return db
-    .select({
-      id: vesselCompanies.id,
-      vesselId: vesselCompanies.vesselId,
-      companyId: vesselCompanies.companyId,
-      companyName: counterparties.name,
-      role: vesselCompanies.role,
-      contactId: vesselCompanies.contactId,
-      contactName: companyContacts.name,
-      note: vesselCompanies.note,
-      addedById: vesselCompanies.addedById,
-      addedByName: vesselCompanies.addedByName,
-      createdAt: vesselCompanies.createdAt,
-      updatedAt: vesselCompanies.updatedAt,
-    })
+    .select(vesselCompanySelectFields)
     .from(vesselCompanies)
     .innerJoin(counterparties, eq(vesselCompanies.companyId, counterparties.id))
     .leftJoin(companyContacts, eq(vesselCompanies.contactId, companyContacts.id))
@@ -596,7 +599,7 @@ export async function getVesselCompanies(vesselId: string) {
 
 export async function addVesselCompany(
   vesselId: string,
-  data: { companyId: string; role: VesselCompanyRole; contactId?: string | null; note?: string; replaceExistingRole?: boolean },
+  data: { companyId: string; role: VesselCompanyRole; contactId?: string | null; note?: string; source?: string; replaceExistingRole?: boolean },
   userId: string,
   userName: string
 ) {
@@ -634,20 +637,7 @@ export async function addVesselCompany(
     }
 
     const [fullUpdated] = await db
-      .select({
-        id: vesselCompanies.id,
-        vesselId: vesselCompanies.vesselId,
-        companyId: vesselCompanies.companyId,
-        companyName: counterparties.name,
-        role: vesselCompanies.role,
-        contactId: vesselCompanies.contactId,
-        contactName: companyContacts.name,
-        note: vesselCompanies.note,
-        addedById: vesselCompanies.addedById,
-        addedByName: vesselCompanies.addedByName,
-        createdAt: vesselCompanies.createdAt,
-        updatedAt: vesselCompanies.updatedAt,
-      })
+      .select(vesselCompanySelectFields)
       .from(vesselCompanies)
       .innerJoin(counterparties, eq(vesselCompanies.companyId, counterparties.id))
       .leftJoin(companyContacts, eq(vesselCompanies.contactId, companyContacts.id))
@@ -662,6 +652,7 @@ export async function addVesselCompany(
       vesselId,
       companyId: data.companyId,
       role: data.role,
+      source: data.source ?? 'manual',
       contactId: data.contactId ?? null,
       note: data.note ?? null,
       addedById: userId,
@@ -670,20 +661,7 @@ export async function addVesselCompany(
     .returning();
   // Re-fetch with company name + contact name
   const [full] = await db
-    .select({
-      id: vesselCompanies.id,
-      vesselId: vesselCompanies.vesselId,
-      companyId: vesselCompanies.companyId,
-      companyName: counterparties.name,
-      role: vesselCompanies.role,
-      contactId: vesselCompanies.contactId,
-      contactName: companyContacts.name,
-      note: vesselCompanies.note,
-      addedById: vesselCompanies.addedById,
-      addedByName: vesselCompanies.addedByName,
-      createdAt: vesselCompanies.createdAt,
-      updatedAt: vesselCompanies.updatedAt,
-    })
+    .select(vesselCompanySelectFields)
     .from(vesselCompanies)
     .innerJoin(counterparties, eq(vesselCompanies.companyId, counterparties.id))
     .leftJoin(companyContacts, eq(vesselCompanies.contactId, companyContacts.id))
@@ -733,20 +711,7 @@ export async function updateVesselCompany(
   if (!updated) return null;
   // Re-fetch with company + contact name
   const [full] = await db
-    .select({
-      id: vesselCompanies.id,
-      vesselId: vesselCompanies.vesselId,
-      companyId: vesselCompanies.companyId,
-      companyName: counterparties.name,
-      role: vesselCompanies.role,
-      contactId: vesselCompanies.contactId,
-      contactName: companyContacts.name,
-      note: vesselCompanies.note,
-      addedById: vesselCompanies.addedById,
-      addedByName: vesselCompanies.addedByName,
-      createdAt: vesselCompanies.createdAt,
-      updatedAt: vesselCompanies.updatedAt,
-    })
+    .select(vesselCompanySelectFields)
     .from(vesselCompanies)
     .innerJoin(counterparties, eq(vesselCompanies.companyId, counterparties.id))
     .leftJoin(companyContacts, eq(vesselCompanies.contactId, companyContacts.id))

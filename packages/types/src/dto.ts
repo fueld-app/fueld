@@ -235,7 +235,21 @@ export interface SupplyPortDto {
 //  VESSEL COMPANIES (associations between vessels and companies)
 // ═══════════════════════════════════════════════════════════════════════
 
-export type VesselCompanyRole = 'OWNER' | 'TIME_CHARTERER' | 'OPERATOR' | 'MANAGER' | (string & {});
+export type VesselCompanyRole =
+  | 'REGISTERED_OWNER'
+  | 'NOMINAL_OWNER'
+  | 'BENEFICIAL_OWNER'
+  | 'GROUP_BENEFICIAL_OWNER'
+  | 'COMMERCIAL_OPERATOR'
+  | 'THIRD_PARTY_OPERATOR'
+  | 'DISPONENT_OWNER'
+  | 'BAREBOAT_CHARTERER'
+  | 'TECHNICAL_MANAGER'
+  | 'ISM_MANAGER'
+  | 'SHIP_MANAGER'
+  | (string & {});
+
+export type VesselCompanySource = 'manual' | 'seasearcher';
 
 export interface VesselCompanyDto {
   id: string;
@@ -245,6 +259,7 @@ export interface VesselCompanyDto {
   companyId: string;
   companyName: string;
   role: VesselCompanyRole;
+  source: VesselCompanySource;
   contactId: string | null;
   contactName: string | null;
   note: string | null;
@@ -469,8 +484,11 @@ export interface OrderNumberSettingsDto {
 
 /** Admin settings for configurable vessel-company roles */
 export interface VesselCompanyRoleOption {
-  key: string;   // e.g. 'OWNER', 'TIME_CHARTERER', or any custom key
-  label: string; // Human-readable label, e.g. 'Owner', 'Time Charterer'
+  key: string;         // e.g. 'REGISTERED_OWNER', 'COMMERCIAL_OPERATOR'
+  label: string;       // Human-readable label, e.g. 'Registered Owner'
+  group: string;       // Category: 'Legal & Financial', 'Operational & Commercial', 'Technical & Safety'
+  description?: string; // Tooltip description of the role
+  seasearcherCode?: string; // Seasearcher type code mapping (e.g. 'RO', 'CO')
 }
 
 export interface VesselCompanyRoleSettingsDto {

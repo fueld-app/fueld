@@ -604,6 +604,7 @@ export async function getVesselsForCompany(companyId: string) {
       companyId: vesselCompanies.companyId,
       companyName: counterparties.name,
       role: vesselCompanies.role,
+      source: vesselCompanies.source,
       contactId: vesselCompanies.contactId,
       contactName: companyContacts.name,
       note: vesselCompanies.note,

@@ -97,7 +97,7 @@ export interface TenantSettings {
   orderNumberTemplate?: string;  // e.g. '{PREFIX}{YYYY}{MM}{DD}-{SEQ:6}', default '{YYYY}{MM}{DD}-{SEQ:6}'
   orderNumberPrefix?: string;    // optional prefix, e.g. 'FU-'
   // Vessel-company roles (configurable from admin)
-  vesselCompanyRoles?: { key: string; label: string }[];
+  vesselCompanyRoles?: { key: string; label: string; group: string; description?: string; seasearcherCode?: string }[];
 }
 
 export const tenants = pgTable('tenants', {
@@ -333,10 +333,17 @@ export const portSuppliers = pgTable('port_suppliers', {
 // ═══════════════════════════════════════════════════════════════════════
 
 export const vesselCompanyRoleEnum = pgEnum('vessel_company_role', [
-  'OWNER',
-  'TIME_CHARTERER',
-  'OPERATOR',
-  'MANAGER',
+  'REGISTERED_OWNER',
+  'NOMINAL_OWNER',
+  'BENEFICIAL_OWNER',
+  'GROUP_BENEFICIAL_OWNER',
+  'COMMERCIAL_OPERATOR',
+  'THIRD_PARTY_OPERATOR',
+  'DISPONENT_OWNER',
+  'BAREBOAT_CHARTERER',
+  'TECHNICAL_MANAGER',
+  'ISM_MANAGER',
+  'SHIP_MANAGER',
 ]);
 
 export const vesselCompanies = pgTable('vessel_companies', {
@@ -344,6 +351,7 @@ export const vesselCompanies = pgTable('vessel_companies', {
   vesselId: uuid('vessel_id').notNull().references(() => vessels.id, { onDelete: 'cascade' }),
   companyId: uuid('company_id').notNull().references(() => counterparties.id, { onDelete: 'cascade' }),
   role: text('role').notNull(),
+  source: text('source').notNull().default('manual'),  // 'manual' | 'seasearcher'
   contactId: uuid('contact_id').references(() => companyContacts.id, { onDelete: 'set null' }),
   note: text('note'),
   addedById: uuid('added_by_id').references(() => users.id),

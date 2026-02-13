@@ -193,6 +193,17 @@ import { API } from '@app/core/config/api';
                         class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm
                                focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
                       />
+                      <select
+                        [value]="role.group"
+                        (change)="updateRoleGroup(i, $any($event.target).value)"
+                        class="w-48 rounded-lg border border-gray-300 px-3 py-2 text-sm
+                               focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                      >
+                        <option value="Legal & Financial">Legal & Financial</option>
+                        <option value="Operational & Commercial">Operational & Commercial</option>
+                        <option value="Technical & Safety">Technical & Safety</option>
+                        <option value="Other">Other</option>
+                      </select>
                       <button
                         (click)="removeRole(i)"
                         [disabled]="roles().length <= 1"
@@ -392,8 +403,14 @@ export class SettingsPageComponent implements OnInit {
     this.roles.set(updated);
   }
 
+  updateRoleGroup(index: number, value: string): void {
+    const updated = [...this.roles()];
+    updated[index] = { ...updated[index], group: value };
+    this.roles.set(updated);
+  }
+
   addRole(): void {
-    this.roles.set([...this.roles(), { key: '', label: '' }]);
+    this.roles.set([...this.roles(), { key: '', label: '', group: 'Other' }]);
   }
 
   removeRole(index: number): void {

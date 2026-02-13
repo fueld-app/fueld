@@ -11,5 +11,8 @@
     "build:api": "bun run --filter @fueld/api build",
     "build:web": "bun run --filter @fueld/web build",
     "dev": "bun run dev:api & bun run dev:web"
+  },
+  "devDependencies": {
+    "pdf-parse": "^2.4.5"
   }
 }

@@ -1225,8 +1225,12 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                         [ngModel]="vesselForm().role"
                         (ngModelChange)="vesselForm.set({ ...vesselForm(), role: $event })"
                         class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
-                        @for (role of roleOptions(); track role.key) {
-                          <option [ngValue]="role.key">{{ role.label }}</option>
+                        @for (grp of roleGroups(); track grp.group) {
+                          <optgroup [label]="grp.group">
+                            @for (role of grp.roles; track role.key) {
+                              <option [ngValue]="role.key">{{ role.label }}</option>
+                            }
+                          </optgroup>
                         }
                       </select>
                     </div>
@@ -1350,15 +1354,19 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                             <td class="px-5 py-2.5">
                               <div class="flex items-center gap-2">
                                 @if (isFleetAutoMatch(v)) {
-                                  <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">Owner</span>
+                                  <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">Registered Owner</span>
                                   <span class="ml-2 inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">Auto</span>
                                 } @else {
                                   <select
                                     [ngModel]="fleetRoleFor(v)"
                                     (ngModelChange)="onFleetRoleChange(v, $event)"
                                     class="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
-                                    @for (role of roleOptions(); track role.key) {
-                                      <option [ngValue]="role.key">{{ role.label }}</option>
+                                    @for (grp of roleGroups(); track grp.group) {
+                                      <optgroup [label]="grp.group">
+                                        @for (role of grp.roles; track role.key) {
+                                          <option [ngValue]="role.key">{{ role.label }}</option>
+                                        }
+                                      </optgroup>
                                     }
                                   </select>
                                   <span class="text-[11px] text-gray-400">
@@ -1907,7 +1915,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly companyVessels = signal<VesselCompanyDto[]>([]);
   readonly vesselsLoading = signal(false);
   readonly showAddVessel = signal(false);
-  readonly vesselForm = signal<{ vesselId: string; role: VesselCompanyRole; contactId: string | null; note: string }>({ vesselId: '', role: 'OWNER', contactId: null, note: '' });
+  readonly vesselForm = signal<{ vesselId: string; role: VesselCompanyRole; contactId: string | null; note: string }>({ vesselId: '', role: 'REGISTERED_OWNER', contactId: null, note: '' });
   readonly editingVesselAssocId = signal<string | null>(null);
   readonly savingVessel = signal(false);
   readonly vesselSearch = signal('');
@@ -1915,11 +1923,29 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly selectedVessel = signal<{ id: string; name: string } | null>(null);
   private vesselSearchTimeout: ReturnType<typeof setTimeout> | null = null;
   readonly roleOptions = signal<VesselCompanyRoleOption[]>([
-    { key: 'OWNER', label: 'Owner' },
-    { key: 'TIME_CHARTERER', label: 'Time Charterer' },
-    { key: 'OPERATOR', label: 'Operator' },
-    { key: 'MANAGER', label: 'Manager' },
+    { key: 'REGISTERED_OWNER', label: 'Registered Owner', group: 'Legal & Financial' },
+    { key: 'NOMINAL_OWNER', label: 'Nominal Owner', group: 'Legal & Financial' },
+    { key: 'BENEFICIAL_OWNER', label: 'Beneficial Owner', group: 'Legal & Financial' },
+    { key: 'GROUP_BENEFICIAL_OWNER', label: 'Group Beneficial Owner', group: 'Legal & Financial' },
+    { key: 'COMMERCIAL_OPERATOR', label: 'Commercial Operator', group: 'Operational & Commercial' },
+    { key: 'THIRD_PARTY_OPERATOR', label: 'Third-Party Operator', group: 'Operational & Commercial' },
+    { key: 'DISPONENT_OWNER', label: 'Disponent Owner', group: 'Operational & Commercial' },
+    { key: 'BAREBOAT_CHARTERER', label: 'Bareboat Charterer', group: 'Operational & Commercial' },
+    { key: 'TECHNICAL_MANAGER', label: 'Technical Manager', group: 'Technical & Safety' },
+    { key: 'ISM_MANAGER', label: 'ISM Manager', group: 'Technical & Safety' },
+    { key: 'SHIP_MANAGER', label: 'Ship Manager', group: 'Technical & Safety' },
   ]);
+
+  readonly roleGroups = computed(() => {
+    const opts = this.roleOptions();
+    const groups = new Map<string, VesselCompanyRoleOption[]>();
+    for (const opt of opts) {
+      const g = opt.group || 'Other';
+      if (!groups.has(g)) groups.set(g, []);
+      groups.get(g)!.push(opt);
+    }
+    return [...groups.entries()].map(([group, roles]) => ({ group, roles }));
+  });
 
   readonly allTypes = ALL_TYPES;
 
@@ -2159,7 +2185,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   }
 
   openAddVessel(): void {
-    this.vesselForm.set({ vesselId: '', role: 'OWNER', contactId: null, note: '' });
+    this.vesselForm.set({ vesselId: '', role: 'REGISTERED_OWNER', contactId: null, note: '' });
     this.editingVesselAssocId.set(null);
     this.selectedVessel.set(null);
     this.vesselSearch.set('');
@@ -2528,7 +2554,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
 
   fleetRoleFor(v: FleetVessel): VesselCompanyRole {
     const key = this.fleetRowKey(v);
-    return this.fleetRoleSelections()[key] ?? 'OWNER';
+    return this.fleetRoleSelections()[key] ?? 'REGISTERED_OWNER';
   }
 
   isFleetAutoMatch(v: FleetVessel): boolean {
@@ -2536,7 +2562,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   }
 
   fleetEffectiveRole(v: FleetVessel): VesselCompanyRole {
-    return this.isFleetAutoMatch(v) ? 'OWNER' : this.fleetRoleFor(v);
+    return this.isFleetAutoMatch(v) ? 'REGISTERED_OWNER' : this.fleetRoleFor(v);
   }
 
   setFleetRoleFor(v: FleetVessel, role: VesselCompanyRole): void {
@@ -2549,9 +2575,9 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
 
   onFleetRoleChange(v: FleetVessel, role: VesselCompanyRole): void {
     const matchedBySeasearcher = v.id && this.fleetMatchBySeasearcherId()[String(v.id)];
-    if (matchedBySeasearcher && role !== 'OWNER') {
-      this.showToast('error', 'Auto-matched vessels must be Owner.');
-      this.setFleetRoleFor(v, 'OWNER');
+    if (matchedBySeasearcher && role !== 'REGISTERED_OWNER') {
+      this.showToast('error', 'Auto-matched vessels must be Registered Owner.');
+      this.setFleetRoleFor(v, 'REGISTERED_OWNER');
       this.linkFleetVessel(v);
       return;
     }
@@ -2591,7 +2617,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     const match = this.fleetLocalMatch(v);
     const role = this.fleetEffectiveRole(v);
     if (match && this.companyVessels().some((vc) => vc.vesselId === match.id && vc.role === role)) {
-      return this.isFleetAutoMatch(v) ? 'Replace Owner' : 'Linked';
+      return this.isFleetAutoMatch(v) ? 'Replace Reg. Owner' : 'Linked';
     }
     if (!match) return 'Import + Link';
     const hasRole = this.companyVessels().some((vc) => vc.vesselId === match.id);
@@ -2607,7 +2633,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     this.linkingFleetKey.set(key);
 
     try {
-      const shouldReplace = this.isFleetAutoMatch(v) && role === 'OWNER';
+      const shouldReplace = this.isFleetAutoMatch(v) && role === 'REGISTERED_OWNER';
       if (this.fleetRoleExists(v) && !shouldReplace) {
         this.showToast('error', 'Role already exists for this vessel.');
         return;

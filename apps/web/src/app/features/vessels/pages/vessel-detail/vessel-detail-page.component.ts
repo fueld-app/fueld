@@ -37,13 +37,6 @@ interface OwnershipEntry {
   country: { code: string | null; name: string | null };
 }
 
-/** Group historical entries by month/year for timeline display */
-interface TimelineGroup {
-  label: string;          // e.g. "Jun 2024"
-  sortKey: number;        // for sorting (timestamp)
-  entries: OwnershipEntry[];
-}
-
 const ROLE_ORDER: Record<string, number> = {
   BO: 0, CO: 1, RO: 2, NO: 3, TM: 4, TP: 5, IM: 6,
 };
@@ -56,6 +49,16 @@ const ROLE_BORDER_COLORS: Record<string, string> = {
   TM: 'border-l-violet-500',
   TP: 'border-l-gray-400',
   IM: 'border-l-rose-500',
+};
+
+const SS_CODE_TO_ROLE: Record<string, string> = {
+  RO: 'REGISTERED_OWNER',
+  NO: 'NOMINAL_OWNER',
+  BO: 'BENEFICIAL_OWNER',
+  CO: 'COMMERCIAL_OPERATOR',
+  TP: 'THIRD_PARTY_OPERATOR',
+  TM: 'TECHNICAL_MANAGER',
+  IM: 'ISM_MANAGER',
 };
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -570,8 +573,12 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                       [ngModel]="companyForm().role"
                       (ngModelChange)="companyForm.set({ ...companyForm(), role: $event })"
                       class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
-                      @for (role of roleOptions(); track role.key) {
-                        <option [ngValue]="role.key">{{ role.label }}</option>
+                      @for (grp of roleGroups(); track grp.group) {
+                        <optgroup [label]="grp.group">
+                          @for (role of grp.roles; track role.key) {
+                            <option [ngValue]="role.key">{{ role.label }}</option>
+                          }
+                        </optgroup>
                       }
                     </select>
                   </div>
@@ -630,7 +637,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                 </svg>
               </div>
-            } @else if (!vesselCompanies().length && !showAddCompany()) {
+            } @else if (!vesselCompanies().length && !seasearcherSuggestions().length && !showAddCompany()) {
               <div class="flex-1 flex items-center justify-center text-sm text-gray-400">No companies added yet</div>
             } @else {
               <div class="flex-1 min-h-0 divide-y divide-gray-50 overflow-y-auto">
@@ -639,6 +646,9 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                     <div class="flex items-center justify-between">
                       <div class="flex items-center gap-2">
                         <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">{{ formatRole(vc.role) }}</span>
+                        @if (vc.source === 'seasearcher') {
+                          <span class="inline-flex items-center rounded-full bg-blue-50 border border-blue-100 px-1.5 py-0.5 text-[9px] font-medium text-blue-600">SS</span>
+                        }
                         <a [routerLink]="['/companies', vc.companyId]" class="font-medium text-brand-700 hover:text-brand-900 hover:underline">{{ vc.companyName }}</a>
                       </div>
                       <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -665,6 +675,34 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                     <p class="text-[10px] text-gray-400 mt-1">
                       Added by {{ vc.addedByName ?? 'Unknown' }} · {{ vc.createdAt | date:'mediumDate' }}
                     </p>
+                  </div>
+                }
+
+                @if (seasearcherSuggestions().length) {
+                  <div class="border-t border-gray-100 px-5 py-3">
+                    <div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Seasearcher Ownership</div>
+                    @for (entry of seasearcherSuggestions(); track entry.typeCode + (entry.companyId ?? entry.companyName)) {
+                      <div class="flex items-center justify-between py-2 text-sm">
+                        <div class="flex items-center gap-2 min-w-0">
+                          <span class="inline-flex items-center rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 text-[10px] font-medium text-blue-700 whitespace-nowrap">{{ entry.type }}</span>
+                          <span class="text-gray-700 truncate">{{ entry.companyName }}</span>
+                          @if (entry.country.code) {
+                            <span class="text-xs flex-shrink-0">{{ ownerFlag(entry) }}</span>
+                          }
+                        </div>
+                        @if (entry.companyId) {
+                          <button (click)="linkSeasearcherCompany(entry)"
+                            [disabled]="navigatingCompanyId() === entry.companyId"
+                            class="flex-shrink-0 ml-2 rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50 transition-colors">
+                            @if (navigatingCompanyId() === entry.companyId) {
+                              <span class="inline-flex items-center gap-1"><svg class="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Linking…</span>
+                            } @else {
+                              Link
+                            }
+                          </button>
+                        }
+                      </div>
+                    }
                   </div>
                 }
               </div>
@@ -889,94 +927,6 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
         </div>
 
         <!-- ═══ Full-width cards ═══ -->
-
-        <!-- Vessel Ownership Timeline -->
-        @if (currentOwnership().length || ownershipTimeline().length) {
-          <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-[20] min-[900px]:col-span-2 min-[1600px]:col-span-3 min-[2000px]:col-span-4">
-            <div class="border-b border-gray-100 px-6 py-3 flex items-center justify-between">
-              <h2 class="text-sm font-semibold text-gray-700">Vessel Ownership Timeline</h2>
-              @if (ownershipLastReported()) {
-                <span class="text-xs text-blue-600 font-medium">Last Reported {{ ownershipLastReported() }}</span>
-              }
-            </div>
-
-            @if (currentOwnership().length) {
-              <div class="px-6 pt-5 pb-3">
-                <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Current Ownership</h3>
-                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
-                  @for (entry of currentOwnership(); track entry.typeCode + entry.companyId) {
-                    <div class="rounded-lg border border-gray-200 bg-gray-50/50 p-3 border-l-4 {{ roleBorderClass(entry.typeCode) }} min-w-0">
-                      <div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">{{ entry.type }}</div>
-                      @if (entry.companyId) {
-                        <button (click)="navigateToCompany(entry)" class="text-sm font-semibold text-blue-700 leading-snug break-words text-left hover:text-blue-900 hover:underline transition-colors cursor-pointer">
-                          @if (navigatingCompanyId() === entry.companyId) {
-                            <span class="inline-flex items-center gap-1"><svg class="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> {{ entry.companyName }}</span>
-                          } @else {
-                            {{ entry.companyName }}
-                          }
-                        </button>
-                      } @else {
-                        <div class="text-sm font-semibold text-gray-700 leading-snug break-words">{{ entry.companyName }}</div>
-                      }
-                      @if (entry.country.name) {
-                        <div class="flex items-center gap-1.5 mt-2">
-                          <span class="text-sm flex-shrink-0">{{ ownerFlag(entry) }}</span>
-                          <span class="text-xs text-gray-600">{{ entry.country.name }}</span>
-                        </div>
-                      }
-                      <div class="text-[10px] text-gray-400 mt-1">{{ ownerDateRange(entry) }}</div>
-                    </div>
-                  }
-                </div>
-              </div>
-            }
-
-            @if (ownershipTimeline().length) {
-              <div class="px-6 pt-4 pb-5 border-t border-gray-100">
-                <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">Historical Ownership Changes</h3>
-                <div class="relative">
-                  <div class="absolute left-[52px] top-0 bottom-0 w-px bg-gray-200"></div>
-
-                  @for (group of ownershipTimeline(); track group.label) {
-                    <div class="relative flex gap-4 mb-5 last:mb-0">
-                      <div class="w-[44px] flex-shrink-0 text-right pt-0.5">
-                        <span class="text-xs font-semibold text-gray-500 leading-tight">{{ group.label }}</span>
-                      </div>
-                      <div class="flex-shrink-0 w-[17px] flex items-start justify-center pt-1.5 relative z-10">
-                        <div class="w-2.5 h-2.5 rounded-full bg-gray-300 ring-2 ring-white"></div>
-                      </div>
-                      <div class="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
-                        @for (entry of group.entries; track entry.typeCode + entry.companyId + entry.from) {
-                          <div class="rounded-lg border border-gray-200 bg-white p-2.5 text-xs border-l-4 {{ roleBorderClass(entry.typeCode) }} min-w-0">
-                            <div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{{ entry.type }}</div>
-                            @if (entry.companyId) {
-                              <button (click)="navigateToCompany(entry)" class="text-xs font-semibold text-blue-700 mt-0.5 break-words text-left hover:text-blue-900 hover:underline transition-colors cursor-pointer">
-                                @if (navigatingCompanyId() === entry.companyId) {
-                                  <span class="inline-flex items-center gap-1"><svg class="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> {{ entry.companyName }}</span>
-                                } @else {
-                                  {{ entry.companyName }}
-                                }
-                              </button>
-                            } @else {
-                              <div class="text-xs font-semibold text-gray-700 mt-0.5 break-words">{{ entry.companyName }}</div>
-                            }
-                            @if (entry.country.name) {
-                              <div class="flex items-center gap-1 mt-1">
-                                <span class="text-xs flex-shrink-0">{{ ownerFlag(entry) }}</span>
-                                <span class="text-[11px] text-gray-500">{{ entry.country.name }}</span>
-                              </div>
-                            }
-                            <div class="text-[10px] text-gray-400 mt-0.5">{{ ownerDateRange(entry) }}</div>
-                          </div>
-                        }
-                      </div>
-                    </div>
-                  }
-                </div>
-              </div>
-            }
-          </div>
-        }
 
         <!-- Port Call History -->
         @if (vessel()!.seasearcherId) {
@@ -1258,7 +1208,7 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
   readonly vesselCompanies = signal<VesselCompanyDto[]>([]);
   readonly companiesLoading = signal(false);
   readonly showAddCompany = signal(false);
-  readonly companyForm = signal<{ companyId: string; role: VesselCompanyRole; contactId: string | null; note: string }>({ companyId: '', role: 'OWNER', contactId: null, note: '' });
+  readonly companyForm = signal<{ companyId: string; role: VesselCompanyRole; contactId: string | null; note: string }>({ companyId: '', role: 'REGISTERED_OWNER', contactId: null, note: '' });
   readonly editingCompanyId = signal<string | null>(null);
   readonly savingCompany = signal(false);
   readonly companySearch = signal('');
@@ -1268,11 +1218,29 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
   readonly companyContacts = signal<CompanyContactDto[]>([]);
   readonly companyContactsLoading = signal(false);
   readonly roleOptions = signal<VesselCompanyRoleOption[]>([
-    { key: 'OWNER', label: 'Owner' },
-    { key: 'TIME_CHARTERER', label: 'Time Charterer' },
-    { key: 'OPERATOR', label: 'Operator' },
-    { key: 'MANAGER', label: 'Manager' },
+    { key: 'REGISTERED_OWNER', label: 'Registered Owner', group: 'Legal & Financial' },
+    { key: 'NOMINAL_OWNER', label: 'Nominal Owner', group: 'Legal & Financial' },
+    { key: 'BENEFICIAL_OWNER', label: 'Beneficial Owner', group: 'Legal & Financial' },
+    { key: 'GROUP_BENEFICIAL_OWNER', label: 'Group Beneficial Owner', group: 'Legal & Financial' },
+    { key: 'COMMERCIAL_OPERATOR', label: 'Commercial Operator', group: 'Operational & Commercial' },
+    { key: 'THIRD_PARTY_OPERATOR', label: 'Third-Party Operator', group: 'Operational & Commercial' },
+    { key: 'DISPONENT_OWNER', label: 'Disponent Owner', group: 'Operational & Commercial' },
+    { key: 'BAREBOAT_CHARTERER', label: 'Bareboat Charterer', group: 'Operational & Commercial' },
+    { key: 'TECHNICAL_MANAGER', label: 'Technical Manager', group: 'Technical & Safety' },
+    { key: 'ISM_MANAGER', label: 'ISM Manager', group: 'Technical & Safety' },
+    { key: 'SHIP_MANAGER', label: 'Ship Manager', group: 'Technical & Safety' },
   ]);
+
+  readonly roleGroups = computed(() => {
+    const opts = this.roleOptions();
+    const groups = new Map<string, VesselCompanyRoleOption[]>();
+    for (const opt of opts) {
+      const g = opt.group || 'Other';
+      if (!groups.has(g)) groups.set(g, []);
+      groups.get(g)!.push(opt);
+    }
+    return [...groups.entries()].map(([group, roles]) => ({ group, roles }));
+  });
 
   // Flag emoji
   readonly vesselFlag = computed(() => {
@@ -1365,53 +1333,21 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
     return { name: '', country: '', flag: '', eta: null, placeId: null };
   });
 
-  // Ownership — current entries (cards)
-  readonly currentOwnership = computed<OwnershipEntry[]>(() => {
+  // Seasearcher ownership suggestions — current entries not yet linked as vesselCompanies
+  readonly seasearcherSuggestions = computed<OwnershipEntry[]>(() => {
     const enr = this.enrichment();
     if (!enr?.ownershipHistory) return [];
-    const all: OwnershipEntry[] = enr.ownershipHistory;
-    return all
-      .filter((e: OwnershipEntry) => e.currentIndicator)
+    const current = (enr.ownershipHistory as OwnershipEntry[])
+      .filter((e: OwnershipEntry) => e.currentIndicator);
+    // Filter out entries already linked as vesselCompanies with matching role + source
+    const vcs = this.vesselCompanies();
+    return current
+      .filter(entry => {
+        const mappedRole = SS_CODE_TO_ROLE[entry.typeCode];
+        if (!mappedRole) return true; // unmapped code — show as suggestion
+        return !vcs.some(vc => vc.role === mappedRole && vc.source === 'seasearcher');
+      })
       .sort((a: OwnershipEntry, b: OwnershipEntry) => (ROLE_ORDER[a.typeCode] ?? 99) - (ROLE_ORDER[b.typeCode] ?? 99));
-  });
-
-  // Ownership — historical timeline (grouped by start-month)
-  readonly ownershipTimeline = computed<TimelineGroup[]>(() => {
-    const enr = this.enrichment();
-    if (!enr?.ownershipHistory) return [];
-    const all: OwnershipEntry[] = enr.ownershipHistory;
-    const past = all.filter((e: OwnershipEntry) => !e.currentIndicator);
-
-    // Group by the month/year the entry started
-    const groups = new Map<string, TimelineGroup>();
-    for (const entry of past) {
-      const d = new Date(entry.from);
-      const label = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-      const sortKey = d.getTime();
-      if (!groups.has(label)) {
-        groups.set(label, { label, sortKey, entries: [] });
-      }
-      groups.get(label)!.entries.push(entry);
-    }
-
-    // Sort groups newest-first, entries within each group by role order
-    const sorted = [...groups.values()].sort((a, b) => b.sortKey - a.sortKey);
-    for (const g of sorted) {
-      g.entries.sort((a, b) => (ROLE_ORDER[a.typeCode] ?? 99) - (ROLE_ORDER[b.typeCode] ?? 99));
-    }
-    return sorted;
-  });
-
-  // Last reported date for ownership
-  readonly ownershipLastReported = computed<string>(() => {
-    const enr = this.enrichment();
-    if (!enr?.ownershipHistory?.length) return '';
-    const all: OwnershipEntry[] = enr.ownershipHistory;
-    const current = all.filter((e: OwnershipEntry) => e.currentIndicator);
-    if (!current.length) return '';
-    const dates = current.map((e: OwnershipEntry) => new Date(e.from).getTime());
-    const latest = new Date(Math.max(...dates));
-    return latest.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
   });
 
   constructor() {
@@ -1694,6 +1630,54 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
     await this.navigateToCompanyById(entry.companyId);
   }
 
+  /** Import a Seasearcher ownership entry as a local vesselCompany link */
+  async linkSeasearcherCompany(entry: OwnershipEntry): Promise<void> {
+    const v = this.vessel();
+    if (!v || !entry.companyId || this.navigatingCompanyId()) return;
+    this.navigatingCompanyId.set(entry.companyId);
+    try {
+      // 1. Find or import the company locally
+      let localCompanyId: string;
+      const lookup = await firstValueFrom(
+        this.http.get<ApiResponse<CounterpartyDto>>(`${API}/companies/by-seasearcher/${entry.companyId}`),
+      );
+      if (lookup.success && lookup.data) {
+        localCompanyId = lookup.data.id;
+      } else {
+        const imported = await firstValueFrom(
+          this.http.post<ApiResponse<CounterpartyDto>>(`${API}/companies/import`, { seasearcherId: entry.companyId }),
+        );
+        if (!imported.success || !imported.data) {
+          this.showToast('error', 'Failed to import company from Seasearcher.');
+          return;
+        }
+        localCompanyId = imported.data.id;
+      }
+
+      // 2. Create vesselCompany link with mapped role
+      const mappedRole = SS_CODE_TO_ROLE[entry.typeCode] || entry.typeCode;
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<VesselCompanyDto>>(`${API}/vessels/local/${v.id}/companies`, {
+          companyId: localCompanyId,
+          role: mappedRole,
+          source: 'seasearcher',
+          replaceExistingRole: true,
+        }),
+      );
+      if (res.success) {
+        this.showToast('success', `Linked ${entry.companyName} as ${this.formatRole(mappedRole)}`);
+        await this.loadVesselCompanies(v.id);
+      } else {
+        this.showToast('error', res.message ?? 'Failed to link company.');
+      }
+    } catch (err) {
+      console.error('Failed to link Seasearcher company:', err);
+      this.showToast('error', 'Failed to link company from Seasearcher.');
+    } finally {
+      this.navigatingCompanyId.set(null);
+    }
+  }
+
   async navigateToCompanyById(seasearcherId: string): Promise<void> {
     if (this.navigatingCompanyId()) return;
     this.navigatingCompanyId.set(seasearcherId);
@@ -1959,7 +1943,7 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
   }
 
   openAddCompany(): void {
-    this.companyForm.set({ companyId: '', role: 'OWNER', contactId: null, note: '' });
+    this.companyForm.set({ companyId: '', role: 'REGISTERED_OWNER', contactId: null, note: '' });
     this.editingCompanyId.set(null);
     this.selectedCompany.set(null);
     this.companySearch.set('');
