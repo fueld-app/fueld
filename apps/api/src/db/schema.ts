@@ -104,6 +104,8 @@ export interface TenantSettings {
   units?: string[];
   // Configurable currency options for order line items
   currencies?: string[];
+  // Configurable company types (e.g. CLIENT, SUPPLIER, BARGE)
+  companyTypes?: string[];
 }
 
 export const tenants = pgTable('tenants', {

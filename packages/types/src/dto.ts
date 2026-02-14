@@ -524,6 +524,11 @@ export interface CurrencySettingsDto {
   currencies: string[];
 }
 
+/** Admin settings for configurable company types */
+export interface CompanyTypeSettingsDto {
+  companyTypes: string[];
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  ORDER ITEM (line items)
 // ═══════════════════════════════════════════════════════════════════════

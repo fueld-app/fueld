@@ -36,6 +36,8 @@ import {
   updateUnitSettings,
   getCurrencySettings,
   updateCurrencySettings,
+  getCompanyTypeSettings,
+  updateCompanyTypeSettings,
 } from './settings.service';
 import { reloadCurrencies } from '../prices/price.service';
 import {
@@ -350,6 +352,18 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     }
   }, {
     detail: { tags: ['Admin Settings'], summary: 'Get currency options for current tenant' },
+  })
+
+  .get('/my-company-types', async () => {
+    try {
+      const data = await getCompanyTypeSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get company type options for current tenant' },
   })
 
   // ── Integrations ────────────────────────────────────────────────
@@ -954,4 +968,37 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       currencies: t.Array(t.String({ minLength: 1 })),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update configurable currency options' },
+  })
+
+  // ═════════════════════════════════════════════════════════════════
+  //  COMPANY TYPE SETTINGS
+  // ═════════════════════════════════════════════════════════════════
+
+  .get('/company-types', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getCompanyTypeSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get configurable company type options' },
+  })
+
+  .put('/company-types', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateCompanyTypeSettings(body.companyTypes);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      companyTypes: t.Array(t.String({ minLength: 1 })),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update configurable company type options' },
   });

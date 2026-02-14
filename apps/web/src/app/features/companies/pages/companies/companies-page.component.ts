@@ -36,12 +36,6 @@ interface CompanySearchResult {
   isSanctioned?: boolean;
 }
 
-const TYPE_LABELS: Record<string, string> = {
-  CLIENT: 'Client',
-  SUPPLIER: 'Supplier',
-  BARGE: 'Barge',
-};
-
 @Component({
   selector: 'app-companies-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -695,7 +689,7 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
 
   // ─── Helpers ───────────────────────────────────────────────────────
   typeLabel(type: string): string {
-    return TYPE_LABELS[type] ?? type;
+    return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
   }
 
   typeBadgeClass(type: string): string {

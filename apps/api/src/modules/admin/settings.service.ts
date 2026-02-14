@@ -682,3 +682,32 @@ export async function updateCurrencySettings(currencies: string[]): Promise<{ cu
 
   return getCurrencySettings();
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+//  COMPANY TYPE SETTINGS
+// ═══════════════════════════════════════════════════════════════════════
+
+const DEFAULT_COMPANY_TYPES = ['CLIENT', 'SUPPLIER', 'BARGE'];
+
+export async function getCompanyTypeSettings(): Promise<{ companyTypes: string[] }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  return { companyTypes: settings.companyTypes ?? DEFAULT_COMPANY_TYPES };
+}
+
+export async function updateCompanyTypeSettings(companyTypes: string[]): Promise<{ companyTypes: string[] }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = { ...(tenant.settings as any) };
+  settings.companyTypes = companyTypes;
+
+  await db
+    .update(tenants)
+    .set({ settings, updatedAt: new Date() })
+    .where(eq(tenants.id, tenant.id));
+
+  return getCompanyTypeSettings();
+}

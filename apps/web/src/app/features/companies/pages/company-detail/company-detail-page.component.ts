@@ -27,14 +27,6 @@ import { LastEditedBadgeComponent } from '../../../../shared/components/last-edi
 import { CommentsCardComponent } from '../../../../shared/components/comments-card/comments-card.component';
 import { API } from '@app/core/config/api';
 
-const TYPE_LABELS: Record<string, string> = {
-  CLIENT: 'Client',
-  SUPPLIER: 'Supplier',
-  BARGE: 'Barge',
-};
-
-const ALL_TYPES = ['CLIENT', 'SUPPLIER', 'BARGE'] as const;
-
 interface CompanyEnrichment {
   id: string;
   companyImo: string;
@@ -558,7 +550,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                     <div>
                       <dt class="text-gray-500">Type</dt>
                       <dd class="mt-0.5 flex flex-wrap gap-1.5">
-                        @for (t of allTypes; track t) {
+                        @for (t of allTypes(); track t) {
                           <button
                             (click)="toggleType(t)"
                             [disabled]="typeSaving()"
@@ -2010,7 +2002,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     return [...groups.entries()].map(([group, roles]) => ({ group, roles }));
   });
 
-  readonly allTypes = ALL_TYPES;
+  readonly allTypes = signal<string[]>(['CLIENT', 'SUPPLIER', 'BARGE']);
 
   // Inline editing state
   readonly editing = signal(false);
@@ -2124,6 +2116,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     const id = this.route.snapshot.paramMap.get('id');
     this.loadUsers();
     this.loadRoleOptions();
+    this.loadCompanyTypes();
     if (id) this.loadCompany(id);
 
     // React to same-route navigation (e.g. clicking related company links)
@@ -3084,7 +3077,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
 
   // ─── Helpers ───────────────────────────────────────────────────────
   typeLabel(type: string): string {
-    return TYPE_LABELS[type] ?? type;
+    return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
   }
 
   typeBadgeClass(type: string): string {
@@ -3471,6 +3464,19 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
       );
       if (res.success && res.data?.roles?.length) {
         this.roleOptions.set(res.data.roles);
+      }
+    } catch {
+      // Keep defaults if fetch fails
+    }
+  }
+
+  private async loadCompanyTypes(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ companyTypes: string[] }>>(`${API}/admin/settings/my-company-types`),
+      );
+      if (res.success && res.data?.companyTypes?.length) {
+        this.allTypes.set(res.data.companyTypes);
       }
     } catch {
       // Keep defaults if fetch fails
