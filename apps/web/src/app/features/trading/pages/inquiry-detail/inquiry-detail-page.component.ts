@@ -286,8 +286,9 @@ interface LliSearchResult {
         (customerContactChange)="onCustomerContactChange($event)"
         (supplierContactChange)="onSupplierContactChange($event)"
       >
-        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[260px]">
-          <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Customer Payment</p>
+        <!-- Customer Payment (projected into client card) -->
+        <div customerPayment>
+          <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Payment</p>
           <div class="flex items-center gap-2">
             <select
               [ngModel]="order()?.customerPaymentTermType ?? ''"
@@ -331,8 +332,9 @@ interface LliSearchResult {
             }
           </div>
         </div>
-        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[260px]">
-          <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Supplier Payment</p>
+        <!-- Supplier Payment (projected into supplier card) -->
+        <div supplierPayment>
+          <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Payment</p>
           <div class="flex items-center gap-2">
             <select
               [ngModel]="order()?.supplierPaymentTermType ?? ''"
@@ -377,26 +379,37 @@ interface LliSearchResult {
           </div>
         </div>
         <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[260px] overflow-auto">
-          <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Customer Note</p>
-          <textarea
-            rows="3"
-            [ngModel]="order()?.customerNote ?? ''"
-            (ngModelChange)="onCustomerNoteChange($event)"
-            placeholder="Customer note to include in PDFs and emails"
-            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
-                   focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-          ></textarea>
-        </div>
-        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[260px] overflow-auto">
-          <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Supplier Note</p>
-          <textarea
-            rows="3"
-            [ngModel]="order()?.supplierNote ?? ''"
-            (ngModelChange)="onSupplierNoteChange($event)"
-            placeholder="Supplier note"
-            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
-                   focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-          ></textarea>
+          <div class="flex items-center gap-3 mb-1.5">
+            <button
+              (click)="noteTab.set('customer')"
+              class="text-xs font-medium uppercase tracking-wider transition-colors"
+              [class]="noteTab() === 'customer' ? 'text-brand-600' : 'text-gray-400 hover:text-gray-600'"
+            >Customer Note</button>
+            <button
+              (click)="noteTab.set('supplier')"
+              class="text-xs font-medium uppercase tracking-wider transition-colors"
+              [class]="noteTab() === 'supplier' ? 'text-brand-600' : 'text-gray-400 hover:text-gray-600'"
+            >Supplier Note</button>
+          </div>
+          @if (noteTab() === 'customer') {
+            <textarea
+              rows="3"
+              [ngModel]="order()?.customerNote ?? ''"
+              (ngModelChange)="onCustomerNoteChange($event)"
+              placeholder="Customer note to include in PDFs and emails"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
+                     focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            ></textarea>
+          } @else {
+            <textarea
+              rows="3"
+              [ngModel]="order()?.supplierNote ?? ''"
+              (ngModelChange)="onSupplierNoteChange($event)"
+              placeholder="Supplier note"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
+                     focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            ></textarea>
+          }
         </div>
         <!-- Terms & Conditions -->
         <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[260px] overflow-auto">
@@ -645,6 +658,7 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   readonly supplierContact = signal<CompanyContactDto | null>(null);
   readonly customerContacts = signal<CompanyContactDto[]>([]);
   readonly supplierContacts = signal<CompanyContactDto[]>([]);
+  readonly noteTab = signal<'customer' | 'supplier'>('customer');
 
   // ─── Send Offer modal state ──────────────────────────────────────
 

@@ -16,8 +16,8 @@ import {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [SearchableDropdownComponent, FormsModule],
   template: `
-    <div class="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
-      <!-- Client + Customer Contact -->
+    <div class="mb-8 grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <!-- Client + Customer Contact + Customer Payment -->
       <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Client</p>
         @if (canEditClient()) {
@@ -51,8 +51,11 @@ import {
             </select>
           }
         </div>
+        <div class="mt-3 border-t border-gray-100 pt-3">
+          <ng-content select="[customerPayment]"></ng-content>
+        </div>
       </div>
-      <!-- Supplier + Supplier Contact -->
+      <!-- Supplier + Supplier Contact + Supplier Payment -->
       <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Supplier</p>
         @if (isReadonly()) {
@@ -88,7 +91,11 @@ import {
             </select>
           }
         </div>
+        <div class="mt-3 border-t border-gray-100 pt-3">
+          <ng-content select="[supplierPayment]"></ng-content>
+        </div>
       </div>
+      <!-- Voyage: Vessel + Place + ETA/ETD -->
       <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Vessel</p>
         @if (isReadonly()) {
@@ -104,41 +111,40 @@ import {
             (selectionChange)="vesselChange.emit($event)"
           />
         }
-      </div>
-      <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Place</p>
-        @if (isReadonly()) {
-          <p class="mt-1 text-sm font-semibold text-gray-900">{{ placeName() }}</p>
-        } @else {
-          <app-searchable-dropdown
-            [options]="placeOptions()"
-            [selected]="placeId()"
-            [asyncSearch]="true"
-            [loading]="placeLoading()"
-            placeholder="Search places..."
-            (searchChange)="placeSearch.emit($event)"
-            (selectionChange)="placeChange.emit($event)"
-          />
-        }
-      </div>
-      <!-- ETA + ETD combined -->
-      <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">ETA</p>
-        @if (isReadonly()) {
-          <p class="mt-1 text-sm font-semibold text-gray-900">
-            {{ formatDateTimeLabel(eta()) }}
-          </p>
-        } @else {
-          <input
-            type="datetime-local"
-            step="60"
-            [ngModel]="formatDateTimeForInput(eta())"
-            (ngModelChange)="etaChange.emit($event)"
-            [min]="minDateTime()"
-            class="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-900
-                   focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
-          />
-        }
+        <div class="mt-3 border-t border-gray-100 pt-3">
+          <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Place</p>
+          @if (isReadonly()) {
+            <p class="mt-1 text-sm font-semibold text-gray-900">{{ placeName() }}</p>
+          } @else {
+            <app-searchable-dropdown
+              [options]="placeOptions()"
+              [selected]="placeId()"
+              [asyncSearch]="true"
+              [loading]="placeLoading()"
+              placeholder="Search places..."
+              (searchChange)="placeSearch.emit($event)"
+              (selectionChange)="placeChange.emit($event)"
+            />
+          }
+        </div>
+        <div class="mt-3 border-t border-gray-100 pt-3">
+          <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">ETA</p>
+          @if (isReadonly()) {
+            <p class="mt-1 text-sm font-semibold text-gray-900">
+              {{ formatDateTimeLabel(eta()) }}
+            </p>
+          } @else {
+            <input
+              type="datetime-local"
+              step="60"
+              [ngModel]="formatDateTimeForInput(eta())"
+              (ngModelChange)="etaChange.emit($event)"
+              [min]="minDateTime()"
+              class="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-900
+                     focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+            />
+          }
+        </div>
         @if (showEtd()) {
           <div class="mt-3 border-t border-gray-100 pt-3">
             <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">ETD</p>
@@ -160,6 +166,7 @@ import {
           </div>
         }
       </div>
+      <!-- Invoicing Company -->
       <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <p class="text-xs font-medium uppercase tracking-wider text-gray-500">Invoicing Company</p>
         @if (isReadonly()) {

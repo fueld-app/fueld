@@ -164,8 +164,9 @@ interface TeamUserOption {
       (customerContactChange)="onCustomerContactChange($event)"
       (supplierContactChange)="onSupplierContactChange($event)"
     >
-      <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[260px]">
-        <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Customer Payment</p>
+      <!-- Customer Payment (projected into client card) -->
+      <div customerPayment>
+        <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Payment</p>
         @if (isReadonly()) {
           <p class="mt-1 text-sm font-semibold text-gray-900">{{ formatCustomerPaymentTerms() }}</p>
         } @else {
@@ -213,8 +214,9 @@ interface TeamUserOption {
           </div>
         }
       </div>
-      <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[260px]">
-        <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Supplier Payment</p>
+      <!-- Supplier Payment (projected into supplier card) -->
+      <div supplierPayment>
+        <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Payment</p>
         @if (isReadonly()) {
           <p class="mt-1 text-sm font-semibold text-gray-900">{{ formatSupplierPaymentTerms() }}</p>
         } @else {
