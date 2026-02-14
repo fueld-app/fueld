@@ -14,6 +14,7 @@ import { debounceTime, switchMap, tap, catchError, takeUntil } from 'rxjs/operat
 import type { PlaceDto, ApiResponse, CreatePlaceDto } from '@fueld/types';
 import { COUNTRIES } from '../../../../shared/data/countries';
 import { AREAS } from '../../../../shared/data/areas';
+import { PaginationComponent } from '../../../../shared/components';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Places Page — Browse local places + search & import from Lloyd's
@@ -48,7 +49,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
 @Component({
   selector: 'app-places-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule],
+  imports: [FormsModule, PaginationComponent],
   template: `
     <div>
       <!-- Header -->
@@ -281,29 +282,12 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
       </div>
 
       <!-- Pagination -->
-      @if (totalCount() > pageSize) {
-        <div class="mt-4 flex items-center justify-between text-sm text-gray-600">
-          <span>Showing {{ (currentPage() - 1) * pageSize + 1 }}–{{ min(currentPage() * pageSize, totalCount()) }} of {{ totalCount() }}</span>
-          <div class="flex gap-2">
-            <button
-              (click)="goToPage(currentPage() - 1)"
-              [disabled]="currentPage() <= 1"
-              class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50
-                     disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              Previous
-            </button>
-            <button
-              (click)="goToPage(currentPage() + 1)"
-              [disabled]="currentPage() * pageSize >= totalCount()"
-              class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50
-                     disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      }
+      <app-pagination
+        [currentPage]="currentPage()"
+        [totalItems]="totalCount()"
+        [pageSize]="pageSize"
+        (pageChange)="goToPage($event)"
+      />
 
       <!-- Import success toast -->
       @if (deleteTarget()) {
@@ -731,10 +715,6 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
 
   openPlace(id: string): void {
     this.router.navigate(['/places', id]);
-  }
-
-  min(a: number, b: number): number {
-    return Math.min(a, b);
   }
 }
 

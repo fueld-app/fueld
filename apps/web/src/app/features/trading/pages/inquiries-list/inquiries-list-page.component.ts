@@ -14,6 +14,7 @@ import { Subscription } from 'rxjs';
 import { FormsModule } from '@angular/forms';
 import { StatusBadgeComponent } from '../../../../shared/components/status-badge/status-badge.component';
 import { SearchableDropdownComponent, type DropdownOption } from '../../../../shared/components/searchable-dropdown/searchable-dropdown.component';
+import { PaginationComponent } from '../../../../shared/components';
 import type { ApiResponse, OrderListRowDto, CounterpartyDto, VesselDto, PlaceDto } from '@fueld/types';
 import { DecimalPipe, DatePipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
@@ -51,7 +52,7 @@ interface LliSearchResult {
 @Component({
   selector: 'app-inquiries-list-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, StatusBadgeComponent, FormsModule, DecimalPipe, DatePipe, SearchableDropdownComponent],
+  imports: [RouterLink, StatusBadgeComponent, FormsModule, DecimalPipe, DatePipe, SearchableDropdownComponent, PaginationComponent],
   template: `
     <div>
       <!-- Header -->
@@ -152,32 +153,12 @@ interface LliSearchResult {
         </div>
 
         <!-- Pagination -->
-        @if (totalItems() > pageSize()) {
-          <div class="mt-4 flex items-center justify-between">
-            <p class="text-sm text-gray-500">
-              Showing {{ ((currentPage() - 1) * pageSize()) + 1 }}–{{ Math.min(currentPage() * pageSize(), totalItems()) }}
-              of {{ totalItems() }}
-            </p>
-            <div class="flex gap-2">
-              <button
-                (click)="goToPage(currentPage() - 1)"
-                [disabled]="currentPage() <= 1"
-                class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700
-                       hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Previous
-              </button>
-              <button
-                (click)="goToPage(currentPage() + 1)"
-                [disabled]="currentPage() * pageSize() >= totalItems()"
-                class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700
-                       hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        }
+        <app-pagination
+          [currentPage]="currentPage()"
+          [totalItems]="totalItems()"
+          [pageSize]="pageSize()"
+          (pageChange)="goToPage($event)"
+        />
 
         <!-- Mobile cards -->
         <div class="space-y-3 md:hidden">
@@ -355,8 +336,6 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private queryParamSub?: Subscription;
-
-  readonly Math = Math;
 
   readonly mode = input<'inquiries' | 'orders'>('inquiries');
 

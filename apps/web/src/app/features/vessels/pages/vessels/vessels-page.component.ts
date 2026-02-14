@@ -13,6 +13,7 @@ import { firstValueFrom, Subject, of } from 'rxjs';
 import { debounceTime, switchMap, tap, catchError, takeUntil } from 'rxjs/operators';
 import type { VesselDto, ApiResponse } from '@fueld/types';
 import { flagFromIso3 } from '../../../../shared/utils/flags';
+import { PaginationComponent } from '../../../../shared/components';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Vessels Page — Browse, search, import from Seasearcher, create
@@ -40,7 +41,7 @@ interface VesselSearchResult {
 @Component({
   selector: 'app-vessels-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule],
+  imports: [FormsModule, PaginationComponent],
   template: `
     <div>
       <!-- Header -->
@@ -222,23 +223,12 @@ interface VesselSearchResult {
         </div>
 
         <!-- Pagination -->
-        @if (totalPages() > 1) {
-          <div class="mt-4 flex items-center justify-between text-sm text-gray-600">
-            <span>Page {{ currentPage() }} of {{ totalPages() }} ({{ total() }} vessels)</span>
-            <div class="flex gap-2">
-              <button
-                (click)="changePage(currentPage() - 1)"
-                [disabled]="currentPage() <= 1"
-                class="rounded-lg border border-gray-200 px-3 py-1.5 text-xs disabled:opacity-40 hover:bg-gray-50"
-              >Prev</button>
-              <button
-                (click)="changePage(currentPage() + 1)"
-                [disabled]="currentPage() >= totalPages()"
-                class="rounded-lg border border-gray-200 px-3 py-1.5 text-xs disabled:opacity-40 hover:bg-gray-50"
-              >Next</button>
-            </div>
-          </div>
-        }
+        <app-pagination
+          [currentPage]="currentPage()"
+          [totalItems]="total()"
+          [pageSize]="pageSize"
+          (pageChange)="changePage($event)"
+        />
       }
 
       <!-- Delete Confirmation Modal -->

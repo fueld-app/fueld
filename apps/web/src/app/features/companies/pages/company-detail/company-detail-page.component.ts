@@ -924,7 +924,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                   </svg>
                 </div>
               } @else if (contacts().length) {
-                <div class="divide-y divide-gray-50">
+                <div class="divide-y divide-gray-50 max-h-[600px] overflow-y-auto">
                   @for (c of contacts(); track c.id) {
                     <div class="px-5 py-3 flex items-start justify-between group">
                       <div class="flex items-start gap-3 min-w-0">

@@ -8,6 +8,7 @@ import {
 import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { PaginationComponent } from '../../../../shared/components';
 import { firstValueFrom } from 'rxjs';
 import type {
   CreditLineDto,
@@ -39,7 +40,7 @@ interface CompanySearchResultOption {
 @Component({
   selector: 'app-customer-credit-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, PaginationComponent],
   template: `
     <div>
       <!-- Header -->
@@ -187,17 +188,12 @@ interface CompanySearchResultOption {
         </div>
 
         <!-- Pagination -->
-        @if (total() > pageSize) {
-          <div class="mt-4 flex items-center justify-between text-sm text-gray-600">
-            <span>Showing {{ (currentPage() - 1) * pageSize + 1 }} - {{ Math.min(currentPage() * pageSize, total()) }} of {{ total() }}</span>
-            <div class="flex gap-2">
-              <button [disabled]="currentPage() === 1" (click)="changePage(currentPage() - 1)"
-                class="rounded-md border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">Prev</button>
-              <button [disabled]="currentPage() * pageSize >= total()" (click)="changePage(currentPage() + 1)"
-                class="rounded-md border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">Next</button>
-            </div>
-          </div>
-        }
+        <app-pagination
+          [currentPage]="currentPage()"
+          [totalItems]="total()"
+          [pageSize]="pageSize"
+          (pageChange)="changePage($event)"
+        />
       }
 
       <!-- Create / Edit modal -->
@@ -373,7 +369,6 @@ export class CustomerCreditPageComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-  readonly Math = Math;
   readonly parseFloat = parseFloat;
   readonly pageSize = 25;
 

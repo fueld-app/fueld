@@ -14,13 +14,14 @@ import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subscription } from 'rxjs';
 import type { ApiResponse, ActivityLogDto, UserSessionDto } from '@fueld/types';
 import { WebSocketService } from '../../../../core/websocket/websocket.service';
+import { PaginationComponent } from '../../../../shared/components';
 
 import { API } from '@app/core/config/api';
 
 @Component({
   selector: 'app-activity-log-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule],
+  imports: [FormsModule, PaginationComponent],
   template: `
     <div>
       <!-- Header -->
@@ -399,28 +400,12 @@ import { API } from '@app/core/config/api';
           </div>
 
           <!-- Pagination -->
-          <div class="flex items-center justify-between mt-4 text-sm text-gray-600">
-            <p>Showing {{ logs().length }} of {{ totalLogs() }} entries</p>
-            <div class="flex gap-2">
-              <button
-                (click)="prevPage()"
-                [disabled]="currentPage() <= 1"
-                class="rounded-md border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Previous
-              </button>
-              <span class="flex items-center px-3 py-1.5 text-sm text-gray-500">
-                Page {{ currentPage() }}
-              </span>
-              <button
-                (click)="nextPage()"
-                [disabled]="logs().length < pageSize"
-                class="rounded-md border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Next
-              </button>
-            </div>
-          </div>
+          <app-pagination
+            [currentPage]="currentPage()"
+            [totalItems]="totalLogs()"
+            [pageSize]="pageSize"
+            (pageChange)="goToPage($event)"
+          />
         }
       }
     </div>
@@ -591,13 +576,8 @@ export class ActivityLogPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  nextPage(): void {
-    this.currentPage.update((p) => p + 1);
-    this.loadLogs();
-  }
-
-  prevPage(): void {
-    this.currentPage.update((p) => Math.max(1, p - 1));
+  goToPage(page: number): void {
+    this.currentPage.set(page);
     this.loadLogs();
   }
 

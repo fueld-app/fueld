@@ -14,6 +14,7 @@ import { debounceTime, switchMap, tap, catchError, takeUntil } from 'rxjs/operat
 import type { CounterpartyDto, ApiResponse } from '@fueld/types';
 import { COUNTRIES } from '../../../../shared/data/countries';
 import { flagFromIso3 } from '../../../../shared/utils/flags';
+import { PaginationComponent } from '../../../../shared/components';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Companies Page — Browse, search, import from Seasearcher, create
@@ -43,7 +44,7 @@ const TYPE_LABELS: Record<string, string> = {
 @Component({
   selector: 'app-companies-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule],
+  imports: [FormsModule, PaginationComponent],
   template: `
     <div>
       <!-- Header -->
@@ -267,23 +268,12 @@ const TYPE_LABELS: Record<string, string> = {
         </div>
 
         <!-- Pagination -->
-        @if (total() > pageSize) {
-          <div class="mt-4 flex items-center justify-between text-sm text-gray-600">
-            <span>Showing {{ (currentPage() - 1) * pageSize + 1 }}–{{ Math.min(currentPage() * pageSize, total()) }} of {{ total() }}</span>
-            <div class="flex gap-2">
-              <button
-                [disabled]="currentPage() === 1"
-                (click)="changePage(currentPage() - 1)"
-                class="rounded-md border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-              >Prev</button>
-              <button
-                [disabled]="currentPage() * pageSize >= total()"
-                (click)="changePage(currentPage() + 1)"
-                class="rounded-md border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-              >Next</button>
-            </div>
-          </div>
-        }
+        <app-pagination
+          [currentPage]="currentPage()"
+          [totalItems]="total()"
+          [pageSize]="pageSize"
+          (pageChange)="changePage($event)"
+        />
       }
 
       <!-- Delete confirmation modal -->
@@ -388,7 +378,6 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
   private readonly destroy$ = new Subject<void>();
   private readonly searchSubject = new Subject<string>();
 
-  readonly Math = Math;
   readonly pageSize = 25;
 
   // ─── State ──────────────────────────────────────────────────────────
