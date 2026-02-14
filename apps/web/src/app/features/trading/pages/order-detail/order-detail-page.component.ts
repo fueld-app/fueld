@@ -264,7 +264,8 @@ interface TeamUserOption {
           </div>
         }
       </div>
-      <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[260px] overflow-auto">
+      <!-- Notes + T&C (projected into invoicing card) -->
+      <div notesAndTerms>
         <div class="flex items-center gap-3 mb-1.5">
           <button
             (click)="noteTab.set('customer')"
@@ -282,7 +283,7 @@ interface TeamUserOption {
             <p class="mt-1 text-sm text-gray-700 whitespace-pre-line">{{ order()?.customerNote || '-' }}</p>
           } @else {
             <textarea
-              rows="3"
+              rows="2"
               [ngModel]="order()?.customerNote ?? ''"
               (ngModelChange)="onCustomerNoteChange($event)"
               placeholder="Customer note to include in PDFs and emails"
@@ -295,7 +296,7 @@ interface TeamUserOption {
             <p class="mt-1 text-sm text-gray-700 whitespace-pre-line">{{ order()?.supplierNote || '-' }}</p>
           } @else {
             <textarea
-              rows="3"
+              rows="2"
               [ngModel]="order()?.supplierNote ?? ''"
               (ngModelChange)="onSupplierNoteChange($event)"
               placeholder="Supplier note"
@@ -304,23 +305,21 @@ interface TeamUserOption {
             ></textarea>
           }
         }
-      </div>
-
-      <!-- Terms & Conditions -->
-      <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[260px] overflow-auto">
-        <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Terms &amp; Conditions</p>
-        @if (isReadonly()) {
-          <p class="mt-1 text-sm text-gray-700 whitespace-pre-line">{{ order()?.termsAndConditions || '-' }}</p>
-        } @else {
-          <textarea
-            rows="4"
-            [ngModel]="order()?.termsAndConditions ?? ''"
-            (ngModelChange)="onTermsChange($event)"
-            placeholder="Terms & conditions text to include in documents"
-            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
-                   focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-          ></textarea>
-        }
+        <div class="mt-3 border-t border-gray-100 pt-3">
+          <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Terms &amp; Conditions</p>
+          @if (isReadonly()) {
+            <p class="mt-1 text-sm text-gray-700 whitespace-pre-line">{{ order()?.termsAndConditions || '-' }}</p>
+          } @else {
+            <textarea
+              rows="2"
+              [ngModel]="order()?.termsAndConditions ?? ''"
+              (ngModelChange)="onTermsChange($event)"
+              placeholder="Terms & conditions text to include in documents"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
+                     focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            ></textarea>
+          }
+        </div>
       </div>
     </app-trading-detail-meta-cards>
 
@@ -337,9 +336,9 @@ interface TeamUserOption {
       (itemsChange)="onItemsChange($event)"
     />
 
-    <!-- Payments + Attachments + Comments + Activity (same row on desktop) -->
+    <!-- Payments + Attachments + Comments -->
     @if (orderId() || order()?.id) {
-      <div class="mt-6 grid grid-cols-1 gap-6 min-[900px]:grid-cols-2 min-[1600px]:grid-cols-4">
+      <div class="mt-6 grid grid-cols-1 gap-6 min-[900px]:grid-cols-2 min-[1600px]:grid-cols-3">
         <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[520px] flex flex-col">
           <div class="flex items-center justify-between gap-4">
             <div>
@@ -444,12 +443,12 @@ interface TeamUserOption {
             <app-comments-card entityType="order" [entityId]="orderId()" />
           </div>
         }
-        @if (order()?.id) {
-          <div class="h-full max-h-[520px] overflow-auto">
-            <app-activity-timeline entityType="order" [entityId]="order()!.id" />
-          </div>
-        }
       </div>
+      @if (order()?.id) {
+        <div class="mt-6">
+          <app-activity-timeline entityType="order" [entityId]="order()!.id" />
+        </div>
+      }
     }
 
     <!-- Toast notification -->

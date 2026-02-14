@@ -378,7 +378,8 @@ interface LliSearchResult {
             }
           </div>
         </div>
-        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[260px] overflow-auto">
+        <!-- Notes + T&C (projected into invoicing card) -->
+        <div notesAndTerms>
           <div class="flex items-center gap-3 mb-1.5">
             <button
               (click)="noteTab.set('customer')"
@@ -393,7 +394,7 @@ interface LliSearchResult {
           </div>
           @if (noteTab() === 'customer') {
             <textarea
-              rows="3"
+              rows="2"
               [ngModel]="order()?.customerNote ?? ''"
               (ngModelChange)="onCustomerNoteChange($event)"
               placeholder="Customer note to include in PDFs and emails"
@@ -402,7 +403,7 @@ interface LliSearchResult {
             ></textarea>
           } @else {
             <textarea
-              rows="3"
+              rows="2"
               [ngModel]="order()?.supplierNote ?? ''"
               (ngModelChange)="onSupplierNoteChange($event)"
               placeholder="Supplier note"
@@ -410,18 +411,17 @@ interface LliSearchResult {
                      focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
             ></textarea>
           }
-        </div>
-        <!-- Terms & Conditions -->
-        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[260px] overflow-auto">
-          <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Terms &amp; Conditions</p>
-          <textarea
-            rows="4"
-            [ngModel]="order()?.termsAndConditions ?? ''"
-            (ngModelChange)="onTermsChange($event)"
-            placeholder="Terms & conditions text to include in documents"
-            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
-                   focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-          ></textarea>
+          <div class="mt-3 border-t border-gray-100 pt-3">
+            <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Terms &amp; Conditions</p>
+            <textarea
+              rows="2"
+              [ngModel]="order()?.termsAndConditions ?? ''"
+              (ngModelChange)="onTermsChange($event)"
+              placeholder="Terms & conditions text to include in documents"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
+                     focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            ></textarea>
+          </div>
         </div>
       </app-trading-detail-meta-cards>
 
@@ -436,19 +436,20 @@ interface LliSearchResult {
         (itemsChange)="onItemsChange($event)"
       />
 
-      <!-- Comments + Activity (side-by-side on desktop) -->
-      <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <!-- Comments -->
+      <div class="mt-6">
         @if (order()?.id) {
-          <div class="h-full max-h-[520px] overflow-auto">
+          <div class="max-h-[520px] overflow-auto">
             <app-comments-card entityType="ORDER" [entityId]="order()!.id" />
           </div>
         }
-        @if (order()?.id) {
-          <div class="h-full max-h-[520px] overflow-auto">
-            <app-activity-timeline entityType="order" [entityId]="order()!.id" />
-          </div>
-        }
       </div>
+      <!-- Activity History (full width) -->
+      @if (order()?.id) {
+        <div class="mt-6">
+          <app-activity-timeline entityType="order" [entityId]="order()!.id" />
+        </div>
+      }
     }
 
     <!-- ═══════════════════════════════════════════════════════════════ -->

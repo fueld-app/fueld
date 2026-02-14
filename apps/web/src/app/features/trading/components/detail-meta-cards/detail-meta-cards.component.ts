@@ -16,7 +16,7 @@ import {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [SearchableDropdownComponent, FormsModule],
   template: `
-    <div class="mb-8 grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+    <div class="mb-8 grid gap-4 grid-cols-1 min-[900px]:grid-cols-2 min-[1600px]:grid-cols-4">
       <!-- Client + Customer Contact + Customer Payment -->
       <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Client</p>
@@ -166,7 +166,7 @@ import {
           </div>
         }
       </div>
-      <!-- Invoicing Company -->
+      <!-- Invoicing + Notes + T&C -->
       <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <p class="text-xs font-medium uppercase tracking-wider text-gray-500">Invoicing Company</p>
         @if (isReadonly()) {
@@ -184,8 +184,10 @@ import {
             }
           </select>
         }
+        <div class="mt-3 border-t border-gray-100 pt-3">
+          <ng-content select="[notesAndTerms]"></ng-content>
+        </div>
       </div>
-      <ng-content></ng-content>
     </div>
   `,
 })
