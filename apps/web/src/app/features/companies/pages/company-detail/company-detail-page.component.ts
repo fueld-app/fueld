@@ -311,7 +311,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
     @media (min-width: 900px) {
       .company-card-grid > div > .rounded-xl,
       .company-card-grid > div > app-comments-card {
-        height: 449px;
+        max-height: 449px;
         display: flex;
         flex-direction: column;
         overflow: hidden;
@@ -496,24 +496,6 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                   >
                     Emails
                   </button>
-                  @if (enrichment()?.companyFleetStats || company()?.companyRoles?.length) {
-                    <button
-                      type="button"
-                      class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
-                      [class]="companyInfoTab() === 'fleet' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
-                      (click)="companyInfoTab.set('fleet')"
-                    >
-                      Fleet
-                    </button>
-                    <button
-                      type="button"
-                      class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
-                      [class]="companyInfoTab() === 'roles' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
-                      (click)="companyInfoTab.set('roles')"
-                    >
-                      Roles
-                    </button>
-                  }
                 </div>
                 </div>
               </div>
@@ -983,46 +965,6 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                         </div>
                       }
                     </div>
-                  }
-                } @else if (companyInfoTab() === 'fleet') {
-                  @if (enrichment()?.companyFleetStats) {
-                    <div class="space-y-3">
-                      <div class="flex justify-between">
-                        <span class="text-gray-500">Total Fleet</span>
-                        <span class="font-medium text-gray-900">{{ enrichment()!.companyFleetStats!.totalFleetSize }} vessels</span>
-                      </div>
-                      <div class="flex justify-between">
-                        <span class="text-gray-500">Most Common Type</span>
-                        <span class="font-medium text-gray-900">{{ enrichment()!.companyFleetStats!.mostFrequentVesselType }}</span>
-                      </div>
-                      @if (enrichment()!.companyFleetStats!.fleetStatsBreakdown.length) {
-                        <div class="pt-2 border-t border-gray-100">
-                          <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Breakdown</span>
-                          <div class="mt-2 space-y-2">
-                            @for (stat of enrichment()!.companyFleetStats!.fleetStatsBreakdown; track stat.key) {
-                              <div class="flex justify-between text-xs">
-                                <span class="text-gray-600">{{ stat.key }}</span>
-                                <span class="text-gray-900 font-medium">{{ stat.vesselCount }}</span>
-                              </div>
-                            }
-                          </div>
-                        </div>
-                      }
-                    </div>
-                  } @else {
-                    <div class="text-xs text-gray-500 text-center">Fleet statistics unavailable</div>
-                  }
-                } @else if (companyInfoTab() === 'roles') {
-                  @if (company()?.companyRoles?.length) {
-                    <div class="flex flex-wrap gap-2">
-                      @for (role of company()!.companyRoles!; track role) {
-                        <span class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700">
-                          {{ role }}
-                        </span>
-                      }
-                    </div>
-                  } @else {
-                    <div class="text-xs text-gray-500 text-center">Company roles unavailable</div>
                   }
                 }
               </div>
@@ -1672,18 +1614,18 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                     <button
                       type="button"
                       class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
-                      [class]="registrationTab() === 'registration' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
-                      (click)="registrationTab.set('registration')"
-                    >
-                      Registration
-                    </button>
-                    <button
-                      type="button"
-                      class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
                       [class]="registrationTab() === 'ownership' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
                       (click)="registrationTab.set('ownership')"
                     >
                       Ownership Structure
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
+                      [class]="registrationTab() === 'registration' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
+                      (click)="registrationTab.set('registration')"
+                    >
+                      Registration
                     </button>
                   </div>
                 </div>
@@ -1940,15 +1882,6 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 </div>
               </div>
 
-            } @else if (company()!.seasearcherId) {
-              <div class="rounded-xl border border-gray-200 bg-white shadow-sm p-5 text-center min-[900px]:order-2">
-                <p class="text-sm text-gray-400">Enrichment data unavailable</p>
-              </div>
-            } @else {
-              <div class="rounded-xl border border-gray-200 bg-white shadow-sm p-5 text-center min-[900px]:order-2">
-                <p class="text-sm text-gray-400">Manually created — no enrichment data</p>
-                <p class="text-xs text-gray-300 mt-1">Import from Seasearcher to get detailed company data</p>
-              </div>
             }
           </div>
         </div>
@@ -2118,7 +2051,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly seizuresLoading = signal(false);
   readonly sanctions = signal<any[] | null>(null);
   readonly sanctionsLoading = signal(false);
-  readonly registrationTab = signal<'registration' | 'ownership'>('registration');
+  readonly registrationTab = signal<'registration' | 'ownership'>('ownership');
   readonly sanctionsTab = signal<'risk' | 'sanctions' | 'seizures'>('risk');
   readonly companyInfoTab = signal<'info' | 'headOffice' | 'offices' | 'emails' | 'fleet' | 'roles'>('info');
   readonly fleetRolesTab = signal<'fleet' | 'roles'>('fleet');
