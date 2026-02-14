@@ -155,6 +155,14 @@ interface TeamUserOption {
       (etdChange)="onEtdChange($event)"
       (invoicingCompanyChange)="onInvoicingCompanyChange($event)"
       (responsibleChange)="onResponsibleUserChange($event)"
+      [customerContactId]="order()?.customerContactId ?? ''"
+      [supplierContactId]="order()?.supplierContactId ?? ''"
+      [customerContactName]="customerContact()?.name ?? ''"
+      [supplierContactName]="supplierContact()?.name ?? ''"
+      [customerContactOptions]="customerContactDropdownOptions()"
+      [supplierContactOptions]="supplierContactDropdownOptions()"
+      (customerContactChange)="onCustomerContactChange($event)"
+      (supplierContactChange)="onSupplierContactChange($event)"
     >
       <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[260px]">
         <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Customer Payment</p>
@@ -295,50 +303,7 @@ interface TeamUserOption {
           }
         }
       </div>
-      <!-- Contact Persons -->
-      <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[260px] overflow-auto">
-        <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-3">Contact Persons</p>
-        <div class="space-y-3">
-          <div>
-            <label class="text-xs font-medium text-gray-500">Customer Contact</label>
-            @if (isReadonly()) {
-              <p class="mt-1 text-sm font-semibold text-gray-900">{{ customerContact()?.name || '-' }}</p>
-            } @else {
-              <select
-                [ngModel]="order()?.customerContactId ?? ''"
-                (ngModelChange)="onCustomerContactChange($event)"
-                class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
-                       focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
-              >
-                <option value="">— None —</option>
-                @for (c of customerContacts(); track c.id) {
-                  <option [value]="c.id">{{ c.name }}{{ c.role ? ' (' + c.role + ')' : '' }}</option>
-                }
-              </select>
-            }
-          </div>
-          <div>
-            <label class="text-xs font-medium text-gray-500">Supplier Contact</label>
-            @if (isReadonly()) {
-              <p class="mt-1 text-sm font-semibold text-gray-900">{{ supplierContact()?.name || '-' }}</p>
-            } @else {
-              <select
-                [ngModel]="order()?.supplierContactId ?? ''"
-                (ngModelChange)="onSupplierContactChange($event)"
-                [disabled]="!order()?.supplierId"
-                class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
-                       focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white
-                       disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <option value="">— None —</option>
-                @for (c of supplierContacts(); track c.id) {
-                  <option [value]="c.id">{{ c.name }}{{ c.role ? ' (' + c.role + ')' : '' }}</option>
-                }
-              </select>
-            }
-          </div>
-        </div>
-      </div>
+
       <!-- Terms & Conditions -->
       <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[260px] overflow-auto">
         <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Terms &amp; Conditions</p>
@@ -741,6 +706,20 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
 
   readonly responsibleUserOptions = computed<DropdownOption[]>(() =>
     this.teamUsers().map((u) => ({ value: u.id, label: u.name })),
+  );
+
+  readonly customerContactDropdownOptions = computed(() =>
+    this.customerContacts().map((c) => ({
+      value: c.id,
+      label: c.name + (c.role ? ` (${c.role})` : ''),
+    })),
+  );
+
+  readonly supplierContactDropdownOptions = computed(() =>
+    this.supplierContacts().map((c) => ({
+      value: c.id,
+      label: c.name + (c.role ? ` (${c.role})` : ''),
+    })),
   );
 
   readonly placeTimezone = computed(() => this.port()?.timezone ?? 'UTC');

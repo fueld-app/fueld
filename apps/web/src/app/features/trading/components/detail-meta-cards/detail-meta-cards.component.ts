@@ -17,6 +17,7 @@ import {
   imports: [SearchableDropdownComponent, FormsModule],
   template: `
     <div class="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
+      <!-- Client + Customer Contact -->
       <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Client</p>
         @if (canEditClient()) {
@@ -32,7 +33,26 @@ import {
         } @else {
           <p class="mt-1 text-sm font-semibold text-gray-900">{{ clientName() }}</p>
         }
+        <div class="mt-3 border-t border-gray-100 pt-3">
+          <label class="text-xs font-medium text-gray-400">Contact Person</label>
+          @if (isReadonly()) {
+            <p class="mt-1 text-sm text-gray-900">{{ customerContactName() || '—' }}</p>
+          } @else {
+            <select
+              [ngModel]="customerContactId()"
+              (ngModelChange)="customerContactChange.emit($event)"
+              class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                     focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+            >
+              <option value="">— None —</option>
+              @for (c of customerContactOptions(); track c.value) {
+                <option [value]="c.value">{{ c.label }}</option>
+              }
+            </select>
+          }
+        </div>
       </div>
+      <!-- Supplier + Supplier Contact -->
       <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Supplier</p>
         @if (isReadonly()) {
@@ -48,6 +68,26 @@ import {
             (selectionChange)="supplierChange.emit($event)"
           />
         }
+        <div class="mt-3 border-t border-gray-100 pt-3">
+          <label class="text-xs font-medium text-gray-400">Contact Person</label>
+          @if (isReadonly()) {
+            <p class="mt-1 text-sm text-gray-900">{{ supplierContactName() || '—' }}</p>
+          } @else {
+            <select
+              [ngModel]="supplierContactId()"
+              (ngModelChange)="supplierContactChange.emit($event)"
+              [disabled]="!supplierId()"
+              class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                     focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white
+                     disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <option value="">— None —</option>
+              @for (c of supplierContactOptions(); track c.value) {
+                <option [value]="c.value">{{ c.label }}</option>
+              }
+            </select>
+          }
+        </div>
       </div>
       <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Vessel</p>
@@ -81,6 +121,7 @@ import {
           />
         }
       </div>
+      <!-- ETA + ETD combined -->
       <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">ETA</p>
         @if (isReadonly()) {
@@ -98,27 +139,27 @@ import {
                    focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
           />
         }
+        @if (showEtd()) {
+          <div class="mt-3 border-t border-gray-100 pt-3">
+            <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">ETD</p>
+            @if (isReadonly()) {
+              <p class="mt-1 text-sm font-semibold text-gray-900">
+                {{ formatDateTimeLabel(etd()) }}
+              </p>
+            } @else {
+              <input
+                type="datetime-local"
+                step="60"
+                [ngModel]="formatDateTimeForInput(etd())"
+                (ngModelChange)="etdChange.emit($event)"
+                [min]="etaMinDateTime() || minDateTime()"
+                class="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-900
+                       focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+              />
+            }
+          </div>
+        }
       </div>
-      @if (showEtd()) {
-        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">ETD</p>
-          @if (isReadonly()) {
-            <p class="mt-1 text-sm font-semibold text-gray-900">
-              {{ formatDateTimeLabel(etd()) }}
-            </p>
-          } @else {
-            <input
-              type="datetime-local"
-              step="60"
-              [ngModel]="formatDateTimeForInput(etd())"
-              (ngModelChange)="etdChange.emit($event)"
-              [min]="etaMinDateTime() || minDateTime()"
-              class="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-900
-                     focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
-            />
-          }
-        </div>
-      }
       <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <p class="text-xs font-medium uppercase tracking-wider text-gray-500">Invoicing Company</p>
         @if (isReadonly()) {
@@ -178,6 +219,13 @@ export class TradingDetailMetaCardsComponent {
   readonly responsibleUserId = input<string>('');
   readonly responsibleOptions = input<DropdownOption[]>([]);
 
+  readonly customerContactId = input<string>('');
+  readonly supplierContactId = input<string>('');
+  readonly customerContactName = input<string>('');
+  readonly supplierContactName = input<string>('');
+  readonly customerContactOptions = input<{ value: string; label: string }[]>([]);
+  readonly supplierContactOptions = input<{ value: string; label: string }[]>([]);
+
   readonly clientSearch = output<string>();
   readonly supplierSearch = output<string>();
   readonly vesselSearch = output<string>();
@@ -191,6 +239,8 @@ export class TradingDetailMetaCardsComponent {
   readonly etdChange = output<string>();
   readonly invoicingCompanyChange = output<string>();
   readonly responsibleChange = output<string>();
+  readonly customerContactChange = output<string>();
+  readonly supplierContactChange = output<string>();
 
   formatDateTimeForInput(dateStr: string | null | undefined): string {
     if (!dateStr) return '';
