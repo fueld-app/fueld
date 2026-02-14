@@ -221,6 +221,10 @@ export const counterparties = pgTable('counterparties', {
   isSanctioned: boolean('is_sanctioned').default(false),
   lastSynced: timestamp('last_synced', { withTimezone: true }),
 
+  // Per-field manual override tracking — fields the user manually edited
+  // that should NOT be overwritten by SeaSearcher sync
+  manualOverrides: jsonb('manual_overrides').$type<string[]>().default([]),
+
   // ── Responsible user ───────────────────────────────────────────────
   responsibleUserId: uuid('responsible_user_id').references(() => users.id),
 
@@ -439,6 +443,13 @@ export const orders = pgTable('orders', {
   supplierCreditDays: integer('supplier_credit_days'),
   supplierNote: text('supplier_note'),
 
+  // Contact persons
+  customerContactId: uuid('customer_contact_id').references(() => companyContacts.id, { onDelete: 'set null' }),
+  supplierContactId: uuid('supplier_contact_id').references(() => companyContacts.id, { onDelete: 'set null' }),
+
+  // Terms & conditions
+  termsAndConditions: text('terms_and_conditions'),
+
   // Analytics
   lossReason: text('loss_reason'),
   closedAt: timestamp('closed_at', { withTimezone: true }),
@@ -460,6 +471,8 @@ export const orderItems = pgTable('order_items', {
   quantityMin: numeric('quantity_min', { precision: 12, scale: 3 }),
   quantityMax: numeric('quantity_max', { precision: 12, scale: 3 }),
   unit: text('unit').notNull().default('MT'),
+
+  description: text('description'),
 
   costPrice: numeric('cost_price', { precision: 12, scale: 4 }),
   costCurrency: text('cost_currency').notNull().default('USD'),

@@ -28,6 +28,7 @@ import {
   importCompanyFromSeasearcher,
   importCompanyByName,
   syncCompanyFromSeasearcher,
+  acceptSeasearcherValue,
   deleteCompany,
   searchCompaniesTypeahead,
   getCompanyEnrichment,
@@ -80,6 +81,9 @@ export const companiesController = new Elysia({ prefix: '/companies' })
         search: query.search,
         type: query.type,
         country: query.country,
+        responsibleUserId: query.responsibleUserId,
+        sortBy: query.sortBy,
+        sortDir: query.sortDir as 'asc' | 'desc' | undefined,
         page: query.page ? parseInt(query.page) : undefined,
         limit: query.limit ? parseInt(query.limit) : undefined,
       });
@@ -90,6 +94,9 @@ export const companiesController = new Elysia({ prefix: '/companies' })
         search: t.Optional(t.String()),
         type: t.Optional(t.String()),
         country: t.Optional(t.String()),
+        responsibleUserId: t.Optional(t.String()),
+        sortBy: t.Optional(t.String()),
+        sortDir: t.Optional(t.String()),
         page: t.Optional(t.String()),
         limit: t.Optional(t.String()),
       }),
@@ -449,10 +456,42 @@ export const companiesController = new Elysia({ prefix: '/companies' })
         country: t.Optional(t.Nullable(t.String())),
         countryIso: t.Optional(t.Nullable(t.String())),
         creditLimit: t.Optional(t.Nullable(t.String())),
+        yearFormed: t.Optional(t.Nullable(t.Number())),
+        fleetSize: t.Optional(t.Nullable(t.Number())),
+        headOfficeAddress: t.Optional(t.Nullable(t.String())),
+        headOfficePhone: t.Optional(t.Nullable(t.String())),
+        headOfficeEmail: t.Optional(t.Nullable(t.String())),
+        website: t.Optional(t.Nullable(t.String())),
+        companyImo: t.Optional(t.Nullable(t.String())),
+        companyRoles: t.Optional(t.Nullable(t.Array(t.String()))),
       }),
       detail: {
         tags: ['Companies'],
-        summary: 'Update company fields (manual companies)',
+        summary: 'Update company fields',
+      },
+    },
+  )
+
+  // ─── Accept SeaSearcher Value (resolve a conflict) ────────────────
+  .post(
+    '/local/:id/accept-seasearcher',
+    async ({ params, body }) => {
+      try {
+        const updated = await acceptSeasearcherValue(params.id, body.field);
+        if (!updated) {
+          return { success: false, data: null, message: 'Company not found' };
+        }
+        return { success: true, data: updated } satisfies ApiResponse<typeof updated>;
+      } catch (err: any) {
+        return { success: false, data: null, message: err?.message ?? 'Failed to accept value' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({ field: t.String() }),
+      detail: {
+        tags: ['Companies'],
+        summary: 'Accept SeaSearcher value for a conflicting field, removing the manual override',
       },
     },
   )

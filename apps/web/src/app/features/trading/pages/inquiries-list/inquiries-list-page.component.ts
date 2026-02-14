@@ -14,7 +14,8 @@ import { Subscription } from 'rxjs';
 import { FormsModule } from '@angular/forms';
 import { StatusBadgeComponent } from '../../../../shared/components/status-badge/status-badge.component';
 import { SearchableDropdownComponent, type DropdownOption } from '../../../../shared/components/searchable-dropdown/searchable-dropdown.component';
-import { PaginationComponent } from '../../../../shared/components';
+import { PaginationComponent, SortHeaderComponent } from '../../../../shared/components';
+import type { SortChangeEvent } from '../../../../shared/components';
 import type { ApiResponse, OrderListRowDto, CounterpartyDto, VesselDto, PlaceDto } from '@fueld/types';
 import { DecimalPipe, DatePipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
@@ -52,7 +53,7 @@ interface LliSearchResult {
 @Component({
   selector: 'app-inquiries-list-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, StatusBadgeComponent, FormsModule, DecimalPipe, DatePipe, SearchableDropdownComponent, PaginationComponent],
+  imports: [RouterLink, StatusBadgeComponent, FormsModule, DecimalPipe, DatePipe, SearchableDropdownComponent, PaginationComponent, SortHeaderComponent],
   template: `
     <div>
       <!-- Header -->
@@ -88,15 +89,15 @@ interface LliSearchResult {
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-gray-200 bg-gray-50/80">
-                <th class="px-4 py-3 text-left font-medium text-gray-600">No.</th>
-                <th class="px-4 py-3 text-left font-medium text-gray-600">Client</th>
-                <th class="px-4 py-3 text-left font-medium text-gray-600">Vessel</th>
-                <th class="px-4 py-3 text-left font-medium text-gray-600">Port</th>
-                <th class="px-4 py-3 text-left font-medium text-gray-600">Status</th>
-                <th class="px-4 py-3 text-left font-medium text-gray-600">Responsible</th>
-                <th class="px-4 py-3 text-left font-medium text-gray-600">ETA</th>
+                <th app-sort-header field="orderNumber" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">No.</th>
+                <th app-sort-header field="client" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Client</th>
+                <th app-sort-header field="vessel" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Vessel</th>
+                <th app-sort-header field="port" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Port</th>
+                <th app-sort-header field="status" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Status</th>
+                <th app-sort-header field="responsible" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Responsible</th>
+                <th app-sort-header field="eta" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">ETA</th>
                 <th class="px-4 py-3 text-right font-medium text-gray-600">Value (USD)</th>
-                <th class="px-4 py-3 text-left font-medium text-gray-600">Created</th>
+                <th app-sort-header field="createdAt" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Created</th>
                 <th class="px-4 py-3 w-12"></th>
               </tr>
             </thead>
@@ -361,6 +362,8 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   readonly currentPage = signal(1);
   readonly pageSize = signal(25);
   readonly searchTerm = signal('');
+  readonly sortBy = signal('');
+  readonly sortDir = signal<'asc' | 'desc'>('asc');
   readonly toast = signal<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // ─── New inquiry modal ────────────────────────────────────────────
@@ -448,6 +451,8 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
       params.set('page', String(this.currentPage()));
       params.set('limit', String(this.pageSize()));
       if (this.searchTerm()) params.set('search', this.searchTerm());
+      if (this.sortBy()) params.set('sortBy', this.sortBy());
+      if (this.sortBy()) params.set('sortDir', this.sortDir());
 
       const res = await firstValueFrom(
         this.http.get<ApiResponse<{ items: OrderListRowDto[]; total: number }>>(
@@ -758,6 +763,13 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
 
   goToPage(page: number): void {
     this.currentPage.set(page);
+    this.loadInquiries();
+  }
+
+  onSort(event: SortChangeEvent): void {
+    this.sortBy.set(event.field);
+    this.sortDir.set(event.dir);
+    this.currentPage.set(1);
     this.loadInquiries();
   }
 

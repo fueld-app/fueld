@@ -79,6 +79,8 @@ export const adminActivityController = new Elysia({ prefix: '/admin' })
         action: (query as any).action ?? undefined,
         dateFrom: (query as any).dateFrom ?? undefined,
         dateTo: (query as any).dateTo ?? undefined,
+        sortBy: (query as any).sortBy ?? undefined,
+        sortDir: (query as any).sortDir ?? undefined,
         limit: pageSize,
         offset: (page - 1) * pageSize,
       });

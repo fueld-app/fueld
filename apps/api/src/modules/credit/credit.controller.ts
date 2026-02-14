@@ -36,6 +36,8 @@ export const creditController = new Elysia({ prefix: '/credit' })
       const results = await listCreditLines({
         type: query.type as 'SUPPLIER' | 'CUSTOMER' | undefined,
         counterpartyId: query.counterpartyId,
+        sortBy: query.sortBy,
+        sortDir: query.sortDir as 'asc' | 'desc' | undefined,
         page: query.page ? parseInt(query.page) : undefined,
         limit: query.limit ? parseInt(query.limit) : undefined,
       });
@@ -45,6 +47,8 @@ export const creditController = new Elysia({ prefix: '/credit' })
       query: t.Object({
         type: t.Optional(t.String()),
         counterpartyId: t.Optional(t.String()),
+        sortBy: t.Optional(t.String()),
+        sortDir: t.Optional(t.String()),
         page: t.Optional(t.String()),
         limit: t.Optional(t.String()),
       }),

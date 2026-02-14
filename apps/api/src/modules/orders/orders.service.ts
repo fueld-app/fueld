@@ -4,7 +4,7 @@
 //  An "inquiry" is simply an order with status INQUIRY or OFFER.
 // ═══════════════════════════════════════════════════════════════════════
 
-import { eq, and, desc, sql, ilike, inArray, or } from 'drizzle-orm';
+import { eq, and, desc, asc, sql, ilike, inArray, or } from 'drizzle-orm';
 import { db } from '../../db';
 import {
   orders,
@@ -18,6 +18,7 @@ import {
   tenants,
   customerPayments,
   invoices,
+  companyContacts,
 } from '../../db/schema';
 import type { TenantSettings } from '../../db/schema';
 import { logActivity } from '../activity/activity.service';
@@ -29,6 +30,8 @@ interface ListOrdersQuery {
   search?: string;
   statuses?: string[];     // filter by status(es), e.g. ['INQUIRY','OFFER'] for inquiries
   salesRepId?: string;
+  sortBy?: string;
+  sortDir?: 'asc' | 'desc';
   page?: number;
   limit?: number;
 }
@@ -46,10 +49,13 @@ interface CreateOrderInput {
   customerPaymentTermType?: string | null;
   customerCreditDays?: number | null;
   customerNote?: string | null;
+  customerContactId?: string | null;
   supplierId?: string | null;
   supplierPaymentTermType?: string | null;
   supplierCreditDays?: number | null;
   supplierNote?: string | null;
+  supplierContactId?: string | null;
+  termsAndConditions?: string | null;
 }
 
 interface UpdateOrderInput {
@@ -65,10 +71,13 @@ interface UpdateOrderInput {
   customerPaymentTermType?: string | null;
   customerCreditDays?: number | null;
   customerNote?: string | null;
+  customerContactId?: string | null;
   supplierId?: string | null;
   supplierPaymentTermType?: string | null;
   supplierCreditDays?: number | null;
   supplierNote?: string | null;
+  supplierContactId?: string | null;
+  termsAndConditions?: string | null;
   lossReason?: string | null;
 }
 
@@ -79,6 +88,7 @@ interface SaveItemInput {
   quantityMin?: string | null;
   quantityMax?: string | null;
   unit?: string;
+  description?: string | null;
   costPrice?: string | null;
   costCurrency?: string | null;
   salesPrice?: string | null;
@@ -171,6 +181,21 @@ export async function listOrders(query?: ListOrdersQuery) {
   const page = query?.page ?? 1;
   const offset = (page - 1) * limit;
 
+  // Sortable columns
+  const sortMap: Record<string, any> = {
+    orderNumber: orders.orderNumber,
+    client: counterparties.name,
+    vessel: vessels.name,
+    port: places.name,
+    status: orders.status,
+    responsible: users.name,
+    eta: orders.eta,
+    createdAt: orders.createdAt,
+  };
+  const sortCol = sortMap[query?.sortBy ?? ''] ?? orders.createdAt;
+  const defaultDir = query?.sortBy ? 'asc' : 'desc';
+  const sortFn = (query?.sortDir ?? defaultDir) === 'desc' ? desc : asc;
+
   const [rows, countResult] = await Promise.all([
     db
       .select({
@@ -191,7 +216,7 @@ export async function listOrders(query?: ListOrdersQuery) {
       .innerJoin(places, eq(orders.placeId, places.id))
       .leftJoin(users, eq(orders.salesRepId, users.id))
       .where(where)
-      .orderBy(desc(orders.createdAt))
+      .orderBy(sortFn(sortCol))
       .limit(limit)
       .offset(offset),
     db.select({ count: sql<number>`count(*)::int` }).from(orders).where(where),
@@ -267,7 +292,7 @@ export async function getOrderById(idOrNumber: string) {
   if (!row) return null;
 
   // Fetch relations in parallel
-  const [client, vessel, place, salesRep, invoicingCompany, items] =
+  const [client, vessel, place, salesRep, invoicingCompany, items, customerContact, supplierContact] =
     await Promise.all([
       db
         .select()
@@ -304,6 +329,22 @@ export async function getOrderById(idOrNumber: string) {
             .then((r) => r[0] ?? null)
         : Promise.resolve(null),
       db.select().from(orderItems).where(eq(orderItems.orderId, row.id)),
+      row.customerContactId
+        ? db
+            .select()
+            .from(companyContacts)
+            .where(eq(companyContacts.id, row.customerContactId))
+            .limit(1)
+            .then((r) => r[0] ? { ...r[0], createdAt: r[0].createdAt.toISOString(), updatedAt: r[0].updatedAt.toISOString() } : null)
+        : Promise.resolve(null),
+      row.supplierContactId
+        ? db
+            .select()
+            .from(companyContacts)
+            .where(eq(companyContacts.id, row.supplierContactId))
+            .limit(1)
+            .then((r) => r[0] ? { ...r[0], createdAt: r[0].createdAt.toISOString(), updatedAt: r[0].updatedAt.toISOString() } : null)
+        : Promise.resolve(null),
     ]);
 
   return {
@@ -317,15 +358,20 @@ export async function getOrderById(idOrNumber: string) {
     customerPaymentTermType: row.customerPaymentTermType ?? null,
     customerCreditDays: row.customerCreditDays ?? null,
     customerNote: row.customerNote ?? null,
+    customerContactId: row.customerContactId ?? null,
     supplierId: row.supplierId ?? null,
     supplierPaymentTermType: row.supplierPaymentTermType ?? null,
     supplierCreditDays: row.supplierCreditDays ?? null,
     supplierNote: row.supplierNote ?? null,
+    supplierContactId: row.supplierContactId ?? null,
+    termsAndConditions: row.termsAndConditions ?? null,
     client,
     vessel,
     place,
     salesRep,
     invoicingCompany,
+    customerContact,
+    supplierContact,
     items: items.map((i) => ({
       id: i.id,
       orderId: i.orderId,
@@ -334,6 +380,7 @@ export async function getOrderById(idOrNumber: string) {
       quantityMin: i.quantityMin,
       quantityMax: i.quantityMax,
       unit: i.unit,
+      description: i.description ?? null,
       costPrice: i.costPrice,
       costCurrency: i.costCurrency,
       salesPrice: i.salesPrice,
@@ -367,10 +414,13 @@ export async function createOrder(input: CreateOrderInput) {
       customerPaymentTermType: input.customerPaymentTermType ?? null,
       customerCreditDays: input.customerCreditDays ?? null,
       customerNote: input.customerNote ?? null,
+      customerContactId: input.customerContactId ?? null,
       supplierId: input.supplierId ?? null,
       supplierPaymentTermType: input.supplierPaymentTermType ?? null,
       supplierCreditDays: input.supplierCreditDays ?? null,
       supplierNote: input.supplierNote ?? null,
+      supplierContactId: input.supplierContactId ?? null,
+      termsAndConditions: input.termsAndConditions ?? null,
     })
     .returning();
 
@@ -398,6 +448,7 @@ export async function updateOrder(id: string, input: UpdateOrderInput) {
     setData.customerCreditDays = input.customerCreditDays;
   }
   if (input.customerNote !== undefined) setData.customerNote = input.customerNote;
+  if (input.customerContactId !== undefined) setData.customerContactId = input.customerContactId;
   if (input.supplierId !== undefined) setData.supplierId = input.supplierId;
   if (input.supplierPaymentTermType !== undefined) {
     setData.supplierPaymentTermType = input.supplierPaymentTermType;
@@ -406,6 +457,8 @@ export async function updateOrder(id: string, input: UpdateOrderInput) {
     setData.supplierCreditDays = input.supplierCreditDays;
   }
   if (input.supplierNote !== undefined) setData.supplierNote = input.supplierNote;
+  if (input.supplierContactId !== undefined) setData.supplierContactId = input.supplierContactId;
+  if (input.termsAndConditions !== undefined) setData.termsAndConditions = input.termsAndConditions;
   if (input.lossReason !== undefined) setData.lossReason = input.lossReason;
 
   // Auto-set closedAt when status moves to CANCELLED or PAID
@@ -470,6 +523,7 @@ export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
       quantityMin: item.quantityMin ?? null,
       quantityMax: item.quantityMax ?? null,
       unit: item.unit ?? 'MT',
+      description: item.description ?? null,
       costPrice: item.costPrice ?? null,
       costCurrency,
       salesPrice: item.salesPrice ?? null,

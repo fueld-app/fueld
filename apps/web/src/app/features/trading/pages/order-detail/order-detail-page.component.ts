@@ -26,6 +26,7 @@ import {
   type OrderAttachmentDto,
   type CustomerPaymentDto,
   type CreditLineDto,
+  type CompanyContactDto,
 } from '@fueld/types';
 
 import {
@@ -292,6 +293,66 @@ interface TeamUserOption {
                      focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
             ></textarea>
           }
+        }
+      </div>
+      <!-- Contact Persons -->
+      <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[260px] overflow-auto">
+        <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-3">Contact Persons</p>
+        <div class="space-y-3">
+          <div>
+            <label class="text-xs font-medium text-gray-500">Customer Contact</label>
+            @if (isReadonly()) {
+              <p class="mt-1 text-sm font-semibold text-gray-900">{{ customerContact()?.name || '-' }}</p>
+            } @else {
+              <select
+                [ngModel]="order()?.customerContactId ?? ''"
+                (ngModelChange)="onCustomerContactChange($event)"
+                class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                       focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+              >
+                <option value="">— None —</option>
+                @for (c of customerContacts(); track c.id) {
+                  <option [value]="c.id">{{ c.name }}{{ c.role ? ' (' + c.role + ')' : '' }}</option>
+                }
+              </select>
+            }
+          </div>
+          <div>
+            <label class="text-xs font-medium text-gray-500">Supplier Contact</label>
+            @if (isReadonly()) {
+              <p class="mt-1 text-sm font-semibold text-gray-900">{{ supplierContact()?.name || '-' }}</p>
+            } @else {
+              <select
+                [ngModel]="order()?.supplierContactId ?? ''"
+                (ngModelChange)="onSupplierContactChange($event)"
+                [disabled]="!order()?.supplierId"
+                class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                       focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white
+                       disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="">— None —</option>
+                @for (c of supplierContacts(); track c.id) {
+                  <option [value]="c.id">{{ c.name }}{{ c.role ? ' (' + c.role + ')' : '' }}</option>
+                }
+              </select>
+            }
+          </div>
+        </div>
+      </div>
+      <!-- Terms & Conditions -->
+      <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[260px] overflow-auto">
+        <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Terms &amp; Conditions</p>
+        @if (isReadonly()) {
+          <p class="mt-1 text-sm text-gray-700 whitespace-pre-line">{{ order()?.termsAndConditions || '-' }}</p>
+        } @else {
+          <textarea
+            rows="4"
+            [ngModel]="order()?.termsAndConditions ?? ''"
+            (ngModelChange)="onTermsChange($event)"
+            placeholder="Terms & conditions text to include in documents"
+            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
+                   focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+          ></textarea>
         }
       </div>
     </app-trading-detail-meta-cards>
@@ -603,6 +664,13 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   readonly configuredUnits = signal<DropdownOption[]>([]);
   readonly configuredCurrencies = signal<DropdownOption[]>([]);
 
+  // ─── Contact persons ─────────────────────────────────────────────
+
+  readonly customerContact = signal<CompanyContactDto | null>(null);
+  readonly supplierContact = signal<CompanyContactDto | null>(null);
+  readonly customerContacts = signal<CompanyContactDto[]>([]);
+  readonly supplierContacts = signal<CompanyContactDto[]>([]);
+
   // ─── Autosave ────────────────────────────────────────────────────
 
   readonly autoSaving = signal(false);
@@ -783,15 +851,22 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
           customerPaymentTermType: d.customerPaymentTermType ?? null,
           customerCreditDays: d.customerCreditDays ?? null,
           customerNote: d.customerNote ?? null,
+          customerContactId: d.customerContactId ?? null,
           supplierId: d.supplierId ?? null,
           supplierPaymentTermType: d.supplierPaymentTermType ?? null,
           supplierCreditDays: d.supplierCreditDays ?? null,
           supplierNote: d.supplierNote ?? null,
+          supplierContactId: d.supplierContactId ?? null,
+          termsAndConditions: d.termsAndConditions ?? null,
           lossReason: d.lossReason,
           closedAt: d.closedAt,
           createdAt: d.createdAt,
           updatedAt: d.updatedAt,
         });
+
+        // Set contact person data
+        if (d.customerContact) this.customerContact.set(d.customerContact);
+        if (d.supplierContact) this.supplierContact.set(d.supplierContact);
 
         if (d.client) this.client.set(d.client);
         if (d.client) this.clients.set([d.client]);
@@ -808,6 +883,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
           (d.items ?? []).map((item: any) => ({
             id: item.id,
             productType: item.productType ?? '',
+            description: item.description ?? '',
             quantity: parseFloat(item.quantity) || 0,
             quantityMin: item.quantityMin ? parseFloat(item.quantityMin) : null,
             quantityMax: item.quantityMax ? parseFloat(item.quantityMax) : null,
@@ -825,6 +901,9 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
         await this.loadCustomerCreditLines(d.clientId);
         await this.loadSupplierCreditLines(d.supplierId);
         await this.loadReferenceData();
+        // Load contacts for the client & supplier companies
+        await this.loadCompanyContacts('customer', d.clientId);
+        if (d.supplierId) await this.loadCompanyContacts('supplier', d.supplierId);
       }
 
       if (ownRes.success) this.ownCompanies.set(ownRes.data);
@@ -1112,6 +1191,41 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     this.triggerAutosave();
   }
 
+  // ─── Contact person handlers ─────────────────────────────────────
+
+  async loadCompanyContacts(side: 'customer' | 'supplier', companyId: string): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<CompanyContactDto[]>>(`${API_URL}/companies/local/${companyId}/contacts`),
+      );
+      if (res.success) {
+        if (side === 'customer') this.customerContacts.set(res.data ?? []);
+        else this.supplierContacts.set(res.data ?? []);
+      }
+    } catch {
+      // silently ignore
+    }
+  }
+
+  onCustomerContactChange(contactId: string): void {
+    this.order.update((o) => (o ? { ...o, customerContactId: contactId || null } : o));
+    const contact = this.customerContacts().find((c) => c.id === contactId) ?? null;
+    this.customerContact.set(contact);
+    this.triggerAutosave();
+  }
+
+  onSupplierContactChange(contactId: string): void {
+    this.order.update((o) => (o ? { ...o, supplierContactId: contactId || null } : o));
+    const contact = this.supplierContacts().find((c) => c.id === contactId) ?? null;
+    this.supplierContact.set(contact);
+    this.triggerAutosave();
+  }
+
+  onTermsChange(value: string): void {
+    this.order.update((o) => (o ? { ...o, termsAndConditions: value || null } : o));
+    this.triggerAutosave();
+  }
+
   onAttachmentSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     this.selectedAttachment = input.files?.[0] ?? null;
@@ -1323,17 +1437,21 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
 
   onClientChange(clientId: string): void {
     if (!clientId) return;
-    this.order.update((o) => (o ? { ...o, clientId } : o));
+    this.order.update((o) => (o ? { ...o, clientId, customerContactId: null } : o));
     const clientData = this.clients().find((c) => c.id === clientId);
     this.client.set(clientData ?? null);
+    this.customerContact.set(null);
     void this.loadCustomerCreditLines(clientId);
+    void this.loadCompanyContacts('customer', clientId);
     this.triggerAutosave();
   }
 
   onSupplierChange(supplierId: string): void {
     if (!supplierId) return;
-    this.order.update((o) => (o ? { ...o, supplierId } : o));
+    this.order.update((o) => (o ? { ...o, supplierId, supplierContactId: null } : o));
+    this.supplierContact.set(null);
     void this.loadSupplierCreditLines(supplierId);
+    void this.loadCompanyContacts('supplier', supplierId);
     this.triggerAutosave();
   }
 
@@ -1389,10 +1507,13 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
           customerPaymentTermType: o.customerPaymentTermType ?? null,
           customerCreditDays: o.customerCreditDays ?? null,
           customerNote: o.customerNote ?? null,
+          customerContactId: o.customerContactId ?? null,
           supplierId: o.supplierId ?? null,
           supplierPaymentTermType: o.supplierPaymentTermType ?? null,
           supplierCreditDays: o.supplierCreditDays ?? null,
           supplierNote: o.supplierNote ?? null,
+          supplierContactId: o.supplierContactId ?? null,
+          termsAndConditions: o.termsAndConditions ?? null,
           eta: o.eta,
           etd: o.etd,
         }),
@@ -1404,6 +1525,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
         quantityMin: r.quantityMin != null ? String(r.quantityMin) : null,
         quantityMax: String(r.quantityMax ?? r.quantity),
         unit: r.unit,
+        description: r.description || null,
         costPrice: r.costPrice ? String(r.costPrice) : null,
         costCurrency: r.costCurrency ?? o.currency,
         salesPrice: r.salesPrice ? String(r.salesPrice) : null,
@@ -1468,10 +1590,13 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
           customerPaymentTermType: o.customerPaymentTermType ?? null,
           customerCreditDays: o.customerCreditDays ?? null,
           customerNote: o.customerNote ?? null,
+          customerContactId: o.customerContactId ?? null,
           supplierId: o.supplierId ?? null,
           supplierPaymentTermType: o.supplierPaymentTermType ?? null,
           supplierCreditDays: o.supplierCreditDays ?? null,
           supplierNote: o.supplierNote ?? null,
+          supplierContactId: o.supplierContactId ?? null,
+          termsAndConditions: o.termsAndConditions ?? null,
           eta: o.eta,
           etd: o.etd,
         }),
@@ -1483,6 +1608,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
         quantityMin: r.quantityMin != null ? String(r.quantityMin) : null,
         quantityMax: String(r.quantityMax ?? r.quantity),
         unit: r.unit,
+        description: r.description || null,
         costPrice: r.costPrice ? String(r.costPrice) : null,
         costCurrency: r.costCurrency ?? o.currency,
         salesPrice: r.salesPrice ? String(r.salesPrice) : null,

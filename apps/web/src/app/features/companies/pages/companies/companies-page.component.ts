@@ -14,7 +14,8 @@ import { debounceTime, switchMap, tap, catchError, takeUntil } from 'rxjs/operat
 import type { CounterpartyDto, ApiResponse } from '@fueld/types';
 import { COUNTRIES } from '../../../../shared/data/countries';
 import { flagFromIso3 } from '../../../../shared/utils/flags';
-import { PaginationComponent } from '../../../../shared/components';
+import { PaginationComponent, SortHeaderComponent } from '../../../../shared/components';
+import type { SortChangeEvent } from '../../../../shared/components';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Companies Page — Browse, search, import from Seasearcher, create
@@ -44,7 +45,7 @@ const TYPE_LABELS: Record<string, string> = {
 @Component({
   selector: 'app-companies-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, PaginationComponent],
+  imports: [FormsModule, PaginationComponent, SortHeaderComponent],
   template: `
     <div>
       <!-- Header -->
@@ -161,6 +162,18 @@ const TYPE_LABELS: Record<string, string> = {
           <option value="SUPPLIER">Supplier</option>
           <option value="BARGE">Barge</option>
         </select>
+
+        <!-- Filter by responsible -->
+        <select
+          [ngModel]="filterResponsible()"
+          (ngModelChange)="filterResponsible.set($event); currentPage.set(1); loadCompanies(); updateUrlParams()"
+          class="rounded-lg border border-gray-300 py-2 pl-3 pr-8 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+        >
+          <option value="">All Responsible</option>
+          @for (u of users(); track u.id) {
+            <option [value]="u.id">{{ u.name }}</option>
+          }
+        </select>
       </div>
 
       <!-- Click-away backdrop for dropdown -->
@@ -181,13 +194,13 @@ const TYPE_LABELS: Record<string, string> = {
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-gray-200 bg-gray-50/80">
-                <th class="px-4 py-3 text-left font-medium text-gray-600">Name</th>
-                <th class="px-4 py-3 text-left font-medium text-gray-600">Type</th>
-                <th class="px-4 py-3 text-left font-medium text-gray-600">Country</th>
+                <th app-sort-header field="name" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Name</th>
+                <th app-sort-header field="type" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Type</th>
+                <th app-sort-header field="country" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Country</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Sanctioned</th>
-                <th class="px-4 py-3 text-right font-medium text-gray-600">Credit Limit</th>
+                <th app-sort-header field="creditLimit" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-right font-medium text-gray-600">Credit Limit</th>
                 <th class="px-4 py-3 text-center font-medium text-gray-600">Contacts</th>
-                <th class="px-4 py-3 text-left font-medium text-gray-600">Responsible</th>
+                <th app-sort-header field="responsible" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Responsible</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Source</th>
                 <th class="px-4 py-3 w-10"></th>
               </tr>
@@ -386,6 +399,10 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
   readonly currentPage = signal(1);
   readonly loading = signal(true);
   readonly filterType = signal('');
+  readonly filterResponsible = signal('');
+  readonly sortBy = signal('');
+  readonly sortDir = signal<'asc' | 'desc'>('asc');
+  readonly users = signal<{ id: string; name: string; email: string }[]>([]);
 
   // Search / typeahead
   readonly searchTerm = signal('');
@@ -424,8 +441,15 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
     if (page > 0) this.currentPage.set(page);
     const type = params.get('type');
     if (type) this.filterType.set(type);
+    const responsible = params.get('responsible');
+    if (responsible) this.filterResponsible.set(responsible);
+    const sortBy = params.get('sortBy');
+    if (sortBy) this.sortBy.set(sortBy);
+    const sortDir = params.get('sortDir') as 'asc' | 'desc';
+    if (sortDir) this.sortDir.set(sortDir);
 
     this.loadCompanies();
+    this.loadUsers();
 
     // Debounced search
     this.searchSubject
@@ -462,6 +486,9 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
     params.set('page', String(this.currentPage()));
     params.set('limit', String(this.pageSize));
     if (this.filterType()) params.set('type', this.filterType());
+    if (this.filterResponsible()) params.set('responsibleUserId', this.filterResponsible());
+    if (this.sortBy()) params.set('sortBy', this.sortBy());
+    if (this.sortBy()) params.set('sortDir', this.sortDir());
 
     try {
       const res = await firstValueFrom(
@@ -540,8 +567,29 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
     const queryParams: Record<string, string | null> = {
       page: this.currentPage() > 1 ? String(this.currentPage()) : null,
       type: this.filterType() || null,
+      responsible: this.filterResponsible() || null,
+      sortBy: this.sortBy() || null,
+      sortDir: this.sortBy() ? this.sortDir() : null,
     };
     this.router.navigate([], { queryParams, queryParamsHandling: 'merge', replaceUrl: true });
+  }
+
+  // ─── Sorting ────────────────────────────────────────────────────
+  onSort(event: SortChangeEvent): void {
+    this.sortBy.set(event.field);
+    this.sortDir.set(event.dir);
+    this.currentPage.set(1);
+    this.updateUrlParams();
+    this.loadCompanies();
+  }
+
+  private async loadUsers(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ id: string; name: string; email: string }[]>>(`${API}/lloyds/users`),
+      );
+      if (res.success && res.data) this.users.set(res.data);
+    } catch { /* ignore */ }
   }
 
   // ─── Delete ────────────────────────────────────────────────────────

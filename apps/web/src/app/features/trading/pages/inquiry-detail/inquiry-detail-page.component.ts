@@ -24,6 +24,7 @@ import {
   type ApiResponse,
   type OwnCompanyDto,
   type CreditLineDto,
+  type CompanyContactDto,
 } from '@fueld/types';
 
 import {
@@ -389,6 +390,54 @@ interface LliSearchResult {
                    focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
           ></textarea>
         </div>
+        <!-- Contact Persons -->
+        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[260px] overflow-auto">
+          <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-3">Contact Persons</p>
+          <div class="space-y-3">
+            <div>
+              <label class="text-xs font-medium text-gray-500">Customer Contact</label>
+              <select
+                [ngModel]="order()?.customerContactId ?? ''"
+                (ngModelChange)="onCustomerContactChange($event)"
+                class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                       focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+              >
+                <option value="">— None —</option>
+                @for (c of customerContacts(); track c.id) {
+                  <option [value]="c.id">{{ c.name }}{{ c.role ? ' (' + c.role + ')' : '' }}</option>
+                }
+              </select>
+            </div>
+            <div>
+              <label class="text-xs font-medium text-gray-500">Supplier Contact</label>
+              <select
+                [ngModel]="order()?.supplierContactId ?? ''"
+                (ngModelChange)="onSupplierContactChange($event)"
+                [disabled]="!order()?.supplierId"
+                class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                       focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white
+                       disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="">— None —</option>
+                @for (c of supplierContacts(); track c.id) {
+                  <option [value]="c.id">{{ c.name }}{{ c.role ? ' (' + c.role + ')' : '' }}</option>
+                }
+              </select>
+            </div>
+          </div>
+        </div>
+        <!-- Terms & Conditions -->
+        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[260px] overflow-auto">
+          <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Terms &amp; Conditions</p>
+          <textarea
+            rows="4"
+            [ngModel]="order()?.termsAndConditions ?? ''"
+            (ngModelChange)="onTermsChange($event)"
+            placeholder="Terms & conditions text to include in documents"
+            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
+                   focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+          ></textarea>
+        </div>
       </app-trading-detail-meta-cards>
 
       <!-- ═══════════════════════════════════════════════════════════ -->
@@ -620,6 +669,10 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   readonly clientImportOptions = signal<DropdownOption[]>([]);
   readonly vesselImportOptions = signal<DropdownOption[]>([]);
   readonly placeImportOptions = signal<DropdownOption[]>([]);
+  readonly customerContact = signal<CompanyContactDto | null>(null);
+  readonly supplierContact = signal<CompanyContactDto | null>(null);
+  readonly customerContacts = signal<CompanyContactDto[]>([]);
+  readonly supplierContacts = signal<CompanyContactDto[]>([]);
 
   // ─── Send Offer modal state ──────────────────────────────────────
 
@@ -850,10 +903,13 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
           customerPaymentTermType: d.customerPaymentTermType ?? null,
           customerCreditDays: d.customerCreditDays ?? null,
           customerNote: d.customerNote ?? null,
+          customerContactId: d.customerContactId ?? null,
           supplierId: d.supplierId ?? null,
           supplierPaymentTermType: d.supplierPaymentTermType ?? null,
           supplierCreditDays: d.supplierCreditDays ?? null,
           supplierNote: d.supplierNote ?? null,
+          supplierContactId: d.supplierContactId ?? null,
+          termsAndConditions: d.termsAndConditions ?? null,
           lossReason: d.lossReason,
           closedAt: d.closedAt,
           createdAt: d.createdAt,
@@ -865,6 +921,10 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
           void this.router.navigate(['/trading/orders', d.orderNumber ?? d.id]);
           return;
         }
+
+        // Set contact person data
+        if (d.customerContact) this.customerContact.set(d.customerContact);
+        if (d.supplierContact) this.supplierContact.set(d.supplierContact);
 
         if (d.client) {
           this.client.set(d.client);
@@ -881,12 +941,15 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
 
         await this.loadCustomerCreditLines(d.clientId);
         await this.loadSupplierCreditLines(d.supplierId);
+        await this.loadCompanyContacts('customer', d.clientId);
+        if (d.supplierId) await this.loadCompanyContacts('supplier', d.supplierId);
 
         // Load suppliers from items or from API
         this.itemRows.set(
           (d.items ?? []).map((item: any) => ({
             id: item.id,
             productType: item.productType ?? '',
+            description: item.description ?? '',
             quantity: parseFloat(item.quantity) || 0,
             quantityMin: item.quantityMin ? parseFloat(item.quantityMin) : null,
             quantityMax: item.quantityMax ? parseFloat(item.quantityMax) : null,
@@ -1057,6 +1120,41 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
     this.triggerAutosave();
   }
 
+  // ─── Contact person handlers ─────────────────────────────────────
+
+  async loadCompanyContacts(side: 'customer' | 'supplier', companyId: string): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<CompanyContactDto[]>>(`${API}/companies/local/${companyId}/contacts`),
+      );
+      if (res.success) {
+        if (side === 'customer') this.customerContacts.set(res.data ?? []);
+        else this.supplierContacts.set(res.data ?? []);
+      }
+    } catch {
+      // silently ignore
+    }
+  }
+
+  onCustomerContactChange(contactId: string): void {
+    this.order.update((o) => (o ? { ...o, customerContactId: contactId || null } : o));
+    const contact = this.customerContacts().find((c) => c.id === contactId) ?? null;
+    this.customerContact.set(contact);
+    this.triggerAutosave();
+  }
+
+  onSupplierContactChange(contactId: string): void {
+    this.order.update((o) => (o ? { ...o, supplierContactId: contactId || null } : o));
+    const contact = this.supplierContacts().find((c) => c.id === contactId) ?? null;
+    this.supplierContact.set(contact);
+    this.triggerAutosave();
+  }
+
+  onTermsChange(value: string): void {
+    this.order.update((o) => (o ? { ...o, termsAndConditions: value || null } : o));
+    this.triggerAutosave();
+  }
+
   onResponsibleUserChange(userId: string): void {
     this.order.update((o) => (o ? { ...o, salesRepId: userId || null } : o));
     this.triggerAutosave();
@@ -1199,17 +1297,21 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
       await this.importClientFromSeasearcher(clientId.replace('seasearcher:', ''));
       return;
     }
-    this.order.update((o) => (o ? { ...o, clientId } : o));
+    this.order.update((o) => (o ? { ...o, clientId, customerContactId: null } : o));
     const clientData = this.clients().find((c) => c.id === clientId);
     this.client.set(clientData ?? null);
+    this.customerContact.set(null);
     await this.loadCustomerCreditLines(clientId);
+    void this.loadCompanyContacts('customer', clientId);
     this.triggerAutosave();
   }
 
   async onSupplierChange(supplierId: string): Promise<void> {
     if (!supplierId) return;
-    this.order.update((o) => (o ? { ...o, supplierId } : o));
+    this.order.update((o) => (o ? { ...o, supplierId, supplierContactId: null } : o));
+    this.supplierContact.set(null);
     await this.loadSupplierCreditLines(supplierId);
+    void this.loadCompanyContacts('supplier', supplierId);
     this.triggerAutosave();
   }
 
@@ -1405,10 +1507,13 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
           customerPaymentTermType: o.customerPaymentTermType ?? null,
           customerCreditDays: o.customerCreditDays ?? null,
           customerNote: o.customerNote ?? null,
+          customerContactId: o.customerContactId ?? null,
           supplierId: o.supplierId ?? null,
           supplierPaymentTermType: o.supplierPaymentTermType ?? null,
           supplierCreditDays: o.supplierCreditDays ?? null,
           supplierNote: o.supplierNote ?? null,
+          supplierContactId: o.supplierContactId ?? null,
+          termsAndConditions: o.termsAndConditions ?? null,
           eta: o.eta,
           etd: o.etd,
         }),
@@ -1427,6 +1532,7 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
         salesCurrency: r.salesCurrency ?? o.currency,
         paymentTerms: r.paymentTerms || null,
         customerNote: r.customerNote ?? null,
+        description: r.description || null,
       }));
 
       await firstValueFrom(
@@ -1460,10 +1566,13 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
           customerPaymentTermType: o.customerPaymentTermType ?? null,
           customerCreditDays: o.customerCreditDays ?? null,
           customerNote: o.customerNote ?? null,
+          customerContactId: o.customerContactId ?? null,
           supplierId: o.supplierId ?? null,
           supplierPaymentTermType: o.supplierPaymentTermType ?? null,
           supplierCreditDays: o.supplierCreditDays ?? null,
           supplierNote: o.supplierNote ?? null,
+          supplierContactId: o.supplierContactId ?? null,
+          termsAndConditions: o.termsAndConditions ?? null,
           eta: o.eta,
           etd: o.etd,
         }),
@@ -1482,6 +1591,7 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
         salesCurrency: r.salesCurrency ?? o.currency,
         paymentTerms: r.paymentTerms || null,
         customerNote: r.customerNote ?? null,
+        description: r.description || null,
       }));
 
       await firstValueFrom(

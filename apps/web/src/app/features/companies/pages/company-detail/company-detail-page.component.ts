@@ -390,11 +390,6 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
             </div>
           </div>
           <div class="flex items-center gap-3">
-            <p class="text-sm text-gray-500">
-              {{ company()!.country ?? 'No country' }}
-              @if (company()!.countryIso) { ({{ company()!.countryIso }}) }
-              @if (company()!.yearFormed) { &middot; Founded {{ company()!.yearFormed }} }
-            </p>
             @if (company()!.lastSynced) {
               <span class="inline-flex items-center gap-1 text-xs text-gray-400" title="Last synced with Seasearcher">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -403,7 +398,6 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 Synced {{ company()!.lastSynced | date:'short' }}
               </span>
             }
-            <span class="text-gray-300">|</span>
             <span class="text-xs text-gray-500">Responsible:</span>
             <select
               [ngModel]="responsibleUserId() ?? ''"
@@ -422,8 +416,8 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
               </svg>
             }
+            <app-last-edited-badge entityType="company" [entityId]="company()!.id" />
           </div>
-          <app-last-edited-badge entityType="company" [entityId]="company()!.id" />
         </div>
 
         <div class="company-card-grid grid grid-cols-1 gap-6 min-[900px]:grid-cols-2 min-[1600px]:grid-cols-3 min-[2000px]:grid-cols-4">
@@ -436,7 +430,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 <h2 class="text-sm font-semibold text-gray-700">Info</h2>
                 <div class="flex items-center gap-2">
                   @if (!editing()) {
-                    @if (!company()!.seasearcherId && companyInfoTab() === 'info') {
+                    @if (companyInfoTab() === 'info' || companyInfoTab() === 'headOffice') {
                       <button
                         (click)="startEditing()"
                         class="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-600 hover:bg-gray-100 transition-colors"
@@ -524,6 +518,44 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 </div>
               </div>
               <div class="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-4 text-sm">
+                @if (syncConflicts().length > 0) {
+                  <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 mb-2">
+                    <div class="flex items-center justify-between mb-2">
+                      <div class="flex items-center gap-2">
+                        <svg class="h-4 w-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                        </svg>
+                        <span class="text-xs font-semibold text-amber-800">SeaSearcher has different values for {{ syncConflicts().length }} field{{ syncConflicts().length > 1 ? 's' : '' }}</span>
+                      </div>
+                      <button (click)="dismissConflicts()" class="text-xs text-amber-600 hover:text-amber-800 font-medium">Dismiss all</button>
+                    </div>
+                    <div class="space-y-2">
+                      @for (conflict of syncConflicts(); track conflict.field) {
+                        <div class="flex items-start justify-between gap-2 rounded-md bg-white/70 px-2.5 py-2 text-xs">
+                          <div class="min-w-0 flex-1">
+                            <span class="font-semibold text-gray-700">{{ FIELD_LABELS[conflict.field] || conflict.field }}</span>
+                            <div class="mt-0.5 text-gray-500">
+                              Yours: <span class="font-medium text-gray-700">{{ conflict.localValue || '(empty)' }}</span>
+                            </div>
+                            <div class="text-gray-500">
+                              SeaSearcher: <span class="font-medium text-amber-700">{{ conflict.seasearcherValue || '(empty)' }}</span>
+                            </div>
+                          </div>
+                          <div class="flex shrink-0 gap-1.5">
+                            <button
+                              (click)="acceptSeasearcherValue(conflict.field)"
+                              class="rounded bg-amber-100 px-2 py-1 text-[11px] font-medium text-amber-800 hover:bg-amber-200 transition-colors"
+                            >Accept</button>
+                            <button
+                              (click)="dismissConflict(conflict.field)"
+                              class="rounded bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-600 hover:bg-gray-200 transition-colors"
+                            >Keep mine</button>
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  </div>
+                }
                 @if (companyInfoTab() === 'info') {
                   <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
                     <div>
@@ -618,15 +650,67 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                     </div>
                     <div>
                       <dt class="text-gray-500">Year Formed</dt>
-                      <dd class="mt-0.5 font-medium text-gray-900">{{ company()!.yearFormed ?? '—' }}</dd>
+                      @if (editing()) {
+                        <dd class="mt-0.5">
+                          <input
+                            type="number"
+                            [value]="editYearFormed() ?? ''"
+                            (input)="editYearFormed.set($any($event.target).value ? +$any($event.target).value : null)"
+                            placeholder="e.g. 1998"
+                            class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
+                          />
+                        </dd>
+                      } @else {
+                        <dd class="mt-0.5 font-medium text-gray-900">{{ company()!.yearFormed ?? '—' }}</dd>
+                      }
                     </div>
                     <div>
                       <dt class="text-gray-500">Fleet Size</dt>
-                      <dd class="mt-0.5 font-medium text-gray-900">{{ company()!.fleetSize ?? '—' }}</dd>
+                      @if (editing()) {
+                        <dd class="mt-0.5">
+                          <input
+                            type="number"
+                            [value]="editFleetSize() ?? ''"
+                            (input)="editFleetSize.set($any($event.target).value ? +$any($event.target).value : null)"
+                            placeholder="0"
+                            class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
+                          />
+                        </dd>
+                      } @else {
+                        <dd class="mt-0.5 font-medium text-gray-900">{{ company()!.fleetSize ?? '—' }}</dd>
+                      }
                     </div>
                     <div>
                       <dt class="text-gray-500">Credit Limit</dt>
-                      <dd class="mt-0.5 font-medium text-gray-900">\${{ company()!.creditLimit }}</dd>
+                      @if (editing()) {
+                        <dd class="mt-0.5">
+                          <input
+                            type="text"
+                            [value]="editCreditLimit()"
+                            (input)="editCreditLimit.set($any($event.target).value)"
+                            placeholder="0"
+                            class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
+                          />
+                        </dd>
+                      } @else {
+                        <dd class="mt-0.5 font-medium text-gray-900">\${{ company()!.creditLimit }}</dd>
+                      }
+                    </div>
+                    <div>
+                      <dt class="text-gray-500">Company IMO</dt>
+                      @if (editing()) {
+                        <dd class="mt-0.5">
+                          <input
+                            type="text"
+                            [value]="editCompanyImo()"
+                            (input)="editCompanyImo.set($any($event.target).value)"
+                            placeholder="IMO number"
+                            class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
+                          />
+                        </dd>
+                      } @else {
+                        <dd class="mt-0.5 font-medium text-gray-900">{{ company()!.companyImo ?? '—' }}</dd>
+                      }
                     </div>
                     <div>
                       <dt class="text-gray-500">Seasearcher ID</dt>
@@ -646,6 +730,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 } @else if (companyInfoTab() === 'headOffice') {
                   <div class="space-y-4">
                     @if (
+                      editing() ||
                       company()!.headOfficeAddress ||
                       company()!.headOfficePhone ||
                       company()!.headOfficeEmail ||
@@ -653,36 +738,84 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                       enrichment()?.headOffice?.faxNumbers?.length
                     ) {
                       <dl class="grid grid-cols-1 gap-y-3 text-sm">
-                        @if (company()!.headOfficeAddress) {
+                        @if (editing() || company()!.headOfficeAddress) {
                           <div>
                             <dt class="text-gray-500">Address</dt>
-                            <dd class="mt-0.5 font-medium text-gray-900">{{ company()!.headOfficeAddress }}</dd>
+                            @if (editing()) {
+                              <dd class="mt-0.5">
+                                <textarea
+                                  [ngModel]="editHeadOfficeAddress()"
+                                  (ngModelChange)="editHeadOfficeAddress.set($event)"
+                                  rows="3"
+                                  class="block w-full rounded-md border border-gray-300 px-2 py-1 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
+                                  placeholder="Head office address"
+                                ></textarea>
+                              </dd>
+                            } @else {
+                              <dd class="mt-0.5 font-medium text-gray-900">{{ company()!.headOfficeAddress }}</dd>
+                            }
                           </div>
                         }
-                        @if (company()!.headOfficePhone) {
+                        @if (editing() || company()!.headOfficePhone) {
                           <div>
                             <dt class="text-gray-500">Phone</dt>
-                            <dd class="mt-0.5 font-medium text-gray-900">{{ company()!.headOfficePhone }}</dd>
+                            @if (editing()) {
+                              <dd class="mt-0.5">
+                                <input
+                                  type="text"
+                                  [ngModel]="editHeadOfficePhone()"
+                                  (ngModelChange)="editHeadOfficePhone.set($event)"
+                                  class="block w-full rounded-md border border-gray-300 px-2 py-1 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
+                                  placeholder="Phone number"
+                                />
+                              </dd>
+                            } @else {
+                              <dd class="mt-0.5 font-medium text-gray-900">{{ company()!.headOfficePhone }}</dd>
+                            }
                           </div>
                         }
-                        @if (company()!.headOfficeEmail) {
+                        @if (editing() || company()!.headOfficeEmail) {
                           <div>
                             <dt class="text-gray-500">Email</dt>
-                            <dd class="mt-0.5">
-                              <a [href]="'mailto:' + company()!.headOfficeEmail" class="font-medium text-brand-600 hover:text-brand-800">
-                                {{ company()!.headOfficeEmail }}
-                              </a>
-                            </dd>
+                            @if (editing()) {
+                              <dd class="mt-0.5">
+                                <input
+                                  type="email"
+                                  [ngModel]="editHeadOfficeEmail()"
+                                  (ngModelChange)="editHeadOfficeEmail.set($event)"
+                                  class="block w-full rounded-md border border-gray-300 px-2 py-1 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
+                                  placeholder="Email address"
+                                />
+                              </dd>
+                            } @else {
+                              <dd class="mt-0.5">
+                                <a [href]="'mailto:' + company()!.headOfficeEmail" class="font-medium text-brand-600 hover:text-brand-800">
+                                  {{ company()!.headOfficeEmail }}
+                                </a>
+                              </dd>
+                            }
                           </div>
                         }
-                        @if (company()!.website) {
+                        @if (editing() || company()!.website) {
                           <div>
                             <dt class="text-gray-500">Website</dt>
-                            <dd class="mt-0.5">
-                              <a [href]="websiteUrl()" target="_blank" rel="noopener noreferrer" class="font-medium text-brand-600 hover:text-brand-800">
-                                {{ company()!.website }}
-                              </a>
-                            </dd>
+                            @if (editing()) {
+                              <dd class="mt-0.5">
+                                <input
+                                  type="url"
+                                  [ngModel]="editWebsite()"
+                                  (ngModelChange)="editWebsite.set($event)"
+                                  class="block w-full rounded-md border border-gray-300 px-2 py-1 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
+                                  placeholder="https://example.com"
+                                />
+                              </dd>
+                            } @else {
+                              <dd class="mt-0.5">
+                                <a [href]="websiteUrl()" target="_blank" rel="noopener noreferrer" class="font-medium text-brand-600 hover:text-brand-800">
+                                  {{ company()!.website }}
+                                </a>
+                              </dd>
+                            }
                           </div>
                         }
                         @if (enrichment()?.headOffice?.faxNumbers?.length) {
@@ -1952,7 +2085,17 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly editName = signal('');
   readonly editCountry = signal('');
   readonly editCountryIso = signal('');
+  readonly editYearFormed = signal<number | null>(null);
+  readonly editFleetSize = signal<number | null>(null);
+  readonly editCreditLimit = signal('');
+  readonly editCompanyImo = signal('');
+  readonly editHeadOfficeAddress = signal('');
+  readonly editHeadOfficePhone = signal('');
+  readonly editHeadOfficeEmail = signal('');
+  readonly editWebsite = signal('');
 
+  // Sync conflict state
+  readonly syncConflicts = signal<{ field: string; localValue: any; seasearcherValue: any }[]>([]);
   // Country typeahead
   readonly countrySearchQuery = signal('');
   readonly showCountryDropdown = signal(false);
@@ -2009,6 +2152,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   private fleetMapInitialized = false;
   private routeSub: Subscription | null = null;
   private syncSub: Subscription | null = null;
+  private conflictsSub: Subscription | null = null;
   private vesselLayer: L.LayerGroup | null = null;
   readonly fleetMapFullscreen = signal(false);
 
@@ -2072,6 +2216,13 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
         this.loadContacts(data.id);
       }
     });
+
+    // Listen for sync conflicts (fields user manually overrode that differ on SeaSearcher)
+    this.conflictsSub = this.wsService.on<{ field: string; localValue: any; seasearcherValue: any }[]>('company-sync-conflicts').subscribe((conflicts) => {
+      if (conflicts?.length) {
+        this.syncConflicts.set(conflicts);
+      }
+    });
   }
 
   ngOnDestroy(): void {
@@ -2081,6 +2232,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     }
     this.routeSub?.unsubscribe();
     this.syncSub?.unsubscribe();
+    this.conflictsSub?.unsubscribe();
   }
 
   private resetState(): void {
@@ -2892,6 +3044,14 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     this.editName.set(c.name);
     this.editCountry.set(c.country ?? '');
     this.editCountryIso.set(c.countryIso ?? '');
+    this.editYearFormed.set(c.yearFormed ?? null);
+    this.editFleetSize.set(c.fleetSize ?? null);
+    this.editCreditLimit.set(c.creditLimit ?? '0');
+    this.editCompanyImo.set(c.companyImo ?? '');
+    this.editHeadOfficeAddress.set(c.headOfficeAddress ?? '');
+    this.editHeadOfficePhone.set(c.headOfficePhone ?? '');
+    this.editHeadOfficeEmail.set(c.headOfficeEmail ?? '');
+    this.editWebsite.set(c.website ?? '');
     this.countrySearchQuery.set(c.country ?? '');
     this.showCountryDropdown.set(false);
     this.editing.set(true);
@@ -2908,10 +3068,18 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
 
     this.editSaving.set(true);
     try {
-      const body: Record<string, string | null> = {};
+      const body: Record<string, any> = {};
       if (this.editName() !== c.name) body['name'] = this.editName();
       if (this.editCountry() !== (c.country ?? '')) body['country'] = this.editCountry() || null;
       if (this.editCountryIso() !== (c.countryIso ?? '')) body['countryIso'] = this.editCountryIso() || null;
+      if (this.editCreditLimit() !== (c.creditLimit ?? '0')) body['creditLimit'] = this.editCreditLimit() || null;
+      if (this.editYearFormed() !== c.yearFormed) body['yearFormed'] = this.editYearFormed();
+      if (this.editFleetSize() !== c.fleetSize) body['fleetSize'] = this.editFleetSize();
+      if (this.editCompanyImo() !== (c.companyImo ?? '')) body['companyImo'] = this.editCompanyImo() || null;
+      if (this.editHeadOfficeAddress() !== (c.headOfficeAddress ?? '')) body['headOfficeAddress'] = this.editHeadOfficeAddress() || null;
+      if (this.editHeadOfficePhone() !== (c.headOfficePhone ?? '')) body['headOfficePhone'] = this.editHeadOfficePhone() || null;
+      if (this.editHeadOfficeEmail() !== (c.headOfficeEmail ?? '')) body['headOfficeEmail'] = this.editHeadOfficeEmail() || null;
+      if (this.editWebsite() !== (c.website ?? '')) body['website'] = this.editWebsite() || null;
 
       if (Object.keys(body).length === 0) {
         this.editing.set(false);
@@ -2938,6 +3106,47 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
 
   goBack(): void {
     this.router.navigate(['/companies']);
+  }
+
+  // ─── Conflict resolution ──────────────────────────────────────────
+
+  readonly FIELD_LABELS: Record<string, string> = {
+    name: 'Company Name',
+    country: 'Country',
+    countryIso: 'Country Code',
+    yearFormed: 'Year Formed',
+    fleetSize: 'Fleet Size',
+    headOfficeAddress: 'Address',
+    headOfficePhone: 'Phone',
+    headOfficeEmail: 'Email',
+    website: 'Website',
+    companyImo: 'Company IMO',
+    companyRoles: 'Company Roles',
+  };
+
+  dismissConflicts(): void {
+    this.syncConflicts.set([]);
+  }
+
+  async acceptSeasearcherValue(field: string): Promise<void> {
+    const c = this.company();
+    if (!c) return;
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<CounterpartyDto>>(`${API}/companies/local/${c.id}/accept-seasearcher`, { field }),
+      );
+      if (res.success && res.data) {
+        this.company.set(res.data);
+        // Remove this conflict from the list
+        this.syncConflicts.update((conflicts) => conflicts.filter((cf) => cf.field !== field));
+      }
+    } catch (err) {
+      console.error('Failed to accept SeaSearcher value:', err);
+    }
+  }
+
+  dismissConflict(field: string): void {
+    this.syncConflicts.update((conflicts) => conflicts.filter((cf) => cf.field !== field));
   }
 
   // ─── Helpers ───────────────────────────────────────────────────────

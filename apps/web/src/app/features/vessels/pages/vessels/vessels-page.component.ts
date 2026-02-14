@@ -13,7 +13,8 @@ import { firstValueFrom, Subject, of } from 'rxjs';
 import { debounceTime, switchMap, tap, catchError, takeUntil } from 'rxjs/operators';
 import type { VesselDto, ApiResponse } from '@fueld/types';
 import { flagFromIso3 } from '../../../../shared/utils/flags';
-import { PaginationComponent } from '../../../../shared/components';
+import { PaginationComponent, SortHeaderComponent } from '../../../../shared/components';
+import type { SortChangeEvent } from '../../../../shared/components';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Vessels Page — Browse, search, import from Seasearcher, create
@@ -41,7 +42,7 @@ interface VesselSearchResult {
 @Component({
   selector: 'app-vessels-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, PaginationComponent],
+  imports: [FormsModule, PaginationComponent, SortHeaderComponent],
   template: `
     <div>
       <!-- Header -->
@@ -167,12 +168,12 @@ interface VesselSearchResult {
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-gray-100 bg-gray-50/60">
-                <th class="px-5 py-3 text-left font-medium text-gray-500">Vessel</th>
-                <th class="px-5 py-3 text-left font-medium text-gray-500">Type</th>
-                <th class="px-5 py-3 text-left font-medium text-gray-500">Flag</th>
-                <th class="px-5 py-3 text-right font-medium text-gray-500">DWT</th>
-                <th class="px-5 py-3 text-right font-medium text-gray-500">GT</th>
-                <th class="px-5 py-3 text-left font-medium text-gray-500">Built</th>
+                <th app-sort-header field="name" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-5 py-3 text-left font-medium text-gray-500">Vessel</th>
+                <th app-sort-header field="type" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-5 py-3 text-left font-medium text-gray-500">Type</th>
+                <th app-sort-header field="flag" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-5 py-3 text-left font-medium text-gray-500">Flag</th>
+                <th app-sort-header field="dwt" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-5 py-3 text-right font-medium text-gray-500">DWT</th>
+                <th app-sort-header field="gt" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-5 py-3 text-right font-medium text-gray-500">GT</th>
+                <th app-sort-header field="buildYear" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-5 py-3 text-left font-medium text-gray-500">Built</th>
                 <th class="px-5 py-3 text-left font-medium text-gray-500">Source</th>
                 <th class="px-5 py-3 text-right font-medium text-gray-500"></th>
               </tr>
@@ -360,6 +361,8 @@ export class VesselsPageComponent implements OnInit, OnDestroy {
   readonly currentPage = signal(1);
   readonly pageSize = 25;
   readonly totalPages = signal(1);
+  readonly sortBy = signal('');
+  readonly sortDir = signal<'asc' | 'desc'>('asc');
 
   // Search
   readonly searchTerm = signal('');
@@ -426,6 +429,8 @@ export class VesselsPageComponent implements OnInit, OnDestroy {
     const params = new URLSearchParams();
     params.set('page', String(this.currentPage()));
     params.set('limit', String(this.pageSize));
+    if (this.sortBy()) params.set('sortBy', this.sortBy());
+    if (this.sortBy()) params.set('sortDir', this.sortDir());
 
     try {
       const res = await firstValueFrom(
@@ -503,8 +508,18 @@ export class VesselsPageComponent implements OnInit, OnDestroy {
   private updateUrlParams(): void {
     const queryParams: Record<string, string | null> = {
       page: this.currentPage() > 1 ? String(this.currentPage()) : null,
+      sortBy: this.sortBy() || null,
+      sortDir: this.sortBy() ? this.sortDir() : null,
     };
     this.router.navigate([], { queryParams, queryParamsHandling: 'merge', replaceUrl: true });
+  }
+
+  onSort(event: SortChangeEvent): void {
+    this.sortBy.set(event.field);
+    this.sortDir.set(event.dir);
+    this.currentPage.set(1);
+    this.updateUrlParams();
+    this.loadVessels();
   }
 
   // ─── Delete ────────────────────────────────────────────────────────

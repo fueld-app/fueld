@@ -54,6 +54,8 @@ export const vesselsController = new Elysia({ prefix: '/vessels' })
     async ({ query }) => {
       const results = await listVessels({
         search: query.search,
+        sortBy: query.sortBy,
+        sortDir: query.sortDir as 'asc' | 'desc' | undefined,
         page: query.page ? parseInt(query.page) : undefined,
         limit: query.limit ? parseInt(query.limit) : undefined,
       });
@@ -62,6 +64,8 @@ export const vesselsController = new Elysia({ prefix: '/vessels' })
     {
       query: t.Object({
         search: t.Optional(t.String()),
+        sortBy: t.Optional(t.String()),
+        sortDir: t.Optional(t.String()),
         page: t.Optional(t.String()),
         limit: t.Optional(t.String()),
       }),

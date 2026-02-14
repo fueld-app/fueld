@@ -4,7 +4,7 @@
 //  Used amount is calculated from open orders automatically.
 // ═══════════════════════════════════════════════════════════════════════
 
-import { eq, and, sql, inArray } from 'drizzle-orm';
+import { eq, and, sql, inArray, asc, desc } from 'drizzle-orm';
 import { db } from '../../db';
 import {
   creditLines,
@@ -177,6 +177,8 @@ async function enrichCreditLine(row: RawCreditLine): Promise<CreditLineDto> {
 export async function listCreditLines(query?: {
   type?: CreditLineType;
   counterpartyId?: string;
+  sortBy?: string;
+  sortDir?: 'asc' | 'desc';
   page?: number;
   limit?: number;
 }) {
@@ -191,6 +193,18 @@ export async function listCreditLines(query?: {
   const limit = query?.limit ?? 25;
   const page = query?.page ?? 1;
   const offset = (page - 1) * limit;
+
+  // Sortable columns
+  const sortMap: Record<string, any> = {
+    updatedAt: creditLines.updatedAt,
+    expires: creditLines.expires,
+    periodDays: creditLines.periodDays,
+    creditAmount: creditLines.creditAmount,
+    createdAt: creditLines.createdAt,
+  };
+  const sortCol = sortMap[query?.sortBy ?? ''] ?? creditLines.updatedAt;
+  const defaultDir = query?.sortBy ? 'asc' : 'desc';
+  const sortFn = (query?.sortDir ?? defaultDir) === 'desc' ? desc : asc;
 
   let listQuery = db
     .select({
@@ -229,7 +243,7 @@ export async function listCreditLines(query?: {
       .where(where)
       .limit(limit)
       .offset(offset)
-      .orderBy(creditLines.createdAt),
+      .orderBy(sortFn(sortCol)),
     countQuery.where(where),
   ]);
 

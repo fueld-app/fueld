@@ -2,7 +2,7 @@
 //  Vessel Service — CRUD + Seasearcher sync for vessels
 // ═══════════════════════════════════════════════════════════════════════
 
-import { eq, ilike, or, and, sql, inArray } from 'drizzle-orm';
+import { eq, ilike, or, and, sql, inArray, asc, desc } from 'drizzle-orm';
 import { db } from '../../db';
 import { vessels, orders, counterparties, places, vesselCompanies, companyContacts, users } from '../../db/schema';
 import type { VesselCompanyRole } from '@fueld/types';
@@ -71,6 +71,8 @@ export interface SeasearcherVesselDetailResponse {
 
 export async function listVessels(query?: {
   search?: string;
+  sortBy?: string;
+  sortDir?: 'asc' | 'desc';
   limit?: number;
   page?: number;
 }) {
@@ -95,6 +97,19 @@ export async function listVessels(query?: {
   const page = query?.page ?? 1;
   const offset = (page - 1) * limit;
 
+  // Sortable columns
+  const sortMap: Record<string, any> = {
+    name: vessels.name,
+    type: vessels.type,
+    flag: vessels.flag,
+    dwt: vessels.dwt,
+    gt: vessels.gt,
+    buildYear: vessels.buildYear,
+    createdAt: vessels.createdAt,
+  };
+  const sortCol = sortMap[query?.sortBy ?? ''] ?? vessels.name;
+  const sortFn = query?.sortDir === 'desc' ? desc : asc;
+
   const [rows, countResult] = await Promise.all([
     db
       .select()
@@ -102,7 +117,7 @@ export async function listVessels(query?: {
       .where(where)
       .limit(limit)
       .offset(offset)
-      .orderBy(vessels.name),
+      .orderBy(sortFn(sortCol)),
     db
       .select({ count: sql<number>`count(*)::int` })
       .from(vessels)

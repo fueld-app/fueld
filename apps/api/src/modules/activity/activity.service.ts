@@ -5,7 +5,7 @@
 //  Supports configurable retention period with hourly auto-pruning.
 // ═══════════════════════════════════════════════════════════════════════
 
-import { eq, and, desc, sql, lt, gte, lte, inArray } from 'drizzle-orm';
+import { eq, and, asc, desc, sql, lt, gte, lte, inArray } from 'drizzle-orm';
 import { db } from '../../db';
 import { activityLogs, tenants, users } from '../../db/schema';
 import { lookupIp } from './geoip';
@@ -242,6 +242,8 @@ export interface ActivityQuery {
   action?: string;
   dateFrom?: string;
   dateTo?: string;
+  sortBy?: string;
+  sortDir?: 'asc' | 'desc';
   limit?: number;
   offset?: number;
 }
@@ -301,6 +303,19 @@ export async function queryActivity(
   const limit = Math.min(query.limit ?? 50, 200);
   const offset = query.offset ?? 0;
 
+  // Sortable columns
+  const sortMap: Record<string, any> = {
+    createdAt: activityLogs.createdAt,
+    user: users.name,
+    action: activityLogs.action,
+    entityType: activityLogs.entityType,
+    platform: activityLogs.platform,
+    clientIp: activityLogs.clientIp,
+  };
+  const sortCol = sortMap[query.sortBy ?? ''] ?? activityLogs.createdAt;
+  const defaultDir = query.sortBy ? 'asc' : 'desc';
+  const sortFn = (query.sortDir ?? defaultDir) === 'desc' ? desc : asc;
+
   const [rows, countResult] = await Promise.all([
     db
       .select({
@@ -328,7 +343,7 @@ export async function queryActivity(
       .from(activityLogs)
       .leftJoin(users, eq(activityLogs.userId, users.id))
       .where(where)
-      .orderBy(desc(activityLogs.createdAt))
+      .orderBy(sortFn(sortCol))
       .limit(limit)
       .offset(offset),
     db

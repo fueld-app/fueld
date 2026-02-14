@@ -3,7 +3,7 @@
 //  Search local DB first; fall back to LLI API if not found.
 // ═══════════════════════════════════════════════════════════════════════
 
-import { eq, ilike, or, and, sql } from 'drizzle-orm';
+import { eq, ilike, or, and, sql, asc, desc } from 'drizzle-orm';
 import { db } from '../../db';
 import { vessels, places, counterparties, orders, portSuppliers, users, companyContacts } from '../../db/schema';
 import { lliGet, seasearcherPlaceSearch, seasearcherPlaceDetail, seasearcherNearbyVessels, seasearcherNearbyVesselsSpatial, seasearcherPortFacilities, seasearcherExpectedArrivals } from './lli.client';
@@ -445,6 +445,9 @@ export async function listPlaces(query?: {
   placeType?: string;
   country?: string;
   search?: string;
+  responsibleUserId?: string;
+  sortBy?: string;
+  sortDir?: 'asc' | 'desc';
   limit?: number;
   page?: number;
 }) {
@@ -452,6 +455,7 @@ export async function listPlaces(query?: {
   if (query?.search) conditions.push(ilike(places.name, `%${query.search}%`));
   if (query?.country) conditions.push(ilike(places.country, `%${query.country}%`));
   if (query?.placeType) conditions.push(eq(places.placeType, query.placeType as any));
+  if (query?.responsibleUserId) conditions.push(eq(places.responsibleUserId, query.responsibleUserId));
 
   const where = conditions.length
     ? conditions.length === 1
@@ -462,6 +466,21 @@ export async function listPlaces(query?: {
   const limit = query?.limit ?? 25;
   const page = query?.page ?? 1;
   const offset = (page - 1) * limit;
+
+  // Sortable columns
+  const sortMap: Record<string, any> = {
+    name: places.name,
+    country: places.country,
+    placeType: places.placeType,
+    unlocode: places.unlocode,
+    area: places.area,
+    createdAt: places.createdAt,
+  };
+  const sortCol = sortMap[query?.sortBy ?? ''] ?? places.name;
+  const sortFn = query?.sortDir === 'desc' ? desc : asc;
+
+  // Alias for responsible user to avoid conflict with other user joins
+  const responsibleUser = users;
 
   const [rows, countResult] = await Promise.all([
     db
@@ -481,6 +500,8 @@ export async function listPlaces(query?: {
         admiraltyChart: places.admiraltyChart,
         parentPlaceId: places.parentPlaceId,
         parentPlaceName: places.parentPlaceName,
+        responsibleUserId: places.responsibleUserId,
+        responsibleUserName: responsibleUser.name,
         lliLastUpdated: places.lliLastUpdated,
         createdAt: places.createdAt,
         updatedAt: places.updatedAt,
@@ -489,11 +510,12 @@ export async function listPlaces(query?: {
       })
       .from(places)
       .leftJoin(orders, eq(orders.placeId, places.id))
+      .leftJoin(responsibleUser, eq(places.responsibleUserId, responsibleUser.id))
       .where(where)
-      .groupBy(places.id)
+      .groupBy(places.id, responsibleUser.name)
       .limit(limit)
       .offset(offset)
-      .orderBy(places.name),
+      .orderBy(sortFn(sortCol)),
     db
       .select({ count: sql<number>`count(*)::int` })
       .from(places)

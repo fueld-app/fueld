@@ -8,7 +8,8 @@ import {
 import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { PaginationComponent } from '../../../../shared/components';
+import { PaginationComponent, SortHeaderComponent } from '../../../../shared/components';
+import type { SortChangeEvent } from '../../../../shared/components';
 import { firstValueFrom } from 'rxjs';
 import type {
   CreditLineDto,
@@ -40,7 +41,7 @@ interface CompanySearchResultOption {
 @Component({
   selector: 'app-customer-credit-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, RouterLink, PaginationComponent],
+  imports: [FormsModule, RouterLink, PaginationComponent, SortHeaderComponent],
   template: `
     <div>
       <!-- Header -->
@@ -75,12 +76,12 @@ interface CompanySearchResultOption {
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-gray-200 bg-gray-50/80">
-                <th class="px-4 py-3 text-left font-medium text-gray-600">Updated</th>
+                <th app-sort-header field="updatedAt" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Updated</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Customer(s)</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Our Companies</th>
-                <th class="px-4 py-3 text-left font-medium text-gray-600">Expires</th>
-                <th class="px-4 py-3 text-left font-medium text-gray-600">Period</th>
-                <th class="px-4 py-3 text-right font-medium text-gray-600">Credit</th>
+                <th app-sort-header field="expires" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Expires</th>
+                <th app-sort-header field="periodDays" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Period</th>
+                <th app-sort-header field="creditAmount" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-right font-medium text-gray-600">Credit</th>
                 <th class="px-4 py-3 text-right font-medium text-gray-600">Used</th>
                 <th class="px-4 py-3 text-right font-medium text-gray-600">Available</th>
                 <th class="px-4 py-3 text-center font-medium text-gray-600">Performance</th>
@@ -377,6 +378,8 @@ export class CustomerCreditPageComponent implements OnInit {
   readonly total = signal(0);
   readonly currentPage = signal(1);
   readonly loading = signal(true);
+  readonly sortBy = signal('');
+  readonly sortDir = signal<'asc' | 'desc'>('asc');
 
   // Own companies
   readonly ownCompanies = signal<OwnCompanyDto[]>([]);
@@ -425,6 +428,7 @@ export class CustomerCreditPageComponent implements OnInit {
         page: String(this.currentPage()),
         limit: String(this.pageSize),
       });
+      if (this.sortBy()) { params.set('sortBy', this.sortBy()); params.set('sortDir', this.sortDir()); }
       const [res, ownRes] = await Promise.all([
         firstValueFrom(
           this.http.get<ApiResponse<{ items: CreditLineDto[]; total: number }>>(`${API}/credit/lines?${params}`),
@@ -451,6 +455,13 @@ export class CustomerCreditPageComponent implements OnInit {
       page: page > 1 ? String(page) : null,
     };
     this.router.navigate([], { queryParams, queryParamsHandling: 'merge', replaceUrl: true });
+    this.loadData();
+  }
+
+  onSort(event: SortChangeEvent): void {
+    this.sortBy.set(event.field);
+    this.sortDir.set(event.dir);
+    this.currentPage.set(1);
     this.loadData();
   }
 

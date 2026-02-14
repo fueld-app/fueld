@@ -425,9 +425,12 @@ onEntityView(async (socketId, entityType, entityId) => {
         sendToSocket(socketId, { type: 'vessel-synced', data: synced });
       }
     } else if (entityType === 'Company') {
-      const synced = await syncCompanyFromSeasearcher(entityId);
-      if (synced) {
-        sendToSocket(socketId, { type: 'company-synced', data: synced });
+      const result = await syncCompanyFromSeasearcher(entityId);
+      if (result) {
+        sendToSocket(socketId, { type: 'company-synced', data: result.company });
+        if (result.conflicts.length > 0) {
+          sendToSocket(socketId, { type: 'company-sync-conflicts', data: result.conflicts });
+        }
       }
     }
   } catch (err: any) {

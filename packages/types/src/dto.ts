@@ -131,6 +131,7 @@ export interface CounterpartyDto {
   website: string | null;
   isSanctioned: boolean;
   lastSynced: string | null;
+  manualOverrides: string[];
   responsibleUserId?: string | null;
   responsibleUserName?: string | null;
   contactsCount?: number | null;
@@ -401,10 +402,13 @@ export interface OrderDto {
   customerPaymentTermType?: PaymentTermType | null;
   customerCreditDays?: number | null;
   customerNote?: string | null;
+  customerContactId?: string | null;
   supplierId?: string | null;
   supplierPaymentTermType?: PaymentTermType | null;
   supplierCreditDays?: number | null;
   supplierNote?: string | null;
+  supplierContactId?: string | null;
+  termsAndConditions?: string | null;
   lossReason: string | null;
   closedAt: string | null;
   createdAt: string;
@@ -423,10 +427,13 @@ export interface CreateOrderDto {
   customerPaymentTermType?: PaymentTermType;
   customerCreditDays?: number;
   customerNote?: string;
+  customerContactId?: string;
   supplierId?: string;
   supplierPaymentTermType?: PaymentTermType;
   supplierCreditDays?: number;
   supplierNote?: string;
+  supplierContactId?: string;
+  termsAndConditions?: string;
 }
 
 export interface UpdateOrderDto {
@@ -442,10 +449,13 @@ export interface UpdateOrderDto {
   customerPaymentTermType?: PaymentTermType | null;
   customerCreditDays?: number | null;
   customerNote?: string | null;
+  customerContactId?: string | null;
   supplierId?: string | null;
   supplierPaymentTermType?: PaymentTermType | null;
   supplierCreditDays?: number | null;
   supplierNote?: string | null;
+  supplierContactId?: string | null;
+  termsAndConditions?: string | null;
   lossReason?: string | null;
 }
 
@@ -456,6 +466,8 @@ export interface OrderDetailDto extends OrderDto {
   place: PlaceDto | null;
   salesRep: { id: string; name: string; email: string } | null;
   invoicingCompany: CounterpartyDto | null;
+  customerContact: CompanyContactDto | null;
+  supplierContact: CompanyContactDto | null;
   items: OrderItemDto[];
   attachments?: OrderAttachmentDto[];
 }
@@ -522,6 +534,7 @@ export interface OrderItemDto {
   productType: ProductType;
   quantity: string;
   unit: string;
+  description: string | null;
   costPrice: string | null;
   costCurrency: string;
   salesPrice: string | null;
@@ -535,6 +548,7 @@ export interface CreateOrderItemDto {
   productType: ProductType;
   quantity: string;
   unit?: string;
+  description?: string;
   costPrice?: string;
   costCurrency?: string;
   salesPrice?: string;

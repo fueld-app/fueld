@@ -14,14 +14,15 @@ import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subscription } from 'rxjs';
 import type { ApiResponse, ActivityLogDto, UserSessionDto } from '@fueld/types';
 import { WebSocketService } from '../../../../core/websocket/websocket.service';
-import { PaginationComponent } from '../../../../shared/components';
+import { PaginationComponent, SortHeaderComponent } from '../../../../shared/components';
+import type { SortChangeEvent } from '../../../../shared/components';
 
 import { API } from '@app/core/config/api';
 
 @Component({
   selector: 'app-activity-log-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, PaginationComponent],
+  imports: [FormsModule, PaginationComponent, SortHeaderComponent],
   template: `
     <div>
       <!-- Header -->
@@ -262,13 +263,13 @@ import { API } from '@app/core/config/api';
             <table class="w-full text-sm">
               <thead>
                 <tr class="border-b border-gray-200 bg-gray-50/80">
-                  <th class="px-4 py-3 text-left font-medium text-gray-600">Time</th>
-                  <th class="px-4 py-3 text-left font-medium text-gray-600">User</th>
-                  <th class="px-4 py-3 text-center font-medium text-gray-600">Action</th>
-                  <th class="px-4 py-3 text-left font-medium text-gray-600">Page / Entity</th>
+                  <th app-sort-header field="createdAt" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Time</th>
+                  <th app-sort-header field="user" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">User</th>
+                  <th app-sort-header field="action" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-center font-medium text-gray-600">Action</th>
+                  <th app-sort-header field="entityType" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Page / Entity</th>
                   <th class="px-4 py-3 text-left font-medium text-gray-600">Details</th>
-                  <th class="px-4 py-3 text-left font-medium text-gray-600">IP</th>
-                  <th class="px-4 py-3 text-left font-medium text-gray-600">Platform</th>
+                  <th app-sort-header field="clientIp" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">IP</th>
+                  <th app-sort-header field="platform" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Platform</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100">
@@ -445,6 +446,8 @@ export class ActivityLogPageComponent implements OnInit, OnDestroy {
   readonly totalLogs = signal(0);
   readonly currentPage = signal(1);
   readonly pageSize = 50;
+  readonly sortBy = signal('');
+  readonly sortDir = signal<'asc' | 'desc'>('asc');
 
   // ── Filters ──
   readonly filterAction = signal('');
@@ -558,6 +561,7 @@ export class ActivityLogPageComponent implements OnInit, OnDestroy {
       if (this.filterEntity()) params['entityType'] = this.filterEntity();
       if (this.filterDateFrom()) params['dateFrom'] = this.filterDateFrom();
       if (this.filterDateTo()) params['dateTo'] = this.filterDateTo();
+      if (this.sortBy()) { params['sortBy'] = this.sortBy(); params['sortDir'] = this.sortDir(); }
 
       const qs = new URLSearchParams(params).toString();
       const res = await firstValueFrom(
@@ -578,6 +582,13 @@ export class ActivityLogPageComponent implements OnInit, OnDestroy {
 
   goToPage(page: number): void {
     this.currentPage.set(page);
+    this.loadLogs();
+  }
+
+  onSort(event: SortChangeEvent): void {
+    this.sortBy.set(event.field);
+    this.sortDir.set(event.dir);
+    this.currentPage.set(1);
     this.loadLogs();
   }
 

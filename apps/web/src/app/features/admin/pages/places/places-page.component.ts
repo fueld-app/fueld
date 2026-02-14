@@ -14,7 +14,8 @@ import { debounceTime, switchMap, tap, catchError, takeUntil } from 'rxjs/operat
 import type { PlaceDto, ApiResponse, CreatePlaceDto } from '@fueld/types';
 import { COUNTRIES } from '../../../../shared/data/countries';
 import { AREAS } from '../../../../shared/data/areas';
-import { PaginationComponent } from '../../../../shared/components';
+import { PaginationComponent, SortHeaderComponent } from '../../../../shared/components';
+import type { SortChangeEvent } from '../../../../shared/components';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Places Page — Browse local places + search & import from Lloyd's
@@ -49,7 +50,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
 @Component({
   selector: 'app-places-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, PaginationComponent],
+  imports: [FormsModule, PaginationComponent, SortHeaderComponent],
   template: `
     <div>
       <!-- Header -->
@@ -157,6 +158,17 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
           <option value="TER">Terminal</option>
           <option value="FIL">Hydrocarbon Field</option>
         </select>
+        <select
+          [ngModel]="filterResponsible()"
+          (ngModelChange)="filterResponsible.set($event); currentPage.set(1); loadPlaces(); updateUrlParams()"
+          class="w-full sm:w-48 rounded-lg border border-gray-300 px-3 py-2 text-sm
+                 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+        >
+          <option value="">All Responsible</option>
+          @for (u of users(); track u.id) {
+            <option [value]="u.id">{{ u.name }}</option>
+          }
+        </select>
         <button
           (click)="loadPlaces()"
           class="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700
@@ -176,11 +188,11 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-gray-200 bg-gray-50/80">
-              <th class="px-4 py-3 text-left font-medium text-gray-600">Name</th>
-              <th class="px-4 py-3 text-left font-medium text-gray-600">Country</th>
-              <th class="px-4 py-3 text-left font-medium text-gray-600">Type</th>
-              <th class="px-4 py-3 text-left font-medium text-gray-600">UNLOCODE</th>
-              <th class="px-4 py-3 text-left font-medium text-gray-600">Area</th>
+              <th app-sort-header field="name" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Name</th>
+              <th app-sort-header field="country" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Country</th>
+              <th app-sort-header field="placeType" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Type</th>
+              <th app-sort-header field="unlocode" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">UNLOCODE</th>
+              <th app-sort-header field="area" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Area</th>
               <th class="px-4 py-3 text-left font-medium text-gray-600">Source</th>
               <th class="px-4 py-3 text-center font-medium text-gray-600">Orders</th>
               <th class="px-4 py-3 text-right font-medium text-gray-600"></th>
@@ -428,6 +440,10 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
   readonly currentPage = signal(1);
   readonly pageSize = 25;
   localTypeFilter = '';
+  readonly filterResponsible = signal('');
+  readonly sortBy = signal('');
+  readonly sortDir = signal<'asc' | 'desc'>('asc');
+  readonly users = signal<{ id: string; name: string; email: string }[]>([]);
 
   // ─── LLI typeahead state ─────────────────────────────────────────
   readonly lliSearchTerm = signal('');
@@ -460,8 +476,15 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
     if (page > 0) this.currentPage.set(page);
     const type = params.get('type');
     if (type) this.localTypeFilter = type;
+    const responsible = params.get('responsible');
+    if (responsible) this.filterResponsible.set(responsible);
+    const sortBy = params.get('sortBy');
+    if (sortBy) this.sortBy.set(sortBy);
+    const sortDir = params.get('sortDir') as 'asc' | 'desc';
+    if (sortDir) this.sortDir.set(sortDir);
 
     this.loadPlaces();
+    this.loadUsers();
 
     // Set up debounced typeahead
     this.searchSubject
@@ -528,6 +551,9 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
     try {
       const params = new URLSearchParams();
       if (this.localTypeFilter) params.set('placeType', this.localTypeFilter);
+      if (this.filterResponsible()) params.set('responsibleUserId', this.filterResponsible());
+      if (this.sortBy()) params.set('sortBy', this.sortBy());
+      if (this.sortBy()) params.set('sortDir', this.sortDir());
       params.set('page', String(this.currentPage()));
       params.set('limit', String(this.pageSize));
 
@@ -592,8 +618,29 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
     const queryParams: Record<string, string | null> = {
       page: this.currentPage() > 1 ? String(this.currentPage()) : null,
       type: this.localTypeFilter || null,
+      responsible: this.filterResponsible() || null,
+      sortBy: this.sortBy() || null,
+      sortDir: this.sortBy() ? this.sortDir() : null,
     };
     this.router.navigate([], { queryParams, queryParamsHandling: 'merge', replaceUrl: true });
+  }
+
+  // ─── Sorting ────────────────────────────────────────────────────
+  onSort(event: SortChangeEvent): void {
+    this.sortBy.set(event.field);
+    this.sortDir.set(event.dir);
+    this.currentPage.set(1);
+    this.updateUrlParams();
+    this.loadPlaces();
+  }
+
+  private async loadUsers(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ id: string; name: string; email: string }[]>>(`${API}/lloyds/users`),
+      );
+      if (res.success && res.data) this.users.set(res.data);
+    } catch { /* ignore */ }
   }
 
   // ─── Delete place ─────────────────────────────────────────────────

@@ -31,6 +31,7 @@ import { WebSocketService } from '../../../../core/websocket/websocket.service';
 export interface OrderItemRow {
   id: string;
   productType: string;
+  description: string;
   quantity: number;
   quantityMin: number | null;
   quantityMax: number | null;
@@ -79,6 +80,7 @@ export interface OrderItemRow {
         <thead>
           <tr class="border-b border-gray-200 bg-gray-50/80">
             <th class="px-4 py-3 text-left font-medium text-gray-600 min-w-[140px]">Product</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-600 min-w-[180px]">Description</th>
             <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Qty</th>
             <th class="px-4 py-3 text-left font-medium text-gray-600 w-16">Unit</th>
             <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[140px]">Cost</th>
@@ -102,6 +104,22 @@ export interface OrderItemRow {
                     [selected]="row.productType"
                     placeholder="Product..."
                     (selectionChange)="updateField(i, 'productType', $event)"
+                  />
+                }
+              </td>
+
+              <!-- Description -->
+              <td class="px-4 py-2">
+                @if (readonly()) {
+                  <span class="text-sm text-gray-700">{{ row.description || '-' }}</span>
+                } @else {
+                  <input
+                    type="text"
+                    [ngModel]="row.description"
+                    (ngModelChange)="updateField(i, 'description', $event)"
+                    placeholder="e.g. local specs"
+                    class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm
+                           focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                   />
                 }
               </td>
@@ -253,7 +271,7 @@ export interface OrderItemRow {
             </tr>
           } @empty {
             <tr>
-              <td [attr.colspan]="readonly() ? 6 : 7" class="px-4 py-12 text-center">
+              <td [attr.colspan]="readonly() ? 7 : 8" class="px-4 py-12 text-center">
                 <p class="text-sm text-gray-400">No line items yet.</p>
                 @if (!readonly()) {
                   <button
@@ -272,6 +290,7 @@ export interface OrderItemRow {
           <tfoot>
             <tr class="border-t-2 border-gray-200 bg-gray-50/50 font-semibold">
               <td class="px-4 py-3 text-right text-gray-600">Totals</td>
+              <td></td>
               <td class="px-4 py-3 text-right tabular-nums text-gray-900">{{ totalQty() | number:'1.3-3' }}</td>
               <td></td>
               <td class="px-4 py-3 text-right tabular-nums text-gray-600">{{ totalCost() | number:'1.2-2' }} {{ baseCurrency }}</td>
@@ -326,6 +345,23 @@ export interface OrderItemRow {
                   [selected]="row.productType"
                   placeholder="Product..."
                   (selectionChange)="updateField(i, 'productType', $event)"
+                />
+              }
+            </div>
+
+            <!-- Description -->
+            <div class="col-span-2">
+              <label class="mb-1 block text-xs font-medium text-gray-500">Description</label>
+              @if (readonly()) {
+                <span class="text-sm text-gray-700">{{ row.description || '-' }}</span>
+              } @else {
+                <input
+                  type="text"
+                  [ngModel]="row.description"
+                  (ngModelChange)="updateField(i, 'description', $event)"
+                  placeholder="e.g. local specs"
+                  class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm
+                         focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                 />
               }
             </div>
@@ -619,6 +655,7 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
     const newRow: OrderItemRow = {
       id: crypto.randomUUID(),
       productType: '',
+      description: '',
       quantity: 0,
       quantityMin: null,
       quantityMax: null,

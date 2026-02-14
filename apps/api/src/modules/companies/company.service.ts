@@ -2,7 +2,7 @@
 //  Company Service — CRUD + Seasearcher sync for counterparties
 // ═══════════════════════════════════════════════════════════════════════
 
-import { eq, ilike, or, and, sql } from 'drizzle-orm';
+import { eq, ilike, or, and, sql, asc, desc } from 'drizzle-orm';
 import { db } from '../../db';
 import { counterparties, companyContacts, companyEmails, orders, vessels, places, users, vesselCompanies } from '../../db/schema';
 import type { CompanyEmailType } from '@fueld/types';
@@ -122,6 +122,9 @@ export async function listCompanies(query?: {
   search?: string;
   type?: string;
   country?: string;
+  responsibleUserId?: string;
+  sortBy?: string;
+  sortDir?: 'asc' | 'desc';
   limit?: number;
   page?: number;
 }) {
@@ -129,6 +132,7 @@ export async function listCompanies(query?: {
   if (query?.search) conditions.push(ilike(counterparties.name, `%${query.search}%`));
   if (query?.type) conditions.push(sql`${counterparties.types} @> ${JSON.stringify([query.type])}::jsonb`);
   if (query?.country) conditions.push(ilike(counterparties.country, `%${query.country}%`));
+  if (query?.responsibleUserId) conditions.push(eq(counterparties.responsibleUserId, query.responsibleUserId));
 
   const where = conditions.length
     ? conditions.length === 1
@@ -139,6 +143,18 @@ export async function listCompanies(query?: {
   const limit = query?.limit ?? 25;
   const page = query?.page ?? 1;
   const offset = (page - 1) * limit;
+
+  // Sortable columns
+  const sortMap: Record<string, any> = {
+    name: counterparties.name,
+    type: counterparties.type,
+    country: counterparties.country,
+    creditLimit: counterparties.creditLimit,
+    responsible: users.name,
+    createdAt: counterparties.createdAt,
+  };
+  const sortCol = sortMap[query?.sortBy ?? ''] ?? counterparties.name;
+  const sortFn = query?.sortDir === 'desc' ? desc : asc;
 
   const [rows, countResult] = await Promise.all([
     db
@@ -168,7 +184,7 @@ export async function listCompanies(query?: {
       .where(where)
       .limit(limit)
       .offset(offset)
-      .orderBy(counterparties.name),
+      .orderBy(sortFn(sortCol)),
     db
       .select({ count: sql<number>`count(*)::int` })
       .from(counterparties)
@@ -338,9 +354,24 @@ export async function importCompanyByName(companyName: string) {
 
 // ═══════════════════════════════════════════════════════════════════════
 //  SYNC COMPANY FROM SEASEARCHER (update existing local record)
+//
+//  Respects manualOverrides: fields the user has manually edited are
+//  NOT overwritten. If SeaSearcher has different data for overridden
+//  fields, those conflicts are returned so the frontend can prompt.
 // ═══════════════════════════════════════════════════════════════════════
 
-export async function syncCompanyFromSeasearcher(companyId: string) {
+export interface SyncConflict {
+  field: string;
+  localValue: string | number | null;
+  seasearcherValue: string | number | null;
+}
+
+export interface SyncResult {
+  company: typeof counterparties.$inferSelect;
+  conflicts: SyncConflict[];
+}
+
+export async function syncCompanyFromSeasearcher(companyId: string): Promise<SyncResult | null> {
   const local = await getCompanyById(companyId);
   if (!local || !local.seasearcherId) return null;
 
@@ -367,36 +398,132 @@ export async function syncCompanyFromSeasearcher(companyId: string) {
     website = ho.webAddress;
   }
 
+  // Map SeaSearcher data to local field names
+  const ssData: Record<string, any> = {
+    name: detail.companyName,
+    country: detail.country?.name ?? null,
+    countryIso: detail.country?.code ?? detail.countryOfAllegiance ?? null,
+    companyImo: detail.companyImo ?? null,
+    yearFormed: detail.yearFormed ?? null,
+    companyRoles: detail.companyRoles ?? null,
+    fleetSize: detail.companyFleetStats?.totalFleetSize ?? null,
+    headOfficeAddress,
+    headOfficePhone,
+    headOfficeEmail,
+    website,
+  };
+
+  const overrides = new Set<string>(local.manualOverrides ?? []);
+  const conflicts: SyncConflict[] = [];
+  const setFields: Record<string, any> = {
+    isSanctioned: detail.isSanctioned ?? false,
+    lastSynced: new Date(),
+    updatedAt: new Date(),
+  };
+
+  // For each field: if user manually overrode it, check for conflict;
+  // otherwise apply SeaSearcher value
+  for (const [field, ssValue] of Object.entries(ssData)) {
+    if (overrides.has(field)) {
+      // Compare local vs SeaSearcher — if different, record conflict
+      const localVal = (local as any)[field];
+      const ssStr = JSON.stringify(ssValue);
+      const localStr = JSON.stringify(localVal);
+      if (ssStr !== localStr && ssValue != null) {
+        conflicts.push({
+          field,
+          localValue: localVal,
+          seasearcherValue: ssValue,
+        });
+      }
+      // Don't overwrite — keep user's manual value
+    } else {
+      // No manual override — apply SeaSearcher value (fallback to local if SS is null)
+      setFields[field] = ssValue ?? (local as any)[field];
+    }
+  }
+
   const [updated] = await db
     .update(counterparties)
-    .set({
-      name: detail.companyName,
-      country: detail.country?.name ?? local.country,
-      countryIso: detail.country?.code ?? local.countryIso,
-      companyImo: detail.companyImo ?? local.companyImo,
-      yearFormed: detail.yearFormed ?? local.yearFormed,
-      companyRoles: detail.companyRoles ?? local.companyRoles,
-      fleetSize: detail.companyFleetStats?.totalFleetSize ?? local.fleetSize,
-      headOfficeAddress,
-      headOfficePhone,
-      headOfficeEmail,
-      website,
-      isSanctioned: detail.isSanctioned ?? false,
-      lastSynced: new Date(),
-      updatedAt: new Date(),
-    })
+    .set(setFields)
     .where(eq(counterparties.id, companyId))
     .returning();
 
-  // Sync contacts from Seasearcher
+  // Sync contacts from Seasearcher (only source='seasearcher' contacts get replaced)
   await syncContactsFromSeasearcher(companyId, detail.headOffice);
 
+  return updated ? { company: updated, conflicts } : null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  ACCEPT SEASEARCHER VALUE (resolve a conflict by accepting SS data)
+// ═══════════════════════════════════════════════════════════════════════
+
+export async function acceptSeasearcherValue(companyId: string, field: string) {
+  const local = await getCompanyById(companyId);
+  if (!local || !local.seasearcherId) return null;
+
+  // Remove the field from manualOverrides
+  const overrides = (local.manualOverrides ?? []).filter((f: string) => f !== field);
+
+  // Re-fetch and apply only this field from SeaSearcher
+  const detail = await seasearcherCompanyDetail<SeasearcherCompanyDetail>(local.seasearcherId);
+
+  let value: any = null;
+  switch (field) {
+    case 'name': value = detail.companyName; break;
+    case 'country': value = detail.country?.name ?? null; break;
+    case 'countryIso': value = detail.country?.code ?? detail.countryOfAllegiance ?? null; break;
+    case 'companyImo': value = detail.companyImo ?? null; break;
+    case 'yearFormed': value = detail.yearFormed ?? null; break;
+    case 'companyRoles': value = detail.companyRoles ?? null; break;
+    case 'fleetSize': value = detail.companyFleetStats?.totalFleetSize ?? null; break;
+    case 'headOfficeAddress': {
+      if (detail.headOffice) {
+        const ho = detail.headOffice;
+        const parts = [ho.addressLine1, ho.addressLine2, ho.addressLine3, ho.addressLine4].filter(Boolean);
+        if (ho.town) parts.push(ho.town);
+        if (ho.country) parts.push(ho.country);
+        if (ho.postCode1) parts.push(ho.postCode1);
+        value = parts.join(', ');
+      }
+      break;
+    }
+    case 'headOfficePhone': {
+      if (detail.headOffice?.telephoneNumbers?.length) {
+        const t = detail.headOffice.telephoneNumbers[0];
+        value = `+${t.countryDialingCode} ${t.areaDialingCode} ${t.number}`.trim();
+      }
+      break;
+    }
+    case 'headOfficeEmail': value = detail.headOffice?.emailAddress ?? null; break;
+    case 'website': value = detail.headOffice?.webAddress ?? null; break;
+  }
+
+  const setFields: Record<string, any> = {
+    manualOverrides: overrides,
+    updatedAt: new Date(),
+  };
+  setFields[field] = value;
+
+  const [updated] = await db
+    .update(counterparties)
+    .set(setFields)
+    .where(eq(counterparties.id, companyId))
+    .returning();
   return updated ?? null;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
 //  UPDATE COMPANY (manual fields)
 // ═══════════════════════════════════════════════════════════════════════
+
+// Fields that can be manually overridden (synced from SeaSearcher)
+const OVERRIDABLE_FIELDS = [
+  'name', 'country', 'countryIso', 'yearFormed', 'fleetSize',
+  'headOfficeAddress', 'headOfficePhone', 'headOfficeEmail', 'website',
+  'companyImo', 'companyRoles',
+] as const;
 
 export async function updateCompany(
   companyId: string,
@@ -405,13 +532,41 @@ export async function updateCompany(
     country?: string | null;
     countryIso?: string | null;
     creditLimit?: string | null;
+    yearFormed?: number | null;
+    fleetSize?: number | null;
+    headOfficeAddress?: string | null;
+    headOfficePhone?: string | null;
+    headOfficeEmail?: string | null;
+    website?: string | null;
+    companyImo?: string | null;
+    companyRoles?: string[] | null;
   },
 ) {
+  // Load current company to merge manualOverrides
+  const current = await getCompanyById(companyId);
+  if (!current) return null;
+
   const setFields: Record<string, any> = { updatedAt: new Date() };
-  if (data.name !== undefined) setFields.name = data.name;
-  if (data.country !== undefined) setFields.country = data.country;
-  if (data.countryIso !== undefined) setFields.countryIso = data.countryIso;
+  const newOverrides = new Set<string>(current.manualOverrides ?? []);
+
+  // Track which overridable fields the user is changing
+  if (data.name !== undefined) { setFields.name = data.name; newOverrides.add('name'); }
+  if (data.country !== undefined) { setFields.country = data.country; newOverrides.add('country'); }
+  if (data.countryIso !== undefined) { setFields.countryIso = data.countryIso; newOverrides.add('countryIso'); }
+  if (data.yearFormed !== undefined) { setFields.yearFormed = data.yearFormed; newOverrides.add('yearFormed'); }
+  if (data.fleetSize !== undefined) { setFields.fleetSize = data.fleetSize; newOverrides.add('fleetSize'); }
+  if (data.headOfficeAddress !== undefined) { setFields.headOfficeAddress = data.headOfficeAddress; newOverrides.add('headOfficeAddress'); }
+  if (data.headOfficePhone !== undefined) { setFields.headOfficePhone = data.headOfficePhone; newOverrides.add('headOfficePhone'); }
+  if (data.headOfficeEmail !== undefined) { setFields.headOfficeEmail = data.headOfficeEmail; newOverrides.add('headOfficeEmail'); }
+  if (data.website !== undefined) { setFields.website = data.website; newOverrides.add('website'); }
+  if (data.companyImo !== undefined) { setFields.companyImo = data.companyImo; newOverrides.add('companyImo'); }
+  if (data.companyRoles !== undefined) { setFields.companyRoles = data.companyRoles; newOverrides.add('companyRoles'); }
+
+  // Non-overridable fields
   if (data.creditLimit !== undefined) setFields.creditLimit = data.creditLimit;
+
+  // Persist manual overrides
+  setFields.manualOverrides = [...newOverrides];
 
   const [updated] = await db
     .update(counterparties)
