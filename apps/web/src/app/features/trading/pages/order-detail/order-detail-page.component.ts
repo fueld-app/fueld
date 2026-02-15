@@ -27,6 +27,7 @@ import {
   type CustomerPaymentDto,
   type CreditLineDto,
   type CompanyContactDto,
+  type BankAccountDto,
 } from '@fueld/types';
 
 import {
@@ -154,6 +155,9 @@ interface TeamUserOption {
       (etaChange)="onEtaChange($event)"
       (etdChange)="onEtdChange($event)"
       (invoicingCompanyChange)="onInvoicingCompanyChange($event)"
+      [bankAccountId]="order()?.bankAccountId ?? ''"
+      [bankAccountOptions]="bankAccounts()"
+      (bankAccountChange)="onBankAccountChange($event)"
       (responsibleChange)="onResponsibleUserChange($event)"
       [customerContactId]="order()?.customerContactId ?? ''"
       [supplierContactId]="order()?.supplierContactId ?? ''"
@@ -213,6 +217,33 @@ interface TeamUserOption {
             }
           </div>
         }
+        <!-- Note toggle -->
+        @if (!isReadonly()) {
+          @if (showCustomerPaymentNote()) {
+            <div class="mt-2">
+              <textarea
+                rows="2"
+                [ngModel]="order()?.customerNote ?? ''"
+                (ngModelChange)="onCustomerNoteChange($event)"
+                placeholder="Customer note for PDFs and emails"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
+                       focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+              ></textarea>
+              <button (click)="showCustomerPaymentNote.set(false)"
+                class="mt-1 text-xs text-gray-400 hover:text-gray-600 transition-colors">Hide note</button>
+            </div>
+          } @else {
+            <button (click)="showCustomerPaymentNote.set(true)"
+              class="mt-2 inline-flex items-center gap-1 text-xs text-gray-400 hover:text-brand-600 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M2 4.75A.75.75 0 0 1 2.75 4h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 4.75Zm0 10.5a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5a.75.75 0 0 1-.75-.75ZM2 10a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 10Z" />
+              </svg>
+              {{ order()?.customerNote ? 'Edit note' : 'Add note' }}
+            </button>
+          }
+        } @else if (order()?.customerNote) {
+          <p class="mt-2 text-xs text-gray-500 whitespace-pre-line">{{ order()?.customerNote }}</p>
+        }
       </div>
       <!-- Supplier Payment (projected into supplier card) -->
       <div supplierPayment>
@@ -263,63 +294,49 @@ interface TeamUserOption {
             }
           </div>
         }
+        <!-- Note toggle -->
+        @if (!isReadonly()) {
+          @if (showSupplierPaymentNote()) {
+            <div class="mt-2">
+              <textarea
+                rows="2"
+                [ngModel]="order()?.supplierNote ?? ''"
+                (ngModelChange)="onSupplierNoteChange($event)"
+                placeholder="Supplier note"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
+                       focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+              ></textarea>
+              <button (click)="showSupplierPaymentNote.set(false)"
+                class="mt-1 text-xs text-gray-400 hover:text-gray-600 transition-colors">Hide note</button>
+            </div>
+          } @else {
+            <button (click)="showSupplierPaymentNote.set(true)"
+              class="mt-2 inline-flex items-center gap-1 text-xs text-gray-400 hover:text-brand-600 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M2 4.75A.75.75 0 0 1 2.75 4h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 4.75Zm0 10.5a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5a.75.75 0 0 1-.75-.75ZM2 10a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 10Z" />
+              </svg>
+              {{ order()?.supplierNote ? 'Edit note' : 'Add note' }}
+            </button>
+          }
+        } @else if (order()?.supplierNote) {
+          <p class="mt-2 text-xs text-gray-500 whitespace-pre-line">{{ order()?.supplierNote }}</p>
+        }
       </div>
       <!-- Notes + T&C (projected into invoicing card) -->
       <div notesAndTerms>
-        <div class="flex items-center gap-3 mb-1.5">
-          <button
-            (click)="noteTab.set('customer')"
-            class="text-xs font-medium uppercase tracking-wider transition-colors"
-            [class]="noteTab() === 'customer' ? 'text-brand-600' : 'text-gray-400 hover:text-gray-600'"
-          >Customer Note</button>
-          <button
-            (click)="noteTab.set('supplier')"
-            class="text-xs font-medium uppercase tracking-wider transition-colors"
-            [class]="noteTab() === 'supplier' ? 'text-brand-600' : 'text-gray-400 hover:text-gray-600'"
-          >Supplier Note</button>
-        </div>
-        @if (noteTab() === 'customer') {
-          @if (isReadonly()) {
-            <p class="mt-1 text-sm text-gray-700 whitespace-pre-line">{{ order()?.customerNote || '-' }}</p>
-          } @else {
-            <textarea
-              rows="2"
-              [ngModel]="order()?.customerNote ?? ''"
-              (ngModelChange)="onCustomerNoteChange($event)"
-              placeholder="Customer note to include in PDFs and emails"
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
-                     focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-            ></textarea>
-          }
+        <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Terms &amp; Conditions</p>
+        @if (isReadonly()) {
+          <p class="mt-1 text-sm text-gray-700 whitespace-pre-line">{{ order()?.termsAndConditions || '-' }}</p>
         } @else {
-          @if (isReadonly()) {
-            <p class="mt-1 text-sm text-gray-700 whitespace-pre-line">{{ order()?.supplierNote || '-' }}</p>
-          } @else {
-            <textarea
-              rows="2"
-              [ngModel]="order()?.supplierNote ?? ''"
-              (ngModelChange)="onSupplierNoteChange($event)"
-              placeholder="Supplier note"
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
-                     focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-            ></textarea>
-          }
+          <textarea
+            rows="2"
+            [ngModel]="order()?.termsAndConditions ?? ''"
+            (ngModelChange)="onTermsChange($event)"
+            placeholder="Terms & conditions text to include in documents"
+            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
+                   focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+          ></textarea>
         }
-        <div class="mt-3 border-t border-gray-100 pt-3">
-          <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Terms &amp; Conditions</p>
-          @if (isReadonly()) {
-            <p class="mt-1 text-sm text-gray-700 whitespace-pre-line">{{ order()?.termsAndConditions || '-' }}</p>
-          } @else {
-            <textarea
-              rows="2"
-              [ngModel]="order()?.termsAndConditions ?? ''"
-              (ngModelChange)="onTermsChange($event)"
-              placeholder="Terms & conditions text to include in documents"
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
-                     focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-            ></textarea>
-          }
-        </div>
       </div>
     </app-trading-detail-meta-cards>
 
@@ -603,6 +620,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   readonly toast = signal<{ type: 'success' | 'error'; message: string } | null>(null);
   readonly invoiceNumber = signal('');
   readonly ownCompanies = signal<OwnCompanyDto[]>([]);
+  readonly bankAccounts = signal<BankAccountDto[]>([]);
   readonly teamUsers = signal<TeamUserOption[]>([]);
   readonly clientSearchLoading = signal(false);
   readonly supplierSearchLoading = signal(false);
@@ -626,6 +644,8 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   readonly paymentMethod = signal('');
   readonly paymentNote = signal('');
   readonly noteTab = signal<'customer' | 'supplier'>('customer');
+  readonly showCustomerPaymentNote = signal(false);
+  readonly showSupplierPaymentNote = signal(false);
   readonly configuredProducts = signal<DropdownOption[]>([]);
   readonly configuredUnits = signal<DropdownOption[]>([]);
   readonly configuredCurrencies = signal<DropdownOption[]>([]);
@@ -824,6 +844,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
           placeId: d.placeId,
           salesRepId: d.salesRepId,
           invoicingCompanyId: d.invoicingCompanyId,
+          bankAccountId: d.bankAccountId ?? null,
           currency: d.currency ?? 'USD',
           status: d.status,
           eta: d.eta,
@@ -887,6 +908,15 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
       }
 
       if (ownRes.success) this.ownCompanies.set(ownRes.data);
+
+      // Load bank accounts for the invoicing company
+      const invoicingId = this.order()?.invoicingCompanyId;
+      if (invoicingId) this.loadBankAccounts(invoicingId);
+
+      // Auto-expand note fields if they already have content
+      if (this.order()?.customerNote) this.showCustomerPaymentNote.set(true);
+      if (this.order()?.supplierNote) this.showSupplierPaymentNote.set(true);
+
       await this.loadAttachments();
       await this.loadPayments();
     } catch {
@@ -1309,8 +1339,26 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   }
 
   onInvoicingCompanyChange(companyId: string): void {
-    this.order.update((o) => o ? { ...o, invoicingCompanyId: companyId || null } : o);
+    this.order.update((o) => o ? { ...o, invoicingCompanyId: companyId || null, bankAccountId: null } : o);
+    this.bankAccounts.set([]);
+    if (companyId) this.loadBankAccounts(companyId);
     this.triggerAutosave();
+  }
+
+  onBankAccountChange(bankAccountId: string): void {
+    this.order.update((o) => o ? { ...o, bankAccountId: bankAccountId || null } : o);
+    this.triggerAutosave();
+  }
+
+  private async loadBankAccounts(companyId: string): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<BankAccountDto[]>>(
+          `${API_URL}/admin/settings/companies/${companyId}/bank-accounts`,
+        ),
+      );
+      if (res.success) this.bankAccounts.set(res.data);
+    } catch { /* silently ignore */ }
   }
 
   async searchClients(term: string): Promise<void> {

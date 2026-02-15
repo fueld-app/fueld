@@ -43,6 +43,7 @@ interface CreateOrderInput {
   placeId: string;
   salesRepId?: string | null;
   invoicingCompanyId?: string | null;
+  bankAccountId?: string | null;
   currency?: string;
   eta?: string | null;
   etd?: string | null;
@@ -64,6 +65,7 @@ interface UpdateOrderInput {
   placeId?: string;
   salesRepId?: string | null;
   invoicingCompanyId?: string | null;
+  bankAccountId?: string | null;
   currency?: string;
   status?: string;
   eta?: string | null;
@@ -408,6 +410,7 @@ export async function createOrder(input: CreateOrderInput) {
       placeId: input.placeId,
       salesRepId: input.salesRepId ?? null,
       invoicingCompanyId: input.invoicingCompanyId ?? null,
+      bankAccountId: input.bankAccountId ?? null,
       currency: input.currency ?? 'USD',
       eta: input.eta ? new Date(input.eta) : null,
       etd: input.etd ? new Date(input.etd) : null,
@@ -437,6 +440,7 @@ export async function updateOrder(id: string, input: UpdateOrderInput) {
   if (input.placeId !== undefined) setData.placeId = input.placeId;
   if (input.salesRepId !== undefined) setData.salesRepId = input.salesRepId;
   if (input.invoicingCompanyId !== undefined) setData.invoicingCompanyId = input.invoicingCompanyId;
+  if (input.bankAccountId !== undefined) setData.bankAccountId = input.bankAccountId;
   if (input.currency !== undefined) setData.currency = input.currency;
   if (input.status !== undefined) setData.status = input.status;
   if (input.eta !== undefined) setData.eta = input.eta ? new Date(input.eta) : null;

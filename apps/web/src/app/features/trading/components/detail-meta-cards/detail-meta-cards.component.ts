@@ -5,7 +5,7 @@ import {
   output,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import type { OwnCompanyDto } from '@fueld/types';
+import type { OwnCompanyDto, BankAccountDto } from '@fueld/types';
 import {
   SearchableDropdownComponent,
   type DropdownOption,
@@ -184,6 +184,27 @@ import {
             }
           </select>
         }
+        <!-- Bank Account -->
+        <div class="mt-3 border-t border-gray-100 pt-3">
+          <label class="text-xs font-medium text-gray-400">Bank Account</label>
+          @if (isReadonly()) {
+            <p class="mt-1 text-sm text-gray-900">{{ bankAccountLabel() }}</p>
+          } @else {
+            <select
+              [ngModel]="bankAccountId()"
+              (ngModelChange)="bankAccountChange.emit($event)"
+              [disabled]="!invoicingCompanyId() || bankAccountOptions().length === 0"
+              class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                     focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white
+                     disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <option value="">— None —</option>
+              @for (ba of bankAccountOptions(); track ba.id) {
+                <option [value]="ba.id">{{ ba.label }} ({{ ba.currency }})</option>
+              }
+            </select>
+          }
+        </div>
         <div class="mt-3 border-t border-gray-100 pt-3">
           <ng-content select="[notesAndTerms]"></ng-content>
         </div>
@@ -225,6 +246,8 @@ export class TradingDetailMetaCardsComponent {
   readonly invoicingCompanyId = input<string>('');
   readonly invoicingCompanyName = input<string>('-');
   readonly ownCompanies = input<OwnCompanyDto[]>([]);
+  readonly bankAccountId = input<string>('');
+  readonly bankAccountOptions = input<BankAccountDto[]>([]);
   readonly responsibleUserId = input<string>('');
   readonly responsibleOptions = input<DropdownOption[]>([]);
 
@@ -247,6 +270,7 @@ export class TradingDetailMetaCardsComponent {
   readonly etaChange = output<string>();
   readonly etdChange = output<string>();
   readonly invoicingCompanyChange = output<string>();
+  readonly bankAccountChange = output<string>();
   readonly responsibleChange = output<string>();
   readonly customerContactChange = output<string>();
   readonly supplierContactChange = output<string>();
@@ -295,5 +319,12 @@ export class TradingDetailMetaCardsComponent {
     if (!id) return '-';
     const match = this.responsibleOptions().find((u) => u.value === id);
     return match?.label ?? '-';
+  }
+
+  bankAccountLabel(): string {
+    const id = this.bankAccountId();
+    if (!id) return '—';
+    const match = this.bankAccountOptions().find((ba) => ba.id === id);
+    return match ? `${match.label} (${match.currency})` : '—';
   }
 }

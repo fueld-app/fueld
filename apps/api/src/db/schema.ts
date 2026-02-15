@@ -430,6 +430,9 @@ export const orders = pgTable('orders', {
   // Invoicing — which of our own companies is invoicing this order
   invoicingCompanyId: uuid('invoicing_company_id').references(() => counterparties.id),
 
+  // Bank account to use on invoices
+  bankAccountId: uuid('bank_account_id').references(() => bankAccounts.id, { onDelete: 'set null' }),
+
   // Currency for pricing (default USD)
   currency: text('currency').notNull().default('USD'),
 

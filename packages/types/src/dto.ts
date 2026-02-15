@@ -395,6 +395,7 @@ export interface OrderDto {
   salesRepId: string | null;
   invoicingCompanyId: string | null;
   invoicingCompanyName?: string | null;
+  bankAccountId: string | null;
   currency: string;
   status: OrderStatus;
   eta: string | null;
@@ -421,6 +422,7 @@ export interface CreateOrderDto {
   placeId: string;
   salesRepId?: string;
   invoicingCompanyId?: string;
+  bankAccountId?: string;
   currency?: string;
   eta?: string;
   etd?: string;
@@ -442,6 +444,7 @@ export interface UpdateOrderDto {
   placeId?: string;
   salesRepId?: string | null;
   invoicingCompanyId?: string | null;
+  bankAccountId?: string | null;
   currency?: string;
   status?: OrderStatus;
   eta?: string | null;
