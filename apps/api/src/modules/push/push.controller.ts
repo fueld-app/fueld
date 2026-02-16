@@ -29,17 +29,22 @@ export const pushController = new Elysia({ prefix: '/push' })
   .post(
     '/subscribe',
     async ({ body, auth }) => {
-      const user = await db.query.users.findFirst({
-        where: eq(users.id, auth.sub),
-        columns: { tenantId: true },
-      });
+      try {
+        const user = await db.query.users.findFirst({
+          where: eq(users.id, auth.sub),
+          columns: { tenantId: true },
+        });
 
-      if (!user?.tenantId) {
-        return { success: false, data: null, message: 'User tenant not found' };
+        if (!user?.tenantId) {
+          return { success: false, data: null, message: 'User tenant not found' };
+        }
+
+        await upsertSubscription(user.tenantId, auth.sub, body);
+        return { success: true, data: null } satisfies ApiResponse<null>;
+      } catch (err) {
+        console.error('[Push] Subscribe failed:', err);
+        return { success: false, data: null, message: 'Failed to save push subscription' } satisfies ApiResponse<null>;
       }
-
-      await upsertSubscription(user.tenantId, auth.sub, body);
-      return { success: true, data: null } satisfies ApiResponse<null>;
     },
     {
       body: t.Object({
@@ -56,8 +61,13 @@ export const pushController = new Elysia({ prefix: '/push' })
   .post(
     '/unsubscribe',
     async ({ body, auth }) => {
-      await removeSubscription(auth.sub, body.endpoint);
-      return { success: true, data: null } satisfies ApiResponse<null>;
+      try {
+        await removeSubscription(auth.sub, body.endpoint);
+        return { success: true, data: null } satisfies ApiResponse<null>;
+      } catch (err) {
+        console.error('[Push] Unsubscribe failed:', err);
+        return { success: false, data: null, message: 'Failed to remove push subscription' } satisfies ApiResponse<null>;
+      }
     },
     {
       body: t.Object({
@@ -69,17 +79,22 @@ export const pushController = new Elysia({ prefix: '/push' })
   .post(
     '/test',
     async ({ auth }) => {
-      const user = await db.query.users.findFirst({
-        where: eq(users.id, auth.sub),
-        columns: { tenantId: true },
-      });
+      try {
+        const user = await db.query.users.findFirst({
+          where: eq(users.id, auth.sub),
+          columns: { tenantId: true },
+        });
 
-      if (!user?.tenantId) {
-        return { success: false, data: { sent: 0 }, message: 'User tenant not found' };
+        if (!user?.tenantId) {
+          return { success: false, data: { sent: 0 }, message: 'User tenant not found' };
+        }
+
+        const sent = await sendTestNotification(auth.sub, user.tenantId);
+        return { success: true, data: { sent } } satisfies ApiResponse<{ sent: number }>;
+      } catch (err) {
+        console.error('[Push] Test notification failed:', err);
+        return { success: false, data: { sent: 0 }, message: 'Failed to send push test notification' } satisfies ApiResponse<{ sent: number }>;
       }
-
-      const sent = await sendTestNotification(auth.sub, user.tenantId);
-      return { success: true, data: { sent } } satisfies ApiResponse<{ sent: number }>;
     },
     {
       detail: { tags: ['Push'], summary: 'Send a test push notification to current user' },

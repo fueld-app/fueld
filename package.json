@@ -10,7 +10,9 @@
     "dev:web": "bun run --filter @fueld/web start",
     "build:api": "bun run --filter @fueld/api build",
     "build:web": "bun run --filter @fueld/web build",
-    "dev": "bun run dev:api & bun run dev:web"
+    "dev": "bun run dev:api & bun run dev:web",
+    "test": "bun test apps/api/tests packages/types/tests",
+    "test:coverage": "bun test --coverage apps/api/tests packages/types/tests"
   },
   "devDependencies": {
     "pdf-parse": "^2.4.5"

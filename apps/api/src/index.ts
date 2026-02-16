@@ -22,7 +22,6 @@ import {
   updatePresence,
   subscribeAdmin,
   unsubscribeAdmin,
-  getAllSessionDtos,
   logCopyEvent,
   logPrintEvent,
   logScreenshotEvent,
@@ -37,405 +36,487 @@ import { startPricePolling, getLatestPricePayload } from './modules/prices/price
 import { jwtAccessPlugin } from './modules/auth/jwt.setup';
 import { db } from './db';
 import { users } from './db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { pushController } from './modules/push/push.controller';
 
-// ─── Run pending database migrations on startup ─────────────────────
 const MIGRATIONS_DIR = process.env['MIGRATIONS_DIR'] || './drizzle';
-try {
-  await migrate(db, { migrationsFolder: MIGRATIONS_DIR });
-  console.log('✅ Database migrations applied');
-} catch (e: any) {
-  const msg = e?.message ?? String(e);
-  // These are all benign — schema already exists from db:push or prior run
-  if (
-    msg.includes('already been applied') ||
-    msg.includes('already exists') ||
-    msg.includes('relation "__drizzle_migrations"') ||
-    msg.includes('Failed query: CREATE TYPE') ||
-    msg.includes('Failed query: CREATE TABLE')
-  ) {
-    console.log('ℹ️  Migrations already up to date');
-  } else {
-    console.error('⚠️  Migration warning:', msg);
+const REQUIRED_PUSH_COLUMNS = [
+  'id',
+  'tenant_id',
+  'user_id',
+  'endpoint',
+  'p256dh',
+  'auth',
+  'expiration_time',
+  'created_at',
+  'updated_at',
+] as const;
+
+async function runPendingMigrations() {
+  try {
+    await migrate(db, { migrationsFolder: MIGRATIONS_DIR });
+    console.log('✅ Database migrations applied');
+  } catch (e: any) {
+    const msg = e?.message ?? String(e);
+    if (
+      msg.includes('already been applied') ||
+      msg.includes('already exists') ||
+      msg.includes('relation "__drizzle_migrations"') ||
+      msg.includes('Failed query: CREATE TYPE') ||
+      msg.includes('Failed query: CREATE TABLE')
+    ) {
+      console.log('ℹ️  Migrations already up to date');
+    } else {
+      console.error('⚠️  Migration warning:', msg);
+    }
   }
 }
 
-const PORT = Number(process.env['PORT']) || 3000;
+async function assertRequiredSchemaAtStartup(): Promise<void> {
+  const rows = await db.execute(sql`
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'push_subscriptions'
+  `);
 
-const app = new Elysia()
-  .use(
-    swagger({
-      documentation: {
-        info: {
-          title: 'Fueld API',
-          version: '0.0.1',
-          description: 'Bunker Trading SaaS — REST API',
-        },
-        tags: [
-          { name: 'Health', description: 'Health-check endpoints' },
-          { name: 'Auth', description: 'Authentication & 2FA' },
-          { name: 'Orders', description: 'Bunker order management' },
-          { name: 'Documents', description: 'Invoice PDF generation & email' },
-          { name: 'Dashboard', description: 'Collections, pipeline & team stats' },
-          { name: 'Lloyd\'s', description: 'Lloyd\'s List Intelligence vessel, port & company lookup' },
-          { name: 'Push', description: 'Push notification subscriptions' },
-        ],
-        components: {
-          securitySchemes: {
-            bearerAuth: {
-              type: 'http',
-              scheme: 'bearer',
-              bearerFormat: 'JWT',
+  const existingColumns = new Set(
+    (rows as Array<{ column_name?: string }>).map((row) => row.column_name).filter(Boolean) as string[],
+  );
+
+  const missingColumns = REQUIRED_PUSH_COLUMNS.filter((name) => !existingColumns.has(name));
+  if (missingColumns.length > 0) {
+    const command = 'bun run --filter @fueld/api db:migrate';
+    throw new Error(
+      [
+        'Missing required schema for push notifications: table public.push_subscriptions is absent or incomplete.',
+        `Missing columns: ${missingColumns.join(', ')}`,
+        `Run ${command} with the intended DATABASE_URL before starting the API.`,
+      ].join(' '),
+    );
+  }
+}
+
+function registerAutoSyncHooks() {
+  onEntityView(async (socketId, entityType, entityId) => {
+    try {
+      if (entityType === 'Vessel') {
+        const synced = await syncVesselFromSeasearcher(entityId);
+        if (synced) {
+          sendToSocket(socketId, { type: 'vessel-synced', data: synced });
+        }
+      } else if (entityType === 'Company') {
+        const result = await syncCompanyFromSeasearcher(entityId);
+        if (result) {
+          sendToSocket(socketId, { type: 'company-synced', data: result.company });
+          if (result.conflicts.length > 0) {
+            sendToSocket(socketId, { type: 'company-sync-conflicts', data: result.conflicts });
+          }
+        }
+      }
+    } catch (err: any) {
+      console.warn(`[Auto-sync] ${entityType} ${entityId} failed:`, err.message);
+    }
+  });
+}
+
+export interface CreateAppOptions {
+  runMigrations?: boolean;
+  enableBackgroundJobs?: boolean;
+}
+
+export async function createApp(options: CreateAppOptions = {}) {
+  if (options.runMigrations !== false) {
+    await runPendingMigrations();
+  }
+
+  const app = new Elysia()
+    .use(
+      swagger({
+        documentation: {
+          info: {
+            title: 'Fueld API',
+            version: '0.0.1',
+            description: 'Bunker Trading SaaS — REST API',
+          },
+          tags: [
+            { name: 'Health', description: 'Health-check endpoints' },
+            { name: 'Auth', description: 'Authentication & 2FA' },
+            { name: 'Orders', description: 'Bunker order management' },
+            { name: 'Documents', description: 'Invoice PDF generation & email' },
+            { name: 'Dashboard', description: 'Collections, pipeline & team stats' },
+            { name: 'Lloyd\'s', description: 'Lloyd\'s List Intelligence vessel, port & company lookup' },
+            { name: 'Push', description: 'Push notification subscriptions' },
+          ],
+          components: {
+            securitySchemes: {
+              bearerAuth: {
+                type: 'http',
+                scheme: 'bearer',
+                bearerFormat: 'JWT',
+              },
             },
           },
         },
+      }),
+    )
+    .use(
+      cors({
+        origin: process.env['CORS_ORIGIN'] || /localhost/,
+      }),
+    )
+    .get(
+      '/health',
+      (): ApiResponse<{ status: string; uptime: number }> => ({
+        success: true,
+        data: {
+          status: 'ok',
+          uptime: process.uptime(),
+        },
+      }),
+      {
+        detail: { tags: ['Health'], summary: 'Health check' },
       },
-    }),
-  )
-  .use(
-    cors({
-      origin: process.env['CORS_ORIGIN'] || /localhost/,
-    }),
-  )
-  .get(
-    '/health',
-    (): ApiResponse<{ status: string; uptime: number }> => ({
-      success: true,
-      data: {
-        status: 'ok',
-        uptime: process.uptime(),
-      },
-    }),
-    {
-      detail: { tags: ['Health'], summary: 'Health check' },
-    },
-  )
+    )
+    .onAfterResponse({ as: 'global' }, ({ request, set, body }) => {
+      const status = typeof set.status === 'number' ? set.status : 200;
+      logFromRequest(request, status, body);
+    })
+    .use(authController)
+    .use(documentsController)
+    .use(dashboardController)
+    .use(lloydsController)
+    .use(companiesController)
+    .use(vesselsController)
+    .use(creditController)
+    .use(adminController)
+    .use(settingsController)
+    .use(inviteController)
+    .use(activityController)
+    .use(adminActivityController)
+    .use(ordersController)
+    .use(commentsController)
+    .use(securityController)
+    .use(pushController)
+    .get('/uploads/avatars/:filename', async ({ params, set }) => {
+      const { join } = await import('path');
+      const path = join(import.meta.dir, '../uploads/avatars', params.filename);
+      const file = Bun.file(path);
+      if (!(await file.exists())) {
+        set.status = 404;
+        return 'Not found';
+      }
+      set.headers['content-type'] = file.type;
+      set.headers['cache-control'] = 'public, max-age=3600';
+      return file;
+    })
+    .get('/uploads/logos/:filename', async ({ params, set }) => {
+      const { join } = await import('path');
+      const path = join(import.meta.dir, '../uploads/logos', params.filename);
+      const file = Bun.file(path);
+      if (!(await file.exists())) {
+        set.status = 404;
+        return 'Not found';
+      }
+      set.headers['content-type'] = file.type;
+      set.headers['cache-control'] = 'public, max-age=3600';
+      return file;
+    })
+    .get('/uploads/attachments/:filename', async ({ params, set }) => {
+      const { join } = await import('path');
+      const path = join(import.meta.dir, '../uploads/attachments', params.filename);
+      const file = Bun.file(path);
+      if (!(await file.exists())) {
+        set.status = 404;
+        return 'Not found';
+      }
+      set.headers['content-type'] = file.type;
+      set.headers['cache-control'] = 'public, max-age=3600';
+      return file;
+    })
+    .use(jwtAccessPlugin)
+    .ws('/ws', {
+      query: t.Object({
+        token: t.String(),
+      }),
 
-  // ─── Global activity logging middleware ─────────────────────────────
-  .onAfterResponse({ as: 'global' }, ({ request, set, body }) => {
-    const status = typeof set.status === 'number' ? set.status : 200;
-    logFromRequest(request, status, body);
-  })
+      async open(ws) {
+        const token = ws.data.query.token;
 
-  .use(authController)
-  .use(documentsController)
-  .use(dashboardController)
-  .use(lloydsController)
-  .use(companiesController)
-  .use(vesselsController)
-  .use(creditController)
-  .use(adminController)
-  .use(settingsController)
-  .use(inviteController)
-  .use(activityController)
-  .use(adminActivityController)
-  .use(ordersController)
-  .use(commentsController)
-  .use(securityController)
-  .use(pushController)
+        try {
+          const raw = await ws.data.jwtAccess.verify(token);
+          if (!raw || !raw['sub'] || raw['pending2fa']) {
+            console.log('[WS] Connection rejected: invalid token');
+            ws.send(JSON.stringify({ type: 'auth-error', message: 'Invalid or expired token' }));
+            ws.close();
+            return;
+          }
 
-  // ─── Static file serving for uploads ───────────────────────────────
-  .get('/uploads/avatars/:filename', async ({ params, set }) => {
-    const { join } = await import('path');
-    const path = join(import.meta.dir, '../uploads/avatars', params.filename);
-    const file = Bun.file(path);
-    if (!(await file.exists())) {
-      set.status = 404;
-      return 'Not found';
-    }
-    set.headers['content-type'] = file.type;
-    set.headers['cache-control'] = 'public, max-age=3600';
-    return file;
-  })
-  .get('/uploads/logos/:filename', async ({ params, set }) => {
-    const { join } = await import('path');
-    const path = join(import.meta.dir, '../uploads/logos', params.filename);
-    const file = Bun.file(path);
-    if (!(await file.exists())) {
-      set.status = 404;
-      return 'Not found';
-    }
-    set.headers['content-type'] = file.type;
-    set.headers['cache-control'] = 'public, max-age=3600';
-    return file;
-  })
-  .get('/uploads/attachments/:filename', async ({ params, set }) => {
-    const { join } = await import('path');
-    const path = join(import.meta.dir, '../uploads/attachments', params.filename);
-    const file = Bun.file(path);
-    if (!(await file.exists())) {
-      set.status = 404;
-      return 'Not found';
-    }
-    set.headers['content-type'] = file.type;
-    set.headers['cache-control'] = 'public, max-age=3600';
-    return file;
-  })
+          const socketId = crypto.randomUUID();
+          (ws.data as any).auth = {
+            sub: raw['sub'] as string,
+            email: raw['email'] as string,
+            role: raw['role'] as string,
+          };
+          (ws.data as any).socketId = socketId;
 
-  // ─── Authenticated WebSocket — persistent session ──────────────────
-  // Client connects with ?token=<JWT> query parameter.
-  // The JWT is verified on upgrade; connection is rejected if invalid.
-  // All app-level push messages flow through this single socket.
-  .use(jwtAccessPlugin)
-  .ws('/ws', {
-    query: t.Object({
-      token: t.String(),
-    }),
+          let userName = (raw['name'] as string) ?? null;
+          if (!userName) {
+            const dbUser = await db.query.users.findFirst({
+              where: eq(users.id, raw['sub'] as string),
+              columns: { name: true },
+            });
+            userName = dbUser?.name ?? (raw['email'] as string);
+          }
 
-    async open(ws) {
-      const token = ws.data.query.token;
+          const request = (ws as any).data?.request as Request | undefined;
+          const ip =
+            (request ? extractClientIp(request) : null)
+            ?? (ws as any).raw?.remoteAddress
+            ?? (ws as any).remoteAddress
+            ?? null;
 
-      try {
-        const raw = await ws.data.jwtAccess.verify(token);
-        if (!raw || !raw['sub'] || raw['pending2fa']) {
-          console.log('[WS] Connection rejected: invalid token');
-          ws.send(JSON.stringify({ type: 'auth-error', message: 'Invalid or expired token' }));
+          addSession(socketId, ws, {
+            userId: raw['sub'] as string,
+            email: raw['email'] as string,
+            name: userName,
+            role: raw['role'] as string,
+            ip,
+            userAgent: null,
+          });
+
+          console.log(`[WS] Authenticated connection from ${raw['email']} (${socketId})`);
+          ws.send(JSON.stringify({ type: 'connected', message: 'WebSocket authenticated' }));
+
+          setTimeout(() => {
+            try {
+              const payload = getLatestPricePayload();
+              if (payload.prices.length > 0 || payload.fxRates) {
+                ws.send(JSON.stringify({ type: 'prices', data: payload }));
+              }
+            } catch {
+              // ws may have closed
+            }
+          }, 500);
+        } catch {
+          console.log('[WS] Connection rejected: token verification failed');
+          ws.send(JSON.stringify({ type: 'auth-error', message: 'Token verification failed' }));
           ws.close();
+        }
+      },
+
+      async message(ws, message) {
+        const auth = (ws.data as any).auth;
+        if (!auth) {
+          ws.send(JSON.stringify({ type: 'auth-error', message: 'Not authenticated' }));
           return;
         }
 
-        // Generate a unique socket ID
-        const socketId = crypto.randomUUID();
+        try {
+          const data = typeof message === 'string' ? JSON.parse(message) : message;
 
-        // Store auth info on the websocket data for use in message handler
-        (ws.data as any).auth = {
-          sub: raw['sub'] as string,
-          email: raw['email'] as string,
-          role: raw['role'] as string,
-        };
-        (ws.data as any).socketId = socketId;
+          switch (data.type) {
+            case 'presence': {
+              const socketId = (ws.data as any).socketId;
+              if (socketId) {
+                updatePresence(socketId, {
+                  currentUrl: data.url ?? null,
+                  timezone: data.timezone ?? null,
+                  platform: data.platform ?? null,
+                  pageTitle: data.pageTitle ?? null,
+                  language: data.language ?? null,
+                });
+              }
+              break;
+            }
 
-        // Track this session — look up user name from DB if not in JWT
-        let userName = (raw['name'] as string) ?? null;
-        if (!userName) {
-          const dbUser = await db.query.users.findFirst({
-            where: eq(users.id, raw['sub'] as string),
-            columns: { name: true },
-          });
-          userName = dbUser?.name ?? (raw['email'] as string);
+            case 'admin:subscribe-sessions': {
+              const socketId = (ws.data as any).socketId;
+              if (auth.role === 'ADMIN' && socketId) {
+                subscribeAdmin(socketId);
+              }
+              break;
+            }
+
+            case 'admin:unsubscribe-sessions': {
+              const socketId = (ws.data as any).socketId;
+              if (socketId) {
+                unsubscribeAdmin(socketId);
+              }
+              break;
+            }
+
+            case 'copy-event': {
+              const socketId = (ws.data as any).socketId;
+              if (socketId) {
+                logCopyEvent(socketId, {
+                  text: String(data.text ?? '').slice(0, 500),
+                  sourceUrl: data.sourceUrl ?? null,
+                  pageTitle: data.pageTitle ?? null,
+                });
+              }
+              break;
+            }
+
+            case 'print-event': {
+              const socketId = (ws.data as any).socketId;
+              if (socketId) {
+                logPrintEvent(socketId, {
+                  sourceUrl: data.sourceUrl ?? null,
+                  pageTitle: data.pageTitle ?? null,
+                });
+              }
+              break;
+            }
+
+            case 'screenshot-event': {
+              const socketId = (ws.data as any).socketId;
+              if (socketId) {
+                logScreenshotEvent(socketId, {
+                  sourceUrl: data.sourceUrl ?? null,
+                  pageTitle: data.pageTitle ?? null,
+                });
+              }
+              break;
+            }
+
+            case 'nearby-vessels': {
+              if (!data.placeId) break;
+              console.log(`[WS] Fetching nearby vessels for place ${data.placeId}…`);
+              try {
+                const vessels = await getNearbyVessels(String(data.placeId));
+                ws.send(JSON.stringify({ type: 'nearby-vessels', data: vessels }));
+                console.log(`[WS] Sent ${vessels.length} nearby vessels`);
+              } catch (err: any) {
+                console.warn(`[WS] Nearby vessels failed for ${data.placeId}:`, err.message);
+                ws.send(JSON.stringify({ type: 'nearby-vessels', data: [] }));
+              }
+              break;
+            }
+
+            case 'vessel-positions': {
+              if (!data.placeId) break;
+              try {
+                const positions = await getNearbyVesselPositions(String(data.placeId));
+                ws.send(JSON.stringify({ type: 'vessel-positions', data: positions }));
+              } catch (err: any) {
+                console.warn(`[WS] Vessel positions failed for ${data.placeId}:`, err.message);
+              }
+              break;
+            }
+
+            case 'sync-place': {
+              if (!data.placeId) break;
+              console.log(`[WS] Syncing place ${data.placeId} from Seasearcher…`);
+              const updated = await syncPlaceFromSeasearcher(String(data.placeId));
+              if (updated) {
+                ws.send(JSON.stringify({ type: 'place-synced', data: updated }));
+                console.log(`[WS] Place ${data.placeId} synced successfully`);
+              } else {
+                ws.send(JSON.stringify({ type: 'sync-error', message: 'Place not found or no Seasearcher ID' }));
+              }
+              break;
+            }
+
+            case 'get-prices': {
+              const payload = getLatestPricePayload();
+              if (payload.prices.length > 0 || payload.fxRates) {
+                ws.send(JSON.stringify({ type: 'prices', data: payload }));
+              }
+              break;
+            }
+
+            case 'ping': {
+              ws.send(JSON.stringify({ type: 'pong' }));
+              break;
+            }
+
+            default:
+              ws.send(JSON.stringify({ type: 'error', message: `Unknown message type: ${data.type}` }));
+          }
+        } catch (err) {
+          console.error('[WS] Error:', err);
+          ws.send(JSON.stringify({ type: 'error', message: 'Failed to process request' }));
         }
-        const request = (ws as any).data?.request as Request | undefined;
-        const ip =
-          (request ? extractClientIp(request) : null)
-          ?? (ws as any).raw?.remoteAddress
-          ?? (ws as any).remoteAddress
-          ?? null;
-        addSession(socketId, ws, {
-          userId: raw['sub'] as string,
-          email: raw['email'] as string,
-          name: userName,
-          role: raw['role'] as string,
-          ip,
-          userAgent: null, // Will be set with first presence message
-        });
+      },
 
-        console.log(`[WS] Authenticated connection from ${raw['email']} (${socketId})`);
-        ws.send(JSON.stringify({ type: 'connected', message: 'WebSocket authenticated' }));
-
-        // Send cached commodity prices after a short delay to allow
-        // the frontend components to set up their subscriptions first
-        setTimeout(() => {
-          try {
-            const payload = getLatestPricePayload();
-            if (payload.prices.length > 0 || payload.fxRates) {
-              ws.send(JSON.stringify({ type: 'prices', data: payload }));
-            }
-          } catch { /* ws may have closed */ }
-        }, 500);
-      } catch (err) {
-        console.log('[WS] Connection rejected: token verification failed');
-        ws.send(JSON.stringify({ type: 'auth-error', message: 'Token verification failed' }));
-        ws.close();
-      }
-    },
-
-    async message(ws, message) {
-      // Ensure authenticated
-      const auth = (ws.data as any).auth;
-      if (!auth) {
-        ws.send(JSON.stringify({ type: 'auth-error', message: 'Not authenticated' }));
-        return;
-      }
-
-      try {
-        const data = typeof message === 'string' ? JSON.parse(message) : message;
-
-        switch (data.type) {
-          case 'presence': {
-            // Client sends current URL, timezone, platform, pageTitle, language
-            const socketId = (ws.data as any).socketId;
-            if (socketId) {
-              updatePresence(socketId, {
-                currentUrl: data.url ?? null,
-                timezone: data.timezone ?? null,
-                platform: data.platform ?? null,
-                pageTitle: data.pageTitle ?? null,
-                language: data.language ?? null,
-              });
-            }
-            break;
-          }
-
-          case 'admin:subscribe-sessions': {
-            const socketId = (ws.data as any).socketId;
-            if (auth.role === 'ADMIN' && socketId) {
-              subscribeAdmin(socketId);
-            }
-            break;
-          }
-
-          case 'admin:unsubscribe-sessions': {
-            const socketId = (ws.data as any).socketId;
-            if (socketId) {
-              unsubscribeAdmin(socketId);
-            }
-            break;
-          }
-
-          case 'copy-event': {
-            const socketId = (ws.data as any).socketId;
-            if (socketId) {
-              logCopyEvent(socketId, {
-                text: String(data.text ?? '').slice(0, 500),
-                sourceUrl: data.sourceUrl ?? null,
-                pageTitle: data.pageTitle ?? null,
-              });
-            }
-            break;
-          }
-
-          case 'print-event': {
-            const socketId = (ws.data as any).socketId;
-            if (socketId) {
-              logPrintEvent(socketId, {
-                sourceUrl: data.sourceUrl ?? null,
-                pageTitle: data.pageTitle ?? null,
-              });
-            }
-            break;
-          }
-
-          case 'screenshot-event': {
-            const socketId = (ws.data as any).socketId;
-            if (socketId) {
-              logScreenshotEvent(socketId, {
-                sourceUrl: data.sourceUrl ?? null,
-                pageTitle: data.pageTitle ?? null,
-              });
-            }
-            break;
-          }
-
-          case 'nearby-vessels': {
-            if (!data.placeId) break;
-            console.log(`[WS] Fetching nearby vessels for place ${data.placeId}…`);
-            try {
-              const vessels = await getNearbyVessels(String(data.placeId));
-              ws.send(JSON.stringify({ type: 'nearby-vessels', data: vessels }));
-              console.log(`[WS] Sent ${vessels.length} nearby vessels`);
-            } catch (err: any) {
-              console.warn(`[WS] Nearby vessels failed for ${data.placeId}:`, err.message);
-              ws.send(JSON.stringify({ type: 'nearby-vessels', data: [] }));
-            }
-            break;
-          }
-
-          case 'vessel-positions': {
-            if (!data.placeId) break;
-            try {
-              const positions = await getNearbyVesselPositions(String(data.placeId));
-              ws.send(JSON.stringify({ type: 'vessel-positions', data: positions }));
-            } catch (err: any) {
-              console.warn(`[WS] Vessel positions failed for ${data.placeId}:`, err.message);
-            }
-            break;
-          }
-
-          case 'sync-place': {
-            if (!data.placeId) break;
-            console.log(`[WS] Syncing place ${data.placeId} from Seasearcher…`);
-            const updated = await syncPlaceFromSeasearcher(String(data.placeId));
-            if (updated) {
-              ws.send(JSON.stringify({ type: 'place-synced', data: updated }));
-              console.log(`[WS] Place ${data.placeId} synced successfully`);
-            } else {
-              ws.send(JSON.stringify({ type: 'sync-error', message: 'Place not found or no Seasearcher ID' }));
-            }
-            break;
-          }
-
-          case 'get-prices': {
-            const payload = getLatestPricePayload();
-            if (payload.prices.length > 0 || payload.fxRates) {
-              ws.send(JSON.stringify({ type: 'prices', data: payload }));
-            }
-            break;
-          }
-
-          case 'ping': {
-            ws.send(JSON.stringify({ type: 'pong' }));
-            break;
-          }
-
-          default:
-            ws.send(JSON.stringify({ type: 'error', message: `Unknown message type: ${data.type}` }));
+      close(ws) {
+        const auth = (ws.data as any).auth;
+        const socketId = (ws.data as any).socketId;
+        if (socketId) {
+          removeSession(socketId);
         }
-      } catch (err) {
-        console.error('[WS] Error:', err);
-        ws.send(JSON.stringify({ type: 'error', message: 'Failed to process request' }));
-      }
-    },
+        console.log(`[WS] Client disconnected${auth ? ` (${auth.email})` : ''}`);
+      },
+    });
 
-    close(ws) {
-      const auth = (ws.data as any).auth;
-      const socketId = (ws.data as any).socketId;
-      if (socketId) {
-        removeSession(socketId);
-      }
-      console.log(`[WS] Client disconnected${auth ? ` (${auth.email})` : ''}`);
-    },
-  })
-
-  .listen(PORT);
-
-console.log(
-  `🛢️  Fueld API is running at http://${app.server?.hostname}:${app.server?.port}`,
-);
-console.log(
-  `📖 Swagger docs at http://${app.server?.hostname}:${app.server?.port}/swagger`,
-);
-
-// Start background activity log pruning
-startPruneJob();
-
-// Start commodity price polling (Yahoo Finance)
-startPricePolling();
-
-// ─── Auto-sync when users view entity detail pages ───────────────────
-// When a user navigates to a vessel/company detail page, the backend
-// automatically syncs from Seasearcher and pushes the fresh data back
-// over WebSocket — no separate HTTP sync call needed from the frontend.
-onEntityView(async (socketId, entityType, entityId) => {
-  try {
-    if (entityType === 'Vessel') {
-      const synced = await syncVesselFromSeasearcher(entityId);
-      if (synced) {
-        sendToSocket(socketId, { type: 'vessel-synced', data: synced });
-      }
-    } else if (entityType === 'Company') {
-      const result = await syncCompanyFromSeasearcher(entityId);
-      if (result) {
-        sendToSocket(socketId, { type: 'company-synced', data: result.company });
-        if (result.conflicts.length > 0) {
-          sendToSocket(socketId, { type: 'company-sync-conflicts', data: result.conflicts });
-        }
-      }
-    }
-  } catch (err: any) {
-    console.warn(`[Auto-sync] ${entityType} ${entityId} failed:`, err.message);
+  if (options.enableBackgroundJobs !== false) {
+    startPruneJob();
+    startPricePolling();
+    registerAutoSyncHooks();
   }
-});
 
-export type App = typeof app;
+  return app;
+}
+
+export interface StartServerOptions extends CreateAppOptions {
+  port?: number;
+}
+
+function formatStartupError(err: unknown, port: number): string {
+  const code = typeof err === 'object' && err !== null && 'code' in err
+    ? String((err as { code?: unknown }).code)
+    : '';
+  const message = err instanceof Error ? err.message : String(err ?? 'Unknown startup error');
+
+  if (code === 'EADDRINUSE' || /address already in use|EADDRINUSE/i.test(message)) {
+    return `Port ${port} is already in use. Stop the existing process or set PORT to a free port.`;
+  }
+
+  if (code === 'EACCES' || /permission denied|EACCES/i.test(message)) {
+    return `Permission denied while binding to port ${port}. Try a higher port (for example PORT=3001).`;
+  }
+
+  return message;
+}
+
+export async function startServer(options: StartServerOptions = {}) {
+  const app = await createApp(options);
+  const port = options.port ?? (Number(process.env['PORT']) || 3000);
+
+  await assertRequiredSchemaAtStartup();
+
+  try {
+    app.listen(port);
+  } catch (err) {
+    const details = formatStartupError(err, port);
+    console.error(`❌ API startup failed: ${details}`);
+    throw err;
+  }
+
+  if (!app.server) {
+    const details = `Server did not initialize on port ${port}`;
+    console.error(`❌ API startup failed: ${details}`);
+    throw new Error(details);
+  }
+
+  console.log(
+    `🛢️  Fueld API is running at http://${app.server?.hostname}:${app.server?.port}`,
+  );
+  console.log(
+    `📖 Swagger docs at http://${app.server?.hostname}:${app.server?.port}/swagger`,
+  );
+
+  return app;
+}
+
+if (import.meta.main) {
+  await startServer().catch((err) => {
+    const port = Number(process.env['PORT']) || 3000;
+    const details = formatStartupError(err, port);
+    console.error(`❌ Fatal startup error: ${details}`);
+    process.exit(1);
+  });
+}
+
+export type App = Awaited<ReturnType<typeof createApp>>;

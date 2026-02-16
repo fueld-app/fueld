@@ -6,9 +6,6 @@
 
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
-      supplierId: suppliers[0].id,
-      supplierPaymentTermType: 'CREDIT' as const,
-      supplierCreditDays: 30,
 import * as schema from './schema';
 import { hashPassword } from '../modules/auth/password.service';
 
@@ -235,10 +232,10 @@ async function seed() {
       salesRepId: trader1.id,
       status: 'INVOICED' as const,
       eta: daysAgo(10),
-    },
       supplierId: suppliers[2].id,
       supplierPaymentTermType: 'CREDIT' as const,
       supplierCreditDays: 30,
+    },
     {
       tenantId: tenant.id,
       clientId: clients[1].id,

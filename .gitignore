@@ -22,3 +22,6 @@ app-release
 # OS
 .DS_Store
 Thumbs.db
+
+# Runtime uploads (local/dev/test artifacts)
+apps/api/uploads/**
