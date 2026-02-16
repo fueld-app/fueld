@@ -6,6 +6,14 @@ import { creditGuard } from './core/auth/credit.guard';
 export const routes: Routes = [
   // ─── Public routes ──────────────────────────────────────────────
   {
+    path: 'reset-password',
+    loadComponent: () =>
+      import('./pages/reset-password/reset-password-page.component').then(
+        (m) => m.ResetPasswordPageComponent,
+      ),
+    title: 'Reset Password',
+  },
+  {
     path: 'login',
     loadComponent: () =>
       import('./pages/login/login-page.component').then((m) => m.LoginPageComponent),

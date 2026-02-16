@@ -289,34 +289,50 @@ import { API } from '@app/core/config/api';
                   <td class="px-4 py-3 text-xs text-gray-500">{{ formatDate(user.createdAt) }}</td>
                   <td class="px-4 py-3 text-right">
                     @if (user.id !== currentUserId()) {
-                      <div class="flex items-center justify-end gap-1">
-                        @if (user.is2faEnabled) {
-                          <button
-                            (click)="reset2fa(user)"
-                            class="rounded-md px-2 py-1 text-xs font-medium text-amber-600 hover:bg-amber-50 transition-colors"
-                            title="Force-reset this user's 2FA so they can set it up again"
+                      <div class="relative inline-flex" (click)="$event.stopPropagation()">
+                        <button
+                          (click)="toggleActionsMenu(user.id, $event)"
+                          class="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                          [attr.aria-expanded]="actionsMenuUserId() === user.id"
+                        >
+                          Actions
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 10.94l3.71-3.71a.75.75 0 1 1 1.06 1.06l-4.24 4.24a.75.75 0 0 1-1.06 0L5.21 8.29a.75.75 0 0 1 .02-1.08z" clip-rule="evenodd" />
+                          </svg>
+                        </button>
+
+                        @if (actionsMenuUserId() === user.id) {
+                          <div
+                            class="absolute right-0 top-full z-50 mt-1 w-40 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
+                            (click)="$event.stopPropagation()"
                           >
-                            Reset 2FA
-                          </button>
+                            <div class="py-1">
+                              @if (user.is2faEnabled) {
+                                <button
+                                  (click)="reset2fa(user); closeActionsMenu()"
+                                  class="block w-full px-3 py-2 text-left text-xs font-medium text-amber-700 hover:bg-amber-50"
+                                >
+                                  Reset 2FA
+                                </button>
+                              }
+                              <button
+                                (click)="sendPasswordReset(user); closeActionsMenu()"
+                                class="block w-full px-3 py-2 text-left text-xs font-medium text-indigo-700 hover:bg-indigo-50"
+                                [disabled]="passwordResetSendingId() === user.id"
+                                [class.opacity-50]="passwordResetSendingId() === user.id"
+                              >
+                                {{ passwordResetSendingId() === user.id ? 'Sending…' : 'Reset password' }}
+                              </button>
+                              <button
+                                (click)="toggleActive(user); closeActionsMenu()"
+                                class="block w-full px-3 py-2 text-left text-xs font-medium hover:bg-gray-50"
+                                [class]="user.isActive ? 'text-red-700' : 'text-green-700'"
+                              >
+                                {{ user.isActive ? 'Deactivate' : 'Activate' }}
+                              </button>
+                            </div>
+                          </div>
                         }
-                        <button
-                          (click)="sendPasswordReset(user)"
-                          class="rounded-md px-2 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 transition-colors"
-                          [disabled]="passwordResetSendingId() === user.id"
-                          [class.opacity-50]="passwordResetSendingId() === user.id"
-                          title="Generate a password reset link for this user"
-                        >
-                          {{ passwordResetSendingId() === user.id ? 'Sending…' : 'Reset password' }}
-                        </button>
-                        <button
-                          (click)="toggleActive(user)"
-                          class="rounded-md px-2 py-1 text-xs font-medium transition-colors"
-                          [class]="user.isActive
-                            ? 'text-red-600 hover:bg-red-50'
-                            : 'text-green-600 hover:bg-green-50'"
-                        >
-                          {{ user.isActive ? 'Deactivate' : 'Activate' }}
-                        </button>
                       </div>
                     }
                   </td>
@@ -670,6 +686,13 @@ export class UsersPageComponent implements OnInit, OnDestroy {
   readonly editingRoleId = signal<string | null>(null);
   readonly editingRole = signal('');
 
+  // Per-row actions dropdown
+  readonly actionsMenuUserId = signal<string | null>(null);
+
+  private readonly onDocumentClick = () => {
+    this.actionsMenuUserId.set(null);
+  };
+
   // Invite modal
   readonly showInviteModal = signal(false);
   readonly inviting = signal(false);
@@ -706,6 +729,8 @@ export class UsersPageComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.loadData();
 
+    document.addEventListener('click', this.onDocumentClick);
+
     // Subscribe to real-time session updates
     this.sessionsSub = this.wsService.on<UserSessionDto[]>('admin:sessions').subscribe((data) => {
       this.sessions.set(data);
@@ -716,6 +741,17 @@ export class UsersPageComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.wsService.send({ type: 'admin:unsubscribe-sessions' });
     this.sessionsSub?.unsubscribe();
+
+    document.removeEventListener('click', this.onDocumentClick);
+  }
+
+  toggleActionsMenu(userId: string, ev: Event) {
+    ev.stopPropagation();
+    this.actionsMenuUserId.set(this.actionsMenuUserId() === userId ? null : userId);
+  }
+
+  closeActionsMenu() {
+    this.actionsMenuUserId.set(null);
   }
 
   async loadData() {
