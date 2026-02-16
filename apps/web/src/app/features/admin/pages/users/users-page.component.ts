@@ -300,39 +300,6 @@ import { API } from '@app/core/config/api';
                             <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 10.94l3.71-3.71a.75.75 0 1 1 1.06 1.06l-4.24 4.24a.75.75 0 0 1-1.06 0L5.21 8.29a.75.75 0 0 1 .02-1.08z" clip-rule="evenodd" />
                           </svg>
                         </button>
-
-                        @if (actionsMenuUserId() === user.id) {
-                          <div
-                            class="absolute right-0 top-full z-50 mt-1 w-40 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
-                            (click)="$event.stopPropagation()"
-                          >
-                            <div class="py-1">
-                              @if (user.is2faEnabled) {
-                                <button
-                                  (click)="reset2fa(user); closeActionsMenu()"
-                                  class="block w-full px-3 py-2 text-left text-xs font-medium text-amber-700 hover:bg-amber-50"
-                                >
-                                  Reset 2FA
-                                </button>
-                              }
-                              <button
-                                (click)="sendPasswordReset(user); closeActionsMenu()"
-                                class="block w-full px-3 py-2 text-left text-xs font-medium text-indigo-700 hover:bg-indigo-50"
-                                [disabled]="passwordResetSendingId() === user.id"
-                                [class.opacity-50]="passwordResetSendingId() === user.id"
-                              >
-                                {{ passwordResetSendingId() === user.id ? 'Sending…' : 'Reset password' }}
-                              </button>
-                              <button
-                                (click)="toggleActive(user); closeActionsMenu()"
-                                class="block w-full px-3 py-2 text-left text-xs font-medium hover:bg-gray-50"
-                                [class]="user.isActive ? 'text-red-700' : 'text-green-700'"
-                              >
-                                {{ user.isActive ? 'Deactivate' : 'Activate' }}
-                              </button>
-                            </div>
-                          </div>
-                        }
                       </div>
                     }
                   </td>
@@ -382,6 +349,44 @@ import { API } from '@app/core/config/api';
             </tbody>
           </table>
         </div>
+
+        <!-- Actions dropdown overlay (fixed so it isn't clipped by overflow containers) -->
+        @if (actionsMenuPos(); as pos) {
+          @if (actionsMenuUser(); as menuUser) {
+            <div
+              class="fixed z-[9999] w-40 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
+              [style.top.px]="pos.top"
+              [style.left.px]="pos.left"
+              (click)="$event.stopPropagation()"
+            >
+              <div class="py-1">
+                @if (menuUser.is2faEnabled) {
+                  <button
+                    (click)="reset2fa(menuUser); closeActionsMenu()"
+                    class="block w-full px-3 py-2 text-left text-xs font-medium text-amber-700 hover:bg-amber-50"
+                  >
+                    Reset 2FA
+                  </button>
+                }
+                <button
+                  (click)="sendPasswordReset(menuUser); closeActionsMenu()"
+                  class="block w-full px-3 py-2 text-left text-xs font-medium text-indigo-700 hover:bg-indigo-50"
+                  [disabled]="passwordResetSendingId() === menuUser.id"
+                  [class.opacity-50]="passwordResetSendingId() === menuUser.id"
+                >
+                  {{ passwordResetSendingId() === menuUser.id ? 'Sending…' : 'Reset password' }}
+                </button>
+                <button
+                  (click)="toggleActive(menuUser); closeActionsMenu()"
+                  class="block w-full px-3 py-2 text-left text-xs font-medium hover:bg-gray-50"
+                  [class]="menuUser.isActive ? 'text-red-700' : 'text-green-700'"
+                >
+                  {{ menuUser.isActive ? 'Deactivate' : 'Activate' }}
+                </button>
+              </div>
+            </div>
+          }
+        }
 
         <!-- Pending Invitations -->
         @if (pendingInvitations().length > 0) {
@@ -688,10 +693,14 @@ export class UsersPageComponent implements OnInit, OnDestroy {
 
   // Per-row actions dropdown
   readonly actionsMenuUserId = signal<string | null>(null);
+  readonly actionsMenuPos = signal<{ top: number; left: number } | null>(null);
+  readonly actionsMenuUser = computed(() => {
+    const id = this.actionsMenuUserId();
+    if (!id) return null;
+    return this.users().find((u) => u.id === id) ?? null;
+  });
 
-  private readonly onDocumentClick = () => {
-    this.actionsMenuUserId.set(null);
-  };
+  private readonly onDocumentClick = () => this.closeActionsMenu();
 
   // Invite modal
   readonly showInviteModal = signal(false);
@@ -730,6 +739,8 @@ export class UsersPageComponent implements OnInit, OnDestroy {
     this.loadData();
 
     document.addEventListener('click', this.onDocumentClick);
+    window.addEventListener('scroll', this.onDocumentClick, true);
+    window.addEventListener('resize', this.onDocumentClick);
 
     // Subscribe to real-time session updates
     this.sessionsSub = this.wsService.on<UserSessionDto[]>('admin:sessions').subscribe((data) => {
@@ -743,15 +754,43 @@ export class UsersPageComponent implements OnInit, OnDestroy {
     this.sessionsSub?.unsubscribe();
 
     document.removeEventListener('click', this.onDocumentClick);
+    window.removeEventListener('scroll', this.onDocumentClick, true);
+    window.removeEventListener('resize', this.onDocumentClick);
   }
 
-  toggleActionsMenu(userId: string, ev: Event) {
+  toggleActionsMenu(userId: string, ev: MouseEvent) {
     ev.stopPropagation();
-    this.actionsMenuUserId.set(this.actionsMenuUserId() === userId ? null : userId);
+
+    if (this.actionsMenuUserId() === userId) {
+      this.closeActionsMenu();
+      return;
+    }
+
+    const target = ev.currentTarget as HTMLElement | null;
+    const rect = target?.getBoundingClientRect();
+    const menuWidth = 160; // Tailwind w-40
+    const gutter = 8;
+
+    // Estimate menu height (2–3 items)
+    const user = this.users().find((u) => u.id === userId);
+    const estimatedHeight = user?.is2faEnabled ? 132 : 98;
+
+    let top = rect ? rect.bottom + 6 : gutter;
+    let left = rect ? rect.right - menuWidth : gutter;
+    left = Math.max(gutter, Math.min(left, window.innerWidth - menuWidth - gutter));
+
+    if (top + estimatedHeight > window.innerHeight - gutter && rect) {
+      top = rect.top - estimatedHeight - 6;
+    }
+    top = Math.max(gutter, top);
+
+    this.actionsMenuUserId.set(userId);
+    this.actionsMenuPos.set({ top, left });
   }
 
   closeActionsMenu() {
     this.actionsMenuUserId.set(null);
+    this.actionsMenuPos.set(null);
   }
 
   async loadData() {
