@@ -53,6 +53,16 @@ const REQUIRED_PUSH_COLUMNS = [
   'updated_at',
 ] as const;
 
+const REQUIRED_PASSWORD_RESET_COLUMNS = [
+  'id',
+  'user_id',
+  'token_hash',
+  'requested_by',
+  'expires_at',
+  'used_at',
+  'created_at',
+] as const;
+
 async function runPendingMigrations() {
   try {
     await migrate(db, { migrationsFolder: MIGRATIONS_DIR });
@@ -61,10 +71,7 @@ async function runPendingMigrations() {
     const msg = e?.message ?? String(e);
     if (
       msg.includes('already been applied') ||
-      msg.includes('already exists') ||
-      msg.includes('relation "__drizzle_migrations"') ||
-      msg.includes('Failed query: CREATE TYPE') ||
-      msg.includes('Failed query: CREATE TABLE')
+      msg.includes('already exists')
     ) {
       console.log('ℹ️  Migrations already up to date');
     } else {
@@ -74,27 +81,32 @@ async function runPendingMigrations() {
 }
 
 async function assertRequiredSchemaAtStartup(): Promise<void> {
-  const rows = await db.execute(sql`
-    SELECT column_name
-    FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = 'push_subscriptions'
-  `);
+  async function assertTableColumns(tableName: string, requiredColumns: readonly string[], purpose: string) {
+    const rows = await db.execute(sql`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = ${tableName}
+    `);
 
-  const existingColumns = new Set(
-    (rows as Array<{ column_name?: string }>).map((row) => row.column_name).filter(Boolean) as string[],
-  );
-
-  const missingColumns = REQUIRED_PUSH_COLUMNS.filter((name) => !existingColumns.has(name));
-  if (missingColumns.length > 0) {
-    const command = 'bun run --filter @fueld/api db:migrate';
-    throw new Error(
-      [
-        'Missing required schema for push notifications: table public.push_subscriptions is absent or incomplete.',
-        `Missing columns: ${missingColumns.join(', ')}`,
-        `Run ${command} with the intended DATABASE_URL before starting the API.`,
-      ].join(' '),
+    const existingColumns = new Set(
+      (rows as Array<{ column_name?: string }>).map((row) => row.column_name).filter(Boolean) as string[],
     );
+
+    const missingColumns = requiredColumns.filter((name) => !existingColumns.has(name));
+    if (missingColumns.length > 0) {
+      const command = 'bun run --filter @fueld/api db:migrate';
+      throw new Error(
+        [
+          `Missing required schema for ${purpose}: table public.${tableName} is absent or incomplete.`,
+          `Missing columns: ${missingColumns.join(', ')}`,
+          `Run ${command} with the intended DATABASE_URL before starting the API.`,
+        ].join(' '),
+      );
+    }
   }
+
+  await assertTableColumns('push_subscriptions', REQUIRED_PUSH_COLUMNS, 'push notifications');
+  await assertTableColumns('password_reset_tokens', REQUIRED_PASSWORD_RESET_COLUMNS, 'password reset');
 }
 
 function registerAutoSyncHooks() {
