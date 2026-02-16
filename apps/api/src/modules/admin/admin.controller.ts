@@ -12,8 +12,9 @@ import {
 } from './admin.service';
 import { disconnectUserSessions } from '../activity/session-tracker';
 import type { ApiResponse } from '@fueld/types';
-import { sendInviteEmail, sendTestEmail } from '../../lib/email';
+import { sendInviteEmail, sendPasswordResetEmail, sendTestEmail } from '../../lib/email';
 import { jwtAccessPlugin, jwtRefreshPlugin, type JwtPayload } from '../auth/jwt.setup';
+import { createPasswordResetForUser } from '../auth/password-reset.service';
 
 // ─── Admin Controller ────────────────────────────────────────────────
 // All endpoints require ADMIN role.
@@ -285,6 +286,50 @@ export const adminController = new Elysia({ prefix: '/admin' })
   }, {
     params: t.Object({ id: t.String() }),
     detail: { tags: ['Admin'], summary: 'Admin force-reset a user\'s 2FA', security: [{ bearerAuth: [] }] },
+  })
+
+  // ── POST /admin/users/:id/send-password-reset ─────────────────────
+  .post('/users/:id/send-password-reset', async ({ auth, params }) => {
+    try {
+      requireAdmin(auth);
+
+      const created = await createPasswordResetForUser({
+        userId: params.id,
+        requestedBy: auth.sub,
+        expiresInMinutes: 60,
+      });
+
+      const baseUrl = process.env['APP_URL'] || 'http://localhost:4200';
+      const resetLink = `${baseUrl}/reset-password?token=${encodeURIComponent(created.token)}`;
+
+      let emailSent = false;
+      try {
+        emailSent = await sendPasswordResetEmail({
+          to: created.email,
+          resetLink,
+          requestedByName: undefined,
+        });
+      } catch (err: any) {
+        console.warn('[Email] Password reset send failed:', err?.message ?? err);
+      }
+
+      return {
+        success: true,
+        data: {
+          userId: created.userId,
+          email: created.email,
+          resetLink,
+          expiresAt: created.expiresAt.toISOString(),
+          emailSent,
+        },
+      } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to send password reset link';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    params: t.Object({ id: t.String() }),
+    detail: { tags: ['Admin'], summary: 'Send a password reset link to a user (admin only)', security: [{ bearerAuth: [] }] },
   });
 
 /** Validate an IP address or CIDR notation */

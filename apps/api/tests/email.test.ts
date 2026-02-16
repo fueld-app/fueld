@@ -174,6 +174,35 @@ describe('email lib', () => {
     expect(String(sentMails[0]?.text)).toContain('Admin User invited you to Fueld as TRADER');
   });
 
+  test('sends password reset email using env SMTP config', async () => {
+    clearSmtpEnv();
+    setSmtpEnv({
+      host: 'smtp.env.test',
+      port: '2525',
+      user: 'env-user',
+      pass: 'env-pass',
+      from: 'noreply@env.test',
+      secure: 'false',
+    });
+
+    const resetLink = 'https://app.fueld.test/reset-password?token=abc';
+    const ok = await emailModule.sendPasswordResetEmail({
+      to: 'user@fueld.test',
+      resetLink,
+      requestedByName: 'Admin User',
+    });
+
+    expect(ok).toBe(true);
+    expect(transportConfigs.length).toBe(1);
+    expect(sentMails.length).toBe(1);
+    expect(sentMails[0]).toMatchObject({
+      from: 'noreply@env.test',
+      to: 'user@fueld.test',
+    });
+    expect(String(sentMails[0]?.subject)).toContain('Password reset');
+    expect(String(sentMails[0]?.text)).toContain(resetLink);
+  });
+
   test('prefers DB SMTP config over env when DB config is complete', async () => {
     const seeded = await seedBasics();
 

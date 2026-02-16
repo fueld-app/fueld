@@ -15,6 +15,7 @@ import {
   disable2fa,
   verify2faToken,
 } from './auth.service';
+import { resetPasswordWithToken } from './password-reset.service';
 import {
   listPasskeys,
   renamePasskey,
@@ -205,6 +206,38 @@ export const authController = new Elysia({ prefix: '/auth' })
       detail: {
         tags: ['Auth'],
         summary: 'Login with email and password',
+      },
+    },
+  )
+
+  // ── POST /auth/password-reset — complete reset using emailed token ──
+  .post(
+    '/password-reset',
+    async ({ body }) => {
+      try {
+        await resetPasswordWithToken({
+          token: body.token,
+          newPassword: body.password,
+        });
+
+        return {
+          success: true,
+          data: null,
+          message: 'Password has been reset',
+        } satisfies ApiResponse<null>;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Password reset failed';
+        return { success: false, data: null, message } satisfies ApiResponse<null>;
+      }
+    },
+    {
+      body: t.Object({
+        token: t.String({ minLength: 1 }),
+        password: t.String({ minLength: 8 }),
+      }),
+      detail: {
+        tags: ['Auth'],
+        summary: 'Reset password using a reset token',
       },
     },
   )

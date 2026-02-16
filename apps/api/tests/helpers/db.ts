@@ -76,6 +76,7 @@ function getTruncateTables() {
   return [
     'activity_logs',
     'entity_comments',
+    'password_reset_tokens',
     'integration_credentials',
     'bank_accounts',
     'user_company_overrides',
@@ -101,6 +102,19 @@ function getTruncateTables() {
 
 async function ensureTestSchemaCompat(): Promise<void> {
   const sql = getSql();
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE cascade,
+      token_hash text NOT NULL,
+      requested_by uuid REFERENCES users(id),
+      expires_at timestamptz NOT NULL,
+      used_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      CONSTRAINT password_reset_tokens_token_hash_unique UNIQUE(token_hash)
+    )
+  `;
   await sql`
     CREATE TABLE IF NOT EXISTS order_number_sequences (
       tenant_id uuid PRIMARY KEY REFERENCES tenants(id),

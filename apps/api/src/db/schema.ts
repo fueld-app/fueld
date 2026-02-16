@@ -670,6 +670,16 @@ export const invitations = pgTable('invitations', {
 //  19. INTEGRATION CREDENTIALS (encrypted API keys / passwords)
 // ═══════════════════════════════════════════════════════════════════════
 
+export const passwordResetTokens = pgTable('password_reset_tokens', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  tokenHash: text('token_hash').notNull().unique(),
+  requestedBy: uuid('requested_by').references(() => users.id),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const integrationCredentials = pgTable('integration_credentials', {
   id: uuid('id').defaultRandom().primaryKey(),
   tenantId: uuid('tenant_id').notNull().references(() => tenants.id),

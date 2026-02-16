@@ -11,6 +11,12 @@ type InviteEmailPayload = {
   role: string;
 };
 
+type PasswordResetEmailPayload = {
+  to: string;
+  resetLink: string;
+  requestedByName?: string;
+};
+
 type SmtpConfig = {
   host: string;
   port: number;
@@ -121,6 +127,49 @@ export async function sendInviteEmail(payload: InviteEmailPayload): Promise<bool
         </a>
       </p>
       <p style="margin: 0; font-size: 12px; color: #6b7280;">If you did not expect this invite, you can ignore this email.</p>
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: cfg.from,
+    to: payload.to,
+    subject,
+    text,
+    html,
+  });
+
+  return true;
+}
+
+export async function sendPasswordResetEmail(payload: PasswordResetEmailPayload): Promise<boolean> {
+  const cfg = await getSmtpConfig();
+  if (!cfg) {
+    console.warn('[Email] SMTP not configured, password reset email skipped');
+    return false;
+  }
+
+  const transporter = await getTransporter();
+  if (!transporter) return false;
+
+  const requestedBy = payload.requestedByName ? ` (requested by ${payload.requestedByName})` : '';
+  const subject = `Password reset for your Fueld account${requestedBy}`;
+  const text =
+    `Hi,\n\n` +
+    `A password reset was requested for your Fueld account${requestedBy}.\n\n` +
+    `Reset your password here:\n${payload.resetLink}\n\n` +
+    `If you did not request this, you can ignore this email.\n`;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #1f2937;">
+      <h2 style="margin: 0 0 12px;">Reset your Fueld password</h2>
+      <p style="margin: 0 0 12px;">A password reset was requested for your Fueld account${requestedBy}.</p>
+      <p style="margin: 0 0 16px;">Click below to set a new password:</p>
+      <p style="margin: 0 0 24px;">
+        <a href="${payload.resetLink}" style="display: inline-block; padding: 10px 16px; background: #2563eb; color: #fff; text-decoration: none; border-radius: 6px;">
+          Reset password
+        </a>
+      </p>
+      <p style="margin: 0; font-size: 12px; color: #6b7280;">If you did not request this, you can ignore this email.</p>
     </div>
   `;
 

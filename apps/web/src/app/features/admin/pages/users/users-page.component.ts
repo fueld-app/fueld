@@ -99,6 +99,52 @@ import { API } from '@app/core/config/api';
           }
         </div>
 
+        @if (passwordResetError()) {
+          <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+            {{ passwordResetError() }}
+          </div>
+        }
+
+        @if (passwordResetLinkResult()) {
+          <div class="mb-4 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <p class="text-sm font-semibold text-indigo-900">Password reset link</p>
+                <p class="mt-0.5 text-xs text-indigo-700">
+                  For <span class="font-medium">{{ passwordResetTargetEmail() }}</span>
+                  @if (passwordResetExpiresAt()) {
+                    · Expires {{ formatDate(passwordResetExpiresAt()) }}
+                  }
+                  @if (passwordResetEmailSent() === false) {
+                    · SMTP not configured (email not sent)
+                  }
+                </p>
+              </div>
+              <button
+                (click)="clearPasswordResetLink()"
+                class="rounded-md px-2 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100 transition-colors"
+                title="Dismiss"
+              >
+                Close
+              </button>
+            </div>
+
+            <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <input
+                class="w-full flex-1 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-xs font-mono text-gray-700"
+                [value]="passwordResetLinkResult()"
+                readonly
+              />
+              <button
+                (click)="copyPasswordResetLink()"
+                class="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors"
+              >
+                {{ passwordResetCopied() ? 'Copied!' : 'Copy' }}
+              </button>
+            </div>
+          </div>
+        }
+
         <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
           <table class="w-full text-sm">
             <thead>
@@ -253,6 +299,15 @@ import { API } from '@app/core/config/api';
                             Reset 2FA
                           </button>
                         }
+                        <button
+                          (click)="sendPasswordReset(user)"
+                          class="rounded-md px-2 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 transition-colors"
+                          [disabled]="passwordResetSendingId() === user.id"
+                          [class.opacity-50]="passwordResetSendingId() === user.id"
+                          title="Generate a password reset link for this user"
+                        >
+                          {{ passwordResetSendingId() === user.id ? 'Sending…' : 'Reset password' }}
+                        </button>
                         <button
                           (click)="toggleActive(user)"
                           class="rounded-md px-2 py-1 text-xs font-medium transition-colors"
@@ -623,6 +678,15 @@ export class UsersPageComponent implements OnInit, OnDestroy {
   readonly inviteLinkResult = signal('');
   readonly copied = signal(false);
 
+  // Password reset link (admin-triggered)
+  readonly passwordResetSendingId = signal<string | null>(null);
+  readonly passwordResetError = signal('');
+  readonly passwordResetLinkResult = signal('');
+  readonly passwordResetTargetEmail = signal('');
+  readonly passwordResetExpiresAt = signal('');
+  readonly passwordResetEmailSent = signal<boolean | null>(null);
+  readonly passwordResetCopied = signal(false);
+
   inviteForm = { name: '', email: '', role: 'TRADER' };
 
   // IP restriction modal
@@ -804,6 +868,72 @@ export class UsersPageComponent implements OnInit, OnDestroy {
       }
     } catch (err) {
       console.error('Failed to reset 2FA:', err);
+    }
+  }
+
+  // ── Admin Password Reset Link ───────────────────────────────────
+
+  clearPasswordResetLink() {
+    this.passwordResetError.set('');
+    this.passwordResetLinkResult.set('');
+    this.passwordResetTargetEmail.set('');
+    this.passwordResetExpiresAt.set('');
+    this.passwordResetEmailSent.set(null);
+    this.passwordResetCopied.set(false);
+  }
+
+  async copyPasswordResetLink() {
+    try {
+      await navigator.clipboard.writeText(this.passwordResetLinkResult());
+      this.passwordResetCopied.set(true);
+      setTimeout(() => this.passwordResetCopied.set(false), 2000);
+    } catch {
+      const input = document.createElement('input');
+      input.value = this.passwordResetLinkResult();
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand('copy');
+      document.body.removeChild(input);
+      this.passwordResetCopied.set(true);
+      setTimeout(() => this.passwordResetCopied.set(false), 2000);
+    }
+  }
+
+  async sendPasswordReset(user: AdminUserDto) {
+    if (user.id === this.currentUserId()) return;
+
+    this.passwordResetSendingId.set(user.id);
+    this.passwordResetError.set('');
+    this.passwordResetCopied.set(false);
+
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<{
+          userId: string;
+          email: string;
+          resetLink: string;
+          expiresAt: string;
+          emailSent: boolean;
+        }>>(`${API}/admin/users/${user.id}/send-password-reset`, {}),
+      );
+
+      if (!res.success || !res.data?.resetLink) {
+        this.passwordResetError.set(res.message || 'Failed to generate password reset link');
+        return;
+      }
+
+      this.passwordResetLinkResult.set(res.data.resetLink);
+      this.passwordResetTargetEmail.set(res.data.email || user.email);
+      this.passwordResetExpiresAt.set(res.data.expiresAt || '');
+      this.passwordResetEmailSent.set(!!res.data.emailSent);
+
+      // Auto-copy for convenience (still shows link + manual copy button)
+      await this.copyPasswordResetLink();
+    } catch (err: any) {
+      const msg = err?.error?.message || err?.error?.error || 'Failed to send password reset link';
+      this.passwordResetError.set(msg);
+    } finally {
+      this.passwordResetSendingId.set(null);
     }
   }
 
