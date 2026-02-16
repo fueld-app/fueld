@@ -1,6 +1,8 @@
 import { Elysia, t } from 'elysia';
 import { swagger } from '@elysiajs/swagger';
 import { cors } from '@elysiajs/cors';
+import { existsSync } from 'fs';
+import { join } from 'path';
 import type { ApiResponse } from '@fueld/types';
 import { authController } from './modules/auth';
 import { documentsController } from './modules/documents/documents.controller';
@@ -40,7 +42,32 @@ import { eq, sql } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { pushController } from './modules/push/push.controller';
 
-const MIGRATIONS_DIR = process.env['MIGRATIONS_DIR'] || './drizzle';
+function resolveMigrationsDir(): string {
+  const env = process.env['MIGRATIONS_DIR'];
+  if (env) return env;
+
+  const candidates = [
+    // When running within the apps/api package directly
+    join(import.meta.dir, '../drizzle'),
+    // When running from monorepo root (bun --filter @fueld/api ...)
+    join(process.cwd(), 'apps/api/drizzle'),
+    // Legacy / fallback
+    join(process.cwd(), 'drizzle'),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      if (existsSync(candidate)) return candidate;
+    } catch {
+      // ignore
+    }
+  }
+
+  // Let drizzle-orm throw a clear error if the path is invalid.
+  return './drizzle';
+}
+
+const MIGRATIONS_DIR = resolveMigrationsDir();
 const REQUIRED_PUSH_COLUMNS = [
   'id',
   'tenant_id',

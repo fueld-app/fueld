@@ -113,6 +113,20 @@
       "when": 1771200011000,
       "tag": "0015_company_manual_overrides",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1771200012000,
+      "tag": "0016_add_bank_account_id_to_orders",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1771200013000,
+      "tag": "0017_password_reset_tokens",
+      "breakpoints": true
     }
   ]
 }
