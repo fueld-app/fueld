@@ -127,6 +127,13 @@
       "when": 1771200013000,
       "tag": "0017_password_reset_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1771200014000,
+      "tag": "0018_place_order_remark",
+      "breakpoints": true
     }
   ]
 }

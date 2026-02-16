@@ -783,6 +783,7 @@ export async function updateLocalPlace(
     admiraltyChart?: string | null;
     parentPlaceId?: string | null;
     parentPlaceName?: string | null;
+    orderRemark?: string | null;
   },
 ) {
   const patch: Partial<typeof places.$inferInsert> = {
@@ -802,10 +803,31 @@ export async function updateLocalPlace(
   if (data.admiraltyChart !== undefined) patch.admiraltyChart = data.admiraltyChart;
   if (data.parentPlaceId !== undefined) patch.parentPlaceId = data.parentPlaceId;
   if (data.parentPlaceName !== undefined) patch.parentPlaceName = data.parentPlaceName;
+  if (data.orderRemark !== undefined) patch.orderRemark = data.orderRemark;
 
   const [updated] = await db
     .update(places)
     .set(patch)
+    .where(eq(places.id, id))
+    .returning();
+
+  return updated ?? null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  UPDATE PLACE DEFAULT ORDER REMARK (applies to all orders in the place)
+// ═══════════════════════════════════════════════════════════════════════
+
+export async function updatePlaceOrderRemark(id: string, orderRemark: string | null) {
+  const trimmed = orderRemark?.trim() ?? '';
+  const value = trimmed ? trimmed : null;
+
+  const [updated] = await db
+    .update(places)
+    .set({
+      orderRemark: value,
+      updatedAt: new Date(),
+    })
     .where(eq(places.id, id))
     .returning();
 

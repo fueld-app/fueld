@@ -324,6 +324,11 @@ interface TeamUserOption {
       </div>
       <!-- Notes + T&C (projected into invoicing card) -->
       <div notesAndTerms>
+        <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Place remark</p>
+        <p class="mt-1 text-sm text-gray-700 whitespace-pre-line">{{ port()?.orderRemark || '-' }}</p>
+        <p class="mt-2 text-[11px] text-gray-400">Edit in Places → Details</p>
+
+        <div class="mt-4"></div>
         <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Terms &amp; Conditions</p>
         @if (isReadonly()) {
           <p class="mt-1 text-sm text-gray-700 whitespace-pre-line">{{ order()?.termsAndConditions || '-' }}</p>

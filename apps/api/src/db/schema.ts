@@ -316,6 +316,9 @@ export const places = pgTable('places', {
   // ── Responsible user ───────────────────────────────────────────────
   responsibleUserId: uuid('responsible_user_id').references(() => users.id),
 
+  // ── Default order remark (applies to all orders in this place) ─────
+  orderRemark: text('order_remark'),
+
   // ── Sync metadata ─────────────────────────────────────────────────
   lliLastUpdated: timestamp('lli_last_updated', { withTimezone: true }),
 

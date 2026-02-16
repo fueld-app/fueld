@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia';
 import { authGuard } from '../auth/auth.guard';
-import { searchVessels, searchPlaces, searchCompanies, importPlaceFromLli, listPlaces, getPlaceById, getPlaceByLliId, getPlaceEnrichment, createPlace, updateLocalPlace, deletePlace, syncPlaceFromSeasearcher, getOrdersForPlace, getPortFacilities, getExpectedArrivals, getPortSuppliers, addPortSupplier, updatePortSupplier, deletePortSupplier, updateResponsibleUser, listActiveUsers, getSupplyPortsForCompany } from './lli.service';
+import { searchVessels, searchPlaces, searchCompanies, importPlaceFromLli, listPlaces, getPlaceById, getPlaceByLliId, getPlaceEnrichment, createPlace, updateLocalPlace, updatePlaceOrderRemark, deletePlace, syncPlaceFromSeasearcher, getOrdersForPlace, getPortFacilities, getExpectedArrivals, getPortSuppliers, addPortSupplier, updatePortSupplier, deletePortSupplier, updateResponsibleUser, listActiveUsers, getSupplyPortsForCompany } from './lli.service';
 import { logActivity } from '../activity/activity.service';
 import { db } from '../../db';
 import { users, places } from '../../db/schema';
@@ -267,10 +267,47 @@ export const lloydsController = new Elysia({ prefix: '/lloyds' })
         admiraltyChart: t.Optional(t.Nullable(t.String())),
         parentPlaceId: t.Optional(t.Nullable(t.String())),
         parentPlaceName: t.Optional(t.Nullable(t.String())),
+        orderRemark: t.Optional(t.Nullable(t.String())),
       }),
       detail: {
         tags: ["Lloyd's"],
         summary: 'Update a locally created place',
+      },
+    },
+  )
+
+  // ─── Update Place Default Order Remark (applies to all orders) ───
+  .put(
+    '/places/local/:id/order-remark',
+    async ({ params, body, set }) => {
+      const existing = await getPlaceById(params.id);
+      if (!existing) {
+        set.status = 404;
+        return { success: false, data: null, message: 'Place not found' };
+      }
+
+      const updated = await updatePlaceOrderRemark(params.id, body.orderRemark ?? null);
+      if (!updated) {
+        set.status = 500;
+        return { success: false, data: null, message: 'Failed to update order remark' };
+      }
+
+      const full = await getPlaceById(params.id);
+      if (!full) {
+        set.status = 500;
+        return { success: false, data: null, message: 'Failed to load updated place' };
+      }
+
+      return { success: true, data: full } satisfies ApiResponse<typeof full>;
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({
+        orderRemark: t.Nullable(t.String()),
+      }),
+      detail: {
+        tags: ["Lloyd's"],
+        summary: 'Update the default order remark for a place',
       },
     },
   )

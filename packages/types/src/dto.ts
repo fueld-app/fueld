@@ -172,6 +172,8 @@ export interface PlaceDto {
   responsibleUserId: string | null;
   responsibleUserName: string | null;
   lliLastUpdated: string | null;
+  /** Default remark applied to all orders in this place (shown on order + included in confirmation PDF). */
+  orderRemark?: string | null;
   orderCount?: number;
   activeOrderCount?: number;
 }

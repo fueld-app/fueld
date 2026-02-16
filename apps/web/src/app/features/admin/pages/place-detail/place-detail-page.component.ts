@@ -1170,6 +1170,46 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
               }
             </div>
 
+            <!-- Default Order Remark -->
+            @if (place()) {
+              <div class="rounded-xl border border-gray-200 bg-white shadow-sm lg:order-4 lg:h-[449px] lg:flex lg:flex-col overflow-hidden">
+                <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
+                  <h2 class="text-sm font-semibold text-gray-700">Default Order Remark</h2>
+                  <button
+                    (click)="saveOrderRemark()"
+                    [disabled]="savingOrderRemark()"
+                    class="rounded-md bg-brand-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
+                  >
+                    {{ savingOrderRemark() ? 'Saving…' : 'Save' }}
+                  </button>
+                </div>
+                <div class="p-5 flex-1 overflow-y-auto">
+                  <p class="text-xs text-gray-500">
+                    This remark is used on all orders for this place. It is visible (read-only) on the order and included in the confirmation PDF.
+                  </p>
+
+                  @if (orderRemarkError()) {
+                    <div class="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+                      {{ orderRemarkError() }}
+                    </div>
+                  }
+
+                  <textarea
+                    rows="8"
+                    [ngModel]="orderRemarkDraft()"
+                    (ngModelChange)="orderRemarkDraft.set($event)"
+                    placeholder="Remark to show on all orders for this place"
+                    class="mt-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
+                           focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  ></textarea>
+
+                  @if (orderRemarkSaved()) {
+                    <p class="mt-2 text-xs font-medium text-green-700">Saved</p>
+                  }
+                </div>
+              </div>
+            }
+
             <!-- Comments -->
             @if (place()) {
               <div class="lg:order-4 lg:h-[449px] overflow-hidden">
@@ -1315,6 +1355,12 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
   readonly responsibleUserId = signal<string | null>(null);
   readonly savingResponsible = signal(false);
 
+  // Default order remark (applies to all orders in this place)
+  readonly orderRemarkDraft = signal('');
+  readonly savingOrderRemark = signal(false);
+  readonly orderRemarkError = signal('');
+  readonly orderRemarkSaved = signal(false);
+
   readonly isManualPlace = computed(() => !this.place()?.lliPlaceId);
   readonly placeTypeOptions = Object.entries(PLACE_TYPE_LABELS).map(([value, label]) => ({
     value,
@@ -1396,6 +1442,10 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
     this.expectedArrivals.set([]);
     this.localTime.set('');
     this.responsibleUserId.set(null);
+    this.orderRemarkDraft.set('');
+    this.savingOrderRemark.set(false);
+    this.orderRemarkError.set('');
+    this.orderRemarkSaved.set(false);
     this.showAddSupplier.set(false);
     this.editingSupplierId.set(null);
     this.editingPlace.set(false);
@@ -1483,6 +1533,44 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
     }
   }
 
+  async saveOrderRemark(): Promise<void> {
+    const current = this.place();
+    if (!current) return;
+    if (this.savingOrderRemark()) return;
+
+    this.savingOrderRemark.set(true);
+    this.orderRemarkError.set('');
+    this.orderRemarkSaved.set(false);
+
+    try {
+      const payload = {
+        orderRemark: this.orderRemarkDraft().trim() || null,
+      };
+
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<PlaceDto>>(
+          `${API}/lloyds/places/local/${current.id}/order-remark`,
+          payload,
+        ),
+      );
+
+      if (!res.success || !res.data) {
+        this.orderRemarkError.set(res.message || 'Failed to save remark');
+        return;
+      }
+
+      this.place.set(res.data);
+      this.orderRemarkDraft.set(res.data.orderRemark ?? '');
+      this.orderRemarkSaved.set(true);
+      setTimeout(() => this.orderRemarkSaved.set(false), 1500);
+    } catch (err: any) {
+      const msg = err?.error?.message || err?.error?.error || 'Failed to save remark';
+      this.orderRemarkError.set(msg);
+    } finally {
+      this.savingOrderRemark.set(false);
+    }
+  }
+
   async loadPlace(id: string): Promise<void> {
     this.loading.set(true);
     try {
@@ -1496,6 +1584,11 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
 
         // Responsible user
         this.responsibleUserId.set(res.data.responsibleUserId ?? null);
+
+        // Default order remark
+        this.orderRemarkDraft.set(res.data.orderRemark ?? '');
+        this.orderRemarkError.set('');
+        this.orderRemarkSaved.set(false);
 
         // Load orders for this place
         this.loadOrders(res.data.id);

@@ -48,11 +48,8 @@ async function fetchInvoiceData(invoiceId: string) {
           vessel: true,
           place: true,
           salesRep: true,
-          items: {
-            with: {
-              supplier: true,
-            },
-          },
+          supplier: true,
+          items: true,
         },
       },
     },
@@ -70,11 +67,8 @@ async function fetchOrderForInvoice(orderId: string) {
       vessel: true,
       place: true,
       salesRep: true,
-      items: {
-        with: {
-          supplier: true,
-        },
-      },
+      supplier: true,
+      items: true,
       invoices: true,
     },
   });
@@ -134,16 +128,22 @@ function formatDateTimeForDisplay(value: string | null, tz: string | null | unde
 
 function buildNotesSection(params: {
   customerNote?: string | null;
+  placeOrderRemark?: string | null;
   itemNotes?: Array<{ label: string; note: string }>;
 }): Content[] {
   const customerNote = params.customerNote?.trim();
+  const placeOrderRemark = params.placeOrderRemark?.trim();
   const itemNotes = params.itemNotes ?? [];
-  if (!customerNote && itemNotes.length === 0) return [];
+  if (!customerNote && !placeOrderRemark && itemNotes.length === 0) return [];
 
   const notes: Content[] = [{ text: 'Notes', style: 'sectionLabel' } as Content];
 
   if (customerNote) {
     notes.push({ text: customerNote, margin: [0, 0, 0, 6] } as Content);
+  }
+
+  if (placeOrderRemark) {
+    notes.push({ text: `Place remark: ${placeOrderRemark}`, margin: [0, 0, 0, 6] } as Content);
   }
 
   if (itemNotes.length) {
@@ -518,6 +518,7 @@ function buildOfferDocument(data: {
   timezone: string | null;
   paymentTerms: string | null;
   customerNote: string | null;
+  placeOrderRemark: string | null;
   itemNotes: Array<{ label: string; note: string }>;
   currency: string;
   items: Array<{
@@ -656,6 +657,7 @@ function buildOfferDocument(data: {
         : []),
       ...buildNotesSection({
         customerNote: data.customerNote,
+        placeOrderRemark: data.placeOrderRemark,
         itemNotes: data.itemNotes,
       }),
       { text: '', margin: [0, 20, 0, 0] } as Content,
@@ -701,6 +703,7 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
     timezone: order.place.timezone ?? null,
     paymentTerms: formatCustomerPaymentTerms(order.customerPaymentTermType, order.customerCreditDays),
     customerNote: order.customerNote ?? null,
+    placeOrderRemark: order.place?.orderRemark ?? null,
     itemNotes: order.items
       .filter((item) => item.customerNote)
       .map((item) => ({
