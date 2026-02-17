@@ -230,6 +230,29 @@ bun test apps/api/tests packages/types/tests
 bun test --coverage apps/api/tests packages/types/tests
 ```
 
+### CI
+
+CI runs on GitHub Actions via `.github/workflows/test.yml` and splits the suite into separate jobs:
+
+- Types
+- API (mocked)
+- API (db)
+- API (e2e)
+- Web unit
+- Web Playwright smoke
+
+Each API/Playwright job provisions a **fresh Postgres database per job**, runs Drizzle migrations, then executes tests.
+
+### Playwright UI tests
+
+Playwright tests live in `apps/web/e2e/`.
+
+```bash
+cd apps/web
+bun run pw:install
+bun run test:e2e
+```
+
 ### API test suites
 
 From `apps/api`:
@@ -305,8 +328,7 @@ On every push to `main`:
 
 - Builds the API as a **standalone Bun binary** (`apps/api/app-release`, target `bun-linux-x64`)
 - Builds the Angular app to `apps/web/dist/web/browser/`
-- Uploads artifacts
-- SSH/SCPs artifacts to `/opt/fueld/staging/…` on the VPS
+- Builds happen on the runner and outputs are copied directly to the VPS via `scp` (no GitHub Actions artifacts)
 - Executes the deploy script on the VPS
 
 ### 3) Blue/green swap logic

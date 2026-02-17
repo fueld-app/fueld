@@ -1,5 +1,8 @@
 import postgres from 'postgres';
 import * as schema from '../../src/db/schema';
+import { existsSync } from 'fs';
+import { join } from 'path';
+import { migrate } from 'drizzle-orm/postgres-js/migrator';
 
 const DEFAULT_DATABASE_URL = 'postgres://fueld:fueld@localhost:5432/fueld_test';
 
@@ -100,6 +103,47 @@ function getTruncateTables() {
   ];
 }
 
+let migrationsPromise: Promise<void> | null = null;
+
+function resolveMigrationsDir(): string {
+  const env = process.env['MIGRATIONS_DIR'];
+  if (env) return env;
+
+  const candidates = [
+    // When running within apps/api directly
+    join(import.meta.dir, '../../../drizzle'),
+    // When running from monorepo root
+    join(process.cwd(), 'apps/api/drizzle'),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      if (existsSync(candidate)) return candidate;
+    } catch {
+      // ignore
+    }
+  }
+
+  return './drizzle';
+}
+
+async function ensureMigrationsApplied(): Promise<void> {
+  if (!migrationsPromise) {
+    migrationsPromise = (async () => {
+      // Import the real app DB so migrations use the same driver/config as production.
+      const { db } = await import('../../src/db');
+      await migrate(db, { migrationsFolder: resolveMigrationsDir() });
+    })();
+  }
+
+  try {
+    await migrationsPromise;
+  } catch {
+    // If migrations fail (e.g. partial schema during local dev),
+    // fall back to the compat shim below.
+  }
+}
+
 async function ensureTestSchemaCompat(): Promise<void> {
   const sql = getSql();
 
@@ -180,6 +224,7 @@ async function ensureTestSchemaCompat(): Promise<void> {
 
 export async function truncateAll(): Promise<void> {
   const sql = getSql();
+  await ensureMigrationsApplied();
   await ensureTestSchemaCompat();
 
   const rows = await sql<{ table_name: string }[]>`
