@@ -134,6 +134,13 @@
       "when": 1771200014000,
       "tag": "0018_place_order_remark",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1771200015000,
+      "tag": "0019_own_company_terms",
+      "breakpoints": true
     }
   ]
 }

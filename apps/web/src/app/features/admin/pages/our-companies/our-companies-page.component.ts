@@ -229,6 +229,56 @@ interface CompanySearchResultOption {
                       }
                     </div>
                   }
+
+                  <!-- Terms (applies to Confirmation/Nomination PDFs) -->
+                  <div class="mt-6 border-t border-gray-200 pt-5">
+                    <div class="flex items-center justify-between">
+                      <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Customer & Supplier Terms</h3>
+                      <button
+                        (click)="saveTerms(co.id)"
+                        [disabled]="savingTerms()"
+                        class="rounded-md bg-brand-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
+                      >
+                        {{ savingTerms() ? 'Saving…' : 'Save terms' }}
+                      </button>
+                    </div>
+                    <p class="mt-1 text-xs text-gray-500">
+                      These are read-only on the order and included in Confirmation and Nomination PDFs. You can use <span class="font-mono">$&#123;companyName&#125;</span> in the text.
+                    </p>
+
+                    @if (termsError()) {
+                      <div class="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+                        {{ termsError() }}
+                      </div>
+                    }
+
+                    <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                      <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Customer terms</label>
+                        <textarea
+                          rows="10"
+                          [ngModel]="customerTermsDraft()"
+                          (ngModelChange)="customerTermsDraft.set($event)"
+                          class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-700 whitespace-pre-line
+                                 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                        ></textarea>
+                      </div>
+                      <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Supplier terms</label>
+                        <textarea
+                          rows="10"
+                          [ngModel]="supplierTermsDraft()"
+                          (ngModelChange)="supplierTermsDraft.set($event)"
+                          class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-700 whitespace-pre-line
+                                 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                        ></textarea>
+                      </div>
+                    </div>
+
+                    @if (termsSaved()) {
+                      <p class="mt-2 text-xs font-medium text-green-700">Saved</p>
+                    }
+                  </div>
                 </div>
               }
             </div>
@@ -429,6 +479,13 @@ export class OurCompaniesPageComponent implements OnInit {
 
   // Expanded section
   readonly expandedCompanyId = signal<string | null>(null);
+
+  // Terms editing (per expanded company)
+  readonly customerTermsDraft = signal('');
+  readonly supplierTermsDraft = signal('');
+  readonly savingTerms = signal(false);
+  readonly termsError = signal('');
+  readonly termsSaved = signal(false);
 
   // Bank accounts
   readonly bankAccounts = signal<BankAccountDto[]>([]);
@@ -632,7 +689,51 @@ export class OurCompaniesPageComponent implements OnInit {
       return;
     }
     this.expandedCompanyId.set(companyId);
+    this.populateTermsDraft(companyId);
     await this.loadBankAccounts(companyId);
+  }
+
+  private populateTermsDraft(companyId: string): void {
+    const co = this.companies().find((c) => c.id === companyId);
+    this.customerTermsDraft.set(co?.customerTerms ?? '');
+    this.supplierTermsDraft.set(co?.supplierTerms ?? '');
+    this.termsError.set('');
+    this.termsSaved.set(false);
+  }
+
+  async saveTerms(companyId: string): Promise<void> {
+    if (this.savingTerms()) return;
+    this.savingTerms.set(true);
+    this.termsError.set('');
+    this.termsSaved.set(false);
+
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<OwnCompanyDto>>(
+          API + '/admin/settings/own-companies/' + companyId + '/terms',
+          {
+            customerTerms: this.customerTermsDraft().trim() || null,
+            supplierTerms: this.supplierTermsDraft().trim() || null,
+          },
+        ),
+      );
+
+      if (!res.success || !res.data) {
+        this.termsError.set(res.message || 'Failed to save terms');
+        return;
+      }
+
+      // Update local list
+      this.companies.update((list) => list.map((c) => (c.id === companyId ? res.data! : c)));
+      this.populateTermsDraft(companyId);
+      this.termsSaved.set(true);
+      setTimeout(() => this.termsSaved.set(false), 1500);
+    } catch (err: any) {
+      const msg = err?.error?.message || err?.error?.error || 'Failed to save terms';
+      this.termsError.set(msg);
+    } finally {
+      this.savingTerms.set(false);
+    }
   }
 
   private async loadBankAccounts(companyId: string): Promise<void> {

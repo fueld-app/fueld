@@ -435,15 +435,14 @@ interface LliSearchResult {
           <p class="mt-2 text-[11px] text-gray-400">Edit in Places → Details</p>
 
           <div class="mt-4"></div>
-          <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Terms &amp; Conditions</p>
-          <textarea
-            rows="2"
-            [ngModel]="order()?.termsAndConditions ?? ''"
-            (ngModelChange)="onTermsChange($event)"
-            placeholder="Terms & conditions text to include in documents"
-            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
-                   focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-          ></textarea>
+          <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Customer terms</p>
+          <p class="mt-1 text-sm text-gray-700 whitespace-pre-line">{{ renderCompanyTerms(selectedOwnCompany()?.customerTerms, selectedOwnCompany()?.name) || '-' }}</p>
+
+          <div class="mt-4"></div>
+          <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Supplier terms</p>
+          <p class="mt-1 text-sm text-gray-700 whitespace-pre-line">{{ renderCompanyTerms(selectedOwnCompany()?.supplierTerms, selectedOwnCompany()?.name) || '-' }}</p>
+
+          <p class="mt-2 text-[11px] text-gray-400">Edit in Admin → Our Companies</p>
         </div>
       </app-trading-detail-meta-cards>
 
@@ -661,6 +660,12 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   readonly places = signal<PlaceDto[]>([]);
   readonly itemRows = signal<OrderItemRow[]>([]);
   readonly ownCompanies = signal<OwnCompanyDto[]>([]);
+
+  readonly selectedOwnCompany = computed(() => {
+    const id = this.order()?.invoicingCompanyId;
+    if (!id) return null;
+    return this.ownCompanies().find((c) => c.id === id) ?? null;
+  });
   readonly bankAccounts = signal<BankAccountDto[]>([]);
   readonly teamUsers = signal<TeamUserOption[]>([]);
   readonly saving = signal(false);
@@ -1814,6 +1819,14 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
     } catch {
       this.showToast('error', 'Failed to cancel inquiry.');
     }
+  }
+
+  renderCompanyTerms(template: string | null | undefined, companyName: string | null | undefined): string {
+    const raw = (template ?? '').trim();
+    if (!raw) return '';
+    const name = (companyName ?? '').trim();
+    if (!name) return raw;
+    return raw.split('${companyName}').join(name);
   }
 
   // ─── PDF Preview ─────────────────────────────────────────────────

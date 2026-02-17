@@ -233,6 +233,10 @@ export const counterparties = pgTable('counterparties', {
   // Company logo (for own companies — used in PDF generation)
   logoUrl: text('logo_url'),
 
+  // Terms templates (used for own companies; rendered into PDFs/orders)
+  customerTerms: text('customer_terms'),
+  supplierTerms: text('supplier_terms'),
+
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

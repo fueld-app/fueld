@@ -2,7 +2,7 @@
 //  Settings Service — Own companies, teams, company groups
 // ═══════════════════════════════════════════════════════════════════════
 
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, isNull } from 'drizzle-orm';
 import { db } from '../../db';
 import {
   counterparties,
@@ -16,6 +16,33 @@ import {
   bankAccounts,
 } from '../../db/schema';
 import type { OwnCompanyDto, TeamDto, CompanyGroupDto, BankAccountDto } from '@fueld/types';
+
+const DEFAULT_CUSTOMER_TERMS =
+  "This Confirmation is made subject to ${companyName}’s General Terms and Conditions of Sale effective February 2026 (“ GTCs”), available at www.rivieramarine.mc,\n" +
+  "which together with this Confirmation constitute the entire agreement between the parties. In the event of conflict, this Confirmation shall prevail, except in respect of Title\n" +
+  "and Retention of Title, Payment, Credit & Security, Sanctions & Compliance, Limitation of Liability and Law & Arbitration, which may only be amended by written agreement\n" +
+  "signed by Seller. Any terms or conditions submitted by Buyer are expressly rejected.\n" +
+  "Delivery procedures, sampling and operational formalities may be carried out in accordance with the Physical Supplier’s standard procedures; however, as between Seller\n" +
+  "and Buyer, the GTCs shall prevail in case of inconsistency.\n" +
+  "Buyer is requested to confirm acceptance. Absent written objection prior to delivery, performance of the Contract shall constitute full acceptance of these Terms.";
+
+const DEFAULT_SUPPLIER_TERMS =
+  "Supplier warrants and represents that:\n" +
+  "1. The Products are not of sanctioned origin and neither Supplier, its affiliates, directors, officers, employees nor ultimate beneficial owners are subject to sanctions\n" +
+  "imposed by the United Nations, European Union, United Kingdom, United States or Singapore.\n" +
+  "2. Supplier is and shall remain in full compliance with all applicable trade sanctions, export controls and related laws (“Sanctions Laws”).\n" +
+  "If, in ${companyName}’s reasonable opinion, any of the above warranties are inaccurate, or if payment under this contract may be delayed, blocked or exposed to\n" +
+  "regulatory risk, ${companyName} shall be entitled , without liability , to suspend performance , terminate the contract , change the currency of payment , or\n" +
+  "implement any alternative lawful payment mechanism at its sole discretion.\n" +
+  "Supplier further warrants that:\n" +
+  "• The supply complies with MARPOL Annex VI and applicable MEPC guidelines;\n" +
+  "• The supply complies with SOLAS requirements, including provision of a valid MSDS prior to delivery;\n" +
+  "• The MARPOL sample shall be drawn at the receiving vessel’s manifold by continuous drip sampler;\n" +
+  "• The Products shall be stable, homogeneous and free from waste oils or harmful contaminants.\n" +
+  "Quantities ordered are maximum quantities. ${companyName} shall not be responsible for payment of quantities supplied in excess of those nominated unless\n" +
+  "expressly agreed in writing.\n" +
+  "Signed and stamped Bunker Delivery Receipts must be provided with the invoice. ${companyName} reserves the right to withhold payment pending receipt of\n" +
+  "proper delivery documentation.";
 
 /** Get tenant ID (single-tenant setup). */
 async function getTenantId(): Promise<string> {
@@ -36,6 +63,8 @@ export async function listOwnCompanies(): Promise<OwnCompanyDto[]> {
       country: counterparties.country,
       countryIso: counterparties.countryIso,
       logoUrl: counterparties.logoUrl,
+      customerTerms: counterparties.customerTerms,
+      supplierTerms: counterparties.supplierTerms,
     })
     .from(counterparties)
     .where(eq(counterparties.isOwnCompany, true))
@@ -52,6 +81,51 @@ export async function setOwnCompany(companyId: string, isOwn: boolean) {
     .returning({ id: counterparties.id, name: counterparties.name });
 
   if (!updated) throw new Error('Company not found');
+
+  if (isOwn) {
+    // Initialize default terms for newly-marked own companies.
+    await db
+      .update(counterparties)
+      .set({ customerTerms: DEFAULT_CUSTOMER_TERMS, updatedAt: new Date() })
+      .where(and(eq(counterparties.id, companyId), isNull(counterparties.customerTerms)));
+    await db
+      .update(counterparties)
+      .set({ supplierTerms: DEFAULT_SUPPLIER_TERMS, updatedAt: new Date() })
+      .where(and(eq(counterparties.id, companyId), isNull(counterparties.supplierTerms)));
+  }
+
+  return updated;
+}
+
+export async function updateOwnCompanyTerms(companyId: string, data: {
+  customerTerms?: string | null;
+  supplierTerms?: string | null;
+}): Promise<OwnCompanyDto> {
+  const [row] = await db
+    .select({
+      id: counterparties.id,
+      isOwnCompany: counterparties.isOwnCompany,
+    })
+    .from(counterparties)
+    .where(eq(counterparties.id, companyId))
+    .limit(1);
+
+  if (!row) throw new Error('Company not found');
+  if (!row.isOwnCompany) throw new Error('Company is not marked as own');
+
+  const patch: Record<string, unknown> = { updatedAt: new Date() };
+  if (data.customerTerms !== undefined) {
+    patch.customerTerms = data.customerTerms?.trim() ? data.customerTerms : null;
+  }
+  if (data.supplierTerms !== undefined) {
+    patch.supplierTerms = data.supplierTerms?.trim() ? data.supplierTerms : null;
+  }
+
+  await db.update(counterparties).set(patch).where(eq(counterparties.id, companyId));
+
+  const list = await listOwnCompanies();
+  const updated = list.find((c) => c.id === companyId);
+  if (!updated) throw new Error('Failed to load updated own company');
   return updated;
 }
 
@@ -287,6 +361,9 @@ export async function getUserCompanyAccess(userId: string): Promise<OwnCompanyDt
       name: counterparties.name,
       country: counterparties.country,
       countryIso: counterparties.countryIso,
+      logoUrl: counterparties.logoUrl,
+      customerTerms: counterparties.customerTerms,
+      supplierTerms: counterparties.supplierTerms,
     })
     .from(userCompanyOverrides)
     .innerJoin(counterparties, eq(userCompanyOverrides.counterpartyId, counterparties.id))
@@ -309,6 +386,9 @@ export async function getUserCompanyAccess(userId: string): Promise<OwnCompanyDt
       name: counterparties.name,
       country: counterparties.country,
       countryIso: counterparties.countryIso,
+      logoUrl: counterparties.logoUrl,
+      customerTerms: counterparties.customerTerms,
+      supplierTerms: counterparties.supplierTerms,
     })
     .from(teamCompanies)
     .innerJoin(counterparties, eq(teamCompanies.counterpartyId, counterparties.id))

@@ -38,6 +38,7 @@ import {
   updateCurrencySettings,
   getCompanyTypeSettings,
   updateCompanyTypeSettings,
+  updateOwnCompanyTerms,
 } from './settings.service';
 import { reloadCurrencies } from '../prices/price.service';
 import {
@@ -122,6 +123,24 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   }, {
     params: t.Object({ id: t.String() }),
     detail: { tags: ['Admin Settings'], summary: 'Unmark a company as own' },
+  })
+
+  .put('/own-companies/:id/terms', async ({ auth, params, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateOwnCompanyTerms(params.id, body);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    params: t.Object({ id: t.String() }),
+    body: t.Object({
+      customerTerms: t.Optional(t.Nullable(t.String())),
+      supplierTerms: t.Optional(t.Nullable(t.String())),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update own company customer/supplier terms' },
   })
 
   // ═══════════════════════════════════════════════════════════════════

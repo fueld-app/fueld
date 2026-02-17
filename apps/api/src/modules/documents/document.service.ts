@@ -68,6 +68,7 @@ async function fetchOrderForInvoice(orderId: string) {
       place: true,
       salesRep: true,
       supplier: true,
+      invoicingCompany: true,
       items: true,
       invoices: true,
     },
@@ -75,6 +76,35 @@ async function fetchOrderForInvoice(orderId: string) {
 
   if (!order) throw new Error(`Order ${orderId} not found`);
   return order;
+}
+
+function renderCompanyTemplate(template: string | null | undefined, companyName: string | null | undefined): string | null {
+  const raw = template?.trim();
+  if (!raw) return null;
+  const name = companyName?.trim();
+  if (!name) return raw;
+  return raw.split('${companyName}').join(name);
+}
+
+function buildCompanyTermsSection(params: {
+  companyName?: string | null;
+  customerTerms?: string | null;
+  supplierTerms?: string | null;
+}): Content[] {
+  const customer = renderCompanyTemplate(params.customerTerms, params.companyName);
+  const supplier = renderCompanyTemplate(params.supplierTerms, params.companyName);
+  if (!customer && !supplier) return [];
+
+  const parts: Content[] = [{ text: 'Terms', style: 'sectionLabel' } as Content];
+  if (customer) {
+    parts.push({ text: 'Customer terms', bold: true, margin: [0, 0, 0, 4] } as Content);
+    parts.push({ text: customer, margin: [0, 0, 0, 8] } as Content);
+  }
+  if (supplier) {
+    parts.push({ text: 'Supplier terms', bold: true, margin: [0, 0, 0, 4] } as Content);
+    parts.push({ text: supplier, margin: [0, 0, 0, 8] } as Content);
+  }
+  return parts;
 }
 
 // ─── PDF Builder ─────────────────────────────────────────────────────
@@ -519,6 +549,9 @@ function buildOfferDocument(data: {
   paymentTerms: string | null;
   customerNote: string | null;
   placeOrderRemark: string | null;
+  companyName: string | null;
+  customerTerms: string | null;
+  supplierTerms: string | null;
   itemNotes: Array<{ label: string; note: string }>;
   currency: string;
   items: Array<{
@@ -660,6 +693,12 @@ function buildOfferDocument(data: {
         placeOrderRemark: data.placeOrderRemark,
         itemNotes: data.itemNotes,
       }),
+
+      ...buildCompanyTermsSection({
+        companyName: data.companyName,
+        customerTerms: data.customerTerms,
+        supplierTerms: data.supplierTerms,
+      }),
       { text: '', margin: [0, 20, 0, 0] } as Content,
       { text: 'Best regards,', margin: [0, 0, 0, 4] } as Content,
       { text: 'Fueld Trading', bold: true } as Content,
@@ -704,6 +743,9 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
     paymentTerms: formatCustomerPaymentTerms(order.customerPaymentTermType, order.customerCreditDays),
     customerNote: order.customerNote ?? null,
     placeOrderRemark: order.place?.orderRemark ?? null,
+    companyName: order.invoicingCompany?.name ?? null,
+    customerTerms: order.invoicingCompany?.customerTerms ?? null,
+    supplierTerms: order.invoicingCompany?.supplierTerms ?? null,
     itemNotes: order.items
       .filter((item) => item.customerNote)
       .map((item) => ({
@@ -746,6 +788,9 @@ function buildProformaDocument(data: {
   currency: string;
   paymentTerms: string | null;
   customerNote: string | null;
+  companyName: string | null;
+  customerTerms: string | null;
+  supplierTerms: string | null;
   itemNotes: Array<{ label: string; note: string }>;
   items: Array<{
     productType: string;
@@ -904,6 +949,12 @@ function buildProformaDocument(data: {
         itemNotes: data.itemNotes,
       }),
 
+      ...buildCompanyTermsSection({
+        companyName: data.companyName,
+        customerTerms: data.customerTerms,
+        supplierTerms: data.supplierTerms,
+      }),
+
       { text: '', margin: [0, 20, 0, 0] } as Content,
       { text: 'Best regards,', margin: [0, 0, 0, 4] } as Content,
       { text: 'Fueld Trading', bold: true } as Content,
@@ -953,6 +1004,9 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
     currency: order.currency ?? 'USD',
     paymentTerms,
     customerNote: order.customerNote ?? null,
+    companyName: order.invoicingCompany?.name ?? null,
+    customerTerms: order.invoicingCompany?.customerTerms ?? null,
+    supplierTerms: order.invoicingCompany?.supplierTerms ?? null,
     itemNotes: order.items
       .filter((item) => item.customerNote)
       .map((item) => ({

@@ -132,6 +132,9 @@ export interface CounterpartyDto {
   isSanctioned: boolean;
   lastSynced: string | null;
   manualOverrides: string[];
+  /** Terms templates used when this counterparty is marked as an own company. May include ${companyName}. */
+  customerTerms?: string | null;
+  supplierTerms?: string | null;
   responsibleUserId?: string | null;
   responsibleUserName?: string | null;
   contactsCount?: number | null;
@@ -989,6 +992,8 @@ export interface OwnCompanyDto {
   country: string | null;
   countryIso: string | null;
   logoUrl: string | null;
+  customerTerms: string | null;
+  supplierTerms: string | null;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
