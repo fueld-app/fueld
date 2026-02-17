@@ -32,11 +32,6 @@ jobs:
           POSTGRES_DB: postgres
         ports:
           - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U fueld" \
-          --health-interval 5s \
-          --health-timeout 3s \
-          --health-retries 20
     env:
       TEST_DB_BASE_URL: postgres://fueld:fueld@localhost:5432
     steps:
@@ -46,6 +41,10 @@ jobs:
           bun-version: latest
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      - name: Wait for Postgres
+        run: |
+          bun -e "import postgres from 'postgres'; const base=process.env.TEST_DB_BASE_URL; const sql=postgres(base + '/postgres',{max:1,connect_timeout:2}); const deadline=Date.now()+60_000; while(true){ try{ await sql`select 1 as ok`; break; } catch(e){ if(Date.now()>deadline){ console.error('Postgres not ready:', String(e?.message ?? e)); process.exit(1);} await new Promise(r=>setTimeout(r,1000)); } } await sql.end({timeout:5}); console.log('Postgres is ready');"
       - name: Create fresh test database
         run: |
           bun -e "import postgres from 'postgres'; const base=process.env.TEST_DB_BASE_URL; const dbName='fueld_test_mocked_' + (process.env.GITHUB_RUN_ID ?? String(Date.now())); const sql=postgres(base + '/postgres',{max:1}); try { await sql.unsafe('CREATE DATABASE ' + dbName); } finally { await sql.end({timeout:5}); } console.log(dbName);" > /tmp/dbname
@@ -67,11 +66,6 @@ jobs:
           POSTGRES_DB: postgres
         ports:
           - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U fueld" \
-          --health-interval 5s \
-          --health-timeout 3s \
-          --health-retries 20
     env:
       TEST_DB_BASE_URL: postgres://fueld:fueld@localhost:5432
     steps:
@@ -81,6 +75,10 @@ jobs:
           bun-version: latest
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      - name: Wait for Postgres
+        run: |
+          bun -e "import postgres from 'postgres'; const base=process.env.TEST_DB_BASE_URL; const sql=postgres(base + '/postgres',{max:1,connect_timeout:2}); const deadline=Date.now()+60_000; while(true){ try{ await sql`select 1 as ok`; break; } catch(e){ if(Date.now()>deadline){ console.error('Postgres not ready:', String(e?.message ?? e)); process.exit(1);} await new Promise(r=>setTimeout(r,1000)); } } await sql.end({timeout:5}); console.log('Postgres is ready');"
       - name: Create fresh test database
         run: |
           bun -e "import postgres from 'postgres'; const base=process.env.TEST_DB_BASE_URL; const dbName='fueld_test_db_' + (process.env.GITHUB_RUN_ID ?? String(Date.now())); const sql=postgres(base + '/postgres',{max:1}); try { await sql.unsafe('CREATE DATABASE ' + dbName); } finally { await sql.end({timeout:5}); } console.log(dbName);" > /tmp/dbname
@@ -102,11 +100,6 @@ jobs:
           POSTGRES_DB: postgres
         ports:
           - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U fueld" \
-          --health-interval 5s \
-          --health-timeout 3s \
-          --health-retries 20
     env:
       TEST_DB_BASE_URL: postgres://fueld:fueld@localhost:5432
     steps:
@@ -116,6 +109,10 @@ jobs:
           bun-version: latest
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      - name: Wait for Postgres
+        run: |
+          bun -e "import postgres from 'postgres'; const base=process.env.TEST_DB_BASE_URL; const sql=postgres(base + '/postgres',{max:1,connect_timeout:2}); const deadline=Date.now()+60_000; while(true){ try{ await sql`select 1 as ok`; break; } catch(e){ if(Date.now()>deadline){ console.error('Postgres not ready:', String(e?.message ?? e)); process.exit(1);} await new Promise(r=>setTimeout(r,1000)); } } await sql.end({timeout:5}); console.log('Postgres is ready');"
       - name: Create fresh test database
         run: |
           bun -e "import postgres from 'postgres'; const base=process.env.TEST_DB_BASE_URL; const dbName='fueld_test_e2e_' + (process.env.GITHUB_RUN_ID ?? String(Date.now())); const sql=postgres(base + '/postgres',{max:1}); try { await sql.unsafe('CREATE DATABASE ' + dbName); } finally { await sql.end({timeout:5}); } console.log(dbName);" > /tmp/dbname
@@ -139,7 +136,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Run web unit tests
-        run: cd apps/web && bun run test
+        run: cd apps/web && CI=true NG_CLI_ANALYTICS=false bun run test
 
   web-playwright:
     name: Web (playwright)
@@ -153,11 +150,6 @@ jobs:
           POSTGRES_DB: postgres
         ports:
           - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U fueld" \
-          --health-interval 5s \
-          --health-timeout 3s \
-          --health-retries 20
     env:
       TEST_DB_BASE_URL: postgres://fueld:fueld@localhost:5432
       WEB_PORT: 4200
@@ -175,6 +167,10 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Wait for Postgres
+        run: |
+          bun -e "import postgres from 'postgres'; const base=process.env.TEST_DB_BASE_URL; const sql=postgres(base + '/postgres',{max:1,connect_timeout:2}); const deadline=Date.now()+60_000; while(true){ try{ await sql`select 1 as ok`; break; } catch(e){ if(Date.now()>deadline){ console.error('Postgres not ready:', String(e?.message ?? e)); process.exit(1);} await new Promise(r=>setTimeout(r,1000)); } } await sql.end({timeout:5}); console.log('Postgres is ready');"
+
       - name: Create fresh test database
         run: |
           bun -e "import postgres from 'postgres'; const base=process.env.TEST_DB_BASE_URL; const dbName='fueld_test_pw_' + (process.env.GITHUB_RUN_ID ?? String(Date.now())); const sql=postgres(base + '/postgres',{max:1}); try { await sql.unsafe('CREATE DATABASE ' + dbName); } finally { await sql.end({timeout:5}); } console.log(dbName);" > /tmp/dbname
@@ -189,29 +185,30 @@ jobs:
       - name: Install Playwright browsers
         run: cd apps/web && bun run pw:install
 
-      - name: Start API
+      - name: Run Playwright (start API + web)
         run: |
-          cd apps/api
-          TEST_DATABASE_URL="$TEST_DATABASE_URL" CORS_ORIGIN="http://localhost:4200" APP_URL="http://localhost:4200" PORT=3000 bun run src/index.ts &
-          for i in $(seq 1 60); do
+          set -euo pipefail
+
+          cleanup() {
+            jobs -p | xargs -r kill || true
+          }
+          trap cleanup EXIT
+
+          (cd apps/api && TEST_DATABASE_URL="$TEST_DATABASE_URL" CORS_ORIGIN="http://localhost:4200" APP_URL="http://localhost:4200" PORT=3000 bun run src/index.ts) &
+          for i in $(seq 1 90); do
             if curl -sf http://127.0.0.1:3000/health > /dev/null; then
-              echo "API is up"; exit 0;
+              echo "API is up"; break
             fi
             sleep 1
           done
-          echo "API failed to start"; exit 1
 
-      - name: Start Web
-        run: |
-          cd apps/web
-          bunx ng serve --host localhost --port 4200 --watch=false &
-          for i in $(seq 1 120); do
+          (cd apps/web && bunx ng serve --host localhost --port 4200 --watch=false) &
+          for i in $(seq 1 180); do
             if curl -sf http://localhost:4200/login > /dev/null; then
-              echo "Web is up"; exit 0;
+              echo "Web is up"; break
             fi
             sleep 1
           done
-          echo "Web failed to start"; exit 1
 
-      - name: Run Playwright
-        run: cd apps/web && bun run test:e2e
+          cd apps/web
+          bun run test:e2e
