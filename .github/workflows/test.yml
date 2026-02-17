@@ -16,7 +16,7 @@ jobs:
         with:
           bun-version: latest
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install
       - name: Run types tests
         run: bun test packages/types/tests
 
@@ -40,11 +40,11 @@ jobs:
         with:
           bun-version: latest
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install
 
       - name: Wait for Postgres
         run: |
-          bun -e "import postgres from 'postgres'; const base=process.env.TEST_DB_BASE_URL; const sql=postgres(base + '/postgres',{max:1,connect_timeout:2}); const deadline=Date.now()+60_000; while(true){ try{ await sql`select 1 as ok`; break; } catch(e){ if(Date.now()>deadline){ console.error('Postgres not ready:', String(e?.message ?? e)); process.exit(1);} await new Promise(r=>setTimeout(r,1000)); } } await sql.end({timeout:5}); console.log('Postgres is ready');"
+          bun -e "import postgres from 'postgres'; const base=process.env.TEST_DB_BASE_URL; const sql=postgres(base + '/postgres',{max:1,connect_timeout:2}); const deadline=Date.now()+60_000; while(true){ try{ await sql.unsafe('select 1'); break; } catch(e){ if(Date.now()>deadline){ console.error('Postgres not ready:', String(e?.message ?? e)); process.exit(1);} await new Promise(r=>setTimeout(r,1000)); } } await sql.end({timeout:5}); console.log('Postgres is ready');"
       - name: Create fresh test database
         run: |
           bun -e "import postgres from 'postgres'; const base=process.env.TEST_DB_BASE_URL; const dbName='fueld_test_mocked_' + (process.env.GITHUB_RUN_ID ?? String(Date.now())); const sql=postgres(base + '/postgres',{max:1}); try { await sql.unsafe('CREATE DATABASE ' + dbName); } finally { await sql.end({timeout:5}); } console.log(dbName);" > /tmp/dbname
@@ -74,11 +74,11 @@ jobs:
         with:
           bun-version: latest
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install
 
       - name: Wait for Postgres
         run: |
-          bun -e "import postgres from 'postgres'; const base=process.env.TEST_DB_BASE_URL; const sql=postgres(base + '/postgres',{max:1,connect_timeout:2}); const deadline=Date.now()+60_000; while(true){ try{ await sql`select 1 as ok`; break; } catch(e){ if(Date.now()>deadline){ console.error('Postgres not ready:', String(e?.message ?? e)); process.exit(1);} await new Promise(r=>setTimeout(r,1000)); } } await sql.end({timeout:5}); console.log('Postgres is ready');"
+          bun -e "import postgres from 'postgres'; const base=process.env.TEST_DB_BASE_URL; const sql=postgres(base + '/postgres',{max:1,connect_timeout:2}); const deadline=Date.now()+60_000; while(true){ try{ await sql.unsafe('select 1'); break; } catch(e){ if(Date.now()>deadline){ console.error('Postgres not ready:', String(e?.message ?? e)); process.exit(1);} await new Promise(r=>setTimeout(r,1000)); } } await sql.end({timeout:5}); console.log('Postgres is ready');"
       - name: Create fresh test database
         run: |
           bun -e "import postgres from 'postgres'; const base=process.env.TEST_DB_BASE_URL; const dbName='fueld_test_db_' + (process.env.GITHUB_RUN_ID ?? String(Date.now())); const sql=postgres(base + '/postgres',{max:1}); try { await sql.unsafe('CREATE DATABASE ' + dbName); } finally { await sql.end({timeout:5}); } console.log(dbName);" > /tmp/dbname
@@ -108,11 +108,11 @@ jobs:
         with:
           bun-version: latest
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install
 
       - name: Wait for Postgres
         run: |
-          bun -e "import postgres from 'postgres'; const base=process.env.TEST_DB_BASE_URL; const sql=postgres(base + '/postgres',{max:1,connect_timeout:2}); const deadline=Date.now()+60_000; while(true){ try{ await sql`select 1 as ok`; break; } catch(e){ if(Date.now()>deadline){ console.error('Postgres not ready:', String(e?.message ?? e)); process.exit(1);} await new Promise(r=>setTimeout(r,1000)); } } await sql.end({timeout:5}); console.log('Postgres is ready');"
+          bun -e "import postgres from 'postgres'; const base=process.env.TEST_DB_BASE_URL; const sql=postgres(base + '/postgres',{max:1,connect_timeout:2}); const deadline=Date.now()+60_000; while(true){ try{ await sql.unsafe('select 1'); break; } catch(e){ if(Date.now()>deadline){ console.error('Postgres not ready:', String(e?.message ?? e)); process.exit(1);} await new Promise(r=>setTimeout(r,1000)); } } await sql.end({timeout:5}); console.log('Postgres is ready');"
       - name: Create fresh test database
         run: |
           bun -e "import postgres from 'postgres'; const base=process.env.TEST_DB_BASE_URL; const dbName='fueld_test_e2e_' + (process.env.GITHUB_RUN_ID ?? String(Date.now())); const sql=postgres(base + '/postgres',{max:1}); try { await sql.unsafe('CREATE DATABASE ' + dbName); } finally { await sql.end({timeout:5}); } console.log(dbName);" > /tmp/dbname
@@ -134,7 +134,7 @@ jobs:
         with:
           node-version: 22
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install
       - name: Run web unit tests
         run: cd apps/web && CI=true NG_CLI_ANALYTICS=false bun run test
 
@@ -165,11 +165,11 @@ jobs:
         with:
           node-version: 22
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install
 
       - name: Wait for Postgres
         run: |
-          bun -e "import postgres from 'postgres'; const base=process.env.TEST_DB_BASE_URL; const sql=postgres(base + '/postgres',{max:1,connect_timeout:2}); const deadline=Date.now()+60_000; while(true){ try{ await sql`select 1 as ok`; break; } catch(e){ if(Date.now()>deadline){ console.error('Postgres not ready:', String(e?.message ?? e)); process.exit(1);} await new Promise(r=>setTimeout(r,1000)); } } await sql.end({timeout:5}); console.log('Postgres is ready');"
+          bun -e "import postgres from 'postgres'; const base=process.env.TEST_DB_BASE_URL; const sql=postgres(base + '/postgres',{max:1,connect_timeout:2}); const deadline=Date.now()+60_000; while(true){ try{ await sql.unsafe('select 1'); break; } catch(e){ if(Date.now()>deadline){ console.error('Postgres not ready:', String(e?.message ?? e)); process.exit(1);} await new Promise(r=>setTimeout(r,1000)); } } await sql.end({timeout:5}); console.log('Postgres is ready');"
 
       - name: Create fresh test database
         run: |
