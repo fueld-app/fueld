@@ -32,7 +32,14 @@ const password = process.env['E2E_USER_PASSWORD'] ?? 'password123';
 const resetTargetEmail = (process.env['E2E_RESET_USER_EMAIL'] ?? 'resetme@fueld.local').toLowerCase();
 const resetTargetPassword = process.env['E2E_RESET_USER_PASSWORD'] ?? 'oldpassword123';
 
+const traderEmail = (process.env['E2E_TRADER_USER_EMAIL'] ?? 'trader@fueld.local').toLowerCase();
+const traderPassword = process.env['E2E_TRADER_USER_PASSWORD'] ?? 'traderpassword123';
+
 const ownCompanyName = process.env['E2E_OWN_COMPANY_NAME'] ?? 'E2E Own Company';
+
+const clientName = process.env['E2E_CLIENT_NAME'] ?? 'E2E Client Co';
+const vesselName = process.env['E2E_VESSEL_NAME'] ?? 'E2E Vessel';
+const placeName = process.env['E2E_PLACE_NAME'] ?? 'E2E Port';
 
 const sql = postgres(DATABASE_URL, { max: 1 });
 const db = drizzle(sql, { schema });
@@ -53,6 +60,7 @@ async function main(): Promise<void> {
 
   const passwordHash = await hashPassword(password);
   const resetPasswordHash = await hashPassword(resetTargetPassword);
+  const traderPasswordHash = await hashPassword(traderPassword);
 
   const existingAdmin = await db.query.users.findFirst({
     where: eq(schema.users.email, email),
@@ -114,6 +122,37 @@ async function main(): Promise<void> {
     });
   }
 
+  // Separate TRADER user for permission tests (not used in password reset flow).
+  const existingTrader = await db.query.users.findFirst({
+    where: eq(schema.users.email, traderEmail),
+  });
+  if (existingTrader) {
+    await db
+      .update(schema.users)
+      .set({
+        tenantId: tenant.id,
+        name: 'E2E Trader',
+        role: 'TRADER',
+        isActive: true,
+        is2faEnabled: false,
+        twoFactorSecret: null,
+        passwordHash: traderPasswordHash,
+        refreshToken: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.users.id, existingTrader.id));
+  } else {
+    await db.insert(schema.users).values({
+      tenantId: tenant.id,
+      email: traderEmail,
+      name: 'E2E Trader',
+      role: 'TRADER',
+      isActive: true,
+      is2faEnabled: false,
+      passwordHash: traderPasswordHash,
+    });
+  }
+
   // Ensure one own company exists for Admin → Our Companies tests.
   const existingOwnCompany = await db.query.counterparties.findFirst({
     where: and(
@@ -134,10 +173,51 @@ async function main(): Promise<void> {
     });
   }
 
+  // Seed one deterministic client + vessel + place for Trading flows.
+  const existingClient = await db.query.counterparties.findFirst({
+    where: and(
+      eq(schema.counterparties.tenantId, tenant.id),
+      eq(schema.counterparties.name, clientName),
+    ),
+  });
+  if (!existingClient) {
+    await db.insert(schema.counterparties).values({
+      tenantId: tenant.id,
+      name: clientName,
+      type: 'CLIENT',
+      types: ['CLIENT'],
+      country: 'US',
+      isOwnCompany: false,
+      customerTerms: null,
+      supplierTerms: null,
+    });
+  }
+
+  const existingVessel = await db.query.vessels.findFirst({
+    where: eq(schema.vessels.name, vesselName),
+  });
+  if (!existingVessel) {
+    await db.insert(schema.vessels).values({
+      name: vesselName,
+    });
+  }
+
+  const existingPlace = await db.query.places.findFirst({
+    where: eq(schema.places.name, placeName),
+  });
+  if (!existingPlace) {
+    await db.insert(schema.places).values({
+      name: placeName,
+      country: 'US',
+    });
+  }
+
   console.log(
     `✅ Seeded Playwright users: ${email}, ${resetTargetEmail} (tenant: ${tenant.name} / ${tenant.domain} / ${tenant.id})`,
   );
+  console.log(`✅ Seeded trader user: ${traderEmail}`);
   console.log(`✅ Seeded own company: ${ownCompanyName}`);
+  console.log(`✅ Seeded trading entities: client=${clientName}, vessel=${vesselName}, place=${placeName}`);
 }
 
 await main()

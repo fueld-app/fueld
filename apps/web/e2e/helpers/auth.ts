@@ -50,4 +50,8 @@ export async function loginViaUi(page: Page, params: { email: string; password: 
 
   // Assert we actually left the login page (guards against silent failures).
   await expect(page).not.toHaveURL(/\/login(\?.*)?$/);
+
+  // Wait for the authenticated app shell to render.
+  // This avoids flakiness where follow-up navigation happens before auth state is applied.
+  await expect(page.getByRole('link', { name: 'Dashboard' })).toBeVisible({ timeout: 15_000 });
 }
