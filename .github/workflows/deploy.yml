@@ -11,9 +11,14 @@ env:
   DOMAIN: riviera-marine.fueld.app
 
 jobs:
-  build:
-    name: Build
+  deploy:
+    name: Build & Deploy
     runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -43,61 +48,6 @@ jobs:
           cd apps/web
           bunx ng build --configuration production
 
-      # ─── Upload artifacts ──────────────────────────────────────────
-      - name: Upload API binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: api-binary
-          path: apps/api/app-release
-          retention-days: 5
-
-      - name: Upload frontend dist
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-dist
-          path: apps/web/dist/web/browser/
-          retention-days: 5
-
-      - name: Upload drizzle migrations
-        uses: actions/upload-artifact@v4
-        with:
-          name: drizzle-migrations
-          path: apps/api/drizzle/
-          retention-days: 5
-
-      - name: Upload deploy script
-        uses: actions/upload-artifact@v4
-        with:
-          name: deploy-script
-          path: deploy/deploy.sh
-          retention-days: 5
-
-      - name: Upload seed script
-        uses: actions/upload-artifact@v4
-        with:
-          name: seed-files
-          path: |
-            apps/api/src/db/seed.ts
-            apps/api/src/db/schema.ts
-            apps/api/src/modules/auth/password.service.ts
-            apps/api/src/lib/crypto.ts
-          retention-days: 5
-
-  deploy:
-    name: Deploy
-    runs-on: ubuntu-latest
-    needs: build
-    environment: production
-    concurrency:
-      group: deploy-production
-      cancel-in-progress: false
-
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
@@ -114,25 +64,25 @@ jobs:
       - name: Upload API binary
         run: |
           scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-            artifacts/api-binary/app-release \
+            apps/api/app-release \
             ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/opt/fueld/staging/app-release
 
       - name: Upload frontend
         run: |
           scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r \
-            artifacts/frontend-dist/* \
+            apps/web/dist/web/browser/* \
             ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/opt/fueld/staging/web/
 
       - name: Upload drizzle migrations
         run: |
           scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r \
-            artifacts/drizzle-migrations/* \
+            apps/api/drizzle/* \
             ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/opt/fueld/staging/drizzle/
 
       - name: Upload deploy script
         run: |
           scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-            artifacts/deploy-script/deploy.sh \
+            deploy/deploy.sh \
             ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/opt/fueld/staging/deploy.sh
 
       - name: Execute deployment
