@@ -1036,7 +1036,8 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   async submitPayment(): Promise<void> {
     const id = this.orderId();
     if (!id) return;
-    const amount = this.paymentAmount().trim();
+    const amountValue = this.paymentAmount();
+    const amount = (typeof amountValue === 'string' ? amountValue : String(amountValue ?? '')).trim();
     if (!amount) {
       this.showToast('error', 'Amount is required.');
       return;
