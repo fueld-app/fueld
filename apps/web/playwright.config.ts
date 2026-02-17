@@ -10,6 +10,12 @@ const testDbUrl =
   ?? 'postgres://fueld:fueld@localhost:5432/fueld_test';
 
 const reuseExistingServers = !process.env['CI'] && process.env['E2E_REUSE_EXISTING_SERVERS'] === '1';
+const isCI = !!process.env['CI'];
+
+const apiCommand = isCI ? 'bun run src/index.ts' : 'bun run dev';
+const webCommand = isCI
+  ? `bun run start -- --port ${PORT} --host localhost --watch=false`
+  : `bun run start -- --port ${PORT} --host localhost`;
 
 export default defineConfig({
   testDir: './e2e',
@@ -21,7 +27,7 @@ export default defineConfig({
   globalSetup: './e2e/global-setup.js',
   webServer: [
     {
-      command: 'bun run dev',
+      command: apiCommand,
       cwd: '../api',
       port: 3000,
       reuseExistingServer: reuseExistingServers,
@@ -32,7 +38,7 @@ export default defineConfig({
       },
     },
     {
-      command: `bun run start -- --port ${PORT} --host localhost`,
+      command: webCommand,
       cwd: '.',
       port: PORT,
       reuseExistingServer: reuseExistingServers,
