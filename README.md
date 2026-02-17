@@ -239,9 +239,10 @@ CI runs on GitHub Actions via `.github/workflows/test.yml` and splits the suite 
 - API (db)
 - API (e2e)
 - Web unit
-- Web Playwright smoke
 
-Each API/Playwright job provisions a **fresh Postgres database per job**, runs Drizzle migrations, then executes tests.
+Playwright UI tests are run locally (see below).
+
+Each DB-backed API job provisions a **fresh Postgres database per job**, runs Drizzle migrations, then executes tests.
 
 ### Playwright UI tests
 
