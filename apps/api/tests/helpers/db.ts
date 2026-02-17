@@ -165,6 +165,17 @@ async function ensureTestSchemaCompat(): Promise<void> {
     ADD COLUMN IF NOT EXISTS cost_currency text DEFAULT 'USD',
     ADD COLUMN IF NOT EXISTS sales_currency text DEFAULT 'USD'
   `;
+
+  await sql`
+    ALTER TABLE counterparties
+    ADD COLUMN IF NOT EXISTS customer_terms text,
+    ADD COLUMN IF NOT EXISTS supplier_terms text
+  `;
+
+  await sql`
+    ALTER TABLE places
+    ADD COLUMN IF NOT EXISTS order_remark text
+  `;
 }
 
 export async function truncateAll(): Promise<void> {
