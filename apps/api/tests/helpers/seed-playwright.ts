@@ -35,6 +35,14 @@ const resetTargetPassword = process.env['E2E_RESET_USER_PASSWORD'] ?? 'oldpasswo
 const traderEmail = (process.env['E2E_TRADER_USER_EMAIL'] ?? 'trader@fueld.local').toLowerCase();
 const traderPassword = process.env['E2E_TRADER_USER_PASSWORD'] ?? 'traderpassword123';
 
+const creditEmail = (process.env['E2E_CREDIT_USER_EMAIL'] ?? 'credit@fueld.local').toLowerCase();
+const creditPassword = process.env['E2E_CREDIT_USER_PASSWORD'] ?? 'creditpassword123';
+
+const twoFaEmail = (process.env['E2E_2FA_USER_EMAIL'] ?? 'twofa@fueld.local').toLowerCase();
+const twoFaPassword = process.env['E2E_2FA_USER_PASSWORD'] ?? 'twofapassword123';
+// Base32 secret used by common TOTP apps; we only need login→/login/2fa redirect stability.
+const twoFaSecret = process.env['E2E_2FA_SECRET'] ?? 'JBSWY3DPEHPK3PXP';
+
 const ownCompanyName = process.env['E2E_OWN_COMPANY_NAME'] ?? 'E2E Own Company';
 
 const clientName = process.env['E2E_CLIENT_NAME'] ?? 'E2E Client Co';
@@ -61,6 +69,8 @@ async function main(): Promise<void> {
   const passwordHash = await hashPassword(password);
   const resetPasswordHash = await hashPassword(resetTargetPassword);
   const traderPasswordHash = await hashPassword(traderPassword);
+  const creditPasswordHash = await hashPassword(creditPassword);
+  const twoFaPasswordHash = await hashPassword(twoFaPassword);
 
   const existingAdmin = await db.query.users.findFirst({
     where: eq(schema.users.email, email),
@@ -153,6 +163,69 @@ async function main(): Promise<void> {
     });
   }
 
+  // CREDITMANAGER user for creditGuard route coverage.
+  const existingCredit = await db.query.users.findFirst({
+    where: eq(schema.users.email, creditEmail),
+  });
+  if (existingCredit) {
+    await db
+      .update(schema.users)
+      .set({
+        tenantId: tenant.id,
+        name: 'E2E Credit Manager',
+        role: 'CREDITMANAGER',
+        isActive: true,
+        is2faEnabled: false,
+        twoFactorSecret: null,
+        passwordHash: creditPasswordHash,
+        refreshToken: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.users.id, existingCredit.id));
+  } else {
+    await db.insert(schema.users).values({
+      tenantId: tenant.id,
+      email: creditEmail,
+      name: 'E2E Credit Manager',
+      role: 'CREDITMANAGER',
+      isActive: true,
+      is2faEnabled: false,
+      passwordHash: creditPasswordHash,
+    });
+  }
+
+  // 2FA-enabled user for login→/login/2fa flow coverage.
+  const existing2fa = await db.query.users.findFirst({
+    where: eq(schema.users.email, twoFaEmail),
+  });
+  if (existing2fa) {
+    await db
+      .update(schema.users)
+      .set({
+        tenantId: tenant.id,
+        name: 'E2E Two-Factor',
+        role: 'TRADER',
+        isActive: true,
+        is2faEnabled: true,
+        twoFactorSecret: twoFaSecret,
+        passwordHash: twoFaPasswordHash,
+        refreshToken: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.users.id, existing2fa.id));
+  } else {
+    await db.insert(schema.users).values({
+      tenantId: tenant.id,
+      email: twoFaEmail,
+      name: 'E2E Two-Factor',
+      role: 'TRADER',
+      isActive: true,
+      is2faEnabled: true,
+      twoFactorSecret: twoFaSecret,
+      passwordHash: twoFaPasswordHash,
+    });
+  }
+
   // Ensure one own company exists for Admin → Our Companies tests.
   const existingOwnCompany = await db.query.counterparties.findFirst({
     where: and(
@@ -216,6 +289,8 @@ async function main(): Promise<void> {
     `✅ Seeded Playwright users: ${email}, ${resetTargetEmail} (tenant: ${tenant.name} / ${tenant.domain} / ${tenant.id})`,
   );
   console.log(`✅ Seeded trader user: ${traderEmail}`);
+  console.log(`✅ Seeded credit manager user: ${creditEmail}`);
+  console.log(`✅ Seeded 2FA user: ${twoFaEmail}`);
   console.log(`✅ Seeded own company: ${ownCompanyName}`);
   console.log(`✅ Seeded trading entities: client=${clientName}, vessel=${vesselName}, place=${placeName}`);
 }
