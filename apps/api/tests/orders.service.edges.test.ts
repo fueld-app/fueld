@@ -34,7 +34,8 @@ describe('orders.service edge branches', () => {
 
     const search = await listOrders({ search: second.orderNumber ?? '' });
     expect(search.total).toBe(1);
-    expect(search.items[0]?.id).toBe(second.id);
+    expect(search.items[0]?.id).toBeDefined();
+    expect(search.items[0]!.id).toBe(second.id);
 
     const filteredByRep = await listOrders({ salesRepId: user.id, statuses: ['INQUIRY', 'CONFIRMED'] });
     expect(filteredByRep.total).toBe(2);
@@ -81,8 +82,10 @@ describe('orders.service edge branches', () => {
 
     const rows = await listOrderPayments(order.id);
     expect(rows.length).toBe(2);
-    expect(rows[0]?.id).toBe(newer?.id);
-    expect(rows[1]?.id).toBe(older?.id);
+    expect(newer?.id).toBeDefined();
+    expect(older?.id).toBeDefined();
+    expect(rows[0]?.id).toBe(newer!.id);
+    expect(rows[1]?.id).toBe(older!.id);
   });
 
   it('covers null-return branches for missing order mutations', async () => {

@@ -206,7 +206,7 @@ export async function listCreditLines(query?: {
   const defaultDir = query?.sortBy ? 'asc' : 'desc';
   const sortFn = (query?.sortDir ?? defaultDir) === 'desc' ? desc : asc;
 
-  let listQuery = db
+  const listQueryBase = db
     .select({
       id: creditLines.id,
       tenantId: creditLines.tenantId,
@@ -223,20 +223,23 @@ export async function listCreditLines(query?: {
     })
     .from(creditLines);
 
-  let countQuery = db
+  const countQueryBase = db
     .select({ count: sql<number>`count(distinct ${creditLines.id})::int` })
     .from(creditLines);
 
-  if (query?.counterpartyId) {
-    listQuery = listQuery.innerJoin(
+  const listQuery = query?.counterpartyId
+    ? listQueryBase.innerJoin(
       creditLineCounterparties,
       eq(creditLineCounterparties.creditLineId, creditLines.id),
-    );
-    countQuery = countQuery.innerJoin(
+    )
+    : listQueryBase;
+
+  const countQuery = query?.counterpartyId
+    ? countQueryBase.innerJoin(
       creditLineCounterparties,
       eq(creditLineCounterparties.creditLineId, creditLines.id),
-    );
-  }
+    )
+    : countQueryBase;
 
   const [rows, countResult] = await Promise.all([
     listQuery

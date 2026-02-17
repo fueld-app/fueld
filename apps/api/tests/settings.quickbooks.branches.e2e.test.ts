@@ -30,7 +30,7 @@ describe('settings quickbooks branch e2e', () => {
     process.env['CORS_ORIGIN'] = originalEnv.CORS_ORIGIN;
   });
 
-  async function adminToken() {
+  async function adminToken(): Promise<string> {
     const seeded = await seedAuthBasics();
     const db = await getDb();
 
@@ -40,6 +40,9 @@ describe('settings quickbooks branch e2e', () => {
       .where(eq(users.id, seeded.user.id));
 
     const login = await loginE2E(seeded.user.email, seeded.password);
+    if (!login.accessToken) {
+      throw new Error('Expected login to return an accessToken');
+    }
     return login.accessToken;
   }
 
@@ -50,8 +53,10 @@ describe('settings quickbooks branch e2e', () => {
 
     const authUrl = String(authUrlRes.data?.data?.authUrl ?? '');
     const state = new URL(authUrl).searchParams.get('state');
-    expect(state).toBeTruthy();
-    return state as string;
+    if (!state) {
+      throw new Error('QuickBooks auth-url did not include a state parameter');
+    }
+    return state;
   }
 
   it('redirects with token_exchange reason when OAuth token exchange fails', async () => {
@@ -64,7 +69,7 @@ describe('settings quickbooks branch e2e', () => {
         return new Response('invalid_grant', { status: 400, statusText: 'Bad Request' });
       }
       return originalFetch(input, init);
-    }) as typeof globalThis.fetch;
+    }) as unknown as typeof globalThis.fetch;
 
     const callback = await requestRaw(`/admin/settings/integrations/quickbooks/callback?code=bad&realmId=1234&state=${state}`, { token });
     expect(callback.status).toBe(302);
@@ -81,7 +86,7 @@ describe('settings quickbooks branch e2e', () => {
         throw new Error('network down');
       }
       return originalFetch(input, init);
-    }) as typeof globalThis.fetch;
+    }) as unknown as typeof globalThis.fetch;
 
     const callback = await requestRaw(`/admin/settings/integrations/quickbooks/callback?code=abc&realmId=5678&state=${state}`, { token });
     expect(callback.status).toBe(302);
@@ -120,7 +125,7 @@ describe('settings quickbooks branch e2e', () => {
       }
 
       return originalFetch(input, init);
-    }) as typeof globalThis.fetch;
+    }) as unknown as typeof globalThis.fetch;
 
     const callback = await requestRaw(`/admin/settings/integrations/quickbooks/callback?code=ok&realmId=9999&state=${state}`, { token });
     expect(callback.status).toBe(302);

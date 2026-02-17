@@ -47,12 +47,12 @@ interface CreateOrderInput {
   currency?: string;
   eta?: string | null;
   etd?: string | null;
-  customerPaymentTermType?: string | null;
+  customerPaymentTermType?: 'CREDIT' | 'COD' | 'PREPAY' | null;
   customerCreditDays?: number | null;
   customerNote?: string | null;
   customerContactId?: string | null;
   supplierId?: string | null;
-  supplierPaymentTermType?: string | null;
+  supplierPaymentTermType?: 'CREDIT' | 'COD' | 'PREPAY' | null;
   supplierCreditDays?: number | null;
   supplierNote?: string | null;
   supplierContactId?: string | null;
@@ -70,12 +70,12 @@ interface UpdateOrderInput {
   status?: string;
   eta?: string | null;
   etd?: string | null;
-  customerPaymentTermType?: string | null;
+  customerPaymentTermType?: 'CREDIT' | 'COD' | 'PREPAY' | null;
   customerCreditDays?: number | null;
   customerNote?: string | null;
   customerContactId?: string | null;
   supplierId?: string | null;
-  supplierPaymentTermType?: string | null;
+  supplierPaymentTermType?: 'CREDIT' | 'COD' | 'PREPAY' | null;
   supplierCreditDays?: number | null;
   supplierNote?: string | null;
   supplierContactId?: string | null;
@@ -400,31 +400,33 @@ export async function createOrder(input: CreateOrderInput) {
   // Generate the external order number
   const orderNumber = await generateOrderNumber(input.tenantId);
 
+  const values: typeof orders.$inferInsert = {
+    tenantId: input.tenantId,
+    orderNumber,
+    clientId: input.clientId,
+    vesselId: input.vesselId,
+    placeId: input.placeId,
+    salesRepId: input.salesRepId ?? null,
+    invoicingCompanyId: input.invoicingCompanyId ?? null,
+    bankAccountId: input.bankAccountId ?? null,
+    currency: input.currency ?? 'USD',
+    eta: input.eta ? new Date(input.eta) : null,
+    etd: input.etd ? new Date(input.etd) : null,
+    customerPaymentTermType: input.customerPaymentTermType ?? null,
+    customerCreditDays: input.customerCreditDays ?? null,
+    customerNote: input.customerNote ?? null,
+    customerContactId: input.customerContactId ?? null,
+    supplierId: input.supplierId ?? null,
+    supplierPaymentTermType: input.supplierPaymentTermType ?? null,
+    supplierCreditDays: input.supplierCreditDays ?? null,
+    supplierNote: input.supplierNote ?? null,
+    supplierContactId: input.supplierContactId ?? null,
+    termsAndConditions: input.termsAndConditions ?? null,
+  };
+
   const [created] = await db
     .insert(orders)
-    .values({
-      tenantId: input.tenantId,
-      orderNumber,
-      clientId: input.clientId,
-      vesselId: input.vesselId,
-      placeId: input.placeId,
-      salesRepId: input.salesRepId ?? null,
-      invoicingCompanyId: input.invoicingCompanyId ?? null,
-      bankAccountId: input.bankAccountId ?? null,
-      currency: input.currency ?? 'USD',
-      eta: input.eta ? new Date(input.eta) : null,
-      etd: input.etd ? new Date(input.etd) : null,
-      customerPaymentTermType: input.customerPaymentTermType ?? null,
-      customerCreditDays: input.customerCreditDays ?? null,
-      customerNote: input.customerNote ?? null,
-      customerContactId: input.customerContactId ?? null,
-      supplierId: input.supplierId ?? null,
-      supplierPaymentTermType: input.supplierPaymentTermType ?? null,
-      supplierCreditDays: input.supplierCreditDays ?? null,
-      supplierNote: input.supplierNote ?? null,
-      supplierContactId: input.supplierContactId ?? null,
-      termsAndConditions: input.termsAndConditions ?? null,
-    })
+    .values(values)
     .returning();
 
   return created;

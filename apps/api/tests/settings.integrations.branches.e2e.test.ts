@@ -42,7 +42,7 @@ describe('settings integrations branch e2e', () => {
         });
       }
       return originalFetch(input, _init);
-    }) as typeof globalThis.fetch;
+    }) as unknown as typeof globalThis.fetch;
 
     const lli = await requestJson('/admin/settings/integrations/lli', {
       method: 'PUT',
@@ -67,7 +67,7 @@ describe('settings integrations branch e2e', () => {
         });
       }
       return originalFetch(input, _init);
-    }) as typeof globalThis.fetch;
+    }) as unknown as typeof globalThis.fetch;
 
     const lli = await requestJson('/admin/settings/integrations/lli', {
       method: 'PUT',
@@ -92,7 +92,7 @@ describe('settings integrations branch e2e', () => {
         });
       }
       return originalFetch(input, _init);
-    }) as typeof globalThis.fetch;
+    }) as unknown as typeof globalThis.fetch;
 
     const lli = await requestJson('/admin/settings/integrations/lli', {
       method: 'PUT',

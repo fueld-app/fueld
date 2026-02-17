@@ -34,6 +34,12 @@ import { db } from '../../db';
 import { users } from '../../db/schema';
 import { eq } from 'drizzle-orm';
 
+const PaymentTermTypeSchema = t.Union([
+  t.Literal('CREDIT'),
+  t.Literal('COD'),
+  t.Literal('PREPAY'),
+]);
+
 export const ordersController = new Elysia({ prefix: '/orders' })
   .use(authGuard)
 
@@ -188,12 +194,12 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         invoicingCompanyId: t.Optional(t.String()),
         bankAccountId: t.Optional(t.Nullable(t.String())),
         currency: t.Optional(t.String()),
-        customerPaymentTermType: t.Optional(t.Nullable(t.String())),
+        customerPaymentTermType: t.Optional(t.Nullable(PaymentTermTypeSchema)),
         customerCreditDays: t.Optional(t.Nullable(t.Number())),
         customerNote: t.Optional(t.Nullable(t.String())),
         customerContactId: t.Optional(t.Nullable(t.String())),
         supplierId: t.Optional(t.Nullable(t.String())),
-        supplierPaymentTermType: t.Optional(t.Nullable(t.String())),
+        supplierPaymentTermType: t.Optional(t.Nullable(PaymentTermTypeSchema)),
         supplierCreditDays: t.Optional(t.Nullable(t.Number())),
         supplierNote: t.Optional(t.Nullable(t.String())),
         supplierContactId: t.Optional(t.Nullable(t.String())),
@@ -244,12 +250,12 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         invoicingCompanyId: t.Optional(t.Nullable(t.String())),
         bankAccountId: t.Optional(t.Nullable(t.String())),
         currency: t.Optional(t.String()),
-        customerPaymentTermType: t.Optional(t.Nullable(t.String())),
+        customerPaymentTermType: t.Optional(t.Nullable(PaymentTermTypeSchema)),
         customerCreditDays: t.Optional(t.Nullable(t.Number())),
         customerNote: t.Optional(t.Nullable(t.String())),
         customerContactId: t.Optional(t.Nullable(t.String())),
         supplierId: t.Optional(t.Nullable(t.String())),
-        supplierPaymentTermType: t.Optional(t.Nullable(t.String())),
+        supplierPaymentTermType: t.Optional(t.Nullable(PaymentTermTypeSchema)),
         supplierCreditDays: t.Optional(t.Nullable(t.Number())),
         supplierNote: t.Optional(t.Nullable(t.String())),
         supplierContactId: t.Optional(t.Nullable(t.String())),

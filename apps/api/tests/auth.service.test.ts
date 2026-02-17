@@ -82,7 +82,7 @@ describe('auth.service', () => {
   test('handles O365 invalid, linked, email-link, and auto-provision branches', async () => {
     const db = await getDb();
 
-    globalThis.fetch = (async () => new Response('unauthorized', { status: 401 })) as typeof fetch;
+    globalThis.fetch = ((async () => new Response('unauthorized', { status: 401 })) as unknown) as typeof fetch;
     await expect(loginWithO365('invalid-token')).rejects.toThrow(
       'Invalid or expired Microsoft access token',
     );
@@ -93,7 +93,7 @@ describe('auth.service', () => {
       .set({ o365Id: 'ms-linked-1', updatedAt: new Date() })
       .where(eq(users.id, seeded.user.id));
 
-    globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    globalThis.fetch = ((async (_input: RequestInfo | URL, init?: RequestInit) => {
       const authHeader = String((init?.headers as Record<string, string> | undefined)?.Authorization ?? '');
 
       if (authHeader.includes('linked-token')) {
@@ -133,7 +133,7 @@ describe('auth.service', () => {
       }
 
       return new Response('unauthorized', { status: 401 });
-    }) as typeof fetch;
+    }) as unknown) as typeof fetch;
 
     const linked = await loginWithO365('linked-token');
     expect(linked.id).toBe(seeded.user.id);

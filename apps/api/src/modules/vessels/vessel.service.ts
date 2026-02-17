@@ -102,8 +102,8 @@ export async function listVessels(query?: {
     name: vessels.name,
     type: vessels.type,
     flag: vessels.flag,
-    dwt: vessels.dwt,
-    gt: vessels.gt,
+    dwt: vessels.deadWeightTonnage,
+    gt: vessels.grossTonnage,
     buildYear: vessels.buildYear,
     createdAt: vessels.createdAt,
   };

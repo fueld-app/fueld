@@ -9,7 +9,7 @@ afterEach(() => {
 
 describe('o365.service', () => {
   test('returns profile when graph API responds with usable identity fields', async () => {
-    globalThis.fetch = (async () =>
+    globalThis.fetch = ((async () =>
       new Response(
         JSON.stringify({
           id: 'ms-1',
@@ -18,7 +18,7 @@ describe('o365.service', () => {
           userPrincipalName: 'user@test.local',
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
-      )) as typeof fetch;
+      )) as unknown) as typeof fetch;
 
     const profile = await validateO365Token('valid-token');
     expect(profile).toEqual({
@@ -30,14 +30,14 @@ describe('o365.service', () => {
   });
 
   test('returns null when graph API response is non-OK', async () => {
-    globalThis.fetch = (async () => new Response('unauthorized', { status: 401 })) as typeof fetch;
+    globalThis.fetch = ((async () => new Response('unauthorized', { status: 401 })) as unknown) as typeof fetch;
 
     const profile = await validateO365Token('bad-token');
     expect(profile).toBeNull();
   });
 
   test('returns null when neither mail nor userPrincipalName is present', async () => {
-    globalThis.fetch = (async () =>
+    globalThis.fetch = ((async () =>
       new Response(
         JSON.stringify({
           id: 'ms-2',
@@ -46,16 +46,16 @@ describe('o365.service', () => {
           userPrincipalName: '',
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
-      )) as typeof fetch;
+      )) as unknown) as typeof fetch;
 
     const profile = await validateO365Token('missing-email-token');
     expect(profile).toBeNull();
   });
 
   test('returns null when fetch throws', async () => {
-    globalThis.fetch = (async () => {
+    globalThis.fetch = ((async () => {
       throw new Error('network down');
-    }) as typeof fetch;
+    }) as unknown) as typeof fetch;
 
     const profile = await validateO365Token('throws-token');
     expect(profile).toBeNull();

@@ -24,7 +24,7 @@ describe('auth controller more branches e2e', () => {
   }
 
   it('covers successful /auth/login/sso branch', async () => {
-    globalThis.fetch = (async () =>
+    globalThis.fetch = ((async () =>
       new Response(
         JSON.stringify({
           id: 'ms-sso-1',
@@ -33,7 +33,7 @@ describe('auth controller more branches e2e', () => {
           userPrincipalName: 'sso-user@test.local',
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
-      )) as typeof fetch;
+      )) as unknown) as typeof fetch;
 
     const res = await requestJson('/auth/login/sso', {
       method: 'POST',

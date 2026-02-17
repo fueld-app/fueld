@@ -99,12 +99,13 @@ export async function renamePasskey(
   passkeyId: string,
   friendlyName: string,
 ): Promise<boolean> {
-  const result = await db
+  const rows = await db
     .update(passkeys)
     .set({ friendlyName })
-    .where(and(eq(passkeys.id, passkeyId), eq(passkeys.userId, userId)));
+    .where(and(eq(passkeys.id, passkeyId), eq(passkeys.userId, userId)))
+    .returning({ id: passkeys.id });
 
-  return (result.rowCount ?? 0) > 0;
+  return rows.length > 0;
 }
 
 /** Delete a passkey. */
@@ -112,11 +113,12 @@ export async function deletePasskey(
   userId: string,
   passkeyId: string,
 ): Promise<boolean> {
-  const result = await db
+  const rows = await db
     .delete(passkeys)
-    .where(and(eq(passkeys.id, passkeyId), eq(passkeys.userId, userId)));
+    .where(and(eq(passkeys.id, passkeyId), eq(passkeys.userId, userId)))
+    .returning({ id: passkeys.id });
 
-  return (result.rowCount ?? 0) > 0;
+  return rows.length > 0;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
