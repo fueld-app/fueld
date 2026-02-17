@@ -29,11 +29,32 @@ const tenantName = process.env['E2E_TENANT_NAME'] ?? 'E2E Tenant';
 const email = (process.env['E2E_USER_EMAIL'] ?? 'e2e@fueld.local').toLowerCase();
 const password = process.env['E2E_USER_PASSWORD'] ?? 'password123';
 
+// Second admin user for parallel admin specs (avoids session invalidation issues when two specs log in as the same user).
+const admin2Email = (process.env['E2E_ADMIN2_EMAIL'] ?? 'admin2@fueld.local').toLowerCase();
+const admin2Password = process.env['E2E_ADMIN2_PASSWORD'] ?? 'admin2password123';
+
 const resetTargetEmail = (process.env['E2E_RESET_USER_EMAIL'] ?? 'resetme@fueld.local').toLowerCase();
 const resetTargetPassword = process.env['E2E_RESET_USER_PASSWORD'] ?? 'oldpassword123';
 
 const traderEmail = (process.env['E2E_TRADER_USER_EMAIL'] ?? 'trader@fueld.local').toLowerCase();
 const traderPassword = process.env['E2E_TRADER_USER_PASSWORD'] ?? 'traderpassword123';
+
+// Extra TRADER users so E2E specs can run in parallel without invalidating each other's sessions.
+const trader2Email = (process.env['E2E_TRADER2_USER_EMAIL'] ?? 'trader2@fueld.local').toLowerCase();
+const trader2Password = process.env['E2E_TRADER2_USER_PASSWORD'] ?? 'trader2password123';
+const trader3Email = (process.env['E2E_TRADER3_USER_EMAIL'] ?? 'trader3@fueld.local').toLowerCase();
+const trader3Password = process.env['E2E_TRADER3_USER_PASSWORD'] ?? 'trader3password123';
+const trader4Email = (process.env['E2E_TRADER4_USER_EMAIL'] ?? 'trader4@fueld.local').toLowerCase();
+const trader4Password = process.env['E2E_TRADER4_USER_PASSWORD'] ?? 'trader4password123';
+const trader5Email = (process.env['E2E_TRADER5_USER_EMAIL'] ?? 'trader5@fueld.local').toLowerCase();
+const trader5Password = process.env['E2E_TRADER5_USER_PASSWORD'] ?? 'trader5password123';
+const trader6Email = (process.env['E2E_TRADER6_USER_EMAIL'] ?? 'trader6@fueld.local').toLowerCase();
+const trader6Password = process.env['E2E_TRADER6_USER_PASSWORD'] ?? 'trader6password123';
+const trader7Email = (process.env['E2E_TRADER7_USER_EMAIL'] ?? 'trader7@fueld.local').toLowerCase();
+const trader7Password = process.env['E2E_TRADER7_USER_PASSWORD'] ?? 'trader7password123';
+
+const limitedEmail = (process.env['E2E_LIMITED_USER_EMAIL'] ?? 'limited@fueld.local').toLowerCase();
+const limitedPassword = process.env['E2E_LIMITED_USER_PASSWORD'] ?? 'limitedpassword123';
 
 const creditEmail = (process.env['E2E_CREDIT_USER_EMAIL'] ?? 'credit@fueld.local').toLowerCase();
 const creditPassword = process.env['E2E_CREDIT_USER_PASSWORD'] ?? 'creditpassword123';
@@ -67,8 +88,10 @@ async function main(): Promise<void> {
   }
 
   const passwordHash = await hashPassword(password);
+  const admin2PasswordHash = await hashPassword(admin2Password);
   const resetPasswordHash = await hashPassword(resetTargetPassword);
   const traderPasswordHash = await hashPassword(traderPassword);
+  const limitedPasswordHash = await hashPassword(limitedPassword);
   const creditPasswordHash = await hashPassword(creditPassword);
   const twoFaPasswordHash = await hashPassword(twoFaPassword);
 
@@ -99,6 +122,36 @@ async function main(): Promise<void> {
       isActive: true,
       is2faEnabled: false,
       passwordHash,
+    });
+  }
+
+  const existingAdmin2 = await db.query.users.findFirst({
+    where: eq(schema.users.email, admin2Email),
+  });
+  if (existingAdmin2) {
+    await db
+      .update(schema.users)
+      .set({
+        tenantId: tenant.id,
+        name: 'E2E Admin 2',
+        role: 'ADMIN',
+        isActive: true,
+        is2faEnabled: false,
+        twoFactorSecret: null,
+        passwordHash: admin2PasswordHash,
+        refreshToken: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.users.id, existingAdmin2.id));
+  } else {
+    await db.insert(schema.users).values({
+      tenantId: tenant.id,
+      email: admin2Email,
+      name: 'E2E Admin 2',
+      role: 'ADMIN',
+      isActive: true,
+      is2faEnabled: false,
+      passwordHash: admin2PasswordHash,
     });
   }
 
@@ -160,6 +213,80 @@ async function main(): Promise<void> {
       isActive: true,
       is2faEnabled: false,
       passwordHash: traderPasswordHash,
+    });
+  }
+
+  const extraTraders: Array<{ email: string; password: string; name: string }> = [
+    { email: trader2Email, password: trader2Password, name: 'E2E Trader 2' },
+    { email: trader3Email, password: trader3Password, name: 'E2E Trader 3' },
+    { email: trader4Email, password: trader4Password, name: 'E2E Trader 4' },
+    { email: trader5Email, password: trader5Password, name: 'E2E Trader 5' },
+    { email: trader6Email, password: trader6Password, name: 'E2E Trader 6' },
+    { email: trader7Email, password: trader7Password, name: 'E2E Trader 7' },
+  ];
+
+  for (const t of extraTraders) {
+    const passwordHash = await hashPassword(t.password);
+    const existing = await db.query.users.findFirst({
+      where: eq(schema.users.email, t.email),
+    });
+
+    if (existing) {
+      await db
+        .update(schema.users)
+        .set({
+          tenantId: tenant.id,
+          name: t.name,
+          role: 'TRADER',
+          isActive: true,
+          is2faEnabled: false,
+          twoFactorSecret: null,
+          passwordHash,
+          refreshToken: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.users.id, existing.id));
+    } else {
+      await db.insert(schema.users).values({
+        tenantId: tenant.id,
+        email: t.email,
+        name: t.name,
+        role: 'TRADER',
+        isActive: true,
+        is2faEnabled: false,
+        passwordHash,
+      });
+    }
+  }
+
+  // Additional limited TRADER user to avoid parallel session contention across specs.
+  const existingLimited = await db.query.users.findFirst({
+    where: eq(schema.users.email, limitedEmail),
+  });
+  if (existingLimited) {
+    await db
+      .update(schema.users)
+      .set({
+        tenantId: tenant.id,
+        name: 'E2E Limited',
+        role: 'TRADER',
+        isActive: true,
+        is2faEnabled: false,
+        twoFactorSecret: null,
+        passwordHash: limitedPasswordHash,
+        refreshToken: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.users.id, existingLimited.id));
+  } else {
+    await db.insert(schema.users).values({
+      tenantId: tenant.id,
+      email: limitedEmail,
+      name: 'E2E Limited',
+      role: 'TRADER',
+      isActive: true,
+      is2faEnabled: false,
+      passwordHash: limitedPasswordHash,
     });
   }
 
@@ -286,9 +413,13 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    `✅ Seeded Playwright users: ${email}, ${resetTargetEmail} (tenant: ${tenant.name} / ${tenant.domain} / ${tenant.id})`,
+    `✅ Seeded Playwright users: ${email}, ${admin2Email}, ${resetTargetEmail} (tenant: ${tenant.name} / ${tenant.domain} / ${tenant.id})`,
   );
   console.log(`✅ Seeded trader user: ${traderEmail}`);
+  console.log(
+    `✅ Seeded additional trader users: ${[trader2Email, trader3Email, trader4Email, trader5Email, trader6Email, trader7Email].join(', ')}`,
+  );
+  console.log(`✅ Seeded limited user: ${limitedEmail}`);
   console.log(`✅ Seeded credit manager user: ${creditEmail}`);
   console.log(`✅ Seeded 2FA user: ${twoFaEmail}`);
   console.log(`✅ Seeded own company: ${ownCompanyName}`);

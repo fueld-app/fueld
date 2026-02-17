@@ -39,7 +39,24 @@ test('admin can generate and use password reset link', async ({ page }) => {
   expect(resetLink).toContain('token=');
 
   // 6) Use the reset link to set a new password
-  await page.goto(resetLink);
+  // The API may return an absolute URL using the tenant's domain (e.g. test.local),
+  // but locally Playwright serves the web app on the configured baseURL (typically localhost).
+  // Rewrite the host to the Playwright baseURL so navigation works in local dev.
+  const baseURL = test.info().project.use.baseURL;
+  let resetHref = resetLink;
+  try {
+    const parsed = new URL(resetLink);
+    if (baseURL) {
+      const base = new URL(baseURL);
+      parsed.protocol = base.protocol;
+      parsed.host = base.host;
+      resetHref = parsed.toString();
+    }
+  } catch {
+    // Relative URL (already compatible with baseURL)
+  }
+
+  await page.goto(resetHref);
   await expect(page.getByRole('heading', { name: 'Reset your password' })).toBeVisible();
   await page.locator('#password').fill(newPassword);
   await page.locator('#confirmPassword').fill(newPassword);

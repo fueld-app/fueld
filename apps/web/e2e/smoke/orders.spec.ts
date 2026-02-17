@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { loginViaUi } from '../helpers/auth';
 
-const email = process.env['E2E_USER_EMAIL'] ?? 'e2e@fueld.local';
-const password = process.env['E2E_USER_PASSWORD'] ?? 'password123';
+const email = process.env['E2E_TRADER5_USER_EMAIL'] ?? 'trader5@fueld.local';
+const password = process.env['E2E_TRADER5_USER_PASSWORD'] ?? 'trader5password123';
 
 test('orders list page loads', async ({ page }) => {
   await loginViaUi(page, { email, password });

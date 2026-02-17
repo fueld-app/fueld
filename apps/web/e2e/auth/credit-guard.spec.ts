@@ -3,8 +3,8 @@ import { loginViaUi } from '../helpers/auth';
 
 test('trader cannot access credit routes', async ({ page }) => {
   await loginViaUi(page, {
-    email: process.env['E2E_TRADER_USER_EMAIL'] ?? 'trader@fueld.local',
-    password: process.env['E2E_TRADER_USER_PASSWORD'] ?? 'traderpassword123',
+    email: process.env['E2E_TRADER6_USER_EMAIL'] ?? 'trader6@fueld.local',
+    password: process.env['E2E_TRADER6_USER_PASSWORD'] ?? 'trader6password123',
   });
 
   await page.goto('/credit/suppliers');

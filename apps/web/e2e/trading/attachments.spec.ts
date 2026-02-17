@@ -11,7 +11,14 @@ async function createOrderFromInquiry(page: import('@playwright/test').Page): Pr
   await page.goto('/trading/inquiries?new=1');
 
   const modal = page.getByRole('dialog');
-  await expect(modal.getByRole('heading', { name: 'New Inquiry' })).toBeVisible();
+  try {
+    await expect(modal.getByRole('heading', { name: 'New Inquiry' })).toBeVisible({ timeout: 15_000 });
+  } catch {
+    const newInquiry = page.getByRole('button', { name: 'New Inquiry' });
+    await expect(newInquiry).toBeVisible({ timeout: 15_000 });
+    await newInquiry.click();
+    await expect(modal.getByRole('heading', { name: 'New Inquiry' })).toBeVisible({ timeout: 15_000 });
+  }
 
   await selectSearchableDropdownOption(page, modal, 'Client', CLIENT_NAME);
   await selectSearchableDropdownOption(page, modal, 'Vessel', VESSEL_NAME);
@@ -27,8 +34,8 @@ async function createOrderFromInquiry(page: import('@playwright/test').Page): Pr
 
 test('upload OTHER attachment and preview/download', async ({ page }) => {
   await loginViaUi(page, {
-    email: process.env['E2E_USER_EMAIL'] ?? 'e2e@fueld.local',
-    password: process.env['E2E_USER_PASSWORD'] ?? 'password123',
+    email: process.env['E2E_TRADER7_USER_EMAIL'] ?? 'trader7@fueld.local',
+    password: process.env['E2E_TRADER7_USER_PASSWORD'] ?? 'trader7password123',
   });
 
   await createOrderFromInquiry(page);

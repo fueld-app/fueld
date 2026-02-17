@@ -3,8 +3,8 @@ import { loginViaUi } from '../helpers/auth';
 
 test('trader cannot access admin routes', async ({ page }) => {
   await loginViaUi(page, {
-    email: process.env['E2E_TRADER_USER_EMAIL'] ?? 'trader@fueld.local',
-    password: process.env['E2E_TRADER_USER_PASSWORD'] ?? 'traderpassword123',
+    email: process.env['E2E_LIMITED_USER_EMAIL'] ?? 'limited@fueld.local',
+    password: process.env['E2E_LIMITED_USER_PASSWORD'] ?? 'limitedpassword123',
   });
 
   await page.goto('/admin/users');

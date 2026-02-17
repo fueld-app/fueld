@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { loginViaUi } from '../helpers/auth';
 
-const adminEmail = process.env['E2E_USER_EMAIL'] ?? 'e2e@fueld.local';
-const adminPassword = process.env['E2E_USER_PASSWORD'] ?? 'password123';
+const adminEmail = process.env['E2E_ADMIN2_EMAIL'] ?? 'admin2@fueld.local';
+const adminPassword = process.env['E2E_ADMIN2_PASSWORD'] ?? 'admin2password123';
 const ownCompanyName = process.env['E2E_OWN_COMPANY_NAME'] ?? 'E2E Own Company';
 
 test('admin can edit own-company customer/supplier terms', async ({ page }) => {
