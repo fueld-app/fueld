@@ -20,6 +20,32 @@ jobs:
       - name: Run types tests
         run: bun test packages/types/tests
 
+  api-typecheck:
+    name: API (typecheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install
+      - name: Typecheck
+        run: cd apps/api && bun run typecheck
+
+  api-build:
+    name: API (build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install
+      - name: Build
+        run: cd apps/api && bun run build
+
   api-mocked:
     name: API (mocked)
     runs-on: ubuntu-latest
@@ -143,6 +169,38 @@ jobs:
         run: bun install
       - name: Run web unit tests
         run: cd apps/web && CI=true NG_CLI_ANALYTICS=false bun run test
+
+  web-typecheck:
+    name: Web (typecheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: bun install
+      - name: Typecheck
+        run: cd apps/web && bunx tsc --noEmit -p tsconfig.json
+
+  web-build:
+    name: Web (build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: bun install
+      - name: Build
+        run: cd apps/web && CI=true NG_CLI_ANALYTICS=false bun run build
 
   web-playwright:
     name: Web (playwright)
