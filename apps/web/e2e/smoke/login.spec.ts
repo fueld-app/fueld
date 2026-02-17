@@ -7,7 +7,7 @@ const password = process.env['E2E_USER_PASSWORD'] ?? 'password123';
 test('login redirects to dashboard', async ({ page }) => {
   await loginViaUi(page, { email, password });
 
-  // Any authenticated route is fine; dashboard is the default.
-  await expect(page).toHaveURL(/\/$|\/analytics|\/trading\//);
-  await expect(page.getByText(/Dashboard|Analytics|Trading/i)).toBeVisible();
+  // Dashboard is the default route after login.
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
 });

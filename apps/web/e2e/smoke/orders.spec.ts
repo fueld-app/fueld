@@ -9,5 +9,5 @@ test('orders list page loads', async ({ page }) => {
 
   await page.goto('/trading/orders');
   await expect(page).toHaveURL(/\/trading\/orders/);
-  await expect(page.getByRole('heading', { name: /Orders/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Orders' })).toBeVisible();
 });
