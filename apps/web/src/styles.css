@@ -48,6 +48,65 @@ body {
   overscroll-behavior-x: none;
 }
 
+/* ─── iOS PWA safe-area handling ───────────────────────────────────
+
+   In iOS standalone mode the status bar/Dynamic Island can overlap content when
+   `apple-mobile-web-app-status-bar-style=black-translucent` + `viewport-fit=cover`.
+   We expose safe-area insets via CSS variables and apply them to the shell.
+*/
+
+:root {
+  --pwa-safe-top: 0px;
+  --pwa-safe-right: 0px;
+  --pwa-safe-bottom: 0px;
+  --pwa-safe-left: 0px;
+}
+
+@media (display-mode: standalone) {
+  :root {
+    --pwa-safe-top: env(safe-area-inset-top, 0px);
+    --pwa-safe-right: env(safe-area-inset-right, 0px);
+    --pwa-safe-bottom: env(safe-area-inset-bottom, 0px);
+    --pwa-safe-left: env(safe-area-inset-left, 0px);
+  }
+
+  /* Ensure full-height on iOS (avoid 100vh issues) */
+  html,
+  body {
+    min-height: 100dvh;
+  }
+
+  .app-shell {
+    min-height: 100dvh;
+  }
+
+  .app-topbar {
+    padding-top: var(--pwa-safe-top);
+    height: calc(4rem + var(--pwa-safe-top));
+  }
+
+  .app-sidebar {
+    padding-top: var(--pwa-safe-top);
+    padding-bottom: var(--pwa-safe-bottom);
+  }
+
+  .app-main {
+    padding-bottom: calc(1rem + var(--pwa-safe-bottom));
+  }
+}
+
+@media (display-mode: standalone) and (min-width: 640px) {
+  .app-main {
+    padding-bottom: calc(1.5rem + var(--pwa-safe-bottom));
+  }
+}
+
+@media (display-mode: standalone) and (min-width: 1024px) {
+  .app-main {
+    padding-bottom: calc(2rem + var(--pwa-safe-bottom));
+  }
+}
+
 /* ─── Scrollbar styling ───────────────────────────────────────────── */
 
 ::-webkit-scrollbar {

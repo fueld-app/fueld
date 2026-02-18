@@ -222,7 +222,7 @@ const NAVIGATION: NavItem[] = [
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <!--  Main content area                                             -->
     <!-- ═══════════════════════════════════════════════════════════════ -->
-    <div class="flex min-h-screen flex-col lg:pl-64">
+    <div class="app-shell flex min-h-screen min-h-[100dvh] flex-col lg:pl-64">
       @if (showUpdateToast()) {
         <div class="fixed right-4 top-4 z-50 w-80 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-lg">
           <p class="text-sm font-semibold text-amber-900">Update available</p>
@@ -244,7 +244,7 @@ const NAVIGATION: NavItem[] = [
         </div>
       }
       <!-- Top bar -->
-      <header class="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-gray-200 bg-white/80 px-4 backdrop-blur-md sm:px-6 lg:px-8">
+      <header class="app-topbar sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-gray-200 bg-white/80 px-4 backdrop-blur-md sm:px-6 lg:px-8">
         <!-- Hamburger (mobile only) -->
         <button
           class="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 lg:hidden"
@@ -401,7 +401,7 @@ const NAVIGATION: NavItem[] = [
       </header>
 
       <!-- Page content -->
-      <main class="flex-1 p-4 sm:p-6 lg:p-8">
+      <main class="app-main flex-1 p-4 sm:p-6 lg:p-8">
         <router-outlet />
       </main>
     </div>
@@ -410,6 +410,7 @@ const NAVIGATION: NavItem[] = [
     :host {
       display: block;
       min-height: 100vh;
+      min-height: 100dvh;
     }
   `,
 })
@@ -731,7 +732,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
   readonly sidebarClasses = computed(() => {
     const base =
-      'fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-sidebar transition-transform duration-300 ease-in-out';
+      'app-sidebar fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-sidebar transition-transform duration-300 ease-in-out';
     const mobileVisibility = this.sidebarOpen()
       ? 'translate-x-0'
       : '-translate-x-full';
