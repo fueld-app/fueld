@@ -95,15 +95,38 @@ body {
   padding-bottom: calc(1rem + var(--safe-bottom));
 }
 
+/* In landscape on notched iPhones, the notch/Dynamic Island sits on the left/right.
+   Add safe-area padding to body content (not the header). */
+@media (orientation: landscape) {
+  .app-main {
+    padding-left: calc(1rem + var(--safe-left));
+    padding-right: calc(1rem + var(--safe-right));
+  }
+}
+
 @media (min-width: 640px) {
   .app-main {
     padding-bottom: calc(1.5rem + var(--safe-bottom));
   }
 }
 
+@media (orientation: landscape) and (min-width: 640px) {
+  .app-main {
+    padding-left: calc(1.5rem + var(--safe-left));
+    padding-right: calc(1.5rem + var(--safe-right));
+  }
+}
+
 @media (min-width: 1024px) {
   .app-main {
     padding-bottom: calc(2rem + var(--safe-bottom));
+  }
+}
+
+@media (orientation: landscape) and (min-width: 1024px) {
+  .app-main {
+    padding-left: calc(2rem + var(--safe-left));
+    padding-right: calc(2rem + var(--safe-right));
   }
 }
 
