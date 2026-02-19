@@ -12,7 +12,7 @@ import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subject, of } from 'rxjs';
 import { debounceTime, switchMap, tap, catchError, takeUntil } from 'rxjs/operators';
 import type { CounterpartyDto, ApiResponse } from '@fueld/types';
-import { COUNTRIES } from '../../../../shared/data/countries';
+import { COUNTRIES, SORTED_COUNTRIES } from '../../../../shared/data/countries';
 import { flagFromIso3 } from '../../../../shared/utils/flags';
 import { PaginationComponent, SortHeaderComponent } from '../../../../shared/components';
 import type { SortChangeEvent } from '../../../../shared/components';
@@ -314,7 +314,7 @@ interface CompanySearchResult {
 
       <!-- Create manually modal -->
       @if (showCreateModal()) {
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" (click)="showCreateModal.set(false)">
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div class="rounded-xl bg-white p-6 shadow-xl w-full max-w-lg mx-4" (click)="$event.stopPropagation()">
             <h3 class="text-lg font-semibold text-gray-900">Create Company</h3>
             <p class="mt-1 text-sm text-gray-500">Add a company manually that isn't in Seasearcher.</p>
@@ -421,7 +421,7 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
     country: '',
     countryIso: '',
   });
-  readonly countries = COUNTRIES;
+  readonly countries = SORTED_COUNTRIES;
   readonly typeOptions = [
     { value: 'CLIENT', label: 'Client' },
     { value: 'SUPPLIER', label: 'Supplier' },

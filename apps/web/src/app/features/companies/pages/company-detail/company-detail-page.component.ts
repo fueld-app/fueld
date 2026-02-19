@@ -1072,7 +1072,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
 
             <!-- Contact Modal -->
             @if (showContactModal()) {
-              <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" (click)="showContactModal.set(false)">
+              <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
                 <div class="rounded-xl bg-white p-6 shadow-xl w-full max-w-md mx-4" (click)="$event.stopPropagation()">
                   <h3 class="text-lg font-semibold text-gray-900">{{ editingContactId() ? 'Edit' : 'Add' }} Contact</h3>
 

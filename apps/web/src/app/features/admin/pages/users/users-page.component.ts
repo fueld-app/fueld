@@ -437,7 +437,7 @@ import { API } from '@app/core/config/api';
 
       <!-- Invite Modal -->
       @if (showInviteModal()) {
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" (click)="closeInviteModal()">
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div
             class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
             (click)="$event.stopPropagation()"
@@ -553,7 +553,7 @@ import { API } from '@app/core/config/api';
 
       <!-- IP Restriction Modal -->
       @if (ipModalUser()) {
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" (click)="closeIpModal()">
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl" (click)="$event.stopPropagation()">
             <h2 class="text-lg font-bold text-gray-900 mb-1">IP Restrictions</h2>
             <p class="text-sm text-gray-500 mb-4">

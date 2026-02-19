@@ -17,7 +17,7 @@ export const COUNTRIES: Country[] = [
   { code: 'AIA', name: 'Anguilla' },
   { code: 'ATA', name: 'Antarctica' },
   { code: 'ATG', name: 'Antigua & Barbuda' },
-  { code: 'EGY', name: 'Arab Republic of Egypt' },
+  { code: 'EGY', name: 'Egypt' },
   { code: 'ARG', name: 'Argentina' },
   { code: 'ABW', name: 'Aruba' },
   { code: 'AUS', name: 'Australia' },
@@ -270,3 +270,8 @@ export const COUNTRIES: Country[] = [
   { code: 'ZMB', name: 'Zambia' },
   { code: 'ZWE', name: 'Zimbabwe' },
 ];
+
+/** Alphabetically sorted country list for consistent dropdown ordering across the app. */
+export const SORTED_COUNTRIES: Country[] = [...COUNTRIES].sort((a, b) =>
+  a.name.localeCompare(b.name),
+);

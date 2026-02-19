@@ -292,7 +292,7 @@ interface CompanySearchResultOption {
 
       <!-- Add Company Modal -->
       @if (showAddModal()) {
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" (click)="showAddModal.set(false)">
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div class="rounded-xl bg-white p-6 shadow-xl w-full max-w-lg mx-4" (click)="$event.stopPropagation()">
             <h3 class="text-lg font-semibold text-gray-900">Add Own Company</h3>
             <p class="mt-1 text-sm text-gray-500">Search for and select an existing company to mark as your own.</p>
@@ -335,7 +335,7 @@ interface CompanySearchResultOption {
 
       <!-- Bank Account Modal (Create / Edit) -->
       @if (bankAccountModalOpen()) {
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" (click)="bankAccountModalOpen.set(false)">
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div class="rounded-xl bg-white p-6 shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto" (click)="$event.stopPropagation()">
             <h3 class="text-lg font-semibold text-gray-900">{{ editingBankAccount() ? 'Edit' : 'Add' }} Bank Account</h3>
             <form class="mt-4 space-y-4" (ngSubmit)="saveBankAccount()">
