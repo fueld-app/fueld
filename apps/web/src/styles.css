@@ -56,10 +56,55 @@ body {
 */
 
 :root {
+  /* Runtime-updated visible viewport height (set in app.ts) */
+  --app-height: 100vh;
+
+  /* Always-available safe-area insets (0 when not applicable). */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+
   --pwa-safe-top: 0px;
   --pwa-safe-right: 0px;
   --pwa-safe-bottom: 0px;
   --pwa-safe-left: 0px;
+}
+
+/* Use the real visible viewport height on iOS (avoids 100vh cutoff behind toolbars). */
+html,
+body {
+  min-height: var(--app-height);
+}
+
+.app-shell {
+  min-height: var(--app-height);
+}
+
+/* Tailwind 'screen' helpers can be problematic on iOS (100vh includes browser UI). */
+.min-h-screen {
+  min-height: var(--app-height);
+}
+
+.h-screen {
+  height: var(--app-height);
+}
+
+/* Ensure bottom content isn't hidden behind iOS home indicator / browser UI. */
+.app-main {
+  padding-bottom: calc(1rem + var(--safe-bottom));
+}
+
+@media (min-width: 640px) {
+  .app-main {
+    padding-bottom: calc(1.5rem + var(--safe-bottom));
+  }
+}
+
+@media (min-width: 1024px) {
+  .app-main {
+    padding-bottom: calc(2rem + var(--safe-bottom));
+  }
 }
 
 @media (display-mode: standalone) {
