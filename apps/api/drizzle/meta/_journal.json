@@ -148,6 +148,13 @@
       "when": 1771200016000,
       "tag": "0020_counterparty_terms_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1771200017000,
+      "tag": "0021_user_phone",
+      "breakpoints": true
     }
   ]
 }
