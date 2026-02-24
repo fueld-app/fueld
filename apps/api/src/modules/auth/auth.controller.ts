@@ -48,6 +48,7 @@ function sanitiseUser(user: {
   leaveEndDate: string | null;
   delegateId: string | null;
   avatarUrl?: string | null;
+  phone?: string | null;
 }) {
   return {
     id: user.id,
@@ -61,6 +62,7 @@ function sanitiseUser(user: {
     leaveEndDate: user.leaveEndDate,
     delegateId: user.delegateId,
     avatarUrl: user.avatarUrl ?? null,
+    phone: user.phone ?? null,
   };
 }
 
@@ -977,6 +979,47 @@ export const authController = new Elysia({ prefix: '/auth' })
     },
     {
       detail: { tags: ['Auth'], summary: 'Delete a passkey', security: [{ bearerAuth: [] }] },
+    },
+  )
+
+  // ══════════════════════════════════════════════════════════════════
+  //  PROFILE
+  // ══════════════════════════════════════════════════════════════════
+
+  // ── PATCH /auth/phone — update user phone number ───────────────────
+  .patch(
+    '/phone',
+    async ({ body, headers, jwtAccess }) => {
+      try {
+        const authHeader = headers['authorization'];
+        if (!authHeader?.startsWith('Bearer ')) {
+          return { success: false, data: null, message: 'Missing authorization header' } satisfies ApiResponse<null>;
+        }
+        const decoded = extractPayload(await jwtAccess.verify(authHeader.slice(7)));
+        if (!decoded) {
+          return { success: false, data: null, message: 'Invalid token' } satisfies ApiResponse<null>;
+        }
+
+        const phone = body.phone?.trim() || null;
+
+        const { db } = await import('../../db');
+        const { users } = await import('../../db/schema');
+        const { eq } = await import('drizzle-orm');
+        await db.update(users).set({ phone, updatedAt: new Date() }).where(eq(users.id, decoded.sub));
+
+        const user = await findUserById(decoded.sub);
+        if (!user) {
+          return { success: false, data: null, message: 'User not found' } satisfies ApiResponse<null>;
+        }
+        return { success: true, data: { user: sanitiseUser(user) } } satisfies ApiResponse<any>;
+      } catch (err) {
+        console.error('[Profile] Phone update failed:', err);
+        return { success: false, data: null, message: 'Failed to update phone number' } satisfies ApiResponse<null>;
+      }
+    },
+    {
+      body: t.Object({ phone: t.Union([t.String(), t.Null()]) }),
+      detail: { tags: ['Auth'], summary: 'Update user phone number', security: [{ bearerAuth: [] }] },
     },
   )
 

@@ -17,6 +17,48 @@ import type { PasskeyDto } from '@fueld/types';
   imports: [FormsModule, DatePipe],
   template: `
     <div class="mx-auto">
+      <!-- Profile: Phone Number -->
+      <div class="mb-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm max-w-md">
+        <h2 class="text-lg font-bold text-gray-900">Profile</h2>
+        <p class="mt-1 text-sm text-gray-500">Your phone number will appear on generated PDF documents (offers, proforma invoices).</p>
+
+        @if (phoneSuccess()) {
+          <div class="mt-3 rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 text-sm text-green-700">
+            {{ phoneSuccess() }}
+          </div>
+        }
+        @if (phoneError()) {
+          <div class="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">
+            {{ phoneError() }}
+          </div>
+        }
+
+        <form (ngSubmit)="savePhone()" class="mt-4 flex items-end gap-3">
+          <div class="flex-1">
+            <label for="phone" class="block text-sm font-medium text-gray-700 mb-1">Phone number</label>
+            <input
+              id="phone"
+              type="tel"
+              [(ngModel)]="phoneValue"
+              name="phone"
+              placeholder="e.g. +45 2613 1217"
+              class="block w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            />
+          </div>
+          <button
+            type="submit"
+            [disabled]="savingPhone()"
+            class="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            @if (savingPhone()) {
+              Saving…
+            } @else {
+              Save
+            }
+          </button>
+        </form>
+      </div>
+
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 
       <div class="flex flex-col rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
@@ -371,7 +413,15 @@ export class TwoFactorSetupPageComponent implements OnInit {
   newPasskeyName = '';
   renameValue = '';
 
+  // Phone state
+  phoneValue = '';
+  readonly savingPhone = signal(false);
+  readonly phoneError = signal('');
+  readonly phoneSuccess = signal('');
+
   async ngOnInit(): Promise<void> {
+    // Load phone
+    this.phoneValue = this.auth.userPhone() || '';
     const user = this.auth.user();
     if (user?.is2faEnabled) {
       this.enabled.set(true);
@@ -449,6 +499,26 @@ export class TwoFactorSetupPageComponent implements OnInit {
       );
     } finally {
       this.disabling.set(false);
+    }
+  }
+
+  // ─── Phone ─────────────────────────────────────────────────────────
+
+  async savePhone(): Promise<void> {
+    this.savingPhone.set(true);
+    this.phoneError.set('');
+    this.phoneSuccess.set('');
+
+    try {
+      await this.auth.updatePhone(this.phoneValue.trim() || null);
+      this.phoneSuccess.set('Phone number updated.');
+      setTimeout(() => this.phoneSuccess.set(''), 4000);
+    } catch (err) {
+      this.phoneError.set(
+        err instanceof Error ? err.message : 'Failed to update phone number.',
+      );
+    } finally {
+      this.savingPhone.set(false);
     }
   }
 

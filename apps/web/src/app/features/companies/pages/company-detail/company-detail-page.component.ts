@@ -726,7 +726,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                                 ></textarea>
                               </dd>
                             } @else {
-                              <dd class="mt-0.5 font-medium text-gray-900">{{ company()!.headOfficeAddress }}</dd>
+                              <dd class="mt-0.5 font-medium text-gray-900 whitespace-pre-line">{{ company()!.headOfficeAddress }}</dd>
                             }
                           </div>
                         }

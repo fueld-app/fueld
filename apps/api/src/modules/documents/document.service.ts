@@ -1,8 +1,10 @@
 import pdfmake from 'pdfmake';
 import type { TDocumentDefinitions, Content, TableCell } from 'pdfmake/interfaces';
-import { eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
+import { existsSync, readFileSync } from 'node:fs';
+import { basename, extname, join } from 'node:path';
 import { db } from '../../db';
-import { orders, orderItems, counterparties, vessels, places, invoices, users } from '../../db/schema';
+import { entityComments, orders, orderItems, counterparties, vessels, places, invoices, users } from '../../db/schema';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Document Service — Server-side PDF generation (pdfmake v0.3)
@@ -69,6 +71,8 @@ async function fetchOrderForInvoice(orderId: string) {
       salesRep: true,
       supplier: true,
       invoicingCompany: true,
+      customerContact: true,
+      supplierContact: true,
       items: true,
       invoices: true,
     },
@@ -97,7 +101,6 @@ function buildCompanyTermsSection(params: {
 
   const parts: Content[] = [{ text: 'Terms', style: 'sectionLabel' } as Content];
   if (customer) {
-    parts.push({ text: 'Customer terms', bold: true, margin: [0, 0, 0, 4] } as Content);
     parts.push({ text: customer, margin: [0, 0, 0, 8] } as Content);
   }
   if (supplier) {
@@ -152,19 +155,23 @@ function formatDateTimeForDisplay(value: string | null, tz: string | null | unde
   const day = String(local.getUTCDate()).padStart(2, '0');
   const hour = String(local.getUTCHours()).padStart(2, '0');
   const minute = String(local.getUTCMinutes()).padStart(2, '0');
-  const formatted = `${year}-${month}-${day} ${hour}:${minute}`;
+  const formatted = `${day}-${month}-${year} ${hour}:${minute}`;
   return tz ? `${formatted} ${tz}` : formatted;
 }
 
 function buildNotesSection(params: {
   customerNote?: string | null;
   placeOrderRemark?: string | null;
+  placeComment?: string | null;
+  termsAndConditions?: string | null;
   itemNotes?: Array<{ label: string; note: string }>;
 }): Content[] {
   const customerNote = params.customerNote?.trim();
   const placeOrderRemark = params.placeOrderRemark?.trim();
+  const placeComment = params.placeComment?.trim();
+  const termsAndConditions = params.termsAndConditions?.trim();
   const itemNotes = params.itemNotes ?? [];
-  if (!customerNote && !placeOrderRemark && itemNotes.length === 0) return [];
+  if (!customerNote && !placeOrderRemark && !placeComment && !termsAndConditions && itemNotes.length === 0) return [];
 
   const notes: Content[] = [{ text: 'Notes', style: 'sectionLabel' } as Content];
 
@@ -173,7 +180,16 @@ function buildNotesSection(params: {
   }
 
   if (placeOrderRemark) {
-    notes.push({ text: `Place remark: ${placeOrderRemark}`, margin: [0, 0, 0, 6] } as Content);
+    notes.push({ text: placeOrderRemark, margin: [0, 0, 0, 6] } as Content);
+  }
+
+  if (placeComment) {
+    notes.push({ text: `Place comment: ${placeComment}`, margin: [0, 0, 0, 6] } as Content);
+  }
+
+  if (termsAndConditions) {
+    notes.push({ text: 'Additional terms / notes:', bold: true, margin: [0, 2, 0, 4] } as Content);
+    notes.push({ text: termsAndConditions, margin: [0, 0, 0, 6] } as Content);
   }
 
   if (itemNotes.length) {
@@ -184,6 +200,35 @@ function buildNotesSection(params: {
   }
 
   return notes;
+}
+
+function tryLoadLogoDataUrl(logoUrl: string | null | undefined): string | null {
+  const raw = (logoUrl ?? '').trim();
+  if (!raw) return null;
+
+  // We expect stored URLs like: /uploads/logos/<filename>
+  const filename = basename(raw.split('?')[0] ?? '');
+  if (!filename) return null;
+
+  const ext = extname(filename).toLowerCase();
+  const mime = ext === '.png'
+    ? 'image/png'
+    : ext === '.jpg' || ext === '.jpeg'
+      ? 'image/jpeg'
+      : null;
+  if (!mime) return null;
+
+  // Resolve to local uploads folder (works in dev and in the deployed /opt/fueld layout).
+  const localPath = join(import.meta.dir, '../../../uploads/logos', filename);
+  if (!existsSync(localPath)) return null;
+
+  try {
+    const buf = readFileSync(localPath);
+    if (!buf.length) return null;
+    return `data:${mime};base64,${buf.toString('base64')}`;
+  } catch {
+    return null;
+  }
 }
 
 function buildInvoiceDocument(data: {
@@ -540,22 +585,38 @@ function buildOfferDocument(data: {
   orderNumber: string | null;
   clientName: string;
   clientCountry: string | null;
+  clientAddress: string | null;
+  customerContactName: string | null;
+  customerContactRole: string | null;
+  customerContactPhone: string | null;
+  customerContactEmail: string | null;
   vesselName: string;
   vesselImo: string | null;
   portName: string;
   eta: string | null;
   etd: string | null;
   timezone: string | null;
+  fromName: string | null;
+  fromEmail: string | null;
+  fromPhone: string | null;
   paymentTerms: string | null;
   customerNote: string | null;
   placeOrderRemark: string | null;
+  placeComment: string | null;
+  termsAndConditions: string | null;
   companyName: string | null;
+  companyAddress: string | null;
+  companyPhone: string | null;
+  companyEmail: string | null;
+  companyWebsite: string | null;
+  companyLogoDataUrl: string | null;
   customerTerms: string | null;
   supplierTerms: string | null;
   itemNotes: Array<{ label: string; note: string }>;
   currency: string;
   items: Array<{
     productType: string;
+    description: string | null;
     quantity: string;
     quantityMin: string | null;
     quantityMax: string | null;
@@ -563,159 +624,257 @@ function buildOfferDocument(data: {
     salesPrice: string | null;
   }>;
   createdAt: Date;
+  docTitle?: string;
 }): TDocumentDefinitions {
+  // ── Prepare data ──────────────────────────────────────────────────
+  const refNum = data.orderNumber ?? 'DRAFT';
+  const senderName = data.companyName?.trim() || 'Fueld Trading';
+  const dd = String(data.createdAt.getUTCDate()).padStart(2, '0');
+  const mm = String(data.createdAt.getUTCMonth() + 1).padStart(2, '0');
+  const yyyy = data.createdAt.getUTCFullYear();
+  const createdDate = `${dd}-${mm}-${yyyy}`;
+  const title = data.docTitle ?? 'OFFER';
+
+  // Customer address block (top-left)
+  const customerBlock: Content[] = [
+    { text: data.clientName, fontSize: 10 } as Content,
+  ];
+  if (data.customerContactName?.trim()) {
+    const role = data.customerContactRole?.trim();
+    customerBlock.push({ text: `Att:${data.customerContactName.trim()}${role ? ` (${role})` : ''}`, fontSize: 10 } as Content);
+  }
+  // Client address — split commas and newlines into separate lines
+  const clientAddr = data.clientAddress?.trim();
+  if (clientAddr) {
+    const lines = clientAddr.split(/\n|,\s*/).map(l => l.trim()).filter(Boolean);
+    for (const line of lines) {
+      customerBlock.push({ text: line, fontSize: 10 } as Content);
+    }
+  } else if (data.clientCountry?.trim()) {
+    customerBlock.push({ text: data.clientCountry.trim(), fontSize: 10 } as Content);
+  }
+
+  // Right-side meta block (Date / Ref / Page — Page is dynamic via header)
+  const rightMetaBlock: Content[] = [];
+  if (data.companyLogoDataUrl) {
+    rightMetaBlock.push({ image: data.companyLogoDataUrl, fit: [150, 50], alignment: 'right', margin: [0, 0, 0, 8] } as Content);
+  }
+
+  // Items table
   const tableHeader: TableCell[] = [
     { text: 'Product', style: 'tableHeader' },
     { text: 'Quantity', style: 'tableHeader', alignment: 'right' },
     { text: 'Unit', style: 'tableHeader' },
-    { text: `Price (${data.currency})`, style: 'tableHeader', alignment: 'right' },
+    { text: 'Price', style: 'tableHeader', alignment: 'right' },
   ];
 
   const tableRows: TableCell[][] = data.items.map((item) => {
     const qty = item.quantityMin && item.quantityMax
-      ? `${formatNumber(item.quantityMin, 0)}-${formatNumber(item.quantityMax, 0)}`
-      : formatNumber(item.quantity, 0);
+      ? `${formatNumber(item.quantityMin, 0)} - ${formatNumber(item.quantityMax, 0)}`
+      : formatNumber(item.quantity, 3);
+    const productCell: Content = item.description?.trim()
+      ? { text: [{ text: item.productType }, { text: `  ${item.description.trim()}`, fontSize: 8, color: '#374151' }] }
+      : { text: item.productType };
     return [
-      { text: item.productType },
+      productCell as TableCell,
       { text: qty, alignment: 'right' },
       { text: item.unit },
-      { text: `${data.currency}/${item.unit} ${formatNumber(item.salesPrice)}`, alignment: 'right' },
+      { text: `${data.currency}/${item.unit}  ${formatNumber(item.salesPrice)}`, alignment: 'right' },
     ];
   });
 
-  const refNum = data.orderNumber ?? 'DRAFT';
-
-  // Delivery dates
-  const deliveryLines: Content[] = [];
+  // Delivery date string
+  let deliveryDateStr = '';
   if (data.eta) {
-    const formatted = formatDateTimeForDisplay(data.eta, data.timezone) ?? data.eta;
-    deliveryLines.push({
-      columns: [
-        { width: '25%', text: 'Delivery date:', bold: true },
-        { width: '75%', text: formatted },
-      ],
-      margin: [0, 2, 0, 0],
-    } as Content);
-  }
-  if (data.etd) {
-    const formatted = formatDateTimeForDisplay(data.etd, data.timezone) ?? data.etd;
-    deliveryLines.push({
-      columns: [
-        { width: '25%', text: 'ETD:', bold: true },
-        { width: '75%', text: formatted },
-      ],
-      margin: [0, 2, 0, 0],
-    } as Content);
+    const fmtEta = formatDateTimeForDisplay(data.eta, data.timezone);
+    deliveryDateStr = fmtEta ?? data.eta;
+    if (data.etd) {
+      const fmtEtd = formatDateTimeForDisplay(data.etd, data.timezone);
+      deliveryDateStr += ` to ${fmtEtd ?? data.etd}`;
+    }
   }
 
+  // "For account of" line
+  const vesselRef = `${data.vesselName}${data.vesselImo ? ` (IMO: ${data.vesselImo})` : ''}`;
+  const vesselDisplay = data.vesselName.startsWith('MV ') ? vesselRef : `MV ${vesselRef}`;
+  const forAccountParts = [`Master and/or owner and/or charterers and/or ${vesselDisplay}`];
+  if (data.clientName) forAccountParts.push(`and/or ${data.clientName}`);
+
+  // ── Header (3 columns: client | title | logo+date/ref) ───────────
+  const header = (currentPage: number, pageCount: number): Content => {
+    const rightStack: Content[] = [];
+    // Logo
+    if (data.companyLogoDataUrl) {
+      rightStack.push({ image: data.companyLogoDataUrl, fit: [150, 50], alignment: 'right', margin: [0, 0, 0, 10] } as Content);
+    }
+    // Date / Ref — tabular so labels and values are column-aligned
+    rightStack.push({
+      table: {
+        widths: ['*', 'auto'],
+        body: [
+          [{ text: 'Date:', bold: true, alignment: 'right', margin: [0, 0, 4, 0] }, { text: createdDate, alignment: 'right' }],
+          [{ text: 'Ref.:', bold: true, alignment: 'right', margin: [0, 0, 4, 0] }, { text: refNum, alignment: 'right' }],
+        ],
+      },
+      layout: {
+        hLineWidth: () => 0,
+        vLineWidth: () => 0,
+        paddingLeft: () => 0,
+        paddingRight: () => 0,
+        paddingTop: () => 1,
+        paddingBottom: () => 1,
+      },
+      fontSize: 10,
+    } as Content);
+
+    return {
+      margin: [40, 30, 40, 0],
+      columns: [
+        { width: 200, stack: currentPage === 1 ? customerBlock : [{ text: '' }] },
+        { width: '*', text: title, style: 'docTitle', alignment: 'center', margin: [10, 0, 10, 0] },
+        { width: 200, stack: rightStack },
+      ],
+    } as Content;
+  };
+
+  // ── Footer (company details + page number) ────────────────────────
+  const footerFn = (currentPage: number, pageCount: number) => {
+    const leftTexts: Content[] = [
+      { text: senderName, fontSize: 8, bold: true, color: '#374151' } as Content,
+    ];
+    if (data.companyAddress?.trim()) {
+      for (const line of data.companyAddress.trim().split(/\n|,\s*/)) {
+        const l = line.trim();
+        if (l) leftTexts.push({ text: l, fontSize: 8, color: '#374151' } as Content);
+      }
+    }
+    const middleTexts: Content[] = [];
+    if (data.companyPhone?.trim()) middleTexts.push({ text: `T ${data.companyPhone.trim()}`, fontSize: 8, color: '#374151' } as Content);
+    if (data.companyEmail?.trim()) middleTexts.push({ text: data.companyEmail.trim(), fontSize: 8, color: '#1a56db' } as Content);
+
+    return {
+      margin: [40, 0, 40, 20] as [number, number, number, number],
+      stack: [
+        { canvas: [{ type: 'line' as const, x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 0.5, lineColor: '#9ca3af' }] },
+        {
+          columns: [
+            { width: '*' as const, stack: leftTexts },
+            { width: '*' as const, stack: middleTexts },
+            { width: 'auto' as const, stack: [{ text: `${currentPage} / ${pageCount}`, fontSize: 8, color: '#374151', alignment: 'right' as const }] },
+          ],
+          margin: [0, 8, 0, 0] as [number, number, number, number],
+        },
+      ],
+    };
+  };
+
+  // ── Document definition ───────────────────────────────────────────
   return {
     pageSize: 'A4',
-    pageMargins: [40, 60, 40, 60],
+    pageMargins: [40, 140, 40, 80],
+    header,
     content: [
-      // Header
-      {
-        columns: [
-          {
-            width: '*',
-            stack: [
-              { text: 'FUELD', style: 'brand' },
-              { text: 'Bunker Trading Solutions', style: 'brandSub' },
-            ],
-          },
-          {
-            width: 'auto',
-            stack: [
-              { text: `Date: ${data.createdAt.toISOString().split('T')[0]}`, alignment: 'right', fontSize: 9 },
-              { text: `Ref.: ${refNum}`, alignment: 'right', fontSize: 9 },
-            ],
-            alignment: 'right',
-          },
-        ],
-      } as Content,
-      { text: '', margin: [0, 10, 0, 0] } as Content,
-      { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 1, lineColor: '#1a56db' }] } as Content,
-      { text: '', margin: [0, 15, 0, 0] } as Content,
+      // Intro text
+      { text: 'With reference to our correspondence, we are pleased to confirm to you the following:', margin: [0, 16, 0, 16] } as Content,
 
-      // Title
-      { text: 'OFFER', style: 'invoiceTitle', alignment: 'center' } as Content,
-      { text: '', margin: [0, 15, 0, 0] } as Content,
-
-      // Client
+      // Vessel / Delivery info (two-column like reference)
       {
         columns: [
           {
             width: '50%',
             stack: [
-              { text: data.clientName, style: 'clientName' },
-              { text: data.clientCountry ?? '', color: '#666666' },
+              {
+                columns: [
+                  { width: 80, text: 'Vessel:', bold: true },
+                  { width: '*', text: `${data.vesselName}${data.vesselImo ? ` (IMO: ${data.vesselImo})` : ''}` },
+                ],
+              } as Content,
+              ...(deliveryDateStr ? [{
+                columns: [
+                  { width: 80, text: 'Delivery date:', bold: true },
+                  { width: '*', text: deliveryDateStr },
+                ],
+                margin: [0, 2, 0, 0],
+              } as Content] : []),
+            ],
+          },
+          {
+            width: '50%',
+            stack: [
+              {
+                columns: [
+                  { width: 90, text: 'Delivery place:', bold: true },
+                  { width: '*', text: data.portName },
+                ],
+              } as Content,
             ],
           },
         ],
+        margin: [0, 0, 0, 14],
       } as Content,
-      { text: '', margin: [0, 10, 0, 0] } as Content,
-
-      { text: 'With reference to our correspondence, we are pleased to offer to you the following:', margin: [0, 0, 0, 10] } as Content,
-
-      // Vessel / Port info
-      {
-        columns: [
-          { width: '25%', text: 'Vessel:', bold: true },
-          { width: '25%', text: `${data.vesselName}${data.vesselImo ? ` (IMO: ${data.vesselImo})` : ''}` },
-          { width: '25%', text: 'Delivery place:', bold: true },
-          { width: '25%', text: data.portName },
-        ],
-      } as Content,
-      ...deliveryLines,
-      { text: '', margin: [0, 15, 0, 0] } as Content,
 
       // Items table
       {
         table: {
           headerRows: 1,
-          widths: ['*', 80, 40, 120],
+          widths: ['*', 70, 35, 120],
           body: [tableHeader, ...tableRows],
         },
         layout: {
           hLineWidth: (i: number, node: { table: { body: unknown[] } }) =>
-            i === 0 || i === 1 || i === node.table.body.length ? 1 : 0.5,
+            i === 0 || i === 1 || i === node.table.body.length ? 1 : 0,
           vLineWidth: () => 0,
-          hLineColor: (i: number) => (i <= 1 ? '#1a56db' : '#e5e7eb'),
-          paddingTop: () => 6,
-          paddingBottom: () => 6,
+          hLineColor: () => '#111827',
+          paddingTop: () => 5,
+          paddingBottom: () => 5,
         },
       } as Content,
+      { text: '', margin: [0, 16, 0, 0] } as Content,
 
+      // For account of
+      { text: `For account of:   ${forAccountParts.join(' ')}`, margin: [0, 0, 0, 4] } as Content,
+
+      // Payment terms
       ...(data.paymentTerms
-        ? [{ text: `Payment terms: ${data.paymentTerms}`, margin: [0, 20, 0, 0] } as Content]
+        ? [{ text: `Payment terms:  ${data.paymentTerms}`, margin: [0, 0, 0, 6] } as Content]
         : []),
+
+      // Notes
       ...buildNotesSection({
         customerNote: data.customerNote,
         placeOrderRemark: data.placeOrderRemark,
-        itemNotes: data.itemNotes,
+        placeComment: data.placeComment,
+        termsAndConditions: null,
+        itemNotes: [],
       }),
 
+      // Company terms (customer only)
       ...buildCompanyTermsSection({
         companyName: data.companyName,
         customerTerms: data.customerTerms,
-        supplierTerms: data.supplierTerms,
+        supplierTerms: null,
       }),
+
+      // Sign-off
       { text: '', margin: [0, 20, 0, 0] } as Content,
-      { text: 'Best regards,', margin: [0, 0, 0, 4] } as Content,
-      { text: 'Fueld Trading', bold: true } as Content,
+      { text: 'Best regards', margin: [0, 0, 0, 6] } as Content,
+      { text: senderName, bold: true, margin: [0, 0, 0, 2] } as Content,
+      ...(data.fromName?.trim()
+        ? [{ text: data.fromName.trim(), fontSize: 9 } as Content]
+        : []),
+      { text: '', margin: [0, 10, 0, 0] } as Content,
+      ...(data.fromEmail?.trim()
+        ? [{ text: `Direct Email:  ${data.fromEmail.trim()}`, fontSize: 9, margin: [0, 0, 0, 2] } as Content]
+        : []),
+      ...(data.fromPhone?.trim()
+        ? [{ text: `Direct Phone:  ${data.fromPhone.trim()}`, fontSize: 9, margin: [0, 0, 0, 2] } as Content]
+        : []),
     ],
-    footer: (currentPage: number, pageCount: number) => ({
-      columns: [
-        { text: 'Generated by Fueld — Bunker Trading SaaS', fontSize: 8, color: '#9ca3af', margin: [40, 0, 0, 0] },
-        { text: `Page ${currentPage} of ${pageCount}`, fontSize: 8, color: '#9ca3af', alignment: 'right', margin: [0, 0, 40, 0] },
-      ],
-    }),
+    footer: footerFn,
     styles: {
-      brand: { fontSize: 22, bold: true, color: '#1a56db' },
-      brandSub: { fontSize: 9, color: '#6b7280', margin: [0, 2, 0, 0] },
-      invoiceTitle: { fontSize: 24, bold: true, color: '#1a56db' },
-      sectionLabel: { fontSize: 10, bold: true, color: '#1a56db', margin: [0, 0, 0, 4] },
-      clientName: { fontSize: 14, bold: true },
-      tableHeader: { fontSize: 9, bold: true, color: '#ffffff', fillColor: '#1a56db' },
+      docTitle: { fontSize: 16, bold: true, color: '#111827' },
+      sectionLabel: { fontSize: 10, bold: true, color: '#111827', margin: [0, 0, 0, 4] },
+      tableHeader: { fontSize: 9, bold: true },
     },
     defaultStyle: { fontSize: 10, font: 'Roboto' },
   };
@@ -730,20 +889,44 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
 }> {
   const order = await fetchOrderForInvoice(orderId);
 
+  const companyLogoDataUrl = tryLoadLogoDataUrl(order.invoicingCompany?.logoUrl ?? null);
+
+  const [latestPlaceComment] = await db
+    .select({ content: entityComments.content })
+    .from(entityComments)
+    .where(and(eq(entityComments.entityType, 'place'), eq(entityComments.entityId, order.placeId)))
+    .orderBy(desc(entityComments.createdAt))
+    .limit(1);
+
   const docData = {
     orderNumber: order.orderNumber,
     clientName: order.client.name,
     clientCountry: order.client.country,
+    clientAddress: order.client.headOfficeAddress ?? null,
+    customerContactName: order.customerContact?.name ?? null,
+    customerContactRole: order.customerContact?.role ?? null,
+    customerContactPhone: order.customerContact?.phone ?? null,
+    customerContactEmail: order.customerContact?.email ?? null,
     vesselName: order.vessel.name,
     vesselImo: order.vessel.imo,
     portName: order.place.name,
     eta: order.eta?.toISOString() ?? null,
     etd: order.etd?.toISOString() ?? null,
     timezone: order.place.timezone ?? null,
+    fromName: order.salesRep?.name ?? null,
+    fromEmail: order.salesRep?.email ?? null,
+    fromPhone: order.salesRep?.phone ?? null,
     paymentTerms: formatCustomerPaymentTerms(order.customerPaymentTermType, order.customerCreditDays),
     customerNote: order.customerNote ?? null,
     placeOrderRemark: order.place?.orderRemark ?? null,
+    placeComment: latestPlaceComment?.content ?? null,
+    termsAndConditions: order.termsAndConditions ?? null,
     companyName: order.invoicingCompany?.name ?? null,
+    companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
+    companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
+    companyEmail: order.invoicingCompany?.headOfficeEmail ?? null,
+    companyWebsite: order.invoicingCompany?.website ?? null,
+    companyLogoDataUrl,
     customerTerms: order.invoicingCompany?.customerTerms ?? null,
     supplierTerms: order.invoicingCompany?.supplierTerms ?? null,
     itemNotes: order.items
@@ -755,6 +938,7 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
     currency: order.currency ?? 'USD',
     items: order.items.map((item) => ({
       productType: item.productType,
+      description: item.description,
       quantity: item.quantity,
       quantityMin: item.quantityMin,
       quantityMax: item.quantityMax,
@@ -766,7 +950,7 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
 
   const docDefinition = buildOfferDocument(docData);
   const buffer = await createPdfBuffer(docDefinition);
-  const fileName = `Fueld_Offer_${order.orderNumber ?? orderId.slice(0, 8)}.pdf`;
+  const fileName = `Offer_${order.orderNumber ?? orderId.slice(0, 8)}.pdf`;
 
   return { buffer, fileName };
 }
@@ -779,6 +963,11 @@ function buildProformaDocument(data: {
   orderNumber: string | null;
   clientName: string;
   clientCountry: string | null;
+  clientAddress: string | null;
+  customerContactName: string | null;
+  customerContactRole: string | null;
+  customerContactPhone: string | null;
+  customerContactEmail: string | null;
   vesselName: string;
   vesselImo: string | null;
   portName: string;
@@ -786,192 +975,270 @@ function buildProformaDocument(data: {
   etd: string | null;
   timezone: string | null;
   currency: string;
+  fromName: string | null;
+  fromEmail: string | null;
+  fromPhone: string | null;
   paymentTerms: string | null;
   customerNote: string | null;
+  placeOrderRemark: string | null;
+  placeComment: string | null;
+  termsAndConditions: string | null;
   companyName: string | null;
+  companyAddress: string | null;
+  companyPhone: string | null;
+  companyEmail: string | null;
+  companyWebsite: string | null;
+  companyLogoDataUrl: string | null;
   customerTerms: string | null;
   supplierTerms: string | null;
   itemNotes: Array<{ label: string; note: string }>;
   items: Array<{
     productType: string;
+    description: string | null;
     quantity: string;
     unit: string;
     salesPrice: string | null;
   }>;
   createdAt: Date;
 }): TDocumentDefinitions {
+  // ── Prepare data ──────────────────────────────────────────────────
+  const refNum = data.orderNumber ?? 'DRAFT';
+  const senderName = data.companyName?.trim() || 'Fueld Trading';
+  const dd2 = String(data.createdAt.getUTCDate()).padStart(2, '0');
+  const mm2 = String(data.createdAt.getUTCMonth() + 1).padStart(2, '0');
+  const yyyy2 = data.createdAt.getUTCFullYear();
+  const createdDate = `${dd2}-${mm2}-${yyyy2}`;
+
+  // Customer address block (top-left)
+  const customerBlock: Content[] = [
+    { text: data.clientName, fontSize: 10 } as Content,
+  ];
+  if (data.customerContactName?.trim()) {
+    const role = data.customerContactRole?.trim();
+    customerBlock.push({ text: `Att:${data.customerContactName.trim()}${role ? ` (${role})` : ''}`, fontSize: 10 } as Content);
+  }
+  // Client address — split commas and newlines into separate lines
+  const clientAddr = data.clientAddress?.trim();
+  if (clientAddr) {
+    const lines = clientAddr.split(/\n|,\s*/).map(l => l.trim()).filter(Boolean);
+    for (const line of lines) {
+      customerBlock.push({ text: line, fontSize: 10 } as Content);
+    }
+  } else if (data.clientCountry?.trim()) {
+    customerBlock.push({ text: data.clientCountry.trim(), fontSize: 10 } as Content);
+  }
+
+  // Items table (with totals for confirmation/nomination)
   const tableHeader: TableCell[] = [
     { text: 'Product', style: 'tableHeader' },
     { text: 'Quantity', style: 'tableHeader', alignment: 'right' },
     { text: 'Unit', style: 'tableHeader' },
-    { text: `Unit price`, style: 'tableHeader', alignment: 'right' },
-    { text: `Total amount`, style: 'tableHeader', alignment: 'right' },
+    { text: 'Price', style: 'tableHeader', alignment: 'right' },
   ];
 
   const tableRows: TableCell[][] = data.items.map((item) => {
-    const qty = parseFloat(item.quantity) || 0;
-    const price = parseFloat(item.salesPrice ?? '0') || 0;
-    const lineTotal = qty * price;
+    const productCell: Content = item.description?.trim()
+      ? { text: [{ text: item.productType }, { text: `  ${item.description.trim()}`, fontSize: 8, color: '#374151' }] }
+      : { text: item.productType };
     return [
-      { text: item.productType },
-      { text: formatNumber(item.quantity, 0), alignment: 'right' },
+      productCell as TableCell,
+      { text: formatNumber(item.quantity, 3), alignment: 'right' },
       { text: item.unit },
-      { text: `${data.currency}/${item.unit} ${formatNumber(item.salesPrice)}`, alignment: 'right' },
-      { text: `${formatNumber(String(lineTotal))} ${data.currency}`, alignment: 'right' },
+      { text: `${data.currency}/${item.unit}  ${formatNumber(item.salesPrice)}`, alignment: 'right' },
     ];
   });
 
-  const grandTotal = data.items.reduce((sum, item) => {
-    const qty = parseFloat(item.quantity) || 0;
-    const price = parseFloat(item.salesPrice ?? '0') || 0;
-    return sum + qty * price;
-  }, 0);
-
-  // Total row
-  tableRows.push([
-    { text: 'Total amount due', bold: true, colSpan: 4 } as TableCell,
-    {} as TableCell,
-    {} as TableCell,
-    {} as TableCell,
-    { text: `${formatNumber(String(grandTotal))} ${data.currency}`, alignment: 'right', bold: true },
-  ]);
-
-  const refNum = data.orderNumber ?? 'DRAFT';
-
-  const deliveryLines: Content[] = [];
+  // Delivery date string
+  let deliveryDateStr = '';
   if (data.eta) {
-    const formatted = formatDateTimeForDisplay(data.eta, data.timezone) ?? data.eta;
-    deliveryLines.push({
-      columns: [
-        { width: '25%', text: 'Delivery date:', bold: true },
-        { width: '75%', text: formatted },
-      ],
-      margin: [0, 2, 0, 0],
-    } as Content);
-  }
-  if (data.etd) {
-    const formatted = formatDateTimeForDisplay(data.etd, data.timezone) ?? data.etd;
-    deliveryLines.push({
-      columns: [
-        { width: '25%', text: 'ETD:', bold: true },
-        { width: '75%', text: formatted },
-      ],
-      margin: [0, 2, 0, 0],
-    } as Content);
+    const fmtEta = formatDateTimeForDisplay(data.eta, data.timezone);
+    deliveryDateStr = fmtEta ?? data.eta;
+    if (data.etd) {
+      const fmtEtd = formatDateTimeForDisplay(data.etd, data.timezone);
+      deliveryDateStr += ` to ${fmtEtd ?? data.etd}`;
+    }
   }
 
+  // "For account of" line (like reference PDF)
+  const vesselRef = `${data.vesselName}${data.vesselImo ? ` (IMO: ${data.vesselImo})` : ''}`;
+  const vesselDisplay = data.vesselName.startsWith('MV ') ? vesselRef : `MV ${vesselRef}`;
+  const forAccountParts = [`Master and/or owner and/or charterers and/or ${vesselDisplay}`];
+  if (data.clientName) forAccountParts.push(`and/or ${data.clientName}`);
+
+  // ── Header (3 columns: client | title | logo+date/ref) ────────────
+  const header = (currentPage: number, _pageCount: number): Content => {
+    const rightStack: Content[] = [];
+    if (data.companyLogoDataUrl) {
+      rightStack.push({ image: data.companyLogoDataUrl, fit: [150, 50], alignment: 'right', margin: [0, 0, 0, 10] } as Content);
+    }
+    // Date / Ref — tabular so labels and values are column-aligned
+    rightStack.push({
+      table: {
+        widths: ['*', 'auto'],
+        body: [
+          [{ text: 'Date:', bold: true, alignment: 'right', margin: [0, 0, 4, 0] }, { text: createdDate, alignment: 'right' }],
+          [{ text: 'Ref.:', bold: true, alignment: 'right', margin: [0, 0, 4, 0] }, { text: refNum, alignment: 'right' }],
+        ],
+      },
+      layout: {
+        hLineWidth: () => 0,
+        vLineWidth: () => 0,
+        paddingLeft: () => 0,
+        paddingRight: () => 0,
+        paddingTop: () => 1,
+        paddingBottom: () => 1,
+      },
+      fontSize: 10,
+    } as Content);
+
+    return {
+      margin: [40, 30, 40, 0],
+      columns: [
+        { width: 150, stack: currentPage === 1 ? customerBlock : [{ text: '' }] },
+        { width: '*', text: 'PROFORMA INVOICE', style: 'docTitle', alignment: 'center', margin: [10, 0, 10, 0], noWrap: true },
+        { width: 150, stack: rightStack },
+      ],
+    } as Content;
+  };
+
+  // ── Footer (company details + page number) ────────────────────────
+  const footerFn = (currentPage: number, pageCount: number) => {
+    const leftTexts: Content[] = [
+      { text: senderName, fontSize: 8, bold: true, color: '#374151' } as Content,
+    ];
+    if (data.companyAddress?.trim()) {
+      for (const line of data.companyAddress.trim().split(/\n|,\s*/)) {
+        const l = line.trim();
+        if (l) leftTexts.push({ text: l, fontSize: 8, color: '#374151' } as Content);
+      }
+    }
+    const middleTexts: Content[] = [];
+    if (data.companyPhone?.trim()) middleTexts.push({ text: `T ${data.companyPhone.trim()}`, fontSize: 8, color: '#374151' } as Content);
+    if (data.companyEmail?.trim()) middleTexts.push({ text: data.companyEmail.trim(), fontSize: 8, color: '#1a56db' } as Content);
+
+    return {
+      margin: [40, 0, 40, 20] as [number, number, number, number],
+      stack: [
+        { canvas: [{ type: 'line' as const, x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 0.5, lineColor: '#9ca3af' }] },
+        {
+          columns: [
+            { width: '*' as const, stack: leftTexts },
+            { width: '*' as const, stack: middleTexts },
+            { width: 'auto' as const, stack: [{ text: `${currentPage} / ${pageCount}`, fontSize: 8, color: '#374151', alignment: 'right' as const }] },
+          ],
+          margin: [0, 8, 0, 0] as [number, number, number, number],
+        },
+      ],
+    };
+  };
+
+  // ── Document definition ───────────────────────────────────────────
   return {
     pageSize: 'A4',
-    pageMargins: [40, 60, 40, 60],
+    pageMargins: [40, 140, 40, 80],
+    header,
     content: [
-      // Header
-      {
-        columns: [
-          {
-            width: '*',
-            stack: [
-              { text: 'FUELD', style: 'brand' },
-              { text: 'Bunker Trading Solutions', style: 'brandSub' },
-            ],
-          },
-          {
-            width: 'auto',
-            stack: [
-              { text: `Date: ${data.createdAt.toISOString().split('T')[0]}`, alignment: 'right', fontSize: 9 },
-              { text: `Ref.: ${refNum}`, alignment: 'right', fontSize: 9 },
-            ],
-            alignment: 'right',
-          },
-        ],
-      } as Content,
-      { text: '', margin: [0, 10, 0, 0] } as Content,
-      { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 1, lineColor: '#1a56db' }] } as Content,
-      { text: '', margin: [0, 15, 0, 0] } as Content,
+      // Intro text
+      { text: 'With reference to our correspondence, we are pleased to confirm to you the following:', margin: [0, 16, 0, 16] } as Content,
 
-      // Title
-      { text: 'PROFORMA INVOICE', style: 'invoiceTitle', alignment: 'center' } as Content,
-      { text: '', margin: [0, 15, 0, 0] } as Content,
-
-      // Client
+      // Vessel / Delivery info (two-column like reference)
       {
         columns: [
           {
             width: '50%',
             stack: [
-              { text: data.clientName, style: 'clientName' },
-              { text: data.clientCountry ?? '', color: '#666666' },
+              {
+                columns: [
+                  { width: 80, text: 'Vessel:', bold: true },
+                  { width: '*', text: vesselRef },
+                ],
+              } as Content,
+              ...(deliveryDateStr ? [{
+                columns: [
+                  { width: 80, text: 'Delivery date:', bold: true },
+                  { width: '*', text: deliveryDateStr },
+                ],
+                margin: [0, 2, 0, 0],
+              } as Content] : []),
+            ],
+          },
+          {
+            width: '50%',
+            stack: [
+              {
+                columns: [
+                  { width: 90, text: 'Delivery place:', bold: true },
+                  { width: '*', text: data.portName },
+                ],
+              } as Content,
             ],
           },
         ],
+        margin: [0, 0, 0, 14],
       } as Content,
-      { text: '', margin: [0, 10, 0, 0] } as Content,
-
-      // Vessel / Port info
-      {
-        columns: [
-          { width: '25%', text: 'Vessel:', bold: true },
-          { width: '25%', text: `${data.vesselName}${data.vesselImo ? ` (IMO: ${data.vesselImo})` : ''}` },
-          { width: '25%', text: 'Delivery place:', bold: true },
-          { width: '25%', text: data.portName },
-        ],
-      } as Content,
-      ...deliveryLines,
-      { text: '', margin: [0, 15, 0, 0] } as Content,
 
       // Items table
       {
         table: {
           headerRows: 1,
-          widths: ['*', 60, 40, 100, 100],
+          widths: ['*', 70, 35, 120],
           body: [tableHeader, ...tableRows],
         },
         layout: {
           hLineWidth: (i: number, node: { table: { body: unknown[] } }) =>
-            i === 0 || i === 1 || i === node.table.body.length ? 1 : 0.5,
+            i === 0 || i === 1 || i === node.table.body.length ? 1 : 0,
           vLineWidth: () => 0,
-          hLineColor: (i: number) => (i <= 1 ? '#1a56db' : '#e5e7eb'),
-          paddingTop: () => 6,
-          paddingBottom: () => 6,
+          hLineColor: () => '#111827',
+          paddingTop: () => 5,
+          paddingBottom: () => 5,
         },
       } as Content,
+      { text: '', margin: [0, 16, 0, 0] } as Content,
 
-      { text: '', margin: [0, 20, 0, 0] } as Content,
+      // For account of
+      { text: `For account of:   ${forAccountParts.join(' ')}`, margin: [0, 0, 0, 4] } as Content,
 
       // Payment terms
       ...(data.paymentTerms
-        ? [
-            { text: `Payment terms: ${data.paymentTerms.replace(/_/g, ' ')}`, margin: [0, 0, 0, 10] } as Content,
-          ]
+        ? [{ text: `Payment terms:  ${data.paymentTerms.replace(/_/g, ' ')}`, margin: [0, 0, 0, 6] } as Content]
         : []),
 
+      // Notes
       ...buildNotesSection({
         customerNote: data.customerNote,
+        placeOrderRemark: data.placeOrderRemark,
+        placeComment: data.placeComment,
+        termsAndConditions: data.termsAndConditions,
         itemNotes: data.itemNotes,
       }),
 
+      // Company terms
       ...buildCompanyTermsSection({
         companyName: data.companyName,
         customerTerms: data.customerTerms,
-        supplierTerms: data.supplierTerms,
+        supplierTerms: null,
       }),
 
+      // Sign-off
       { text: '', margin: [0, 20, 0, 0] } as Content,
-      { text: 'Best regards,', margin: [0, 0, 0, 4] } as Content,
-      { text: 'Fueld Trading', bold: true } as Content,
+      { text: 'Best regards', margin: [0, 0, 0, 6] } as Content,
+      { text: senderName, bold: true, margin: [0, 0, 0, 2] } as Content,
+      ...(data.fromName?.trim()
+        ? [{ text: data.fromName.trim(), fontSize: 9 } as Content]
+        : []),
+      { text: '', margin: [0, 10, 0, 0] } as Content,
+      ...(data.fromEmail?.trim()
+        ? [{ text: `Direct Email:  ${data.fromEmail.trim()}`, fontSize: 9, margin: [0, 0, 0, 2] } as Content]
+        : []),
+      ...(data.fromPhone?.trim()
+        ? [{ text: `Direct Phone:  ${data.fromPhone.trim()}`, fontSize: 9, margin: [0, 0, 0, 2] } as Content]
+        : []),
     ],
-    footer: (currentPage: number, pageCount: number) => ({
-      columns: [
-        { text: 'Generated by Fueld — Bunker Trading SaaS', fontSize: 8, color: '#9ca3af', margin: [40, 0, 0, 0] },
-        { text: `Page ${currentPage} of ${pageCount}`, fontSize: 8, color: '#9ca3af', alignment: 'right', margin: [0, 0, 40, 0] },
-      ],
-    }),
+    footer: footerFn,
     styles: {
-      brand: { fontSize: 22, bold: true, color: '#1a56db' },
-      brandSub: { fontSize: 9, color: '#6b7280', margin: [0, 2, 0, 0] },
-      invoiceTitle: { fontSize: 24, bold: true, color: '#1a56db' },
-      sectionLabel: { fontSize: 10, bold: true, color: '#1a56db', margin: [0, 0, 0, 4] },
-      clientName: { fontSize: 14, bold: true },
-      tableHeader: { fontSize: 9, bold: true, color: '#ffffff', fillColor: '#1a56db' },
+      docTitle: { fontSize: 16, bold: true, color: '#111827' },
+      sectionLabel: { fontSize: 10, bold: true, color: '#111827', margin: [0, 0, 0, 4] },
+      tableHeader: { fontSize: 9, bold: true },
     },
     defaultStyle: { fontSize: 10, font: 'Roboto' },
   };
@@ -986,6 +1253,15 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
 }> {
   const order = await fetchOrderForInvoice(orderId);
 
+  const companyLogoDataUrl = tryLoadLogoDataUrl(order.invoicingCompany?.logoUrl ?? null);
+
+  const [latestPlaceComment] = await db
+    .select({ content: entityComments.content })
+    .from(entityComments)
+    .where(and(eq(entityComments.entityType, 'place'), eq(entityComments.entityId, order.placeId)))
+    .orderBy(desc(entityComments.createdAt))
+    .limit(1);
+
   const paymentTerms = formatCustomerPaymentTerms(
     order.customerPaymentTermType,
     order.customerCreditDays,
@@ -995,6 +1271,11 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
     orderNumber: order.orderNumber,
     clientName: order.client.name,
     clientCountry: order.client.country,
+    clientAddress: order.client.headOfficeAddress ?? null,
+    customerContactName: order.customerContact?.name ?? null,
+    customerContactRole: order.customerContact?.role ?? null,
+    customerContactPhone: order.customerContact?.phone ?? null,
+    customerContactEmail: order.customerContact?.email ?? null,
     vesselName: order.vessel.name,
     vesselImo: order.vessel.imo,
     portName: order.place.name,
@@ -1002,9 +1283,20 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
     etd: order.etd?.toISOString() ?? null,
     timezone: order.place.timezone ?? null,
     currency: order.currency ?? 'USD',
+    fromName: order.salesRep?.name ?? null,
+    fromEmail: order.salesRep?.email ?? null,
+    fromPhone: order.salesRep?.phone ?? null,
     paymentTerms,
     customerNote: order.customerNote ?? null,
+    placeOrderRemark: order.place?.orderRemark ?? null,
+    placeComment: latestPlaceComment?.content ?? null,
+    termsAndConditions: order.termsAndConditions ?? null,
     companyName: order.invoicingCompany?.name ?? null,
+    companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
+    companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
+    companyEmail: order.invoicingCompany?.headOfficeEmail ?? null,
+    companyWebsite: order.invoicingCompany?.website ?? null,
+    companyLogoDataUrl,
     customerTerms: order.invoicingCompany?.customerTerms ?? null,
     supplierTerms: order.invoicingCompany?.supplierTerms ?? null,
     itemNotes: order.items
@@ -1015,6 +1307,7 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
       })),
     items: order.items.map((item) => ({
       productType: item.productType,
+      description: item.description,
       quantity: item.quantity,
       unit: item.unit,
       salesPrice: item.salesPrice,
@@ -1024,7 +1317,7 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
 
   const docDefinition = buildProformaDocument(docData);
   const buffer = await createPdfBuffer(docDefinition);
-  const fileName = `Fueld_Proforma_${order.orderNumber ?? orderId.slice(0, 8)}.pdf`;
+  const fileName = `Nomination_${order.orderNumber ?? orderId.slice(0, 8)}.pdf`;
 
   return { buffer, fileName };
 }

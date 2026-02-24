@@ -163,6 +163,7 @@ export const users = pgTable('users', {
 
   // Profile
   avatarUrl: text('avatar_url'),
+  phone: text('phone'),
 
   // IP restriction (JSON array of allowed CIDR/IPs, null = unrestricted)
   allowedIps: text('allowed_ips'),
@@ -890,6 +891,8 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
   place: one(places, { fields: [orders.placeId], references: [places.id] }),
   salesRep: one(users, { fields: [orders.salesRepId], references: [users.id] }),
   supplier: one(counterparties, { fields: [orders.supplierId], references: [counterparties.id] }),
+  customerContact: one(companyContacts, { fields: [orders.customerContactId], references: [companyContacts.id] }),
+  supplierContact: one(companyContacts, { fields: [orders.supplierContactId], references: [companyContacts.id] }),
   invoicingCompany: one(counterparties, {
     fields: [orders.invoicingCompanyId],
     references: [counterparties.id],

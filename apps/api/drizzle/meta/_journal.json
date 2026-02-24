@@ -141,6 +141,13 @@
       "when": 1771200015000,
       "tag": "0019_own_company_terms",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1771200016000,
+      "tag": "0020_counterparty_terms_columns",
+      "breakpoints": true
     }
   ]
 }

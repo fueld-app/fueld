@@ -151,6 +151,7 @@ import { API } from '@app/core/config/api';
               <tr class="border-b border-gray-200 bg-gray-50/80">
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Name</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Email</th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600">Phone</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Role</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Team</th>
                 <th class="px-4 py-3 text-center font-medium text-gray-600">Auth</th>
@@ -176,6 +177,29 @@ import { API } from '@app/core/config/api';
                     </div>
                   </td>
                   <td class="px-4 py-3 text-gray-600">{{ user.email }}</td>
+                  <td class="px-4 py-3 text-gray-600">
+                    @if (editingPhoneId() === user.id) {
+                      <form (ngSubmit)="savePhoneEdit(user.id)" class="flex items-center gap-1">
+                        <input
+                          type="tel"
+                          [(ngModel)]="editingPhoneValue"
+                          name="phone"
+                          placeholder="+45 2613 1217"
+                          class="w-32 rounded-md border border-gray-300 px-2 py-1 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                          (blur)="savePhoneEdit(user.id)"
+                          (keydown.escape)="editingPhoneId.set(null)"
+                        />
+                      </form>
+                    } @else {
+                      <button
+                        (click)="startEditPhone(user)"
+                        class="text-xs text-gray-500 hover:text-brand-600 transition-colors cursor-pointer"
+                        title="Click to edit phone"
+                      >
+                        {{ user.phone || '—' }}
+                      </button>
+                    }
+                  </td>
                   <td class="px-4 py-3">
                     @if (editingRoleId() === user.id) {
                       <select
@@ -306,7 +330,7 @@ import { API } from '@app/core/config/api';
                 </tr>
                 @if (expandedSessionUserId() === user.id) {
                   <tr>
-                  <td colspan="10" class="bg-gray-50/80 px-4 py-3">
+                  <td colspan="11" class="bg-gray-50/80 px-4 py-3">
                       <div class="ml-10">
                         <p class="text-xs font-medium text-gray-500 mb-2">Active Sessions</p>
                         <div class="space-y-2">
@@ -343,7 +367,7 @@ import { API } from '@app/core/config/api';
                 }
               } @empty {
                 <tr>
-                  <td colspan="10" class="px-4 py-8 text-center text-gray-400">No users found</td>
+                  <td colspan="11" class="px-4 py-8 text-center text-gray-400">No users found</td>
                 </tr>
               }
             </tbody>
@@ -691,6 +715,10 @@ export class UsersPageComponent implements OnInit, OnDestroy {
   readonly editingRoleId = signal<string | null>(null);
   readonly editingRole = signal('');
 
+  // Phone editing
+  readonly editingPhoneId = signal<string | null>(null);
+  editingPhoneValue = '';
+
   // Per-row actions dropdown
   readonly actionsMenuUserId = signal<string | null>(null);
   readonly actionsMenuPos = signal<{ top: number; left: number } | null>(null);
@@ -876,6 +904,34 @@ export class UsersPageComponent implements OnInit, OnDestroy {
       }
     } catch (err) {
       console.error('Failed to update role:', err);
+    }
+  }
+
+  // ── Phone editing ───────────────────────────────────────────────
+
+  startEditPhone(user: AdminUserDto) {
+    this.editingPhoneId.set(user.id);
+    this.editingPhoneValue = user.phone ?? '';
+  }
+
+  async savePhoneEdit(userId: string) {
+    const phone = this.editingPhoneValue.trim() || null;
+    this.editingPhoneId.set(null);
+
+    try {
+      const res = await firstValueFrom(
+        this.http.patch<ApiResponse<{ id: string; phone: string | null }>>(`${API}/admin/users/${userId}/phone`, {
+          phone,
+        }),
+      );
+
+      if (res.success && res.data) {
+        this.users.update((list) =>
+          list.map((u) => (u.id === userId ? { ...u, phone: res.data!.phone } : u)),
+        );
+      }
+    } catch (err) {
+      console.error('Failed to update phone:', err);
     }
   }
 

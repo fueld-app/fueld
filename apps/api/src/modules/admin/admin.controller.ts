@@ -9,6 +9,7 @@ import {
   acceptInvitation,
   updateUserAllowedIps,
   adminReset2fa,
+  updateUserPhone,
 } from './admin.service';
 import { disconnectUserSessions } from '../activity/session-tracker';
 import type { ApiResponse } from '@fueld/types';
@@ -44,6 +45,7 @@ function sanitiseUser(user: {
   leaveEndDate: string | null;
   delegateId: string | null;
   avatarUrl?: string | null;
+  phone?: string | null;
 }) {
   return {
     id: user.id,
@@ -58,6 +60,7 @@ function sanitiseUser(user: {
     leaveEndDate: user.leaveEndDate,
     delegateId: user.delegateId,
     avatarUrl: user.avatarUrl ?? null,
+    phone: user.phone ?? null,
   };
 }
 
@@ -262,6 +265,22 @@ export const adminController = new Elysia({ prefix: '/admin' })
     params: t.Object({ id: t.String() }),
     body: t.Object({ allowedIps: t.Union([t.Array(t.String()), t.Null()]) }),
     detail: { tags: ['Admin'], summary: 'Set allowed IP addresses for a user', security: [{ bearerAuth: [] }] },
+  })
+
+  // ── PATCH /admin/users/:id/phone ─────────────────────────────────
+  .patch('/users/:id/phone', async ({ auth, params, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateUserPhone(params.id, body.phone);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update phone';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    params: t.Object({ id: t.String() }),
+    body: t.Object({ phone: t.Union([t.String(), t.Null()]) }),
+    detail: { tags: ['Admin'], summary: 'Update user phone number', security: [{ bearerAuth: [] }] },
   })
 
   // ── POST /admin/users/:id/reset-2fa ──────────────────────────────

@@ -667,9 +667,9 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       const file = body.file;
 
       // Validate file type
-      const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'];
+      const allowed = ['image/jpeg', 'image/png'];
       if (!allowed.includes(file.type)) {
-        return { success: false, data: null, message: 'Only JPEG, PNG, WebP, and SVG are allowed' } satisfies ApiResponse<null>;
+        return { success: false, data: null, message: 'Only JPEG and PNG are allowed' } satisfies ApiResponse<null>;
       }
       if (file.size > 2 * 1024 * 1024) {
         return { success: false, data: null, message: 'Logo must be under 2 MB' } satisfies ApiResponse<null>;

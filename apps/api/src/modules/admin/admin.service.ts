@@ -31,6 +31,7 @@ export async function listUsers() {
       o365Id: users.o365Id,
       passkeyCount: sql<number>`count(${passkeys.id})`,
       isActive: users.isActive,
+      phone: users.phone,
       allowedIps: users.allowedIps,
       createdAt: users.createdAt,
     })
@@ -44,6 +45,7 @@ export async function listUsers() {
   return rows.map((u) => ({
     ...u,
     teamName: u.teamName ?? null,
+    phone: u.phone ?? null,
     allowedIps: u.allowedIps ? JSON.parse(u.allowedIps) as string[] : null,
     hasPasskeys: Number(u.passkeyCount) > 0,
     hasMicrosoftSso: !!u.o365Id,
@@ -348,6 +350,20 @@ export async function updateUserAllowedIps(userId: string, allowedIps: string[] 
     id: updated.id,
     allowedIps: updated.allowedIps ? JSON.parse(updated.allowedIps) as string[] : null,
   };
+}
+
+// ── Update User Phone ────────────────────────────────────────────────
+
+export async function updateUserPhone(userId: string, phone: string | null) {
+  const [updated] = await db
+    .update(users)
+    .set({ phone: phone?.trim() || null, updatedAt: new Date() })
+    .where(eq(users.id, userId))
+    .returning();
+
+  if (!updated) throw new Error('User not found');
+
+  return { id: updated.id, phone: updated.phone ?? null };
 }
 
 // ── Get User Allowed IPs (for auth check) ────────────────────────────

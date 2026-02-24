@@ -325,16 +325,52 @@ interface TeamUserOption {
       <!-- Notes + T&C (projected into invoicing card) -->
       <div notesAndTerms>
         <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Place remark</p>
-        <p class="mt-1 text-sm text-gray-700 whitespace-pre-line">{{ port()?.orderRemark || '-' }}</p>
+        @if (port()?.orderRemark) {
+          <p
+            class="mt-1 text-sm text-gray-700 whitespace-pre-line"
+            [class.fueld-clamp-1]="!showPlaceRemarkFull()"
+          >{{ port()?.orderRemark }}</p>
+          <button
+            type="button"
+            (click)="showPlaceRemarkFull.set(!showPlaceRemarkFull())"
+            class="mt-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+          >{{ showPlaceRemarkFull() ? 'Show less' : 'Show more' }}</button>
+        } @else {
+          <p class="mt-1 text-sm text-gray-700">-</p>
+        }
         <p class="mt-2 text-[11px] text-gray-400">Edit in Places → Details</p>
 
         <div class="mt-4"></div>
         <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Customer terms</p>
-        <p class="mt-1 text-sm text-gray-700 whitespace-pre-line">{{ renderCompanyTerms(selectedOwnCompany()?.customerTerms, selectedOwnCompany()?.name) || '-' }}</p>
+        @if (customerTermsText()) {
+          <p
+            class="mt-1 text-sm text-gray-700 whitespace-pre-line"
+            [class.fueld-clamp-1]="!showCustomerTermsFull()"
+          >{{ customerTermsText() }}</p>
+          <button
+            type="button"
+            (click)="showCustomerTermsFull.set(!showCustomerTermsFull())"
+            class="mt-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+          >{{ showCustomerTermsFull() ? 'Show less' : 'Show more' }}</button>
+        } @else {
+          <p class="mt-1 text-sm text-gray-700">-</p>
+        }
 
         <div class="mt-4"></div>
         <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Supplier terms</p>
-        <p class="mt-1 text-sm text-gray-700 whitespace-pre-line">{{ renderCompanyTerms(selectedOwnCompany()?.supplierTerms, selectedOwnCompany()?.name) || '-' }}</p>
+        @if (supplierTermsText()) {
+          <p
+            class="mt-1 text-sm text-gray-700 whitespace-pre-line"
+            [class.fueld-clamp-1]="!showSupplierTermsFull()"
+          >{{ supplierTermsText() }}</p>
+          <button
+            type="button"
+            (click)="showSupplierTermsFull.set(!showSupplierTermsFull())"
+            class="mt-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+          >{{ showSupplierTermsFull() ? 'Show less' : 'Show more' }}</button>
+        } @else {
+          <p class="mt-1 text-sm text-gray-700">-</p>
+        }
 
         <p class="mt-2 text-[11px] text-gray-400">Edit in Admin → Our Companies</p>
       </div>
@@ -589,6 +625,16 @@ interface TeamUserOption {
     <!-- PDF Preview Modal -->
     <app-pdf-preview-modal />
   `,
+  styles: [
+    `
+      .fueld-clamp-1 {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 1;
+        overflow: hidden;
+      }
+    `,
+  ],
 })
 export class OrderDetailPageComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
@@ -655,6 +701,20 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   readonly configuredProducts = signal<DropdownOption[]>([]);
   readonly configuredUnits = signal<DropdownOption[]>([]);
   readonly configuredCurrencies = signal<DropdownOption[]>([]);
+
+  // ─── Terms UI (collapsed by default) ─────────────────────────────
+
+  readonly showPlaceRemarkFull = signal(false);
+  readonly showCustomerTermsFull = signal(false);
+  readonly showSupplierTermsFull = signal(false);
+
+  readonly customerTermsText = computed(() =>
+    this.renderCompanyTerms(this.selectedOwnCompany()?.customerTerms, this.selectedOwnCompany()?.name) || '',
+  );
+
+  readonly supplierTermsText = computed(() =>
+    this.renderCompanyTerms(this.selectedOwnCompany()?.supplierTerms, this.selectedOwnCompany()?.name) || '',
+  );
 
   // ─── Contact persons ─────────────────────────────────────────────
 
@@ -1704,7 +1764,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
       const blob = await firstValueFrom(
         this.http.get(`${API_URL}/orders/${id}/offer/pdf`, { responseType: 'blob' }),
       );
-      modal.setBlob(blob, `Confirmation_${this.order()?.orderNumber ?? id}.pdf`);
+      modal.setBlob(blob, `Offer_${this.order()?.orderNumber ?? id}.pdf`);
     } catch {
       modal.showError();
       this.showToast('error', 'Failed to generate offer PDF.');

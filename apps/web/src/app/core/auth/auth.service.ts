@@ -63,6 +63,7 @@ export class AuthService {
   readonly isAdmin = computed(() => this.user()?.role === Role.Admin);
   readonly isCreditManager = computed(() => this.user()?.role === Role.CreditManager);
   readonly canAccessCredit = computed(() => this.isAdmin() || this.isCreditManager());
+  readonly userPhone = computed(() => this.user()?.phone ?? '');
   readonly avatarUrl = computed(() => {
     const url = this.user()?.avatarUrl;
     if (!url) return null;
@@ -366,6 +367,24 @@ export class AuthService {
     if (currentUser) {
       this.setUser({ ...currentUser, is2faEnabled: false });
     }
+  }
+
+  // ─── Profile ────────────────────────────────────────────────────────
+
+  /** Update the current user's phone number. */
+  async updatePhone(phone: string | null): Promise<void> {
+    const res = await firstValueFrom(
+      this.http.patch<ApiResponse<{ user: UserDto }>>(
+        `${API_URL}/auth/phone`,
+        { phone },
+      ),
+    );
+
+    if (!res.success || !res.data) {
+      throw new Error(res.message ?? 'Failed to update phone');
+    }
+
+    this.setUser(res.data.user);
   }
 
   // ─── Passkey Authentication ─────────────────────────────────────────

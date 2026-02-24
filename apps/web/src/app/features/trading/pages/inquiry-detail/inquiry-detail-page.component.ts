@@ -431,16 +431,52 @@ interface LliSearchResult {
         <!-- T&C (projected into invoicing card) -->
         <div notesAndTerms>
           <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Place remark</p>
-          <p class="mt-1 text-sm text-gray-700 whitespace-pre-line">{{ port()?.orderRemark || '-' }}</p>
+          @if (port()?.orderRemark) {
+            <p
+              class="mt-1 text-sm text-gray-700 whitespace-pre-line"
+              [class.fueld-clamp-1]="!showPlaceRemarkFull()"
+            >{{ port()?.orderRemark }}</p>
+            <button
+              type="button"
+              (click)="showPlaceRemarkFull.set(!showPlaceRemarkFull())"
+              class="mt-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            >{{ showPlaceRemarkFull() ? 'Show less' : 'Show more' }}</button>
+          } @else {
+            <p class="mt-1 text-sm text-gray-700">-</p>
+          }
           <p class="mt-2 text-[11px] text-gray-400">Edit in Places → Details</p>
 
           <div class="mt-4"></div>
           <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Customer terms</p>
-          <p class="mt-1 text-sm text-gray-700 whitespace-pre-line">{{ renderCompanyTerms(selectedOwnCompany()?.customerTerms, selectedOwnCompany()?.name) || '-' }}</p>
+          @if (customerTermsText()) {
+            <p
+              class="mt-1 text-sm text-gray-700 whitespace-pre-line"
+              [class.fueld-clamp-1]="!showCustomerTermsFull()"
+            >{{ customerTermsText() }}</p>
+            <button
+              type="button"
+              (click)="showCustomerTermsFull.set(!showCustomerTermsFull())"
+              class="mt-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            >{{ showCustomerTermsFull() ? 'Show less' : 'Show more' }}</button>
+          } @else {
+            <p class="mt-1 text-sm text-gray-700">-</p>
+          }
 
           <div class="mt-4"></div>
           <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Supplier terms</p>
-          <p class="mt-1 text-sm text-gray-700 whitespace-pre-line">{{ renderCompanyTerms(selectedOwnCompany()?.supplierTerms, selectedOwnCompany()?.name) || '-' }}</p>
+          @if (supplierTermsText()) {
+            <p
+              class="mt-1 text-sm text-gray-700 whitespace-pre-line"
+              [class.fueld-clamp-1]="!showSupplierTermsFull()"
+            >{{ supplierTermsText() }}</p>
+            <button
+              type="button"
+              (click)="showSupplierTermsFull.set(!showSupplierTermsFull())"
+              class="mt-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            >{{ showSupplierTermsFull() ? 'Show less' : 'Show more' }}</button>
+          } @else {
+            <p class="mt-1 text-sm text-gray-700">-</p>
+          }
 
           <p class="mt-2 text-[11px] text-gray-400">Edit in Admin → Our Companies</p>
         </div>
@@ -633,6 +669,16 @@ interface LliSearchResult {
     <!-- PDF Preview Modal -->
     <app-pdf-preview-modal />
   `,
+  styles: [
+    `
+      .fueld-clamp-1 {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 1;
+        overflow: hidden;
+      }
+    `,
+  ],
 })
 export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
@@ -666,6 +712,20 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
     if (!id) return null;
     return this.ownCompanies().find((c) => c.id === id) ?? null;
   });
+
+  // ─── Terms UI (collapsed by default) ─────────────────────────────
+
+  readonly showPlaceRemarkFull = signal(false);
+  readonly showCustomerTermsFull = signal(false);
+  readonly showSupplierTermsFull = signal(false);
+
+  readonly customerTermsText = computed(() =>
+    this.renderCompanyTerms(this.selectedOwnCompany()?.customerTerms, this.selectedOwnCompany()?.name) || '',
+  );
+
+  readonly supplierTermsText = computed(() =>
+    this.renderCompanyTerms(this.selectedOwnCompany()?.supplierTerms, this.selectedOwnCompany()?.name) || '',
+  );
   readonly bankAccounts = signal<BankAccountDto[]>([]);
   readonly teamUsers = signal<TeamUserOption[]>([]);
   readonly saving = signal(false);

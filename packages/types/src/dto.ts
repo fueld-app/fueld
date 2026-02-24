@@ -47,6 +47,7 @@ export interface UserDto {
   leaveEndDate: string | null;
   delegateId: string | null;
   avatarUrl?: string | null;
+  phone?: string | null;
   createdAt?: string;
 }
 
@@ -62,6 +63,7 @@ export interface AdminUserDto {
   hasPasskeys: boolean;
   hasMicrosoftSso: boolean;
   isActive: boolean;
+  phone?: string | null;
   allowedIps: string[] | null;
   createdAt: string;
 }

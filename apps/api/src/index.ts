@@ -90,6 +90,20 @@ const REQUIRED_PASSWORD_RESET_COLUMNS = [
   'created_at',
 ] as const;
 
+const REQUIRED_COUNTERPARTY_COLUMNS = [
+  'id',
+  'tenant_id',
+  'name',
+  'type',
+  'types',
+  'is_own_company',
+  'manual_overrides',
+  'logo_url',
+  'customer_terms',
+  'supplier_terms',
+  'updated_at',
+] as const;
+
 async function runPendingMigrations() {
   try {
     await migrate(db, { migrationsFolder: MIGRATIONS_DIR });
@@ -134,6 +148,7 @@ async function assertRequiredSchemaAtStartup(): Promise<void> {
 
   await assertTableColumns('push_subscriptions', REQUIRED_PUSH_COLUMNS, 'push notifications');
   await assertTableColumns('password_reset_tokens', REQUIRED_PASSWORD_RESET_COLUMNS, 'password reset');
+  await assertTableColumns('counterparties', REQUIRED_COUNTERPARTY_COLUMNS, 'counterparties (companies)');
 }
 
 function registerAutoSyncHooks() {
