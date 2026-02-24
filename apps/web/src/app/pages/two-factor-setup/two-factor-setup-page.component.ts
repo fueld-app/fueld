@@ -22,8 +22,10 @@ import type { PasskeyDto, ApiResponse } from '@fueld/types';
   imports: [FormsModule, DatePipe],
   template: `
     <div class="mx-auto">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
       <!-- Profile: Phone Number -->
-      <div class="mb-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm max-w-md">
+      <div class="flex flex-col rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
         <h2 class="text-lg font-bold text-gray-900">Profile</h2>
         <p class="mt-1 text-sm text-gray-500">Your phone number will appear on generated PDF documents (offers, proforma invoices).</p>
 
@@ -65,7 +67,7 @@ import type { PasskeyDto, ApiResponse } from '@fueld/types';
       </div>
 
       <!-- WhatsApp Linked Device -->
-      <div class="mb-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm max-w-md">
+      <div class="flex flex-col rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
         <div class="flex items-start gap-3">
           <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-50">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-600" viewBox="0 0 24 24" fill="currentColor">
@@ -159,8 +161,7 @@ import type { PasskeyDto, ApiResponse } from '@fueld/types';
         }
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-
+      <!-- Two-Factor Authentication -->
       <div class="flex flex-col rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
         <h1
           class="text-xl font-bold text-gray-900"
