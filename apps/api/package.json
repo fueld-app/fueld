@@ -25,6 +25,7 @@
     "@elysiajs/jwt": "^1.4.0",
     "@elysiajs/swagger": "^1.2.0",
     "@fueld/types": "workspace:*",
+    "@hapi/boom": "^10.0.1",
     "@simplewebauthn/server": "^13.2.2",
     "drizzle-orm": "^0.45.1",
     "elysia": "^1.2.0",
@@ -39,6 +40,7 @@
   },
   "devDependencies": {
     "@types/bun": "latest",
+    "@types/hapi__boom": "^9.0.1",
     "@types/nodemailer": "^6.4.17",
     "@types/pdfmake": "^0.3.0",
     "@types/qrcode": "^1.5.6",

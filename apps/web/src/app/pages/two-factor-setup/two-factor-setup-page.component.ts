@@ -4,12 +4,17 @@ import {
   inject,
   signal,
   OnInit,
+  OnDestroy,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { DatePipe } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
+import { firstValueFrom, Subscription } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
-import type { PasskeyDto } from '@fueld/types';
+import { WebSocketService } from '../../core/websocket/websocket.service';
+import { API_URL } from '../../core/config/api';
+import type { PasskeyDto, ApiResponse } from '@fueld/types';
 
 @Component({
   selector: 'app-two-factor-setup-page',
@@ -57,6 +62,101 @@ import type { PasskeyDto } from '@fueld/types';
             }
           </button>
         </form>
+      </div>
+
+      <!-- WhatsApp Linked Device -->
+      <div class="mb-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm max-w-md">
+        <div class="flex items-start gap-3">
+          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-50">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-600" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+            </svg>
+          </div>
+          <div>
+            <h2 class="text-lg font-bold text-gray-900">WhatsApp</h2>
+            <p class="mt-1 text-sm text-gray-500">
+              Link your WhatsApp to send offers and invoices directly from the system.
+            </p>
+          </div>
+        </div>
+
+        @if (waError()) {
+          <div class="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">
+            {{ waError() }}
+          </div>
+        }
+
+        @if (waStatus() === 'connected' || waStatus() === 'stored') {
+          <!-- Connected state -->
+          <div class="mt-4 flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 p-4">
+            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-100">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-600" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
+              </svg>
+            </div>
+            <div class="flex-1">
+              <p class="text-sm font-semibold text-green-900">WhatsApp linked</p>
+              @if (waPhone()) {
+                <p class="text-sm text-green-700">+{{ waPhone() }}</p>
+              }
+            </div>
+          </div>
+          <button
+            (click)="unlinkWhatsApp()"
+            [disabled]="waLoading()"
+            class="mt-4 rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-600
+                   hover:bg-red-50 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50"
+          >
+            @if (waLoading()) { Unlinking… } @else { Unlink WhatsApp }
+          </button>
+        } @else if (waStatus() === 'qr') {
+          <!-- QR code scanning -->
+          <div class="mt-4 space-y-3">
+            <p class="text-sm text-gray-600">
+              Open WhatsApp on your phone → Settings → Linked Devices → Link a Device, then scan this QR code.
+            </p>
+            <div class="flex justify-center">
+              <div class="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+                <img
+                  [src]="waQrDataUrl()"
+                  alt="WhatsApp QR code"
+                  class="h-52 w-52"
+                  width="208"
+                  height="208"
+                />
+              </div>
+            </div>
+            <p class="text-center text-xs text-gray-400">QR code refreshes automatically</p>
+          </div>
+        } @else if (waStatus() === 'connecting') {
+          <!-- Connecting -->
+          <div class="mt-4 flex items-center gap-3 text-sm text-gray-400">
+            <svg class="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            Connecting to WhatsApp…
+          </div>
+        } @else {
+          <!-- Not linked -->
+          <button
+            (click)="linkWhatsApp()"
+            [disabled]="waLoading()"
+            class="mt-4 inline-flex items-center gap-2 rounded-lg bg-green-600 px-5 py-2.5 text-sm font-semibold text-white
+                   shadow-sm transition-colors hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500
+                   focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            @if (waLoading()) {
+              <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+              </svg>
+              Starting…
+            } @else {
+              Link WhatsApp
+            }
+          </button>
+        }
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
@@ -385,9 +485,11 @@ import type { PasskeyDto } from '@fueld/types';
     </div>
   `,
 })
-export class TwoFactorSetupPageComponent implements OnInit {
+export class TwoFactorSetupPageComponent implements OnInit, OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly http = inject(HttpClient);
+  private readonly wsService = inject(WebSocketService);
 
   readonly loadingQr = signal(true);
   readonly qrDataUrl = signal('');
@@ -419,9 +521,38 @@ export class TwoFactorSetupPageComponent implements OnInit {
   readonly phoneError = signal('');
   readonly phoneSuccess = signal('');
 
+  // WhatsApp state
+  readonly waStatus = signal<'none' | 'connecting' | 'qr' | 'connected' | 'stored' | 'closed'>('none');
+  readonly waQrDataUrl = signal('');
+  readonly waPhone = signal<string | null>(null);
+  readonly waLoading = signal(false);
+  readonly waError = signal('');
+  private waSubs: Subscription[] = [];
+
   async ngOnInit(): Promise<void> {
     // Load phone
     this.phoneValue = this.auth.userPhone() || '';
+
+    // Load WhatsApp status
+    this.loadWhatsAppStatus();
+    // Subscribe to WhatsApp WebSocket events
+    this.waSubs.push(
+      this.wsService.on<string>('whatsapp:qr').subscribe((qr) => {
+        this.waStatus.set('qr');
+        this.waQrDataUrl.set(qr);
+      }),
+      this.wsService.on<{ phoneNumber: string | null }>('whatsapp:connected').subscribe((data) => {
+        this.waStatus.set('connected');
+        this.waPhone.set(data.phoneNumber);
+        this.waQrDataUrl.set('');
+      }),
+      this.wsService.on<{ reason: string }>('whatsapp:disconnected').subscribe(() => {
+        this.waStatus.set('none');
+        this.waPhone.set(null);
+        this.waQrDataUrl.set('');
+      }),
+    );
+
     const user = this.auth.user();
     if (user?.is2faEnabled) {
       this.enabled.set(true);
@@ -590,6 +721,74 @@ export class TwoFactorSetupPageComponent implements OnInit {
       this.passkeyError.set(
         err instanceof Error ? err.message : 'Failed to remove passkey.',
       );
+    }
+  }
+
+  // ─── WhatsApp Methods ──────────────────────────────────────────────
+
+  ngOnDestroy(): void {
+    this.waSubs.forEach((s) => s.unsubscribe());
+  }
+
+  async loadWhatsAppStatus(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ linked: boolean; status: string; phoneNumber?: string | null; qr?: string }>>(
+          `${API_URL}/whatsapp/status`,
+        ),
+      );
+      if (res.success && res.data) {
+        const d = res.data;
+        if (d.linked) {
+          this.waStatus.set(d.status === 'stored' ? 'stored' : 'connected');
+          this.waPhone.set(d.phoneNumber ?? null);
+        } else {
+          this.waStatus.set('none');
+        }
+      }
+    } catch {
+      // Not linked — default state is fine
+    }
+  }
+
+  async linkWhatsApp(): Promise<void> {
+    this.waLoading.set(true);
+    this.waError.set('');
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<{ status: string; qr?: string }>>(
+          `${API_URL}/whatsapp/link`,
+          {},
+        ),
+      );
+      if (res.success && res.data) {
+        const status = res.data.status as any;
+        this.waStatus.set(status);
+        if (res.data.qr) {
+          this.waQrDataUrl.set(res.data.qr);
+        }
+      }
+    } catch (err: any) {
+      this.waError.set(err?.error?.message ?? 'Failed to start WhatsApp linking.');
+    } finally {
+      this.waLoading.set(false);
+    }
+  }
+
+  async unlinkWhatsApp(): Promise<void> {
+    this.waLoading.set(true);
+    this.waError.set('');
+    try {
+      await firstValueFrom(
+        this.http.delete<ApiResponse<null>>(`${API_URL}/whatsapp/link`),
+      );
+      this.waStatus.set('none');
+      this.waPhone.set(null);
+      this.waQrDataUrl.set('');
+    } catch (err: any) {
+      this.waError.set(err?.error?.message ?? 'Failed to unlink WhatsApp.');
+    } finally {
+      this.waLoading.set(false);
     }
   }
 }

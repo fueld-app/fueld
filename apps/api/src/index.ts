@@ -42,6 +42,8 @@ import { users } from './db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { pushController } from './modules/push/push.controller';
+import { whatsappController } from './modules/whatsapp/whatsapp.controller';
+import { reconnectStoredSessions as reconnectWhatsAppSessions } from './modules/whatsapp/whatsapp.service';
 
 function resolveMigrationsDir(): string {
   const env = process.env['MIGRATIONS_DIR'];
@@ -254,6 +256,7 @@ export async function createApp(options: CreateAppOptions = {}) {
     .use(commentsController)
     .use(securityController)
     .use(pushController)
+    .use(whatsappController)
     .get('/uploads/avatars/:filename', async ({ params, set }) => {
       const { join } = await import('path');
       const path = join(import.meta.dir, '../uploads/avatars', params.filename);
@@ -510,6 +513,7 @@ export async function createApp(options: CreateAppOptions = {}) {
     startPruneJob();
     startPricePolling();
     registerAutoSyncHooks();
+    reconnectWhatsAppSessions();
   }
 
   return app;

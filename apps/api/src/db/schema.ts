@@ -194,6 +194,28 @@ export const pushSubscriptions = pgTable('push_subscriptions', {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
+//  3b. WHATSAPP AUTH STATE (Baileys multi-device sessions)
+// ═══════════════════════════════════════════════════════════════════════
+
+export const whatsappSessions = pgTable('whatsapp_sessions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id).unique(),
+  creds: jsonb('creds'),                       // Baileys AuthenticationCreds
+  syncedAt: timestamp('synced_at', { withTimezone: true }),
+  phoneNumber: text('phone_number'),            // Linked phone number (for display)
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const whatsappKeys = pgTable('whatsapp_keys', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  keyType: text('key_type').notNull(),          // e.g. 'pre-key', 'session', 'sender-key', 'app-state-sync-key', etc.
+  keyId: text('key_id').notNull(),              // The specific key identifier
+  keyData: jsonb('key_data').notNull(),         // The serialized key data
+});
+
+// ═══════════════════════════════════════════════════════════════════════
 //  4. COUNTERPARTIES
 // ═══════════════════════════════════════════════════════════════════════
 

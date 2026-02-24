@@ -155,6 +155,13 @@
       "when": 1771200017000,
       "tag": "0021_user_phone",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1771200018000,
+      "tag": "0022_whatsapp_sessions",
+      "breakpoints": true
     }
   ]
 }

@@ -620,10 +620,11 @@ interface TeamUserOption {
       [vesselName]="vesselName()"
       [portName]="portName()"
       (sendEmail)="onSendEmail($event)"
+      (sendWhatsApp)="onSendInvoiceWhatsApp($event)"
     />
 
     <!-- PDF Preview Modal -->
-    <app-pdf-preview-modal />
+    <app-pdf-preview-modal (sendWhatsApp)="onSendPdfWhatsApp($event)" />
   `,
   styles: [
     `
@@ -1818,6 +1819,66 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
           this.showToast('error', 'Failed to send email. Check O365 token.');
         },
       });
+  }
+
+  // ─── WhatsApp send handlers ──────────────────────────────────────
+
+  /** Send invoice PDF via WhatsApp from the email modal */
+  async onSendInvoiceWhatsApp(phone: string): Promise<void> {
+    const id = this.orderId();
+    if (!id) return;
+    try {
+      const blob = await firstValueFrom(
+        this.http.get(`${API_URL}/orders/${id}/invoice/pdf`, { responseType: 'blob' }),
+      );
+      const base64 = await this.blobToBase64(blob);
+      await firstValueFrom(
+        this.http.post<ApiResponse<{ success: boolean }>>(`${API_URL}/whatsapp/send`, {
+          phone,
+          message: `Invoice ${this.invoiceNumber()} — Bunker Delivery (${this.vesselName()})`,
+          pdfBase64: base64,
+          pdfFileName: `Fueld_Invoice_${this.invoiceNumber()}.pdf`,
+        }),
+      );
+      this.emailModal()?.waDone();
+      this.showToast('success', `Invoice sent via WhatsApp to ${phone}`);
+    } catch {
+      this.emailModal()?.waDone();
+      this.showToast('error', 'Failed to send via WhatsApp. Is your device linked?');
+    }
+  }
+
+  /** Send an already-loaded PDF via WhatsApp from the PDF preview modal */
+  async onSendPdfWhatsApp(ev: { phone: string; blob: Blob; fileName: string }): Promise<void> {
+    try {
+      const base64 = await this.blobToBase64(ev.blob);
+      await firstValueFrom(
+        this.http.post<ApiResponse<{ success: boolean }>>(`${API_URL}/whatsapp/send`, {
+          phone: ev.phone,
+          message: `${ev.fileName} — Order ${this.order()?.orderNumber ?? ''}`,
+          pdfBase64: base64,
+          pdfFileName: ev.fileName,
+        }),
+      );
+      this.pdfModal()?.waDone();
+      this.showToast('success', `PDF sent via WhatsApp to ${ev.phone}`);
+    } catch {
+      this.pdfModal()?.waDone();
+      this.showToast('error', 'Failed to send via WhatsApp. Is your device linked?');
+    }
+  }
+
+  private blobToBase64(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        // strip the data:…;base64, prefix
+        resolve(result.split(',')[1] ?? result);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
   }
 
   private markPaid(): void {

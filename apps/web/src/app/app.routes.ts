@@ -259,12 +259,18 @@ export const routes: Routes = [
       },
       // ── Account ──
       {
-        path: 'account/security',
+        path: 'account/settings',
         loadComponent: () =>
           import('./pages/two-factor-setup/two-factor-setup-page.component').then(
             (m) => m.TwoFactorSetupPageComponent,
           ),
-        title: 'Account > Security',
+        title: 'Account > Settings',
+      },
+      // Redirect old path
+      {
+        path: 'account/security',
+        redirectTo: 'account/settings',
+        pathMatch: 'full',
       },
     ],
   },

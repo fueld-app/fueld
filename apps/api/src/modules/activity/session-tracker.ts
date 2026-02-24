@@ -334,6 +334,22 @@ export function sendToSocket(socketId: string, message: Record<string, unknown>)
 }
 
 /**
+ * Send a message to ALL WebSocket sessions for a given userId.
+ * Used for user-specific real-time updates (e.g. WhatsApp QR codes).
+ */
+export function sendToUserSockets(userId: string, message: Record<string, any>): void {
+  const payload = JSON.stringify(message);
+  for (const [socketId, session] of sessions.entries()) {
+    if (session.userId === userId) {
+      const ws = wsConnections.get(socketId);
+      if (ws) {
+        try { ws.send(payload); } catch { /* closing */ }
+      }
+    }
+  }
+}
+
+/**
  * Force-disconnect all WebSocket sessions for a given user.
  * Sends a 'force-logout' message before closing, so the client can
  * clean up (clear tokens, redirect to login).
