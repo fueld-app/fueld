@@ -3,6 +3,7 @@ import type { TDocumentDefinitions, Content, TableCell } from 'pdfmake/interface
 import { and, desc, eq } from 'drizzle-orm';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
+import QRCode from 'qrcode';
 import { db } from '../../db';
 import { entityComments, orders, orderItems, counterparties, vessels, places, invoices, users } from '../../db/schema';
 
@@ -625,6 +626,7 @@ function buildOfferDocument(data: {
   }>;
   createdAt: Date;
   docTitle?: string;
+  verifyUrl?: string | null;
 }): TDocumentDefinitions {
   // ── Prepare data ──────────────────────────────────────────────────
   const refNum = data.orderNumber ?? 'DRAFT';
@@ -855,20 +857,49 @@ function buildOfferDocument(data: {
         supplierTerms: null,
       }),
 
-      // Sign-off
+      // Sign-off (with optional QR code on the right)
       { text: '', margin: [0, 20, 0, 0] } as Content,
-      { text: 'Best regards', margin: [0, 0, 0, 6] } as Content,
-      { text: senderName, bold: true, margin: [0, 0, 0, 2] } as Content,
-      ...(data.fromName?.trim()
-        ? [{ text: data.fromName.trim(), fontSize: 9 } as Content]
-        : []),
-      { text: '', margin: [0, 10, 0, 0] } as Content,
-      ...(data.fromEmail?.trim()
-        ? [{ text: `Direct Email:  ${data.fromEmail.trim()}`, fontSize: 9, margin: [0, 0, 0, 2] } as Content]
-        : []),
-      ...(data.fromPhone?.trim()
-        ? [{ text: `Direct Phone:  ${data.fromPhone.trim()}`, fontSize: 9, margin: [0, 0, 0, 2] } as Content]
-        : []),
+      ...(data.verifyUrl ? [{
+        columns: [
+          {
+            width: '*',
+            stack: [
+              { text: 'Best regards', margin: [0, 0, 0, 6] } as Content,
+              { text: senderName, bold: true, margin: [0, 0, 0, 2] } as Content,
+              ...(data.fromName?.trim()
+                ? [{ text: data.fromName.trim(), fontSize: 9 } as Content]
+                : []),
+              { text: '', margin: [0, 10, 0, 0] } as Content,
+              ...(data.fromEmail?.trim()
+                ? [{ text: `Direct Email:  ${data.fromEmail.trim()}`, fontSize: 9, margin: [0, 0, 0, 2] } as Content]
+                : []),
+              ...(data.fromPhone?.trim()
+                ? [{ text: `Direct Phone:  ${data.fromPhone.trim()}`, fontSize: 9, margin: [0, 0, 0, 2] } as Content]
+                : []),
+            ],
+          },
+          {
+            width: 'auto',
+            stack: [
+              { image: data.verifyUrl, fit: [80, 80], alignment: 'right' } as Content,
+              { text: 'Scan to verify', fontSize: 7, color: '#6b7280', alignment: 'center', margin: [0, 4, 0, 0] } as Content,
+            ],
+          },
+        ],
+      } as Content] : [
+        { text: 'Best regards', margin: [0, 0, 0, 6] } as Content,
+        { text: senderName, bold: true, margin: [0, 0, 0, 2] } as Content,
+        ...(data.fromName?.trim()
+          ? [{ text: data.fromName.trim(), fontSize: 9 } as Content]
+          : []),
+        { text: '', margin: [0, 10, 0, 0] } as Content,
+        ...(data.fromEmail?.trim()
+          ? [{ text: `Direct Email:  ${data.fromEmail.trim()}`, fontSize: 9, margin: [0, 0, 0, 2] } as Content]
+          : []),
+        ...(data.fromPhone?.trim()
+          ? [{ text: `Direct Phone:  ${data.fromPhone.trim()}`, fontSize: 9, margin: [0, 0, 0, 2] } as Content]
+          : []),
+      ]),
     ],
     footer: footerFn,
     styles: {
@@ -946,7 +977,15 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
       salesPrice: item.salesPrice,
     })),
     createdAt: new Date(),
+    verifyUrl: null as string | null,
   };
+
+  // Generate QR code verification URL
+  const appUrl = process.env['APP_URL'] || 'http://localhost:4200';
+  const verifyLink = `${appUrl}/verify/${orderId}/offer`;
+  try {
+    docData.verifyUrl = await QRCode.toDataURL(verifyLink, { width: 160, margin: 1 });
+  } catch { /* QR generation failed — continue without */ }
 
   const docDefinition = buildOfferDocument(docData);
   const buffer = await createPdfBuffer(docDefinition);
@@ -1000,6 +1039,7 @@ function buildProformaDocument(data: {
     salesPrice: string | null;
   }>;
   createdAt: Date;
+  verifyUrl?: string | null;
 }): TDocumentDefinitions {
   // ── Prepare data ──────────────────────────────────────────────────
   const refNum = data.orderNumber ?? 'DRAFT';
@@ -1219,20 +1259,49 @@ function buildProformaDocument(data: {
         supplierTerms: null,
       }),
 
-      // Sign-off
+      // Sign-off (with optional QR code on the right)
       { text: '', margin: [0, 20, 0, 0] } as Content,
-      { text: 'Best regards', margin: [0, 0, 0, 6] } as Content,
-      { text: senderName, bold: true, margin: [0, 0, 0, 2] } as Content,
-      ...(data.fromName?.trim()
-        ? [{ text: data.fromName.trim(), fontSize: 9 } as Content]
-        : []),
-      { text: '', margin: [0, 10, 0, 0] } as Content,
-      ...(data.fromEmail?.trim()
-        ? [{ text: `Direct Email:  ${data.fromEmail.trim()}`, fontSize: 9, margin: [0, 0, 0, 2] } as Content]
-        : []),
-      ...(data.fromPhone?.trim()
-        ? [{ text: `Direct Phone:  ${data.fromPhone.trim()}`, fontSize: 9, margin: [0, 0, 0, 2] } as Content]
-        : []),
+      ...(data.verifyUrl ? [{
+        columns: [
+          {
+            width: '*',
+            stack: [
+              { text: 'Best regards', margin: [0, 0, 0, 6] } as Content,
+              { text: senderName, bold: true, margin: [0, 0, 0, 2] } as Content,
+              ...(data.fromName?.trim()
+                ? [{ text: data.fromName.trim(), fontSize: 9 } as Content]
+                : []),
+              { text: '', margin: [0, 10, 0, 0] } as Content,
+              ...(data.fromEmail?.trim()
+                ? [{ text: `Direct Email:  ${data.fromEmail.trim()}`, fontSize: 9, margin: [0, 0, 0, 2] } as Content]
+                : []),
+              ...(data.fromPhone?.trim()
+                ? [{ text: `Direct Phone:  ${data.fromPhone.trim()}`, fontSize: 9, margin: [0, 0, 0, 2] } as Content]
+                : []),
+            ],
+          },
+          {
+            width: 'auto',
+            stack: [
+              { image: data.verifyUrl, fit: [80, 80], alignment: 'right' } as Content,
+              { text: 'Scan to verify', fontSize: 7, color: '#6b7280', alignment: 'center', margin: [0, 4, 0, 0] } as Content,
+            ],
+          },
+        ],
+      } as Content] : [
+        { text: 'Best regards', margin: [0, 0, 0, 6] } as Content,
+        { text: senderName, bold: true, margin: [0, 0, 0, 2] } as Content,
+        ...(data.fromName?.trim()
+          ? [{ text: data.fromName.trim(), fontSize: 9 } as Content]
+          : []),
+        { text: '', margin: [0, 10, 0, 0] } as Content,
+        ...(data.fromEmail?.trim()
+          ? [{ text: `Direct Email:  ${data.fromEmail.trim()}`, fontSize: 9, margin: [0, 0, 0, 2] } as Content]
+          : []),
+        ...(data.fromPhone?.trim()
+          ? [{ text: `Direct Phone:  ${data.fromPhone.trim()}`, fontSize: 9, margin: [0, 0, 0, 2] } as Content]
+          : []),
+      ]),
     ],
     footer: footerFn,
     styles: {
@@ -1313,7 +1382,15 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
       salesPrice: item.salesPrice,
     })),
     createdAt: new Date(),
+    verifyUrl: null as string | null,
   };
+
+  // Generate QR code verification URL
+  const appUrl = process.env['APP_URL'] || 'http://localhost:4200';
+  const verifyLink = `${appUrl}/verify/${orderId}/proforma-invoice`;
+  try {
+    docData.verifyUrl = await QRCode.toDataURL(verifyLink, { width: 160, margin: 1 });
+  } catch { /* QR generation failed — continue without */ }
 
   const docDefinition = buildProformaDocument(docData);
   const buffer = await createPdfBuffer(docDefinition);

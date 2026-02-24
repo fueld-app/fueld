@@ -6,6 +6,7 @@ import { join } from 'path';
 import type { ApiResponse } from '@fueld/types';
 import { authController } from './modules/auth';
 import { documentsController } from './modules/documents/documents.controller';
+import { verifyController } from './modules/documents/verify.controller';
 import { dashboardController } from './modules/dashboard/dashboard.controller';
 import { lloydsController } from './modules/lloyds';
 import { companiesController } from './modules/companies/companies.controller';
@@ -238,6 +239,7 @@ export async function createApp(options: CreateAppOptions = {}) {
     })
     .use(authController)
     .use(documentsController)
+    .use(verifyController)
     .use(dashboardController)
     .use(lloydsController)
     .use(companiesController)

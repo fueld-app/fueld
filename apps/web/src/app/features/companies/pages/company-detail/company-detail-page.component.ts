@@ -1949,7 +1949,9 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
 
   // ─── State ──────────────────────────────────────────────────────────
   readonly loading = signal(true);
-  readonly canDeleteEntity = computed(() => this.authService.isAdmin());
+  readonly canDeleteEntity = computed(() =>
+    this.authService.isAdmin() || this.authService.isCreditManager() || this.authService.isTeamLead(),
+  );
   readonly company = signal<CounterpartyDto | null>(null);
   readonly enrichment = signal<CompanyEnrichment | null>(null);
   readonly enrichmentLoading = signal(false);
@@ -2912,7 +2914,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
 
   async executeDelete(): Promise<void> {
     if (!this.canDeleteEntity()) {
-      this.deleteError.set('Only admins can delete companies');
+      this.deleteError.set('Only admins, credit managers and team leads can delete companies');
       return;
     }
     const c = this.company();

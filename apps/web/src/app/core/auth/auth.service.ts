@@ -61,6 +61,7 @@ export class AuthService {
   readonly userEmail = computed(() => this.user()?.email ?? '');
   readonly userRole = computed(() => this.user()?.role ?? '');
   readonly isAdmin = computed(() => this.user()?.role === Role.Admin);
+  readonly isTeamLead = computed(() => this.user()?.role === Role.Teamlead);
   readonly isCreditManager = computed(() => this.user()?.role === Role.CreditManager);
   readonly canAccessCredit = computed(() => this.isAdmin() || this.isCreditManager());
   readonly userPhone = computed(() => this.user()?.phone ?? '');

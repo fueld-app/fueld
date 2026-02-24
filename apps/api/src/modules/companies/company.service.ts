@@ -615,6 +615,26 @@ export async function updateCompanyResponsibleUser(companyId: string, userId: st
 // ═══════════════════════════════════════════════════════════════════════
 
 export async function deleteCompany(id: string) {
+  // Pre-check: refuse if any orders/inquiries reference this company
+  const [linked] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(orders)
+    .where(
+      or(
+        eq(orders.clientId, id),
+        eq(orders.supplierId, id),
+        eq(orders.invoicingCompanyId, id),
+      ),
+    );
+
+  if (linked && linked.count > 0) {
+    const label = linked.count === 1 ? 'order/inquiry' : 'orders/inquiries';
+    throw Object.assign(
+      new Error(`Cannot delete: company is linked to ${linked.count} ${label}. Remove them first.`),
+      { code: 'HAS_ORDERS', count: linked.count },
+    );
+  }
+
   const [deleted] = await db
     .delete(counterparties)
     .where(eq(counterparties.id, id))

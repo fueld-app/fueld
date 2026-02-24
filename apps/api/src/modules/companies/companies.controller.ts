@@ -520,9 +520,10 @@ export const companiesController = new Elysia({ prefix: '/companies' })
   .delete(
     '/local/:id',
     async ({ params, auth, set }) => {
-      if (auth.role !== 'ADMIN') {
+      const allowed = ['ADMIN', 'CREDITMANAGER', 'TEAMLEAD'];
+      if (!allowed.includes(auth.role)) {
         set.status = 403;
-        return { success: false, data: null, message: 'Only admins can delete companies' };
+        return { success: false, data: null, message: 'Only admins, credit managers and team leads can delete companies' };
       }
       try {
         const deleted = await deleteCompany(params.id);
@@ -531,11 +532,18 @@ export const companiesController = new Elysia({ prefix: '/companies' })
         }
         return { success: true, data: deleted } satisfies ApiResponse<typeof deleted>;
       } catch (err: any) {
+        if (err?.code === 'HAS_ORDERS') {
+          return {
+            success: false,
+            data: null,
+            message: err.message,
+          };
+        }
         if (err?.code === '23503') {
           return {
             success: false,
             data: null,
-            message: 'Cannot delete: company has linked orders. Remove orders first.',
+            message: 'Cannot delete: company has linked records. Remove them first.',
           };
         }
         throw err;
