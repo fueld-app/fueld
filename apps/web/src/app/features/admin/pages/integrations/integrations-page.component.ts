@@ -843,8 +843,8 @@ export class IntegrationsPageComponent implements OnInit {
       );
       if (waRes.success) {
         this.waEnabled.set(waRes.data.enabled);
+        if (waRes.data.enabled) await this.loadWaGroups();
         this.waDefaultGroupJid.set(waRes.data.defaultGroupJid);
-        if (waRes.data.enabled) this.loadWaGroups();
       }
     } catch (err) {
       console.error('Failed to load integrations:', err);

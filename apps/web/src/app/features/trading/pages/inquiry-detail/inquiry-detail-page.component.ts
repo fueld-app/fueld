@@ -977,9 +977,9 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   private async checkWhatsAppLinked(): Promise<void> {
     try {
       const res = await firstValueFrom(
-        this.http.get<ApiResponse<{ linked: boolean }>>(`${API}/whatsapp/status`),
+        this.http.get<ApiResponse<{ linked: boolean; whatsappEnabled?: boolean }>>(`${API}/whatsapp/status`),
       );
-      if (res.success && res.data?.linked) {
+      if (res.success && res.data?.linked && res.data?.whatsappEnabled !== false) {
         this.waLinked.set(true);
       }
     } catch {

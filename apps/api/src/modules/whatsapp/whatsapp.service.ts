@@ -20,6 +20,7 @@ import { whatsappSessions, whatsappKeys } from '../../db/schema';
 import { sendToUserSockets } from '../activity/session-tracker';
 import { parseRFQ } from './rfq-parser';
 import { saveIncomingRfq, getUserTenantId } from '../rfq/rfq.service';
+import { getWhatsAppSettings } from '../admin/settings.service';
 
 // ─── In-memory connection pool ───────────────────────────────────────
 
@@ -302,7 +303,11 @@ export async function getWhatsAppStatus(userId: string): Promise<{
   status: string;
   phoneNumber?: string | null;
   qr?: string;
+  whatsappEnabled: boolean;
 }> {
+  const waSettings = await getWhatsAppSettings();
+  const enabled = waSettings.enabled;
+
   // Check in-memory connection first
   const conn = connections.get(userId);
 
@@ -322,6 +327,7 @@ export async function getWhatsAppStatus(userId: string): Promise<{
       status: conn.status,
       phoneNumber: conn.phoneNumber,
       qr: conn.qr,
+      whatsappEnabled: enabled,
     };
   }
 
@@ -330,10 +336,11 @@ export async function getWhatsAppStatus(userId: string): Promise<{
       linked: true,
       status: 'stored',
       phoneNumber: session.phoneNumber,
+      whatsappEnabled: enabled,
     };
   }
 
-  return { linked: false, status: 'none' };
+  return { linked: false, status: 'none', whatsappEnabled: enabled };
 }
 
 export async function disconnectWhatsApp(userId: string): Promise<void> {

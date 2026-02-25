@@ -67,6 +67,7 @@ import type { PasskeyDto, ApiResponse } from '@fueld/types';
       </div>
 
       <!-- WhatsApp Linked Device -->
+      @if (waEnabled()) {
       <div class="flex flex-col rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
         <div class="flex items-start gap-3">
           <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-50">
@@ -161,6 +162,7 @@ import type { PasskeyDto, ApiResponse } from '@fueld/types';
           </button>
         }
       </div>
+      }
 
       <!-- Two-Factor Authentication -->
       <div class="flex flex-col rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
@@ -524,6 +526,7 @@ export class TwoFactorSetupPageComponent implements OnInit, OnDestroy {
   readonly phoneSuccess = signal('');
 
   // WhatsApp state
+  readonly waEnabled = signal(true);  // assume enabled until status response says otherwise
   readonly waStatus = signal<'none' | 'connecting' | 'qr' | 'connected' | 'stored' | 'closed'>('none');
   readonly waQrDataUrl = signal('');
   readonly waPhone = signal<string | null>(null);
@@ -735,12 +738,13 @@ export class TwoFactorSetupPageComponent implements OnInit, OnDestroy {
   async loadWhatsAppStatus(): Promise<void> {
     try {
       const res = await firstValueFrom(
-        this.http.get<ApiResponse<{ linked: boolean; status: string; phoneNumber?: string | null; qr?: string }>>(
+        this.http.get<ApiResponse<{ linked: boolean; status: string; phoneNumber?: string | null; qr?: string; whatsappEnabled?: boolean }>>(
           `${API_URL}/whatsapp/status`,
         ),
       );
       if (res.success && res.data) {
         const d = res.data;
+        this.waEnabled.set(d.whatsappEnabled !== false);
         if (d.linked) {
           this.waStatus.set(d.status === 'stored' ? 'stored' : 'connected');
           this.waPhone.set(d.phoneNumber ?? null);

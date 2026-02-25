@@ -593,7 +593,7 @@ export async function startServer(options: StartServerOptions = {}) {
 }
 
 if (import.meta.main) {
-  await startServer().catch((err) => {
+  startServer().catch((err) => {
     const port = Number(process.env['PORT']) || 3000;
     const details = formatStartupError(err, port);
     console.error(`❌ Fatal startup error: ${details}`);
