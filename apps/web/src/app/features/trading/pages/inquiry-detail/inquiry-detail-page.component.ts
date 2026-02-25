@@ -225,11 +225,9 @@ interface LliSearchResult {
                 <select [ngModel]="order()?.currency ?? 'USD'" (ngModelChange)="onCurrencyChange($event); settingsOpen.set(false)"
                   class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-900
                          focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white">
-                  <option value="USD">USD</option>
-                  <option value="EUR">EUR</option>
-                  <option value="GBP">GBP</option>
-                  <option value="SGD">SGD</option>
-                  <option value="AED">AED</option>
+                  @for (c of configuredCurrencies(); track c) {
+                    <option [value]="c">{{ c }}</option>
+                  }
                 </select>
               </div>
             }
@@ -490,6 +488,7 @@ interface LliSearchResult {
         [readonly]="false"
         [allowDeliveredEdit]="false"
         [currency]="order()?.currency ?? 'USD'"
+        [currencyOptionsInput]="currencyDropdownOptions()"
         (itemsChange)="onItemsChange($event)"
       />
 
@@ -728,6 +727,10 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   );
   readonly bankAccounts = signal<BankAccountDto[]>([]);
   readonly teamUsers = signal<TeamUserOption[]>([]);
+  readonly configuredCurrencies = signal<string[]>(['USD', 'EUR', 'DKK', 'AED']);
+  readonly currencyDropdownOptions = computed(() =>
+    this.configuredCurrencies().map((c) => ({ value: c, label: c })),
+  );
   readonly saving = signal(false);
   readonly toast = signal<{ type: 'success' | 'error'; message: string } | null>(null);
   readonly actionsOpen = signal(false);
@@ -1079,7 +1082,7 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   private async loadReferenceData(): Promise<void> {
     try {
       // Load initial suppliers list
-      const [suppliersRes, usersRes] = await Promise.all([
+      const [suppliersRes, usersRes, currenciesRes] = await Promise.all([
         firstValueFrom(
           this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
             `${API}/companies/local?type=SUPPLIER&limit=100`,
@@ -1088,9 +1091,15 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
         firstValueFrom(
           this.http.get<ApiResponse<TeamUserOption[]>>(`${API}/lloyds/users`),
         ),
+        firstValueFrom(
+          this.http.get<ApiResponse<{ currencies: string[] }>>(`${API}/admin/settings/my-currencies`),
+        ),
       ]);
       if (suppliersRes.success) this.suppliers.set(suppliersRes.data.companies);
       if (usersRes.success) this.teamUsers.set(usersRes.data ?? []);
+      if (currenciesRes.success && currenciesRes.data.currencies.length) {
+        this.configuredCurrencies.set(currenciesRes.data.currencies);
+      }
     } catch {
       // silently ignore
     }

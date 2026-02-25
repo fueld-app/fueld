@@ -265,11 +265,9 @@ interface CompanySearchResultOption {
                   <label class="block text-sm font-medium text-gray-700">Currency *</label>
                   <select [ngModel]="form().currency" (ngModelChange)="updateForm('currency', $event)"
                     class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white">
-                    <option value="USD">USD</option>
-                    <option value="EUR">EUR</option>
-                    <option value="GBP">GBP</option>
-                    <option value="SGD">SGD</option>
-                    <option value="AED">AED</option>
+                    @for (c of configuredCurrencies(); track c) {
+                      <option [value]="c">{{ c }}</option>
+                    }
                   </select>
                 </div>
                 <div>
@@ -413,6 +411,9 @@ export class CustomerCreditPageComponent implements OnInit {
   readonly deleteTarget = signal<CreditLineDto | null>(null);
   readonly deleting = signal(false);
 
+  // Configured currencies
+  readonly configuredCurrencies = signal<string[]>(['USD', 'EUR', 'DKK', 'AED']);
+
   ngOnInit(): void {
     const params = this.route.snapshot.queryParamMap;
     const page = Number(params.get('page'));
@@ -429,12 +430,15 @@ export class CustomerCreditPageComponent implements OnInit {
         limit: String(this.pageSize),
       });
       if (this.sortBy()) { params.set('sortBy', this.sortBy()); params.set('sortDir', this.sortDir()); }
-      const [res, ownRes] = await Promise.all([
+      const [res, ownRes, currenciesRes] = await Promise.all([
         firstValueFrom(
           this.http.get<ApiResponse<{ items: CreditLineDto[]; total: number }>>(`${API}/credit/lines?${params}`),
         ),
         firstValueFrom(
           this.http.get<ApiResponse<OwnCompanyDto[]>>(`${API}/companies/own`),
+        ),
+        firstValueFrom(
+          this.http.get<ApiResponse<{ currencies: string[] }>>(`${API}/admin/settings/my-currencies`),
         ),
       ]);
       if (res.success && res.data) {
@@ -442,6 +446,9 @@ export class CustomerCreditPageComponent implements OnInit {
         this.total.set(res.data.total);
       }
       if (ownRes.success) this.ownCompanies.set(ownRes.data);
+      if (currenciesRes.success && currenciesRes.data.currencies.length) {
+        this.configuredCurrencies.set(currenciesRes.data.currencies);
+      }
     } catch (err) {
       console.error('Failed to load credit lines:', err);
     } finally {

@@ -85,6 +85,15 @@ interface CompanySearchResultOption {
                           </svg>
                         </div>
                       </button>
+                      <button
+                        (click)="removeLogo(co.id); $event.stopPropagation()"
+                        class="absolute -top-1.5 -right-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                        title="Remove logo"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                          <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                      </button>
                     } @else {
                       <button
                         (click)="triggerLogoUpload($event, co.id)"
@@ -113,25 +122,15 @@ interface CompanySearchResultOption {
                   </div>
                 </div>
                 <div class="flex items-center gap-2 flex-shrink-0">
-                  @if (co.logoUrl) {
-                    <button (click)="removeLogo(co.id)"
-                      class="rounded-md p-1.5 text-gray-400 hover:text-red-500 transition-colors" title="Remove logo">
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-                      </svg>
-                    </button>
-                  }
                   <button
                     (click)="toggleExpand(co.id)"
                     class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M4 4a2 2 0 00-2 2v1h20V6a2 2 0 00-2-2H4zM2 9v7a2 2 0 002 2h12a2 2 0 002-2V9H2zm6 2a1 1 0 000 2h4a1 1 0 100-2H8z" />
+                      <path d="M10.5 6a.5.5 0 0 0-1 0v3.5H6a.5.5 0 0 0 0 1h3.5V14a.5.5 0 0 0 1 0v-3.5H14a.5.5 0 0 0 0-1h-3.5V6Z" />
+                      <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm0-1a7 7 0 1 0 0-14 7 7 0 0 0 0 14Z" clip-rule="evenodd" />
                     </svg>
-                    Bank Accounts
-                    @if (bankAccountCounts()[co.id]) {
-                      <span class="inline-flex items-center rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">{{ bankAccountCounts()[co.id] }}</span>
-                    }
+                    {{ expandedCompanyId() === co.id ? 'Hide Details' : 'Show Details' }}
                   </button>
                   <button (click)="confirmRemove(co)"
                     class="rounded-md p-1.5 text-gray-400 hover:text-red-500 transition-colors" title="Remove company">
@@ -233,7 +232,7 @@ interface CompanySearchResultOption {
                   <!-- Terms (applies to Confirmation/Nomination PDFs) -->
                   <div class="mt-6 border-t border-gray-200 pt-5">
                     <div class="flex items-center justify-between">
-                      <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Customer & Supplier Terms</h3>
+                      <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Terms, VAT & Invoicing</h3>
                       <button
                         (click)="saveTerms(co.id)"
                         [disabled]="savingTerms()"
@@ -377,8 +376,12 @@ interface CompanySearchResultOption {
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-600">Currency *</label>
-                  <input type="text" [(ngModel)]="baForm.currency" name="currency" required placeholder="USD" maxlength="3"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono uppercase focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
+                  <select [(ngModel)]="baForm.currency" name="currency" required
+                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono uppercase focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white">
+                    @for (c of configuredCurrencies(); track c) {
+                      <option [value]="c">{{ c }}</option>
+                    }
+                  </select>
                 </div>
                 <div class="col-span-2">
                   <label class="block text-xs font-medium text-gray-600">Beneficiary Name</label>
@@ -550,8 +553,23 @@ export class OurCompaniesPageComponent implements OnInit {
   // Logo
   readonly uploadingLogoId = signal<string | null>(null);
 
+  // Configured currencies
+  readonly configuredCurrencies = signal<string[]>(['USD', 'EUR', 'DKK', 'AED']);
+
   ngOnInit(): void {
     this.loadData();
+    this.loadCurrencies();
+  }
+
+  private async loadCurrencies(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ currencies: string[] }>>(API + '/admin/settings/my-currencies'),
+      );
+      if (res.success && res.data.currencies.length) {
+        this.configuredCurrencies.set(res.data.currencies);
+      }
+    } catch { /* keep defaults */ }
   }
 
   resolveUrl(url: string | null): string {

@@ -552,13 +552,16 @@ interface TeamUserOption {
             </div>
             <div>
               <label class="text-xs font-medium text-gray-500">Currency</label>
-              <input
-                type="text"
+              <select
                 [ngModel]="paymentCurrency()"
                 (ngModelChange)="paymentCurrency.set($event)"
                 class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 uppercase
-                       focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-              />
+                       focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 bg-white"
+              >
+                @for (c of configuredCurrencies(); track c.value) {
+                  <option [value]="c.value">{{ c.label }}</option>
+                }
+              </select>
             </div>
             <div>
               <label class="text-xs font-medium text-gray-500">Received at</label>
