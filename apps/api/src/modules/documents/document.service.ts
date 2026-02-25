@@ -179,30 +179,41 @@ function formatNumber(val: string | null | undefined, decimals = 2): string {
  * remaining digits in local-style groups.
  * e.g. "+4526131217" → "+45 2613 1217", "+18005551234" → "+1 800 555 1234"
  */
+/** Known 2-digit E.164 country codes (the rest in 2xx-9xx range are 3-digit). */
+const TWO_DIGIT_CC = new Set([
+  '20','27','30','31','32','33','34','36','39',
+  '40','41','43','44','45','46','47','48','49',
+  '51','52','53','54','55','56','57','58',
+  '60','61','62','63','64','65','66',
+  '81','82','84','86','90','91','92','93','94','95','98',
+]);
+
 function formatPhoneDisplay(phone: string | null | undefined): string | null {
   if (!phone) return null;
   // Strip everything except digits and leading +
   let cleaned = phone.replace(/[^\d+]/g, '');
   if (!cleaned.startsWith('+')) cleaned = `+${cleaned}`;
 
-  // Split into country code + national number
-  // Try common country code lengths: 1 (US/CA), 2, 3
-  let cc = '';
-  let national = '';
   const digits = cleaned.slice(1); // without +
-  if (digits.startsWith('1') && digits.length >= 11) {
-    cc = '1'; national = digits.slice(1);
-  } else if (digits.length > 2) {
-    // Try 2-digit country code first (most European, Asian, etc.)
-    cc = digits.slice(0, 2); national = digits.slice(2);
+  if (digits.length < 4) return cleaned; // too short to format
+
+  // Detect country code length: 1 (+1, +7), 2, or 3
+  let ccLen = 2;
+  if (digits.startsWith('1') || digits.startsWith('7')) {
+    ccLen = 1;
+  } else if (TWO_DIGIT_CC.has(digits.slice(0, 2))) {
+    ccLen = 2;
   } else {
-    return cleaned; // too short to format
+    ccLen = 3;
   }
 
-  // Group national number in blocks of 4, last group can be shorter
+  const cc = digits.slice(0, ccLen);
+  const national = digits.slice(ccLen);
+
+  // Group national number in blocks of 2 (common international style)
   const groups: string[] = [];
-  for (let i = 0; i < national.length; i += 4) {
-    groups.push(national.slice(i, i + 4));
+  for (let i = 0; i < national.length; i += 2) {
+    groups.push(national.slice(i, i + 2));
   }
   return `+${cc} ${groups.join(' ')}`;
 }
@@ -263,6 +274,24 @@ function parseTimezoneOffset(tz: string | null | undefined): number | null {
   const hours = parseInt(match[2], 10);
   const minutes = match[3] ? parseInt(match[3], 10) : 0;
   return sign * (hours * 60 + minutes);
+}
+
+/** Compute invoice due date from payment terms. */
+function computeDueDate(
+  baseDate: Date,
+  paymentTermType: string | null | undefined,
+  creditDays: number | null | undefined,
+): string {
+  if (paymentTermType === 'CREDIT') {
+    const days = creditDays ?? 30;
+    return new Date(baseDate.getTime() + days * 86_400_000).toISOString().split('T')[0]!;
+  }
+  // COD / PREPAY → due immediately
+  if (paymentTermType === 'COD' || paymentTermType === 'PREPAY') {
+    return baseDate.toISOString().split('T')[0]!;
+  }
+  // Default fallback: 30 days
+  return new Date(baseDate.getTime() + 30 * 86_400_000).toISOString().split('T')[0]!;
 }
 
 function formatDateTimeForDisplay(value: string | null, tz: string | null | undefined): string | null {
@@ -519,14 +548,7 @@ function buildInvoiceDocument(data: {
         ],
       } as Content,
 
-      // ── Notes / Payment Terms ──
-      ...(data.paymentTerms
-        ? [{ text: [{ text: 'Payment terms: ', bold: true }, { text: data.paymentTerms }], margin: [0, 10, 0, 0] } as Content]
-        : []),
-      ...buildNotesSection({
-        customerNote: data.customerNote,
-        itemNotes: data.itemNotes,
-      }),
+      // ── Notes / Payment Terms ── (removed — not needed on invoices)
 
       // ── Divider ──
       { text: '', margin: [0, 14, 0, 0] } as Content,
@@ -647,10 +669,10 @@ function buildInvoiceDocument(data: {
       const middleTexts: Content[] = [];
       if (data.companyPhone?.trim()) {
         const display = formatPhoneDisplay(data.companyPhone) ?? data.companyPhone.trim();
-        middleTexts.push({ text: `Phone No: ${display}`, fontSize: 8, color: '#374151', link: phoneToTelUri(data.companyPhone) } as Content);
+        middleTexts.push({ text: `Phone No : ${display}`, fontSize: 8, color: '#1a56db', link: phoneToTelUri(data.companyPhone) } as Content);
       }
       if (data.companyEmail?.trim()) {
-        middleTexts.push({ text: `Email: ${data.companyEmail.trim()}`, fontSize: 8, color: '#1a56db', link: `mailto:${data.companyEmail.trim()}` } as Content);
+        middleTexts.push({ text: `Email : ${data.companyEmail.trim()}`, fontSize: 8, color: '#1a56db', link: `mailto:${data.companyEmail.trim()}` } as Content);
       }
       return {
         margin: [40, 0, 40, 20] as [number, number, number, number],
@@ -781,7 +803,11 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
   // Find the first invoice or generate a preview number
   const invoice = order.invoices?.[0];
   const invoiceNumber = invoice?.invoiceNumber ?? `PREVIEW-${orderId.slice(0, 8).toUpperCase()}`;
-  const dueDate = invoice?.dueDate ?? new Date(Date.now() + 30 * 86_400_000).toISOString().split('T')[0]!;
+  const dueDate = invoice?.dueDate ?? computeDueDate(
+    invoice?.createdAt ?? new Date(),
+    order.customerPaymentTermType,
+    order.customerCreditDays,
+  );
 
   const bank = await loadOrderBankDetails(order.bankAccountId, order.invoicingCompanyId);
 
@@ -1032,7 +1058,7 @@ function buildOfferDocument(data: {
     const middleTexts: Content[] = [];
     if (data.companyPhone?.trim()) {
       const display = formatPhoneDisplay(data.companyPhone) ?? data.companyPhone.trim();
-      middleTexts.push({ text: `T ${display}`, fontSize: 8, color: '#374151', link: phoneToTelUri(data.companyPhone) } as Content);
+      middleTexts.push({ text: `T ${display}`, fontSize: 8, color: '#1a56db', link: phoneToTelUri(data.companyPhone) } as Content);
     }
     if (data.companyEmail?.trim()) {
       middleTexts.push({ text: data.companyEmail.trim(), fontSize: 8, color: '#1a56db', link: `mailto:${data.companyEmail.trim()}` } as Content);
@@ -1312,6 +1338,9 @@ function buildProformaDocument(data: {
   verifyUrl?: string | null;
   verifyLink?: string | null;
   fraudPreventionText?: string | null;
+  bank?: BankDetails | null;
+  vatNumber?: string | null;
+  latePaymentInterest?: string | null;
 }): TDocumentDefinitions {
   // ── Prepare data ──────────────────────────────────────────────────
   const refNum = data.orderNumber ?? 'DRAFT';
@@ -1427,7 +1456,7 @@ function buildProformaDocument(data: {
     const middleTexts: Content[] = [];
     if (data.companyPhone?.trim()) {
       const display = formatPhoneDisplay(data.companyPhone) ?? data.companyPhone.trim();
-      middleTexts.push({ text: `T ${display}`, fontSize: 8, color: '#374151', link: phoneToTelUri(data.companyPhone) } as Content);
+      middleTexts.push({ text: `T ${display}`, fontSize: 8, color: '#1a56db', link: phoneToTelUri(data.companyPhone) } as Content);
     }
     if (data.companyEmail?.trim()) {
       middleTexts.push({ text: data.companyEmail.trim(), fontSize: 8, color: '#1a56db', link: `mailto:${data.companyEmail.trim()}` } as Content);
@@ -1503,9 +1532,6 @@ function buildProformaDocument(data: {
       } as Content,
       { text: '', margin: [0, 16, 0, 0] } as Content,
 
-      // For account of
-      { text: [{ text: 'For account of:  ', bold: true }, { text: forAccountParts.join(' ') }], margin: [0, 0, 0, 4] } as Content,
-
       // Payment terms
       ...(data.paymentTerms
         ? [{ text: [{ text: 'Payment terms:  ', bold: true }, { text: data.paymentTerms.replace(/_/g, ' ') }], margin: [0, 0, 0, 6] } as Content]
@@ -1526,6 +1552,79 @@ function buildProformaDocument(data: {
         customerTerms: data.customerTerms,
         supplierTerms: null,
       }),
+
+      // ── Remittance Instructions ──
+      ...(data.bank ? [
+        { text: '', margin: [0, 14, 0, 0] } as Content,
+        { canvas: [{ type: 'line' as const, x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 0.5, lineColor: '#e5e7eb' }] } as Content,
+        { text: '', margin: [0, 10, 0, 0] } as Content,
+        { text: 'REMITTANCE INSTRUCTIONS', style: 'sectionLabel' } as Content,
+        { text: 'Payment to be effected, free of all charges to us, by telegraphic transfer to:', fontSize: 9, margin: [0, 2, 0, 6] } as Content,
+        {
+          columns: [
+            { width: '25%', text: 'Bank:', bold: true },
+            { width: '75%', text: data.bank.bankName },
+          ],
+          margin: [0, 2, 0, 0],
+        } as Content,
+        ...(data.bank.branchAddress ? [{
+          columns: [
+            { width: '25%', text: '' },
+            { width: '75%', text: data.bank.branchAddress, color: '#374151' },
+          ],
+          margin: [0, 2, 0, 0],
+        } as Content] : []),
+        ...(data.bank.accountName ? [{
+          columns: [
+            { width: '25%', text: 'In favour of:', bold: true },
+            { width: '75%', text: data.bank.accountName },
+          ],
+          margin: [0, 2, 0, 0],
+        } as Content] : []),
+        ...(data.bank.iban ? [{
+          columns: [
+            { width: '25%', text: 'IBAN No:', bold: true },
+            { width: '75%', text: data.bank.iban, font: 'Roboto' },
+          ],
+          margin: [0, 2, 0, 0],
+        } as Content] : []),
+        ...(data.bank.accountNumber ? [{
+          columns: [
+            { width: '25%', text: 'Account No:', bold: true },
+            { width: '75%', text: data.bank.accountNumber, font: 'Roboto' },
+          ],
+          margin: [0, 2, 0, 0],
+        } as Content] : []),
+        ...(data.bank.swift ? [{
+          columns: [
+            { width: '25%', text: 'SWIFT:', bold: true },
+            { width: '75%', text: data.bank.swift },
+          ],
+          margin: [0, 2, 0, 0],
+        } as Content] : []),
+        ...(data.bank.intermediaryBank ? [{
+          columns: [
+            { width: '25%', text: 'Intermediary bank:', bold: true },
+            { width: '75%', text: data.bank.intermediaryBank },
+          ],
+          margin: [0, 2, 0, 0],
+        } as Content] : []),
+      ] : []),
+
+      // ── VAT Number ──
+      ...(data.vatNumber ? [{
+        text: `${data.companyName ?? 'Company'} VAT: ${data.vatNumber}`,
+        fontSize: 9,
+        margin: [0, 10, 0, 0],
+      } as Content] : []),
+
+      // ── Payment note ──
+      ...(data.latePaymentInterest ? [{
+        text: `Note : Late payment charged @ ${data.latePaymentInterest} interest, per month pro rata.`,
+        fontSize: 8, color: '#b91c1c', bold: true,
+        decoration: 'underline' as const,
+        margin: [0, 10, 0, 0],
+      } as Content] : []),
 
       // ── Fraud Prevention ──
       ...(data.fraudPreventionText ? [
@@ -1601,6 +1700,7 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
   const order = await fetchOrderForInvoice(orderId);
 
   const companyLogoDataUrl = tryLoadLogoDataUrl(order.invoicingCompany?.logoUrl ?? null);
+  const bank = await loadOrderBankDetails(order.bankAccountId, order.invoicingCompanyId);
 
   const [latestPlaceComment] = await db
     .select({ content: entityComments.content })
@@ -1663,6 +1763,9 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
     verifyUrl: null as string | null,
     verifyLink: null as string | null,
     fraudPreventionText: order.invoicingCompany?.fraudPreventionText ?? null,
+    bank,
+    vatNumber: order.invoicingCompany?.vatNumber ?? null,
+    latePaymentInterest: order.invoicingCompany?.latePaymentInterest ?? null,
   };
 
   // Generate QR code verification URL
