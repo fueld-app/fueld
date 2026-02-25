@@ -289,16 +289,22 @@ function buildNotesSection(params: {
   customerNote?: string | null;
   termsAndConditions?: string | null;
   itemNotes?: Array<{ label: string; note: string }>;
+  placeRemark?: string | null;
 }): Content[] {
   const customerNote = params.customerNote?.trim();
   const termsAndConditions = params.termsAndConditions?.trim();
+  const placeRemark = params.placeRemark?.trim();
   const itemNotes = params.itemNotes ?? [];
-  if (!customerNote && !termsAndConditions && itemNotes.length === 0) return [];
+  if (!customerNote && !termsAndConditions && !placeRemark && itemNotes.length === 0) return [];
 
   const notes: Content[] = [{ text: 'Notes', style: 'sectionLabel' } as Content];
 
   if (customerNote) {
     notes.push({ text: customerNote, margin: [0, 0, 0, 6] } as Content);
+  }
+
+  if (placeRemark) {
+    notes.push({ text: placeRemark, margin: [0, 0, 0, 6] } as Content);
   }
 
   if (termsAndConditions) {
@@ -874,6 +880,7 @@ function buildOfferDocument(data: {
   paymentTerms: string | null;
   customerNote: string | null;
   termsAndConditions: string | null;
+  placeRemark: string | null;
   companyName: string | null;
   companyAddress: string | null;
   companyPhone: string | null;
@@ -1104,8 +1111,9 @@ function buildOfferDocument(data: {
       // Notes
       ...buildNotesSection({
         customerNote: data.customerNote,
-        termsAndConditions: null,
-        itemNotes: [],
+        termsAndConditions: data.termsAndConditions,
+        itemNotes: data.itemNotes,
+        placeRemark: data.placeRemark,
       }),
 
       // Sign-off (with optional QR code on the right)
@@ -1194,6 +1202,7 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
     paymentTerms: formatCustomerPaymentTerms(order.customerPaymentTermType, order.customerCreditDays),
     customerNote: order.customerNote ?? null,
     termsAndConditions: order.termsAndConditions ?? null,
+    placeRemark: order.place.orderRemark ?? null,
     companyName: order.invoicingCompany?.name ?? null,
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
     companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
@@ -1276,6 +1285,7 @@ function buildProformaDocument(data: {
   bank?: BankDetails | null;
   vatNumber?: string | null;
   latePaymentInterest?: string | null;
+  placeRemark?: string | null;
 }): TDocumentDefinitions {
   // ── Prepare data ──────────────────────────────────────────────────
   const refNum = data.orderNumber ?? 'DRAFT';
@@ -1474,6 +1484,7 @@ function buildProformaDocument(data: {
         customerNote: data.customerNote,
         termsAndConditions: data.termsAndConditions,
         itemNotes: data.itemNotes,
+        placeRemark: data.placeRemark,
       }),
 
       // ── Remittance Instructions ──
@@ -1652,6 +1663,7 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
     paymentTerms,
     customerNote: order.customerNote ?? null,
     termsAndConditions: order.termsAndConditions ?? null,
+    placeRemark: order.place.orderRemark ?? null,
     companyName: order.invoicingCompany?.name ?? null,
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
     companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
