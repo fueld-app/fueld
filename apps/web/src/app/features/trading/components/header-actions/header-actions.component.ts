@@ -86,7 +86,7 @@ const ACTIONS: ActionItem[] = [
         class="absolute right-0 z-50 mt-2 w-52 origin-top-right rounded-lg border border-gray-200 bg-white py-1 shadow-lg ring-1 ring-black/5"
         role="menu"
       >
-        @for (action of actions; track action.key) {
+        @for (action of displayActions(); track action.key) {
           <button
             (click)="onAction(action.key)"
             class="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"

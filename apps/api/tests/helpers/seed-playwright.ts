@@ -32,6 +32,8 @@ const password = process.env['E2E_USER_PASSWORD'] ?? 'password123';
 // Second admin user for parallel admin specs (avoids session invalidation issues when two specs log in as the same user).
 const admin2Email = (process.env['E2E_ADMIN2_EMAIL'] ?? 'admin2@fueld.local').toLowerCase();
 const admin2Password = process.env['E2E_ADMIN2_PASSWORD'] ?? 'admin2password123';
+const admin3Email = (process.env['E2E_ADMIN3_EMAIL'] ?? 'admin3@fueld.local').toLowerCase();
+const admin3Password = process.env['E2E_ADMIN3_PASSWORD'] ?? 'admin3password123';
 
 const resetTargetEmail = (process.env['E2E_RESET_USER_EMAIL'] ?? 'resetme@fueld.local').toLowerCase();
 const resetTargetPassword = process.env['E2E_RESET_USER_PASSWORD'] ?? 'oldpassword123';
@@ -89,6 +91,7 @@ async function main(): Promise<void> {
 
   const passwordHash = await hashPassword(password);
   const admin2PasswordHash = await hashPassword(admin2Password);
+  const admin3PasswordHash = await hashPassword(admin3Password);
   const resetPasswordHash = await hashPassword(resetTargetPassword);
   const traderPasswordHash = await hashPassword(traderPassword);
   const limitedPasswordHash = await hashPassword(limitedPassword);
@@ -152,6 +155,36 @@ async function main(): Promise<void> {
       isActive: true,
       is2faEnabled: false,
       passwordHash: admin2PasswordHash,
+    });
+  }
+
+  const existingAdmin3 = await db.query.users.findFirst({
+    where: eq(schema.users.email, admin3Email),
+  });
+  if (existingAdmin3) {
+    await db
+      .update(schema.users)
+      .set({
+        tenantId: tenant.id,
+        name: 'E2E Admin 3',
+        role: 'ADMIN',
+        isActive: true,
+        is2faEnabled: false,
+        twoFactorSecret: null,
+        passwordHash: admin3PasswordHash,
+        refreshToken: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.users.id, existingAdmin3.id));
+  } else {
+    await db.insert(schema.users).values({
+      tenantId: tenant.id,
+      email: admin3Email,
+      name: 'E2E Admin 3',
+      role: 'ADMIN',
+      isActive: true,
+      is2faEnabled: false,
+      passwordHash: admin3PasswordHash,
     });
   }
 
@@ -413,7 +446,7 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    `✅ Seeded Playwright users: ${email}, ${admin2Email}, ${resetTargetEmail} (tenant: ${tenant.name} / ${tenant.domain} / ${tenant.id})`,
+    `✅ Seeded Playwright users: ${email}, ${admin2Email}, ${admin3Email}, ${resetTargetEmail} (tenant: ${tenant.name} / ${tenant.domain} / ${tenant.id})`,
   );
   console.log(`✅ Seeded trader user: ${traderEmail}`);
   console.log(

@@ -1,8 +1,8 @@
 import { test, expect, type Page } from '@playwright/test';
 import { loginViaUi } from '../helpers/auth';
 
-const adminEmail = process.env['E2E_USER_EMAIL'] ?? 'e2e@fueld.local';
-const adminPassword = process.env['E2E_USER_PASSWORD'] ?? 'password123';
+const adminEmail = process.env['E2E_ADMIN3_EMAIL'] ?? 'admin3@fueld.local';
+const adminPassword = process.env['E2E_ADMIN3_PASSWORD'] ?? 'admin3password123';
 
 async function createInviteLink(adminPage: Page, invitedName: string, invitedEmail: string): Promise<string> {
   await adminPage.goto('/admin/users');

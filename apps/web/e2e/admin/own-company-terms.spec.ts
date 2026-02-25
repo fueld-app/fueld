@@ -17,17 +17,21 @@ test('admin can edit own-company customer/supplier terms', async ({ page }) => {
     .locator('xpath=ancestor::div[contains(@class, "rounded-xl")]')
     .first();
   await expect(companyCard).toBeVisible();
-  await companyCard.getByRole('button', { name: 'Bank Accounts' }).first().click();
+  await companyCard.getByRole('button', { name: /Show Details|Hide Details/i }).first().click();
 
   // Terms editor is inside the expanded section.
-  await expect(page.getByText('Customer & Supplier Terms')).toBeVisible();
+  const termsSection = page
+    .locator('div.mt-6.border-t.border-gray-200.pt-5')
+    .filter({ hasText: 'Terms, VAT & Invoicing' })
+    .first();
+  await expect(termsSection).toBeVisible();
 
-  const customerBox = page.locator('label:has-text("Customer terms")').locator('..').locator('textarea');
-  const supplierBox = page.locator('label:has-text("Supplier terms")').locator('..').locator('textarea');
+  const customerBox = termsSection.locator('textarea').nth(0);
+  const supplierBox = termsSection.locator('textarea').nth(1);
 
-  await customerBox.fill('Customer terms for ${companyName} (E2E)');
-  await supplierBox.fill('Supplier terms for ${companyName} (E2E)');
+  await customerBox.fill(`Customer terms for ${ownCompanyName} (E2E)`);
+  await supplierBox.fill(`Supplier terms for ${ownCompanyName} (E2E)`);
 
-  await page.getByRole('button', { name: 'Save terms' }).click();
+  await termsSection.getByRole('button', { name: 'Save terms' }).click();
   await expect(page.getByText('Saved')).toBeVisible();
 });
