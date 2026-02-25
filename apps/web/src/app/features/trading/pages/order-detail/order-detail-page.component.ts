@@ -619,12 +619,13 @@ interface TeamUserOption {
       [invoiceNumber]="invoiceNumber()"
       [vesselName]="vesselName()"
       [portName]="portName()"
+      [waLinked]="waLinked()"
       (sendEmail)="onSendEmail($event)"
       (sendWhatsApp)="onSendInvoiceWhatsApp($event)"
     />
 
     <!-- PDF Preview Modal -->
-    <app-pdf-preview-modal (sendWhatsApp)="onSendPdfWhatsApp($event)" />
+    <app-pdf-preview-modal [waLinked]="waLinked()" (sendWhatsApp)="onSendPdfWhatsApp($event)" />
   `,
   styles: [
     `
@@ -702,6 +703,9 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   readonly configuredProducts = signal<DropdownOption[]>([]);
   readonly configuredUnits = signal<DropdownOption[]>([]);
   readonly configuredCurrencies = signal<DropdownOption[]>([]);
+
+  /** Whether the user has linked WhatsApp in Settings */
+  readonly waLinked = signal(false);
 
   // ─── Terms UI (collapsed by default) ─────────────────────────────
 
@@ -882,6 +886,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.loadOrder();
+    this.checkWhatsAppLinked();
   }
 
   ngOnDestroy(): void {
@@ -1822,6 +1827,20 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   }
 
   // ─── WhatsApp send handlers ──────────────────────────────────────
+
+  /** Check if the current user has linked WhatsApp */
+  private async checkWhatsAppLinked(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ linked: boolean }>>(`${API_URL}/whatsapp/status`),
+      );
+      if (res.success && res.data?.linked) {
+        this.waLinked.set(true);
+      }
+    } catch {
+      // Not linked — keep default false
+    }
+  }
 
   /** Send invoice PDF via WhatsApp from the email modal */
   async onSendInvoiceWhatsApp(phone: string): Promise<void> {

@@ -119,6 +119,70 @@ function formatNumber(val: string | null | undefined, decimals = 2): string {
   return isNaN(n) ? '—' : n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
+/**
+ * Format a phone number for display: keep international prefix, format
+ * remaining digits in local-style groups.
+ * e.g. "+4526131217" → "+45 2613 1217", "+18005551234" → "+1 800 555 1234"
+ */
+function formatPhoneDisplay(phone: string | null | undefined): string | null {
+  if (!phone) return null;
+  // Strip everything except digits and leading +
+  let cleaned = phone.replace(/[^\d+]/g, '');
+  if (!cleaned.startsWith('+')) cleaned = `+${cleaned}`;
+
+  // Split into country code + national number
+  // Try common country code lengths: 1 (US/CA), 2, 3
+  let cc = '';
+  let national = '';
+  const digits = cleaned.slice(1); // without +
+  if (digits.startsWith('1') && digits.length >= 11) {
+    cc = '1'; national = digits.slice(1);
+  } else if (digits.length > 2) {
+    // Try 2-digit country code first (most European, Asian, etc.)
+    cc = digits.slice(0, 2); national = digits.slice(2);
+  } else {
+    return cleaned; // too short to format
+  }
+
+  // Group national number in blocks of 4, last group can be shorter
+  const groups: string[] = [];
+  for (let i = 0; i < national.length; i += 4) {
+    groups.push(national.slice(i, i + 4));
+  }
+  return `+${cc} ${groups.join(' ')}`;
+}
+
+/** Strip non-digit/+ chars for use in tel: URI */
+function phoneToTelUri(phone: string): string {
+  return 'tel:' + phone.replace(/[^\d+]/g, '');
+}
+
+/** Build a pdfmake text node for a phone number with tel: link */
+function phoneTextNode(label: string, phone: string, opts: { fontSize?: number; margin?: number[] } = {}): Content {
+  const display = formatPhoneDisplay(phone) ?? phone;
+  const uri = phoneToTelUri(phone);
+  return {
+    text: [
+      { text: label, bold: true },
+      { text: display, link: uri, color: '#1a56db' },
+    ],
+    fontSize: opts.fontSize ?? 10,
+    margin: opts.margin ?? [0, 0, 0, 2],
+  } as Content;
+}
+
+/** Build a pdfmake text node for an email with mailto: link */
+function emailTextNode(label: string, email: string, opts: { fontSize?: number; margin?: number[] } = {}): Content {
+  return {
+    text: [
+      { text: label, bold: true },
+      { text: email, link: `mailto:${email}`, color: '#1a56db' },
+    ],
+    fontSize: opts.fontSize ?? 10,
+    margin: opts.margin ?? [0, 0, 0, 2],
+  } as Content;
+}
+
 function formatCustomerPaymentTerms(
   type: string | null | undefined,
   creditDays: number | null | undefined,
@@ -390,7 +454,7 @@ function buildInvoiceDocument(data: {
 
       // ── Notes / Payment Terms ──
       ...(data.paymentTerms
-        ? [{ text: `Payment terms: ${data.paymentTerms}`, margin: [0, 10, 0, 0] } as Content]
+        ? [{ text: [{ text: 'Payment terms: ', bold: true }, { text: data.paymentTerms }], margin: [0, 10, 0, 0] } as Content]
         : []),
       ...buildNotesSection({
         customerNote: data.customerNote,
@@ -751,8 +815,13 @@ function buildOfferDocument(data: {
       }
     }
     const middleTexts: Content[] = [];
-    if (data.companyPhone?.trim()) middleTexts.push({ text: `T ${data.companyPhone.trim()}`, fontSize: 8, color: '#374151' } as Content);
-    if (data.companyEmail?.trim()) middleTexts.push({ text: data.companyEmail.trim(), fontSize: 8, color: '#1a56db' } as Content);
+    if (data.companyPhone?.trim()) {
+      const display = formatPhoneDisplay(data.companyPhone) ?? data.companyPhone.trim();
+      middleTexts.push({ text: `T ${display}`, fontSize: 8, color: '#374151', link: phoneToTelUri(data.companyPhone) } as Content);
+    }
+    if (data.companyEmail?.trim()) {
+      middleTexts.push({ text: data.companyEmail.trim(), fontSize: 8, color: '#1a56db', link: `mailto:${data.companyEmail.trim()}` } as Content);
+    }
 
     return {
       margin: [40, 0, 40, 20] as [number, number, number, number],
@@ -779,38 +848,29 @@ function buildOfferDocument(data: {
       // Intro text
       { text: 'With reference to our correspondence, we are pleased to confirm to you the following:', margin: [0, 16, 0, 16] } as Content,
 
-      // Vessel / Delivery info (two-column like reference)
+      // Vessel / Delivery info (single-column stack)
       {
-        columns: [
+        stack: [
           {
-            width: '50%',
-            stack: [
-              {
-                columns: [
-                  { width: 80, text: 'Vessel:', bold: true },
-                  { width: '*', text: `${data.vesselName}${data.vesselImo ? ` (IMO: ${data.vesselImo})` : ''}` },
-                ],
-              } as Content,
-              ...(deliveryDateStr ? [{
-                columns: [
-                  { width: 80, text: 'Delivery date:', bold: true },
-                  { width: '*', text: deliveryDateStr },
-                ],
-                margin: [0, 2, 0, 0],
-              } as Content] : []),
+            columns: [
+              { width: 90, text: 'Vessel:', bold: true },
+              { width: '*', text: `${data.vesselName}${data.vesselImo ? ` (IMO: ${data.vesselImo})` : ''}` },
             ],
-          },
+          } as Content,
           {
-            width: '50%',
-            stack: [
-              {
-                columns: [
-                  { width: 90, text: 'Delivery place:', bold: true },
-                  { width: '*', text: data.portName },
-                ],
-              } as Content,
+            columns: [
+              { width: 90, text: 'Delivery place:', bold: true },
+              { width: '*', text: data.portName },
             ],
-          },
+            margin: [0, 2, 0, 0],
+          } as Content,
+          ...(deliveryDateStr ? [{
+            columns: [
+              { width: 90, text: 'Delivery date:', bold: true },
+              { width: '*', text: deliveryDateStr },
+            ],
+            margin: [0, 2, 0, 0],
+          } as Content] : []),
         ],
         margin: [0, 0, 0, 14],
       } as Content,
@@ -834,11 +894,11 @@ function buildOfferDocument(data: {
       { text: '', margin: [0, 16, 0, 0] } as Content,
 
       // For account of
-      { text: `For account of:   ${forAccountParts.join(' ')}`, margin: [0, 0, 0, 4] } as Content,
+      { text: [{ text: 'For account of:  ', bold: true }, { text: forAccountParts.join(' ') }], margin: [0, 0, 0, 4] } as Content,
 
       // Payment terms
       ...(data.paymentTerms
-        ? [{ text: `Payment terms:  ${data.paymentTerms}`, margin: [0, 0, 0, 6] } as Content]
+        ? [{ text: [{ text: 'Payment terms:  ', bold: true }, { text: data.paymentTerms }], margin: [0, 0, 0, 6] } as Content]
         : []),
 
       // Notes
@@ -871,10 +931,10 @@ function buildOfferDocument(data: {
                 : []),
               { text: '', margin: [0, 10, 0, 0] } as Content,
               ...(data.fromEmail?.trim()
-                ? [{ text: `Direct Email:  ${data.fromEmail.trim()}`, fontSize: 9, margin: [0, 0, 0, 2] } as Content]
+                ? [emailTextNode('Direct Email:  ', data.fromEmail.trim(), { fontSize: 9 })]
                 : []),
               ...(data.fromPhone?.trim()
-                ? [{ text: `Direct Phone:  ${data.fromPhone.trim()}`, fontSize: 9, margin: [0, 0, 0, 2] } as Content]
+                ? [phoneTextNode('Direct Phone:  ', data.fromPhone.trim(), { fontSize: 9 })]
                 : []),
             ],
           },
@@ -894,10 +954,10 @@ function buildOfferDocument(data: {
           : []),
         { text: '', margin: [0, 10, 0, 0] } as Content,
         ...(data.fromEmail?.trim()
-          ? [{ text: `Direct Email:  ${data.fromEmail.trim()}`, fontSize: 9, margin: [0, 0, 0, 2] } as Content]
+          ? [emailTextNode('Direct Email:  ', data.fromEmail.trim(), { fontSize: 9 })]
           : []),
         ...(data.fromPhone?.trim()
-          ? [{ text: `Direct Phone:  ${data.fromPhone.trim()}`, fontSize: 9, margin: [0, 0, 0, 2] } as Content]
+          ? [phoneTextNode('Direct Phone:  ', data.fromPhone.trim(), { fontSize: 9 })]
           : []),
       ]),
     ],
@@ -1153,8 +1213,13 @@ function buildProformaDocument(data: {
       }
     }
     const middleTexts: Content[] = [];
-    if (data.companyPhone?.trim()) middleTexts.push({ text: `T ${data.companyPhone.trim()}`, fontSize: 8, color: '#374151' } as Content);
-    if (data.companyEmail?.trim()) middleTexts.push({ text: data.companyEmail.trim(), fontSize: 8, color: '#1a56db' } as Content);
+    if (data.companyPhone?.trim()) {
+      const display = formatPhoneDisplay(data.companyPhone) ?? data.companyPhone.trim();
+      middleTexts.push({ text: `T ${display}`, fontSize: 8, color: '#374151', link: phoneToTelUri(data.companyPhone) } as Content);
+    }
+    if (data.companyEmail?.trim()) {
+      middleTexts.push({ text: data.companyEmail.trim(), fontSize: 8, color: '#1a56db', link: `mailto:${data.companyEmail.trim()}` } as Content);
+    }
 
     return {
       margin: [40, 0, 40, 20] as [number, number, number, number],
@@ -1181,38 +1246,29 @@ function buildProformaDocument(data: {
       // Intro text
       { text: 'With reference to our correspondence, we are pleased to confirm to you the following:', margin: [0, 16, 0, 16] } as Content,
 
-      // Vessel / Delivery info (two-column like reference)
+      // Vessel / Delivery info (single-column stack)
       {
-        columns: [
+        stack: [
           {
-            width: '50%',
-            stack: [
-              {
-                columns: [
-                  { width: 80, text: 'Vessel:', bold: true },
-                  { width: '*', text: vesselRef },
-                ],
-              } as Content,
-              ...(deliveryDateStr ? [{
-                columns: [
-                  { width: 80, text: 'Delivery date:', bold: true },
-                  { width: '*', text: deliveryDateStr },
-                ],
-                margin: [0, 2, 0, 0],
-              } as Content] : []),
+            columns: [
+              { width: 90, text: 'Vessel:', bold: true },
+              { width: '*', text: vesselRef },
             ],
-          },
+          } as Content,
           {
-            width: '50%',
-            stack: [
-              {
-                columns: [
-                  { width: 90, text: 'Delivery place:', bold: true },
-                  { width: '*', text: data.portName },
-                ],
-              } as Content,
+            columns: [
+              { width: 90, text: 'Delivery place:', bold: true },
+              { width: '*', text: data.portName },
             ],
-          },
+            margin: [0, 2, 0, 0],
+          } as Content,
+          ...(deliveryDateStr ? [{
+            columns: [
+              { width: 90, text: 'Delivery date:', bold: true },
+              { width: '*', text: deliveryDateStr },
+            ],
+            margin: [0, 2, 0, 0],
+          } as Content] : []),
         ],
         margin: [0, 0, 0, 14],
       } as Content,
@@ -1236,11 +1292,11 @@ function buildProformaDocument(data: {
       { text: '', margin: [0, 16, 0, 0] } as Content,
 
       // For account of
-      { text: `For account of:   ${forAccountParts.join(' ')}`, margin: [0, 0, 0, 4] } as Content,
+      { text: [{ text: 'For account of:  ', bold: true }, { text: forAccountParts.join(' ') }], margin: [0, 0, 0, 4] } as Content,
 
       // Payment terms
       ...(data.paymentTerms
-        ? [{ text: `Payment terms:  ${data.paymentTerms.replace(/_/g, ' ')}`, margin: [0, 0, 0, 6] } as Content]
+        ? [{ text: [{ text: 'Payment terms:  ', bold: true }, { text: data.paymentTerms.replace(/_/g, ' ') }], margin: [0, 0, 0, 6] } as Content]
         : []),
 
       // Notes
@@ -1273,10 +1329,10 @@ function buildProformaDocument(data: {
                 : []),
               { text: '', margin: [0, 10, 0, 0] } as Content,
               ...(data.fromEmail?.trim()
-                ? [{ text: `Direct Email:  ${data.fromEmail.trim()}`, fontSize: 9, margin: [0, 0, 0, 2] } as Content]
+                ? [emailTextNode('Direct Email:  ', data.fromEmail.trim(), { fontSize: 9 })]
                 : []),
               ...(data.fromPhone?.trim()
-                ? [{ text: `Direct Phone:  ${data.fromPhone.trim()}`, fontSize: 9, margin: [0, 0, 0, 2] } as Content]
+                ? [phoneTextNode('Direct Phone:  ', data.fromPhone.trim(), { fontSize: 9 })]
                 : []),
             ],
           },
@@ -1296,10 +1352,10 @@ function buildProformaDocument(data: {
           : []),
         { text: '', margin: [0, 10, 0, 0] } as Content,
         ...(data.fromEmail?.trim()
-          ? [{ text: `Direct Email:  ${data.fromEmail.trim()}`, fontSize: 9, margin: [0, 0, 0, 2] } as Content]
+          ? [emailTextNode('Direct Email:  ', data.fromEmail.trim(), { fontSize: 9 })]
           : []),
         ...(data.fromPhone?.trim()
-          ? [{ text: `Direct Phone:  ${data.fromPhone.trim()}`, fontSize: 9, margin: [0, 0, 0, 2] } as Content]
+          ? [phoneTextNode('Direct Phone:  ', data.fromPhone.trim(), { fontSize: 9 })]
           : []),
       ]),
     ],

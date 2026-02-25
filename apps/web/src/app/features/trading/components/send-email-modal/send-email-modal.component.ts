@@ -81,20 +81,27 @@ import { FormsModule } from '@angular/forms';
             </div>
 
             <!-- WhatsApp phone -->
-            <div>
-              <label for="wa-phone" class="block text-sm font-medium text-gray-700">WhatsApp number
-                <span class="text-gray-400 font-normal">(optional)</span>
-              </label>
-              <input
-                id="wa-phone"
-                type="tel"
-                [(ngModel)]="waPhoneNumber"
-                placeholder="+45 12345678"
-                class="mt-1.5 w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm shadow-sm
-                       placeholder:text-gray-400 focus:border-green-500 focus:outline-none
-                       focus:ring-2 focus:ring-green-500/20"
-              />
-            </div>
+            @if (waLinked()) {
+              <div>
+                <label for="wa-phone" class="block text-sm font-medium text-gray-700">WhatsApp number
+                  <span class="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <input
+                  id="wa-phone"
+                  type="tel"
+                  [(ngModel)]="waPhoneNumber"
+                  placeholder="+45 12345678"
+                  class="mt-1.5 w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm shadow-sm
+                         placeholder:text-gray-400 focus:border-green-500 focus:outline-none
+                         focus:ring-2 focus:ring-green-500/20"
+                />
+              </div>
+            } @else {
+              <p class="text-sm text-gray-400">
+                <a href="/account/security" class="text-brand-600 underline hover:text-brand-700">Link WhatsApp in Settings</a>
+                to send invoices via WhatsApp.
+              </p>
+            }
           </div>
 
           <!-- Footer -->
@@ -107,7 +114,7 @@ import { FormsModule } from '@angular/forms';
               Cancel
             </button>
             <!-- Send via WhatsApp -->
-            @if (waPhoneNumber) {
+            @if (waLinked() && waPhoneNumber) {
               <button
                 (click)="sendWa()"
                 [disabled]="waSending()"
@@ -160,7 +167,8 @@ export class SendEmailModalComponent {
   readonly invoiceNumber = input<string>('');
   readonly vesselName = input<string>('');
   readonly portName = input<string>('');
-
+  /** Whether the current user has linked WhatsApp in Settings */
+  readonly waLinked = input(false);
   readonly sendEmail = output<string>();
   readonly sendWhatsApp = output<string>();
 
