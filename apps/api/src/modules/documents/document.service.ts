@@ -138,34 +138,6 @@ async function loadOrderBankDetails(
   return DEFAULT_BANK_DETAILS;
 }
 
-function renderCompanyTemplate(template: string | null | undefined, companyName: string | null | undefined): string | null {
-  const raw = template?.trim();
-  if (!raw) return null;
-  const name = companyName?.trim();
-  if (!name) return raw;
-  return raw.split('${companyName}').join(name);
-}
-
-function buildCompanyTermsSection(params: {
-  companyName?: string | null;
-  customerTerms?: string | null;
-  supplierTerms?: string | null;
-}): Content[] {
-  const customer = renderCompanyTemplate(params.customerTerms, params.companyName);
-  const supplier = renderCompanyTemplate(params.supplierTerms, params.companyName);
-  if (!customer && !supplier) return [];
-
-  const parts: Content[] = [{ text: 'Terms', style: 'sectionLabel' } as Content];
-  if (customer) {
-    parts.push({ text: customer, margin: [0, 0, 0, 8] } as Content);
-  }
-  if (supplier) {
-    parts.push({ text: 'Supplier terms', bold: true, margin: [0, 0, 0, 4] } as Content);
-    parts.push({ text: supplier, margin: [0, 0, 0, 8] } as Content);
-  }
-  return parts;
-}
-
 // ─── PDF Builder ─────────────────────────────────────────────────────
 
 function formatNumber(val: string | null | undefined, decimals = 2): string {
@@ -908,8 +880,6 @@ function buildOfferDocument(data: {
   companyEmail: string | null;
   companyWebsite: string | null;
   companyLogoDataUrl: string | null;
-  customerTerms: string | null;
-  supplierTerms: string | null;
   itemNotes: Array<{ label: string; note: string }>;
   currency: string;
   items: Array<{
@@ -1138,13 +1108,6 @@ function buildOfferDocument(data: {
         itemNotes: [],
       }),
 
-      // Company terms (customer only)
-      ...buildCompanyTermsSection({
-        companyName: data.companyName,
-        customerTerms: data.customerTerms,
-        supplierTerms: null,
-      }),
-
       // Sign-off (with optional QR code on the right)
       { text: '', margin: [0, 20, 0, 0] } as Content,
       ...(data.verifyUrl ? [{
@@ -1237,8 +1200,6 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
     companyEmail: order.invoicingCompany?.headOfficeEmail ?? null,
     companyWebsite: order.invoicingCompany?.website ?? null,
     companyLogoDataUrl,
-    customerTerms: order.invoicingCompany?.customerTerms ?? null,
-    supplierTerms: order.invoicingCompany?.supplierTerms ?? null,
     itemNotes: order.items
       .filter((item) => item.customerNote)
       .map((item) => ({
@@ -1300,8 +1261,6 @@ function buildProformaDocument(data: {
   companyEmail: string | null;
   companyWebsite: string | null;
   companyLogoDataUrl: string | null;
-  customerTerms: string | null;
-  supplierTerms: string | null;
   itemNotes: Array<{ label: string; note: string }>;
   items: Array<{
     productType: string;
@@ -1517,13 +1476,6 @@ function buildProformaDocument(data: {
         itemNotes: data.itemNotes,
       }),
 
-      // Company terms
-      ...buildCompanyTermsSection({
-        companyName: data.companyName,
-        customerTerms: data.customerTerms,
-        supplierTerms: null,
-      }),
-
       // ── Remittance Instructions ──
       ...(data.bank ? [
         { text: '', margin: [0, 14, 0, 0] } as Content,
@@ -1706,8 +1658,6 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
     companyEmail: order.invoicingCompany?.headOfficeEmail ?? null,
     companyWebsite: order.invoicingCompany?.website ?? null,
     companyLogoDataUrl,
-    customerTerms: order.invoicingCompany?.customerTerms ?? null,
-    supplierTerms: order.invoicingCompany?.supplierTerms ?? null,
     itemNotes: order.items
       .filter((item) => item.customerNote)
       .map((item) => ({
