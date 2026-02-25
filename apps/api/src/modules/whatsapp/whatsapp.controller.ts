@@ -6,8 +6,6 @@ import {
   disconnectWhatsApp,
   sendWhatsAppMessage,
   listWhatsAppGroups,
-  getDefaultGroup,
-  setDefaultGroup,
 } from './whatsapp.service';
 import type { ApiResponse } from '@fueld/types';
 
@@ -110,25 +108,6 @@ export const whatsappController = new Elysia({ prefix: '/whatsapp' })
       detail: {
         tags: ['WhatsApp'],
         summary: 'List WhatsApp groups for current user',
-        security: [{ bearerAuth: [] }],
-      },
-    },
-  )
-
-  // ── PUT /whatsapp/default-group ────────────────────────────────────
-  .put(
-    '/default-group',
-    async ({ auth, body }) => {
-      await setDefaultGroup(auth.userId, body.groupJid);
-      return { success: true, data: null, message: 'Default group updated' } satisfies ApiResponse<null>;
-    },
-    {
-      body: t.Object({
-        groupJid: t.Nullable(t.String({ description: 'Group JID to set as default, or null to clear' })),
-      }),
-      detail: {
-        tags: ['WhatsApp'],
-        summary: 'Set/clear the default WhatsApp group',
         security: [{ bearerAuth: [] }],
       },
     },

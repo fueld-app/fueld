@@ -302,18 +302,15 @@ export async function getWhatsAppStatus(userId: string): Promise<{
   status: string;
   phoneNumber?: string | null;
   qr?: string;
-  defaultGroupJid?: string | null;
 }> {
   // Check in-memory connection first
   const conn = connections.get(userId);
 
-  // Always load default group from DB
   const [session] = await db
     .select({
       phoneNumber: whatsappSessions.phoneNumber,
       syncedAt: whatsappSessions.syncedAt,
       creds: whatsappSessions.creds,
-      defaultGroupJid: whatsappSessions.defaultGroupJid,
     })
     .from(whatsappSessions)
     .where(eq(whatsappSessions.userId, userId))
@@ -325,7 +322,6 @@ export async function getWhatsAppStatus(userId: string): Promise<{
       status: conn.status,
       phoneNumber: conn.phoneNumber,
       qr: conn.qr,
-      defaultGroupJid: session?.defaultGroupJid ?? null,
     };
   }
 
@@ -334,7 +330,6 @@ export async function getWhatsAppStatus(userId: string): Promise<{
       linked: true,
       status: 'stored',
       phoneNumber: session.phoneNumber,
-      defaultGroupJid: session.defaultGroupJid ?? null,
     };
   }
 
@@ -385,22 +380,6 @@ export async function listWhatsAppGroups(userId: string): Promise<WhatsAppGroup[
     console.warn('[WhatsApp] Failed to fetch groups:', err.message);
     return [];
   }
-}
-
-export async function getDefaultGroup(userId: string): Promise<string | null> {
-  const [row] = await db
-    .select({ defaultGroupJid: whatsappSessions.defaultGroupJid })
-    .from(whatsappSessions)
-    .where(eq(whatsappSessions.userId, userId))
-    .limit(1);
-  return row?.defaultGroupJid ?? null;
-}
-
-export async function setDefaultGroup(userId: string, groupJid: string | null): Promise<void> {
-  await db
-    .update(whatsappSessions)
-    .set({ defaultGroupJid: groupJid, updatedAt: new Date() })
-    .where(eq(whatsappSessions.userId, userId));
 }
 
 // ─── Send Message ────────────────────────────────────────────────────

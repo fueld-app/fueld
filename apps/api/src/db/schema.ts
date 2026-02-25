@@ -106,6 +106,9 @@ export interface TenantSettings {
   currencies?: string[];
   // Configurable company types (e.g. CLIENT, SUPPLIER, BARGE)
   companyTypes?: string[];
+  // WhatsApp integration
+  whatsappEnabled?: boolean;
+  whatsappDefaultGroupJid?: string | null;
 }
 
 export const tenants = pgTable('tenants', {

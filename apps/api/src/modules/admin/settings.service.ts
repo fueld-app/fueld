@@ -814,3 +814,34 @@ export async function updateCompanyTypeSettings(companyTypes: string[]): Promise
 
   return getCompanyTypeSettings();
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+//  WHATSAPP SETTINGS
+// ═══════════════════════════════════════════════════════════════════════
+
+export async function getWhatsAppSettings(): Promise<{ enabled: boolean; defaultGroupJid: string | null }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  return {
+    enabled: settings.whatsappEnabled ?? false,
+    defaultGroupJid: settings.whatsappDefaultGroupJid ?? null,
+  };
+}
+
+export async function updateWhatsAppSettings(data: { enabled?: boolean; defaultGroupJid?: string | null }): Promise<{ enabled: boolean; defaultGroupJid: string | null }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = { ...(tenant.settings as any) };
+  if (data.enabled !== undefined) settings.whatsappEnabled = data.enabled;
+  if (data.defaultGroupJid !== undefined) settings.whatsappDefaultGroupJid = data.defaultGroupJid;
+
+  await db
+    .update(tenants)
+    .set({ settings, updatedAt: new Date() })
+    .where(eq(tenants.id, tenant.id));
+
+  return getWhatsAppSettings();
+}

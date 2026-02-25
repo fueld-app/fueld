@@ -39,6 +39,8 @@ import {
   getCompanyTypeSettings,
   updateCompanyTypeSettings,
   updateOwnCompanyTerms,
+  getWhatsAppSettings,
+  updateWhatsAppSettings,
 } from './settings.service';
 import { reloadCurrencies } from '../prices/price.service';
 import {
@@ -1023,4 +1025,38 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       companyTypes: t.Array(t.String({ minLength: 1 })),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update configurable company type options' },
+  })
+
+  // ═════════════════════════════════════════════════════════════
+  //  WHATSAPP SETTINGS
+  // ═════════════════════════════════════════════════════════════
+
+  .get('/whatsapp', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getWhatsAppSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get WhatsApp integration settings' },
+  })
+
+  .put('/whatsapp', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateWhatsAppSettings(body);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      enabled: t.Optional(t.Boolean()),
+      defaultGroupJid: t.Optional(t.Nullable(t.String())),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update WhatsApp integration settings' },
   });

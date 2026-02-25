@@ -608,6 +608,123 @@ import { API } from '@app/core/config/api';
             </div>
           </div>
 
+          <!-- ════════════════════════════════════════════════════════ -->
+          <!--  WhatsApp Integration                                  -->
+          <!-- ════════════════════════════════════════════════════════ -->
+          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
+              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-50">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-600" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347zM12.05 21.785c-1.875 0-3.713-.504-5.322-1.46l-.382-.227-3.961.99 1.01-3.694-.25-.394A9.848 9.848 0 011.847 12c0-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.82 9.82 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884zm0-21.67C5.495.115.112 5.498.112 12.055c0 2.104.549 4.162 1.595 5.98L.05 24l6.148-1.612a11.87 11.87 0 005.843 1.53h.005c6.554 0 11.89-5.335 11.893-11.893A11.82 11.82 0 0020.526 3.49 11.81 11.81 0 0012.05.115z" />
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-base font-semibold text-gray-900">WhatsApp</h3>
+                <p class="text-sm text-gray-500">Enable WhatsApp messaging, RFQ parsing, and set a default broadcast group.</p>
+              </div>
+              <div>
+                @if (waEnabled()) {
+                  <span class="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700 ring-1 ring-green-600/20">
+                    <span class="h-1.5 w-1.5 rounded-full bg-green-500"></span>
+                    Enabled
+                  </span>
+                } @else {
+                  <span class="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-600 ring-1 ring-gray-500/10">
+                    <span class="h-1.5 w-1.5 rounded-full bg-gray-400"></span>
+                    Disabled
+                  </span>
+                }
+              </div>
+            </div>
+
+            <div class="px-6 py-5">
+              @if (waSaveSuccess()) {
+                <div class="mb-4 flex items-center gap-2 rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-700">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                  </svg>
+                  {{ waSaveSuccess() }}
+                </div>
+              }
+              @if (waSaveError()) {
+                <div class="mb-4 flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                  </svg>
+                  {{ waSaveError() }}
+                </div>
+              }
+
+              <!-- Enable/Disable toggle -->
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-sm font-medium text-gray-900">Enable WhatsApp</p>
+                  <p class="text-xs text-gray-500">Allow users to link their WhatsApp accounts and send messages.</p>
+                </div>
+                <button
+                  (click)="toggleWhatsApp()"
+                  [disabled]="waSaving()"
+                  [class]="waEnabled()
+                    ? 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-green-500 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50'
+                    : 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50'"
+                >
+                  <span
+                    [class]="waEnabled()
+                      ? 'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out translate-x-5'
+                      : 'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out translate-x-0'"
+                  ></span>
+                </button>
+              </div>
+
+              <!-- Default Group picker (visible when enabled) -->
+              @if (waEnabled()) {
+                <div class="mt-5 border-t border-gray-100 pt-5">
+                  <label class="block text-sm font-medium text-gray-700">Default Group</label>
+                  <p class="mt-0.5 text-xs text-gray-500">
+                    WhatsApp group for automatic RFQ sharing. Requires a user to have WhatsApp linked.
+                  </p>
+                  <div class="mt-2 flex items-center gap-2">
+                    <select
+                      [value]="waDefaultGroupJid() ?? ''"
+                      (change)="onWaGroupChange($any($event.target).value)"
+                      [disabled]="waGroupsLoading() || waSaving()"
+                      class="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm
+                             focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:opacity-50"
+                    >
+                      <option value="">None</option>
+                      @for (g of waGroups(); track g.jid) {
+                        <option [value]="g.jid">{{ g.name }} ({{ g.participants }})</option>
+                      }
+                    </select>
+                    <button
+                      (click)="loadWaGroups()"
+                      [disabled]="waGroupsLoading()"
+                      class="rounded-lg border border-gray-300 p-2 text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                      title="Refresh groups"
+                    >
+                      @if (waGroupsLoading()) {
+                        <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                      } @else {
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                          <polyline points="23 4 23 10 17 10" />
+                          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                        </svg>
+                      }
+                    </button>
+                  </div>
+                  @if (!waGroups().length && !waGroupsLoading()) {
+                    <p class="mt-2 text-xs text-amber-600">
+                      No groups available. Make sure at least one user has linked WhatsApp, then click refresh.
+                    </p>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+
         </div>
       }
     </div>
@@ -662,6 +779,15 @@ export class IntegrationsPageComponent implements OnInit {
   readonly pushSaveSuccess = signal('');
   readonly pushSaveError = signal('');
 
+  // ── WhatsApp ─────────────────────────────────────────────────────
+  readonly waEnabled = signal(false);
+  readonly waDefaultGroupJid = signal<string | null>(null);
+  readonly waGroups = signal<{ jid: string; name: string; participants: number }[]>([]);
+  readonly waGroupsLoading = signal(false);
+  readonly waSaving = signal(false);
+  readonly waSaveSuccess = signal('');
+  readonly waSaveError = signal('');
+
   // ── Computed status helpers ────────────────────────────────────────
   lliStatus = () => this.integrations().find((i) => i.provider.toUpperCase() === 'LLI') ?? null;
   qbStatus = () => this.integrations().find((i) => i.provider.toUpperCase() === 'QUICKBOOKS') ?? null;
@@ -709,6 +835,16 @@ export class IntegrationsPageComponent implements OnInit {
         const push = res.data.find((i) => i.provider.toUpperCase() === 'PUSH');
         if (push?.pushPublicKey) this.pushPublicKey.set(push.pushPublicKey);
         if (push?.pushSubject) this.pushSubject.set(push.pushSubject);
+      }
+
+      // Load WhatsApp settings
+      const waRes = await firstValueFrom(
+        this.http.get<ApiResponse<{ enabled: boolean; defaultGroupJid: string | null }>>(`${API}/admin/settings/whatsapp`),
+      );
+      if (waRes.success) {
+        this.waEnabled.set(waRes.data.enabled);
+        this.waDefaultGroupJid.set(waRes.data.defaultGroupJid);
+        if (waRes.data.enabled) this.loadWaGroups();
       }
     } catch (err) {
       console.error('Failed to load integrations:', err);
@@ -945,6 +1081,67 @@ export class IntegrationsPageComponent implements OnInit {
       this.pushSaveError.set(msg);
     } finally {
       this.pushSaving.set(false);
+    }
+  }
+
+  // ── WhatsApp ─────────────────────────────────────────────────────
+
+  async toggleWhatsApp(): Promise<void> {
+    this.waSaving.set(true);
+    this.waSaveSuccess.set('');
+    this.waSaveError.set('');
+    const enabled = !this.waEnabled();
+
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<{ enabled: boolean; defaultGroupJid: string | null }>>(`${API}/admin/settings/whatsapp`, { enabled }),
+      );
+      if (res.success) {
+        this.waEnabled.set(res.data.enabled);
+        this.waDefaultGroupJid.set(res.data.defaultGroupJid);
+        this.waSaveSuccess.set(enabled ? 'WhatsApp integration enabled.' : 'WhatsApp integration disabled.');
+        if (enabled) this.loadWaGroups();
+      }
+    } catch (err: any) {
+      this.waSaveError.set(err?.error?.error ?? 'Failed to update WhatsApp settings.');
+    } finally {
+      this.waSaving.set(false);
+    }
+  }
+
+  async onWaGroupChange(jid: string): Promise<void> {
+    this.waSaving.set(true);
+    this.waSaveSuccess.set('');
+    this.waSaveError.set('');
+
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<{ enabled: boolean; defaultGroupJid: string | null }>>(`${API}/admin/settings/whatsapp`, {
+          defaultGroupJid: jid || null,
+        }),
+      );
+      if (res.success) {
+        this.waDefaultGroupJid.set(res.data.defaultGroupJid);
+        this.waSaveSuccess.set('Default group updated.');
+      }
+    } catch (err: any) {
+      this.waSaveError.set(err?.error?.error ?? 'Failed to update default group.');
+    } finally {
+      this.waSaving.set(false);
+    }
+  }
+
+  async loadWaGroups(): Promise<void> {
+    this.waGroupsLoading.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ jid: string; name: string; participants: number }[]>>(`${API}/whatsapp/groups`),
+      );
+      if (res.success) this.waGroups.set(res.data);
+    } catch (err) {
+      console.error('Failed to load WhatsApp groups:', err);
+    } finally {
+      this.waGroupsLoading.set(false);
     }
   }
 
