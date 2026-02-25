@@ -877,8 +877,20 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   readonly canUseSupplierCredit = computed(() => !!this.supplierCreditSummary());
 
   formatDateTimeForInput(date: Date, timeZone: string): string {
+    const fixedOffset = this.parseFixedOffsetMinutes(timeZone);
+    if (fixedOffset !== null) {
+      const shifted = new Date(date.getTime() + fixedOffset * 60_000);
+      const year = String(shifted.getUTCFullYear()).padStart(4, '0');
+      const month = String(shifted.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(shifted.getUTCDate()).padStart(2, '0');
+      const hour = String(shifted.getUTCHours()).padStart(2, '0');
+      const minute = String(shifted.getUTCMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day}T${hour}:${minute}`;
+    }
+
+    const safeTimeZone = this.normalizeTimeZone(timeZone);
     const parts = new Intl.DateTimeFormat('en-CA', {
-      timeZone,
+      timeZone: safeTimeZone,
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -902,8 +914,12 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   }
 
   private getTimeZoneOffset(date: Date, timeZone: string): number {
+    const fixedOffset = this.parseFixedOffsetMinutes(timeZone);
+    if (fixedOffset !== null) return fixedOffset;
+
+    const safeTimeZone = this.normalizeTimeZone(timeZone);
     const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone,
+      timeZone: safeTimeZone,
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -931,6 +947,27 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
     const offset = this.getTimeZoneOffset(new Date(utcGuess), timeZone);
     const utcTime = utcGuess - offset * 60_000;
     return new Date(utcTime).toISOString();
+  }
+
+  private normalizeTimeZone(timeZone: string): string {
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone }).format(new Date());
+      return timeZone;
+    } catch {
+      return 'UTC';
+    }
+  }
+
+  private parseFixedOffsetMinutes(timeZone: string): number | null {
+    const match = timeZone.match(/([+-])\s*(\d{1,2})(?::(\d{2}))?/);
+    if (!match) return null;
+
+    const sign = match[1] === '-' ? -1 : 1;
+    const hours = Number(match[2]);
+    const minutes = Number(match[3] ?? '0');
+    if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+
+    return sign * (hours * 60 + minutes);
   }
 
   // ─── Autosave ────────────────────────────────────────────────────
