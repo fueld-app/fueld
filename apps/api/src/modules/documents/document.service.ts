@@ -1,9 +1,9 @@
 import pdfmake from 'pdfmake';
+import vfsFonts from 'pdfmake/build/vfs_fonts.js';
 import type { TDocumentDefinitions, Content, TableCell } from 'pdfmake/interfaces';
 import { and, desc, eq } from 'drizzle-orm';
 import { existsSync, readFileSync } from 'node:fs';
-import { basename, dirname, extname, join } from 'node:path';
-import { createRequire } from 'node:module';
+import { basename, extname, join } from 'node:path';
 import QRCode from 'qrcode';
 import { db } from '../../db';
 import { bankAccounts, orders, orderItems, counterparties, vessels, places, invoices, users } from '../../db/schema';
@@ -12,46 +12,18 @@ import { bankAccounts, orders, orderItems, counterparties, vessels, places, invo
 //  Document Service — Server-side PDF generation (pdfmake v0.3)
 // ═══════════════════════════════════════════════════════════════════════
 
-const require = createRequire(import.meta.url);
-
-function resolvePdfmakeFontFile(fileName: string): string | null {
-  const candidates: string[] = [];
-
-  try {
-    const packageJsonPath = require.resolve('pdfmake/package.json');
-    const packageRoot = dirname(packageJsonPath);
-    candidates.push(join(packageRoot, 'fonts', 'Roboto', fileName));
-  } catch {
-    // noop
-  }
-
-  candidates.push(join(process.cwd(), 'node_modules', 'pdfmake', 'fonts', 'Roboto', fileName));
-
-  return candidates.find((path) => existsSync(path)) ?? null;
+for (const [fontFileName, base64Data] of Object.entries(vfsFonts as Record<string, string>)) {
+  pdfmake.virtualfs.writeFileSync(fontFileName, base64Data, 'base64');
 }
-
-const robotoRegular = resolvePdfmakeFontFile('Roboto-Regular.ttf');
-const robotoMedium = resolvePdfmakeFontFile('Roboto-Medium.ttf');
-const robotoItalic = resolvePdfmakeFontFile('Roboto-Italic.ttf');
-const robotoMediumItalic = resolvePdfmakeFontFile('Roboto-MediumItalic.ttf');
-
-const hasRobotoFonts = Boolean(robotoRegular && robotoMedium && robotoItalic && robotoMediumItalic);
 
 // Configure fonts (server-side: use built-in Roboto shipped with pdfmake)
 pdfmake.setFonts({
-  Roboto: hasRobotoFonts
-    ? {
-        normal: robotoRegular!,
-        bold: robotoMedium!,
-        italics: robotoItalic!,
-        bolditalics: robotoMediumItalic!,
-      }
-    : {
-        normal: 'Helvetica',
-        bold: 'Helvetica-Bold',
-        italics: 'Helvetica-Oblique',
-        bolditalics: 'Helvetica-BoldOblique',
-      },
+  Roboto: {
+    normal: 'Roboto-Regular.ttf',
+    bold: 'Roboto-Medium.ttf',
+    italics: 'Roboto-Italic.ttf',
+    bolditalics: 'Roboto-MediumItalic.ttf',
+  },
 });
 
 // ─── Bank details (configurable per tenant in a real system) ─────────
