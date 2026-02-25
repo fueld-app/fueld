@@ -1,7 +1,7 @@
 import { Elysia, t } from 'elysia';
 import { swagger } from '@elysiajs/swagger';
 import { cors } from '@elysiajs/cors';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import type { ApiResponse } from '@fueld/types';
 import { authController } from './modules/auth';
@@ -40,7 +40,6 @@ import { jwtAccessPlugin } from './modules/auth/jwt.setup';
 import { db } from './db';
 import { users } from './db/schema';
 import { eq, sql } from 'drizzle-orm';
-import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { pushController } from './modules/push/push.controller';
 import { whatsappController } from './modules/whatsapp/whatsapp.controller';
 import { reconnectStoredSessions as reconnectWhatsAppSessions } from './modules/whatsapp/whatsapp.service';
@@ -71,87 +70,69 @@ function resolveMigrationsDir(): string {
 }
 
 const MIGRATIONS_DIR = resolveMigrationsDir();
-const REQUIRED_PUSH_COLUMNS = [
-  'id',
-  'tenant_id',
-  'user_id',
-  'endpoint',
-  'p256dh',
-  'auth',
-  'expiration_time',
-  'created_at',
-  'updated_at',
-] as const;
-
-const REQUIRED_PASSWORD_RESET_COLUMNS = [
-  'id',
-  'user_id',
-  'token_hash',
-  'requested_by',
-  'expires_at',
-  'used_at',
-  'created_at',
-] as const;
-
-const REQUIRED_COUNTERPARTY_COLUMNS = [
-  'id',
-  'tenant_id',
-  'name',
-  'type',
-  'types',
-  'is_own_company',
-  'manual_overrides',
-  'logo_url',
-  'customer_terms',
-  'supplier_terms',
-  'updated_at',
-] as const;
 
 async function runPendingMigrations() {
-  try {
-    await migrate(db, { migrationsFolder: MIGRATIONS_DIR });
-    console.log('✅ Database migrations applied');
-  } catch (e: any) {
-    const msg = e?.message ?? String(e);
-    if (
-      msg.includes('already been applied') ||
-      msg.includes('already exists')
-    ) {
-      console.log('ℹ️  Migrations already up to date');
-    } else {
-      console.error('⚠️  Migration warning:', msg);
-    }
+  // Ensure our tracking table exists
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS _applied_migrations (
+      tag text PRIMARY KEY,
+      applied_at timestamptz DEFAULT now()
+    )
+  `);
+
+  // Read journal to discover all migrations
+  const journalPath = join(MIGRATIONS_DIR, 'meta/_journal.json');
+  if (!existsSync(journalPath)) {
+    console.warn('⚠️  No migration journal found at', journalPath);
+    return;
   }
-}
+  const journal = JSON.parse(readFileSync(journalPath, 'utf-8')) as {
+    entries: Array<{ tag: string }>;
+  };
 
-async function assertRequiredSchemaAtStartup(): Promise<void> {
-  async function assertTableColumns(tableName: string, requiredColumns: readonly string[], purpose: string) {
-    const rows = await db.execute(sql`
-      SELECT column_name
-      FROM information_schema.columns
-      WHERE table_schema = 'public' AND table_name = ${tableName}
-    `);
+  // Find which migrations have already been applied
+  const applied = (await db.execute(sql`SELECT tag FROM _applied_migrations`)) as Array<{ tag: string }>;
+  const appliedTags = new Set(applied.map((r) => r.tag));
 
-    const existingColumns = new Set(
-      (rows as Array<{ column_name?: string }>).map((row) => row.column_name).filter(Boolean) as string[],
-    );
+  let newCount = 0;
+  for (const entry of journal.entries) {
+    if (appliedTags.has(entry.tag)) continue;
 
-    const missingColumns = requiredColumns.filter((name) => !existingColumns.has(name));
-    if (missingColumns.length > 0) {
-      const command = 'bun run --filter @fueld/api db:migrate';
-      throw new Error(
-        [
-          `Missing required schema for ${purpose}: table public.${tableName} is absent or incomplete.`,
-          `Missing columns: ${missingColumns.join(', ')}`,
-          `Run ${command} with the intended DATABASE_URL before starting the API.`,
-        ].join(' '),
-      );
+    const filePath = join(MIGRATIONS_DIR, `${entry.tag}.sql`);
+    if (!existsSync(filePath)) {
+      throw new Error(`Migration file missing: ${filePath}`);
     }
+    const content = readFileSync(filePath, 'utf-8');
+    const statements = content
+      .split('--> statement-breakpoint')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    for (const stmt of statements) {
+      try {
+        await db.execute(sql.raw(stmt));
+      } catch (e: any) {
+        const msg = e?.message ?? String(e);
+        // Tolerate "already exists" for bootstrapping existing databases
+        if (msg.includes('already exists') || msg.includes('duplicate')) {
+          console.log(`  ↳ skipped (already exists): ${stmt.slice(0, 80)}…`);
+        } else {
+          console.error(`❌ Migration ${entry.tag} failed on statement:\n  ${stmt.slice(0, 120)}`);
+          throw e;
+        }
+      }
+    }
+
+    await db.execute(sql`INSERT INTO _applied_migrations (tag) VALUES (${entry.tag})`);
+    newCount++;
+    console.log(`  ✅ Applied migration: ${entry.tag}`);
   }
 
-  await assertTableColumns('push_subscriptions', REQUIRED_PUSH_COLUMNS, 'push notifications');
-  await assertTableColumns('password_reset_tokens', REQUIRED_PASSWORD_RESET_COLUMNS, 'password reset');
-  await assertTableColumns('counterparties', REQUIRED_COUNTERPARTY_COLUMNS, 'counterparties (companies)');
+  if (newCount === 0) {
+    console.log('ℹ️  Migrations already up to date');
+  } else {
+    console.log(`✅ ${newCount} migration(s) applied`);
+  }
 }
 
 function registerAutoSyncHooks() {
@@ -543,8 +524,6 @@ function formatStartupError(err: unknown, port: number): string {
 export async function startServer(options: StartServerOptions = {}) {
   const app = await createApp(options);
   const port = options.port ?? (Number(process.env['PORT']) || 3000);
-
-  await assertRequiredSchemaAtStartup();
 
   try {
     app.listen(port);
