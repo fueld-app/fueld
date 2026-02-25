@@ -12,8 +12,11 @@ import { bankAccounts, orders, orderItems, counterparties, vessels, places, invo
 //  Document Service — Server-side PDF generation (pdfmake v0.3)
 // ═══════════════════════════════════════════════════════════════════════
 
-for (const [fontFileName, base64Data] of Object.entries(vfsFonts as Record<string, string>)) {
-  pdfmake.virtualfs.writeFileSync(fontFileName, base64Data, 'base64');
+const pdfmakeVfs = (pdfmake as any)?.virtualfs;
+if (pdfmakeVfs && typeof pdfmakeVfs.writeFileSync === 'function') {
+  for (const [fontFileName, base64Data] of Object.entries(vfsFonts as Record<string, string>)) {
+    pdfmakeVfs.writeFileSync(fontFileName, base64Data, 'base64');
+  }
 }
 
 // Configure fonts (server-side: use built-in Roboto shipped with pdfmake)
