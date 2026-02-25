@@ -666,7 +666,7 @@ interface LliSearchResult {
     }
 
     <!-- PDF Preview Modal -->
-    <app-pdf-preview-modal />
+    <app-pdf-preview-modal [waLinked]="waLinked()" />
   `,
   styles: [
     `
@@ -735,6 +735,10 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   readonly toast = signal<{ type: 'success' | 'error'; message: string } | null>(null);
   readonly actionsOpen = signal(false);
   readonly settingsOpen = signal(false);
+
+  /** Whether the user has linked WhatsApp in Settings */
+  readonly waLinked = signal(false);
+
   readonly clientSearchLoading = signal(false);
   readonly vesselSearchLoading = signal(false);
   readonly placeSearchLoading = signal(false);
@@ -958,6 +962,7 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.loadData();
+    this.checkWhatsAppLinked();
   }
 
   ngOnDestroy(): void {
@@ -967,6 +972,20 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   }
 
   // ─── Data loading ─────────────────────────────────────────────────
+
+  /** Check if the current user has linked WhatsApp */
+  private async checkWhatsAppLinked(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ linked: boolean }>>(`${API}/whatsapp/status`),
+      );
+      if (res.success && res.data?.linked) {
+        this.waLinked.set(true);
+      }
+    } catch {
+      // Not linked — keep default false
+    }
+  }
 
   private async loadData(): Promise<void> {
     const id = this.inquiryId();

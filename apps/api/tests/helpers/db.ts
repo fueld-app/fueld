@@ -213,7 +213,8 @@ async function ensureTestSchemaCompat(): Promise<void> {
   await sql`
     ALTER TABLE counterparties
     ADD COLUMN IF NOT EXISTS customer_terms text,
-    ADD COLUMN IF NOT EXISTS supplier_terms text
+    ADD COLUMN IF NOT EXISTS supplier_terms text,
+    ADD COLUMN IF NOT EXISTS late_payment_interest text
   `;
 
   await sql`

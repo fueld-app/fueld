@@ -169,6 +169,13 @@
       "when": 1771200019000,
       "tag": "0023_bank_account_intermediary_and_vat",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1771200020000,
+      "tag": "0024_late_payment_interest",
+      "breakpoints": true
     }
   ]
 }

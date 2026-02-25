@@ -276,15 +276,20 @@ function parseTimezoneOffset(tz: string | null | undefined): number | null {
   return sign * (hours * 60 + minutes);
 }
 
-/** Compute invoice due date from payment terms. */
+/** Compute invoice due date from payment terms.
+ *  For CREDIT terms the due date is deliveryDate (ETA) + creditDays.
+ *  Falls back to baseDate when ETA is not available.
+ */
 function computeDueDate(
   baseDate: Date,
   paymentTermType: string | null | undefined,
   creditDays: number | null | undefined,
+  deliveryDate?: Date | null,
 ): string {
   if (paymentTermType === 'CREDIT') {
     const days = creditDays ?? 30;
-    return new Date(baseDate.getTime() + days * 86_400_000).toISOString().split('T')[0]!;
+    const anchor = deliveryDate ?? baseDate;
+    return new Date(anchor.getTime() + days * 86_400_000).toISOString().split('T')[0]!;
   }
   // COD / PREPAY → due immediately
   if (paymentTermType === 'COD' || paymentTermType === 'PREPAY') {
@@ -807,6 +812,7 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
     invoice?.createdAt ?? new Date(),
     order.customerPaymentTermType,
     order.customerCreditDays,
+    order.eta,
   );
 
   const bank = await loadOrderBankDetails(order.bankAccountId, order.invoicingCompanyId);
