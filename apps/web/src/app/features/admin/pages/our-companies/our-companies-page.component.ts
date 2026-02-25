@@ -288,6 +288,17 @@ interface CompanySearchResultOption {
                         />
                       </div>
                       <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Late Payment Interest <span class="text-gray-400 font-normal">(shown on invoices)</span></label>
+                        <input
+                          type="text"
+                          [ngModel]="latePaymentInterestDraft()"
+                          (ngModelChange)="latePaymentInterestDraft.set($event)"
+                          placeholder="e.g. 2%"
+                          class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700
+                                 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                        />
+                      </div>
+                      <div>
                         <label class="block text-xs font-semibold text-gray-600 mb-1">Fraud Prevention Notice <span class="text-gray-400 font-normal">(shown on invoices)</span></label>
                         <textarea
                           rows="4"
@@ -518,6 +529,7 @@ export class OurCompaniesPageComponent implements OnInit {
   readonly supplierTermsDraft = signal('');
   readonly vatDraft = signal('');
   readonly fraudDraft = signal('');
+  readonly latePaymentInterestDraft = signal('');
   readonly savingTerms = signal(false);
   readonly termsError = signal('');
   readonly termsSaved = signal(false);
@@ -750,6 +762,7 @@ export class OurCompaniesPageComponent implements OnInit {
     this.supplierTermsDraft.set(co?.supplierTerms ?? '');
     this.vatDraft.set(co?.vatNumber ?? '');
     this.fraudDraft.set(co?.fraudPreventionText ?? '');
+    this.latePaymentInterestDraft.set(co?.latePaymentInterest ?? '');
     this.termsError.set('');
     this.termsSaved.set(false);
   }
@@ -769,6 +782,7 @@ export class OurCompaniesPageComponent implements OnInit {
             supplierTerms: this.supplierTermsDraft().trim() || null,
             vatNumber: this.vatDraft().trim() || null,
             fraudPreventionText: this.fraudDraft().trim() || null,
+            latePaymentInterest: this.latePaymentInterestDraft().trim() || null,
           },
         ),
       );

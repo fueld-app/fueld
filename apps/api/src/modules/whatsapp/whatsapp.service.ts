@@ -29,6 +29,32 @@ interface UserConnection {
 
 const connections = new Map<string, UserConnection>();
 
+// ─── Buffer Revival (JSONB round-trip loses Buffer types) ────────────
+
+/**
+ * When Buffer/Uint8Array values are stored in JSONB (PostgreSQL), they get
+ * serialized as `{ type: "Buffer", data: [72, 101, …] }`.  On retrieval the
+ * plain object is returned instead of an actual Buffer, which causes Baileys'
+ * crypto helpers (aesEncryptGCM etc.) to throw:
+ *   "The data argument must be of type string or an instance of Buffer …"
+ *
+ * This utility recursively converts those serialized representations back into
+ * real Buffer instances.
+ */
+function reviveBuffers(obj: unknown): unknown {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(reviveBuffers);
+  const rec = obj as Record<string, unknown>;
+  if (rec.type === 'Buffer' && Array.isArray(rec.data)) {
+    return Buffer.from(rec.data as number[]);
+  }
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(rec)) {
+    out[k] = reviveBuffers(v);
+  }
+  return out;
+}
+
 // ─── DB-backed Auth State for Baileys ────────────────────────────────
 
 async function useDbAuthState(userId: string) {
@@ -41,7 +67,7 @@ async function useDbAuthState(userId: string) {
 
   let creds: AuthenticationCreds;
   if (existing?.creds) {
-    creds = existing.creds as AuthenticationCreds;
+    creds = reviveBuffers(existing.creds) as AuthenticationCreds;
   } else {
     // Use Baileys' helper to generate initial creds
     const { initAuthCreds } = await import('@whiskeysockets/baileys');
@@ -68,7 +94,7 @@ async function useDbAuthState(userId: string) {
           const result: Record<string, any> = {};
           for (const row of rows) {
             if (ids.includes(row.keyId)) {
-              result[row.keyId] = row.keyData;
+              result[row.keyId] = reviveBuffers(row.keyData);
             }
           }
           return result;

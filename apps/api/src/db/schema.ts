@@ -266,6 +266,9 @@ export const counterparties = pgTable('counterparties', {
   customerTerms: text('customer_terms'),
   supplierTerms: text('supplier_terms'),
 
+  // Late payment interest rate (e.g. "2%") — shown on invoices
+  latePaymentInterest: text('late_payment_interest'),
+
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

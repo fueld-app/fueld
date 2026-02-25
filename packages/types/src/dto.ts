@@ -1000,6 +1000,7 @@ export interface OwnCompanyDto {
   supplierTerms: string | null;
   vatNumber: string | null;
   fraudPreventionText: string | null;
+  latePaymentInterest: string | null;
 }
 
 // ═══════════════════════════════════════════════════════════════════════

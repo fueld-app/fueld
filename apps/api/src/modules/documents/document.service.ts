@@ -376,6 +376,7 @@ function buildInvoiceDocument(data: {
   companyName: string | null;
   vatNumber: string | null;
   fraudPreventionText: string | null;
+  latePaymentInterest: string | null;
   verifyUrl?: string | null;
   verifyLink?: string | null;
   companyLogoDataUrl: string | null;
@@ -595,7 +596,12 @@ function buildInvoiceDocument(data: {
       } as Content] : []),
 
       // ── Payment note ──
-      { text: 'Note: Late payment charged @ 2% interest, per month pro rata.', fontSize: 8, color: '#6b7280', margin: [0, 10, 0, 0] } as Content,
+      ...(data.latePaymentInterest ? [{
+        text: `Note : Late payment charged @ ${data.latePaymentInterest} interest, per month pro rata.`,
+        fontSize: 8, color: '#b91c1c', bold: true,
+        decoration: 'underline' as const,
+        margin: [0, 10, 0, 0],
+      } as Content] : []),
 
       // ── Fraud Prevention ──
       ...(data.fraudPreventionText ? [
@@ -747,6 +753,7 @@ export async function generateInvoicePdfBuffer(invoiceId: string): Promise<Buffe
     companyName: order.invoicingCompany?.name ?? null,
     vatNumber: order.invoicingCompany?.vatNumber ?? null,
     fraudPreventionText: order.invoicingCompany?.fraudPreventionText ?? null,
+    latePaymentInterest: order.invoicingCompany?.latePaymentInterest ?? null,
     verifyUrl,
     verifyLink,
     companyLogoDataUrl,
@@ -827,6 +834,7 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
     companyName: order.invoicingCompany?.name ?? null,
     vatNumber: order.invoicingCompany?.vatNumber ?? null,
     fraudPreventionText: order.invoicingCompany?.fraudPreventionText ?? null,
+    latePaymentInterest: order.invoicingCompany?.latePaymentInterest ?? null,
     verifyUrl,
     verifyLink,
     companyLogoDataUrl,

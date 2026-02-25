@@ -67,6 +67,7 @@ export async function listOwnCompanies(): Promise<OwnCompanyDto[]> {
       supplierTerms: counterparties.supplierTerms,
       vatNumber: counterparties.vatNumber,
       fraudPreventionText: counterparties.fraudPreventionText,
+      latePaymentInterest: counterparties.latePaymentInterest,
     })
     .from(counterparties)
     .where(eq(counterparties.isOwnCompany, true))
@@ -104,6 +105,7 @@ export async function updateOwnCompanyTerms(companyId: string, data: {
   supplierTerms?: string | null;
   vatNumber?: string | null;
   fraudPreventionText?: string | null;
+  latePaymentInterest?: string | null;
 }): Promise<OwnCompanyDto> {
   const [row] = await db
     .select({
@@ -129,6 +131,9 @@ export async function updateOwnCompanyTerms(companyId: string, data: {
   }
   if (data.fraudPreventionText !== undefined) {
     patch.fraudPreventionText = data.fraudPreventionText?.trim() ? data.fraudPreventionText : null;
+  }
+  if (data.latePaymentInterest !== undefined) {
+    patch.latePaymentInterest = data.latePaymentInterest?.trim() ? data.latePaymentInterest : null;
   }
 
   await db.update(counterparties).set(patch).where(eq(counterparties.id, companyId));
