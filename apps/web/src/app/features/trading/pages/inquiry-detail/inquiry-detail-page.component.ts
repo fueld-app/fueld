@@ -666,7 +666,7 @@ interface LliSearchResult {
     }
 
     <!-- PDF Preview Modal -->
-    <app-pdf-preview-modal [waLinked]="waLinked()" />
+    <app-pdf-preview-modal [waLinked]="waLinked()" [defaultPhone]="customerContact()?.phone ?? null" (sendWhatsApp)="onSendPdfWhatsApp($event)" />
   `,
   styles: [
     `
@@ -1954,6 +1954,39 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
       modal.showError();
       this.showToast('error', 'Failed to generate proforma invoice PDF.');
     }
+  }
+
+  // ─── WhatsApp send from PDF modal ───────────────────────────────
+
+  async onSendPdfWhatsApp(ev: { phone: string; blob: Blob; fileName: string }): Promise<void> {
+    try {
+      const base64 = await this.blobToBase64(ev.blob);
+      await firstValueFrom(
+        this.http.post<ApiResponse<{ success: boolean }>>(`${API}/whatsapp/send`, {
+          phone: ev.phone,
+          message: `${ev.fileName} — Order ${this.order()?.orderNumber ?? ''}`,
+          pdfBase64: base64,
+          pdfFileName: ev.fileName,
+        }),
+      );
+      this.pdfModal()?.waDone();
+      this.showToast('success', `PDF sent via WhatsApp to ${ev.phone}`);
+    } catch {
+      this.pdfModal()?.waDone();
+      this.showToast('error', 'Failed to send via WhatsApp. Is your device linked?');
+    }
+  }
+
+  private blobToBase64(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        resolve(result.includes(',') ? result.split(',')[1] : result);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
   }
 
   // ─── Toast ───────────────────────────────────────────────────────
