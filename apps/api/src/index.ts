@@ -81,26 +81,6 @@ async function runPendingMigrations() {
     )
   `);
 
-  // Bootstrap: if _applied_migrations is empty but __drizzle_migrations exists,
-  // import tags so the custom runner doesn't re-run already-applied migrations.
-  const existingCount = (await db.execute(sql`SELECT count(*)::int AS c FROM _applied_migrations`)) as Array<{ c: number }>;
-  if ((existingCount[0]?.c ?? 0) === 0) {
-    try {
-      const drizzleMigrations = (await db.execute(
-        sql`SELECT hash FROM __drizzle_migrations ORDER BY created_at`,
-      )) as Array<{ hash: string }>;
-      if (drizzleMigrations.length > 0) {
-        console.log(`  ↳ Bootstrapping _applied_migrations from ${drizzleMigrations.length} drizzle migration(s)…`);
-        // Drizzle stores the tag as the hash column
-        for (const row of drizzleMigrations) {
-          await db.execute(sql`INSERT INTO _applied_migrations (tag) VALUES (${row.hash}) ON CONFLICT DO NOTHING`);
-        }
-      }
-    } catch {
-      // __drizzle_migrations table doesn't exist — that's fine
-    }
-  }
-
   // Read journal to discover all migrations
   const journalPath = join(MIGRATIONS_DIR, 'meta/_journal.json');
   if (!existsSync(journalPath)) {
@@ -110,6 +90,27 @@ async function runPendingMigrations() {
   const journal = JSON.parse(readFileSync(journalPath, 'utf-8')) as {
     entries: Array<{ tag: string }>;
   };
+
+  // Bootstrap: if _applied_migrations is empty but __drizzle_migrations has
+  // entries, mark the first N journal entries as applied (drizzle stores a
+  // content hash, not the tag, so we match by count/order instead).
+  const existingCount = (await db.execute(sql`SELECT count(*)::int AS c FROM _applied_migrations`)) as Array<{ c: number }>;
+  if ((existingCount[0]?.c ?? 0) === 0) {
+    try {
+      const drizzleCount = (await db.execute(
+        sql`SELECT count(*)::int AS c FROM "__drizzle_migrations"`,
+      )) as Array<{ c: number }>;
+      const n = drizzleCount[0]?.c ?? 0;
+      if (n > 0 && n <= journal.entries.length) {
+        console.log(`  ↳ Bootstrapping: marking first ${n} migrations as applied (from __drizzle_migrations)…`);
+        for (let i = 0; i < n; i++) {
+          await db.execute(sql`INSERT INTO _applied_migrations (tag) VALUES (${journal.entries[i].tag}) ON CONFLICT DO NOTHING`);
+        }
+      }
+    } catch {
+      // __drizzle_migrations table doesn't exist — that's fine
+    }
+  }
 
   // Find which migrations have already been applied
   const applied = (await db.execute(sql`SELECT tag FROM _applied_migrations`)) as Array<{ tag: string }>;
@@ -133,22 +134,33 @@ async function runPendingMigrations() {
       try {
         await db.execute(sql.raw(stmt));
       } catch (e: any) {
-        const msg = e?.message ?? String(e);
-        const code = e?.code ?? '';
-        // Tolerate "already exists" for bootstrapping existing databases
-        // Check both message text AND PostgreSQL error codes:
-        //   42710 = duplicate_object (types, functions)
-        //   42P07 = duplicate_table
-        //   42P06 = duplicate_schema
-        //   42701 = duplicate_column
+        // Detect "already exists" / duplicate-object errors robustly.
+        // postgres-js may put the PG error message in different properties
+        // depending on version and whether drizzle wraps it.  Stringify
+        // the entire error so we never miss it.
+        const allText = [
+          e?.message,
+          e?.detail,
+          e?.code,
+          e?.cause?.message,
+          e?.cause?.code,
+          String(e),
+        ].filter(Boolean).join(' ');
+
+        const DUPLICATE_CODES = ['42710', '42P07', '42P06', '42701'];
         const isDuplicate =
-          msg.includes('already exists') ||
-          msg.includes('duplicate') ||
-          ['42710', '42P07', '42P06', '42701'].includes(code);
+          allText.includes('already exists') ||
+          allText.includes('duplicate') ||
+          DUPLICATE_CODES.some((c) => allText.includes(c));
+
         if (isDuplicate) {
           console.log(`  ↳ skipped (already exists): ${stmt.slice(0, 80)}…`);
         } else {
           console.error(`❌ Migration ${entry.tag} failed on statement:\n  ${stmt.slice(0, 120)}`);
+          console.error('  Error details:', JSON.stringify({
+            message: e?.message, code: e?.code, detail: e?.detail,
+            severity: e?.severity, causeMsg: e?.cause?.message,
+          }));
           throw e;
         }
       }
