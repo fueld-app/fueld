@@ -43,7 +43,7 @@ jobs:
       - name: Build API (standalone binary)
         run: |
           cd apps/api
-          bun build src/index.ts --compile --bytecode --minify --production --format=esm --target=bun-linux-x64 --outfile app-release
+          bun build src/index.ts --compile --minify --target=bun-linux-x64 --outfile app-release
 
       # ─── Build Frontend ────────────────────────────────────────────
       - name: Build Frontend

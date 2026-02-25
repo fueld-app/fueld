@@ -72,6 +72,8 @@ sleep 2
 if ! systemctl is-active --quiet "fueld-api@${NEXT_SLOT}"; then
   err "${NEXT_SLOT} failed to start"
   systemctl status "fueld-api@${NEXT_SLOT}" --no-pager || true
+  echo "--- journalctl output ---"
+  journalctl -u "fueld-api@${NEXT_SLOT}" -n 50 --no-pager || true
   exit 1
 fi
 
