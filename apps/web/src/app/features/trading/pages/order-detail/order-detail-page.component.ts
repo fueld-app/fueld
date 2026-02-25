@@ -620,12 +620,13 @@ interface TeamUserOption {
       [vesselName]="vesselName()"
       [portName]="portName()"
       [waLinked]="waLinked()"
+      [defaultPhone]="customerContact()?.phone ?? null"
       (sendEmail)="onSendEmail($event)"
       (sendWhatsApp)="onSendInvoiceWhatsApp($event)"
     />
 
     <!-- PDF Preview Modal -->
-    <app-pdf-preview-modal [waLinked]="waLinked()" (sendWhatsApp)="onSendPdfWhatsApp($event)" />
+    <app-pdf-preview-modal [waLinked]="waLinked()" [defaultPhone]="customerContact()?.phone ?? null" (sendWhatsApp)="onSendPdfWhatsApp($event)" />
   `,
   styles: [
     `

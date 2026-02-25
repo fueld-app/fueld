@@ -139,6 +139,8 @@ export interface CounterpartyDto {
   supplierTerms?: string | null;
   responsibleUserId?: string | null;
   responsibleUserName?: string | null;
+  vatNumber?: string | null;
+  fraudPreventionText?: string | null;
   contactsCount?: number | null;
 }
 
@@ -996,6 +998,8 @@ export interface OwnCompanyDto {
   logoUrl: string | null;
   customerTerms: string | null;
   supplierTerms: string | null;
+  vatNumber: string | null;
+  fraudPreventionText: string | null;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1015,6 +1019,7 @@ export interface BankAccountDto {
   branchAddress: string | null;
   sortCode: string | null;
   routingNumber: string | null;
+  intermediaryBank: string | null;
   isDefault: boolean;
   notes: string | null;
   createdAt: string;
@@ -1032,6 +1037,7 @@ export interface CreateBankAccountDto {
   branchAddress?: string | null;
   sortCode?: string | null;
   routingNumber?: string | null;
+  intermediaryBank?: string | null;
   isDefault?: boolean;
   notes?: string | null;
 }

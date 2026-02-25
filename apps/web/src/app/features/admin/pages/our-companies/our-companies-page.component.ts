@@ -275,6 +275,31 @@ interface CompanySearchResultOption {
                       </div>
                     </div>
 
+                    <!-- VAT & Fraud Prevention (invoice-specific) -->
+                    <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                      <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">VAT Number</label>
+                        <input
+                          type="text"
+                          [ngModel]="vatDraft()"
+                          (ngModelChange)="vatDraft.set($event)"
+                          placeholder="e.g. FR31000060599"
+                          class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700
+                                 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                        />
+                      </div>
+                      <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Fraud Prevention Notice <span class="text-gray-400 font-normal">(shown on invoices)</span></label>
+                        <textarea
+                          rows="4"
+                          [ngModel]="fraudDraft()"
+                          (ngModelChange)="fraudDraft.set($event)"
+                          class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-700 whitespace-pre-line
+                                 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                        ></textarea>
+                      </div>
+                    </div>
+
                     @if (termsSaved()) {
                       <p class="mt-2 text-xs font-medium text-green-700">Saved</p>
                     }
@@ -386,6 +411,11 @@ interface CompanySearchResultOption {
                     class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
                 </div>
                 <div class="col-span-2">
+                  <label class="block text-xs font-medium text-gray-600">Intermediary Bank</label>
+                  <input type="text" [(ngModel)]="baForm.intermediaryBank" name="intermediaryBank" placeholder="e.g. SWIFT BSUIFRPP / CACIB"
+                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
+                </div>
+                <div class="col-span-2">
                   <label class="block text-xs font-medium text-gray-600">Branch Address</label>
                   <input type="text" [(ngModel)]="baForm.branchAddress" name="branchAddress"
                     class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
@@ -483,6 +513,8 @@ export class OurCompaniesPageComponent implements OnInit {
   // Terms editing (per expanded company)
   readonly customerTermsDraft = signal('');
   readonly supplierTermsDraft = signal('');
+  readonly vatDraft = signal('');
+  readonly fraudDraft = signal('');
   readonly savingTerms = signal(false);
   readonly termsError = signal('');
   readonly termsSaved = signal(false);
@@ -509,6 +541,7 @@ export class OurCompaniesPageComponent implements OnInit {
     branchAddress: '',
     sortCode: '',
     routingNumber: '',
+    intermediaryBank: '',
     notes: '',
     isDefault: false,
   };
@@ -697,6 +730,8 @@ export class OurCompaniesPageComponent implements OnInit {
     const co = this.companies().find((c) => c.id === companyId);
     this.customerTermsDraft.set(co?.customerTerms ?? '');
     this.supplierTermsDraft.set(co?.supplierTerms ?? '');
+    this.vatDraft.set(co?.vatNumber ?? '');
+    this.fraudDraft.set(co?.fraudPreventionText ?? '');
     this.termsError.set('');
     this.termsSaved.set(false);
   }
@@ -714,6 +749,8 @@ export class OurCompaniesPageComponent implements OnInit {
           {
             customerTerms: this.customerTermsDraft().trim() || null,
             supplierTerms: this.supplierTermsDraft().trim() || null,
+            vatNumber: this.vatDraft().trim() || null,
+            fraudPreventionText: this.fraudDraft().trim() || null,
           },
         ),
       );
@@ -758,7 +795,7 @@ export class OurCompaniesPageComponent implements OnInit {
     this.baForm = {
       label: '', bankName: '', accountName: '', accountNumber: '',
       iban: '', swiftBic: '', currency: '', branchAddress: '',
-      sortCode: '', routingNumber: '', notes: '', isDefault: false,
+      sortCode: '', routingNumber: '', intermediaryBank: '', notes: '', isDefault: false,
     };
     this.bankAccountModalOpen.set(true);
   }
@@ -778,6 +815,7 @@ export class OurCompaniesPageComponent implements OnInit {
       branchAddress: ba.branchAddress ?? '',
       sortCode: ba.sortCode ?? '',
       routingNumber: ba.routingNumber ?? '',
+      intermediaryBank: (ba as any).intermediaryBank ?? '',
       notes: ba.notes ?? '',
       isDefault: ba.isDefault,
     };
@@ -803,6 +841,7 @@ export class OurCompaniesPageComponent implements OnInit {
       branchAddress: this.baForm.branchAddress || null,
       sortCode: this.baForm.sortCode || null,
       routingNumber: this.baForm.routingNumber || null,
+      intermediaryBank: this.baForm.intermediaryBank || null,
       notes: this.baForm.notes || null,
       isDefault: this.baForm.isDefault,
     };

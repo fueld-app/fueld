@@ -139,8 +139,10 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     body: t.Object({
       customerTerms: t.Optional(t.Nullable(t.String())),
       supplierTerms: t.Optional(t.Nullable(t.String())),
+      vatNumber: t.Optional(t.Nullable(t.String())),
+      fraudPreventionText: t.Optional(t.Nullable(t.String())),
     }),
-    detail: { tags: ['Admin Settings'], summary: 'Update own company customer/supplier terms' },
+    detail: { tags: ['Admin Settings'], summary: 'Update own company terms, VAT, and fraud prevention text' },
   })
 
   // ═══════════════════════════════════════════════════════════════════

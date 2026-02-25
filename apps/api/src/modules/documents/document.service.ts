@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
 import QRCode from 'qrcode';
 import { db } from '../../db';
-import { entityComments, orders, orderItems, counterparties, vessels, places, invoices, users } from '../../db/schema';
+import { bankAccounts, entityComments, orders, orderItems, counterparties, vessels, places, invoices, users } from '../../db/schema';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Document Service — Server-side PDF generation (pdfmake v0.3)
@@ -25,18 +25,24 @@ pdfmake.setFonts({
 
 interface BankDetails {
   bankName: string;
-  accountName: string;
-  iban: string;
-  swift: string;
+  accountName: string | null;
+  accountNumber: string | null;
+  iban: string | null;
+  swift: string | null;
   currency: string;
+  branchAddress: string | null;
+  intermediaryBank: string | null;
 }
 
 const DEFAULT_BANK_DETAILS: BankDetails = {
   bankName: 'DNB Bank ASA',
   accountName: 'Fueld Trading Ltd',
+  accountNumber: null,
   iban: 'NO93 8601 1117 947',
   swift: 'DNBANOKKXXX',
   currency: 'USD',
+  branchAddress: null,
+  intermediaryBank: null,
 };
 
 // ─── Data fetching ───────────────────────────────────────────────────
@@ -52,6 +58,7 @@ async function fetchInvoiceData(invoiceId: string) {
           place: true,
           salesRep: true,
           supplier: true,
+          invoicingCompany: true,
           items: true,
         },
       },
@@ -81,6 +88,54 @@ async function fetchOrderForInvoice(orderId: string) {
 
   if (!order) throw new Error(`Order ${orderId} not found`);
   return order;
+}
+
+/** Load the bank account assigned to an order (or the company default). */
+async function loadOrderBankDetails(
+  bankAccountId: string | null | undefined,
+  invoicingCompanyId: string | null | undefined,
+): Promise<BankDetails> {
+  // Try specific bank account first
+  if (bankAccountId) {
+    const [ba] = await db
+      .select()
+      .from(bankAccounts)
+      .where(eq(bankAccounts.id, bankAccountId))
+      .limit(1);
+    if (ba) {
+      return {
+        bankName: ba.bankName,
+        accountName: ba.accountName,
+        accountNumber: ba.accountNumber,
+        iban: ba.iban,
+        swift: ba.swiftBic,
+        currency: ba.currency,
+        branchAddress: ba.branchAddress,
+        intermediaryBank: ba.intermediaryBank,
+      };
+    }
+  }
+  // Fallback: default bank account for the invoicing company
+  if (invoicingCompanyId) {
+    const [ba] = await db
+      .select()
+      .from(bankAccounts)
+      .where(and(eq(bankAccounts.counterpartyId, invoicingCompanyId), eq(bankAccounts.isDefault, true)))
+      .limit(1);
+    if (ba) {
+      return {
+        bankName: ba.bankName,
+        accountName: ba.accountName,
+        accountNumber: ba.accountNumber,
+        iban: ba.iban,
+        swift: ba.swiftBic,
+        currency: ba.currency,
+        branchAddress: ba.branchAddress,
+        intermediaryBank: ba.intermediaryBank,
+      };
+    }
+  }
+  return DEFAULT_BANK_DETAILS;
 }
 
 function renderCompanyTemplate(template: string | null | undefined, companyName: string | null | undefined): string | null {
@@ -318,6 +373,14 @@ function buildInvoiceDocument(data: {
   totalAmount: string | null;
   bank: BankDetails;
   createdAt: Date;
+  companyName: string | null;
+  vatNumber: string | null;
+  fraudPreventionText: string | null;
+  verifyUrl?: string | null;
+  companyLogoDataUrl: string | null;
+  companyAddress: string | null;
+  companyPhone: string | null;
+  companyEmail: string | null;
 }): TDocumentDefinitions {
   // Build line items table
   const tableHeader: TableCell[] = [
@@ -360,10 +423,12 @@ function buildInvoiceDocument(data: {
         columns: [
           {
             width: '*',
-            stack: [
-              { text: 'FUELD', style: 'brand' },
-              { text: 'Bunker Trading Solutions', style: 'brandSub' },
-            ],
+            stack: data.companyLogoDataUrl
+              ? [{ image: data.companyLogoDataUrl, fit: [140, 50] } as Content]
+              : [
+                  { text: data.companyName ?? 'FUELD', style: 'brand' } as Content,
+                  { text: 'Bunker Trading Solutions', style: 'brandSub' } as Content,
+                ],
           },
           {
             width: 'auto',
@@ -469,51 +534,129 @@ function buildInvoiceDocument(data: {
       { text: '', margin: [0, 10, 0, 0] } as Content,
 
       // ── Bank Details ──
-      { text: 'Payment Details', style: 'sectionLabel' } as Content,
+      { text: 'REMITTANCE INSTRUCTIONS', style: 'sectionLabel' } as Content,
+      { text: 'Payment to be effected, free of all charges to us, by telegraphic transfer to:', fontSize: 9, margin: [0, 2, 0, 6] } as Content,
       {
         columns: [
           { width: '25%', text: 'Bank:', bold: true },
           { width: '75%', text: data.bank.bankName },
         ],
-        margin: [0, 4, 0, 0],
+        margin: [0, 2, 0, 0],
       } as Content,
-      {
+      ...(data.bank.branchAddress ? [{
         columns: [
-          { width: '25%', text: 'Account Name:', bold: true },
+          { width: '25%', text: '' },
+          { width: '75%', text: data.bank.branchAddress, color: '#374151' },
+        ],
+        margin: [0, 2, 0, 0],
+      } as Content] : []),
+      ...(data.bank.accountName ? [{
+        columns: [
+          { width: '25%', text: 'In favour of:', bold: true },
           { width: '75%', text: data.bank.accountName },
         ],
         margin: [0, 2, 0, 0],
-      } as Content,
-      {
+      } as Content] : []),
+      ...(data.bank.iban ? [{
         columns: [
-          { width: '25%', text: 'IBAN:', bold: true },
-          { width: '75%', text: data.bank.iban },
+          { width: '25%', text: 'IBAN No:', bold: true },
+          { width: '75%', text: data.bank.iban, font: 'Roboto' },
         ],
         margin: [0, 2, 0, 0],
-      } as Content,
-      {
+      } as Content] : []),
+      ...(data.bank.accountNumber ? [{
+        columns: [
+          { width: '25%', text: 'Account No:', bold: true },
+          { width: '75%', text: data.bank.accountNumber, font: 'Roboto' },
+        ],
+        margin: [0, 2, 0, 0],
+      } as Content] : []),
+      ...(data.bank.swift ? [{
         columns: [
           { width: '25%', text: 'SWIFT:', bold: true },
           { width: '75%', text: data.bank.swift },
         ],
         margin: [0, 2, 0, 0],
-      } as Content,
-      {
+      } as Content] : []),
+      ...(data.bank.intermediaryBank ? [{
         columns: [
-          { width: '25%', text: 'Currency:', bold: true },
-          { width: '75%', text: data.bank.currency },
+          { width: '25%', text: 'Intermediary bank:', bold: true },
+          { width: '75%', text: data.bank.intermediaryBank },
         ],
         margin: [0, 2, 0, 0],
-      } as Content,
+      } as Content] : []),
+
+      // ── VAT Number ──
+      ...(data.vatNumber ? [{
+        text: `${data.companyName ?? 'Company'} VAT: ${data.vatNumber}`,
+        fontSize: 9,
+        margin: [0, 10, 0, 0],
+      } as Content] : []),
+
+      // ── Payment note ──
+      { text: 'Note: Late payment charged @ 2% interest, per month pro rata.', fontSize: 8, color: '#6b7280', margin: [0, 10, 0, 0] } as Content,
+
+      // ── Fraud Prevention ──
+      ...(data.fraudPreventionText ? [
+        { text: '', margin: [0, 10, 0, 0] } as Content,
+        { text: 'FRAUD PREVENTION', fontSize: 9, bold: true, margin: [0, 0, 0, 4] } as Content,
+        { text: data.fraudPreventionText, fontSize: 8, color: '#374151', margin: [0, 0, 0, 0] } as Content,
+      ] : []),
+
+      // ── QR code verification ──
+      ...(data.verifyUrl ? [
+        { text: '', margin: [0, 14, 0, 0] } as Content,
+        {
+          columns: [
+            { width: '*', text: '' },
+            {
+              width: 'auto',
+              stack: [
+                { image: data.verifyUrl, fit: [80, 80], alignment: 'center' } as Content,
+                { text: 'Scan to verify', fontSize: 7, color: '#6b7280', alignment: 'center', margin: [0, 4, 0, 0] } as Content,
+              ],
+            },
+            { width: '*', text: '' },
+          ],
+        } as Content,
+      ] : []),
     ],
 
     // ── Footer ──
-    footer: (currentPage: number, pageCount: number) => ({
-      columns: [
-        { text: 'Generated by Fueld — Bunker Trading SaaS', fontSize: 8, color: '#9ca3af', margin: [40, 0, 0, 0] },
-        { text: `Page ${currentPage} of ${pageCount}`, fontSize: 8, color: '#9ca3af', alignment: 'right', margin: [0, 0, 40, 0] },
-      ],
-    }),
+    footer: (currentPage: number, pageCount: number) => {
+      const senderName = data.companyName?.trim() || 'Fueld Trading';
+      const leftTexts: Content[] = [
+        { text: senderName, fontSize: 8, bold: true, color: '#374151' } as Content,
+      ];
+      if (data.companyAddress?.trim()) {
+        for (const line of data.companyAddress.trim().split(/\n|,\s*/)) {
+          const l = line.trim();
+          if (l) leftTexts.push({ text: l, fontSize: 8, color: '#374151' } as Content);
+        }
+      }
+      const middleTexts: Content[] = [];
+      if (data.companyPhone?.trim()) {
+        const display = formatPhoneDisplay(data.companyPhone) ?? data.companyPhone.trim();
+        middleTexts.push({ text: `Phone No: ${display}`, fontSize: 8, color: '#374151', link: phoneToTelUri(data.companyPhone) } as Content);
+      }
+      if (data.companyEmail?.trim()) {
+        middleTexts.push({ text: `Email: ${data.companyEmail.trim()}`, fontSize: 8, color: '#1a56db', link: `mailto:${data.companyEmail.trim()}` } as Content);
+      }
+      return {
+        margin: [40, 0, 40, 20] as [number, number, number, number],
+        stack: [
+          { canvas: [{ type: 'line' as const, x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 0.5, lineColor: '#9ca3af' }] },
+          {
+            columns: [
+              { width: '*' as const, stack: leftTexts },
+              { width: '*' as const, stack: middleTexts },
+              { width: 'auto' as const, text: `Page ${currentPage} of ${pageCount}`, fontSize: 8, color: '#374151', alignment: 'right' as const },
+            ],
+            margin: [0, 6, 0, 0] as [number, number, number, number],
+          },
+        ],
+      };
+    },
 
     // ── Styles ──
     styles: {
@@ -549,6 +692,27 @@ export async function generateInvoicePdfBuffer(invoiceId: string): Promise<Buffe
   const invoice = await fetchInvoiceData(invoiceId);
   const order = invoice.order;
 
+  const bank = await loadOrderBankDetails(order.bankAccountId, order.invoicingCompanyId);
+
+  // QR code verification
+  let verifyUrl: string | null = null;
+  const appUrl = process.env['APP_URL'] || 'http://localhost:4200';
+  const verifyLink = `${appUrl}/verify/${order.id}/invoice`;
+  try {
+    verifyUrl = await QRCode.toDataURL(verifyLink, { width: 160, margin: 1 });
+  } catch { /* QR generation failed — continue without */ }
+
+  // Company logo
+  let companyLogoDataUrl: string | null = null;
+  if (order.invoicingCompany?.logoUrl) {
+    const logoPath = join(process.cwd(), 'uploads', order.invoicingCompany.logoUrl);
+    if (existsSync(logoPath)) {
+      const ext = extname(logoPath).replace('.', '');
+      const mime = ext === 'svg' ? 'image/svg+xml' : ext === 'png' ? 'image/png' : 'image/jpeg';
+      companyLogoDataUrl = `data:${mime};base64,${readFileSync(logoPath).toString('base64')}`;
+    }
+  }
+
   const docData = {
     invoiceNumber: invoice.invoiceNumber,
     dueDate: invoice.dueDate,
@@ -574,8 +738,16 @@ export async function generateInvoicePdfBuffer(invoiceId: string): Promise<Buffe
       costPrice: item.costPrice,
     })),
     totalAmount: invoice.amount,
-    bank: DEFAULT_BANK_DETAILS,
+    bank,
     createdAt: invoice.createdAt,
+    companyName: order.invoicingCompany?.name ?? null,
+    vatNumber: order.invoicingCompany?.vatNumber ?? null,
+    fraudPreventionText: order.invoicingCompany?.fraudPreventionText ?? null,
+    verifyUrl,
+    companyLogoDataUrl,
+    companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
+    companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
+    companyEmail: order.invoicingCompany?.headOfficeEmail ?? null,
   };
 
   const docDefinition = buildInvoiceDocument(docData);
@@ -598,6 +770,27 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
   const invoice = order.invoices?.[0];
   const invoiceNumber = invoice?.invoiceNumber ?? `PREVIEW-${orderId.slice(0, 8).toUpperCase()}`;
   const dueDate = invoice?.dueDate ?? new Date(Date.now() + 30 * 86_400_000).toISOString().split('T')[0]!;
+
+  const bank = await loadOrderBankDetails(order.bankAccountId, order.invoicingCompanyId);
+
+  // QR code verification
+  let verifyUrl: string | null = null;
+  const appUrl = process.env['APP_URL'] || 'http://localhost:4200';
+  const verifyLink = `${appUrl}/verify/${orderId}/invoice`;
+  try {
+    verifyUrl = await QRCode.toDataURL(verifyLink, { width: 160, margin: 1 });
+  } catch { /* QR generation failed — continue without */ }
+
+  // Company logo
+  let companyLogoDataUrl: string | null = null;
+  if (order.invoicingCompany?.logoUrl) {
+    const logoPath = join(process.cwd(), 'uploads', order.invoicingCompany.logoUrl);
+    if (existsSync(logoPath)) {
+      const ext = extname(logoPath).replace('.', '');
+      const mime = ext === 'svg' ? 'image/svg+xml' : ext === 'png' ? 'image/png' : 'image/jpeg';
+      companyLogoDataUrl = `data:${mime};base64,${readFileSync(logoPath).toString('base64')}`;
+    }
+  }
 
   const docData = {
     invoiceNumber,
@@ -624,8 +817,16 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
       costPrice: item.costPrice,
     })),
     totalAmount: invoice?.amount ?? null,
-    bank: DEFAULT_BANK_DETAILS,
+    bank,
     createdAt: invoice?.createdAt ?? new Date(),
+    companyName: order.invoicingCompany?.name ?? null,
+    vatNumber: order.invoicingCompany?.vatNumber ?? null,
+    fraudPreventionText: order.invoicingCompany?.fraudPreventionText ?? null,
+    verifyUrl,
+    companyLogoDataUrl,
+    companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
+    companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
+    companyEmail: order.invoicingCompany?.headOfficeEmail ?? null,
   };
 
   const docDefinition = buildInvoiceDocument(docData);
@@ -1040,12 +1241,7 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
     verifyUrl: null as string | null,
   };
 
-  // Generate QR code verification URL
-  const appUrl = process.env['APP_URL'] || 'http://localhost:4200';
-  const verifyLink = `${appUrl}/verify/${orderId}/offer`;
-  try {
-    docData.verifyUrl = await QRCode.toDataURL(verifyLink, { width: 160, margin: 1 });
-  } catch { /* QR generation failed — continue without */ }
+  // QR code removed from offers — only shown on invoices and proforma invoices
 
   const docDefinition = buildOfferDocument(docData);
   const buffer = await createPdfBuffer(docDefinition);

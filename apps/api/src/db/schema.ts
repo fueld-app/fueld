@@ -256,6 +256,12 @@ export const counterparties = pgTable('counterparties', {
   // Company logo (for own companies — used in PDF generation)
   logoUrl: text('logo_url'),
 
+  // VAT number (displayed on invoices)
+  vatNumber: text('vat_number'),
+
+  // Fraud prevention notice (displayed on invoices)
+  fraudPreventionText: text('fraud_prevention_text'),
+
   // Terms templates (used for own companies; rendered into PDFs/orders)
   customerTerms: text('customer_terms'),
   supplierTerms: text('supplier_terms'),
@@ -920,6 +926,7 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
     references: [counterparties.id],
     relationName: 'invoicingOrders',
   }),
+  bankAccount: one(bankAccounts, { fields: [orders.bankAccountId], references: [bankAccounts.id] }),
   items: many(orderItems),
   invoices: many(invoices),
   attachments: many(orderAttachments),
@@ -991,6 +998,7 @@ export const bankAccounts = pgTable('bank_accounts', {
   branchAddress: text('branch_address'),
   sortCode: text('sort_code'),              // UK sort code
   routingNumber: text('routing_number'),     // US routing number
+  intermediaryBank: text('intermediary_bank'),  // e.g. "SWIFT BSUIFRPP / CACIB"
   isDefault: boolean('is_default').notNull().default(false),
   notes: text('notes'),
 

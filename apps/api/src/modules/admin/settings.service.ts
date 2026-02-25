@@ -65,6 +65,8 @@ export async function listOwnCompanies(): Promise<OwnCompanyDto[]> {
       logoUrl: counterparties.logoUrl,
       customerTerms: counterparties.customerTerms,
       supplierTerms: counterparties.supplierTerms,
+      vatNumber: counterparties.vatNumber,
+      fraudPreventionText: counterparties.fraudPreventionText,
     })
     .from(counterparties)
     .where(eq(counterparties.isOwnCompany, true))
@@ -100,6 +102,8 @@ export async function setOwnCompany(companyId: string, isOwn: boolean) {
 export async function updateOwnCompanyTerms(companyId: string, data: {
   customerTerms?: string | null;
   supplierTerms?: string | null;
+  vatNumber?: string | null;
+  fraudPreventionText?: string | null;
 }): Promise<OwnCompanyDto> {
   const [row] = await db
     .select({
@@ -119,6 +123,12 @@ export async function updateOwnCompanyTerms(companyId: string, data: {
   }
   if (data.supplierTerms !== undefined) {
     patch.supplierTerms = data.supplierTerms?.trim() ? data.supplierTerms : null;
+  }
+  if (data.vatNumber !== undefined) {
+    patch.vatNumber = data.vatNumber?.trim() ? data.vatNumber : null;
+  }
+  if (data.fraudPreventionText !== undefined) {
+    patch.fraudPreventionText = data.fraudPreventionText?.trim() ? data.fraudPreventionText : null;
   }
 
   await db.update(counterparties).set(patch).where(eq(counterparties.id, companyId));
@@ -364,6 +374,8 @@ export async function getUserCompanyAccess(userId: string): Promise<OwnCompanyDt
       logoUrl: counterparties.logoUrl,
       customerTerms: counterparties.customerTerms,
       supplierTerms: counterparties.supplierTerms,
+      vatNumber: counterparties.vatNumber,
+      fraudPreventionText: counterparties.fraudPreventionText,
     })
     .from(userCompanyOverrides)
     .innerJoin(counterparties, eq(userCompanyOverrides.counterpartyId, counterparties.id))
@@ -389,6 +401,8 @@ export async function getUserCompanyAccess(userId: string): Promise<OwnCompanyDt
       logoUrl: counterparties.logoUrl,
       customerTerms: counterparties.customerTerms,
       supplierTerms: counterparties.supplierTerms,
+      vatNumber: counterparties.vatNumber,
+      fraudPreventionText: counterparties.fraudPreventionText,
     })
     .from(teamCompanies)
     .innerJoin(counterparties, eq(teamCompanies.counterpartyId, counterparties.id))
@@ -440,6 +454,7 @@ export async function createBankAccount(
     branchAddress?: string | null;
     sortCode?: string | null;
     routingNumber?: string | null;
+    intermediaryBank?: string | null;
     isDefault?: boolean;
     notes?: string | null;
   },
@@ -466,6 +481,7 @@ export async function createBankAccount(
       branchAddress: data.branchAddress ?? null,
       sortCode: data.sortCode ?? null,
       routingNumber: data.routingNumber ?? null,
+      intermediaryBank: data.intermediaryBank ?? null,
       isDefault: data.isDefault ?? false,
       notes: data.notes ?? null,
     })
@@ -491,7 +507,7 @@ export async function updateBankAccount(
   const allowed = [
     'label', 'bankName', 'accountName', 'accountNumber', 'iban',
     'swiftBic', 'currency', 'branchAddress', 'sortCode', 'routingNumber',
-    'isDefault', 'notes',
+    'intermediaryBank', 'isDefault', 'notes',
   ];
   for (const key of allowed) {
     if (data[key] !== undefined) {

@@ -169,6 +169,8 @@ export class SendEmailModalComponent {
   readonly portName = input<string>('');
   /** Whether the current user has linked WhatsApp in Settings */
   readonly waLinked = input(false);
+  /** Pre-fill phone number from the contact person */
+  readonly defaultPhone = input<string | null>(null);
   readonly sendEmail = output<string>();
   readonly sendWhatsApp = output<string>();
 
@@ -180,7 +182,7 @@ export class SendEmailModalComponent {
 
   show(): void {
     this.recipientEmail = '';
-    this.waPhoneNumber = '';
+    this.waPhoneNumber = this.defaultPhone() ?? '';
     this.sending.set(false);
     this.waSending.set(false);
     this.open.set(true);

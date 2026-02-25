@@ -162,6 +162,13 @@
       "when": 1771200018000,
       "tag": "0022_whatsapp_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1771200019000,
+      "tag": "0023_bank_account_intermediary_and_vat",
+      "breakpoints": true
     }
   ]
 }
