@@ -2,6 +2,7 @@ import {
   Component,
   ChangeDetectionStrategy,
   signal,
+  computed,
   inject,
   OnInit,
 } from '@angular/core';
@@ -683,19 +684,66 @@ import { API } from '@app/core/config/api';
                   <p class="mt-0.5 text-xs text-gray-500">
                     WhatsApp group for automatic RFQ sharing. Requires a user to have WhatsApp linked.
                   </p>
-                  <div class="mt-2 flex items-center gap-2">
-                    <select
-                      [value]="waDefaultGroupJid() ?? ''"
-                      (change)="onWaGroupChange($any($event.target).value)"
-                      [disabled]="waGroupsLoading() || waSaving()"
-                      class="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm
-                             focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:opacity-50"
-                    >
-                      <option value="">None</option>
-                      @for (g of waGroups(); track g.jid) {
-                        <option [value]="g.jid">{{ g.name }} ({{ g.participants }})</option>
+                  <div class="relative mt-2 flex items-center gap-2">
+                    <!-- Typeahead input -->
+                    <div class="relative flex-1">
+                      <input
+                        type="text"
+                        [value]="waGroupSearch()"
+                        (input)="waGroupSearch.set($any($event.target).value); waGroupDropdownOpen.set(true)"
+                        (focus)="waGroupDropdownOpen.set(true)"
+                        (blur)="waGroupDropdownOpen.set(false); syncWaGroupSearchText()"
+                        (keydown.escape)="waGroupDropdownOpen.set(false)"
+                        [disabled]="waGroupsLoading() || waSaving()"
+                        placeholder="Search groups…"
+                        autocomplete="off"
+                        class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm
+                               focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:opacity-50"
+                      />
+                      @if (waGroupSearch() && !waGroupsLoading()) {
+                        <button
+                          (click)="clearWaGroupSelection()"
+                          class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                          title="Clear selection"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                        </button>
                       }
-                    </select>
+
+                      <!-- Dropdown -->
+                      @if (waGroupDropdownOpen() && !waGroupsLoading()) {
+                        <div
+                          class="absolute left-0 top-full z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg"
+                          (mousedown)="$event.preventDefault()"
+                        >
+                          <button
+                            (click)="selectWaGroup('', 'None')"
+                            class="flex w-full items-center px-3 py-2 text-left text-sm text-gray-500 hover:bg-gray-50 transition-colors"
+                            [class.bg-brand-50]="!waDefaultGroupJid()"
+                          >
+                            None
+                          </button>
+                          @for (g of filteredWaGroups(); track g.jid) {
+                            <button
+                              (click)="selectWaGroup(g.jid, g.name + ' (' + g.participants + ')')"
+                              class="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-gray-900 hover:bg-gray-50 transition-colors"
+                              [class.bg-brand-50]="g.jid === waDefaultGroupJid()"
+                            >
+                              <span>{{ g.name }}</span>
+                              <span class="text-xs text-gray-400">{{ g.participants }} members</span>
+                            </button>
+                          } @empty {
+                            @if (waGroups().length) {
+                              <div class="px-3 py-2 text-sm text-gray-400">No groups matching "{{ waGroupSearch() }}"</div>
+                            }
+                          }
+                        </div>
+                      }
+                    </div>
+
+                    <!-- Refresh button -->
                     <button
                       (click)="loadWaGroups()"
                       [disabled]="waGroupsLoading()"
@@ -787,6 +835,14 @@ export class IntegrationsPageComponent implements OnInit {
   readonly waSaving = signal(false);
   readonly waSaveSuccess = signal('');
   readonly waSaveError = signal('');
+  readonly waGroupSearch = signal('');
+  readonly waGroupDropdownOpen = signal(false);
+  readonly filteredWaGroups = computed(() => {
+    const term = this.waGroupSearch().toLowerCase().trim();
+    const groups = this.waGroups();
+    if (!term) return groups;
+    return groups.filter((g) => g.name.toLowerCase().includes(term));
+  });
 
   // ── Computed status helpers ────────────────────────────────────────
   lliStatus = () => this.integrations().find((i) => i.provider.toUpperCase() === 'LLI') ?? null;
@@ -845,6 +901,7 @@ export class IntegrationsPageComponent implements OnInit {
         this.waEnabled.set(waRes.data.enabled);
         if (waRes.data.enabled) await this.loadWaGroups();
         this.waDefaultGroupJid.set(waRes.data.defaultGroupJid);
+        this.syncWaGroupSearchText();
       }
     } catch (err) {
       console.error('Failed to load integrations:', err);
@@ -1122,6 +1179,7 @@ export class IntegrationsPageComponent implements OnInit {
       );
       if (res.success) {
         this.waDefaultGroupJid.set(res.data.defaultGroupJid);
+        this.syncWaGroupSearchText();
         this.waSaveSuccess.set('Default group updated.');
       }
     } catch (err: any) {
@@ -1129,6 +1187,28 @@ export class IntegrationsPageComponent implements OnInit {
     } finally {
       this.waSaving.set(false);
     }
+  }
+
+  selectWaGroup(jid: string, displayName: string): void {
+    this.waGroupDropdownOpen.set(false);
+    this.waGroupSearch.set(jid ? displayName : '');
+    this.onWaGroupChange(jid);
+  }
+
+  clearWaGroupSelection(): void {
+    this.waGroupSearch.set('');
+    this.waGroupDropdownOpen.set(false);
+    this.onWaGroupChange('');
+  }
+
+  syncWaGroupSearchText(): void {
+    const jid = this.waDefaultGroupJid();
+    if (!jid) {
+      this.waGroupSearch.set('');
+      return;
+    }
+    const g = this.waGroups().find((x) => x.jid === jid);
+    this.waGroupSearch.set(g ? `${g.name} (${g.participants})` : '');
   }
 
   async loadWaGroups(): Promise<void> {
