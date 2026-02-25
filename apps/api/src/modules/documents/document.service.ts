@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
 import QRCode from 'qrcode';
 import { db } from '../../db';
-import { bankAccounts, entityComments, orders, orderItems, counterparties, vessels, places, invoices, users } from '../../db/schema';
+import { bankAccounts, orders, orderItems, counterparties, vessels, places, invoices, users } from '../../db/schema';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Document Service — Server-side PDF generation (pdfmake v0.3)
@@ -315,30 +315,18 @@ function formatDateTimeForDisplay(value: string | null, tz: string | null | unde
 
 function buildNotesSection(params: {
   customerNote?: string | null;
-  placeOrderRemark?: string | null;
-  placeComment?: string | null;
   termsAndConditions?: string | null;
   itemNotes?: Array<{ label: string; note: string }>;
 }): Content[] {
   const customerNote = params.customerNote?.trim();
-  const placeOrderRemark = params.placeOrderRemark?.trim();
-  const placeComment = params.placeComment?.trim();
   const termsAndConditions = params.termsAndConditions?.trim();
   const itemNotes = params.itemNotes ?? [];
-  if (!customerNote && !placeOrderRemark && !placeComment && !termsAndConditions && itemNotes.length === 0) return [];
+  if (!customerNote && !termsAndConditions && itemNotes.length === 0) return [];
 
   const notes: Content[] = [{ text: 'Notes', style: 'sectionLabel' } as Content];
 
   if (customerNote) {
     notes.push({ text: customerNote, margin: [0, 0, 0, 6] } as Content);
-  }
-
-  if (placeOrderRemark) {
-    notes.push({ text: placeOrderRemark, margin: [0, 0, 0, 6] } as Content);
-  }
-
-  if (placeComment) {
-    notes.push({ text: `Place comment: ${placeComment}`, margin: [0, 0, 0, 6] } as Content);
   }
 
   if (termsAndConditions) {
@@ -913,8 +901,6 @@ function buildOfferDocument(data: {
   fromPhone: string | null;
   paymentTerms: string | null;
   customerNote: string | null;
-  placeOrderRemark: string | null;
-  placeComment: string | null;
   termsAndConditions: string | null;
   companyName: string | null;
   companyAddress: string | null;
@@ -1092,9 +1078,6 @@ function buildOfferDocument(data: {
     pageMargins: [40, 140, 40, 80],
     header,
     content: [
-      // Intro text
-      { text: 'With reference to our correspondence, we are pleased to confirm to you the following:', margin: [0, 16, 0, 16] } as Content,
-
       // Vessel / Delivery info (single-column stack)
       {
         stack: [
@@ -1151,8 +1134,6 @@ function buildOfferDocument(data: {
       // Notes
       ...buildNotesSection({
         customerNote: data.customerNote,
-        placeOrderRemark: data.placeOrderRemark,
-        placeComment: data.placeComment,
         termsAndConditions: null,
         itemNotes: [],
       }),
@@ -1229,13 +1210,6 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
 
   const companyLogoDataUrl = tryLoadLogoDataUrl(order.invoicingCompany?.logoUrl ?? null);
 
-  const [latestPlaceComment] = await db
-    .select({ content: entityComments.content })
-    .from(entityComments)
-    .where(and(eq(entityComments.entityType, 'place'), eq(entityComments.entityId, order.placeId)))
-    .orderBy(desc(entityComments.createdAt))
-    .limit(1);
-
   const docData = {
     orderNumber: order.orderNumber,
     clientName: order.client.name,
@@ -1256,8 +1230,6 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
     fromPhone: order.salesRep?.phone ?? null,
     paymentTerms: formatCustomerPaymentTerms(order.customerPaymentTermType, order.customerCreditDays),
     customerNote: order.customerNote ?? null,
-    placeOrderRemark: order.place?.orderRemark ?? null,
-    placeComment: latestPlaceComment?.content ?? null,
     termsAndConditions: order.termsAndConditions ?? null,
     companyName: order.invoicingCompany?.name ?? null,
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
@@ -1321,8 +1293,6 @@ function buildProformaDocument(data: {
   fromPhone: string | null;
   paymentTerms: string | null;
   customerNote: string | null;
-  placeOrderRemark: string | null;
-  placeComment: string | null;
   termsAndConditions: string | null;
   companyName: string | null;
   companyAddress: string | null;
@@ -1490,9 +1460,6 @@ function buildProformaDocument(data: {
     pageMargins: [40, 140, 40, 80],
     header,
     content: [
-      // Intro text
-      { text: 'With reference to our correspondence, we are pleased to confirm to you the following:', margin: [0, 16, 0, 16] } as Content,
-
       // Vessel / Delivery info (single-column stack)
       {
         stack: [
@@ -1546,8 +1513,6 @@ function buildProformaDocument(data: {
       // Notes
       ...buildNotesSection({
         customerNote: data.customerNote,
-        placeOrderRemark: data.placeOrderRemark,
-        placeComment: data.placeComment,
         termsAndConditions: data.termsAndConditions,
         itemNotes: data.itemNotes,
       }),
@@ -1708,13 +1673,6 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
   const companyLogoDataUrl = tryLoadLogoDataUrl(order.invoicingCompany?.logoUrl ?? null);
   const bank = await loadOrderBankDetails(order.bankAccountId, order.invoicingCompanyId);
 
-  const [latestPlaceComment] = await db
-    .select({ content: entityComments.content })
-    .from(entityComments)
-    .where(and(eq(entityComments.entityType, 'place'), eq(entityComments.entityId, order.placeId)))
-    .orderBy(desc(entityComments.createdAt))
-    .limit(1);
-
   const paymentTerms = formatCustomerPaymentTerms(
     order.customerPaymentTermType,
     order.customerCreditDays,
@@ -1741,8 +1699,6 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
     fromPhone: order.salesRep?.phone ?? null,
     paymentTerms,
     customerNote: order.customerNote ?? null,
-    placeOrderRemark: order.place?.orderRemark ?? null,
-    placeComment: latestPlaceComment?.content ?? null,
     termsAndConditions: order.termsAndConditions ?? null,
     companyName: order.invoicingCompany?.name ?? null,
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
