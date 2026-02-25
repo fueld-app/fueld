@@ -17,8 +17,8 @@ export const authGuard: CanActivateFn = (route, state) => {
   }
 
   // Enforce MFA setup when required (skip check on the setup page itself)
-  if (authService.mfaSetupRequired() && !state.url.startsWith('/account/security')) {
-    return router.createUrlTree(['/account/security']);
+  if (authService.mfaSetupRequired() && !state.url.startsWith('/account/settings')) {
+    return router.createUrlTree(['/account/settings']);
   }
 
   return true;

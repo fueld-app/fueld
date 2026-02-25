@@ -195,7 +195,7 @@ export class InviteSignupPageComponent implements OnInit {
     try {
       await this.auth.acceptInvite(this.token, this.password);
       this.success.set(true);
-      await this.router.navigate(['/account/security']);
+      await this.router.navigate(['/account/settings']);
     } catch (err: any) {
       const msg = err instanceof Error ? err.message : err?.error?.message;
       this.error.set(msg || 'Failed to create account');

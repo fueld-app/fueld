@@ -235,7 +235,7 @@ export class LoginPageComponent {
       }
 
       if (result.requiresMfaSetup) {
-        await this.router.navigate(['/account/security'], {
+        await this.router.navigate(['/account/settings'], {
           state: { returnUrl: this.returnUrl },
         });
         return;
