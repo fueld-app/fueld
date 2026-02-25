@@ -218,6 +218,13 @@
       "when": 1772023200000,
       "tag": "0030_orders_schema_backfill",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1772024100000,
+      "tag": "0031_order_items_schema_backfill",
+      "breakpoints": true
     }
   ]
 }
