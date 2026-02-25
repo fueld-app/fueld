@@ -3,7 +3,7 @@ DO $$ BEGIN
   CREATE TYPE rfq_status AS ENUM ('PENDING', 'ACCEPTED', 'DISMISSED');
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
-
+--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS incoming_rfqs (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   tenant_id uuid NOT NULL REFERENCES tenants(id),
