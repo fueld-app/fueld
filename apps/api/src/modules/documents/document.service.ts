@@ -14,7 +14,7 @@ import { bankAccounts, orders, orderItems, counterparties, vessels, places, invo
 
 const require = createRequire(import.meta.url);
 
-function resolvePdfmakeFontFile(fileName: string): string {
+function resolvePdfmakeFontFile(fileName: string): string | null {
   const candidates: string[] = [];
 
   try {
@@ -27,18 +27,31 @@ function resolvePdfmakeFontFile(fileName: string): string {
 
   candidates.push(join(process.cwd(), 'node_modules', 'pdfmake', 'fonts', 'Roboto', fileName));
 
-  const existing = candidates.find((path) => existsSync(path));
-  return existing ?? candidates[0] ?? `node_modules/pdfmake/fonts/Roboto/${fileName}`;
+  return candidates.find((path) => existsSync(path)) ?? null;
 }
+
+const robotoRegular = resolvePdfmakeFontFile('Roboto-Regular.ttf');
+const robotoMedium = resolvePdfmakeFontFile('Roboto-Medium.ttf');
+const robotoItalic = resolvePdfmakeFontFile('Roboto-Italic.ttf');
+const robotoMediumItalic = resolvePdfmakeFontFile('Roboto-MediumItalic.ttf');
+
+const hasRobotoFonts = Boolean(robotoRegular && robotoMedium && robotoItalic && robotoMediumItalic);
 
 // Configure fonts (server-side: use built-in Roboto shipped with pdfmake)
 pdfmake.setFonts({
-  Roboto: {
-    normal: resolvePdfmakeFontFile('Roboto-Regular.ttf'),
-    bold: resolvePdfmakeFontFile('Roboto-Medium.ttf'),
-    italics: resolvePdfmakeFontFile('Roboto-Italic.ttf'),
-    bolditalics: resolvePdfmakeFontFile('Roboto-MediumItalic.ttf'),
-  },
+  Roboto: hasRobotoFonts
+    ? {
+        normal: robotoRegular!,
+        bold: robotoMedium!,
+        italics: robotoItalic!,
+        bolditalics: robotoMediumItalic!,
+      }
+    : {
+        normal: 'Helvetica',
+        bold: 'Helvetica-Bold',
+        italics: 'Helvetica-Oblique',
+        bolditalics: 'Helvetica-BoldOblique',
+      },
 });
 
 // ─── Bank details (configurable per tenant in a real system) ─────────
