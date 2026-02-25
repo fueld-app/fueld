@@ -1482,9 +1482,7 @@ function buildProformaDocument(data: {
       // Notes
       ...buildNotesSection({
         customerNote: data.customerNote,
-        termsAndConditions: data.termsAndConditions,
         itemNotes: data.itemNotes,
-        placeRemark: data.placeRemark,
       }),
 
       // ── Remittance Instructions ──
