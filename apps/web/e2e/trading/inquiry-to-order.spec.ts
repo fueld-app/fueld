@@ -85,10 +85,8 @@ test('create inquiry, view PDFs, convert to order, add item, view order PDFs', a
     }
   });
 
-  // Pick first product option for the new row.
   await productInput.click();
   await page.getByRole('listbox').getByRole('option').first().click();
-
   await page.locator('app-order-items input[placeholder="e.g. local specs"]').first().fill('E2E item');
   await page.locator('app-order-items input[placeholder="Qty"]').first().fill('100');
 
@@ -106,7 +104,7 @@ test('create inquiry, view PDFs, convert to order, add item, view order PDFs', a
   {
     const pdf = waitForPdfResponse(page, '/proforma/pdf');
     await page.getByRole('button', { name: 'Actions' }).click();
-    await page.getByRole('menuitem', { name: 'View Nomination' }).click();
+    await page.getByRole('menuitem', { name: 'View Proforma Invoice' }).click();
     await pdf;
     await closePdfPreviewIfOpen(page);
   }

@@ -1,5 +1,5 @@
 import { describe, it, beforeEach, expect } from 'bun:test';
-import { orders, orderItems, invoices } from '../src/db/schema';
+import { orders, orderItems, invoices, tenants } from '../src/db/schema';
 import { eq } from 'drizzle-orm';
 import { getDb, seedBasics, truncateAll } from './helpers/db';
 
@@ -122,6 +122,44 @@ describe('orders: inquiries flow', () => {
 
     const resolved = await resolveOrderId(created.orderNumber!);
     expect(resolved).toBe(created.id);
+  });
+
+  it('keeps order numbers unique when tenant template omits SEQ token', async () => {
+    const { tenant, client, vessel, place, user } = await seedBasics();
+    const { createOrder } = await loadOrdersService();
+    const db = await getDb();
+
+    await db
+      .update(tenants)
+      .set({
+        settings: {
+          orderNumberTemplate: '{PREFIX}{YYYY}{MM}{DD}',
+          orderNumberPrefix: 'RIV-',
+        },
+      })
+      .where(eq(tenants.id, tenant.id));
+
+    const first = await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+    });
+
+    const second = await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+    });
+
+    expect(first.orderNumber).toBeTruthy();
+    expect(second.orderNumber).toBeTruthy();
+    expect(first.orderNumber).not.toBe(second.orderNumber);
+    expect(first.orderNumber).toContain('RIV-');
+    expect(second.orderNumber).toContain('RIV-');
   });
 
   it('sets closedAt when cancelling an inquiry', async () => {

@@ -100,6 +100,17 @@ interface SaveItemInput {
   customerNote?: string | null;
   deliveredQuantity?: string | null;
 }
+
+function normalizeOrderNumberTemplate(template: string): string {
+  const trimmed = template.trim();
+  if (!trimmed) return '{YYYY}{MM}{DD}-{SEQ:6}';
+
+  const hasSeqToken = /\{SEQ(?::\d+)?\}/.test(trimmed);
+  if (hasSeqToken) return trimmed;
+
+  return `${trimmed}-{SEQ:6}`;
+}
+
 // ─── Generate next order number ───────────────────────────────────────
 
 async function generateOrderNumber(tenantId: string): Promise<string> {
@@ -124,7 +135,9 @@ async function generateOrderNumber(tenantId: string): Promise<string> {
   });
   const settings = (tenant?.settings ?? {}) as TenantSettings;
   const prefix = settings.orderNumberPrefix ?? '';
-  const template = settings.orderNumberTemplate ?? '{YYYY}{MM}{DD}-{SEQ:6}';
+  const template = normalizeOrderNumberTemplate(
+    settings.orderNumberTemplate ?? '{YYYY}{MM}{DD}-{SEQ:6}',
+  );
 
   // Use UTC/GMT date
   const now = new Date();

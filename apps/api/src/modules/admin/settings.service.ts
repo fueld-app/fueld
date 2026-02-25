@@ -590,13 +590,24 @@ export interface OrderNumberSettingsDto {
   preview: string;
 }
 
+function normalizeOrderNumberTemplate(template: string): string {
+  const trimmed = template.trim();
+  if (!trimmed) return '{YYYY}{MM}{DD}-{SEQ:6}';
+
+  const hasSeqToken = /\{SEQ(?::\d+)?\}/.test(trimmed);
+  if (hasSeqToken) return trimmed;
+
+  return `${trimmed}-{SEQ:6}`;
+}
+
 function generatePreview(template: string, prefix: string, seq: number): string {
+  const normalizedTemplate = normalizeOrderNumberTemplate(template);
   const now = new Date();
   const yyyy = now.getUTCFullYear().toString();
   const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
   const dd = String(now.getUTCDate()).padStart(2, '0');
 
-  let result = template
+  let result = normalizedTemplate
     .replace('{PREFIX}', prefix)
     .replace('{YYYY}', yyyy)
     .replace('{MM}', mm)
@@ -615,7 +626,9 @@ export async function getOrderNumberSettings(): Promise<OrderNumberSettingsDto> 
   if (!tenant) throw new Error('No tenant found');
 
   const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
-  const template = settings.orderNumberTemplate ?? '{YYYY}{MM}{DD}-{SEQ:6}';
+  const template = normalizeOrderNumberTemplate(
+    settings.orderNumberTemplate ?? '{YYYY}{MM}{DD}-{SEQ:6}',
+  );
   const prefix = settings.orderNumberPrefix ?? '';
 
   // Get current sequence
@@ -642,7 +655,9 @@ export async function updateOrderNumberSettings(data: {
   if (!tenant) throw new Error('No tenant found');
 
   const settings = { ...(tenant.settings as any) };
-  if (data.template !== undefined) settings.orderNumberTemplate = data.template;
+  if (data.template !== undefined) {
+    settings.orderNumberTemplate = normalizeOrderNumberTemplate(data.template);
+  }
   if (data.prefix !== undefined) settings.orderNumberPrefix = data.prefix;
 
   await db
@@ -844,4 +859,23 @@ export async function updateWhatsAppSettings(data: { enabled?: boolean; defaultG
     .where(eq(tenants.id, tenant.id));
 
   return getWhatsAppSettings();
+}
+
+/**
+ * Fetch terms for a selected company.
+ * @param companyId - The ID of the selected company.
+ * @returns An object containing customer and supplier terms.
+ */
+export async function getCompanyTerms(companyId: string): Promise<{ customerTerms: string | null; supplierTerms: string | null }> {
+  const companies = await listOwnCompanies();
+  const selectedCompany = companies.find((company) => company.id === companyId);
+
+  if (!selectedCompany) {
+    throw new Error(`Company with ID ${companyId} not found.`);
+  }
+
+  return {
+    customerTerms: selectedCompany.customerTerms,
+    supplierTerms: selectedCompany.supplierTerms,
+  };
 }
