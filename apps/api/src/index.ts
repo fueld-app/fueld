@@ -91,24 +91,24 @@ async function runPendingMigrations() {
     entries: Array<{ tag: string }>;
   };
 
-  // Bootstrap: if _applied_migrations is empty but __drizzle_migrations has
-  // entries, mark the first N journal entries as applied (drizzle stores a
-  // content hash, not the tag, so we match by count/order instead).
-  const existingCount = (await db.execute(sql`SELECT count(*)::int AS c FROM _applied_migrations`)) as Array<{ c: number }>;
-  if ((existingCount[0]?.c ?? 0) === 0) {
-    try {
-      const drizzleCount = (await db.execute(
-        sql`SELECT count(*)::int AS c FROM "__drizzle_migrations"`,
-      )) as Array<{ c: number }>;
-      const n = drizzleCount[0]?.c ?? 0;
-      if (n > 0 && n <= journal.entries.length) {
-        console.log(`  ↳ Bootstrapping: marking first ${n} migrations as applied (from __drizzle_migrations)…`);
-        for (let i = 0; i < n; i++) {
-          await db.execute(sql`INSERT INTO _applied_migrations (tag) VALUES (${journal.entries[i].tag}) ON CONFLICT DO NOTHING`);
-        }
-      }
-    } catch {
-      // __drizzle_migrations table doesn't exist — that's fine
+  // ── Bootstrap detection ──────────────────────────────────────────
+  // If _applied_migrations is empty, check whether the database already
+  // has tables (i.e. it was previously migrated by drizzle's built-in
+  // migrate() which uses a separate tracking table).  In that case we
+  // enter "bootstrap mode": every statement error is tolerated and each
+  // migration is recorded, so that subsequent starts use the normal
+  // strict path.
+  const appliedCount = (await db.execute(sql`SELECT count(*)::int AS c FROM _applied_migrations`)) as Array<{ c: number }>;
+  let bootstrapMode = false;
+  if ((appliedCount[0]?.c ?? 0) === 0) {
+    const tableCheck = (await db.execute(sql`
+      SELECT count(*)::int AS c
+      FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'users'
+    `)) as Array<{ c: number }>;
+    if ((tableCheck[0]?.c ?? 0) > 0) {
+      bootstrapMode = true;
+      console.log('  ↳ Detected existing database with empty migration tracker — entering bootstrap mode…');
     }
   }
 
@@ -135,15 +135,9 @@ async function runPendingMigrations() {
         await db.execute(sql.raw(stmt));
       } catch (e: any) {
         // Detect "already exists" / duplicate-object errors robustly.
-        // postgres-js may put the PG error message in different properties
-        // depending on version and whether drizzle wraps it.  Stringify
-        // the entire error so we never miss it.
         const allText = [
-          e?.message,
-          e?.detail,
-          e?.code,
-          e?.cause?.message,
-          e?.cause?.code,
+          e?.message, e?.detail, e?.code,
+          e?.cause?.message, e?.cause?.code,
           String(e),
         ].filter(Boolean).join(' ');
 
@@ -155,6 +149,11 @@ async function runPendingMigrations() {
 
         if (isDuplicate) {
           console.log(`  ↳ skipped (already exists): ${stmt.slice(0, 80)}…`);
+        } else if (bootstrapMode) {
+          // During bootstrap of an existing DB, tolerate ALL errors.
+          // Old migrations can reference columns/types that later
+          // migrations removed — that's expected.
+          console.log(`  ↳ skipped (bootstrap): ${stmt.slice(0, 80)}…`);
         } else {
           console.error(`❌ Migration ${entry.tag} failed on statement:\n  ${stmt.slice(0, 120)}`);
           console.error('  Error details:', JSON.stringify({
