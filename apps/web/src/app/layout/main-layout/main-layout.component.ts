@@ -162,7 +162,7 @@ const NAVIGATION: NavItem[] = [
               [routerLink]="item.route"
               routerLinkActive="bg-sidebar-active text-sidebar-text-active"
               [routerLinkActiveOptions]="{ exact: item.route === '/' }"
-              class="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-text transition-colors hover:bg-sidebar-hover hover:text-sidebar-text-active"
+              class="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-text transition-colors hover:bg-sidebar-hover hover:text-sidebar-text-active focus-visible:outline-none"
               (click)="closeSidebar()"
             >
               <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
@@ -175,7 +175,7 @@ const NAVIGATION: NavItem[] = [
             <div>
               <button
                 (click)="toggleGroup(item.label)"
-                class="group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-text transition-colors hover:bg-sidebar-hover hover:text-sidebar-text-active"
+                class="group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-text transition-colors hover:bg-sidebar-hover hover:text-sidebar-text-active focus-visible:outline-none"
                 [attr.aria-expanded]="isGroupOpen(item.label)"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
@@ -200,7 +200,7 @@ const NAVIGATION: NavItem[] = [
                     <a
                       [routerLink]="child.route"
                       routerLinkActive="text-sidebar-text-active bg-sidebar-active"
-                      class="block rounded-md px-3 py-2 text-sm text-sidebar-text transition-colors hover:bg-sidebar-hover hover:text-sidebar-text-active"
+                      class="block rounded-md px-3 py-2 text-sm text-sidebar-text transition-colors hover:bg-sidebar-hover hover:text-sidebar-text-active focus-visible:outline-none"
                       (click)="closeSidebar()"
                     >
                       {{ child.label }}

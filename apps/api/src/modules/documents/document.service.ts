@@ -377,6 +377,7 @@ function buildInvoiceDocument(data: {
   vatNumber: string | null;
   fraudPreventionText: string | null;
   verifyUrl?: string | null;
+  verifyLink?: string | null;
   companyLogoDataUrl: string | null;
   companyAddress: string | null;
   companyPhone: string | null;
@@ -612,8 +613,11 @@ function buildInvoiceDocument(data: {
             {
               width: 'auto',
               stack: [
-                { image: data.verifyUrl, fit: [80, 80], alignment: 'center' } as Content,
-                { text: 'Scan to verify', fontSize: 7, color: '#6b7280', alignment: 'center', margin: [0, 4, 0, 0] } as Content,
+                { image: data.verifyUrl, fit: [80, 80], alignment: 'center', link: data.verifyLink ?? undefined } as Content,
+                { text: 'Scan or click to verify', fontSize: 7, color: '#1a56db', alignment: 'center', margin: [0, 4, 0, 0], link: data.verifyLink ?? undefined } as Content,
+                ...(data.verifyLink ? [
+                  { text: `Verify domain: ${new URL(data.verifyLink).hostname}`, fontSize: 6, color: '#6b7280', alignment: 'center', margin: [0, 2, 0, 0] } as Content,
+                ] : []),
               ],
             },
             { width: '*', text: '' },
@@ -744,6 +748,7 @@ export async function generateInvoicePdfBuffer(invoiceId: string): Promise<Buffe
     vatNumber: order.invoicingCompany?.vatNumber ?? null,
     fraudPreventionText: order.invoicingCompany?.fraudPreventionText ?? null,
     verifyUrl,
+    verifyLink,
     companyLogoDataUrl,
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
     companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
@@ -823,6 +828,7 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
     vatNumber: order.invoicingCompany?.vatNumber ?? null,
     fraudPreventionText: order.invoicingCompany?.fraudPreventionText ?? null,
     verifyUrl,
+    verifyLink,
     companyLogoDataUrl,
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
     companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
@@ -1296,6 +1302,8 @@ function buildProformaDocument(data: {
   }>;
   createdAt: Date;
   verifyUrl?: string | null;
+  verifyLink?: string | null;
+  fraudPreventionText?: string | null;
 }): TDocumentDefinitions {
   // ── Prepare data ──────────────────────────────────────────────────
   const refNum = data.orderNumber ?? 'DRAFT';
@@ -1511,6 +1519,13 @@ function buildProformaDocument(data: {
         supplierTerms: null,
       }),
 
+      // ── Fraud Prevention ──
+      ...(data.fraudPreventionText ? [
+        { text: '', margin: [0, 10, 0, 0] } as Content,
+        { text: 'FRAUD PREVENTION', fontSize: 9, bold: true, margin: [0, 0, 0, 4] } as Content,
+        { text: data.fraudPreventionText, fontSize: 8, color: '#374151', margin: [0, 0, 0, 0] } as Content,
+      ] : []),
+
       // Sign-off (with optional QR code on the right)
       { text: '', margin: [0, 20, 0, 0] } as Content,
       ...(data.verifyUrl ? [{
@@ -1535,8 +1550,11 @@ function buildProformaDocument(data: {
           {
             width: 'auto',
             stack: [
-              { image: data.verifyUrl, fit: [80, 80], alignment: 'right' } as Content,
-              { text: 'Scan to verify', fontSize: 7, color: '#6b7280', alignment: 'center', margin: [0, 4, 0, 0] } as Content,
+              { image: data.verifyUrl, fit: [80, 80], alignment: 'right', link: data.verifyLink ?? undefined } as Content,
+              { text: 'Scan or click to verify', fontSize: 7, color: '#1a56db', alignment: 'center', margin: [0, 4, 0, 0], link: data.verifyLink ?? undefined } as Content,
+              ...(data.verifyLink ? [
+                { text: `Verify domain: ${new URL(data.verifyLink).hostname}`, fontSize: 6, color: '#6b7280', alignment: 'center', margin: [0, 2, 0, 0] } as Content,
+              ] : []),
             ],
           },
         ],
@@ -1635,6 +1653,8 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
     })),
     createdAt: new Date(),
     verifyUrl: null as string | null,
+    verifyLink: null as string | null,
+    fraudPreventionText: order.invoicingCompany?.fraudPreventionText ?? null,
   };
 
   // Generate QR code verification URL
@@ -1642,6 +1662,7 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
   const verifyLink = `${appUrl}/verify/${orderId}/proforma-invoice`;
   try {
     docData.verifyUrl = await QRCode.toDataURL(verifyLink, { width: 160, margin: 1 });
+    docData.verifyLink = verifyLink;
   } catch { /* QR generation failed — continue without */ }
 
   const docDefinition = buildProformaDocument(docData);
