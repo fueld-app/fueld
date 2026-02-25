@@ -2,7 +2,8 @@ import pdfmake from 'pdfmake';
 import type { TDocumentDefinitions, Content, TableCell } from 'pdfmake/interfaces';
 import { and, desc, eq } from 'drizzle-orm';
 import { existsSync, readFileSync } from 'node:fs';
-import { basename, extname, join } from 'node:path';
+import { basename, dirname, extname, join } from 'node:path';
+import { createRequire } from 'node:module';
 import QRCode from 'qrcode';
 import { db } from '../../db';
 import { bankAccounts, orders, orderItems, counterparties, vessels, places, invoices, users } from '../../db/schema';
@@ -11,13 +12,32 @@ import { bankAccounts, orders, orderItems, counterparties, vessels, places, invo
 //  Document Service — Server-side PDF generation (pdfmake v0.3)
 // ═══════════════════════════════════════════════════════════════════════
 
+const require = createRequire(import.meta.url);
+
+function resolvePdfmakeFontFile(fileName: string): string {
+  const candidates: string[] = [];
+
+  try {
+    const packageJsonPath = require.resolve('pdfmake/package.json');
+    const packageRoot = dirname(packageJsonPath);
+    candidates.push(join(packageRoot, 'fonts', 'Roboto', fileName));
+  } catch {
+    // noop
+  }
+
+  candidates.push(join(process.cwd(), 'node_modules', 'pdfmake', 'fonts', 'Roboto', fileName));
+
+  const existing = candidates.find((path) => existsSync(path));
+  return existing ?? candidates[0] ?? `node_modules/pdfmake/fonts/Roboto/${fileName}`;
+}
+
 // Configure fonts (server-side: use built-in Roboto shipped with pdfmake)
 pdfmake.setFonts({
   Roboto: {
-    normal: 'node_modules/pdfmake/fonts/Roboto/Roboto-Regular.ttf',
-    bold: 'node_modules/pdfmake/fonts/Roboto/Roboto-Medium.ttf',
-    italics: 'node_modules/pdfmake/fonts/Roboto/Roboto-Italic.ttf',
-    bolditalics: 'node_modules/pdfmake/fonts/Roboto/Roboto-MediumItalic.ttf',
+    normal: resolvePdfmakeFontFile('Roboto-Regular.ttf'),
+    bold: resolvePdfmakeFontFile('Roboto-Medium.ttf'),
+    italics: resolvePdfmakeFontFile('Roboto-Italic.ttf'),
+    bolditalics: resolvePdfmakeFontFile('Roboto-MediumItalic.ttf'),
   },
 });
 
