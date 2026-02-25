@@ -203,6 +203,7 @@ export const whatsappSessions = pgTable('whatsapp_sessions', {
   creds: jsonb('creds'),                       // Baileys AuthenticationCreds
   syncedAt: timestamp('synced_at', { withTimezone: true }),
   phoneNumber: text('phone_number'),            // Linked phone number (for display)
+  defaultGroupJid: text('default_group_jid'),   // Default WA group for auto-sharing (e.g. trader RFQ group)
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -1019,6 +1020,49 @@ export const bankAccountsRelations = relations(bankAccounts, ({ one }) => ({
 }));
 
 // ═══════════════════════════════════════════════════════════════════════
+//  INCOMING RFQs (parsed from WhatsApp DMs or manual paste)
+// ═══════════════════════════════════════════════════════════════════════
+
+export const rfqStatusEnum = pgEnum('rfq_status', [
+  'PENDING',     // awaiting review
+  'ACCEPTED',    // converted to inquiry
+  'DISMISSED',   // trader dismissed it
+]);
+
+export const incomingRfqs = pgTable('incoming_rfqs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  userId: uuid('user_id').notNull().references(() => users.id),
+
+  // Source info
+  source: text('source').notNull().default('whatsapp'),    // 'whatsapp' | 'manual'
+  senderPhone: text('sender_phone'),
+  senderName: text('sender_name'),
+  rawText: text('raw_text').notNull(),
+
+  // Parsed fields
+  vesselName: text('vessel_name'),
+  imo: text('imo'),
+  port: text('port'),
+  products: jsonb('products').$type<Array<{ name: string; quantity: number | null; unit: string }>>().default([]),
+  eta: timestamp('eta', { withTimezone: true }),
+  confidence: doublePrecision('confidence').notNull().default(0),
+
+  // Workflow
+  status: rfqStatusEnum('status').notNull().default('PENDING'),
+  orderId: uuid('order_id').references(() => orders.id),     // set when converted to inquiry
+
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const incomingRfqsRelations = relations(incomingRfqs, ({ one }) => ({
+  tenant: one(tenants, { fields: [incomingRfqs.tenantId], references: [tenants.id] }),
+  user: one(users, { fields: [incomingRfqs.userId], references: [users.id] }),
+  order: one(orders, { fields: [incomingRfqs.orderId], references: [orders.id] }),
+}));
+
+// ═══════════════════════════════════════════════════════════════════════
 //  TYPE INFERENCE HELPERS
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -1084,3 +1128,6 @@ export type NewEntityComment = typeof entityComments.$inferInsert;
 
 export type BankAccount = typeof bankAccounts.$inferSelect;
 export type NewBankAccount = typeof bankAccounts.$inferInsert;
+
+export type IncomingRfq = typeof incomingRfqs.$inferSelect;
+export type NewIncomingRfq = typeof incomingRfqs.$inferInsert;

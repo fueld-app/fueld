@@ -42,6 +42,7 @@ import { users } from './db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { pushController } from './modules/push/push.controller';
 import { whatsappController } from './modules/whatsapp/whatsapp.controller';
+import { rfqController } from './modules/rfq/rfq.controller';
 import { reconnectStoredSessions as reconnectWhatsAppSessions } from './modules/whatsapp/whatsapp.service';
 
 function resolveMigrationsDir(): string {
@@ -238,6 +239,7 @@ export async function createApp(options: CreateAppOptions = {}) {
     .use(securityController)
     .use(pushController)
     .use(whatsappController)
+    .use(rfqController)
     .get('/uploads/avatars/:filename', async ({ params, set }) => {
       const { join } = await import('path');
       const path = join(import.meta.dir, '../uploads/avatars', params.filename);

@@ -12,7 +12,7 @@ import {
   OnDestroy,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { DecimalPipe } from '@angular/common';
+import { DecimalPipe, DatePipe } from '@angular/common';
 import { Router, RouterOutlet, RouterLink, RouterLinkActive, NavigationEnd } from '@angular/router';
 import { firstValueFrom, Subscription, filter } from 'rxjs';
 import { Title } from '@angular/platform-browser';
@@ -122,7 +122,7 @@ const NAVIGATION: NavItem[] = [
 @Component({
   selector: 'app-main-layout',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, UserMenuComponent, DecimalPipe],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, UserMenuComponent, DecimalPipe, DatePipe],
   template: `
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <!--  Mobile Overlay Backdrop                                       -->
@@ -385,14 +385,20 @@ const NAVIGATION: NavItem[] = [
             <span class="hidden sm:inline">New Inquiry</span>
           </button>
 
-          <!-- Notifications bell -->
+          <!-- Notifications bell (RFQ inbox) -->
           <button
-            class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
-            aria-label="Notifications"
+            (click)="toggleRfqPanel()"
+            class="relative rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+            aria-label="Incoming RFQs"
           >
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
             </svg>
+            @if (pendingRfqs().length > 0) {
+              <span class="absolute -top-0.5 -right-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                {{ pendingRfqs().length }}
+              </span>
+            }
           </button>
 
           <!-- User menu -->
@@ -405,12 +411,175 @@ const NAVIGATION: NavItem[] = [
         <router-outlet />
       </main>
     </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!--  RFQ Slide-out Panel (right edge)                              -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    @if (rfqPanelOpen()) {
+      <div class="fixed inset-0 z-[60] bg-black/30 backdrop-blur-sm" (click)="closeRfqPanel()"></div>
+      <aside class="fixed inset-y-0 right-0 z-[61] w-full max-w-md bg-white shadow-xl flex flex-col animate-slide-in-right">
+        <!-- Header -->
+        <div class="flex items-center justify-between border-b px-5 py-4">
+          <h2 class="text-lg font-semibold text-gray-900">Incoming RFQs</h2>
+          <div class="flex items-center gap-2">
+            <button (click)="openPasteModal()" class="text-xs font-medium text-brand-600 hover:text-brand-700">+ Paste RFQ</button>
+            <button (click)="closeRfqPanel()" class="rounded p-1 text-gray-400 hover:text-gray-600">
+              <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- RFQ list -->
+        <div class="flex-1 overflow-y-auto divide-y divide-gray-100">
+          @if (rfqLoading()) {
+            <div class="flex items-center justify-center p-8 text-gray-400">
+              <svg class="h-5 w-5 animate-spin mr-2" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+              Loading…
+            </div>
+          } @else if (pendingRfqs().length === 0) {
+            <div class="flex flex-col items-center justify-center p-10 text-gray-400">
+              <svg class="h-12 w-12 mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
+              <p class="text-sm font-medium">No pending RFQs</p>
+              <p class="text-xs mt-1">Incoming WhatsApp messages with bunker requests will appear here.</p>
+            </div>
+          } @else {
+            @for (rfq of pendingRfqs(); track rfq.id) {
+              <div class="px-5 py-4 hover:bg-gray-50 transition-colors">
+                <!-- Sender + confidence -->
+                <div class="flex items-center justify-between mb-2">
+                  <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center justify-center h-7 w-7 rounded-full bg-green-100 text-green-700 text-xs font-bold">
+                      {{ (rfq.senderName || rfq.senderPhone || '?')[0].toUpperCase() }}
+                    </span>
+                    <div>
+                      <div class="text-sm font-medium text-gray-900">{{ rfq.senderName || 'Unknown' }}</div>
+                      <div class="text-xs text-gray-500">+{{ rfq.senderPhone }}</div>
+                    </div>
+                  </div>
+                  <span class="text-xs px-1.5 py-0.5 rounded-full"
+                    [class]="rfq.confidence > 0.6 ? 'bg-green-100 text-green-700' : rfq.confidence > 0.4 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-500'">
+                    {{ (rfq.confidence * 100).toFixed(0) }}%
+                  </span>
+                </div>
+
+                <!-- Parsed fields -->
+                <div class="space-y-1 mb-3">
+                  @if (rfq.vesselName) {
+                    <div class="flex items-center gap-1.5 text-sm">
+                      <span class="text-gray-400 w-4 text-center">🚢</span>
+                      <span class="font-medium text-gray-800">{{ rfq.vesselName }}</span>
+                      @if (rfq.imo) { <span class="text-xs text-gray-400">IMO {{ rfq.imo }}</span> }
+                    </div>
+                  }
+                  @if (rfq.port) {
+                    <div class="flex items-center gap-1.5 text-sm">
+                      <span class="text-gray-400 w-4 text-center">📍</span>
+                      <span class="text-gray-700">{{ rfq.port }}</span>
+                    </div>
+                  }
+                  @if (rfq.products?.length) {
+                    <div class="flex items-center gap-1.5 text-sm">
+                      <span class="text-gray-400 w-4 text-center">⛽</span>
+                      <span class="text-gray-700">
+                        @for (p of rfq.products; track p.name; let last = $last) {
+                          {{ p.name }}{{ p.quantity ? ' ' + p.quantity + ' ' + p.unit : '' }}{{ last ? '' : ', ' }}
+                        }
+                      </span>
+                    </div>
+                  }
+                  @if (rfq.eta) {
+                    <div class="flex items-center gap-1.5 text-sm">
+                      <span class="text-gray-400 w-4 text-center">📅</span>
+                      <span class="text-gray-700">{{ rfq.eta | date:'mediumDate' }}</span>
+                    </div>
+                  }
+                </div>
+
+                <!-- Raw text (truncated) -->
+                <div class="text-xs text-gray-500 bg-gray-50 rounded p-2 mb-3 whitespace-pre-wrap line-clamp-3">{{ rfq.rawText }}</div>
+
+                <!-- Actions -->
+                <div class="flex gap-2">
+                  <button
+                    (click)="createInquiryFromRfq(rfq)"
+                    class="flex-1 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-700 transition-colors"
+                  >
+                    Create Inquiry
+                  </button>
+                  <button
+                    (click)="dismissRfqItem(rfq.id)"
+                    class="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            }
+          }
+        </div>
+      </aside>
+    }
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!--  Paste RFQ Modal                                               -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    @if (pasteModalOpen()) {
+      <div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-sm" (click)="closePasteModal()">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4" (click)="$event.stopPropagation()">
+          <div class="flex items-center justify-between px-6 py-4 border-b">
+            <h3 class="text-base font-semibold text-gray-900">Paste RFQ</h3>
+            <button (click)="closePasteModal()" class="text-gray-400 hover:text-gray-600">
+              <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+            </button>
+          </div>
+          <div class="px-6 py-5">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Paste the RFQ message below</label>
+            <textarea
+              #pasteInput
+              class="w-full h-44 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 placeholder-gray-400 resize-none"
+              placeholder="MV Pacific Voyager&#10;IMO 9876543&#10;Fujairah Anchorage&#10;VLSFO 500 MT&#10;LSMGO 100 MT&#10;ETA 15/01/2025"
+              [value]="pasteText()"
+              (input)="pasteText.set($any($event.target).value)"
+            ></textarea>
+            @if (pasteError()) {
+              <p class="text-xs text-red-500 mt-2">{{ pasteError() }}</p>
+            }
+          </div>
+          <div class="flex justify-end gap-3 px-6 py-4 bg-gray-50 rounded-b-xl">
+            <button (click)="closePasteModal()" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100">Cancel</button>
+            <button
+              (click)="submitPastedRfq()"
+              [disabled]="pasteSubmitting()"
+              class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 disabled:opacity-50 transition-colors"
+            >
+              @if (pasteSubmitting()) {
+                <svg class="inline h-4 w-4 animate-spin mr-1" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+              }
+              Parse & Add
+            </button>
+          </div>
+        </div>
+      </div>
+    }
   `,
   styles: `
     :host {
       display: block;
       min-height: 100vh;
       min-height: 100dvh;
+    }
+    @keyframes slide-in-right {
+      from { transform: translateX(100%); }
+      to { transform: translateX(0); }
+    }
+    .animate-slide-in-right {
+      animation: slide-in-right 0.25s ease-out;
+    }
+    .line-clamp-3 {
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
     }
   `,
 })
@@ -423,6 +592,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   private readonly updateService = inject(AppUpdateService);
   private routerSub: Subscription | null = null;
   private priceSub: Subscription | null = null;
+  private rfqSub: Subscription | null = null;
   private copyHandler: ((e: ClipboardEvent) => void) | null = null;
   private printHandler: (() => void) | null = null;
   private screenshotHandler: ((e: KeyboardEvent) => void) | null = null;
@@ -436,6 +606,15 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   readonly showUpdateToast = computed(() =>
     this.updateService.updateAvailable() && !this.updateDismissed(),
   );
+
+  // ─── RFQ panel ──────────────────────────────────────────────────
+  readonly rfqPanelOpen = signal(false);
+  readonly rfqLoading = signal(false);
+  readonly pendingRfqs = signal<any[]>([]);
+  readonly pasteModalOpen = signal(false);
+  readonly pasteText = signal('');
+  readonly pasteError = signal<string | null>(null);
+  readonly pasteSubmitting = signal(false);
 
   private readonly updateReset = effect(() => {
     if (this.updateService.updateAvailable()) {
@@ -514,11 +693,22 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
       }
     };
     document.addEventListener('keydown', this.screenshotHandler as EventListener);
+
+    // Subscribe to incoming RFQ notifications
+    this.rfqSub = this.wsService
+      .on<any>('rfq:new')
+      .subscribe((data) => {
+        this.pendingRfqs.update((list) => [data, ...list]);
+      });
+
+    // Load pending RFQs on startup
+    this.loadPendingRfqs();
   }
 
   ngOnDestroy(): void {
     this.routerSub?.unsubscribe();
     this.priceSub?.unsubscribe();
+    this.rfqSub?.unsubscribe();
     if (this.copyHandler) {
       document.removeEventListener('copy', this.copyHandler as EventListener);
     }
@@ -761,5 +951,95 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
   isGroupOpen(label: string): boolean {
     return this.openGroups().has(label);
+  }
+
+  // ─── RFQ panel methods ──────────────────────────────────────────
+
+  toggleRfqPanel(): void {
+    const opening = !this.rfqPanelOpen();
+    this.rfqPanelOpen.set(opening);
+    if (opening) this.loadPendingRfqs();
+  }
+
+  closeRfqPanel(): void {
+    this.rfqPanelOpen.set(false);
+  }
+
+  async loadPendingRfqs(): Promise<void> {
+    this.rfqLoading.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<any[]>>(`${API}/rfqs`),
+      );
+      if (res.success && res.data) {
+        this.pendingRfqs.set(res.data);
+      }
+    } catch { /* ignore */ } finally {
+      this.rfqLoading.set(false);
+    }
+  }
+
+  async dismissRfqItem(rfqId: string): Promise<void> {
+    try {
+      await firstValueFrom(
+        this.http.put(`${API}/rfqs/${rfqId}/dismiss`, {}),
+      );
+      this.pendingRfqs.update((list) => list.filter((r) => r.id !== rfqId));
+    } catch { /* ignore */ }
+  }
+
+  createInquiryFromRfq(rfq: any): void {
+    // Navigate to inquiry creation page with pre-filled data from the RFQ
+    const params: any = {};
+    if (rfq.vesselName) params.vesselName = rfq.vesselName;
+    if (rfq.imo) params.imo = rfq.imo;
+    if (rfq.port) params.port = rfq.port;
+    if (rfq.eta) params.eta = rfq.eta;
+    if (rfq.products?.length) params.products = JSON.stringify(rfq.products);
+    params.rfqId = rfq.id;
+
+    this.closeRfqPanel();
+    this.router.navigate(['/trading/inquiries'], { queryParams: { new: '1', ...params } });
+  }
+
+  // ─── Paste RFQ modal ───────────────────────────────────────────
+
+  openPasteModal(): void {
+    this.pasteText.set('');
+    this.pasteError.set(null);
+    this.pasteModalOpen.set(true);
+  }
+
+  closePasteModal(): void {
+    this.pasteModalOpen.set(false);
+  }
+
+  async submitPastedRfq(): Promise<void> {
+    const text = this.pasteText().trim();
+    if (text.length < 10) {
+      this.pasteError.set('Please paste a longer RFQ message.');
+      return;
+    }
+
+    this.pasteSubmitting.set(true);
+    this.pasteError.set(null);
+
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<any>>(`${API}/rfqs/parse`, { text }),
+      );
+      if (res.success && res.data?.parsed) {
+        this.closePasteModal();
+        await this.loadPendingRfqs();
+        // Open the panel to show the newly added RFQ
+        this.rfqPanelOpen.set(true);
+      } else {
+        this.pasteError.set('Could not detect any RFQ data in the text. Try including vessel name, port, and product (e.g. VLSFO, MGO).');
+      }
+    } catch {
+      this.pasteError.set('Something went wrong. Please try again.');
+    } finally {
+      this.pasteSubmitting.set(false);
+    }
   }
 }

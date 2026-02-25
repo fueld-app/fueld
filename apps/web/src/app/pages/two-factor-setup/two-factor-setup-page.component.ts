@@ -103,6 +103,37 @@ import type { PasskeyDto, ApiResponse } from '@fueld/types';
               }
             </div>
           </div>
+
+          <!-- Default Group picker -->
+          <div class="mt-4">
+            <label class="block text-sm font-medium text-gray-700">Default Group</label>
+            <p class="mt-0.5 text-xs text-gray-500">Choose a WhatsApp group for automatic sharing (e.g. RFQ discussions with fellow traders).</p>
+            <div class="mt-2 flex items-center gap-2">
+              <select
+                [value]="waDefaultGroupJid() ?? ''"
+                (change)="onDefaultGroupChange($any($event.target).value)"
+                [disabled]="waGroupsLoading()"
+                class="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm
+                       focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:opacity-50"
+              >
+                <option value="">None</option>
+                @for (g of waGroups(); track g.jid) {
+                  <option [value]="g.jid">{{ g.name }} ({{ g.participants }})</option>
+                }
+              </select>
+              <button
+                (click)="loadWaGroups()"
+                [disabled]="waGroupsLoading()"
+                class="rounded-lg border border-gray-300 p-2 text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                title="Refresh groups"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" [class.animate-spin]="waGroupsLoading()" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311V15a.75.75 0 01-1.5 0v-3.5a.75.75 0 01.75-.75H8.5a.75.75 0 010 1.5H7.058l.174.174a4 4 0 006.651-1.795.75.75 0 011.429.445zm-1.06-5.736A5.5 5.5 0 014.688 8.576a.75.75 0 01-1.429-.445 4 4 0 016.651-1.795l.174.174V5a.75.75 0 011.5 0v3.5a.75.75 0 01-.75.75H8.5a.75.75 0 010-1.5h1.442l-.312-.311a5.474 5.474 0 00-3.878-1.627 5.5 5.5 0 018.5 0z" clip-rule="evenodd" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
           <button
             (click)="unlinkWhatsApp()"
             [disabled]="waLoading()"
@@ -528,6 +559,9 @@ export class TwoFactorSetupPageComponent implements OnInit, OnDestroy {
   readonly waPhone = signal<string | null>(null);
   readonly waLoading = signal(false);
   readonly waError = signal('');
+  readonly waGroups = signal<{ jid: string; name: string; participants: number }[]>([]);
+  readonly waGroupsLoading = signal(false);
+  readonly waDefaultGroupJid = signal<string | null>(null);
   private waSubs: Subscription[] = [];
 
   async ngOnInit(): Promise<void> {
@@ -734,7 +768,7 @@ export class TwoFactorSetupPageComponent implements OnInit, OnDestroy {
   async loadWhatsAppStatus(): Promise<void> {
     try {
       const res = await firstValueFrom(
-        this.http.get<ApiResponse<{ linked: boolean; status: string; phoneNumber?: string | null; qr?: string }>>(
+        this.http.get<ApiResponse<{ linked: boolean; status: string; phoneNumber?: string | null; qr?: string; defaultGroupJid?: string | null }>>(
           `${API_URL}/whatsapp/status`,
         ),
       );
@@ -743,12 +777,44 @@ export class TwoFactorSetupPageComponent implements OnInit, OnDestroy {
         if (d.linked) {
           this.waStatus.set(d.status === 'stored' ? 'stored' : 'connected');
           this.waPhone.set(d.phoneNumber ?? null);
+          this.waDefaultGroupJid.set(d.defaultGroupJid ?? null);
+          this.loadWaGroups();
         } else {
           this.waStatus.set('none');
         }
       }
     } catch {
       // Not linked — default state is fine
+    }
+  }
+
+  async loadWaGroups(): Promise<void> {
+    this.waGroupsLoading.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ jid: string; name: string; participants: number }[]>>(
+          `${API_URL}/whatsapp/groups`,
+        ),
+      );
+      if (res.success && res.data) {
+        this.waGroups.set(res.data);
+      }
+    } catch {
+      // Groups may not load if not connected — ok
+    } finally {
+      this.waGroupsLoading.set(false);
+    }
+  }
+
+  async onDefaultGroupChange(jid: string): Promise<void> {
+    const value = jid || null;
+    this.waDefaultGroupJid.set(value);
+    try {
+      await firstValueFrom(
+        this.http.put<ApiResponse<null>>(`${API_URL}/whatsapp/default-group`, { groupJid: value }),
+      );
+    } catch {
+      this.waError.set('Failed to save default group.');
     }
   }
 

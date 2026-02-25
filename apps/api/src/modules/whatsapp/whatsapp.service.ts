@@ -11,12 +11,15 @@ import makeWASocket, {
   type WASocket,
   type ConnectionState,
   type AuthenticationCreds,
+  type WAMessage,
 } from '@whiskeysockets/baileys';
 import QRCode from 'qrcode';
 import { eq, and } from 'drizzle-orm';
 import { db } from '../../db';
 import { whatsappSessions, whatsappKeys } from '../../db/schema';
 import { sendToUserSockets } from '../activity/session-tracker';
+import { parseRFQ } from './rfq-parser';
+import { saveIncomingRfq, getUserTenantId } from '../rfq/rfq.service';
 
 // ─── In-memory connection pool ───────────────────────────────────────
 
@@ -244,6 +247,46 @@ export async function startWhatsAppSession(userId: string): Promise<{ qr?: strin
     }
   });
 
+  // ─── Incoming message listener (RFQ parsing) ────────────────────
+  sock.ev.on('messages.upsert', async ({ messages, type }) => {
+    if (type !== 'notify') return; // Ignore history sync etc.
+
+    for (const msg of messages) {
+      try {
+        // Only process DMs (not group messages)
+        const jid = msg.key.remoteJid;
+        if (!jid || !jid.endsWith('@s.whatsapp.net')) continue;
+
+        // Skip own outgoing messages
+        if (msg.key.fromMe) continue;
+
+        // Extract text content
+        const text =
+          msg.message?.conversation ||
+          msg.message?.extendedTextMessage?.text ||
+          null;
+        if (!text) continue;
+
+        // Extract sender info
+        const senderPhone = jid.split('@')[0];
+        const senderName = msg.pushName ?? null;
+
+        // Attempt to parse as RFQ
+        const parsed = parseRFQ(text, senderPhone, senderName);
+        if (!parsed) continue; // Not an RFQ
+
+        // Get user's tenant for saving
+        const tenantId = await getUserTenantId(userId);
+        if (!tenantId) continue;
+
+        await saveIncomingRfq(userId, tenantId, parsed, 'whatsapp');
+        console.log(`[WhatsApp] Parsed RFQ from +${senderPhone} for user ${userId} (confidence: ${parsed.confidence.toFixed(2)})`);
+      } catch (err: any) {
+        console.warn('[WhatsApp] Error processing incoming message:', err.message);
+      }
+    }
+  });
+
   // Wait briefly for QR or connection
   await new Promise((r) => setTimeout(r, 2000));
 
@@ -259,34 +302,39 @@ export async function getWhatsAppStatus(userId: string): Promise<{
   status: string;
   phoneNumber?: string | null;
   qr?: string;
+  defaultGroupJid?: string | null;
 }> {
   // Check in-memory connection first
   const conn = connections.get(userId);
+
+  // Always load default group from DB
+  const [session] = await db
+    .select({
+      phoneNumber: whatsappSessions.phoneNumber,
+      syncedAt: whatsappSessions.syncedAt,
+      creds: whatsappSessions.creds,
+      defaultGroupJid: whatsappSessions.defaultGroupJid,
+    })
+    .from(whatsappSessions)
+    .where(eq(whatsappSessions.userId, userId))
+    .limit(1);
+
   if (conn) {
     return {
       linked: conn.status === 'connected',
       status: conn.status,
       phoneNumber: conn.phoneNumber,
       qr: conn.qr,
+      defaultGroupJid: session?.defaultGroupJid ?? null,
     };
   }
-
-  // Check DB for existing session
-  const [session] = await db
-    .select({
-      phoneNumber: whatsappSessions.phoneNumber,
-      syncedAt: whatsappSessions.syncedAt,
-      creds: whatsappSessions.creds,
-    })
-    .from(whatsappSessions)
-    .where(eq(whatsappSessions.userId, userId))
-    .limit(1);
 
   if (session?.creds) {
     return {
       linked: true,
-      status: 'stored',           // Has credentials but socket not open
+      status: 'stored',
       phoneNumber: session.phoneNumber,
+      defaultGroupJid: session.defaultGroupJid ?? null,
     };
   }
 
@@ -310,6 +358,49 @@ export async function disconnectWhatsApp(userId: string): Promise<void> {
 async function cleanupSession(userId: string): Promise<void> {
   await db.delete(whatsappKeys).where(eq(whatsappKeys.userId, userId));
   await db.delete(whatsappSessions).where(eq(whatsappSessions.userId, userId));
+}
+
+// ─── Groups ──────────────────────────────────────────────────────────
+
+export interface WhatsAppGroup {
+  jid: string;
+  name: string;
+  participants: number;
+}
+
+export async function listWhatsAppGroups(userId: string): Promise<WhatsAppGroup[]> {
+  const conn = connections.get(userId);
+  if (!conn?.socket || conn.status !== 'connected') {
+    return [];
+  }
+
+  try {
+    const groups = await conn.socket.groupFetchAllParticipating();
+    return Object.values(groups).map((g: any) => ({
+      jid: g.id,
+      name: g.subject ?? g.id,
+      participants: g.participants?.length ?? 0,
+    }));
+  } catch (err: any) {
+    console.warn('[WhatsApp] Failed to fetch groups:', err.message);
+    return [];
+  }
+}
+
+export async function getDefaultGroup(userId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ defaultGroupJid: whatsappSessions.defaultGroupJid })
+    .from(whatsappSessions)
+    .where(eq(whatsappSessions.userId, userId))
+    .limit(1);
+  return row?.defaultGroupJid ?? null;
+}
+
+export async function setDefaultGroup(userId: string, groupJid: string | null): Promise<void> {
+  await db
+    .update(whatsappSessions)
+    .set({ defaultGroupJid: groupJid, updatedAt: new Date() })
+    .where(eq(whatsappSessions.userId, userId));
 }
 
 // ─── Send Message ────────────────────────────────────────────────────

@@ -1,0 +1,1 @@
+ALTER TABLE whatsapp_sessions ADD COLUMN IF NOT EXISTS default_group_jid text;

@@ -367,11 +367,28 @@ async function fetchYahooChart(ticker: string, name: string): Promise<CommodityP
 
 // ─── Broadcast ───────────────────────────────────────────────────────
 
+// ─── Broadcast (deduplicated) ────────────────────────────────────────
+
+let lastBroadcastHash = '';
+
 function broadcast(): void {
   const payload = getLatestPricePayload();
-  if (payload.prices.length > 0 || payload.fxRates) {
-    broadcastToAll({ type: 'prices', data: payload });
-  }
+  if (payload.prices.length === 0 && !payload.fxRates) return;
+
+  // Build a fingerprint from the actual data values (not updatedAt timestamps)
+  const fingerprint = payload.prices
+    .map((p) => `${p.ticker}:${p.price}:${p.change}`)
+    .join('|')
+    + '||'
+    + Object.entries(payload.fxRates?.rates ?? {})
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => `${k}:${v}`)
+      .join('|');
+
+  if (fingerprint === lastBroadcastHash) return; // no change
+  lastBroadcastHash = fingerprint;
+
+  broadcastToAll({ type: 'prices', data: payload });
 }
 
 function round2(n: number): number {
