@@ -284,8 +284,20 @@ export class TradingDetailMetaCardsComponent {
   formatDateTimeLabel(dateStr: string | null | undefined): string {
     if (!dateStr) return '-';
     const date = new Date(dateStr);
+
+    const fixedOffset = this.parseFixedOffsetMinutes(this.timezone());
+    if (fixedOffset !== null) {
+      const shifted = new Date(date.getTime() + fixedOffset * 60_000);
+      const day = String(shifted.getUTCDate()).padStart(2, '0');
+      const month = shifted.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' });
+      const year = shifted.getUTCFullYear();
+      const hour = String(shifted.getUTCHours()).padStart(2, '0');
+      const minute = String(shifted.getUTCMinutes()).padStart(2, '0');
+      return `${day} ${month} ${year}, ${hour}:${minute}`;
+    }
+
     return new Intl.DateTimeFormat('en-GB', {
-      timeZone: this.timezone(),
+      timeZone: this.normalizeTimeZone(this.timezone()),
       day: '2-digit',
       month: 'short',
       year: 'numeric',
@@ -296,8 +308,19 @@ export class TradingDetailMetaCardsComponent {
   }
 
   private formatDateTimeParts(date: Date): string {
+    const fixedOffset = this.parseFixedOffsetMinutes(this.timezone());
+    if (fixedOffset !== null) {
+      const shifted = new Date(date.getTime() + fixedOffset * 60_000);
+      const year = String(shifted.getUTCFullYear()).padStart(4, '0');
+      const month = String(shifted.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(shifted.getUTCDate()).padStart(2, '0');
+      const hour = String(shifted.getUTCHours()).padStart(2, '0');
+      const minute = String(shifted.getUTCMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day}T${hour}:${minute}`;
+    }
+
     const parts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: this.timezone(),
+      timeZone: this.normalizeTimeZone(this.timezone()),
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -312,6 +335,27 @@ export class TradingDetailMetaCardsComponent {
     const hour = map.get('hour') ?? '00';
     const minute = map.get('minute') ?? '00';
     return `${year}-${month}-${day}T${hour}:${minute}`;
+  }
+
+  private normalizeTimeZone(timeZone: string): string {
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone }).format(new Date());
+      return timeZone;
+    } catch {
+      return 'UTC';
+    }
+  }
+
+  private parseFixedOffsetMinutes(timeZone: string): number | null {
+    const match = timeZone.match(/([+-])\s*(\d{1,2})(?::(\d{2}))?/);
+    if (!match) return null;
+
+    const sign = match[1] === '-' ? -1 : 1;
+    const hours = Number(match[2]);
+    const minutes = Number(match[3] ?? '0');
+    if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+
+    return sign * (hours * 60 + minutes);
   }
 
   responsibleLabel(): string {
