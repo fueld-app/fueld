@@ -409,6 +409,7 @@ export interface OrderDto {
   status: OrderStatus;
   eta: string | null;
   etd: string | null;
+  deliveredAt: string | null;
   customerPaymentTermType?: PaymentTermType | null;
   customerCreditDays?: number | null;
   customerNote?: string | null;
@@ -458,6 +459,7 @@ export interface UpdateOrderDto {
   status?: OrderStatus;
   eta?: string | null;
   etd?: string | null;
+  deliveredAt?: string | null;
   customerPaymentTermType?: PaymentTermType | null;
   customerCreditDays?: number | null;
   customerNote?: string | null;
@@ -559,6 +561,7 @@ export interface OrderItemDto {
   profit: string | null;
   paymentTerms: PaymentTerms | null;
   customerNote?: string | null;
+  deliveredQuantity?: string | null;
 }
 
 export interface CreateOrderItemDto {
@@ -572,6 +575,7 @@ export interface CreateOrderItemDto {
   salesCurrency?: string;
   paymentTerms?: PaymentTerms;
   customerNote?: string;
+  deliveredQuantity?: string;
 }
 
 export interface OrderAttachmentDto {

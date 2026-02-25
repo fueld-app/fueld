@@ -198,7 +198,8 @@ async function ensureTestSchemaCompat(): Promise<void> {
     ADD COLUMN IF NOT EXISTS supplier_contact_id uuid,
     ADD COLUMN IF NOT EXISTS terms_and_conditions text,
     ADD COLUMN IF NOT EXISTS loss_reason text,
-    ADD COLUMN IF NOT EXISTS closed_at timestamptz
+    ADD COLUMN IF NOT EXISTS closed_at timestamptz,
+    ADD COLUMN IF NOT EXISTS delivered_at timestamptz
   `;
 
   await sql`
@@ -207,7 +208,8 @@ async function ensureTestSchemaCompat(): Promise<void> {
     ADD COLUMN IF NOT EXISTS quantity_max numeric(12, 3),
     ADD COLUMN IF NOT EXISTS description text,
     ADD COLUMN IF NOT EXISTS cost_currency text DEFAULT 'USD',
-    ADD COLUMN IF NOT EXISTS sales_currency text DEFAULT 'USD'
+    ADD COLUMN IF NOT EXISTS sales_currency text DEFAULT 'USD',
+    ADD COLUMN IF NOT EXISTS delivered_quantity numeric(12, 3)
   `;
 
   await sql`

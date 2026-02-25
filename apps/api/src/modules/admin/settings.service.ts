@@ -381,6 +381,7 @@ export async function getUserCompanyAccess(userId: string): Promise<OwnCompanyDt
       supplierTerms: counterparties.supplierTerms,
       vatNumber: counterparties.vatNumber,
       fraudPreventionText: counterparties.fraudPreventionText,
+      latePaymentInterest: counterparties.latePaymentInterest,
     })
     .from(userCompanyOverrides)
     .innerJoin(counterparties, eq(userCompanyOverrides.counterpartyId, counterparties.id))
@@ -408,6 +409,7 @@ export async function getUserCompanyAccess(userId: string): Promise<OwnCompanyDt
       supplierTerms: counterparties.supplierTerms,
       vatNumber: counterparties.vatNumber,
       fraudPreventionText: counterparties.fraudPreventionText,
+      latePaymentInterest: counterparties.latePaymentInterest,
     })
     .from(teamCompanies)
     .innerJoin(counterparties, eq(teamCompanies.counterpartyId, counterparties.id))

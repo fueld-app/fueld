@@ -263,6 +263,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         status: t.Optional(t.String()),
         eta: t.Optional(t.Nullable(t.String())),
         etd: t.Optional(t.Nullable(t.String())),
+        deliveredAt: t.Optional(t.Nullable(t.String())),
         lossReason: t.Optional(t.Nullable(t.String())),
       }),
       detail: {
@@ -348,6 +349,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
             salesCurrency: t.Optional(t.Nullable(t.String())),
             paymentTerms: t.Optional(t.Nullable(t.String())),
             customerNote: t.Optional(t.Nullable(t.String())),
+            deliveredQuantity: t.Optional(t.Nullable(t.String())),
           }),
         ),
       }),

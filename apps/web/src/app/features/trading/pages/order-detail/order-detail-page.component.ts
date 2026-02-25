@@ -389,6 +389,33 @@ interface TeamUserOption {
       (itemsChange)="onItemsChange($event)"
     />
 
+    <!-- ═════════════════════════════════════════════════════════════ -->
+    <!--  Delivery Details (visible for DELIVERED / INVOICED)         -->
+    <!-- ═════════════════════════════════════════════════════════════ -->
+    @if (allowDeliveredEdit()) {
+      <div class="mt-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Delivery Details</h3>
+        <div class="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div>
+            <label class="mb-1 block text-xs font-medium text-gray-500">Delivered At</label>
+            <input
+              type="date"
+              [ngModel]="deliveredAtLocal()"
+              (ngModelChange)="onDeliveredAtChange($event)"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm
+                     focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            />
+          </div>
+          <div class="flex items-end">
+            <p class="text-xs text-gray-400">
+              Delivered quantities can be edited in the items grid above.
+              The final invoice will use delivered quantities.
+            </p>
+          </div>
+        </div>
+      </div>
+    }
+
     <!-- Payments + Attachments + Comments -->
     @if (orderId() || order()?.id) {
       <div class="mt-6 grid grid-cols-1 gap-6 min-[900px]:grid-cols-2 min-[1600px]:grid-cols-3">
@@ -770,6 +797,13 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     return status === OrderStatus.Delivered || status === OrderStatus.Invoiced;
   });
 
+  /** deliveredAt formatted as YYYY-MM-DD for <input type="date"> */
+  readonly deliveredAtLocal = computed(() => {
+    const iso = this.order()?.deliveredAt;
+    if (!iso) return '';
+    return iso.slice(0, 10);
+  });
+
   readonly isPaidOrCancelled = computed(() => {
     const status = this.order()?.status;
     return status === OrderStatus.Paid || status === OrderStatus.Cancelled;
@@ -937,6 +971,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
           termsAndConditions: d.termsAndConditions ?? null,
           lossReason: d.lossReason,
           closedAt: d.closedAt,
+          deliveredAt: d.deliveredAt ?? null,
           createdAt: d.createdAt,
           updatedAt: d.updatedAt,
         });
@@ -972,6 +1007,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
             profit: parseFloat(item.profit) || 0,
             paymentTerms: item.paymentTerms ?? '',
             customerNote: item.customerNote ?? '',
+            deliveredQuantity: item.deliveredQuantity ? parseFloat(item.deliveredQuantity) : null,
           })),
         );
 
@@ -1344,10 +1380,15 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
           const confirmDelivered = confirm('BDR uploaded. Mark order as delivered?');
           if (confirmDelivered) {
             await this.setOrderStatus(OrderStatus.Delivered);
+            // Set deliveredAt to today
+            const today = new Date();
+            today.setHours(12, 0, 0, 0);
+            this.order.update((o) => (o ? { ...o, deliveredAt: today.toISOString() } : o));
+            // Pre-fill deliveredQuantity from quantity for each item
             this.itemRows.update((rows) =>
               rows.map((row) => ({
                 ...row,
-                quantity: row.quantity,
+                deliveredQuantity: row.deliveredQuantity ?? row.quantity,
               })),
             );
             this.triggerAutosave();
@@ -1598,6 +1639,12 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     this.triggerAutosave();
   }
 
+  onDeliveredAtChange(value: string): void {
+    const iso = value ? new Date(value + 'T00:00:00Z').toISOString() : null;
+    this.order.update((o) => (o ? { ...o, deliveredAt: iso } : o));
+    this.triggerAutosave();
+  }
+
   private triggerAutosave(): void {
     if (this.isPaidOrCancelled()) return;
     this.changeVersion.update((v) => v + 1);
@@ -1629,6 +1676,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
           termsAndConditions: o.termsAndConditions ?? null,
           eta: o.eta,
           etd: o.etd,
+          deliveredAt: o.deliveredAt ?? null,
         }),
       );
 
@@ -1645,6 +1693,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
         salesCurrency: r.salesCurrency ?? o.currency,
         paymentTerms: r.paymentTerms || null,
         customerNote: r.customerNote ?? null,
+        deliveredQuantity: r.deliveredQuantity != null ? String(r.deliveredQuantity) : null,
       }));
 
       await firstValueFrom(
@@ -1712,6 +1761,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
           termsAndConditions: o.termsAndConditions ?? null,
           eta: o.eta,
           etd: o.etd,
+          deliveredAt: o.deliveredAt ?? null,
         }),
       );
 
@@ -1728,6 +1778,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
         salesCurrency: r.salesCurrency ?? o.currency,
         paymentTerms: r.paymentTerms || null,
         customerNote: r.customerNote ?? null,
+        deliveredQuantity: r.deliveredQuantity != null ? String(r.deliveredQuantity) : null,
       }));
 
       await firstValueFrom(

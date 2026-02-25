@@ -769,7 +769,7 @@ export async function generateInvoicePdfBuffer(invoiceId: string): Promise<Buffe
       })),
     items: order.items.map((item) => ({
       productType: item.productType,
-      quantity: item.quantity,
+      quantity: item.deliveredQuantity ?? item.quantity,
       unit: item.unit,
       salesPrice: item.salesPrice,
       costPrice: item.costPrice,
@@ -812,7 +812,7 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
     invoice?.createdAt ?? new Date(),
     order.customerPaymentTermType,
     order.customerCreditDays,
-    order.eta,
+    order.deliveredAt ?? order.eta,
   );
 
   const bank = await loadOrderBankDetails(order.bankAccountId, order.invoicingCompanyId);
@@ -855,7 +855,7 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
       })),
     items: order.items.map((item) => ({
       productType: item.productType,
-      quantity: item.quantity,
+      quantity: item.deliveredQuantity ?? item.quantity,
       unit: item.unit,
       salesPrice: item.salesPrice,
       costPrice: item.costPrice,

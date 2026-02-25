@@ -498,6 +498,9 @@ export const orders = pgTable('orders', {
   lossReason: text('loss_reason'),
   closedAt: timestamp('closed_at', { withTimezone: true }),
 
+  // Delivery
+  deliveredAt: timestamp('delivered_at', { withTimezone: true }),
+
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -523,6 +526,8 @@ export const orderItems = pgTable('order_items', {
   salesPrice: numeric('sales_price', { precision: 12, scale: 4 }),
   salesCurrency: text('sales_currency').notNull().default('USD'),
   profit: numeric('profit', { precision: 12, scale: 4 }),
+
+  deliveredQuantity: numeric('delivered_quantity', { precision: 12, scale: 3 }),
 
   paymentTerms: paymentTermsEnum('payment_terms'),
 

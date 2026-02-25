@@ -43,6 +43,7 @@ export interface OrderItemRow {
   profit: number;
   paymentTerms: string;
   customerNote?: string | null;
+  deliveredQuantity?: number | null;
 }
 
 @Component({
@@ -83,6 +84,9 @@ export interface OrderItemRow {
             <th class="px-4 py-3 text-left font-medium text-gray-600 min-w-[180px]">Description</th>
             <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Qty</th>
             <th class="px-4 py-3 text-left font-medium text-gray-600 w-16">Unit</th>
+            @if (allowDeliveredEdit()) {
+              <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[110px]">Del. Qty</th>
+            }
             <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[140px]">Cost</th>
             <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[140px]">Sell</th>
             <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Profit ({{ baseCurrency }})</th>
@@ -191,6 +195,19 @@ export interface OrderItemRow {
                 }
               </td>
 
+              <!-- Delivered Qty -->
+              @if (allowDeliveredEdit()) {
+                <td class="px-4 py-2">
+                  <input
+                    type="number" step="0.001" min="0"
+                    [ngModel]="row.deliveredQuantity ?? row.quantity"
+                    (ngModelChange)="updateField(i, 'deliveredQuantity', +$event)"
+                    class="w-24 rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm tabular-nums
+                           focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  />
+                </td>
+              }
+
               <!-- Cost -->
               <td class="px-4 py-2">
                 @if (readonly()) {
@@ -271,7 +288,7 @@ export interface OrderItemRow {
             </tr>
           } @empty {
             <tr>
-              <td [attr.colspan]="readonly() ? 7 : 8" class="px-4 py-12 text-center">
+              <td [attr.colspan]="(readonly() ? 7 : 8) + (allowDeliveredEdit() ? 1 : 0)" class="px-4 py-12 text-center">
                 <p class="text-sm text-gray-400">No line items yet.</p>
                 @if (!readonly()) {
                   <button
@@ -293,6 +310,9 @@ export interface OrderItemRow {
               <td></td>
               <td class="px-4 py-3 text-right tabular-nums text-gray-900">{{ totalQty() | number:'1.3-3' }}</td>
               <td></td>
+              @if (allowDeliveredEdit()) {
+                <td class="px-4 py-3 text-right tabular-nums text-gray-900">{{ totalDeliveredQty() | number:'1.3-3' }}</td>
+              }
               <td class="px-4 py-3 text-right tabular-nums text-gray-600">{{ totalCost() | number:'1.2-2' }} {{ baseCurrency }}</td>
               <td class="px-4 py-3 text-right tabular-nums text-gray-600">{{ totalRevenue() | number:'1.2-2' }} {{ baseCurrency }}</td>
               <td class="px-4 py-3 text-right tabular-nums"
@@ -498,6 +518,19 @@ export interface OrderItemRow {
               </span>
             </div>
 
+            <!-- Delivered Qty (mobile) -->
+            @if (allowDeliveredEdit()) {
+              <div>
+                <label class="mb-1 block text-xs font-medium text-gray-500">Delivered Qty</label>
+                <input type="number" step="0.001" min="0"
+                  [ngModel]="row.deliveredQuantity ?? row.quantity"
+                  (ngModelChange)="updateField(i, 'deliveredQuantity', +$event)"
+                  class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
+                         focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                />
+              </div>
+            }
+
           </div>
         </div>
       } @empty {
@@ -647,6 +680,10 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
 
   readonly totalProfit = computed(() =>
     this.rows().reduce((s, r) => s + this.profitForRow(r), 0),
+  );
+
+  readonly totalDeliveredQty = computed(() =>
+    this.rows().reduce((s, r) => s + (r.deliveredQuantity ?? r.quantity ?? 0), 0),
   );
 
   // ─── Actions ─────────────────────────────────────────────────────

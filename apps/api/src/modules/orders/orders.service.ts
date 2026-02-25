@@ -70,6 +70,7 @@ interface UpdateOrderInput {
   status?: string;
   eta?: string | null;
   etd?: string | null;
+  deliveredAt?: string | null;
   customerPaymentTermType?: 'CREDIT' | 'COD' | 'PREPAY' | null;
   customerCreditDays?: number | null;
   customerNote?: string | null;
@@ -97,6 +98,7 @@ interface SaveItemInput {
   salesCurrency?: string | null;
   paymentTerms?: string | null;
   customerNote?: string | null;
+  deliveredQuantity?: string | null;
 }
 // ─── Generate next order number ───────────────────────────────────────
 
@@ -354,6 +356,7 @@ export async function getOrderById(idOrNumber: string) {
     orderNumber: row.orderNumber,
     eta: row.eta?.toISOString() ?? null,
     etd: row.etd?.toISOString() ?? null,
+    deliveredAt: row.deliveredAt?.toISOString() ?? null,
     closedAt: row.closedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -390,6 +393,7 @@ export async function getOrderById(idOrNumber: string) {
       profit: i.profit,
       paymentTerms: i.paymentTerms,
       customerNote: i.customerNote,
+      deliveredQuantity: i.deliveredQuantity,
     })),
   };
 }
@@ -447,6 +451,7 @@ export async function updateOrder(id: string, input: UpdateOrderInput) {
   if (input.status !== undefined) setData.status = input.status;
   if (input.eta !== undefined) setData.eta = input.eta ? new Date(input.eta) : null;
   if (input.etd !== undefined) setData.etd = input.etd ? new Date(input.etd) : null;
+  if (input.deliveredAt !== undefined) setData.deliveredAt = input.deliveredAt ? new Date(input.deliveredAt) : null;
   if (input.customerPaymentTermType !== undefined) {
     setData.customerPaymentTermType = input.customerPaymentTermType;
   }
@@ -537,6 +542,7 @@ export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
       profit: profit.toFixed(4),
       paymentTerms: item.paymentTerms as any ?? null,
       customerNote: item.customerNote ?? null,
+      deliveredQuantity: item.deliveredQuantity ?? null,
     };
   });
 

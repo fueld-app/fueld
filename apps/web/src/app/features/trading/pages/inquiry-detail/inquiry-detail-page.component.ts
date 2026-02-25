@@ -1026,6 +1026,7 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
           termsAndConditions: d.termsAndConditions ?? null,
           lossReason: d.lossReason,
           closedAt: d.closedAt,
+          deliveredAt: d.deliveredAt ?? null,
           createdAt: d.createdAt,
           updatedAt: d.updatedAt,
         });
