@@ -11,7 +11,7 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
-import { DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map, firstValueFrom } from 'rxjs';
 import {
@@ -23,6 +23,8 @@ import {
   type PlaceDto,
   type ApiResponse,
   type OwnCompanyDto,
+  type OrderAttachmentDto,
+  type CustomerPaymentDto,
   type CreditLineDto,
   type CompanyContactDto,
   type BankAccountDto,
@@ -89,6 +91,7 @@ interface LliSearchResult {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
+    DatePipe,
     DecimalPipe,
     TradingDetailHeaderComponent,
     TradingDetailMetaCardsComponent,
@@ -492,19 +495,119 @@ interface LliSearchResult {
         (itemsChange)="onItemsChange($event)"
       />
 
-      <!-- Comments -->
-      <div class="mt-6">
+      <!-- Payments + Attachments + Comments -->
+      @if (inquiryId() || order()?.id) {
+        <div class="mt-6 grid grid-cols-1 gap-6 min-[900px]:grid-cols-2 min-[1600px]:grid-cols-3">
+          <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[520px] flex flex-col">
+            <div class="flex items-center justify-between gap-4">
+              <div>
+                <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Payments</h3>
+                <p class="mt-1 text-xs text-gray-500">Total paid: {{ paymentsTotal() | number : '1.2-2' }} {{ order()?.currency ?? 'USD' }}</p>
+              </div>
+              <button
+                type="button"
+                (click)="openPaymentModal()"
+                [disabled]="!canRecordPayment()"
+                class="inline-flex items-center justify-center rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold
+                       text-white shadow-sm transition-colors hover:bg-brand-700 disabled:opacity-50"
+              >
+                Add payment
+              </button>
+            </div>
+            <div class="mt-4 flex-1 overflow-auto">
+              @if (paymentsLoading()) {
+                <p class="text-sm text-gray-400">Loading payments...</p>
+              } @else if (payments().length === 0) {
+                <p class="text-sm text-gray-400">No payments recorded yet.</p>
+              } @else {
+                <ul class="divide-y divide-gray-100">
+                  @for (payment of payments(); track payment.id) {
+                    <li class="flex items-start justify-between gap-4 py-3 text-sm">
+                      <div>
+                        <div class="font-semibold text-gray-900">
+                          {{ payment.amount }} {{ payment.currency }}
+                        </div>
+                        <div class="mt-0.5 text-xs text-gray-500">
+                          {{ payment.receivedAt | date : 'mediumDate' }}
+                          @if (payment.method) { · {{ payment.method }} }
+                        </div>
+                        @if (payment.note) {
+                          <div class="mt-1 text-xs text-gray-600 whitespace-pre-line">{{ payment.note }}</div>
+                        }
+                      </div>
+                      <div class="text-xs text-gray-400">{{ payment.createdAt | date : 'short' }}</div>
+                    </li>
+                  }
+                </ul>
+              }
+            </div>
+          </div>
+          <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[520px] flex flex-col">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Attachments</h3>
+            </div>
+            <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <select
+                [ngModel]="attachmentType()"
+                (ngModelChange)="attachmentType.set($event)"
+                class="w-full sm:w-40 rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                       focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+              >
+                <option value="BDR">BDR</option>
+                <option value="OTHER">Other</option>
+              </select>
+              <input
+                type="file"
+                (change)="onAttachmentSelected($event)"
+                accept="application/pdf,image/*"
+                class="w-full text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-gray-100
+                       file:px-3 file:py-2 file:text-sm file:font-medium file:text-gray-700 hover:file:bg-gray-200"
+              />
+              <button
+                type="button"
+                (click)="uploadAttachment()"
+                [disabled]="uploadingAttachment() || !selectedAttachment"
+                class="inline-flex items-center justify-center rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold
+                       text-white shadow-sm transition-colors hover:bg-brand-700 disabled:opacity-50"
+              >
+                Upload
+              </button>
+            </div>
+            <div class="mt-4 flex-1 overflow-auto">
+              @if (attachments().length === 0) {
+                <p class="text-sm text-gray-400">No attachments yet.</p>
+              } @else {
+                <ul class="divide-y divide-gray-100">
+                  @for (att of attachments(); track att.id) {
+                    <li class="flex items-center justify-between py-2 text-sm">
+                      <div class="flex items-center gap-2">
+                        <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">{{ att.type }}</span>
+                        <button
+                          type="button"
+                          (click)="openAttachment(att)"
+                          class="text-left text-brand-600 hover:underline"
+                        >
+                          {{ att.fileName }}
+                        </button>
+                      </div>
+                      <span class="text-xs text-gray-400">{{ formatFileSize(att.fileSize) }}</span>
+                    </li>
+                  }
+                </ul>
+              }
+            </div>
+          </div>
+          @if (order()?.id) {
+            <div class="h-full max-h-[520px] overflow-auto">
+              <app-comments-card entityType="ORDER" [entityId]="order()!.id" />
+            </div>
+          }
+        </div>
         @if (order()?.id) {
-          <div class="max-h-[520px] overflow-auto">
-            <app-comments-card entityType="ORDER" [entityId]="order()!.id" />
+          <div class="mt-6">
+            <app-activity-timeline entityType="order" [entityId]="order()!.id" />
           </div>
         }
-      </div>
-      <!-- Activity History (full width) -->
-      @if (order()?.id) {
-        <div class="mt-6">
-          <app-activity-timeline entityType="order" [entityId]="order()!.id" />
-        </div>
       }
     }
 
@@ -645,6 +748,103 @@ interface LliSearchResult {
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <!--  Toast Notification                                           -->
     <!-- ═══════════════════════════════════════════════════════════════ -->
+    @if (paymentModalOpen()) {
+      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div class="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-gray-900">Record payment</h3>
+            <button
+              type="button"
+              (click)="closePaymentModal()"
+              class="text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
+          </div>
+          <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label class="text-xs font-medium text-gray-500">Amount</label>
+              <input
+                type="number"
+                min="0"
+                [ngModel]="paymentAmount()"
+                (ngModelChange)="paymentAmount.set($event)"
+                class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
+                       focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+              />
+            </div>
+            <div>
+              <label class="text-xs font-medium text-gray-500">Currency</label>
+              <select
+                [ngModel]="paymentCurrency()"
+                (ngModelChange)="paymentCurrency.set($event)"
+                class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 uppercase
+                       focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 bg-white"
+              >
+                @for (c of currencyDropdownOptions(); track c.value) {
+                  <option [value]="c.value">{{ c.label }}</option>
+                }
+              </select>
+            </div>
+            <div>
+              <label class="text-xs font-medium text-gray-500">Received at</label>
+              <input
+                type="datetime-local"
+                [ngModel]="paymentReceivedAt()"
+                (ngModelChange)="paymentReceivedAt.set($event)"
+                class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
+                       focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+              />
+            </div>
+            <div>
+              <label class="text-xs font-medium text-gray-500">Method</label>
+              <input
+                type="text"
+                [ngModel]="paymentMethod()"
+                (ngModelChange)="paymentMethod.set($event)"
+                placeholder="Wire, ACH, card"
+                class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
+                       focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+              />
+            </div>
+          </div>
+          <div class="mt-3">
+            <label class="text-xs font-medium text-gray-500">Note</label>
+            <textarea
+              rows="3"
+              [ngModel]="paymentNote()"
+              (ngModelChange)="paymentNote.set($event)"
+              class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
+                     focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            ></textarea>
+          </div>
+          <div class="mt-5 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              (click)="closePaymentModal()"
+              class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              (click)="submitPayment()"
+              [disabled]="paymentSaving()"
+              class="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold
+                     text-white shadow-sm transition-colors hover:bg-brand-700 disabled:opacity-50"
+            >
+              @if (paymentSaving()) {
+                <svg class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+              }
+              Record payment
+            </button>
+          </div>
+        </div>
+      </div>
+    }
     @if (toast()) {
       <div
         class="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-lg border px-4 py-3 text-sm font-medium shadow-lg transition-all"
@@ -743,10 +943,23 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   readonly vesselSearchLoading = signal(false);
   readonly placeSearchLoading = signal(false);
   readonly supplierSearchLoading = signal(false);
+  readonly attachments = signal<OrderAttachmentDto[]>([]);
+  readonly uploadingAttachment = signal(false);
+  readonly attachmentType = signal<'BDR' | 'OTHER'>('OTHER');
+  selectedAttachment: File | null = null;
+  readonly payments = signal<CustomerPaymentDto[]>([]);
+  readonly paymentsLoading = signal(false);
   readonly customerCreditLines = signal<CreditLineDto[]>([]);
   readonly customerCreditLoading = signal(false);
   readonly supplierCreditLines = signal<CreditLineDto[]>([]);
   readonly supplierCreditLoading = signal(false);
+  readonly paymentModalOpen = signal(false);
+  readonly paymentSaving = signal(false);
+  readonly paymentAmount = signal('');
+  readonly paymentCurrency = signal('USD');
+  readonly paymentReceivedAt = signal('');
+  readonly paymentMethod = signal('');
+  readonly paymentNote = signal('');
   readonly clientImportOptions = signal<DropdownOption[]>([]);
   readonly vesselImportOptions = signal<DropdownOption[]>([]);
   readonly placeImportOptions = signal<DropdownOption[]>([]);
@@ -875,6 +1088,12 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   });
 
   readonly canUseSupplierCredit = computed(() => !!this.supplierCreditSummary());
+
+  readonly paymentsTotal = computed(() =>
+    this.payments().reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0),
+  );
+
+  readonly canRecordPayment = computed(() => this.order()?.status !== OrderStatus.Cancelled);
 
   formatDateTimeForInput(date: Date, timeZone: string): string {
     const fixedOffset = this.parseFixedOffsetMinutes(timeZone);
@@ -1129,6 +1348,9 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
       // Auto-expand note fields if they already have content
       if (this.order()?.customerNote) this.showCustomerPaymentNote.set(true);
       if (this.order()?.supplierNote) this.showSupplierPaymentNote.set(true);
+
+      await this.loadAttachments();
+      await this.loadPayments();
     } catch {
       this.showToast('error', 'Failed to load inquiry.');
     } finally {
@@ -1201,6 +1423,35 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
       this.supplierCreditLines.set([]);
     } finally {
       this.supplierCreditLoading.set(false);
+    }
+  }
+
+  private async loadAttachments(): Promise<void> {
+    const id = this.inquiryId();
+    if (!id) return;
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<OrderAttachmentDto[]>>(`${API}/orders/${id}/attachments`),
+      );
+      if (res.success) this.attachments.set(res.data ?? []);
+    } catch {
+      this.attachments.set([]);
+    }
+  }
+
+  private async loadPayments(): Promise<void> {
+    const id = this.inquiryId();
+    if (!id) return;
+    this.paymentsLoading.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<CustomerPaymentDto[]>>(`${API}/orders/${id}/payments`),
+      );
+      if (res.success) this.payments.set(res.data ?? []);
+    } catch {
+      this.payments.set([]);
+    } finally {
+      this.paymentsLoading.set(false);
     }
   }
 
@@ -1324,6 +1575,111 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   onResponsibleUserChange(userId: string): void {
     this.order.update((o) => (o ? { ...o, salesRepId: userId || null } : o));
     this.triggerAutosave();
+  }
+
+  onAttachmentSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    this.selectedAttachment = input.files?.[0] ?? null;
+  }
+
+  async uploadAttachment(): Promise<void> {
+    const id = this.inquiryId();
+    if (!id || !this.selectedAttachment) return;
+    this.uploadingAttachment.set(true);
+    try {
+      const form = new FormData();
+      form.append('file', this.selectedAttachment);
+      form.append('type', this.attachmentType());
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<OrderAttachmentDto>>(`${API}/orders/${id}/attachments`, form),
+      );
+      if (res.success && res.data) {
+        this.attachments.update((prev) => [res.data, ...prev]);
+        this.selectedAttachment = null;
+      }
+    } catch {
+      this.showToast('error', 'Failed to upload attachment.');
+    } finally {
+      this.uploadingAttachment.set(false);
+    }
+  }
+
+  async openAttachment(att: OrderAttachmentDto): Promise<void> {
+    const modal = this.pdfModal();
+    if (!modal) return;
+    modal.showLoading(att.fileName || 'Attachment');
+    try {
+      const url = att.filePath.startsWith('http')
+        ? att.filePath
+        : `${API}${att.filePath}`;
+      const blob = await firstValueFrom(
+        this.http.get(url, { responseType: 'blob' }),
+      );
+      modal.setBlob(blob, att.fileName || 'attachment');
+    } catch {
+      modal.showError();
+      this.showToast('error', 'Failed to load attachment.');
+    }
+  }
+
+  openPaymentModal(): void {
+    const currency = this.order()?.currency ?? 'USD';
+    this.paymentAmount.set('');
+    this.paymentCurrency.set(currency);
+    this.paymentReceivedAt.set(this.formatDateTimeForInput(new Date(), this.placeTimezone()));
+    this.paymentMethod.set('');
+    this.paymentNote.set('');
+    this.paymentModalOpen.set(true);
+  }
+
+  closePaymentModal(): void {
+    this.paymentModalOpen.set(false);
+  }
+
+  async submitPayment(): Promise<void> {
+    const id = this.inquiryId();
+    if (!id) return;
+    const amountValue = this.paymentAmount();
+    const amount = (typeof amountValue === 'string' ? amountValue : String(amountValue ?? '')).trim();
+    if (!amount) {
+      this.showToast('error', 'Amount is required.');
+      return;
+    }
+
+    this.paymentSaving.set(true);
+    try {
+      const receivedAt = this.paymentReceivedAt();
+      const receivedIso = receivedAt ? new Date(receivedAt).toISOString() : undefined;
+      const currency = this.paymentCurrency().trim() || (this.order()?.currency ?? 'USD');
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<CustomerPaymentDto>>(`${API}/orders/${id}/payments`, {
+          amount,
+          currency,
+          receivedAt: receivedIso,
+          method: this.paymentMethod() || null,
+          note: this.paymentNote() || null,
+        }),
+      );
+      if (res.success) {
+        await this.loadPayments();
+        this.closePaymentModal();
+        this.showToast('success', 'Payment recorded.');
+      } else {
+        this.showToast('error', res.message ?? 'Failed to record payment.');
+      }
+    } catch {
+      this.showToast('error', 'Failed to record payment.');
+    } finally {
+      this.paymentSaving.set(false);
+    }
+  }
+
+  formatFileSize(size: number): string {
+    if (!size) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    const idx = Math.min(Math.floor(Math.log(size) / Math.log(1024)), units.length - 1);
+    const value = size / Math.pow(1024, idx);
+    return `${value.toFixed(idx === 0 ? 0 : 1)} ${units[idx]}`;
   }
 
   // ─── Typeahead search methods ────────────────────────────────────
