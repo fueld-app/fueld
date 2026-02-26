@@ -1836,21 +1836,22 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   private async viewInvoicePdf(): Promise<void> {
     const id = this.orderId();
     if (!id) return;
-    if (!this.canGenerateInvoice()) {
-      this.showToast('error', 'Invoice can be generated after delivery.');
-      return;
-    }
+    const status = this.order()?.status;
+    const isFinalInvoice = status === OrderStatus.Delivered
+      || status === OrderStatus.Invoiced
+      || status === OrderStatus.Paid;
+    const documentTitle = isFinalInvoice ? 'Invoice' : 'Proforma Invoice';
     const modal = this.pdfModal();
     if (!modal) return;
-    modal.showLoading('Invoice');
+    modal.showLoading(documentTitle);
     try {
       const blob = await firstValueFrom(
         this.http.get(`${API_URL}/orders/${id}/invoice/pdf`, { responseType: 'blob' }),
       );
-      modal.setBlob(blob, `Fueld_Invoice_${this.invoiceNumber()}.pdf`);
+      modal.setBlob(blob, `${isFinalInvoice ? 'Fueld_Invoice' : 'Fueld_Proforma'}_${this.invoiceNumber()}.pdf`);
     } catch {
       modal.showError();
-      this.showToast('error', 'Failed to generate invoice PDF.');
+      this.showToast('error', `Failed to generate ${documentTitle.toLowerCase()} PDF.`);
     }
   }
 
@@ -2000,13 +2001,6 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
       return;
     }
     this.openPaymentModal();
-  }
-
-  private canGenerateInvoice(): boolean {
-    const status = this.order()?.status;
-    return status === OrderStatus.Delivered
-      || status === OrderStatus.Invoiced
-      || status === OrderStatus.Paid;
   }
 
   // ─── Toast ───────────────────────────────────────────────────────
