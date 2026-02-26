@@ -54,6 +54,21 @@ import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
                 Download
               </a>
 
+              @if (verifyUrl()) {
+                <button
+                  (click)="copyVerifyUrl()"
+                  class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold
+                         text-gray-700 shadow-sm transition-colors hover:bg-gray-50
+                         focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
+                  title="Copy verification URL"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path d="M8 2a2 2 0 0 0-2 2v1H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-1h1a2 2 0 0 0 2-2V7.414a2 2 0 0 0-.586-1.414l-3.414-3.414A2 2 0 0 0 10.586 2H8Zm3 3a1 1 0 0 0 1 1h2v6a1 1 0 0 1-1 1h-1V7a2 2 0 0 0-2-2H7V4a1 1 0 0 1 1-1h2.586L11 3.414V5Z" />
+                  </svg>
+                  {{ verifyCopied() ? 'Copied' : 'Copy Verify URL' }}
+                </button>
+              }
+
               <!-- WhatsApp send button -->
               @if (!loading()) {
                 @if (!waLinked()) {
@@ -186,6 +201,8 @@ export class PdfPreviewModalComponent {
   });
   readonly title = signal('');
   readonly fileName = signal('');
+  readonly verifyUrl = signal('');
+  readonly verifyCopied = signal(false);
 
   // WhatsApp send
   readonly sendWhatsApp = output<{ phone: string; blob: Blob; fileName: string }>();
@@ -202,19 +219,45 @@ export class PdfPreviewModalComponent {
     this.revokePreviousUrl();
     this.title.set(title);
     this.fileName.set('');
+    this.verifyUrl.set('');
+    this.verifyCopied.set(false);
     this.rawBlobUrl.set('');
     this.loading.set(true);
     this.visible.set(true);
   }
 
   /** Set the loaded PDF blob and display it */
-  setBlob(blob: Blob, fileName: string): void {
+  setBlob(blob: Blob, fileName: string, verifyUrl?: string | null): void {
     const url = URL.createObjectURL(blob);
     this.currentBlobUrl = url;
     this.currentBlob = blob;
     this.rawBlobUrl.set(url);
     this.fileName.set(fileName);
+    this.verifyUrl.set((verifyUrl ?? '').trim());
+    this.verifyCopied.set(false);
     this.loading.set(false);
+  }
+
+  async copyVerifyUrl(): Promise<void> {
+    const url = this.verifyUrl();
+    if (!url) return;
+
+    try {
+      await navigator.clipboard.writeText(url);
+      this.verifyCopied.set(true);
+      setTimeout(() => this.verifyCopied.set(false), 1400);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      this.verifyCopied.set(true);
+      setTimeout(() => this.verifyCopied.set(false), 1400);
+    }
   }
 
   /** Show an error and close the loading state */
@@ -237,6 +280,8 @@ export class PdfPreviewModalComponent {
     this.waFormOpen.set(false);
     this.waSending.set(false);
     this.waNotLinkedMsg.set(false);
+    this.verifyUrl.set('');
+    this.verifyCopied.set(false);
     this.waPhone = '';
     this.revokePreviousUrl();
   }

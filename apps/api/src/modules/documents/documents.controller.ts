@@ -35,6 +35,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       set.headers['X-Document-Revision'] = String(revision.revisionNumber);
       set.headers['X-Document-Reference'] = revision.verificationRef;
       set.headers['X-Document-Fingerprint'] = revision.fingerprintShort;
+      set.headers['X-Document-Verify-Token'] = revision.verifyToken;
 
       return buffer;
     },
@@ -71,6 +72,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       set.headers['X-Document-Revision'] = String(revision.revisionNumber);
       set.headers['X-Document-Reference'] = revision.verificationRef;
       set.headers['X-Document-Fingerprint'] = revision.fingerprintShort;
+      set.headers['X-Document-Verify-Token'] = revision.verifyToken;
 
       return buffer;
     },
@@ -107,6 +109,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       set.headers['X-Document-Revision'] = String(revision.revisionNumber);
       set.headers['X-Document-Reference'] = revision.verificationRef;
       set.headers['X-Document-Fingerprint'] = revision.fingerprintShort;
+      set.headers['X-Document-Verify-Token'] = revision.verifyToken;
 
       return buffer;
     },

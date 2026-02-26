@@ -10,7 +10,7 @@ import {
   effect,
 } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, type HttpResponse } from '@angular/common/http';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
@@ -1883,10 +1883,16 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     if (!modal) return;
     modal.showLoading(documentTitle);
     try {
-      const blob = await firstValueFrom(
-        this.http.get(`${API_URL}/orders/${id}/invoice/pdf`, { responseType: 'blob' }),
+      const res = await firstValueFrom(
+        this.http.get(`${API_URL}/orders/${id}/invoice/pdf`, { responseType: 'blob', observe: 'response' }),
       );
-      modal.setBlob(blob, `${isFinalInvoice ? 'Fueld_Invoice' : 'Fueld_Proforma'}_${this.invoiceNumber()}.pdf`);
+      const blob = res.body;
+      if (!blob) throw new Error('Missing PDF body');
+      modal.setBlob(
+        blob,
+        `${isFinalInvoice ? 'Fueld_Invoice' : 'Fueld_Proforma'}_${this.invoiceNumber()}.pdf`,
+        this.buildVerifyUrlFromResponse(res),
+      );
     } catch {
       modal.showError();
       this.showToast('error', `Failed to generate ${documentTitle.toLowerCase()} PDF.`);
@@ -1908,10 +1914,12 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     if (!modal) return;
     modal.showLoading('Confirmation');
     try {
-      const blob = await firstValueFrom(
-        this.http.get(`${API_URL}/orders/${id}/offer/pdf`, { responseType: 'blob' }),
+      const res = await firstValueFrom(
+        this.http.get(`${API_URL}/orders/${id}/offer/pdf`, { responseType: 'blob', observe: 'response' }),
       );
-      modal.setBlob(blob, `Confirmation_${this.order()?.orderNumber ?? id}.pdf`);
+      const blob = res.body;
+      if (!blob) throw new Error('Missing PDF body');
+      modal.setBlob(blob, `Confirmation_${this.order()?.orderNumber ?? id}.pdf`, this.buildVerifyUrlFromResponse(res));
     } catch {
       modal.showError();
       this.showToast('error', 'Failed to generate confirmation PDF.');
@@ -1933,14 +1941,21 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     if (!modal) return;
     modal.showLoading('Proforma Invoice');
     try {
-      const blob = await firstValueFrom(
-        this.http.get(`${API_URL}/orders/${id}/proforma/pdf`, { responseType: 'blob' }),
+      const res = await firstValueFrom(
+        this.http.get(`${API_URL}/orders/${id}/proforma/pdf`, { responseType: 'blob', observe: 'response' }),
       );
-      modal.setBlob(blob, `Nomination_${this.order()?.orderNumber ?? id}.pdf`);
+      const blob = res.body;
+      if (!blob) throw new Error('Missing PDF body');
+      modal.setBlob(blob, `Nomination_${this.order()?.orderNumber ?? id}.pdf`, this.buildVerifyUrlFromResponse(res));
     } catch {
       modal.showError();
       this.showToast('error', 'Failed to generate proforma invoice PDF.');
     }
+  }
+
+  private buildVerifyUrlFromResponse(res: HttpResponse<Blob>): string | null {
+    const token = res.headers.get('X-Document-Verify-Token')?.trim();
+    return token ? `${API_URL}/verify/token/${token}` : null;
   }
 
   onSendEmail(recipientEmail: string): void {

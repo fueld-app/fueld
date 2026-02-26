@@ -243,6 +243,13 @@ export async function createApp(options: CreateAppOptions = {}) {
     .use(
       cors({
         origin: process.env['CORS_ORIGIN'] || /localhost/,
+        exposeHeaders: [
+          'Content-Disposition',
+          'X-Document-Revision',
+          'X-Document-Reference',
+          'X-Document-Fingerprint',
+          'X-Document-Verify-Token',
+        ],
       }),
     )
     .get(
