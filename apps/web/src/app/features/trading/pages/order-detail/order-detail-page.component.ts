@@ -1860,15 +1860,15 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     if (!id) return;
     const modal = this.pdfModal();
     if (!modal) return;
-    modal.showLoading('Offer');
+    modal.showLoading('Confirmation');
     try {
       const blob = await firstValueFrom(
         this.http.get(`${API_URL}/orders/${id}/offer/pdf`, { responseType: 'blob' }),
       );
-      modal.setBlob(blob, `Offer_${this.order()?.orderNumber ?? id}.pdf`);
+      modal.setBlob(blob, `Confirmation_${this.order()?.orderNumber ?? id}.pdf`);
     } catch {
       modal.showError();
-      this.showToast('error', 'Failed to generate offer PDF.');
+      this.showToast('error', 'Failed to generate confirmation PDF.');
     }
   }
 

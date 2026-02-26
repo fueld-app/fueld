@@ -1567,6 +1567,9 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
   revision: DocumentRevisionInfo;
 }> {
   const order = await fetchOrderForInvoice(orderId);
+  const isInquiryContext = order.status === 'INQUIRY' || order.status === 'OFFER';
+  const documentTitle = isInquiryContext ? 'OFFER' : 'CONFIRMATION';
+  const baseFileName = isInquiryContext ? 'Offer' : 'Confirmation';
   const existingRevision = await getLatestDocumentRevisionByStream({
     documentType: 'OFFER',
     orderId: order.id,
@@ -1587,7 +1590,7 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
 
   if (existingRevision && offerCombinedUpdatedAtMs <= existingRevision.issuedAt.getTime()) {
     const existingBuffer = loadDocumentRevisionBuffer(existingRevision);
-    const existingFileName = `Offer_${order.orderNumber ?? orderId.slice(0, 8)}.pdf`;
+    const existingFileName = `${baseFileName}_${order.orderNumber ?? orderId.slice(0, 8)}.pdf`;
     return { buffer: existingBuffer, fileName: existingFileName, revision: existingRevision };
   }
 
@@ -1641,6 +1644,7 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
       salesPrice: item.salesPrice,
     })),
     createdAt: order.createdAt,
+    docTitle: documentTitle,
     verifyUrl: null as string | null,
     printMeta: null,
   };
@@ -1649,7 +1653,7 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
 
   const docDefinition = buildOfferDocument(docData);
   const buffer = await createPdfBuffer(docDefinition);
-  const fileName = `Offer_${order.orderNumber ?? orderId.slice(0, 8)}.pdf`;
+  const fileName = `${baseFileName}_${order.orderNumber ?? orderId.slice(0, 8)}.pdf`;
   const revision = await persistDocumentRevision({
     tenantId: order.tenantId,
     orderId: order.id,
