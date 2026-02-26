@@ -577,11 +577,26 @@ function formatDateTimeForDisplay(value: string | null, tz: string | null | unde
   return tz ? `${formatted} ${tz}` : formatted;
 }
 
-function replaceCompanyNamePlaceholder(value: string | null | undefined, companyName: string | null | undefined): string | null {
+function replaceCompanyNamePlaceholder(
+  value: string | null | undefined,
+  companyName: string | null | undefined,
+  documentName?: string | null,
+): string | null {
   if (!value) return null;
+  let result = value;
   const resolvedName = companyName?.trim();
-  if (!resolvedName) return value;
-  return value.replace(/\$\{companyName\}/g, resolvedName);
+  if (resolvedName) {
+    result = result.replace(/\$\{companyName\}/g, resolvedName);
+  }
+
+  const resolvedDocumentName = documentName?.trim();
+  if (resolvedDocumentName) {
+    result = result
+      .replace(/\$\{documentName\}/g, resolvedDocumentName)
+      .replace(/\$\{offerOrConfirmation\}/g, resolvedDocumentName);
+  }
+
+  return result;
 }
 
 function buildNotesSection(params: {
@@ -1572,6 +1587,7 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
   const order = await fetchOrderForInvoice(orderId);
   const isInquiryContext = order.status === 'INQUIRY' || order.status === 'OFFER';
   const documentTitle = isInquiryContext ? 'OFFER' : 'CONFIRMATION';
+  const documentName = isInquiryContext ? 'Offer' : 'Confirmation';
   const baseFileName = isInquiryContext ? 'Offer' : 'Confirmation';
   const existingRevision = await getLatestDocumentRevisionByStream({
     documentType: 'OFFER',
@@ -1622,6 +1638,7 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
     termsAndConditions: replaceCompanyNamePlaceholder(
       order.termsAndConditions ?? order.invoicingCompany?.customerTerms ?? null,
       order.invoicingCompany?.name ?? null,
+      documentName,
     ),
     placeRemark: order.place.orderRemark ?? null,
     companyName: order.invoicingCompany?.name ?? null,

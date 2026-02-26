@@ -280,6 +280,12 @@ export const ordersController = new Elysia({ prefix: '/orders' })
       try {
         const orderId = await resolveOrderId(params.id);
         if (!orderId) return { success: false, data: null, message: 'Order not found' };
+        if (body.status === 'CONFIRMED') {
+          const order = await getOrderById(orderId);
+          if (!order?.items?.length) {
+            return { success: false, data: null, message: 'Add at least one line item before converting to order' };
+          }
+        }
         const updated = await updateOrderStatus(
           orderId,
           body.status,

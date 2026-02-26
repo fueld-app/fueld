@@ -18,8 +18,8 @@ import {
 import type { OwnCompanyDto, TeamDto, CompanyGroupDto, BankAccountDto } from '@fueld/types';
 
 const DEFAULT_CUSTOMER_TERMS =
-  "This Confirmation is made subject to ${companyName}’s General Terms and Conditions of Sale effective February 2026 (“ GTCs”), available at www.rivieramarine.mc,\n" +
-  "which together with this Confirmation constitute the entire agreement between the parties. In the event of conflict, this Confirmation shall prevail, except in respect of Title\n" +
+  "This ${documentName} is made subject to ${companyName}’s General Terms and Conditions of Sale effective February 2026 (“ GTCs”), available at www.rivieramarine.mc,\n" +
+  "which together with this ${documentName} constitute the entire agreement between the parties. In the event of conflict, this ${documentName} shall prevail, except in respect of Title\n" +
   "and Retention of Title, Payment, Credit & Security, Sanctions & Compliance, Limitation of Liability and Law & Arbitration, which may only be amended by written agreement\n" +
   "signed by Seller. Any terms or conditions submitted by Buyer are expressly rejected.\n" +
   "Delivery procedures, sampling and operational formalities may be carried out in accordance with the Physical Supplier’s standard procedures; however, as between Seller\n" +

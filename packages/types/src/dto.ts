@@ -134,7 +134,7 @@ export interface CounterpartyDto {
   isSanctioned: boolean;
   lastSynced: string | null;
   manualOverrides: string[];
-  /** Terms templates used when this counterparty is marked as an own company. May include ${companyName}. */
+  /** Terms templates used when this counterparty is marked as an own company. May include ${companyName} and ${documentName}. */
   customerTerms?: string | null;
   supplierTerms?: string | null;
   responsibleUserId?: string | null;

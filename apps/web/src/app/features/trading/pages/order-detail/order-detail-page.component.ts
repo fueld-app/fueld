@@ -110,6 +110,9 @@ interface TeamUserOption {
         <app-header-actions
           [orderId]="orderId()"
           [status]="order()?.status ?? null"
+          [hasInvoicingCompany]="hasInvoicingCompany()"
+          [hasBankAccount]="hasBankAccount()"
+          [hasLineItems]="hasLineItems()"
           (actionTriggered)="onAction($event)"
         />
       </div>
@@ -812,6 +815,9 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   readonly canRecordPayment = computed(() => this.order()?.status !== OrderStatus.Cancelled);
 
   readonly canEditClient = computed(() => !this.isPaidOrCancelled());
+  readonly hasInvoicingCompany = computed(() => !!this.order()?.invoicingCompanyId);
+  readonly hasBankAccount = computed(() => !!this.order()?.bankAccountId);
+  readonly hasLineItems = computed(() => this.itemRows().length > 0);
 
   readonly isResponsibleUser = computed(() => {
     const currentUserId = this.auth.user()?.id ?? '';
@@ -1752,12 +1758,36 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   onAction(action: HeaderAction): void {
     switch (action) {
       case 'generate-invoice':
+        if (!this.hasLineItems()) {
+          this.showToast('error', 'Add at least one line item before viewing Invoice/Proforma.');
+          break;
+        }
+        if (!this.hasBankAccount()) {
+          this.showToast('error', 'Select a bank account before viewing Invoice/Proforma.');
+          break;
+        }
         this.viewInvoicePdf();
         break;
       case 'view-offer':
+        if (!this.hasLineItems()) {
+          this.showToast('error', 'Add at least one line item before generating Confirmation PDF.');
+          break;
+        }
+        if (!this.hasInvoicingCompany()) {
+          this.showToast('error', 'Select an invoicing company before generating Confirmation PDF.');
+          break;
+        }
         this.viewOfferPdf();
         break;
       case 'view-proforma':
+        if (!this.hasLineItems()) {
+          this.showToast('error', 'Add at least one line item before generating Proforma Invoice.');
+          break;
+        }
+        if (!this.hasBankAccount()) {
+          this.showToast('error', 'Select a bank account before generating Proforma Invoice.');
+          break;
+        }
         this.viewProformaPdf();
         break;
       case 'send-email':
@@ -1836,6 +1866,14 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   private async viewInvoicePdf(): Promise<void> {
     const id = this.orderId();
     if (!id) return;
+    if (!this.hasLineItems()) {
+      this.showToast('error', 'Add at least one line item before viewing Invoice/Proforma.');
+      return;
+    }
+    if (!this.hasBankAccount()) {
+      this.showToast('error', 'Select a bank account before viewing Invoice/Proforma.');
+      return;
+    }
     const status = this.order()?.status;
     const isFinalInvoice = status === OrderStatus.Delivered
       || status === OrderStatus.Invoiced
@@ -1858,6 +1896,14 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   private async viewOfferPdf(): Promise<void> {
     const id = this.orderId();
     if (!id) return;
+    if (!this.hasLineItems()) {
+      this.showToast('error', 'Add at least one line item before generating Confirmation PDF.');
+      return;
+    }
+    if (!this.hasInvoicingCompany()) {
+      this.showToast('error', 'Select an invoicing company before generating Confirmation PDF.');
+      return;
+    }
     const modal = this.pdfModal();
     if (!modal) return;
     modal.showLoading('Confirmation');
@@ -1875,6 +1921,14 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   private async viewProformaPdf(): Promise<void> {
     const id = this.orderId();
     if (!id) return;
+    if (!this.hasLineItems()) {
+      this.showToast('error', 'Add at least one line item before generating Proforma Invoice.');
+      return;
+    }
+    if (!this.hasBankAccount()) {
+      this.showToast('error', 'Select a bank account before generating Proforma Invoice.');
+      return;
+    }
     const modal = this.pdfModal();
     if (!modal) return;
     modal.showLoading('Proforma Invoice');

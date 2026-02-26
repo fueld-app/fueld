@@ -18,6 +18,15 @@ export const documentsController = new Elysia({ prefix: '/orders' })
     async ({ params, set }) => {
       const orderId = await resolveOrderId(params.id);
       if (!orderId) { set.status = 404; return { success: false, message: 'Order not found' }; }
+      const order = await getOrderById(orderId);
+      if (!order?.items?.length) {
+        set.status = 400;
+        return { success: false, message: 'Add at least one line item before generating documents' };
+      }
+      if (!order?.invoicingCompanyId) {
+        set.status = 400;
+        return { success: false, message: 'Select an invoicing company before generating Offer/Confirmation PDF' };
+      }
       const { buffer, fileName, revision } = await generateOfferPdfBuffer(orderId);
 
       set.headers['Content-Type'] = 'application/pdf';
@@ -45,6 +54,15 @@ export const documentsController = new Elysia({ prefix: '/orders' })
     async ({ params, set }) => {
       const orderId = await resolveOrderId(params.id);
       if (!orderId) { set.status = 404; return { success: false, message: 'Order not found' }; }
+      const order = await getOrderById(orderId);
+      if (!order?.items?.length) {
+        set.status = 400;
+        return { success: false, message: 'Add at least one line item before generating documents' };
+      }
+      if (!order?.bankAccountId) {
+        set.status = 400;
+        return { success: false, message: 'Select a bank account before generating Proforma Invoice' };
+      }
       const { buffer, fileName, revision } = await generateProformaInvoicePdfBuffer(orderId);
 
       set.headers['Content-Type'] = 'application/pdf';
@@ -72,6 +90,15 @@ export const documentsController = new Elysia({ prefix: '/orders' })
     async ({ params, set }) => {
       const orderId = await resolveOrderId(params.id);
       if (!orderId) { set.status = 404; return { success: false, message: 'Order not found' }; }
+      const order = await getOrderById(orderId);
+      if (!order?.items?.length) {
+        set.status = 400;
+        return { success: false, message: 'Add at least one line item before generating documents' };
+      }
+      if (!order?.bankAccountId) {
+        set.status = 400;
+        return { success: false, message: 'Select a bank account before generating Invoice/Proforma' };
+      }
       const { buffer, fileName, revision } = await generateOrderInvoicePdfBuffer(orderId);
 
       set.headers['Content-Type'] = 'application/pdf';

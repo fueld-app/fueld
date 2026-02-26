@@ -106,6 +106,9 @@ const ACTIONS: ActionItem[] = [
 export class HeaderActionsComponent implements OnInit, OnDestroy {
   readonly orderId = input.required<string>();
   readonly status = input<OrderStatus | null>(null);
+  readonly hasInvoicingCompany = input<boolean>(false);
+  readonly hasBankAccount = input<boolean>(false);
+  readonly hasLineItems = input<boolean>(false);
   readonly actionTriggered = output<HeaderAction>();
 
   readonly isOpen = signal(false);
@@ -135,6 +138,9 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
 
   private updateActions(): void {
     const status = this.status();
+    const hasInvoicingCompany = this.hasInvoicingCompany();
+    const hasBankAccount = this.hasBankAccount();
+    const hasLineItems = this.hasLineItems();
     const showInvoiceAsFinal =
       status === OrderStatus.Delivered
       || status === OrderStatus.Invoiced
@@ -145,7 +151,15 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
       .filter((action) => action.key !== 'mark-paid' || canMarkPaid)
       .map((action) =>
         action.key === 'generate-invoice'
-          ? { ...action, label: showInvoiceAsFinal ? 'View Invoice' : 'View Proforma Invoice' }
+          ? {
+              ...action,
+              label: showInvoiceAsFinal ? 'View Invoice' : 'View Proforma Invoice',
+              disabled: !hasBankAccount || !hasLineItems,
+            }
+          : action.key === 'view-offer'
+            ? { ...action, disabled: !hasInvoicingCompany || !hasLineItems }
+          : action.key === 'view-proforma'
+            ? { ...action, disabled: !hasBankAccount || !hasLineItems }
           : action.key === 'mark-paid'
             ? { ...action, disabled: !canMarkPaid }
           : action,

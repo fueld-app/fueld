@@ -168,7 +168,8 @@ interface LliSearchResult {
                 <hr class="my-1 border-gray-100">
                 <button
                   (click)="viewOfferPdf(); actionsOpen.set(false)"
-                  class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  [disabled]="!hasInvoicingCompany() || !hasLineItems()"
+                  class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                     <path d="M10.75 2.75a.75.75 0 0 0-1.5 0v8.614L6.295 8.235a.75.75 0 1 0-1.09 1.03l4.25 4.5a.75.75 0 0 0 1.09 0l4.25-4.5a.75.75 0 0 0-1.09-1.03l-2.955 3.129V2.75Z" />
@@ -178,7 +179,8 @@ interface LliSearchResult {
                 </button>
                 <button
                   (click)="viewProformaPdf(); actionsOpen.set(false)"
-                  class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  [disabled]="!hasBankAccount() || !hasLineItems()"
+                  class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                     <path fill-rule="evenodd" d="M4.5 2A1.5 1.5 0 0 0 3 3.5v13A1.5 1.5 0 0 0 4.5 18h11a1.5 1.5 0 0 0 1.5-1.5V7.621a1.5 1.5 0 0 0-.44-1.06l-4.12-4.122A1.5 1.5 0 0 0 11.378 2H4.5Zm2.25 8.5a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5h-6.5Zm0 3a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5h-6.5ZM6.75 6a.75.75 0 0 0 0 1.5h3.5a.75.75 0 0 0 0-1.5h-3.5Z" clip-rule="evenodd" />
@@ -188,7 +190,8 @@ interface LliSearchResult {
                 <hr class="my-1 border-gray-100">
                 <button
                   (click)="convertToOrder(); actionsOpen.set(false)"
-                  class="flex w-full items-center gap-2 px-4 py-2 text-sm text-green-700 hover:bg-green-50"
+                  [disabled]="!hasLineItems()"
+                  class="flex w-full items-center gap-2 px-4 py-2 text-sm text-green-700 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                     <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd" />
@@ -1052,6 +1055,8 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   );
 
   readonly hasInvoicingCompany = computed(() => !!this.order()?.invoicingCompanyId);
+  readonly hasBankAccount = computed(() => !!this.order()?.bankAccountId);
+  readonly hasLineItems = computed(() => this.itemRows().length > 0);
   readonly isResponsibleUser = computed(() => {
     const currentUserId = this.auth.user()?.id ?? '';
     return !!currentUserId && this.order()?.salesRepId === currentUserId;
@@ -2266,6 +2271,10 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   async convertToOrder(): Promise<void> {
     const id = this.inquiryId();
     if (!id) return;
+    if (!this.hasLineItems()) {
+      this.showToast('error', 'Add at least one line item before converting to order.');
+      return;
+    }
 
     try {
       // Save pending changes first
@@ -2331,6 +2340,14 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   async viewOfferPdf(): Promise<void> {
     const id = this.inquiryId();
     if (!id) return;
+    if (!this.hasLineItems()) {
+      this.showToast('error', 'Add at least one line item before generating Offer PDF.');
+      return;
+    }
+    if (!this.hasInvoicingCompany()) {
+      this.showToast('error', 'Select an invoicing company before generating Offer PDF.');
+      return;
+    }
     const modal = this.pdfModal();
     if (!modal) return;
     modal.showLoading('Offer');
@@ -2348,6 +2365,14 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   async viewProformaPdf(): Promise<void> {
     const id = this.inquiryId();
     if (!id) return;
+    if (!this.hasLineItems()) {
+      this.showToast('error', 'Add at least one line item before generating Proforma Invoice.');
+      return;
+    }
+    if (!this.hasBankAccount()) {
+      this.showToast('error', 'Select a bank account before generating Proforma Invoice.');
+      return;
+    }
     const modal = this.pdfModal();
     if (!modal) return;
     modal.showLoading('Proforma Invoice');
