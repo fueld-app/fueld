@@ -445,7 +445,9 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
     this.loading.set(true);
     try {
       const params = new URLSearchParams();
-      if (!this.isOrders()) {
+      if (this.isOrders()) {
+        params.set('statuses', 'CONFIRMED,DELIVERED,INVOICED,PAID,CANCELLED');
+      } else {
         params.set('statuses', 'INQUIRY,OFFER');
       }
       params.set('page', String(this.currentPage()));

@@ -1814,6 +1814,7 @@ function buildProformaDocument(data: {
   const vesselDisplay = data.vesselName.startsWith('MV ') ? vesselRef : `MV ${vesselRef}`;
   const forAccountParts = [`Master and/or owner and/or charterers and/or ${vesselDisplay}`];
   if (data.clientName) forAccountParts.push(`and/or ${data.clientName}`);
+  const hasNotesSection = !!data.customerNote?.trim() || data.itemNotes.length > 0;
 
   // ── Header (3 columns: client | title | logo+date/ref) ────────────
   const header = (currentPage: number, _pageCount: number): Content => {
@@ -1958,7 +1959,7 @@ function buildProformaDocument(data: {
 
       // ── Remittance Instructions ──
       ...(data.bank ? [
-        { text: '', margin: [0, 14, 0, 0] } as Content,
+        { text: '', margin: [0, hasNotesSection ? 6 : 14, 0, 0] } as Content,
         { canvas: [{ type: 'line' as const, x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 0.5, lineColor: '#e5e7eb' }] } as Content,
         { text: '', margin: [0, 10, 0, 0] } as Content,
         { text: 'REMITTANCE INSTRUCTIONS', style: 'sectionLabel' } as Content,
