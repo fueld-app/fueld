@@ -1118,6 +1118,7 @@ export interface SecuritySettingsDto {
   passkeyAllowPasswordless: boolean;
   tokenExpirationMinutes: number;
   sessionTimeoutMinutes: number;
+  documentVerificationLinkExpiryDays: number; // 0 = never expires
 }
 
 export interface UpdateSecuritySettingsDto {
@@ -1131,6 +1132,7 @@ export interface UpdateSecuritySettingsDto {
   passkeyAllowPasswordless?: boolean;
   tokenExpirationMinutes?: number;
   sessionTimeoutMinutes?: number;
+  documentVerificationLinkExpiryDays?: number;
 }
 
 // ═══════════════════════════════════════════════════════════════════════

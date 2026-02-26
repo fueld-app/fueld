@@ -23,6 +23,7 @@ async function getSecuritySettings(): Promise<SecuritySettingsDto> {
     passkeyAllowPasswordless: s.passkeyAllowPasswordless ?? false,
     tokenExpirationMinutes: s.tokenExpirationMinutes ?? 15,
     sessionTimeoutMinutes: s.sessionTimeoutMinutes ?? 480,
+    documentVerificationLinkExpiryDays: s.documentVerificationLinkExpiryDays ?? 0,
   };
 }
 
@@ -52,6 +53,7 @@ async function updateSecuritySettings(
     passkeyAllowPasswordless: merged.passkeyAllowPasswordless ?? false,
     tokenExpirationMinutes: merged.tokenExpirationMinutes ?? 15,
     sessionTimeoutMinutes: merged.sessionTimeoutMinutes ?? 480,
+    documentVerificationLinkExpiryDays: merged.documentVerificationLinkExpiryDays ?? 0,
   };
 }
 
@@ -96,6 +98,9 @@ export const securityController = new Elysia({ prefix: '/admin/security' })
       if (body.sessionTimeoutMinutes !== undefined) {
         patch.sessionTimeoutMinutes = Math.max(5, Math.min(10080, body.sessionTimeoutMinutes));
       }
+      if (body.documentVerificationLinkExpiryDays !== undefined) {
+        patch.documentVerificationLinkExpiryDays = Math.max(0, Math.min(3650, body.documentVerificationLinkExpiryDays));
+      }
 
       const settings = await updateSecuritySettings(patch);
       return { success: true, data: settings };
@@ -112,6 +117,7 @@ export const securityController = new Elysia({ prefix: '/admin/security' })
         passkeyAllowPasswordless: t.Optional(t.Boolean()),
         tokenExpirationMinutes: t.Optional(t.Number()),
         sessionTimeoutMinutes: t.Optional(t.Number()),
+        documentVerificationLinkExpiryDays: t.Optional(t.Number()),
       }),
     },
   );

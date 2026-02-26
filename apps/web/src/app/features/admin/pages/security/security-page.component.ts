@@ -341,6 +341,21 @@ import { API } from '@app/core/config/api';
                 </div>
                 <p class="mt-1 text-xs text-gray-500">Inactive sessions are terminated after this period. Default: 480 min (8 hours).</p>
               </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Document Verification Link Expiry</label>
+                <div class="flex items-center gap-2">
+                  <input
+                    type="number"
+                    [ngModel]="documentVerificationLinkExpiryDays()"
+                    (ngModelChange)="documentVerificationLinkExpiryDays.set($event)"
+                    min="0"
+                    max="3650"
+                    class="w-24 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                  />
+                  <span class="text-sm text-gray-500">days</span>
+                </div>
+                <p class="mt-1 text-xs text-gray-500">Public verification links expire after this many days. Set 0 for no expiry.</p>
+              </div>
             </div>
             <div class="border-t border-gray-100 px-6 py-3 bg-gray-50/50 flex justify-end">
               <button
@@ -388,6 +403,7 @@ export class SecurityPageComponent implements OnInit {
   // Session
   readonly tokenExpirationMinutes = signal(15);
   readonly sessionTimeoutMinutes = signal(480);
+  readonly documentVerificationLinkExpiryDays = signal(0);
 
   ngOnInit(): void {
     this.loadSettings();
@@ -408,6 +424,7 @@ export class SecurityPageComponent implements OnInit {
         this.passkeyAllowPasswordless.set(res.data.passkeyAllowPasswordless);
         this.tokenExpirationMinutes.set(res.data.tokenExpirationMinutes);
         this.sessionTimeoutMinutes.set(res.data.sessionTimeoutMinutes);
+        this.documentVerificationLinkExpiryDays.set(res.data.documentVerificationLinkExpiryDays ?? 0);
       }
     } catch {
       // silent
@@ -476,6 +493,7 @@ export class SecurityPageComponent implements OnInit {
         this.http.put(`${API}/admin/security`, {
           tokenExpirationMinutes: this.tokenExpirationMinutes(),
           sessionTimeoutMinutes: this.sessionTimeoutMinutes(),
+          documentVerificationLinkExpiryDays: this.documentVerificationLinkExpiryDays(),
         }),
       );
       this.showSuccess();

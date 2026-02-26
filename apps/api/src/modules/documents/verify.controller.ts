@@ -5,6 +5,7 @@ import {
   generateProformaInvoicePdfBuffer,
   getDocumentRevisionByVerifyToken,
   getLatestDocumentRevisionByOrderId,
+  isDocumentRevisionVerificationExpired,
   loadDocumentRevisionBuffer,
 } from './document.service';
 import { resolveOrderId } from '../orders/orders.service';
@@ -29,6 +30,10 @@ export const verifyController = new Elysia({ prefix: '/verify' })
       const existingRevision = await getLatestDocumentRevisionByOrderId(orderId, 'OFFER');
       const generated = existingRevision ? null : await generateOfferPdfBuffer(orderId);
       const revision = existingRevision ?? generated!.revision;
+      if (await isDocumentRevisionVerificationExpired(revision)) {
+        set.status = 410;
+        return { success: false, message: 'Verification link expired' };
+      }
       const fileName = generated?.fileName ?? `Offer_${orderId.slice(0, 8)}.pdf`;
       const buffer = loadDocumentRevisionBuffer(revision);
 
@@ -64,6 +69,10 @@ export const verifyController = new Elysia({ prefix: '/verify' })
       const existingRevision = await getLatestDocumentRevisionByOrderId(orderId, 'PROFORMA_INVOICE');
       const generated = existingRevision ? null : await generateProformaInvoicePdfBuffer(orderId);
       const revision = existingRevision ?? generated!.revision;
+      if (await isDocumentRevisionVerificationExpired(revision)) {
+        set.status = 410;
+        return { success: false, message: 'Verification link expired' };
+      }
       const fileName = generated?.fileName ?? `Nomination_${orderId.slice(0, 8)}.pdf`;
       const buffer = loadDocumentRevisionBuffer(revision);
 
@@ -100,6 +109,10 @@ export const verifyController = new Elysia({ prefix: '/verify' })
       const existingRevision = await getLatestDocumentRevisionByOrderId(orderId, 'INVOICE');
       const generated = existingRevision ? null : await generateOrderInvoicePdfBuffer(orderId);
       const revision = existingRevision ?? generated!.revision;
+      if (await isDocumentRevisionVerificationExpired(revision)) {
+        set.status = 410;
+        return { success: false, message: 'Verification link expired' };
+      }
       const fileName = generated?.fileName ?? `Invoice_${orderId.slice(0, 8)}.pdf`;
       const buffer = loadDocumentRevisionBuffer(revision);
 
@@ -130,6 +143,11 @@ export const verifyController = new Elysia({ prefix: '/verify' })
       if (!revision) {
         set.status = 404;
         return { success: false, message: 'Document not found' };
+      }
+
+      if (await isDocumentRevisionVerificationExpired(revision)) {
+        set.status = 410;
+        return { success: false, message: 'Verification link expired' };
       }
 
       const buffer = loadDocumentRevisionBuffer(revision);

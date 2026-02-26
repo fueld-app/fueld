@@ -1687,6 +1687,7 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
           placeId: o.placeId,
           salesRepId: o.salesRepId ?? null,
           invoicingCompanyId: o.invoicingCompanyId,
+          bankAccountId: o.bankAccountId ?? null,
           currency: o.currency,
           customerPaymentTermType: o.customerPaymentTermType ?? null,
           customerCreditDays: o.customerCreditDays ?? null,
@@ -1746,6 +1747,7 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
       await firstValueFrom(
         this.http.put<ApiResponse<any>>(`${API}/orders/${id}`, {
           invoicingCompanyId: o.invoicingCompanyId,
+          bankAccountId: o.bankAccountId ?? null,
           salesRepId: o.salesRepId ?? null,
           customerPaymentTermType: o.customerPaymentTermType ?? null,
           customerCreditDays: o.customerCreditDays ?? null,
@@ -1795,11 +1797,14 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   // ─── Send Offer to Customer ──────────────────────────────────────
 
   openSendOfferModal(): void {
-    this.offerEmail = '';
+    this.offerEmail = this.customerContact()?.email?.trim() || this.client()?.headOfficeEmail?.trim() || '';
     this.offerSubject = `Bunker Offer — ${this.vesselName()} at ${this.portName()}`;
     const o = this.order();
     const items = this.itemRows();
     const currency = o?.currency ?? 'USD';
+    const responsibleName = this.teamUsers().find((u) => u.id === o?.salesRepId)?.name
+      ?? this.auth.user()?.name
+      ?? '';
     let body = `Dear Customer,\n\nPlease find our offer for bunker supply to ${this.vesselName()} at ${this.portName()}.\n`;
     if (o?.eta) body += `\nETA: ${this.formatDateTimeForEmail(o.eta)}`;
     if (o?.etd) body += `\nETD: ${this.formatDateTimeForEmail(o.etd)}`;
@@ -1810,9 +1815,15 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
           ? `${item.quantityMin}-${item.quantityMax}`
           : String(item.quantity);
         body += `${i + 1}. ${item.productType || 'Product'} — ${qty} ${item.unit} @ ${currency} ${item.salesPrice?.toFixed(2) ?? '0.00'}/${item.unit}\n`;
+        if (item.description?.trim()) {
+          body += `   Description: ${item.description.trim()}\n`;
+        }
       });
     }
     body += `\nBest regards`;
+    if (responsibleName.trim()) {
+      body += `\n${responsibleName.trim()}`;
+    }
     this.offerBody = body;
     this.showSendOfferModal.set(true);
   }

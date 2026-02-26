@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, join } from 'node:path';
 import QRCode from 'qrcode';
 import { db } from '../../db';
-import { bankAccounts, orders, orderItems, counterparties, vessels, places, invoices, users, documentRevisions } from '../../db/schema';
+import { bankAccounts, orders, orderItems, counterparties, vessels, places, invoices, users, documentRevisions, tenants, type TenantSettings } from '../../db/schema';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Document Service — Server-side PDF generation (pdfmake v0.3)
@@ -47,6 +47,7 @@ type DocumentType = 'OFFER' | 'PROFORMA_INVOICE' | 'INVOICE' | 'OTHER';
 
 export interface DocumentRevisionInfo {
   id: string;
+  tenantId: string;
   revisionNumber: number;
   verificationRef: string;
   verifyToken: string;
@@ -116,6 +117,7 @@ function buildVerificationRef(documentType: DocumentType, issuedAt: Date, revisi
 function mapRevisionInfo(revision: typeof documentRevisions.$inferSelect, isNew = false): DocumentRevisionInfo {
   return {
     id: revision.id,
+    tenantId: revision.tenantId,
     revisionNumber: revision.revisionNumber,
     verificationRef: revision.verificationRef,
     verifyToken: revision.verifyToken,
@@ -129,6 +131,28 @@ function mapRevisionInfo(revision: typeof documentRevisions.$inferSelect, isNew 
 
 function getRevisionAbsolutePath(filePath: string): string {
   return join(process.cwd(), 'uploads', filePath);
+}
+
+async function getTenantDocumentVerificationExpiryDays(tenantId: string): Promise<number> {
+  const [tenant] = await db
+    .select({ settings: tenants.settings })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+
+  const settings = (tenant?.settings ?? {}) as TenantSettings;
+  const raw = settings.documentVerificationLinkExpiryDays;
+  if (raw === undefined || raw === null) return 0;
+  const days = Number(raw);
+  if (!Number.isFinite(days)) return 0;
+  return Math.max(0, Math.floor(days));
+}
+
+export async function isDocumentRevisionVerificationExpired(revision: DocumentRevisionInfo): Promise<boolean> {
+  const expiryDays = await getTenantDocumentVerificationExpiryDays(revision.tenantId);
+  if (expiryDays <= 0) return false;
+  const expiresAt = revision.issuedAt.getTime() + expiryDays * 24 * 60 * 60 * 1000;
+  return Date.now() > expiresAt;
 }
 
 async function persistDocumentRevision(params: {
@@ -510,6 +534,13 @@ function formatDateTimeForDisplay(value: string | null, tz: string | null | unde
   const minute = String(local.getUTCMinutes()).padStart(2, '0');
   const formatted = `${day}-${month}-${year} ${hour}:${minute}`;
   return tz ? `${formatted} ${tz}` : formatted;
+}
+
+function replaceCompanyNamePlaceholder(value: string | null | undefined, companyName: string | null | undefined): string | null {
+  if (!value) return null;
+  const resolvedName = companyName?.trim();
+  if (!resolvedName) return value;
+  return value.replace(/\$\{companyName\}/g, resolvedName);
 }
 
 function buildNotesSection(params: {
@@ -1486,7 +1517,10 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
     fromPhone: order.salesRep?.phone ?? null,
     paymentTerms: formatCustomerPaymentTerms(order.customerPaymentTermType, order.customerCreditDays),
     customerNote: order.customerNote ?? null,
-    termsAndConditions: order.termsAndConditions ?? order.invoicingCompany?.customerTerms ?? null,
+    termsAndConditions: replaceCompanyNamePlaceholder(
+      order.termsAndConditions ?? order.invoicingCompany?.customerTerms ?? null,
+      order.invoicingCompany?.name ?? null,
+    ),
     placeRemark: order.place.orderRemark ?? null,
     companyName: order.invoicingCompany?.name ?? null,
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,

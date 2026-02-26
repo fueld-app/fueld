@@ -99,6 +99,7 @@ export interface TenantSettings {
   passkeyAllowPasswordless?: boolean; // Allow passkeys for passwordless login
   tokenExpirationMinutes?: number;  // JWT lifetime (default 15)
   sessionTimeoutMinutes?: number;   // Idle session timeout (default 480 = 8h)
+  documentVerificationLinkExpiryDays?: number; // 0 = never expires
   // Branding
   defaultLogoUrl?: string;       // Default company logo if a company has none
   // Order numbering
