@@ -9,7 +9,7 @@ import {
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
-import type { ApiResponse, OrderNumberSettingsDto, VesselCompanyRoleSettingsDto, VesselCompanyRoleOption, ProductSettingsDto, UnitSettingsDto, CurrencySettingsDto, CompanyTypeSettingsDto } from '@fueld/types';
+import type { ApiResponse, OrderNumberSettingsDto, VesselCompanyRoleSettingsDto, VesselCompanyRoleOption, ProductSettingsDto, UnitSettingsDto, CurrencySettingsDto, CompanyTypeSettingsDto, InquiryCancelReasonSettingsDto } from '@fueld/types';
 
 import { API } from '@app/core/config/api';
 
@@ -440,6 +440,83 @@ import { API } from '@app/core/config/api';
           </div>
 
           <!-- ════════════════════════════════════════════════════════ -->
+          <!--  Inquiry Cancel Reasons                                 -->
+          <!-- ════════════════════════════════════════════════════════ -->
+          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
+              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-rose-50">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-rose-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.53-10.53a.75.75 0 0 0-1.06-1.06L10 8.94 7.53 6.47a.75.75 0 0 0-1.06 1.06L8.94 10l-2.47 2.47a.75.75 0 1 0 1.06 1.06L10 11.06l2.47 2.47a.75.75 0 0 0 1.06-1.06L11.06 10l2.47-2.47Z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-semibold text-gray-900">Inquiry Cancel Reasons</h3>
+                <p class="text-xs text-gray-500">Configure selectable reasons required when cancelling an inquiry.</p>
+              </div>
+            </div>
+
+            <div class="p-6 space-y-3">
+              @for (reason of inquiryCancelReasons(); track $index; let i = $index) {
+                <div class="flex items-center gap-2">
+                  <div class="flex flex-col gap-0.5 shrink-0">
+                    <button (click)="moveInquiryCancelReasonUp(i)" [disabled]="i === 0" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move up">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
+                    </button>
+                    <button (click)="moveInquiryCancelReasonDown(i)" [disabled]="i === inquiryCancelReasons().length - 1" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move down">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    [value]="reason"
+                    (input)="updateInquiryCancelReason(i, $any($event.target).value)"
+                    class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm
+                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                  />
+                  <button
+                    (click)="removeInquiryCancelReason(i)"
+                    [disabled]="inquiryCancelReasons().length <= 1"
+                    class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 transition-colors shrink-0"
+                    title="Remove reason"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              }
+              <button
+                (click)="addInquiryCancelReason()"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-xs font-medium text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+                </svg>
+                Add Reason
+              </button>
+
+              <div class="flex items-center gap-3 pt-2">
+                <button
+                  (click)="saveInquiryCancelReasons()"
+                  [disabled]="inquiryCancelReasonsSaving()"
+                  class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm
+                         hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                >
+                  @if (inquiryCancelReasonsSaving()) { Saving… } @else { Save Reasons }
+                </button>
+                @if (inquiryCancelReasonsSaved()) {
+                  <span class="text-sm text-green-600 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                    </svg>
+                    Saved
+                  </span>
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- ════════════════════════════════════════════════════════ -->
           <!--  Vessel–Company Role Options                            -->
           <!-- ════════════════════════════════════════════════════════ -->
           <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden min-[900px]:col-span-2">
@@ -631,6 +708,11 @@ export class SettingsPageComponent implements OnInit {
   readonly companyTypesSaving = signal(false);
   readonly companyTypesSaved = signal(false);
 
+  // Inquiry cancellation reasons
+  readonly inquiryCancelReasons = signal<string[]>([]);
+  readonly inquiryCancelReasonsSaving = signal(false);
+  readonly inquiryCancelReasonsSaved = signal(false);
+
   readonly livePreview = computed(() => {
     const tmpl = this.template();
     const pfx = this.prefix();
@@ -662,6 +744,7 @@ export class SettingsPageComponent implements OnInit {
     this.loadUnits();
     this.loadCurrencies();
     this.loadCompanyTypes();
+    this.loadInquiryCancelReasons();
   }
 
   private async loadSettings(): Promise<void> {
@@ -1126,6 +1209,74 @@ export class SettingsPageComponent implements OnInit {
       this.showToast('error', 'Failed to save company types.');
     } finally {
       this.companyTypesSaving.set(false);
+    }
+  }
+
+  // ─── Inquiry cancellation reasons ────────────────────────────────
+
+  private async loadInquiryCancelReasons(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<InquiryCancelReasonSettingsDto>>(`${API}/admin/settings/inquiry-cancel-reasons`),
+      );
+      if (res.success) this.inquiryCancelReasons.set(res.data.reasons);
+    } catch {
+      this.showToast('error', 'Failed to load inquiry cancellation reasons.');
+    }
+  }
+
+  updateInquiryCancelReason(index: number, value: string): void {
+    const updated = [...this.inquiryCancelReasons()];
+    updated[index] = value;
+    this.inquiryCancelReasons.set(updated);
+  }
+
+  addInquiryCancelReason(): void {
+    this.inquiryCancelReasons.set([...this.inquiryCancelReasons(), '']);
+  }
+
+  removeInquiryCancelReason(index: number): void {
+    this.inquiryCancelReasons.set(this.inquiryCancelReasons().filter((_, i) => i !== index));
+  }
+
+  moveInquiryCancelReasonUp(index: number): void {
+    if (index <= 0) return;
+    const updated = [...this.inquiryCancelReasons()];
+    [updated[index - 1], updated[index]] = [updated[index], updated[index - 1]];
+    this.inquiryCancelReasons.set(updated);
+  }
+
+  moveInquiryCancelReasonDown(index: number): void {
+    const arr = this.inquiryCancelReasons();
+    if (index >= arr.length - 1) return;
+    const updated = [...arr];
+    [updated[index], updated[index + 1]] = [updated[index + 1], updated[index]];
+    this.inquiryCancelReasons.set(updated);
+  }
+
+  async saveInquiryCancelReasons(): Promise<void> {
+    const valid = this.inquiryCancelReasons().map((r) => r.trim()).filter((r) => r.length > 0);
+    if (valid.length === 0) {
+      this.showToast('error', 'At least one inquiry cancellation reason is required.');
+      return;
+    }
+    this.inquiryCancelReasonsSaving.set(true);
+    this.inquiryCancelReasonsSaved.set(false);
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<InquiryCancelReasonSettingsDto>>(`${API}/admin/settings/inquiry-cancel-reasons`, { reasons: valid }),
+      );
+      if (res.success) {
+        this.inquiryCancelReasons.set(res.data.reasons);
+        this.inquiryCancelReasonsSaved.set(true);
+        setTimeout(() => this.inquiryCancelReasonsSaved.set(false), 3000);
+      } else {
+        this.showToast('error', (res as any).message ?? 'Failed to save.');
+      }
+    } catch {
+      this.showToast('error', 'Failed to save inquiry cancellation reasons.');
+    } finally {
+      this.inquiryCancelReasonsSaving.set(false);
     }
   }
 }

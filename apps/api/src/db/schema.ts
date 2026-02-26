@@ -114,6 +114,8 @@ export interface TenantSettings {
   currencies?: string[];
   // Configurable company types (e.g. CLIENT, SUPPLIER, BARGE)
   companyTypes?: string[];
+  // Configurable reasons required when cancelling inquiries
+  inquiryCancelReasons?: string[];
   // WhatsApp integration
   whatsappEnabled?: boolean;
   whatsappDefaultGroupJid?: string | null;

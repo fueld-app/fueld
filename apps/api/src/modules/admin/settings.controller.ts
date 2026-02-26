@@ -38,6 +38,8 @@ import {
   updateCurrencySettings,
   getCompanyTypeSettings,
   updateCompanyTypeSettings,
+  getInquiryCancelReasonSettings,
+  updateInquiryCancelReasonSettings,
   updateOwnCompanyTerms,
   getWhatsAppSettings,
   updateWhatsAppSettings,
@@ -388,6 +390,18 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     }
   }, {
     detail: { tags: ['Admin Settings'], summary: 'Get company type options for current tenant' },
+  })
+
+  .get('/my-inquiry-cancel-reasons', async () => {
+    try {
+      const data = await getInquiryCancelReasonSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get inquiry cancellation reasons for current tenant' },
   })
 
   // ── Integrations ────────────────────────────────────────────────
@@ -1025,6 +1039,39 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       companyTypes: t.Array(t.String({ minLength: 1 })),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update configurable company type options' },
+  })
+
+  // ═════════════════════════════════════════════════════════════════
+  //  INQUIRY CANCELLATION REASON SETTINGS
+  // ═════════════════════════════════════════════════════════════════
+
+  .get('/inquiry-cancel-reasons', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getInquiryCancelReasonSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get configurable inquiry cancellation reasons' },
+  })
+
+  .put('/inquiry-cancel-reasons', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateInquiryCancelReasonSettings(body.reasons);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      reasons: t.Array(t.String({ minLength: 1 })),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update configurable inquiry cancellation reasons' },
   })
 
   // ═════════════════════════════════════════════════════════════

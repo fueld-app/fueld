@@ -831,6 +831,49 @@ export async function updateCompanyTypeSettings(companyTypes: string[]): Promise
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+//  INQUIRY CANCELLATION REASON SETTINGS
+// ═══════════════════════════════════════════════════════════════════════
+
+const DEFAULT_INQUIRY_CANCEL_REASONS = [
+  'Price not competitive',
+  'Customer cancelled request',
+  'No supplier availability',
+  'Credit not approved',
+  'Duplicate inquiry',
+];
+
+export async function getInquiryCancelReasonSettings(): Promise<{ reasons: string[] }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  return { reasons: settings.inquiryCancelReasons ?? DEFAULT_INQUIRY_CANCEL_REASONS };
+}
+
+export async function updateInquiryCancelReasonSettings(reasons: string[]): Promise<{ reasons: string[] }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const cleaned = reasons
+    .map((reason) => reason.trim())
+    .filter((reason) => reason.length > 0);
+
+  if (!cleaned.length) {
+    throw new Error('At least one inquiry cancellation reason is required');
+  }
+
+  const settings = { ...(tenant.settings as any) };
+  settings.inquiryCancelReasons = cleaned;
+
+  await db
+    .update(tenants)
+    .set({ settings, updatedAt: new Date() })
+    .where(eq(tenants.id, tenant.id));
+
+  return getInquiryCancelReasonSettings();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 //  WHATSAPP SETTINGS
 // ═══════════════════════════════════════════════════════════════════════
 

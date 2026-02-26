@@ -543,6 +543,11 @@ export interface CompanyTypeSettingsDto {
   companyTypes: string[];
 }
 
+/** Admin settings for configurable inquiry cancellation reasons */
+export interface InquiryCancelReasonSettingsDto {
+  reasons: string[];
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  ORDER ITEM (line items)
 // ═══════════════════════════════════════════════════════════════════════

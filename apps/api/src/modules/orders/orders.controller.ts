@@ -33,6 +33,7 @@ import type { ApiResponse } from '@fueld/types';
 import { db } from '../../db';
 import { users } from '../../db/schema';
 import { eq } from 'drizzle-orm';
+import { getInquiryCancelReasonSettings } from '../admin/settings.service';
 
 const PaymentTermTypeSchema = t.Union([
   t.Literal('CREDIT'),
@@ -280,17 +281,34 @@ export const ordersController = new Elysia({ prefix: '/orders' })
       try {
         const orderId = await resolveOrderId(params.id);
         if (!orderId) return { success: false, data: null, message: 'Order not found' };
+        let order: Awaited<ReturnType<typeof getOrderById>> | null = null;
+        if (body.status === 'CONFIRMED' || body.status === 'CANCELLED') {
+          order = await getOrderById(orderId);
+        }
+
         if (body.status === 'CONFIRMED') {
-          const order = await getOrderById(orderId);
           if (!order?.items?.length) {
             return { success: false, data: null, message: 'Add at least one line item before converting to order' };
           }
         }
+
+        if (body.status === 'CANCELLED' && (order?.status === 'INQUIRY' || order?.status === 'OFFER')) {
+          const reason = body.lossReason?.trim();
+          if (!reason) {
+            return { success: false, data: null, message: 'Cancellation reason is required' };
+          }
+
+          const reasonSettings = await getInquiryCancelReasonSettings();
+          if (!reasonSettings.reasons.includes(reason)) {
+            return { success: false, data: null, message: 'Invalid cancellation reason' };
+          }
+        }
+
         const updated = await updateOrderStatus(
           orderId,
           body.status,
           auth.sub,
-          body.lossReason,
+          body.lossReason?.trim(),
         );
         if (!updated) {
           return { success: false, data: null, message: 'Order not found' };

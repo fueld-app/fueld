@@ -10,7 +10,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, type HttpResponse } from '@angular/common/http';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map, firstValueFrom } from 'rxjs';
@@ -28,6 +28,7 @@ import {
   type CreditLineDto,
   type CompanyContactDto,
   type BankAccountDto,
+  type InquiryCancelReasonSettingsDto,
 } from '@fueld/types';
 
 import {
@@ -199,7 +200,7 @@ interface LliSearchResult {
                   Convert to Order
                 </button>
                 <button
-                  (click)="cancelInquiry(); actionsOpen.set(false)"
+                  (click)="openCancelInquiryModal(); actionsOpen.set(false)"
                   class="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-700 hover:bg-red-50"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-red-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -749,6 +750,68 @@ interface LliSearchResult {
     }
 
     <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!--  Cancel Inquiry Modal                                          -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    @if (showCancelInquiryModal()) {
+      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div class="w-full max-w-lg rounded-2xl bg-white shadow-2xl" role="dialog" aria-modal="true">
+          <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+            <h2 class="text-lg font-semibold text-gray-900">Cancel Inquiry</h2>
+            <button (click)="closeCancelInquiryModal()" class="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600" aria-label="Close">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+              </svg>
+            </button>
+          </div>
+
+          <div class="space-y-4 px-6 py-5">
+            <p class="text-sm text-gray-600">Select a reason before cancelling this inquiry.</p>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Cancellation Reason</label>
+              <select
+                [ngModel]="selectedCancelReason()"
+                (ngModelChange)="selectedCancelReason.set($event ?? '')"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900
+                       focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+              >
+                <option value="">Select reason...</option>
+                @for (reason of inquiryCancelReasons(); track reason) {
+                  <option [value]="reason">{{ reason }}</option>
+                }
+              </select>
+              @if (!inquiryCancelReasons().length) {
+                <p class="mt-2 text-xs text-amber-700">No cancellation reasons configured in Admin Settings.</p>
+              }
+            </div>
+          </div>
+
+          <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-4">
+            <button
+              (click)="closeCancelInquiryModal()"
+              class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              (click)="cancelInquiry()"
+              [disabled]="cancellingInquiry() || !selectedCancelReason()"
+              class="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold
+                     text-white shadow-sm transition-colors hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              @if (cancellingInquiry()) {
+                <svg class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+              }
+              Confirm Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
     <!--  Toast Notification                                           -->
     <!-- ═══════════════════════════════════════════════════════════════ -->
     @if (paymentModalOpen()) {
@@ -990,6 +1053,13 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   inquirySubject = '';
   inquiryBody = '';
   inquirySupplierTarget = '';
+
+  // ─── Cancel inquiry modal state ───────────────────────────────────
+
+  readonly showCancelInquiryModal = signal(false);
+  readonly cancellingInquiry = signal(false);
+  readonly inquiryCancelReasons = signal<string[]>([]);
+  readonly selectedCancelReason = signal('');
 
   // ─── Computed ────────────────────────────────────────────────────
 
@@ -1366,7 +1436,7 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   private async loadReferenceData(): Promise<void> {
     try {
       // Load initial suppliers list
-      const [suppliersRes, usersRes, currenciesRes] = await Promise.all([
+      const [suppliersRes, usersRes, currenciesRes, cancelReasonsRes] = await Promise.all([
         firstValueFrom(
           this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
             `${API}/companies/local?type=SUPPLIER&limit=100`,
@@ -1378,11 +1448,17 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
         firstValueFrom(
           this.http.get<ApiResponse<{ currencies: string[] }>>(`${API}/admin/settings/my-currencies`),
         ),
+        firstValueFrom(
+          this.http.get<ApiResponse<InquiryCancelReasonSettingsDto>>(`${API}/admin/settings/my-inquiry-cancel-reasons`),
+        ),
       ]);
       if (suppliersRes.success) this.suppliers.set(suppliersRes.data.companies);
       if (usersRes.success) this.teamUsers.set(usersRes.data ?? []);
       if (currenciesRes.success && currenciesRes.data.currencies.length) {
         this.configuredCurrencies.set(currenciesRes.data.currencies);
+      }
+      if (cancelReasonsRes.success) {
+        this.inquiryCancelReasons.set(cancelReasonsRes.data.reasons ?? []);
       }
     } catch {
       // silently ignore
@@ -2305,23 +2381,51 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
 
   // ─── Cancel Inquiry ──────────────────────────────────────────────
 
+  openCancelInquiryModal(): void {
+    if (!this.inquiryCancelReasons().length) {
+      this.showToast('error', 'No cancellation reasons configured. Please ask admin to configure reasons in Settings.');
+      return;
+    }
+    this.selectedCancelReason.set('');
+    this.showCancelInquiryModal.set(true);
+  }
+
+  closeCancelInquiryModal(): void {
+    this.showCancelInquiryModal.set(false);
+    this.selectedCancelReason.set('');
+  }
+
   async cancelInquiry(): Promise<void> {
     const id = this.inquiryId();
     if (!id) return;
+
+    const reason = this.selectedCancelReason().trim();
+    if (!reason) {
+      this.showToast('error', 'Please select a cancellation reason.');
+      return;
+    }
+
+    this.cancellingInquiry.set(true);
 
     try {
       const res = await firstValueFrom(
         this.http.put<ApiResponse<any>>(`${API}/orders/${id}/status`, {
           status: 'CANCELLED',
+          lossReason: reason,
         }),
       );
 
       if (res.success) {
         this.order.update((o) => (o ? { ...o, status: OrderStatus.Cancelled } : o));
+        this.closeCancelInquiryModal();
         this.showToast('success', 'Inquiry cancelled.');
+      } else {
+        this.showToast('error', res.message ?? 'Failed to cancel inquiry.');
       }
     } catch {
       this.showToast('error', 'Failed to cancel inquiry.');
+    } finally {
+      this.cancellingInquiry.set(false);
     }
   }
 
@@ -2352,10 +2456,12 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
     if (!modal) return;
     modal.showLoading('Offer');
     try {
-      const blob = await firstValueFrom(
-        this.http.get(`${API}/orders/${id}/offer/pdf`, { responseType: 'blob' }),
+      const res = await firstValueFrom(
+        this.http.get(`${API}/orders/${id}/offer/pdf`, { responseType: 'blob', observe: 'response' }),
       );
-      modal.setBlob(blob, `Offer_${this.order()?.orderNumber ?? id}.pdf`);
+      const blob = res.body;
+      if (!blob) throw new Error('Missing PDF body');
+      modal.setBlob(blob, `Offer_${this.order()?.orderNumber ?? id}.pdf`, this.buildVerifyUrlFromResponse(res));
     } catch {
       modal.showError();
       this.showToast('error', 'Failed to generate offer PDF.');
@@ -2377,14 +2483,21 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
     if (!modal) return;
     modal.showLoading('Proforma Invoice');
     try {
-      const blob = await firstValueFrom(
-        this.http.get(`${API}/orders/${id}/proforma/pdf`, { responseType: 'blob' }),
+      const res = await firstValueFrom(
+        this.http.get(`${API}/orders/${id}/proforma/pdf`, { responseType: 'blob', observe: 'response' }),
       );
-      modal.setBlob(blob, `Proforma_${this.order()?.orderNumber ?? id}.pdf`);
+      const blob = res.body;
+      if (!blob) throw new Error('Missing PDF body');
+      modal.setBlob(blob, `Proforma_${this.order()?.orderNumber ?? id}.pdf`, this.buildVerifyUrlFromResponse(res));
     } catch {
       modal.showError();
       this.showToast('error', 'Failed to generate proforma invoice PDF.');
     }
+  }
+
+  private buildVerifyUrlFromResponse(res: HttpResponse<Blob>): string | null {
+    const token = res.headers.get('X-Document-Verify-Token')?.trim();
+    return token ? `${API}/verify/token/${token}` : null;
   }
 
   // ─── WhatsApp send from PDF modal ───────────────────────────────
