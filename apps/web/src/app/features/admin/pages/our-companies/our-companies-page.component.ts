@@ -242,7 +242,7 @@ interface CompanySearchResultOption {
                       </button>
                     </div>
                     <p class="mt-1 text-xs text-gray-500">
-                      These are read-only on the order and included in Confirmation and Nomination PDFs. You can use <span class="font-mono">$&#123;companyName&#125;</span> in the text.
+                      These are read-only on the order and included in Confirmation and Nomination PDFs. You can use <span class="font-mono">$&#123;companyName&#125;</span> and <span class="font-mono">$&#123;documentName&#125;</span> in the text (e.g. Offer/Confirmation).
                     </p>
 
                     @if (termsError()) {
