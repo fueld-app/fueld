@@ -2,11 +2,12 @@ import pdfmake from 'pdfmake';
 import vfsFonts from 'pdfmake/build/vfs_fonts.js';
 import type { TDocumentDefinitions, Content, TableCell } from 'pdfmake/interfaces';
 import { and, desc, eq } from 'drizzle-orm';
-import { existsSync, readFileSync } from 'node:fs';
-import { basename, extname, join } from 'node:path';
+import { createHash, randomUUID } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { basename, dirname, extname, join } from 'node:path';
 import QRCode from 'qrcode';
 import { db } from '../../db';
-import { bankAccounts, orders, orderItems, counterparties, vessels, places, invoices, users } from '../../db/schema';
+import { bankAccounts, orders, orderItems, counterparties, vessels, places, invoices, users, documentRevisions } from '../../db/schema';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Document Service — Server-side PDF generation (pdfmake v0.3)
@@ -40,6 +41,224 @@ interface BankDetails {
   currency: string;
   branchAddress: string | null;
   intermediaryBank: string | null;
+}
+
+type DocumentType = 'OFFER' | 'PROFORMA_INVOICE' | 'INVOICE' | 'OTHER';
+
+export interface DocumentRevisionInfo {
+  id: string;
+  revisionNumber: number;
+  verificationRef: string;
+  verifyToken: string;
+  sha256Hex: string;
+  fingerprintShort: string;
+  issuedAt: Date;
+  filePath: string;
+  isNew: boolean;
+}
+
+interface DocumentPrintMeta {
+  issuedAt: Date;
+  revisionNumber: number;
+  verificationRef: string;
+  fingerprintShort: string;
+}
+
+function formatIssuedAtUtc(date: Date): string {
+  return date.toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
+
+function trimTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, '');
+}
+
+function getPublicApiBaseUrl(): string {
+  const explicit = process.env['VERIFY_BASE_URL']
+    ?? process.env['PUBLIC_API_URL']
+    ?? process.env['API_URL'];
+  if (explicit?.trim()) return trimTrailingSlash(explicit.trim());
+
+  const appUrl = process.env['APP_URL'];
+  if (appUrl?.trim()) {
+    try {
+      const parsed = new URL(appUrl.trim());
+      const isLocal = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+      if (isLocal) return `${parsed.protocol}//${parsed.hostname}:3000`;
+      return `${parsed.origin}/api`;
+    } catch {
+      // fall through
+    }
+  }
+
+  return 'http://localhost:3000';
+}
+
+function sanitizePathSegment(value: string): string {
+  return value.replace(/[^a-zA-Z0-9_-]/g, '-');
+}
+
+function documentTypePrefix(documentType: DocumentType): string {
+  switch (documentType) {
+    case 'OFFER': return 'OFF';
+    case 'PROFORMA_INVOICE': return 'PFI';
+    case 'INVOICE': return 'INV';
+    default: return 'DOC';
+  }
+}
+
+function buildVerificationRef(documentType: DocumentType, issuedAt: Date, revisionNumber: number): string {
+  const yyyy = String(issuedAt.getUTCFullYear());
+  const mm = String(issuedAt.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(issuedAt.getUTCDate()).padStart(2, '0');
+  return `${documentTypePrefix(documentType)}-${yyyy}${mm}${dd}-R${String(revisionNumber).padStart(3, '0')}`;
+}
+
+function mapRevisionInfo(revision: typeof documentRevisions.$inferSelect, isNew = false): DocumentRevisionInfo {
+  return {
+    id: revision.id,
+    revisionNumber: revision.revisionNumber,
+    verificationRef: revision.verificationRef,
+    verifyToken: revision.verifyToken,
+    sha256Hex: revision.sha256Hex,
+    fingerprintShort: revision.fingerprintShort,
+    issuedAt: revision.issuedAt,
+    filePath: revision.filePath,
+    isNew,
+  };
+}
+
+function getRevisionAbsolutePath(filePath: string): string {
+  return join(process.cwd(), 'uploads', filePath);
+}
+
+async function persistDocumentRevision(params: {
+  tenantId: string;
+  orderId?: string | null;
+  invoiceId?: string | null;
+  documentType: DocumentType;
+  fileName: string;
+  buffer: Buffer;
+  generatedBy?: string | null;
+}): Promise<DocumentRevisionInfo> {
+  const streamTarget = params.invoiceId ?? params.orderId;
+  if (!streamTarget) throw new Error('Missing document stream target (orderId/invoiceId)');
+
+  const streamKey = `${params.documentType}:${streamTarget}`;
+  const sha256Hex = createHash('sha256').update(params.buffer).digest('hex');
+
+  const [existing] = await db
+    .select()
+    .from(documentRevisions)
+    .where(and(
+      eq(documentRevisions.tenantId, params.tenantId),
+      eq(documentRevisions.streamKey, streamKey),
+      eq(documentRevisions.sha256Hex, sha256Hex),
+    ))
+    .limit(1);
+
+  if (existing) return mapRevisionInfo(existing, false);
+
+  const [latest] = await db
+    .select({ revisionNumber: documentRevisions.revisionNumber })
+    .from(documentRevisions)
+    .where(and(
+      eq(documentRevisions.tenantId, params.tenantId),
+      eq(documentRevisions.streamKey, streamKey),
+    ))
+    .orderBy(desc(documentRevisions.revisionNumber))
+    .limit(1);
+
+  const revisionNumber = (latest?.revisionNumber ?? 0) + 1;
+  const issuedAt = new Date();
+  const fingerprintShort = sha256Hex.slice(0, 12).toUpperCase();
+  const verifyToken = randomUUID().replace(/-/g, '');
+  const verificationRef = buildVerificationRef(params.documentType, issuedAt, revisionNumber);
+
+  const safeStream = sanitizePathSegment(streamKey);
+  const relativePath = join('documents', sanitizePathSegment(params.tenantId), safeStream, `r${String(revisionNumber).padStart(4, '0')}-${fingerprintShort}.pdf`);
+  const absolutePath = join(process.cwd(), 'uploads', relativePath);
+
+  mkdirSync(dirname(absolutePath), { recursive: true });
+  writeFileSync(absolutePath, params.buffer);
+
+  const payload = {
+    tenantId: params.tenantId,
+    orderId: params.orderId ?? null,
+    invoiceId: params.invoiceId ?? null,
+    documentType: params.documentType,
+    streamKey,
+    revisionNumber,
+    verificationRef,
+    verifyToken,
+    sha256Hex,
+    fingerprintShort,
+    filePath: relativePath,
+    fileName: params.fileName,
+    mimeType: 'application/pdf',
+    fileSize: params.buffer.length,
+    generatedBy: params.generatedBy ?? null,
+    issuedAt,
+  };
+
+  try {
+    const [inserted] = await db.insert(documentRevisions).values(payload).returning();
+    return mapRevisionInfo(inserted, true);
+  } catch {
+    const [concurrent] = await db
+      .select()
+      .from(documentRevisions)
+      .where(and(
+        eq(documentRevisions.tenantId, params.tenantId),
+        eq(documentRevisions.streamKey, streamKey),
+        eq(documentRevisions.sha256Hex, sha256Hex),
+      ))
+      .limit(1);
+    if (concurrent) return mapRevisionInfo(concurrent, false);
+    throw new Error('Failed to persist document revision');
+  }
+}
+
+export async function getLatestDocumentRevisionByOrderId(
+  orderId: string,
+  documentType: Exclude<DocumentType, 'OTHER'>,
+): Promise<DocumentRevisionInfo | null> {
+  const streamKey = `${documentType}:${orderId}`;
+  const [revision] = await db
+    .select()
+    .from(documentRevisions)
+    .where(eq(documentRevisions.streamKey, streamKey))
+    .orderBy(desc(documentRevisions.revisionNumber))
+    .limit(1);
+
+  return revision ? mapRevisionInfo(revision) : null;
+}
+
+export async function getDocumentRevisionByVerifyToken(token: string): Promise<DocumentRevisionInfo | null> {
+  const [revision] = await db
+    .select()
+    .from(documentRevisions)
+    .where(eq(documentRevisions.verifyToken, token))
+    .limit(1);
+
+  return revision ? mapRevisionInfo(revision) : null;
+}
+
+export function loadDocumentRevisionBuffer(revision: DocumentRevisionInfo): Buffer {
+  const absolutePath = getRevisionAbsolutePath(revision.filePath);
+  if (!existsSync(absolutePath)) {
+    throw new Error(`Document artifact missing on disk: ${revision.filePath}`);
+  }
+  return readFileSync(absolutePath);
+}
+
+async function overwriteDocumentRevisionArtifact(revision: DocumentRevisionInfo, buffer: Buffer): Promise<void> {
+  const absolutePath = getRevisionAbsolutePath(revision.filePath);
+  mkdirSync(dirname(absolutePath), { recursive: true });
+  writeFileSync(absolutePath, buffer);
+  await db
+    .update(documentRevisions)
+    .set({ fileSize: buffer.length })
+    .where(eq(documentRevisions.id, revision.id));
 }
 
 const DEFAULT_BANK_DETAILS: BankDetails = {
@@ -305,7 +524,11 @@ function buildNotesSection(params: {
   const itemNotes = params.itemNotes ?? [];
   if (!customerNote && !termsAndConditions && !placeRemark && itemNotes.length === 0) return [];
 
-  const notes: Content[] = [{ text: 'Notes', style: 'sectionLabel' } as Content];
+  const notes: Content[] = [];
+  
+  if (customerNote || placeRemark) {
+    notes.push({ text: 'Notes', style: 'sectionLabel' } as Content);
+  }
 
   if (customerNote) {
     notes.push({ text: customerNote, margin: [0, 0, 0, 6] } as Content);
@@ -316,7 +539,7 @@ function buildNotesSection(params: {
   }
 
   if (termsAndConditions) {
-    notes.push({ text: 'Additional terms / notes:', bold: true, margin: [0, 2, 0, 4] } as Content);
+    notes.push({ text: 'Terms:', bold: true, margin: [0, 2, 0, 4] } as Content);
     notes.push({ text: termsAndConditions, margin: [0, 0, 0, 6] } as Content);
   }
 
@@ -391,6 +614,7 @@ function buildInvoiceDocument(data: {
   companyAddress: string | null;
   companyPhone: string | null;
   companyEmail: string | null;
+  printMeta?: DocumentPrintMeta | null;
 }): TDocumentDefinitions {
   // Build line items table
   const tableHeader: TableCell[] = [
@@ -665,6 +889,13 @@ function buildInvoiceDocument(data: {
             ],
             margin: [0, 6, 0, 0] as [number, number, number, number],
           },
+          ...(data.printMeta ? [{
+            text: `Issued (UTC): ${formatIssuedAtUtc(data.printMeta.issuedAt)}   Revision: ${data.printMeta.revisionNumber}   Ref: ${data.printMeta.verificationRef}   Fingerprint: ${data.printMeta.fingerprintShort}`,
+            fontSize: 7,
+            color: '#6b7280',
+            alignment: 'center',
+            margin: [0, 16, 0, 0] as [number, number, number, number],
+          } as Content] : []),
         ],
       };
     },
@@ -707,8 +938,7 @@ export async function generateInvoicePdfBuffer(invoiceId: string): Promise<Buffe
 
   // QR code verification
   let verifyUrl: string | null = null;
-  const appUrl = process.env['APP_URL'] || 'http://localhost:4200';
-  const verifyLink = `${appUrl}/verify/${order.id}/invoice`;
+  const verifyLink = `${getPublicApiBaseUrl()}/verify/${order.id}/invoice`;
   try {
     verifyUrl = await QRCode.toDataURL(verifyLink, { width: 160, margin: 1 });
   } catch { /* QR generation failed — continue without */ }
@@ -776,6 +1006,7 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
   buffer: Buffer;
   invoiceNumber: string;
   fileName: string;
+  revision: DocumentRevisionInfo;
 }> {
   const order = await fetchOrderForInvoice(orderId);
 
@@ -783,7 +1014,7 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
   const invoice = order.invoices?.[0];
   const invoiceNumber = invoice?.invoiceNumber ?? `PREVIEW-${orderId.slice(0, 8).toUpperCase()}`;
   const dueDate = invoice?.dueDate ?? computeDueDate(
-    invoice?.createdAt ?? new Date(),
+    invoice?.createdAt ?? order.createdAt,
     order.customerPaymentTermType,
     order.customerCreditDays,
     order.deliveredAt ?? order.eta,
@@ -793,8 +1024,7 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
 
   // QR code verification
   let verifyUrl: string | null = null;
-  const appUrl = process.env['APP_URL'] || 'http://localhost:4200';
-  const verifyLink = `${appUrl}/verify/${orderId}/invoice`;
+  const verifyLink = `${getPublicApiBaseUrl()}/verify/${orderId}/invoice`;
   try {
     verifyUrl = await QRCode.toDataURL(verifyLink, { width: 160, margin: 1 });
   } catch { /* QR generation failed — continue without */ }
@@ -836,7 +1066,7 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
     })),
     totalAmount: invoice?.amount ?? null,
     bank,
-    createdAt: invoice?.createdAt ?? new Date(),
+    createdAt: invoice?.createdAt ?? order.createdAt,
     companyName: order.invoicingCompany?.name ?? null,
     vatNumber: order.invoicingCompany?.vatNumber ?? null,
     fraudPreventionText: order.invoicingCompany?.fraudPreventionText ?? null,
@@ -847,13 +1077,47 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
     companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
     companyEmail: order.invoicingCompany?.headOfficeEmail ?? null,
+    printMeta: null,
   };
 
   const docDefinition = buildInvoiceDocument(docData);
   const buffer = await createPdfBuffer(docDefinition);
   const fileName = `Fueld_Invoice_${invoiceNumber.replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`;
+  const revision = await persistDocumentRevision({
+    tenantId: order.tenantId,
+    orderId: order.id,
+    invoiceId: invoice?.id ?? null,
+    documentType: 'INVOICE',
+    fileName,
+    buffer,
+  });
 
-  return { buffer, invoiceNumber, fileName };
+  if (revision.isNew) {
+    const verifyTokenLink = `${getPublicApiBaseUrl()}/verify/token/${revision.verifyToken}`;
+    let verifyTokenQr = docData.verifyUrl;
+    try {
+      verifyTokenQr = await QRCode.toDataURL(verifyTokenLink, { width: 160, margin: 1 });
+    } catch {
+      // keep existing QR (or null) if token QR generation fails
+    }
+    const finalized = buildInvoiceDocument({
+      ...docData,
+      verifyUrl: verifyTokenQr,
+      verifyLink: verifyTokenLink,
+      printMeta: {
+        issuedAt: revision.issuedAt,
+        revisionNumber: revision.revisionNumber,
+        verificationRef: revision.verificationRef,
+        fingerprintShort: revision.fingerprintShort,
+      },
+    });
+    const finalizedBuffer = await createPdfBuffer(finalized);
+    await overwriteDocumentRevisionArtifact(revision, finalizedBuffer);
+  }
+
+  const canonicalBuffer = loadDocumentRevisionBuffer(revision);
+
+  return { buffer: canonicalBuffer, invoiceNumber, fileName, revision };
 }
 
 // ─── Internal: pdfmake → Buffer ──────────────────────────────────────
@@ -909,6 +1173,7 @@ function buildOfferDocument(data: {
   createdAt: Date;
   docTitle?: string;
   verifyUrl?: string | null;
+  printMeta?: DocumentPrintMeta | null;
 }): TDocumentDefinitions {
   // ── Prepare data ──────────────────────────────────────────────────
   const refNum = data.orderNumber ?? 'DRAFT';
@@ -1053,6 +1318,13 @@ function buildOfferDocument(data: {
           ],
           margin: [0, 8, 0, 0] as [number, number, number, number],
         },
+        ...(data.printMeta ? [{
+          text: `Issued (UTC): ${formatIssuedAtUtc(data.printMeta.issuedAt)}   Revision: ${data.printMeta.revisionNumber}   Ref: ${data.printMeta.verificationRef}   Fingerprint: ${data.printMeta.fingerprintShort}`,
+          fontSize: 7,
+          color: '#6b7280',
+          alignment: 'center',
+          margin: [0, 16, 0, 0] as [number, number, number, number],
+        } as Content] : []),
       ],
     };
   };
@@ -1066,6 +1338,10 @@ function buildOfferDocument(data: {
       // Vessel / Delivery info (single-column stack)
       {
         stack: [
+          {
+            text: 'With reference to our correspondence, we are pleased to confirm to you the following:',
+            margin: [0, 0, 0, 8],
+          } as Content,
           {
             columns: [
               { width: 90, text: 'Vessel:', bold: true },
@@ -1184,6 +1460,7 @@ function buildOfferDocument(data: {
 export async function generateOfferPdfBuffer(orderId: string): Promise<{
   buffer: Buffer;
   fileName: string;
+  revision: DocumentRevisionInfo;
 }> {
   const order = await fetchOrderForInvoice(orderId);
 
@@ -1233,8 +1510,9 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
       unit: item.unit,
       salesPrice: item.salesPrice,
     })),
-    createdAt: new Date(),
+    createdAt: order.createdAt,
     verifyUrl: null as string | null,
+    printMeta: null,
   };
 
   // QR code removed from offers — only shown on invoices and proforma invoices
@@ -1242,8 +1520,31 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
   const docDefinition = buildOfferDocument(docData);
   const buffer = await createPdfBuffer(docDefinition);
   const fileName = `Offer_${order.orderNumber ?? orderId.slice(0, 8)}.pdf`;
+  const revision = await persistDocumentRevision({
+    tenantId: order.tenantId,
+    orderId: order.id,
+    documentType: 'OFFER',
+    fileName,
+    buffer,
+  });
 
-  return { buffer, fileName };
+  if (revision.isNew) {
+    const finalized = buildOfferDocument({
+      ...docData,
+      printMeta: {
+        issuedAt: revision.issuedAt,
+        revisionNumber: revision.revisionNumber,
+        verificationRef: revision.verificationRef,
+        fingerprintShort: revision.fingerprintShort,
+      },
+    });
+    const finalizedBuffer = await createPdfBuffer(finalized);
+    await overwriteDocumentRevisionArtifact(revision, finalizedBuffer);
+  }
+
+  const canonicalBuffer = loadDocumentRevisionBuffer(revision);
+
+  return { buffer: canonicalBuffer, fileName, revision };
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1294,6 +1595,7 @@ function buildProformaDocument(data: {
   vatNumber?: string | null;
   latePaymentInterest?: string | null;
   placeRemark?: string | null;
+  printMeta?: DocumentPrintMeta | null;
 }): TDocumentDefinitions {
   // ── Prepare data ──────────────────────────────────────────────────
   const refNum = data.orderNumber ?? 'DRAFT';
@@ -1427,6 +1729,13 @@ function buildProformaDocument(data: {
           ],
           margin: [0, 8, 0, 0] as [number, number, number, number],
         },
+        ...(data.printMeta ? [{
+          text: `Issued (UTC): ${formatIssuedAtUtc(data.printMeta.issuedAt)}   Revision: ${data.printMeta.revisionNumber}   Ref: ${data.printMeta.verificationRef}   Fingerprint: ${data.printMeta.fingerprintShort}`,
+          fontSize: 7,
+          color: '#6b7280',
+          alignment: 'center',
+          margin: [0, 16, 0, 0] as [number, number, number, number],
+        } as Content] : []),
       ],
     };
   };
@@ -1636,6 +1945,7 @@ function buildProformaDocument(data: {
 export async function generateProformaInvoicePdfBuffer(orderId: string): Promise<{
   buffer: Buffer;
   fileName: string;
+  revision: DocumentRevisionInfo;
 }> {
   const order = await fetchOrderForInvoice(orderId);
 
@@ -1689,18 +1999,18 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
       unit: item.unit,
       salesPrice: item.salesPrice,
     })),
-    createdAt: new Date(),
+    createdAt: order.createdAt,
     verifyUrl: null as string | null,
     verifyLink: null as string | null,
     fraudPreventionText: order.invoicingCompany?.fraudPreventionText ?? null,
     bank,
     vatNumber: order.invoicingCompany?.vatNumber ?? null,
     latePaymentInterest: order.invoicingCompany?.latePaymentInterest ?? null,
+    printMeta: null,
   };
 
   // Generate QR code verification URL
-  const appUrl = process.env['APP_URL'] || 'http://localhost:4200';
-  const verifyLink = `${appUrl}/verify/${orderId}/proforma-invoice`;
+  const verifyLink = `${getPublicApiBaseUrl()}/verify/${orderId}/proforma-invoice`;
   try {
     docData.verifyUrl = await QRCode.toDataURL(verifyLink, { width: 160, margin: 1 });
     docData.verifyLink = verifyLink;
@@ -1709,6 +2019,38 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
   const docDefinition = buildProformaDocument(docData);
   const buffer = await createPdfBuffer(docDefinition);
   const fileName = `Nomination_${order.orderNumber ?? orderId.slice(0, 8)}.pdf`;
+  const revision = await persistDocumentRevision({
+    tenantId: order.tenantId,
+    orderId: order.id,
+    documentType: 'PROFORMA_INVOICE',
+    fileName,
+    buffer,
+  });
 
-  return { buffer, fileName };
+  if (revision.isNew) {
+    const verifyTokenLink = `${getPublicApiBaseUrl()}/verify/token/${revision.verifyToken}`;
+    let verifyTokenQr = docData.verifyUrl;
+    try {
+      verifyTokenQr = await QRCode.toDataURL(verifyTokenLink, { width: 160, margin: 1 });
+    } catch {
+      // keep existing QR (or null) if token QR generation fails
+    }
+    const finalized = buildProformaDocument({
+      ...docData,
+      verifyUrl: verifyTokenQr,
+      verifyLink: verifyTokenLink,
+      printMeta: {
+        issuedAt: revision.issuedAt,
+        revisionNumber: revision.revisionNumber,
+        verificationRef: revision.verificationRef,
+        fingerprintShort: revision.fingerprintShort,
+      },
+    });
+    const finalizedBuffer = await createPdfBuffer(finalized);
+    await overwriteDocumentRevisionArtifact(revision, finalizedBuffer);
+  }
+
+  const canonicalBuffer = loadDocumentRevisionBuffer(revision);
+
+  return { buffer: canonicalBuffer, fileName, revision };
 }

@@ -18,11 +18,14 @@ export const documentsController = new Elysia({ prefix: '/orders' })
     async ({ params, set }) => {
       const orderId = await resolveOrderId(params.id);
       if (!orderId) { set.status = 404; return { success: false, message: 'Order not found' }; }
-      const { buffer, fileName } = await generateOfferPdfBuffer(orderId);
+      const { buffer, fileName, revision } = await generateOfferPdfBuffer(orderId);
 
       set.headers['Content-Type'] = 'application/pdf';
       set.headers['Content-Disposition'] = `attachment; filename="${fileName}"`;
       set.headers['Content-Length'] = String(buffer.length);
+      set.headers['X-Document-Revision'] = String(revision.revisionNumber);
+      set.headers['X-Document-Reference'] = revision.verificationRef;
+      set.headers['X-Document-Fingerprint'] = revision.fingerprintShort;
 
       return buffer;
     },
@@ -42,11 +45,14 @@ export const documentsController = new Elysia({ prefix: '/orders' })
     async ({ params, set }) => {
       const orderId = await resolveOrderId(params.id);
       if (!orderId) { set.status = 404; return { success: false, message: 'Order not found' }; }
-      const { buffer, fileName } = await generateProformaInvoicePdfBuffer(orderId);
+      const { buffer, fileName, revision } = await generateProformaInvoicePdfBuffer(orderId);
 
       set.headers['Content-Type'] = 'application/pdf';
       set.headers['Content-Disposition'] = `attachment; filename="${fileName}"`;
       set.headers['Content-Length'] = String(buffer.length);
+      set.headers['X-Document-Revision'] = String(revision.revisionNumber);
+      set.headers['X-Document-Reference'] = revision.verificationRef;
+      set.headers['X-Document-Fingerprint'] = revision.fingerprintShort;
 
       return buffer;
     },
@@ -66,11 +72,14 @@ export const documentsController = new Elysia({ prefix: '/orders' })
     async ({ params, set }) => {
       const orderId = await resolveOrderId(params.id);
       if (!orderId) { set.status = 404; return { success: false, message: 'Order not found' }; }
-      const { buffer, fileName } = await generateOrderInvoicePdfBuffer(orderId);
+      const { buffer, fileName, revision } = await generateOrderInvoicePdfBuffer(orderId);
 
       set.headers['Content-Type'] = 'application/pdf';
       set.headers['Content-Disposition'] = `attachment; filename="${fileName}"`;
       set.headers['Content-Length'] = String(buffer.length);
+      set.headers['X-Document-Revision'] = String(revision.revisionNumber);
+      set.headers['X-Document-Reference'] = revision.verificationRef;
+      set.headers['X-Document-Fingerprint'] = revision.fingerprintShort;
 
       return buffer;
     },

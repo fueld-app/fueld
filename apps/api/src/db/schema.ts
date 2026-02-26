@@ -75,6 +75,13 @@ export const invoiceStatusEnum = pgEnum('invoice_status', [
   'VOID',
 ]);
 
+export const documentTypeEnum = pgEnum('document_type', [
+  'OFFER',
+  'PROFORMA_INVOICE',
+  'INVOICE',
+  'OTHER',
+]);
+
 // ═══════════════════════════════════════════════════════════════════════
 //  1. MULTI-TENANCY ROOT
 // ═══════════════════════════════════════════════════════════════════════
@@ -577,6 +584,31 @@ export const invoices = pgTable('invoices', {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
+//  12a. DOCUMENT REVISIONS (immutable PDF artifacts + fingerprints)
+// ═══════════════════════════════════════════════════════════════════════
+
+export const documentRevisions = pgTable('document_revisions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  orderId: uuid('order_id').references(() => orders.id, { onDelete: 'cascade' }),
+  invoiceId: uuid('invoice_id').references(() => invoices.id, { onDelete: 'cascade' }),
+  documentType: documentTypeEnum('document_type').notNull(),
+  streamKey: text('stream_key').notNull(),
+  revisionNumber: integer('revision_number').notNull(),
+  verificationRef: text('verification_ref').notNull(),
+  verifyToken: text('verify_token').notNull().unique(),
+  sha256Hex: text('sha256_hex').notNull(),
+  fingerprintShort: text('fingerprint_short').notNull(),
+  filePath: text('file_path').notNull(),
+  fileName: text('file_name').notNull(),
+  mimeType: text('mime_type').notNull().default('application/pdf'),
+  fileSize: integer('file_size').notNull(),
+  generatedBy: uuid('generated_by').references(() => users.id),
+  issuedAt: timestamp('issued_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ═══════════════════════════════════════════════════════════════════════
 //  12b. CUSTOMER PAYMENTS (ledger entries)
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -942,6 +974,7 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
   items: many(orderItems),
   invoices: many(invoices),
   attachments: many(orderAttachments),
+  documentRevisions: many(documentRevisions),
 }));
 
 export const orderItemsRelations = relations(orderItems, ({ one }) => ({
@@ -956,6 +989,14 @@ export const orderAttachmentsRelations = relations(orderAttachments, ({ one }) =
 export const invoicesRelations = relations(invoices, ({ one, many }) => ({
   order: one(orders, { fields: [invoices.orderId], references: [orders.id] }),
   comments: many(invoiceComments),
+  documentRevisions: many(documentRevisions),
+}));
+
+export const documentRevisionsRelations = relations(documentRevisions, ({ one }) => ({
+  tenant: one(tenants, { fields: [documentRevisions.tenantId], references: [tenants.id] }),
+  order: one(orders, { fields: [documentRevisions.orderId], references: [orders.id] }),
+  invoice: one(invoices, { fields: [documentRevisions.invoiceId], references: [invoices.id] }),
+  generatedByUser: one(users, { fields: [documentRevisions.generatedBy], references: [users.id] }),
 }));
 
 export const invoiceCommentsRelations = relations(invoiceComments, ({ one }) => ({
