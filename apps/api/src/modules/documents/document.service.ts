@@ -133,6 +133,25 @@ function getRevisionAbsolutePath(filePath: string): string {
   return join(process.cwd(), 'uploads', filePath);
 }
 
+function resolveDocumentStreamTarget(params: {
+  orderId?: string | null;
+  invoiceId?: string | null;
+}): string | null {
+  return params.invoiceId ?? params.orderId ?? null;
+}
+
+function toMs(date: Date | null | undefined): number {
+  return date ? date.getTime() : 0;
+}
+
+function maxMs(values: Array<Date | null | undefined>): number {
+  return values.reduce((acc, value) => Math.max(acc, toMs(value)), 0);
+}
+
+function maxItemUpdatedAtMs(items: Array<{ updatedAt: Date }>): number {
+  return items.reduce((acc, item) => Math.max(acc, item.updatedAt.getTime()), 0);
+}
+
 async function getTenantDocumentVerificationExpiryDays(tenantId: string): Promise<number> {
   const [tenant] = await db
     .select({ settings: tenants.settings })
@@ -247,6 +266,28 @@ export async function getLatestDocumentRevisionByOrderId(
   documentType: Exclude<DocumentType, 'OTHER'>,
 ): Promise<DocumentRevisionInfo | null> {
   const streamKey = `${documentType}:${orderId}`;
+  const [revision] = await db
+    .select()
+    .from(documentRevisions)
+    .where(eq(documentRevisions.streamKey, streamKey))
+    .orderBy(desc(documentRevisions.revisionNumber))
+    .limit(1);
+
+  return revision ? mapRevisionInfo(revision) : null;
+}
+
+export async function getLatestDocumentRevisionByStream(params: {
+  documentType: Exclude<DocumentType, 'OTHER'>;
+  orderId?: string | null;
+  invoiceId?: string | null;
+}): Promise<DocumentRevisionInfo | null> {
+  const streamTarget = resolveDocumentStreamTarget({
+    orderId: params.orderId,
+    invoiceId: params.invoiceId,
+  });
+  if (!streamTarget) return null;
+
+  const streamKey = `${params.documentType}:${streamTarget}`;
   const [revision] = await db
     .select()
     .from(documentRevisions)
@@ -1043,6 +1084,38 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
 
   // Find the first invoice or generate a preview number
   const invoice = order.invoices?.[0];
+  const existingRevision = await getLatestDocumentRevisionByStream({
+    documentType: 'INVOICE',
+    orderId: order.id,
+    invoiceId: invoice?.id ?? null,
+  });
+
+  const invoiceSourceUpdatedAtMs = maxMs([
+    order.updatedAt,
+    order.client.updatedAt,
+    order.vessel.updatedAt,
+    order.place.updatedAt,
+    order.invoicingCompany?.updatedAt ?? null,
+    order.salesRep?.updatedAt ?? null,
+    invoice?.updatedAt ?? invoice?.createdAt ?? null,
+    order.customerContact?.updatedAt ?? null,
+    order.supplierContact?.updatedAt ?? null,
+  ]);
+  const itemSourceUpdatedAtMs = maxItemUpdatedAtMs(order.items);
+  const sourceUpdatedAtMs = Math.max(invoiceSourceUpdatedAtMs, itemSourceUpdatedAtMs);
+
+  if (existingRevision && sourceUpdatedAtMs <= existingRevision.issuedAt.getTime()) {
+    const existingBuffer = loadDocumentRevisionBuffer(existingRevision);
+    const existingInvoiceNumber = invoice?.invoiceNumber ?? `PREVIEW-${orderId.slice(0, 8).toUpperCase()}`;
+    const existingFileName = `Fueld_Invoice_${existingInvoiceNumber.replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`;
+    return {
+      buffer: existingBuffer,
+      invoiceNumber: existingInvoiceNumber,
+      fileName: existingFileName,
+      revision: existingRevision,
+    };
+  }
+
   const invoiceNumber = invoice?.invoiceNumber ?? `PREVIEW-${orderId.slice(0, 8).toUpperCase()}`;
   const dueDate = invoice?.dueDate ?? computeDueDate(
     invoice?.createdAt ?? order.createdAt,
@@ -1494,6 +1567,29 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
   revision: DocumentRevisionInfo;
 }> {
   const order = await fetchOrderForInvoice(orderId);
+  const existingRevision = await getLatestDocumentRevisionByStream({
+    documentType: 'OFFER',
+    orderId: order.id,
+  });
+
+  const offerSourceUpdatedAtMs = maxMs([
+    order.updatedAt,
+    order.client.updatedAt,
+    order.vessel.updatedAt,
+    order.place.updatedAt,
+    order.invoicingCompany?.updatedAt ?? null,
+    order.salesRep?.updatedAt ?? null,
+    order.customerContact?.updatedAt ?? null,
+    order.supplierContact?.updatedAt ?? null,
+  ]);
+  const offerItemUpdatedAtMs = maxItemUpdatedAtMs(order.items);
+  const offerCombinedUpdatedAtMs = Math.max(offerSourceUpdatedAtMs, offerItemUpdatedAtMs);
+
+  if (existingRevision && offerCombinedUpdatedAtMs <= existingRevision.issuedAt.getTime()) {
+    const existingBuffer = loadDocumentRevisionBuffer(existingRevision);
+    const existingFileName = `Offer_${order.orderNumber ?? orderId.slice(0, 8)}.pdf`;
+    return { buffer: existingBuffer, fileName: existingFileName, revision: existingRevision };
+  }
 
   const companyLogoDataUrl = tryLoadLogoDataUrl(order.invoicingCompany?.logoUrl ?? null);
 
@@ -1982,6 +2078,29 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
   revision: DocumentRevisionInfo;
 }> {
   const order = await fetchOrderForInvoice(orderId);
+  const existingRevision = await getLatestDocumentRevisionByStream({
+    documentType: 'PROFORMA_INVOICE',
+    orderId: order.id,
+  });
+
+  const proformaSourceUpdatedAtMs = maxMs([
+    order.updatedAt,
+    order.client.updatedAt,
+    order.vessel.updatedAt,
+    order.place.updatedAt,
+    order.invoicingCompany?.updatedAt ?? null,
+    order.salesRep?.updatedAt ?? null,
+    order.customerContact?.updatedAt ?? null,
+    order.supplierContact?.updatedAt ?? null,
+  ]);
+  const proformaItemUpdatedAtMs = maxItemUpdatedAtMs(order.items);
+  const proformaCombinedUpdatedAtMs = Math.max(proformaSourceUpdatedAtMs, proformaItemUpdatedAtMs);
+
+  if (existingRevision && proformaCombinedUpdatedAtMs <= existingRevision.issuedAt.getTime()) {
+    const existingBuffer = loadDocumentRevisionBuffer(existingRevision);
+    const existingFileName = `Nomination_${order.orderNumber ?? orderId.slice(0, 8)}.pdf`;
+    return { buffer: existingBuffer, fileName: existingFileName, revision: existingRevision };
+  }
 
   const companyLogoDataUrl = tryLoadLogoDataUrl(order.invoicingCompany?.logoUrl ?? null);
   const bank = await loadOrderBankDetails(order.bankAccountId, order.invoicingCompanyId);
