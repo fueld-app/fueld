@@ -1287,6 +1287,9 @@ function buildOfferDocument(data: {
   const yyyy = data.createdAt.getUTCFullYear();
   const createdDate = `${dd}-${mm}-${yyyy}`;
   const title = data.docTitle ?? 'OFFER';
+  const openingSentence = title === 'CONFIRMATION'
+    ? 'With reference to our correspondence, we are pleased to confirm to you the following:'
+    : 'With reference to our correspondence, we are pleased to offer to you the following:';
 
   // Customer address block (top-left)
   const customerBlock: Content[] = [
@@ -1443,7 +1446,7 @@ function buildOfferDocument(data: {
       {
         stack: [
           {
-            text: 'With reference to our correspondence, we are pleased to confirm to you the following:',
+            text: openingSentence,
             margin: [0, 0, 0, 8],
           } as Content,
           {
