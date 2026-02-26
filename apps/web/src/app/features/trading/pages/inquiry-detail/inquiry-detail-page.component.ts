@@ -1289,7 +1289,7 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
 
         if (d.status !== OrderStatus.Inquiry && d.status !== OrderStatus.Offer) {
           this.pageLoading.set(false);
-          void this.router.navigate(['/trading/orders', d.orderNumber ?? d.id]);
+          void this.router.navigate(['/trading/orders', d.id]);
           return;
         }
 
@@ -2279,10 +2279,12 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
       );
 
       if (res.success) {
+        this.order.update((o) => (o ? { ...o, status: OrderStatus.Confirmed } : o));
         this.showToast('success', 'Inquiry converted to order. Redirecting...');
+        const targetId = res.data?.id ?? this.order()?.id ?? id;
         // Redirect to the order detail page
         setTimeout(() => {
-          this.router.navigate(['/trading/orders', id]);
+          this.router.navigate(['/trading/orders', targetId]);
         }, 1000);
       } else {
         this.showToast('error', 'Failed to convert inquiry.');
