@@ -69,6 +69,16 @@ export const routes: Routes = [
           },
           {
             path: 'orders/completed',
+            redirectTo: 'completed-orders',
+            pathMatch: 'full',
+          },
+          {
+            path: 'orders/completed/:id',
+            redirectTo: 'completed-orders/:id',
+            pathMatch: 'full',
+          },
+          {
+            path: 'completed-orders',
             loadComponent: () =>
               import('./features/trading/pages/completed-orders-list/completed-orders-list-page.component').then(
                 (m) => m.CompletedOrdersListPageComponent,
@@ -77,9 +87,35 @@ export const routes: Routes = [
           },
           {
             path: 'orders/cancelled',
+            redirectTo: 'cancelled-orders',
+            pathMatch: 'full',
+          },
+          {
+            path: 'orders/cancelled/:id',
+            redirectTo: 'cancelled-orders/:id',
+            pathMatch: 'full',
+          },
+          {
+            path: 'cancelled-orders',
             loadComponent: () =>
               import('./features/trading/pages/cancelled-orders-list/cancelled-orders-list-page.component').then(
                 (m) => m.CancelledOrdersListPageComponent,
+              ),
+            title: 'Trading > Cancelled Orders',
+          },
+          {
+            path: 'completed-orders/:id',
+            loadComponent: () =>
+              import('./features/trading/pages/order-detail/order-detail-page.component').then(
+                (m) => m.OrderDetailPageComponent,
+              ),
+            title: 'Trading > Completed Orders',
+          },
+          {
+            path: 'cancelled-orders/:id',
+            loadComponent: () =>
+              import('./features/trading/pages/order-detail/order-detail-page.component').then(
+                (m) => m.OrderDetailPageComponent,
               ),
             title: 'Trading > Cancelled Orders',
           },

@@ -344,7 +344,15 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   readonly isActiveOrders = computed(() => this.mode() === 'active-orders');
   readonly isCompletedOrders = computed(() => this.mode() === 'completed-orders');
   readonly isCancelledOrders = computed(() => this.mode() === 'cancelled-orders');
-  readonly baseRoute = computed(() => (this.isOrders() ? '/trading/orders' : '/trading/inquiries'));
+  readonly baseRoute = computed(() => (
+    this.isActiveOrders()
+      ? '/trading/orders'
+      : this.isCompletedOrders()
+        ? '/trading/completed-orders'
+        : this.isCancelledOrders()
+          ? '/trading/cancelled-orders'
+          : '/trading/inquiries'
+  ));
   readonly titleText = computed(() => (
     this.isActiveOrders()
       ? 'Active Orders'

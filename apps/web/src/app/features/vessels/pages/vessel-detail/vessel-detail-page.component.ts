@@ -1994,7 +1994,11 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
   goToOrder(orderId: string, status?: string): void {
     const baseRoute = status === 'INQUIRY' || status === 'OFFER'
       ? '/trading/inquiries'
-      : '/trading/orders';
+      : status === 'PAID'
+        ? '/trading/completed-orders'
+        : status === 'CANCELLED'
+          ? '/trading/cancelled-orders'
+          : '/trading/orders';
     this.router.navigate([baseRoute, orderId]);
   }
 

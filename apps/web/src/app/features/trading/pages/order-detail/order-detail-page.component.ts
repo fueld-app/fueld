@@ -1055,10 +1055,21 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  private detailBaseRouteForStatus(status: string): '/trading/orders' | '/trading/inquiries' {
-    return status === OrderStatus.Inquiry || status === OrderStatus.Offer
-      ? '/trading/inquiries'
-      : '/trading/orders';
+  private detailBaseRouteForStatus(status: string):
+    '/trading/orders'
+    | '/trading/inquiries'
+    | '/trading/completed-orders'
+    | '/trading/cancelled-orders' {
+    if (status === OrderStatus.Inquiry || status === OrderStatus.Offer) {
+      return '/trading/inquiries';
+    }
+    if (status === OrderStatus.Paid) {
+      return '/trading/completed-orders';
+    }
+    if (status === OrderStatus.Cancelled) {
+      return '/trading/cancelled-orders';
+    }
+    return '/trading/orders';
   }
 
   private async normalizeDetailRoute(status: string, routeId: string): Promise<void> {
@@ -1066,17 +1077,17 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     const expectedBase = this.detailBaseRouteForStatus(status);
     const isOnOrdersPath = currentPath.startsWith('/trading/orders/');
     const isOnInquiriesPath = currentPath.startsWith('/trading/inquiries/');
+    const isOnCompletedPath = currentPath.startsWith('/trading/completed-orders/');
+    const isOnCancelledPath = currentPath.startsWith('/trading/cancelled-orders/');
 
-    if (expectedBase === '/trading/inquiries' && isOnOrdersPath) {
-      await this.router.navigate(['/trading/inquiries', routeId], {
-        replaceUrl: true,
-        queryParamsHandling: 'preserve',
-      });
-      return;
-    }
+    const isAlreadyOnExpectedPath =
+      (expectedBase === '/trading/orders' && isOnOrdersPath)
+      || (expectedBase === '/trading/inquiries' && isOnInquiriesPath)
+      || (expectedBase === '/trading/completed-orders' && isOnCompletedPath)
+      || (expectedBase === '/trading/cancelled-orders' && isOnCancelledPath);
 
-    if (expectedBase === '/trading/orders' && isOnInquiriesPath) {
-      await this.router.navigate(['/trading/orders', routeId], {
+    if (!isAlreadyOnExpectedPath) {
+      await this.router.navigate([expectedBase, routeId], {
         replaceUrl: true,
         queryParamsHandling: 'preserve',
       });

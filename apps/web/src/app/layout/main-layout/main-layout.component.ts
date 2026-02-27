@@ -76,8 +76,8 @@ const NAVIGATION: NavItem[] = [
     icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
     children: [
       { label: 'Active Orders', route: '/trading/orders' },
-      { label: 'Completed Orders', route: '/trading/orders/completed' },
-      { label: 'Cancelled Orders', route: '/trading/orders/cancelled' },
+      { label: 'Completed Orders', route: '/trading/completed-orders' },
+      { label: 'Cancelled Orders', route: '/trading/cancelled-orders' },
       { label: 'Inquiries', route: '/trading/inquiries' },
     ],
   },
@@ -890,8 +890,15 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     this.router.navigate(['/vessels', id]);
   }
 
-  private orderDetailRoute(status?: string): '/trading/orders' | '/trading/inquiries' {
-    return status === 'INQUIRY' || status === 'OFFER' ? '/trading/inquiries' : '/trading/orders';
+  private orderDetailRoute(status?: string):
+    '/trading/orders'
+    | '/trading/inquiries'
+    | '/trading/completed-orders'
+    | '/trading/cancelled-orders' {
+    if (status === 'INQUIRY' || status === 'OFFER') return '/trading/inquiries';
+    if (status === 'PAID') return '/trading/completed-orders';
+    if (status === 'CANCELLED') return '/trading/cancelled-orders';
+    return '/trading/orders';
   }
 
   goToOrder(orderNumber: string, status?: string): void {
