@@ -282,7 +282,7 @@ export async function getLatestDocumentRevisionByOrderId(
 }
 
 export async function getLatestDocumentRevisionByStream(params: {
-  documentType: Exclude<DocumentType, 'OTHER'>;
+  documentType: DocumentType;
   orderId?: string | null;
   invoiceId?: string | null;
 }): Promise<DocumentRevisionInfo | null> {
@@ -895,7 +895,7 @@ function buildInvoiceDocument(data: {
       // ── Notes / Payment Terms ── (removed — not needed on invoices)
 
       // ── Divider ──
-      { text: '', margin: [0, 8, 0, 0] } as Content,
+      { text: '', margin: [0, 4, 0, 0] } as Content,
       {
         canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 0.5, lineColor: '#e5e7eb' }],
       } as Content,
@@ -1371,9 +1371,12 @@ function buildOfferDocument(data: {
   const yyyy = data.createdAt.getUTCFullYear();
   const createdDate = `${dd}-${mm}-${yyyy}`;
   const title = data.docTitle ?? 'OFFER';
-  const openingSentence = title === 'CONFIRMATION'
-    ? 'With reference to our correspondence, we are pleased to confirm to you the following:'
-    : 'With reference to our correspondence, we are pleased to offer to you the following:';
+  const openingTopMargin = title === 'NOMINATION' ? 8 : 18;
+  const openingSentence = title === 'NOMINATION'
+    ? 'With reference to our correspondence, we are pleased to nominate to you the following:'
+    : title === 'CONFIRMATION'
+      ? 'With reference to our correspondence, we are pleased to confirm to you the following:'
+      : 'With reference to our correspondence, we are pleased to offer to you the following:';
 
   // Customer address block (top-left)
   const customerBlock: Content[] = [
@@ -1444,8 +1447,10 @@ function buildOfferDocument(data: {
   // "For account of" line
   const vesselRef = `${data.vesselName}${data.vesselImo ? ` (IMO: ${data.vesselImo})` : ''}`;
   const vesselDisplay = data.vesselName.startsWith('MV ') ? vesselRef : `MV ${vesselRef}`;
-  const forAccountParts = [`Master and/or owner and/or charterers and/or ${vesselDisplay}`];
-  if (data.clientName) forAccountParts.push(`and/or ${data.clientName}`);
+  const forAccountParts = title === 'NOMINATION'
+    ? [data.companyName?.trim() || 'Invoicing company']
+    : [`Master and/or owner and/or charterers and/or ${vesselDisplay}`];
+  if (title !== 'NOMINATION' && data.clientName) forAccountParts.push(`and/or ${data.clientName}`);
 
   // ── Header (3 columns: client | title | logo+date/ref) ───────────
   const header = (currentPage: number, pageCount: number): Content => {
@@ -1545,7 +1550,7 @@ function buildOfferDocument(data: {
         stack: [
           {
             text: openingSentence,
-            margin: [0, 18, 0, 12],
+            margin: [0, openingTopMargin, 0, 12],
           } as Content,
           {
             columns: [
@@ -1606,7 +1611,7 @@ function buildOfferDocument(data: {
       }),
 
       // Sign-off (with optional QR code on the right)
-      { text: '', margin: [0, 14, 0, 0] } as Content,
+      { text: '', margin: [0, 8, 0, 0] } as Content,
       ...(data.verifyUrl ? [{
         columns: [
           {
@@ -1617,7 +1622,7 @@ function buildOfferDocument(data: {
               ...(data.fromName?.trim()
                 ? [{ text: data.fromName.trim(), fontSize: 9 } as Content]
                 : []),
-              { text: '', margin: [0, 10, 0, 0] } as Content,
+              { text: '', margin: [0, 2, 0, 0] } as Content,
               ...(data.fromEmail?.trim()
                 ? [emailTextNode('Direct Email:  ', data.fromEmail.trim(), { fontSize: 9 })]
                 : []),
@@ -1640,7 +1645,7 @@ function buildOfferDocument(data: {
         ...(data.fromName?.trim()
           ? [{ text: data.fromName.trim(), fontSize: 9 } as Content]
           : []),
-        { text: '', margin: [0, 10, 0, 0] } as Content,
+        { text: '', margin: [0, 2, 0, 0] } as Content,
         ...(data.fromEmail?.trim()
           ? [emailTextNode('Direct Email:  ', data.fromEmail.trim(), { fontSize: 9 })]
           : []),
@@ -1763,6 +1768,122 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
     tenantId: order.tenantId,
     orderId: order.id,
     documentType: 'OFFER',
+    fileName,
+    buffer,
+  });
+
+  if (revision.isNew) {
+    const finalized = buildOfferDocument({
+      ...docData,
+      printMeta: {
+        issuedAt: revision.issuedAt,
+        revisionNumber: revision.revisionNumber,
+        verificationRef: revision.verificationRef,
+        fingerprintShort: revision.fingerprintShort,
+      },
+    });
+    const finalizedBuffer = await createPdfBuffer(finalized);
+    await overwriteDocumentRevisionArtifact(revision, finalizedBuffer);
+  }
+
+  const canonicalBuffer = loadDocumentRevisionBuffer(revision);
+
+  return { buffer: canonicalBuffer, fileName, revision };
+}
+
+/**
+ * Generate a supplier-facing nomination PDF for a given order ID.
+ * Reuses the confirmation layout and content structure.
+ */
+export async function generateNominationPdfBuffer(orderId: string): Promise<{
+  buffer: Buffer;
+  fileName: string;
+  revision: DocumentRevisionInfo;
+}> {
+  const order = await fetchOrderForInvoice(orderId);
+  const existingRevision = await getLatestDocumentRevisionByStream({
+    documentType: 'OTHER',
+    orderId: order.id,
+  });
+
+  const nominationSourceUpdatedAtMs = maxMs([
+    order.updatedAt,
+    order.supplier?.updatedAt ?? null,
+    order.vessel.updatedAt,
+    order.place.updatedAt,
+    order.invoicingCompany?.updatedAt ?? null,
+    order.salesRep?.updatedAt ?? null,
+    order.supplierContact?.updatedAt ?? null,
+  ]);
+  const nominationItemUpdatedAtMs = maxItemUpdatedAtMs(order.items);
+  const nominationCombinedUpdatedAtMs = Math.max(nominationSourceUpdatedAtMs, nominationItemUpdatedAtMs);
+
+  if (existingRevision && nominationCombinedUpdatedAtMs <= existingRevision.issuedAt.getTime()) {
+    const existingBuffer = loadDocumentRevisionBuffer(existingRevision);
+    const existingFileName = `Nomination_${order.orderNumber ?? orderId.slice(0, 8)}.pdf`;
+    return { buffer: existingBuffer, fileName: existingFileName, revision: existingRevision };
+  }
+
+  const companyLogoDataUrl = tryLoadLogoDataUrl(order.invoicingCompany?.logoUrl ?? null);
+
+  const docData = {
+    orderNumber: order.orderNumber,
+    clientName: order.supplier?.name ?? 'Supplier',
+    clientCountry: order.supplier?.country ?? null,
+    clientAddress: order.supplier?.headOfficeAddress ?? null,
+    customerContactName: order.supplierContact?.name ?? null,
+    customerContactRole: order.supplierContact?.role ?? null,
+    customerContactPhone: order.supplierContact?.phone ?? null,
+    customerContactEmail: order.supplierContact?.email ?? null,
+    vesselName: order.vessel.name,
+    vesselImo: order.vessel.imo,
+    portName: order.place.name,
+    eta: order.eta?.toISOString() ?? null,
+    etd: order.etd?.toISOString() ?? null,
+    timezone: order.place.timezone ?? null,
+    fromName: order.salesRep?.name ?? null,
+    fromEmail: order.salesRep?.email ?? null,
+    fromPhone: order.salesRep?.phone ?? null,
+    paymentTerms: formatCustomerPaymentTerms(order.supplierPaymentTermType, order.supplierCreditDays),
+    customerNote: null,
+    termsAndConditions: replaceCompanyNamePlaceholder(
+      order.invoicingCompany?.supplierTerms ?? null,
+      order.invoicingCompany?.name ?? null,
+      'Nomination',
+    ),
+    placeRemark: null,
+    companyName: order.invoicingCompany?.name ?? null,
+    companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
+    companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
+    companyEmail: order.invoicingCompany?.headOfficeEmail ?? null,
+    companyRegistrationNumber: getCompanyRegistrationNumber(order.invoicingCompany),
+    vatNumber: order.invoicingCompany?.vatNumber ?? null,
+    companyWebsite: order.invoicingCompany?.website ?? null,
+    companyLogoDataUrl,
+    itemNotes: [],
+    currency: order.currency ?? 'USD',
+    items: order.items.map((item) => ({
+      productType: item.productType,
+      description: item.description,
+      quantity: item.quantity,
+      quantityMin: item.quantityMin,
+      quantityMax: item.quantityMax,
+      unit: item.unit,
+      salesPrice: item.salesPrice,
+    })),
+    createdAt: order.createdAt,
+    docTitle: 'NOMINATION',
+    verifyUrl: null as string | null,
+    printMeta: null,
+  };
+
+  const docDefinition = buildOfferDocument(docData);
+  const buffer = await createPdfBuffer(docDefinition);
+  const fileName = `Nomination_${order.orderNumber ?? orderId.slice(0, 8)}.pdf`;
+  const revision = await persistDocumentRevision({
+    tenantId: order.tenantId,
+    orderId: order.id,
+    documentType: 'OTHER',
     fileName,
     buffer,
   });
@@ -2218,7 +2339,7 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
 
   if (existingRevision && proformaCombinedUpdatedAtMs <= existingRevision.issuedAt.getTime()) {
     const existingBuffer = loadDocumentRevisionBuffer(existingRevision);
-    const existingFileName = `Nomination_${order.orderNumber ?? orderId.slice(0, 8)}.pdf`;
+    const existingFileName = `Proforma_Invoice_${order.orderNumber ?? orderId.slice(0, 8)}.pdf`;
     return { buffer: existingBuffer, fileName: existingFileName, revision: existingRevision };
   }
 
@@ -2292,7 +2413,7 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
 
   const docDefinition = buildProformaDocument(docData);
   const buffer = await createPdfBuffer(docDefinition);
-  const fileName = `Nomination_${order.orderNumber ?? orderId.slice(0, 8)}.pdf`;
+  const fileName = `Proforma_Invoice_${order.orderNumber ?? orderId.slice(0, 8)}.pdf`;
   const revision = await persistDocumentRevision({
     tenantId: order.tenantId,
     orderId: order.id,

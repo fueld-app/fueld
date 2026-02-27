@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia';
 import { authGuard } from '../auth/auth.guard';
-import { generateOrderInvoicePdfBuffer, generateOfferPdfBuffer, generateProformaInvoicePdfBuffer } from './document.service';
+import { generateNominationPdfBuffer, generateOrderInvoicePdfBuffer, generateOfferPdfBuffer, generateProformaInvoicePdfBuffer } from './document.service';
 import { sendInvoiceEmail } from './mail.service';
 import { resolveOrderId, getOrderById } from '../orders/orders.service';
 
@@ -44,6 +44,47 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       detail: {
         tags: ['Documents'],
         summary: 'Generate offer PDF for an order/inquiry',
+        security: [{ bearerAuth: [] }],
+      },
+    },
+  )
+
+  // ── GET /orders/:id/nomination/pdf ────────────────────────────────
+  .get(
+    '/:id/nomination/pdf',
+    async ({ params, set }) => {
+      const orderId = await resolveOrderId(params.id);
+      if (!orderId) { set.status = 404; return { success: false, message: 'Order not found' }; }
+      const order = await getOrderById(orderId);
+      if (!order?.items?.length) {
+        set.status = 400;
+        return { success: false, message: 'Add at least one line item before generating documents' };
+      }
+      if (!order?.supplierId) {
+        set.status = 400;
+        return { success: false, message: 'Select a supplier before generating Nomination PDF' };
+      }
+      if (!order?.invoicingCompanyId) {
+        set.status = 400;
+        return { success: false, message: 'Select an invoicing company before generating Nomination PDF' };
+      }
+      const { buffer, fileName, revision } = await generateNominationPdfBuffer(orderId);
+
+      set.headers['Content-Type'] = 'application/pdf';
+      set.headers['Content-Disposition'] = `attachment; filename="${fileName}"`;
+      set.headers['Content-Length'] = String(buffer.length);
+      set.headers['X-Document-Revision'] = String(revision.revisionNumber);
+      set.headers['X-Document-Reference'] = revision.verificationRef;
+      set.headers['X-Document-Fingerprint'] = revision.fingerprintShort;
+      set.headers['X-Document-Verify-Token'] = revision.verifyToken;
+
+      return buffer;
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: {
+        tags: ['Documents'],
+        summary: 'Generate nomination PDF for an order',
         security: [{ bearerAuth: [] }],
       },
     },

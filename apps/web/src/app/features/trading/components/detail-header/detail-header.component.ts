@@ -33,7 +33,9 @@ import { StatusBadgeComponent } from '../../../../shared/components/status-badge
             <p>
               @if (entityNumber()) {
                 <span class="font-mono text-gray-600">{{ entityNumber() }}</span>
-                <span class="mx-1.5">·</span>
+                @if (subtitle().trim()) {
+                  <span class="mx-1.5">·</span>
+                }
               }
               {{ subtitle() }}
             </p>

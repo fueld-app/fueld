@@ -10,7 +10,7 @@ import { InquiriesListPageComponent } from '../inquiries-list/inquiries-list-pag
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [InquiriesListPageComponent],
   template: `
-    <app-inquiries-list-page mode="orders" />
+    <app-inquiries-list-page mode="active-orders" />
   `,
 })
 export class OrdersListPageComponent {}

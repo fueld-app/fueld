@@ -111,8 +111,10 @@ interface TeamUserOption {
           [orderId]="orderId()"
           [status]="order()?.status ?? null"
           [hasInvoicingCompany]="hasInvoicingCompany()"
+          [hasSupplier]="hasSupplier()"
           [hasBankAccount]="hasBankAccount()"
           [hasLineItems]="hasLineItems()"
+          [hasEnoughPayments]="hasEnoughPaymentsForMarkPaid()"
           (actionTriggered)="onAction($event)"
         />
         <div class="relative">
@@ -848,6 +850,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
 
   readonly canEditClient = computed(() => !this.isPaidOrCancelled());
   readonly hasInvoicingCompany = computed(() => !!this.order()?.invoicingCompanyId);
+  readonly hasSupplier = computed(() => !!this.order()?.supplierId);
   readonly hasBankAccount = computed(() => !!this.order()?.bankAccountId);
   readonly hasLineItems = computed(() => this.itemRows().length > 0);
 
@@ -903,6 +906,20 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   readonly paymentsTotal = computed(() =>
     this.payments().reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0),
   );
+
+  readonly totalDueForMarkPaid = computed(() =>
+    this.itemRows().reduce((sum, item) => {
+      const qty = Number(item.deliveredQuantity ?? item.quantity ?? 0);
+      const unitPrice = Number(item.salesPrice ?? 0);
+      return sum + qty * unitPrice;
+    }, 0),
+  );
+
+  readonly hasEnoughPaymentsForMarkPaid = computed(() => {
+    const due = this.totalDueForMarkPaid();
+    if (due <= 0) return false;
+    return this.paymentsTotal() >= due;
+  });
 
   readonly customerCreditSummary = computed(() => {
     const currency = this.order()?.currency ?? 'USD';
@@ -1936,7 +1953,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
       : `${API_URL}/orders/${id}/proforma/pdf`;
     const fileName = isFinalInvoice
       ? `Fueld_Invoice_${this.invoiceNumber()}.pdf`
-      : `Nomination_${this.order()?.orderNumber ?? id}.pdf`;
+      : `Proforma_Invoice_${this.order()?.orderNumber ?? id}.pdf`;
     const modal = this.pdfModal();
     if (!modal) return;
     modal.showLoading(documentTitle);
@@ -1988,26 +2005,30 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     const id = this.orderId();
     if (!id) return;
     if (!this.hasLineItems()) {
-      this.showToast('error', 'Add at least one line item before generating Proforma Invoice.');
+      this.showToast('error', 'Add at least one line item before generating Nomination PDF.');
       return;
     }
-    if (!this.hasBankAccount()) {
-      this.showToast('error', 'Select a bank account before generating Proforma Invoice.');
+    if (!this.hasSupplier()) {
+      this.showToast('error', 'Select a supplier before generating Nomination PDF.');
+      return;
+    }
+    if (!this.hasInvoicingCompany()) {
+      this.showToast('error', 'Select an invoicing company before generating Nomination PDF.');
       return;
     }
     const modal = this.pdfModal();
     if (!modal) return;
-    modal.showLoading('Proforma Invoice');
+    modal.showLoading('Nomination');
     try {
       const res = await firstValueFrom(
-        this.http.get(`${API_URL}/orders/${id}/proforma/pdf`, { responseType: 'blob', observe: 'response' }),
+        this.http.get(`${API_URL}/orders/${id}/nomination/pdf`, { responseType: 'blob', observe: 'response' }),
       );
       const blob = res.body;
       if (!blob) throw new Error('Missing PDF body');
       modal.setBlob(blob, `Nomination_${this.order()?.orderNumber ?? id}.pdf`, this.buildVerifyUrlFromResponse(res));
     } catch {
       modal.showError();
-      this.showToast('error', 'Failed to generate proforma invoice PDF.');
+      this.showToast('error', 'Failed to generate nomination PDF.');
     }
   }
 
@@ -2125,6 +2146,11 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   private markPaid(): void {
     if (this.order()?.status === OrderStatus.Paid) {
       this.showToast('error', 'Order is already marked as paid.');
+      return;
+    }
+    if (!this.hasEnoughPaymentsForMarkPaid()) {
+      this.showToast('error', 'Add payments equal to the total due before marking as paid.');
+      this.openPaymentModal();
       return;
     }
     this.openPaymentModal();

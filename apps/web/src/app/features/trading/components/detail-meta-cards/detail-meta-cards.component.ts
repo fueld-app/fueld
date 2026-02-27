@@ -1,10 +1,12 @@
 import {
   Component,
   ChangeDetectionStrategy,
+  inject,
   input,
   output,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import type { OwnCompanyDto, BankAccountDto } from '@fueld/types';
 import {
   SearchableDropdownComponent,
@@ -19,7 +21,20 @@ import {
     <div class="mb-8 grid gap-4 grid-cols-1 min-[900px]:grid-cols-2 min-[1600px]:grid-cols-4">
       <!-- Client + Customer Contact + Customer Payment -->
       <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Client</p>
+        <button
+          type="button"
+          (click)="navigateToClient()"
+          [disabled]="!clientId()"
+          class="text-xs font-medium uppercase tracking-wider mb-1.5"
+          [class.text-gray-500]="!clientId()"
+          [class.text-brand-600]="!!clientId()"
+          [class.hover:underline]="!!clientId()"
+          [class.cursor-pointer]="!!clientId()"
+          [class.cursor-not-allowed]="!clientId()"
+          [class.opacity-50]="!clientId()"
+        >
+          Client
+        </button>
         @if (canEditClient()) {
           <app-searchable-dropdown
             [options]="clientOptions()"
@@ -57,7 +72,20 @@ import {
       </div>
       <!-- Supplier + Supplier Contact + Supplier Payment -->
       <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Supplier</p>
+        <button
+          type="button"
+          (click)="navigateToSupplier()"
+          [disabled]="!supplierId()"
+          class="text-xs font-medium uppercase tracking-wider mb-1.5"
+          [class.text-gray-500]="!supplierId()"
+          [class.text-brand-600]="!!supplierId()"
+          [class.hover:underline]="!!supplierId()"
+          [class.cursor-pointer]="!!supplierId()"
+          [class.cursor-not-allowed]="!supplierId()"
+          [class.opacity-50]="!supplierId()"
+        >
+          Supplier
+        </button>
         @if (isReadonly()) {
           <p class="mt-1 text-sm font-semibold text-gray-900">{{ supplierName() }}</p>
         } @else {
@@ -97,7 +125,20 @@ import {
       </div>
       <!-- Voyage: Vessel + Place + ETA/ETD -->
       <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Vessel</p>
+        <button
+          type="button"
+          (click)="navigateToVessel()"
+          [disabled]="!vesselId()"
+          class="text-xs font-medium uppercase tracking-wider mb-1.5"
+          [class.text-gray-500]="!vesselId()"
+          [class.text-brand-600]="!!vesselId()"
+          [class.hover:underline]="!!vesselId()"
+          [class.cursor-pointer]="!!vesselId()"
+          [class.cursor-not-allowed]="!vesselId()"
+          [class.opacity-50]="!vesselId()"
+        >
+          Vessel
+        </button>
         @if (isReadonly()) {
           <p class="mt-1 text-sm font-semibold text-gray-900">{{ vesselName() }}</p>
         } @else {
@@ -112,7 +153,20 @@ import {
           />
         }
         <div class="mt-3 border-t border-gray-100 pt-3">
-          <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">Place</p>
+          <button
+            type="button"
+            (click)="navigateToPlace()"
+            [disabled]="!placeId()"
+            class="text-xs font-medium uppercase tracking-wider mb-1.5"
+            [class.text-gray-500]="!placeId()"
+            [class.text-brand-600]="!!placeId()"
+            [class.hover:underline]="!!placeId()"
+            [class.cursor-pointer]="!!placeId()"
+            [class.cursor-not-allowed]="!placeId()"
+            [class.opacity-50]="!placeId()"
+          >
+            Place
+          </button>
           @if (isReadonly()) {
             <p class="mt-1 text-sm font-semibold text-gray-900">{{ placeName() }}</p>
           } @else {
@@ -213,6 +267,8 @@ import {
   `,
 })
 export class TradingDetailMetaCardsComponent {
+  private readonly router = inject(Router);
+
   readonly clientName = input.required<string>();
   readonly supplierName = input<string>('—');
   readonly vesselName = input.required<string>();
@@ -274,6 +330,30 @@ export class TradingDetailMetaCardsComponent {
   readonly responsibleChange = output<string>();
   readonly customerContactChange = output<string>();
   readonly supplierContactChange = output<string>();
+
+  navigateToClient(): void {
+    const id = this.clientId();
+    if (!id) return;
+    void this.router.navigate(['/companies', id]);
+  }
+
+  navigateToSupplier(): void {
+    const id = this.supplierId();
+    if (!id) return;
+    void this.router.navigate(['/companies', id]);
+  }
+
+  navigateToVessel(): void {
+    const id = this.vesselId();
+    if (!id) return;
+    void this.router.navigate(['/vessels', id]);
+  }
+
+  navigateToPlace(): void {
+    const id = this.placeId();
+    if (!id) return;
+    void this.router.navigate(['/places', id]);
+  }
 
   formatDateTimeForInput(dateStr: string | null | undefined): string {
     if (!dateStr) return '';

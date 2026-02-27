@@ -106,8 +106,10 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
   readonly orderId = input.required<string>();
   readonly status = input<OrderStatus | null>(null);
   readonly hasInvoicingCompany = input<boolean>(false);
+  readonly hasSupplier = input<boolean>(false);
   readonly hasBankAccount = input<boolean>(false);
   readonly hasLineItems = input<boolean>(false);
+  readonly hasEnoughPayments = input<boolean>(false);
   readonly actionTriggered = output<HeaderAction>();
 
   readonly isOpen = signal(false);
@@ -138,6 +140,7 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
   private updateActions(): void {
     const status = this.status();
     const hasInvoicingCompany = this.hasInvoicingCompany();
+    const hasSupplier = this.hasSupplier();
     const hasBankAccount = this.hasBankAccount();
     const hasLineItems = this.hasLineItems();
     const showInvoiceAsFinal =
@@ -158,7 +161,9 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
           : action.key === 'view-offer'
             ? { ...action, disabled: !hasInvoicingCompany || !hasLineItems }
           : action.key === 'view-proforma'
-            ? { ...action, disabled: !hasBankAccount || !hasLineItems }
+            ? { ...action, disabled: !hasSupplier || !hasLineItems }
+          : action.key === 'send-email'
+            ? { ...action, disabled: true }
           : action.key === 'mark-paid'
             ? { ...action, disabled: !canMarkPaid }
           : action,

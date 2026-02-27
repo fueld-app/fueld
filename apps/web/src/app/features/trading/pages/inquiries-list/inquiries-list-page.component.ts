@@ -338,15 +338,30 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private queryParamSub?: Subscription;
 
-  readonly mode = input<'inquiries' | 'orders'>('inquiries');
+  readonly mode = input<'inquiries' | 'active-orders' | 'completed-orders' | 'cancelled-orders'>('inquiries');
 
-  readonly isOrders = computed(() => this.mode() === 'orders');
+  readonly isOrders = computed(() => this.mode() !== 'inquiries');
+  readonly isActiveOrders = computed(() => this.mode() === 'active-orders');
+  readonly isCompletedOrders = computed(() => this.mode() === 'completed-orders');
+  readonly isCancelledOrders = computed(() => this.mode() === 'cancelled-orders');
   readonly baseRoute = computed(() => (this.isOrders() ? '/trading/orders' : '/trading/inquiries'));
-  readonly titleText = computed(() => (this.isOrders() ? 'Orders' : 'Inquiries'));
+  readonly titleText = computed(() => (
+    this.isActiveOrders()
+      ? 'Active Orders'
+      : this.isCompletedOrders()
+        ? 'Completed Orders'
+        : this.isCancelledOrders()
+          ? 'Cancelled Orders'
+        : 'Inquiries'
+  ));
   readonly subtitleText = computed(() =>
-    this.isOrders()
-      ? 'Manage your bunker trading orders.'
-      : 'Manage bunker inquiries and offers before confirmation.',
+    this.isActiveOrders()
+      ? 'Orders waiting for delivery or payment.'
+      : this.isCompletedOrders()
+        ? 'Orders that are paid and delivered.'
+        : this.isCancelledOrders()
+          ? 'Orders that have been cancelled.'
+        : 'Manage bunker inquiries and offers before confirmation.',
   );
   readonly searchPlaceholder = computed(() =>
     this.isOrders()
@@ -445,8 +460,12 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
     this.loading.set(true);
     try {
       const params = new URLSearchParams();
-      if (this.isOrders()) {
-        params.set('statuses', 'CONFIRMED,DELIVERED,INVOICED,PAID,CANCELLED');
+      if (this.isActiveOrders()) {
+        params.set('statuses', 'CONFIRMED,DELIVERED,INVOICED');
+      } else if (this.isCompletedOrders()) {
+        params.set('statuses', 'PAID');
+      } else if (this.isCancelledOrders()) {
+        params.set('statuses', 'CANCELLED');
       } else {
         params.set('statuses', 'INQUIRY,OFFER');
       }

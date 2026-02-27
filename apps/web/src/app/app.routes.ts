@@ -65,7 +65,23 @@ export const routes: Routes = [
               import('./features/trading/pages/orders-list/orders-list-page.component').then(
                 (m) => m.OrdersListPageComponent,
               ),
-            title: 'Trading > Orders',
+            title: 'Trading > Active Orders',
+          },
+          {
+            path: 'orders/completed',
+            loadComponent: () =>
+              import('./features/trading/pages/completed-orders-list/completed-orders-list-page.component').then(
+                (m) => m.CompletedOrdersListPageComponent,
+              ),
+            title: 'Trading > Completed Orders',
+          },
+          {
+            path: 'orders/cancelled',
+            loadComponent: () =>
+              import('./features/trading/pages/cancelled-orders-list/cancelled-orders-list-page.component').then(
+                (m) => m.CancelledOrdersListPageComponent,
+              ),
+            title: 'Trading > Cancelled Orders',
           },
           {
             path: 'orders/:id',
