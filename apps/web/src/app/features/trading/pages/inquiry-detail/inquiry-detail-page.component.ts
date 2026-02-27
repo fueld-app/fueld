@@ -190,7 +190,7 @@ interface LliSearchResult {
                 </button>
                 <hr class="my-1 border-gray-100">
                 <button
-                  (click)="convertToOrder(); actionsOpen.set(false)"
+                  (click)="openConvertToOrderModal(); actionsOpen.set(false)"
                   [disabled]="!hasLineItems()"
                   class="flex w-full items-center gap-2 px-4 py-2 text-sm text-green-700 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
                 >
@@ -750,6 +750,49 @@ interface LliSearchResult {
     }
 
     <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!--  Convert to Order Modal                                        -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    @if (showConvertToOrderModal()) {
+      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div class="w-full max-w-md rounded-2xl bg-white shadow-2xl" role="dialog" aria-modal="true">
+          <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+            <h2 class="text-lg font-semibold text-gray-900">Convert to Order?</h2>
+            <button (click)="closeConvertToOrderModal()" class="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600" aria-label="Close">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+              </svg>
+            </button>
+          </div>
+          <div class="px-6 py-5">
+            <p class="text-sm text-gray-600">This will change the inquiry status to <strong>CONFIRMED</strong> and redirect you to the order page.</p>
+          </div>
+          <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-4">
+            <button
+              (click)="closeConvertToOrderModal()"
+              class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              (click)="confirmConvertToOrder()"
+              [disabled]="convertingToOrder()"
+              class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold
+                     text-white shadow-sm transition-colors hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              @if (convertingToOrder()) {
+                <svg class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+              }
+              Confirm Convert
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
     <!--  Cancel Inquiry Modal                                          -->
     <!-- ═══════════════════════════════════════════════════════════════ -->
     @if (showCancelInquiryModal()) {
@@ -1053,6 +1096,11 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   inquirySubject = '';
   inquiryBody = '';
   inquirySupplierTarget = '';
+
+  // ─── Convert inquiry modal state ──────────────────────────────────
+
+  readonly showConvertToOrderModal = signal(false);
+  readonly convertingToOrder = signal(false);
 
   // ─── Cancel inquiry modal state ───────────────────────────────────
 
@@ -2344,6 +2392,23 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
 
   // ─── Convert to Order ────────────────────────────────────────────
 
+  openConvertToOrderModal(): void {
+    if (!this.hasLineItems()) {
+      this.showToast('error', 'Add at least one line item before converting to order.');
+      return;
+    }
+    this.showConvertToOrderModal.set(true);
+  }
+
+  closeConvertToOrderModal(): void {
+    this.showConvertToOrderModal.set(false);
+  }
+
+  async confirmConvertToOrder(): Promise<void> {
+    if (this.convertingToOrder()) return;
+    await this.convertToOrder();
+  }
+
   async convertToOrder(): Promise<void> {
     const id = this.inquiryId();
     if (!id) return;
@@ -2352,6 +2417,7 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
       return;
     }
 
+    this.convertingToOrder.set(true);
     try {
       // Save pending changes first
       await this.save();
@@ -2364,6 +2430,7 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
       );
 
       if (res.success) {
+        this.closeConvertToOrderModal();
         this.order.update((o) => (o ? { ...o, status: OrderStatus.Confirmed } : o));
         this.showToast('success', 'Inquiry converted to order. Redirecting...');
         const targetId = res.data?.id ?? this.order()?.id ?? id;
@@ -2376,6 +2443,8 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
       }
     } catch {
       this.showToast('error', 'Failed to convert inquiry.');
+    } finally {
+      this.convertingToOrder.set(false);
     }
   }
 
