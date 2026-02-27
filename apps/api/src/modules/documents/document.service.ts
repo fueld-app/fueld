@@ -792,6 +792,7 @@ function buildInvoiceDocument(data: {
     const price = parseFloat(item.salesPrice ?? '0') || 0;
     return sum + qty * price;
   }, 0);
+  const totalAmountDueLabel = `Total amount due to ${data.companyName?.trim() || 'Company'}`;
 
   const docDefinition: TDocumentDefinitions = {
     pageSize: 'A4',
@@ -875,6 +876,14 @@ function buildInvoiceDocument(data: {
           paddingTop: () => 6,
           paddingBottom: () => 6,
         },
+      } as Content,
+
+      {
+        columns: [
+          { width: '*', text: totalAmountDueLabel, bold: true },
+          { width: 'auto', text: `${formatNumber(String(grandTotal), 2)} USD`, bold: true, alignment: 'right' },
+        ],
+        margin: [0, 6, 0, 0],
       } as Content,
 
       // ── Total ──
@@ -1875,6 +1884,12 @@ function buildProformaDocument(data: {
       { text: `${data.currency}/${item.unit}  ${formatNumber(item.salesPrice)}`, alignment: 'right' },
     ];
   });
+  const grandTotal = data.items.reduce((sum, item) => {
+    const qty = parseFloat(item.quantity) || 0;
+    const price = parseFloat(item.salesPrice ?? '0') || 0;
+    return sum + qty * price;
+  }, 0);
+  const totalAmountDueLabel = `Total amount due to ${data.companyName?.trim() || 'Company'}`;
 
   // Delivery date string
   let deliveryDateStr = '';
@@ -2027,6 +2042,13 @@ function buildProformaDocument(data: {
           paddingTop: () => 5,
           paddingBottom: () => 5,
         },
+      } as Content,
+      {
+        columns: [
+          { width: '*', text: totalAmountDueLabel, bold: true },
+          { width: 'auto', text: `${formatNumber(String(grandTotal), 2)} ${data.currency}`, bold: true, alignment: 'right' },
+        ],
+        margin: [0, 6, 0, 0],
       } as Content,
       { text: '', margin: [0, 16, 0, 0] } as Content,
 
