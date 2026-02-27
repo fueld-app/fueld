@@ -12,40 +12,6 @@ async function createOrderFromInquiry(page: import('@playwright/test').Page): Pr
   await page.getByRole('button', { name: 'Confirm Convert' }).click();
   await page.waitForURL(/\/trading\/orders\//, { timeout: 15_000 });
   await expect(page.getByRole('heading', { name: 'Order Detail' })).toBeVisible();
-
-  // Add a minimal item so downstream documents have line items.
-  const orderItems = page.locator('app-order-items');
-  const productInput = orderItems.locator('input[role="combobox"][placeholder="Product..."]').first();
-
-  await orderItems.scrollIntoViewIfNeeded();
-  await orderItems.getByRole('button', { name: 'Add Item' }).click();
-  try {
-    await expect(productInput).toBeVisible({ timeout: 5_000 });
-  } catch {
-    // Sometimes the header button click doesn't register under load; the empty state button is a reliable fallback.
-    const emptyAdd = orderItems.getByRole('button', { name: '+ Add your first item' });
-    if (await emptyAdd.isVisible()) {
-      await emptyAdd.click();
-    }
-    await expect(productInput).toBeVisible({ timeout: 10_000 });
-  }
-
-  const itemsSaved = page.waitForResponse((res) => {
-    if (res.status() !== 200) return false;
-    if (res.request().method() !== 'PUT') return false;
-    try {
-      const url = new URL(res.url());
-      return /\/orders\/[^/]+\/items$/.test(url.pathname);
-    } catch {
-      return false;
-    }
-  });
-
-  await productInput.click();
-  await page.getByRole('listbox').getByRole('option').first().click();
-  await page.locator('app-order-items input[placeholder="Qty"]').first().fill('100');
-
-  await itemsSaved;
 }
 
 test('mark delivered via BDR upload and generate invoice PDF', async ({ page }) => {

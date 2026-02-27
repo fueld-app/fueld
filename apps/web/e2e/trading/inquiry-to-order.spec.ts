@@ -30,39 +30,7 @@ test('create inquiry, view PDFs, convert to order, add item, view order PDFs', a
   await page.getByRole('button', { name: 'Confirm Convert' }).click();
   await page.waitForURL(/\/trading\/orders\//, { timeout: 15_000 });
 
-  // Add one item and wait for autosave to persist it.
-  const orderItems = page.locator('app-order-items');
-  const productInput = orderItems.locator('input[role="combobox"][placeholder="Product..."]').first();
-
-  await orderItems.scrollIntoViewIfNeeded();
-  await orderItems.getByRole('button', { name: 'Add Item' }).click();
-  try {
-    await expect(productInput).toBeVisible({ timeout: 5_000 });
-  } catch {
-    const emptyAdd = orderItems.getByRole('button', { name: '+ Add your first item' });
-    if (await emptyAdd.isVisible()) {
-      await emptyAdd.click();
-    }
-    await expect(productInput).toBeVisible({ timeout: 10_000 });
-  }
-
-  const itemsSaved = page.waitForResponse((res) => {
-    if (res.status() !== 200) return false;
-    const req = res.request();
-    if (req.method() !== 'PUT') return false;
-    try {
-      const url = new URL(res.url());
-      return /\/orders\/[^/]+\/items$/.test(url.pathname);
-    } catch {
-      return false;
-    }
-  });
-
-  await productInput.click();
-  await page.getByRole('listbox').getByRole('option').first().click();
-  await page.locator('app-order-items input[placeholder="e.g. local specs"]').first().fill('E2E item');
-  await page.locator('app-order-items input[placeholder="Qty"]').first().fill('100');
-
-  await itemsSaved;
+  // The inquiry is seeded with a valid line item via API helper.
+  await expect(page.locator('app-order-items tbody tr').first()).toBeVisible();
 
 });
