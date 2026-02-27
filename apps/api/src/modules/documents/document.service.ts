@@ -434,6 +434,12 @@ async function fetchOrderForInvoice(orderId: string) {
   return order;
 }
 
+function getCompanyRegistrationNumber(company: unknown): string | null {
+  if (!company || typeof company !== 'object') return null;
+  const value = (company as { companyRegistrationNumber?: unknown }).companyRegistrationNumber;
+  return typeof value === 'string' ? value : null;
+}
+
 /** Load the bank account assigned to an order (or the company default). */
 async function loadOrderBankDetails(
   bankAccountId: string | null | undefined,
@@ -1129,7 +1135,7 @@ export async function generateInvoicePdfBuffer(invoiceId: string): Promise<Buffe
     createdAt: invoice.createdAt,
     companyName: order.invoicingCompany?.name ?? null,
     vatNumber: order.invoicingCompany?.vatNumber ?? null,
-    companyRegistrationNumber: order.invoicingCompany?.companyRegistrationNumber ?? null,
+    companyRegistrationNumber: getCompanyRegistrationNumber(order.invoicingCompany),
     fraudPreventionText: order.invoicingCompany?.fraudPreventionText ?? null,
     latePaymentInterest: order.invoicingCompany?.latePaymentInterest ?? null,
     verifyUrl,
@@ -1248,7 +1254,7 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
     createdAt: invoice?.createdAt ?? order.createdAt,
     companyName: order.invoicingCompany?.name ?? null,
     vatNumber: order.invoicingCompany?.vatNumber ?? null,
-    companyRegistrationNumber: order.invoicingCompany?.companyRegistrationNumber ?? null,
+    companyRegistrationNumber: getCompanyRegistrationNumber(order.invoicingCompany),
     fraudPreventionText: order.invoicingCompany?.fraudPreventionText ?? null,
     latePaymentInterest: order.invoicingCompany?.latePaymentInterest ?? null,
     verifyUrl,
@@ -1714,7 +1720,7 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
     companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
     companyEmail: order.invoicingCompany?.headOfficeEmail ?? null,
-    companyRegistrationNumber: order.invoicingCompany?.companyRegistrationNumber ?? null,
+    companyRegistrationNumber: getCompanyRegistrationNumber(order.invoicingCompany),
     vatNumber: order.invoicingCompany?.vatNumber ?? null,
     companyWebsite: order.invoicingCompany?.website ?? null,
     companyLogoDataUrl,
@@ -2240,7 +2246,7 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
     companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
     companyEmail: order.invoicingCompany?.headOfficeEmail ?? null,
-    companyRegistrationNumber: order.invoicingCompany?.companyRegistrationNumber ?? null,
+    companyRegistrationNumber: getCompanyRegistrationNumber(order.invoicingCompany),
     companyWebsite: order.invoicingCompany?.website ?? null,
     companyLogoDataUrl,
     itemNotes: order.items

@@ -446,7 +446,8 @@ export async function getUserCompanyAccess(userId: string): Promise<OwnCompanyDt
 
   // Fall back to team companies
   const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
-  if (!user?.teamId) {
+  const teamId = user?.teamId;
+  if (!teamId) {
     // No team, no overrides → return all own companies
     return listOwnCompanies();
   }
@@ -457,14 +458,14 @@ export async function getUserCompanyAccess(userId: string): Promise<OwnCompanyDt
         .select(OWN_COMPANY_SELECT)
         .from(teamCompanies)
         .innerJoin(counterparties, eq(teamCompanies.counterpartyId, counterparties.id))
-        .where(eq(teamCompanies.teamId, user.teamId));
+        .where(eq(teamCompanies.teamId, teamId));
     } catch (err) {
       if (!isMissingCompanyRegistrationNumberColumnError(err)) throw err;
       const legacy = await db
         .select(OWN_COMPANY_SELECT_LEGACY)
         .from(teamCompanies)
         .innerJoin(counterparties, eq(teamCompanies.counterpartyId, counterparties.id))
-        .where(eq(teamCompanies.teamId, user.teamId));
+        .where(eq(teamCompanies.teamId, teamId));
       return withLegacyRegistrationNumber(legacy);
     }
   })();
