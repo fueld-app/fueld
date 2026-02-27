@@ -51,30 +51,67 @@ async function getTenantId(): Promise<string> {
   return tenant.id;
 }
 
+const OWN_COMPANY_SELECT = {
+  id: counterparties.id,
+  name: counterparties.name,
+  country: counterparties.country,
+  countryIso: counterparties.countryIso,
+  logoUrl: counterparties.logoUrl,
+  customerTerms: counterparties.customerTerms,
+  supplierTerms: counterparties.supplierTerms,
+  vatNumber: counterparties.vatNumber,
+  companyRegistrationNumber: counterparties.companyRegistrationNumber,
+  fraudPreventionText: counterparties.fraudPreventionText,
+  latePaymentInterest: counterparties.latePaymentInterest,
+};
+
+const OWN_COMPANY_SELECT_LEGACY = {
+  id: counterparties.id,
+  name: counterparties.name,
+  country: counterparties.country,
+  countryIso: counterparties.countryIso,
+  logoUrl: counterparties.logoUrl,
+  customerTerms: counterparties.customerTerms,
+  supplierTerms: counterparties.supplierTerms,
+  vatNumber: counterparties.vatNumber,
+  fraudPreventionText: counterparties.fraudPreventionText,
+  latePaymentInterest: counterparties.latePaymentInterest,
+};
+
+function isMissingCompanyRegistrationNumberColumnError(err: unknown): boolean {
+  return err instanceof Error && err.message.includes('company_registration_number');
+}
+
+function withLegacyRegistrationNumber(
+  rows: Array<Omit<OwnCompanyDto, 'companyRegistrationNumber'>>,
+): OwnCompanyDto[] {
+  return rows.map((row) => ({ ...row, companyRegistrationNumber: null }));
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  OWN COMPANIES
 // ═══════════════════════════════════════════════════════════════════════
 
 export async function listOwnCompanies(): Promise<OwnCompanyDto[]> {
-  const rows = await db
-    .select({
-      id: counterparties.id,
-      name: counterparties.name,
-      country: counterparties.country,
-      countryIso: counterparties.countryIso,
-      logoUrl: counterparties.logoUrl,
-      customerTerms: counterparties.customerTerms,
-      supplierTerms: counterparties.supplierTerms,
-      vatNumber: counterparties.vatNumber,
-      companyRegistrationNumber: counterparties.companyRegistrationNumber,
-      fraudPreventionText: counterparties.fraudPreventionText,
-      latePaymentInterest: counterparties.latePaymentInterest,
-    })
-    .from(counterparties)
-    .where(eq(counterparties.isOwnCompany, true))
-    .orderBy(counterparties.name);
+  try {
+    const rows = await db
+      .select(OWN_COMPANY_SELECT)
+      .from(counterparties)
+      .where(eq(counterparties.isOwnCompany, true))
+      .orderBy(counterparties.name);
 
-  return rows;
+    return rows;
+  } catch (err) {
+    if (!isMissingCompanyRegistrationNumberColumnError(err)) throw err;
+
+    const legacyRows = await db
+      .select(OWN_COMPANY_SELECT_LEGACY)
+      .from(counterparties)
+      .where(eq(counterparties.isOwnCompany, true))
+      .orderBy(counterparties.name);
+
+    return withLegacyRegistrationNumber(legacyRows);
+  }
 }
 
 export async function setOwnCompany(companyId: string, isOwn: boolean) {
@@ -143,7 +180,15 @@ export async function updateOwnCompanyTerms(companyId: string, data: {
     patch.latePaymentInterest = data.latePaymentInterest?.trim() ? data.latePaymentInterest : null;
   }
 
-  await db.update(counterparties).set(patch).where(eq(counterparties.id, companyId));
+  try {
+    await db.update(counterparties).set(patch).where(eq(counterparties.id, companyId));
+  } catch (err) {
+    if (!isMissingCompanyRegistrationNumberColumnError(err) || !('companyRegistrationNumber' in patch)) {
+      throw err;
+    }
+    delete patch['companyRegistrationNumber'];
+    await db.update(counterparties).set(patch).where(eq(counterparties.id, companyId));
+  }
 
   const list = await listOwnCompanies();
   const updated = list.find((c) => c.id === companyId);
@@ -377,23 +422,23 @@ export async function deleteCompanyGroup(groupId: string) {
 
 export async function getUserCompanyAccess(userId: string): Promise<OwnCompanyDto[]> {
   // Check for per-user overrides first
-  const overrides = await db
-    .select({
-      id: counterparties.id,
-      name: counterparties.name,
-      country: counterparties.country,
-      countryIso: counterparties.countryIso,
-      logoUrl: counterparties.logoUrl,
-      customerTerms: counterparties.customerTerms,
-      supplierTerms: counterparties.supplierTerms,
-      vatNumber: counterparties.vatNumber,
-      companyRegistrationNumber: counterparties.companyRegistrationNumber,
-      fraudPreventionText: counterparties.fraudPreventionText,
-      latePaymentInterest: counterparties.latePaymentInterest,
-    })
-    .from(userCompanyOverrides)
-    .innerJoin(counterparties, eq(userCompanyOverrides.counterpartyId, counterparties.id))
-    .where(eq(userCompanyOverrides.userId, userId));
+  const overrides = await (async () => {
+    try {
+      return await db
+        .select(OWN_COMPANY_SELECT)
+        .from(userCompanyOverrides)
+        .innerJoin(counterparties, eq(userCompanyOverrides.counterpartyId, counterparties.id))
+        .where(eq(userCompanyOverrides.userId, userId));
+    } catch (err) {
+      if (!isMissingCompanyRegistrationNumberColumnError(err)) throw err;
+      const legacy = await db
+        .select(OWN_COMPANY_SELECT_LEGACY)
+        .from(userCompanyOverrides)
+        .innerJoin(counterparties, eq(userCompanyOverrides.counterpartyId, counterparties.id))
+        .where(eq(userCompanyOverrides.userId, userId));
+      return withLegacyRegistrationNumber(legacy);
+    }
+  })();
 
   if (overrides.length > 0) {
     return overrides;
@@ -406,23 +451,23 @@ export async function getUserCompanyAccess(userId: string): Promise<OwnCompanyDt
     return listOwnCompanies();
   }
 
-  const teamCos = await db
-    .select({
-      id: counterparties.id,
-      name: counterparties.name,
-      country: counterparties.country,
-      countryIso: counterparties.countryIso,
-      logoUrl: counterparties.logoUrl,
-      customerTerms: counterparties.customerTerms,
-      supplierTerms: counterparties.supplierTerms,
-      vatNumber: counterparties.vatNumber,
-      companyRegistrationNumber: counterparties.companyRegistrationNumber,
-      fraudPreventionText: counterparties.fraudPreventionText,
-      latePaymentInterest: counterparties.latePaymentInterest,
-    })
-    .from(teamCompanies)
-    .innerJoin(counterparties, eq(teamCompanies.counterpartyId, counterparties.id))
-    .where(eq(teamCompanies.teamId, user.teamId));
+  const teamCos = await (async () => {
+    try {
+      return await db
+        .select(OWN_COMPANY_SELECT)
+        .from(teamCompanies)
+        .innerJoin(counterparties, eq(teamCompanies.counterpartyId, counterparties.id))
+        .where(eq(teamCompanies.teamId, user.teamId));
+    } catch (err) {
+      if (!isMissingCompanyRegistrationNumberColumnError(err)) throw err;
+      const legacy = await db
+        .select(OWN_COMPANY_SELECT_LEGACY)
+        .from(teamCompanies)
+        .innerJoin(counterparties, eq(teamCompanies.counterpartyId, counterparties.id))
+        .where(eq(teamCompanies.teamId, user.teamId));
+      return withLegacyRegistrationNumber(legacy);
+    }
+  })();
 
   // If team has no companies assigned, return all own companies
   return teamCos.length > 0 ? teamCos : listOwnCompanies();
