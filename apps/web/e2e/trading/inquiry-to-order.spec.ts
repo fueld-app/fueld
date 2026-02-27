@@ -19,14 +19,14 @@ test('create inquiry, view offer PDF, convert to order, and verify order page', 
   {
     const pdf = waitForPdfResponse(page, '/offer/pdf');
     await page.getByRole('button', { name: 'Actions' }).click();
-    await page.getByRole('button', { name: 'View Offer PDF' }).click();
+    await page.getByRole('menuitem', { name: 'View Offer PDF' }).click();
     await pdf;
     await closePdfPreviewIfOpen(page);
   }
 
   // Convert to Order
   await page.getByRole('button', { name: 'Actions' }).click();
-  await page.getByRole('button', { name: 'Convert to Order' }).click();
+  await page.getByRole('menuitem', { name: 'Convert to Order' }).click();
   await page.getByRole('button', { name: 'Confirm Convert' }).click();
   await page.waitForURL(/\/trading\/orders\//, { timeout: 15_000 });
 

@@ -17,7 +17,15 @@ import { OrderStatus } from '@fueld/types';
 //  Actions: Generate Invoice, Send Email, Mark Paid
 // ═══════════════════════════════════════════════════════════════════════
 
-export type HeaderAction = 'generate-invoice' | 'view-offer' | 'view-proforma' | 'send-email' | 'mark-delivered' | 'mark-paid';
+export type HeaderAction =
+  | 'generate-invoice'
+  | 'view-offer'
+  | 'view-proforma'
+  | 'convert-to-order'
+  | 'cancel-inquiry'
+  | 'send-email'
+  | 'mark-delivered'
+  | 'mark-paid';
 
 interface ActionItem {
   key: HeaderAction;
@@ -45,6 +53,18 @@ const ACTIONS: ActionItem[] = [
     label: 'View Proforma Invoice',
     icon: 'M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z',
     color: 'text-brand-600',
+  },
+  {
+    key: 'convert-to-order',
+    label: 'Convert to Order',
+    icon: 'M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z',
+    color: 'text-green-600',
+  },
+  {
+    key: 'cancel-inquiry',
+    label: 'Cancel Inquiry',
+    icon: 'M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z',
+    color: 'text-red-500',
   },
   {
     key: 'send-email',
@@ -145,10 +165,12 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
 
   private updateActions(): void {
     const status = this.status();
+    const normalizedStatus = String(status ?? '').toUpperCase();
     const hasInvoicingCompany = this.hasInvoicingCompany();
     const hasSupplier = this.hasSupplier();
     const hasBankAccount = this.hasBankAccount();
     const hasLineItems = this.hasLineItems();
+    const isInquiry = normalizedStatus === 'INQUIRY' || normalizedStatus === 'OFFER';
     const showInvoiceAsFinal =
       status === OrderStatus.Delivered
       || status === OrderStatus.Invoiced
@@ -156,27 +178,48 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
     const canMarkDelivered = status === OrderStatus.Confirmed;
     const canMarkPaid = status !== OrderStatus.Paid;
 
-    const nextActions = ACTIONS
-      .filter((action) => action.key !== 'mark-paid' || canMarkPaid)
-      .map((action) =>
-        action.key === 'generate-invoice'
-          ? {
-              ...action,
-              label: showInvoiceAsFinal ? 'View Invoice' : 'View Proforma Invoice',
-              disabled: !hasBankAccount || !hasLineItems,
-            }
-          : action.key === 'view-offer'
-            ? { ...action, disabled: !hasInvoicingCompany || !hasLineItems }
-          : action.key === 'view-proforma'
-            ? { ...action, disabled: !hasSupplier || !hasLineItems }
-          : action.key === 'send-email'
-            ? { ...action, disabled: true }
-          : action.key === 'mark-delivered'
-            ? { ...action, disabled: !canMarkDelivered }
-          : action.key === 'mark-paid'
-            ? { ...action, disabled: !canMarkPaid }
-          : action,
-      );
+    const nextActions = isInquiry
+      ? ACTIONS
+          .filter((action) =>
+            action.key === 'view-offer'
+            || action.key === 'generate-invoice'
+            || action.key === 'convert-to-order'
+            || action.key === 'cancel-inquiry',
+          )
+          .map((action) =>
+            action.key === 'view-offer'
+              ? { ...action, label: 'View Offer PDF', disabled: !hasInvoicingCompany || !hasLineItems }
+              : action.key === 'generate-invoice'
+                ? { ...action, label: 'View Proforma Invoice', disabled: !hasBankAccount || !hasLineItems }
+                : action.key === 'convert-to-order'
+                  ? { ...action, disabled: !hasLineItems }
+                  : action,
+          )
+      : ACTIONS
+          .filter((action) =>
+            action.key !== 'convert-to-order'
+            && action.key !== 'cancel-inquiry'
+            && (action.key !== 'mark-paid' || canMarkPaid),
+          )
+          .map((action) =>
+            action.key === 'generate-invoice'
+              ? {
+                  ...action,
+                  label: showInvoiceAsFinal ? 'View Invoice' : 'View Proforma Invoice',
+                  disabled: !hasBankAccount || !hasLineItems,
+                }
+              : action.key === 'view-offer'
+                ? { ...action, disabled: !hasInvoicingCompany || !hasLineItems }
+              : action.key === 'view-proforma'
+                ? { ...action, disabled: !hasSupplier || !hasLineItems }
+              : action.key === 'send-email'
+                ? { ...action, disabled: true }
+              : action.key === 'mark-delivered'
+                ? { ...action, disabled: !canMarkDelivered }
+              : action.key === 'mark-paid'
+                ? { ...action, disabled: !canMarkPaid }
+              : action,
+          );
 
     this.displayActions.set(nextActions);
   }

@@ -102,8 +102,8 @@ export const routes: Routes = [
           {
             path: 'inquiries/:id',
             loadComponent: () =>
-              import('./features/trading/pages/inquiry-detail/inquiry-detail-page.component').then(
-                (m) => m.InquiryDetailPageComponent,
+              import('./features/trading/pages/order-detail/order-detail-page.component').then(
+                (m) => m.OrderDetailPageComponent,
               ),
             title: 'Trading > Inquiries',
           },

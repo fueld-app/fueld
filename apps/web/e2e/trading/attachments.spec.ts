@@ -9,7 +9,7 @@ async function createOrderFromInquiry(page: import('@playwright/test').Page): Pr
   await expect(page.getByRole('button', { name: 'Actions' })).toBeVisible({ timeout: 15_000 });
 
   await page.getByRole('button', { name: 'Actions' }).click();
-  await page.getByRole('button', { name: 'Convert to Order' }).click();
+  await page.getByRole('menuitem', { name: 'Convert to Order' }).click();
   await page.getByRole('button', { name: 'Confirm Convert' }).click();
   await page.waitForURL(/\/trading\/orders\//, { timeout: 15_000 });
 }

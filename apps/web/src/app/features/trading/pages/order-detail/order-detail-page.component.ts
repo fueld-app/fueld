@@ -9,7 +9,7 @@ import {
   OnDestroy,
   effect,
 } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClient, type HttpResponse } from '@angular/common/http';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -79,9 +79,9 @@ interface TeamUserOption {
   ],
   template: `
     <app-trading-detail-header
-      title="Order Detail"
-      breadcrumbLabel="Orders"
-      breadcrumbLink="/trading/orders"
+      [title]="isInquiryContext() ? 'Inquiry Detail' : 'Order Detail'"
+      [breadcrumbLabel]="isInquiryContext() ? 'Inquiries' : 'Orders'"
+      [breadcrumbLink]="isInquiryContext() ? '/trading/inquiries' : '/trading/orders'"
       [entityNumber]="order()?.orderNumber ?? null"
       [fallbackId]="orderId()"
       [status]="order()?.status ?? 'INQUIRY'"
@@ -673,6 +673,43 @@ interface TeamUserOption {
       </div>
     }
 
+    @if (showConvertToOrderModal()) {
+      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-gray-900">Convert to Order?</h3>
+            <button
+              type="button"
+              (click)="closeConvertToOrderModal()"
+              class="text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
+          </div>
+          <p class="mt-3 text-sm text-gray-600">
+            This will change the status from inquiry to confirmed order.
+          </p>
+          <div class="mt-5 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              (click)="closeConvertToOrderModal()"
+              class="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              (click)="confirmConvertToOrder()"
+              [disabled]="convertingToOrder()"
+              class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-700 disabled:opacity-50"
+            >
+              Confirm Convert
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
     <!-- Send Email Modal -->
     <app-send-email-modal
       [invoiceNumber]="invoiceNumber()"
@@ -700,6 +737,7 @@ interface TeamUserOption {
 })
 export class OrderDetailPageComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly http = inject(HttpClient);
   private readonly auth = inject(AuthService);
 
@@ -761,6 +799,10 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   readonly showCustomerPaymentNote = signal(false);
   readonly showSupplierPaymentNote = signal(false);
   readonly settingsOpen = signal(false);
+  readonly showConvertToOrderModal = signal(false);
+  readonly convertingToOrder = signal(false);
+  readonly cancellingInquiry = signal(false);
+  readonly inquiryCancelReasons = signal<string[]>([]);
   readonly configuredProducts = signal<DropdownOption[]>([]);
   readonly configuredUnits = signal<DropdownOption[]>([]);
   readonly configuredCurrencies = signal<DropdownOption[]>([]);
@@ -808,6 +850,10 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   readonly vesselName = computed(() => this.vessel()?.name ?? '—');
   readonly portName = computed(() => this.port()?.name ?? '—');
   readonly subtitle = computed(() => '');
+  readonly isInquiryContext = computed(() => {
+    const status = this.order()?.status;
+    return status === OrderStatus.Inquiry || status === OrderStatus.Offer;
+  });
   readonly invoicingCompanyName = computed(() => {
     const id = this.order()?.invoicingCompanyId;
     if (!id) return '—';
@@ -1256,7 +1302,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
 
   private async loadReferenceData(): Promise<void> {
     try {
-      const [suppliersRes, usersRes, productsRes, unitsRes, currenciesRes, attachmentTypesRes] = await Promise.all([
+      const [suppliersRes, usersRes, productsRes, unitsRes, currenciesRes, attachmentTypesRes, cancelReasonsRes] = await Promise.all([
         firstValueFrom(
           this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
             `${API_URL}/companies/local?type=SUPPLIER&limit=100`,
@@ -1277,6 +1323,9 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
         firstValueFrom(
           this.http.get<ApiResponse<{ attachmentTypes: string[] }>>(`${API_URL}/admin/settings/my-attachment-types`),
         ),
+        firstValueFrom(
+          this.http.get<ApiResponse<{ reasons: string[] }>>(`${API_URL}/admin/settings/my-inquiry-cancel-reasons`),
+        ),
       ]);
       if (suppliersRes.success) this.suppliers.set(suppliersRes.data.companies);
       if (usersRes.success) this.teamUsers.set(usersRes.data ?? []);
@@ -1294,6 +1343,9 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
         if (!attachmentTypesRes.data.attachmentTypes.includes(this.attachmentType())) {
           this.attachmentType.set(attachmentTypesRes.data.attachmentTypes[0]!);
         }
+      }
+      if (cancelReasonsRes.success) {
+        this.inquiryCancelReasons.set(cancelReasonsRes.data.reasons ?? []);
       }
     } catch {
       // silently ignore
@@ -1845,6 +1897,12 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
         }
         this.viewProformaPdf();
         break;
+      case 'convert-to-order':
+        this.openConvertToOrderModal();
+        break;
+      case 'cancel-inquiry':
+        void this.cancelInquiryWithDefaultReason();
+        break;
       case 'send-email':
         if (!this.isResponsibleUser()) {
           this.showToast('error', 'Only the responsible user can send this email.');
@@ -1858,6 +1916,87 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
       case 'mark-delivered':
         this.markDelivered();
         break;
+    }
+  }
+
+  openConvertToOrderModal(): void {
+    if (!this.hasLineItems()) {
+      this.showToast('error', 'Add at least one line item before converting to order.');
+      return;
+    }
+    this.showConvertToOrderModal.set(true);
+  }
+
+  closeConvertToOrderModal(): void {
+    this.showConvertToOrderModal.set(false);
+  }
+
+  async confirmConvertToOrder(): Promise<void> {
+    if (this.convertingToOrder()) return;
+    const id = this.orderId();
+    if (!id) return;
+    if (!this.hasLineItems()) {
+      this.showToast('error', 'Add at least one line item before converting to order.');
+      return;
+    }
+
+    this.convertingToOrder.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}/status`, { status: 'CONFIRMED' }),
+      );
+      if (res.success) {
+        this.order.update((o) => (o ? { ...o, status: OrderStatus.Confirmed } : o));
+        this.closeConvertToOrderModal();
+        this.showToast('success', 'Inquiry converted to order.');
+        await this.router.navigate(['/trading/orders', id]);
+      } else {
+        this.showToast('error', res.message ?? 'Failed to convert inquiry.');
+      }
+    } catch {
+      this.showToast('error', 'Failed to convert inquiry.');
+    } finally {
+      this.convertingToOrder.set(false);
+    }
+  }
+
+  private async cancelInquiryWithDefaultReason(): Promise<void> {
+    const id = this.orderId();
+    if (!id) return;
+
+    const status = this.order()?.status;
+    if (status !== OrderStatus.Inquiry && status !== OrderStatus.Offer) {
+      this.showToast('error', 'Only inquiries can be cancelled from this action.');
+      return;
+    }
+
+    const reason = this.inquiryCancelReasons()[0]?.trim();
+    if (!reason) {
+      this.showToast('error', 'No cancellation reasons configured. Please ask admin to configure reasons in Settings.');
+      return;
+    }
+
+    const confirmed = window.confirm(`Cancel inquiry with reason: ${reason}?`);
+    if (!confirmed) return;
+
+    this.cancellingInquiry.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}/status`, {
+          status: 'CANCELLED',
+          lossReason: reason,
+        }),
+      );
+      if (res.success) {
+        this.order.update((o) => (o ? { ...o, status: OrderStatus.Cancelled } : o));
+        this.showToast('success', 'Inquiry cancelled.');
+      } else {
+        this.showToast('error', res.message ?? 'Failed to cancel inquiry.');
+      }
+    } catch {
+      this.showToast('error', 'Failed to cancel inquiry.');
+    } finally {
+      this.cancellingInquiry.set(false);
     }
   }
 
@@ -1993,27 +2132,29 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   private async viewOfferPdf(): Promise<void> {
     const id = this.orderId();
     if (!id) return;
+    const isInquiry = this.isInquiryContext();
+    const documentName = isInquiry ? 'Offer' : 'Confirmation';
     if (!this.hasLineItems()) {
-      this.showToast('error', 'Add at least one line item before generating Confirmation PDF.');
+      this.showToast('error', `Add at least one line item before generating ${documentName} PDF.`);
       return;
     }
     if (!this.hasInvoicingCompany()) {
-      this.showToast('error', 'Select an invoicing company before generating Confirmation PDF.');
+      this.showToast('error', `Select an invoicing company before generating ${documentName} PDF.`);
       return;
     }
     const modal = this.pdfModal();
     if (!modal) return;
-    modal.showLoading('Confirmation');
+    modal.showLoading(documentName);
     try {
       const res = await firstValueFrom(
         this.http.get(`${API_URL}/orders/${id}/offer/pdf`, { responseType: 'blob', observe: 'response' }),
       );
       const blob = res.body;
       if (!blob) throw new Error('Missing PDF body');
-      modal.setBlob(blob, `Confirmation_${this.order()?.orderNumber ?? id}.pdf`, this.buildVerifyUrlFromResponse(res));
+      modal.setBlob(blob, `${documentName}_${this.order()?.orderNumber ?? id}.pdf`, this.buildVerifyUrlFromResponse(res));
     } catch {
       modal.showError();
-      this.showToast('error', 'Failed to generate confirmation PDF.');
+      this.showToast('error', `Failed to generate ${documentName.toLowerCase()} PDF.`);
     }
   }
 
