@@ -17,7 +17,7 @@ import { OrderStatus } from '@fueld/types';
 //  Actions: Generate Invoice, Send Email, Mark Paid
 // ═══════════════════════════════════════════════════════════════════════
 
-export type HeaderAction = 'generate-invoice' | 'view-offer' | 'view-proforma' | 'send-email' | 'mark-paid';
+export type HeaderAction = 'generate-invoice' | 'view-offer' | 'view-proforma' | 'send-email' | 'mark-delivered' | 'mark-paid';
 
 interface ActionItem {
   key: HeaderAction;
@@ -51,6 +51,12 @@ const ACTIONS: ActionItem[] = [
     label: 'Send Email',
     icon: 'M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75',
     color: 'text-indigo-600',
+  },
+  {
+    key: 'mark-delivered',
+    label: 'Mark Delivered',
+    icon: 'M8.25 18.75a1.5 1.5 0 0 1-1.5-1.5v-6.879a2.25 2.25 0 0 1 .659-1.591l5.625-5.625a2.25 2.25 0 0 1 3.182 0l.625.625a2.25 2.25 0 0 1 0 3.182l-5.625 5.625a2.25 2.25 0 0 1-1.591.659H8.25v4.5h9a.75.75 0 0 1 0 1.5h-9Z',
+    color: 'text-emerald-600',
   },
   {
     key: 'mark-paid',
@@ -147,6 +153,7 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
       status === OrderStatus.Delivered
       || status === OrderStatus.Invoiced
       || status === OrderStatus.Paid;
+    const canMarkDelivered = status === OrderStatus.Confirmed;
     const canMarkPaid = status !== OrderStatus.Paid;
 
     const nextActions = ACTIONS
@@ -164,6 +171,8 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
             ? { ...action, disabled: !hasSupplier || !hasLineItems }
           : action.key === 'send-email'
             ? { ...action, disabled: true }
+          : action.key === 'mark-delivered'
+            ? { ...action, disabled: !canMarkDelivered }
           : action.key === 'mark-paid'
             ? { ...action, disabled: !canMarkPaid }
           : action,
