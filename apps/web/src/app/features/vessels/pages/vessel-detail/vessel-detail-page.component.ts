@@ -488,7 +488,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                   </thead>
                   <tbody class="divide-y divide-gray-50">
                     @for (o of vesselOrders(); track o.id) {
-                      <tr class="hover:bg-gray-50/50 transition-colors cursor-pointer" (click)="goToOrder(o.id)">
+                      <tr class="hover:bg-gray-50/50 transition-colors cursor-pointer" (click)="goToOrder(o.id, o.status)">
                         <td class="px-5 py-2.5">
                           <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
                             [class]="statusBadgeClass(o.status)">
@@ -1991,8 +1991,11 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
     this.router.navigate(['/vessels']);
   }
 
-  goToOrder(orderId: string): void {
-    this.router.navigate(['/trading/orders', orderId]);
+  goToOrder(orderId: string, status?: string): void {
+    const baseRoute = status === 'INQUIRY' || status === 'OFFER'
+      ? '/trading/inquiries'
+      : '/trading/orders';
+    this.router.navigate([baseRoute, orderId]);
   }
 
   // ─── Helpers ───────────────────────────────────────────────────────

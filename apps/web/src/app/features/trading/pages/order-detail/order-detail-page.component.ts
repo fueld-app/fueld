@@ -1055,6 +1055,34 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     }
   }
 
+  private detailBaseRouteForStatus(status: string): '/trading/orders' | '/trading/inquiries' {
+    return status === OrderStatus.Inquiry || status === OrderStatus.Offer
+      ? '/trading/inquiries'
+      : '/trading/orders';
+  }
+
+  private async normalizeDetailRoute(status: string, routeId: string): Promise<void> {
+    const currentPath = this.router.url.split('?')[0]?.split('#')[0] ?? '';
+    const expectedBase = this.detailBaseRouteForStatus(status);
+    const isOnOrdersPath = currentPath.startsWith('/trading/orders/');
+    const isOnInquiriesPath = currentPath.startsWith('/trading/inquiries/');
+
+    if (expectedBase === '/trading/inquiries' && isOnOrdersPath) {
+      await this.router.navigate(['/trading/inquiries', routeId], {
+        replaceUrl: true,
+        queryParamsHandling: 'preserve',
+      });
+      return;
+    }
+
+    if (expectedBase === '/trading/orders' && isOnInquiriesPath) {
+      await this.router.navigate(['/trading/orders', routeId], {
+        replaceUrl: true,
+        queryParamsHandling: 'preserve',
+      });
+    }
+  }
+
   private async loadOrder(): Promise<void> {
     const id = this.orderId();
     if (!id) return;
@@ -1097,6 +1125,8 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
           createdAt: d.createdAt,
           updatedAt: d.updatedAt,
         });
+
+        await this.normalizeDetailRoute(d.status, id);
 
         // Set contact person data
         if (d.customerContact) this.customerContact.set(d.customerContact);

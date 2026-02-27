@@ -45,6 +45,7 @@ interface SearchResult {
   name: string;
   subtitle: string;
   kind: 'place' | 'company' | 'vessel' | 'order';
+  orderStatus?: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -848,11 +849,14 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
       if (ordersRes.success && ordersRes.data?.items?.length) {
         for (const o of ordersRes.data.items) {
+          const orderRouteId = o.id ?? o.orderNumber;
+          if (!orderRouteId) continue;
           results.push({
-            id: o.orderNumber,
-            name: o.orderNumber,
+            id: orderRouteId,
+            name: o.orderNumber ?? o.id ?? 'Order',
             subtitle: [o.status, o.clientName, o.vesselName, o.placeName].filter(Boolean).join(' · '),
             kind: 'order',
+            orderStatus: o.status,
           });
         }
       }
@@ -886,16 +890,20 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     this.router.navigate(['/vessels', id]);
   }
 
-  goToOrder(orderNumber: string): void {
+  private orderDetailRoute(status?: string): '/trading/orders' | '/trading/inquiries' {
+    return status === 'INQUIRY' || status === 'OFFER' ? '/trading/inquiries' : '/trading/orders';
+  }
+
+  goToOrder(orderNumber: string, status?: string): void {
     this.searchOpen.set(false);
     this.searchTerm.set('');
     this.searchResults.set([]);
-    this.router.navigate(['/trading/orders', orderNumber]);
+    this.router.navigate([this.orderDetailRoute(status), orderNumber]);
   }
 
   goToResult(result: SearchResult): void {
     if (result.kind === 'order') {
-      this.goToOrder(result.id);
+      this.goToOrder(result.id, result.orderStatus);
     } else if (result.kind === 'company') {
       this.goToCompany(result.id);
     } else if (result.kind === 'vessel') {

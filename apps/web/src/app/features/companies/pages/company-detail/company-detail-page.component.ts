@@ -1247,7 +1247,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                     </thead>
                     <tbody class="divide-y divide-gray-50">
                       @for (order of companyOrders(); track order.id) {
-                        <tr class="hover:bg-gray-50/50 cursor-pointer transition-colors" (click)="goToOrder(order.id)">
+                        <tr class="hover:bg-gray-50/50 cursor-pointer transition-colors" (click)="goToOrder(order.id, order.status)">
                           <td class="px-5 py-2.5">
                             <span class="font-medium text-gray-900">{{ order.vesselName }}</span>
                             @if (order.vesselImo) {
@@ -3028,8 +3028,11 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  goToOrder(orderId: string): void {
-    this.router.navigate(['/trading/orders', orderId]);
+  goToOrder(orderId: string, status?: string): void {
+    const baseRoute = status === 'INQUIRY' || status === 'OFFER'
+      ? '/trading/inquiries'
+      : '/trading/orders';
+    this.router.navigate([baseRoute, orderId]);
   }
 
   goBack(): void {

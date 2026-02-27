@@ -15,6 +15,13 @@ test('create inquiry, view offer PDF, convert to order, and verify order page', 
   await page.goto(`/trading/inquiries/${inquiryId}`);
   await expect(page.getByRole('button', { name: 'Actions' })).toBeVisible();
 
+  const inquiriesNavLink = page.locator('aside nav a', { hasText: 'Inquiries' });
+  const activeOrdersNavLink = page.locator('aside nav a', { hasText: 'Active Orders' });
+  await expect(inquiriesNavLink).toHaveClass(/text-sidebar-text-active/);
+  await expect(inquiriesNavLink).toHaveClass(/bg-sidebar-active/);
+  await expect(activeOrdersNavLink).not.toHaveClass(/text-sidebar-text-active/);
+  await expect(activeOrdersNavLink).not.toHaveClass(/bg-sidebar-active/);
+
   // View Offer PDF (Inquiry page actions)
   {
     const pdf = waitForPdfResponse(page, '/offer/pdf');
