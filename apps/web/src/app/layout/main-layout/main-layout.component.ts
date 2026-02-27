@@ -455,11 +455,11 @@ const NAVIGATION: NavItem[] = [
                 <div class="flex items-center justify-between mb-2">
                   <div class="flex items-center gap-2">
                     <span class="inline-flex items-center justify-center h-7 w-7 rounded-full bg-green-100 text-green-700 text-xs font-bold">
-                      {{ (rfq.senderName || rfq.senderPhone || '?')[0].toUpperCase() }}
+                      {{ senderInitial(rfq) }}
                     </span>
                     <div>
-                      <div class="text-sm font-medium text-gray-900">{{ rfq.senderName || 'Unknown' }}</div>
-                      <div class="text-xs text-gray-500">+{{ rfq.senderPhone }}</div>
+                      <div class="text-sm font-medium text-gray-900">{{ senderDisplayName(rfq) }}</div>
+                      <div class="text-xs text-gray-500">{{ senderDisplayMeta(rfq) }}</div>
                     </div>
                   </div>
                   <span class="text-xs px-1.5 py-0.5 rounded-full"
@@ -502,7 +502,7 @@ const NAVIGATION: NavItem[] = [
                 </div>
 
                 <!-- Raw text (truncated) -->
-                <div class="text-xs text-gray-500 bg-gray-50 rounded p-2 mb-3 whitespace-pre-wrap line-clamp-3">{{ rfq.rawText }}</div>
+                <div class="text-xs text-gray-500 bg-gray-50 rounded p-2 mb-3 whitespace-pre-wrap max-h-24 overflow-y-auto">{{ rfq.rawText }}</div>
 
                 <!-- Actions -->
                 <div class="flex gap-2">
@@ -580,12 +580,6 @@ const NAVIGATION: NavItem[] = [
     }
     .animate-slide-in-right {
       animation: slide-in-right 0.25s ease-out;
-    }
-    .line-clamp-3 {
-      display: -webkit-box;
-      -webkit-line-clamp: 3;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
     }
   `,
 })
@@ -996,6 +990,52 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
     this.closeRfqPanel();
     this.router.navigate(['/trading/inquiries'], { queryParams: { new: '1', ...params } });
+  }
+
+  private extractSenderNameFromRawText(rawText: unknown): string | null {
+    if (typeof rawText !== 'string') return null;
+    const firstLine = rawText.split(/\r?\n/)[0]?.trim();
+    if (!firstLine) return null;
+
+    const exportMatch = firstLine.match(/^\[[^\]]+\]\s*([^:]+):/);
+    if (exportMatch?.[1]?.trim()) {
+      return exportMatch[1].trim();
+    }
+
+    const headerMatch = firstLine.match(/^(.+?)\s+\d{1,2}:\d{2}(?:\s?(?:AM|PM))?$/i);
+    if (headerMatch?.[1]?.trim()) {
+      return headerMatch[1].trim();
+    }
+
+    return null;
+  }
+
+  private normalizeSenderPhone(value: unknown): string | null {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    if (trimmed.toLowerCase() === 'manual') return null;
+    const digits = trimmed.replace(/\D/g, '');
+    return digits.length >= 6 ? digits : null;
+  }
+
+  senderDisplayName(rfq: any): string {
+    const explicit = typeof rfq?.senderName === 'string' ? rfq.senderName.trim() : '';
+    if (explicit) return explicit;
+    return this.extractSenderNameFromRawText(rfq?.rawText) ?? 'Unknown';
+  }
+
+  senderDisplayMeta(rfq: any): string {
+    const phone = this.normalizeSenderPhone(rfq?.senderPhone);
+    if (phone) return `+${phone}`;
+    const source = typeof rfq?.source === 'string' ? rfq.source.trim() : '';
+    return source || '—';
+  }
+
+  senderInitial(rfq: any): string {
+    const label = this.senderDisplayName(rfq);
+    const first = label.charAt(0).toUpperCase();
+    return first || '?';
   }
 
   // ─── Paste RFQ modal ───────────────────────────────────────────

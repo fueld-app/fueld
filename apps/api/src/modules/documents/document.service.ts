@@ -44,6 +44,7 @@ interface BankDetails {
 }
 
 type DocumentType = 'OFFER' | 'PROFORMA_INVOICE' | 'INVOICE' | 'OTHER';
+const DOCUMENT_TEMPLATE_VERSION = '2026-02-27b';
 
 export interface DocumentRevisionInfo {
   id: string;
@@ -140,6 +141,10 @@ function resolveDocumentStreamTarget(params: {
   return params.invoiceId ?? params.orderId ?? null;
 }
 
+function buildDocumentStreamKey(documentType: DocumentType, streamTarget: string): string {
+  return `${documentType}:${streamTarget}:${DOCUMENT_TEMPLATE_VERSION}`;
+}
+
 function toMs(date: Date | null | undefined): number {
   return date ? date.getTime() : 0;
 }
@@ -186,7 +191,7 @@ async function persistDocumentRevision(params: {
   const streamTarget = params.invoiceId ?? params.orderId;
   if (!streamTarget) throw new Error('Missing document stream target (orderId/invoiceId)');
 
-  const streamKey = `${params.documentType}:${streamTarget}`;
+  const streamKey = buildDocumentStreamKey(params.documentType, streamTarget);
   const sha256Hex = createHash('sha256').update(params.buffer).digest('hex');
 
   const [existing] = await db
@@ -265,7 +270,7 @@ export async function getLatestDocumentRevisionByOrderId(
   orderId: string,
   documentType: Exclude<DocumentType, 'OTHER'>,
 ): Promise<DocumentRevisionInfo | null> {
-  const streamKey = `${documentType}:${orderId}`;
+  const streamKey = buildDocumentStreamKey(documentType, orderId);
   const [revision] = await db
     .select()
     .from(documentRevisions)
@@ -287,7 +292,7 @@ export async function getLatestDocumentRevisionByStream(params: {
   });
   if (!streamTarget) return null;
 
-  const streamKey = `${params.documentType}:${streamTarget}`;
+  const streamKey = buildDocumentStreamKey(params.documentType, streamTarget);
   const [revision] = await db
     .select()
     .from(documentRevisions)
@@ -729,6 +734,7 @@ function tryLoadLogoDataUrl(logoUrl: string | null | undefined): string | null {
 
 function buildInvoiceDocument(data: {
   invoiceNumber: string;
+  orderNumber?: string | null;
   dueDate: string;
   clientName: string;
   clientCountry: string | null;
@@ -850,7 +856,7 @@ function buildInvoiceDocument(data: {
           },
         ],
       } as Content,
-      { text: '', margin: [0, 10, 0, 0] } as Content,
+      { text: '', margin: [0, 22, 0, 0] } as Content,
 
       // ── Vessel Info ──
       {
@@ -859,7 +865,7 @@ function buildInvoiceDocument(data: {
           { width: '50%', text: `Port: ${data.portName}`, style: 'vesselInfo', alignment: 'right' },
         ],
       } as Content,
-      { text: '', margin: [0, 15, 0, 0] } as Content,
+      { text: '', margin: [0, 10, 0, 0] } as Content,
 
       // ── Line Items Table ──
       {
@@ -886,38 +892,19 @@ function buildInvoiceDocument(data: {
         margin: [0, 6, 0, 0],
       } as Content,
 
-      // ── Total ──
-      { text: '', margin: [0, 10, 0, 0] } as Content,
-      {
-        columns: [
-          { width: '*', text: '' },
-          {
-            width: 'auto',
-            table: {
-              body: [
-                [
-                  { text: 'TOTAL', style: 'totalLabel' },
-                  { text: `USD ${formatNumber(String(grandTotal))}`, style: 'totalValue' },
-                ],
-              ],
-            },
-            layout: 'noBorders',
-          },
-        ],
-      } as Content,
-
       // ── Notes / Payment Terms ── (removed — not needed on invoices)
 
       // ── Divider ──
-      { text: '', margin: [0, 14, 0, 0] } as Content,
+      { text: '', margin: [0, 8, 0, 0] } as Content,
       {
         canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 0.5, lineColor: '#e5e7eb' }],
       } as Content,
-      { text: '', margin: [0, 10, 0, 0] } as Content,
+      { text: '', margin: [0, 6, 0, 0] } as Content,
 
       // ── Bank Details ──
       { text: 'REMITTANCE INSTRUCTIONS', style: 'sectionLabel' } as Content,
       { text: 'Payment to be effected, free of all charges to us, by telegraphic transfer to:', fontSize: 9, margin: [0, 2, 0, 6] } as Content,
+      { text: `Please include Order Ref ${data.orderNumber ?? data.invoiceNumber} in the transfer message/note.`, fontSize: 9, margin: [0, 0, 0, 6] } as Content,
       {
         columns: [
           { width: '25%', text: 'Bank:', bold: true },
@@ -983,30 +970,32 @@ function buildInvoiceDocument(data: {
         margin: [0, 10, 0, 0],
       } as Content] : []),
 
-      // ── Fraud Prevention ──
-      ...(data.fraudPreventionText ? [
+      // ── Fraud Prevention + QR (2-column) ──
+      ...((data.fraudPreventionText || data.verifyUrl) ? [
         { text: '', margin: [0, 10, 0, 0] } as Content,
-        { text: 'FRAUD PREVENTION', fontSize: 9, bold: true, margin: [0, 0, 0, 4] } as Content,
-        { text: data.fraudPreventionText, fontSize: 8, color: '#374151', margin: [0, 0, 0, 0] } as Content,
-      ] : []),
-
-      // ── QR code verification ──
-      ...(data.verifyUrl ? [
-        { text: '', margin: [0, 14, 0, 0] } as Content,
         {
           columns: [
-            { width: '*', text: '' },
             {
-              width: 'auto',
+              width: '*',
               stack: [
-                { image: data.verifyUrl, fit: [80, 80], alignment: 'center', link: data.verifyLink ?? undefined } as Content,
-                { text: 'Scan or click to verify', fontSize: 7, color: '#1a56db', alignment: 'center', margin: [0, 4, 0, 0], link: data.verifyLink ?? undefined } as Content,
-                ...(data.verifyLink ? [
-                  { text: `Verify domain: ${new URL(data.verifyLink).hostname}`, fontSize: 6, color: '#6b7280', alignment: 'center', margin: [0, 2, 0, 0] } as Content,
+                ...(data.fraudPreventionText ? [
+                  { text: 'FRAUD PREVENTION', fontSize: 9, bold: true, margin: [0, 0, 0, 4] } as Content,
+                  { text: data.fraudPreventionText, fontSize: 8, color: '#374151', margin: [0, 0, 10, 0] } as Content,
                 ] : []),
               ],
             },
-            { width: '*', text: '' },
+            {
+              width: 'auto',
+              stack: [
+                ...(data.verifyUrl ? [
+                  { image: data.verifyUrl, fit: [80, 80], alignment: 'right', link: data.verifyLink ?? undefined } as Content,
+                  { text: 'Scan or click to verify', fontSize: 7, color: '#1a56db', alignment: 'center', margin: [0, 4, 0, 0], link: data.verifyLink ?? undefined } as Content,
+                  ...(data.verifyLink ? [
+                    { text: `Verify domain: ${new URL(data.verifyLink).hostname}`, fontSize: 6, color: '#6b7280', alignment: 'center', margin: [0, 2, 0, 0] } as Content,
+                  ] : []),
+                ] : []),
+              ],
+            },
           ],
         } as Content,
       ] : []),
@@ -1117,6 +1106,7 @@ export async function generateInvoicePdfBuffer(invoiceId: string): Promise<Buffe
 
   const docData = {
     invoiceNumber: invoice.invoiceNumber,
+    orderNumber: order.orderNumber ?? null,
     dueDate: invoice.dueDate,
     clientName: order.client.name,
     clientCountry: order.client.country,
@@ -1236,6 +1226,7 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
 
   const docData = {
     invoiceNumber,
+    orderNumber: order.orderNumber ?? null,
     dueDate,
     clientName: order.client.name,
     clientCountry: order.client.country,
@@ -1431,6 +1422,13 @@ function buildOfferDocument(data: {
       { text: `${data.currency}/${item.unit}  ${formatNumber(item.salesPrice)}`, alignment: 'right' },
     ];
   });
+  const normalizedTableRows: TableCell[][] = tableRows.map((row) => {
+    const next = [...row];
+    while (next.length < tableHeader.length) {
+      next.push({ text: '' });
+    }
+    return next.slice(0, tableHeader.length);
+  });
 
   // Delivery date string
   let deliveryDateStr = '';
@@ -1452,6 +1450,7 @@ function buildOfferDocument(data: {
   // ── Header (3 columns: client | title | logo+date/ref) ───────────
   const header = (currentPage: number, pageCount: number): Content => {
     const rightStack: Content[] = [];
+    const customerTopOffset = data.companyLogoDataUrl ? 60 : 0;
     // Logo
     if (data.companyLogoDataUrl) {
       rightStack.push({ image: data.companyLogoDataUrl, fit: [150, 50], alignment: 'right', margin: [0, 0, 0, 10] } as Content);
@@ -1479,7 +1478,7 @@ function buildOfferDocument(data: {
     return {
       margin: [40, 30, 40, 0],
       columns: [
-        { width: 200, stack: currentPage === 1 ? customerBlock : [{ text: '' }] },
+        { width: 200, stack: currentPage === 1 ? customerBlock : [{ text: '' }], margin: [0, customerTopOffset, 0, 0] },
         { width: '*', text: title, style: 'docTitle', alignment: 'center', margin: [10, 0, 10, 0] },
         { width: 200, stack: rightStack },
       ],
@@ -1546,7 +1545,7 @@ function buildOfferDocument(data: {
         stack: [
           {
             text: openingSentence,
-            margin: [0, 0, 0, 8],
+            margin: [0, 18, 0, 12],
           } as Content,
           {
             columns: [
@@ -1569,7 +1568,7 @@ function buildOfferDocument(data: {
             margin: [0, 2, 0, 0],
           } as Content] : []),
         ],
-        margin: [0, 0, 0, 14],
+        margin: [0, 0, 0, 10],
       } as Content,
 
       // Items table
@@ -1577,7 +1576,7 @@ function buildOfferDocument(data: {
         table: {
           headerRows: 1,
           widths: ['*', 70, 35, 120],
-          body: [tableHeader, ...tableRows],
+          body: [tableHeader, ...normalizedTableRows],
         },
         layout: {
           hLineWidth: (i: number, node: { table: { body: unknown[] } }) =>
@@ -1588,7 +1587,7 @@ function buildOfferDocument(data: {
           paddingBottom: () => 5,
         },
       } as Content,
-      { text: '', margin: [0, 16, 0, 0] } as Content,
+      { text: '', margin: [0, 10, 0, 0] } as Content,
 
       // For account of
       { text: [{ text: 'For account of:  ', bold: true }, { text: forAccountParts.join(' ') }], margin: [0, 0, 0, 4] } as Content,
@@ -1607,7 +1606,7 @@ function buildOfferDocument(data: {
       }),
 
       // Sign-off (with optional QR code on the right)
-      { text: '', margin: [0, 20, 0, 0] } as Content,
+      { text: '', margin: [0, 14, 0, 0] } as Content,
       ...(data.verifyUrl ? [{
         columns: [
           {
@@ -1871,9 +1870,13 @@ function buildProformaDocument(data: {
     { text: 'Quantity', style: 'tableHeader', alignment: 'right' },
     { text: 'Unit', style: 'tableHeader' },
     { text: 'Price', style: 'tableHeader', alignment: 'right' },
+    { text: 'Total amount', style: 'tableHeader', alignment: 'right' },
   ];
 
   const tableRows: TableCell[][] = data.items.map((item) => {
+    const qty = parseFloat(item.quantity) || 0;
+    const unitPrice = parseFloat(item.salesPrice ?? '0') || 0;
+    const lineTotal = qty * unitPrice;
     const productCell: Content = item.description?.trim()
       ? { text: [{ text: item.productType }, { text: `  ${item.description.trim()}`, fontSize: 8, color: '#374151' }] }
       : { text: item.productType };
@@ -1882,7 +1885,15 @@ function buildProformaDocument(data: {
       { text: formatNumber(item.quantity, 3), alignment: 'right' },
       { text: item.unit },
       { text: `${data.currency}/${item.unit}  ${formatNumber(item.salesPrice)}`, alignment: 'right' },
+      { text: `${formatNumber(String(lineTotal), 2)} ${data.currency}`, alignment: 'right' },
     ];
+  });
+  const normalizedTableRows: TableCell[][] = tableRows.map((row) => {
+    const next = [...row];
+    while (next.length < tableHeader.length) {
+      next.push({ text: '' });
+    }
+    return next.slice(0, tableHeader.length);
   });
   const grandTotal = data.items.reduce((sum, item) => {
     const qty = parseFloat(item.quantity) || 0;
@@ -1912,6 +1923,7 @@ function buildProformaDocument(data: {
   // ── Header (3 columns: client | title | logo+date/ref) ────────────
   const header = (currentPage: number, _pageCount: number): Content => {
     const rightStack: Content[] = [];
+    const customerTopOffset = data.companyLogoDataUrl ? 60 : 0;
     if (data.companyLogoDataUrl) {
       rightStack.push({ image: data.companyLogoDataUrl, fit: [150, 50], alignment: 'right', margin: [0, 0, 0, 10] } as Content);
     }
@@ -1938,7 +1950,7 @@ function buildProformaDocument(data: {
     return {
       margin: [40, 30, 40, 0],
       columns: [
-        { width: 150, stack: currentPage === 1 ? customerBlock : [{ text: '' }] },
+        { width: 150, stack: currentPage === 1 ? customerBlock : [{ text: '' }], margin: [0, customerTopOffset, 0, 0] },
         { width: '*', text: 'PROFORMA INVOICE', style: 'docTitle', alignment: 'center', margin: [10, 0, 10, 0], noWrap: true },
         { width: 150, stack: rightStack },
       ],
@@ -2024,15 +2036,15 @@ function buildProformaDocument(data: {
             margin: [0, 2, 0, 0],
           } as Content] : []),
         ],
-        margin: [0, 0, 0, 14],
+        margin: [0, 20, 0, 14],
       } as Content,
 
       // Items table
       {
         table: {
           headerRows: 1,
-          widths: ['*', 70, 35, 120],
-          body: [tableHeader, ...tableRows],
+          widths: ['*', 65, 35, 90, 110],
+          body: [tableHeader, ...normalizedTableRows],
         },
         layout: {
           hLineWidth: (i: number, node: { table: { body: unknown[] } }) =>
@@ -2050,11 +2062,11 @@ function buildProformaDocument(data: {
         ],
         margin: [0, 6, 0, 0],
       } as Content,
-      { text: '', margin: [0, 16, 0, 0] } as Content,
+      { text: '', margin: [0, 6, 0, 0] } as Content,
 
       // Payment terms
       ...(data.paymentTerms
-        ? [{ text: [{ text: 'Payment terms:  ', bold: true }, { text: data.paymentTerms.replace(/_/g, ' ') }], margin: [0, 0, 0, 6] } as Content]
+        ? [{ text: [{ text: 'Payment terms:  ', bold: true }, { text: data.paymentTerms.replace(/_/g, ' ') }], margin: [0, 0, 0, 2] } as Content]
         : []),
 
       // Notes
@@ -2065,11 +2077,12 @@ function buildProformaDocument(data: {
 
       // ── Remittance Instructions ──
       ...(data.bank ? [
-        { text: '', margin: [0, hasNotesSection ? 6 : 14, 0, 0] } as Content,
+        { text: '', margin: [0, hasNotesSection ? 2 : 8, 0, 0] } as Content,
         { canvas: [{ type: 'line' as const, x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 0.5, lineColor: '#e5e7eb' }] } as Content,
-        { text: '', margin: [0, 10, 0, 0] } as Content,
+        { text: '', margin: [0, 6, 0, 0] } as Content,
         { text: 'REMITTANCE INSTRUCTIONS', style: 'sectionLabel' } as Content,
         { text: 'Payment to be effected, free of all charges to us, by telegraphic transfer to:', fontSize: 9, margin: [0, 2, 0, 6] } as Content,
+        { text: `Please include Order Ref ${data.orderNumber ?? refNum} in the transfer message/note.`, fontSize: 9, margin: [0, 0, 0, 6] } as Content,
         {
           columns: [
             { width: '25%', text: 'Bank:', bold: true },
@@ -2136,59 +2149,35 @@ function buildProformaDocument(data: {
         margin: [0, 10, 0, 0],
       } as Content] : []),
 
-      // ── Fraud Prevention ──
-      ...(data.fraudPreventionText ? [
+      // ── Fraud Prevention + QR (2-column) ──
+      ...((data.fraudPreventionText || data.verifyUrl) ? [
         { text: '', margin: [0, 10, 0, 0] } as Content,
-        { text: 'FRAUD PREVENTION', fontSize: 9, bold: true, margin: [0, 0, 0, 4] } as Content,
-        { text: data.fraudPreventionText, fontSize: 8, color: '#374151', margin: [0, 0, 0, 0] } as Content,
+        {
+          columns: [
+            {
+              width: '*',
+              stack: [
+                ...(data.fraudPreventionText ? [
+                  { text: 'FRAUD PREVENTION', fontSize: 9, bold: true, margin: [0, 0, 0, 4] } as Content,
+                  { text: data.fraudPreventionText, fontSize: 8, color: '#374151', margin: [0, 0, 10, 0] } as Content,
+                ] : []),
+              ],
+            },
+            {
+              width: 'auto',
+              stack: [
+                ...(data.verifyUrl ? [
+                  { image: data.verifyUrl, fit: [80, 80], alignment: 'right', link: data.verifyLink ?? undefined } as Content,
+                  { text: 'Scan or click to verify', fontSize: 7, color: '#1a56db', alignment: 'center', margin: [0, 4, 0, 0], link: data.verifyLink ?? undefined } as Content,
+                  ...(data.verifyLink ? [
+                    { text: `Verify domain: ${new URL(data.verifyLink).hostname}`, fontSize: 6, color: '#6b7280', alignment: 'center', margin: [0, 2, 0, 0] } as Content,
+                  ] : []),
+                ] : []),
+              ],
+            },
+          ],
+        } as Content,
       ] : []),
-
-      // Sign-off (with optional QR code on the right)
-      { text: '', margin: [0, 20, 0, 0] } as Content,
-      ...(data.verifyUrl ? [{
-        columns: [
-          {
-            width: '*',
-            stack: [
-              { text: 'Best regards', margin: [0, 0, 0, 6] } as Content,
-              { text: senderName, bold: true, margin: [0, 0, 0, 2] } as Content,
-              ...(data.fromName?.trim()
-                ? [{ text: data.fromName.trim(), fontSize: 9 } as Content]
-                : []),
-              { text: '', margin: [0, 10, 0, 0] } as Content,
-              ...(data.fromEmail?.trim()
-                ? [emailTextNode('Direct Email:  ', data.fromEmail.trim(), { fontSize: 9 })]
-                : []),
-              ...(data.fromPhone?.trim()
-                ? [phoneTextNode('Direct Phone:  ', data.fromPhone.trim(), { fontSize: 9 })]
-                : []),
-            ],
-          },
-          {
-            width: 'auto',
-            stack: [
-              { image: data.verifyUrl, fit: [80, 80], alignment: 'right', link: data.verifyLink ?? undefined } as Content,
-              { text: 'Scan or click to verify', fontSize: 7, color: '#1a56db', alignment: 'center', margin: [0, 4, 0, 0], link: data.verifyLink ?? undefined } as Content,
-              ...(data.verifyLink ? [
-                { text: `Verify domain: ${new URL(data.verifyLink).hostname}`, fontSize: 6, color: '#6b7280', alignment: 'center', margin: [0, 2, 0, 0] } as Content,
-              ] : []),
-            ],
-          },
-        ],
-      } as Content] : [
-        { text: 'Best regards', margin: [0, 0, 0, 6] } as Content,
-        { text: senderName, bold: true, margin: [0, 0, 0, 2] } as Content,
-        ...(data.fromName?.trim()
-          ? [{ text: data.fromName.trim(), fontSize: 9 } as Content]
-          : []),
-        { text: '', margin: [0, 10, 0, 0] } as Content,
-        ...(data.fromEmail?.trim()
-          ? [emailTextNode('Direct Email:  ', data.fromEmail.trim(), { fontSize: 9 })]
-          : []),
-        ...(data.fromPhone?.trim()
-          ? [phoneTextNode('Direct Phone:  ', data.fromPhone.trim(), { fontSize: 9 })]
-          : []),
-      ]),
     ],
     footer: footerFn,
     styles: {

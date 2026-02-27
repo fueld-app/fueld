@@ -15,6 +15,11 @@ import {
   seasearcherCompanySanctions,
 } from '../lloyds/lli.client';
 
+function isMissingCompanyRegistrationColumnError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return /company_registration_number/i.test(error.message);
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  Seasearcher Response Types
 // ═══════════════════════════════════════════════════════════════════════
@@ -199,11 +204,23 @@ export async function listCompanies(query?: {
 // ═══════════════════════════════════════════════════════════════════════
 
 export async function getCompanyById(id: string) {
-  const [row] = await db
-    .select()
-    .from(counterparties)
-    .where(eq(counterparties.id, id))
-    .limit(1);
+  let row: typeof counterparties.$inferSelect | null = null;
+  try {
+    const [selected] = await db
+      .select()
+      .from(counterparties)
+      .where(eq(counterparties.id, id))
+      .limit(1);
+    row = selected ?? null;
+  } catch (error) {
+    if (!isMissingCompanyRegistrationColumnError(error)) throw error;
+    row = await db.query.counterparties.findFirst({
+      where: eq(counterparties.id, id),
+      columns: {
+        companyRegistrationNumber: false,
+      },
+    }) as typeof counterparties.$inferSelect | null;
+  }
   if (!row) return null;
 
   let responsibleUserName: string | null = null;
@@ -224,11 +241,23 @@ export async function getCompanyById(id: string) {
 // ═══════════════════════════════════════════════════════════════════════
 
 export async function getCompanyBySeasearcherId(seasearcherId: string) {
-  const [row] = await db
-    .select()
-    .from(counterparties)
-    .where(eq(counterparties.seasearcherId, seasearcherId))
-    .limit(1);
+  let row: typeof counterparties.$inferSelect | null = null;
+  try {
+    const [selected] = await db
+      .select()
+      .from(counterparties)
+      .where(eq(counterparties.seasearcherId, seasearcherId))
+      .limit(1);
+    row = selected ?? null;
+  } catch (error) {
+    if (!isMissingCompanyRegistrationColumnError(error)) throw error;
+    row = await db.query.counterparties.findFirst({
+      where: eq(counterparties.seasearcherId, seasearcherId),
+      columns: {
+        companyRegistrationNumber: false,
+      },
+    }) as typeof counterparties.$inferSelect | null;
+  }
   return row ?? null;
 }
 
@@ -666,7 +695,16 @@ export async function searchCompaniesTypeahead(
 
   // 1. Local DB
   const localResults = await db
-    .select()
+    .select({
+      id: counterparties.id,
+      seasearcherId: counterparties.seasearcherId,
+      name: counterparties.name,
+      companyImo: counterparties.companyImo,
+      country: counterparties.country,
+      countryIso: counterparties.countryIso,
+      fleetSize: counterparties.fleetSize,
+      isSanctioned: counterparties.isSanctioned,
+    })
     .from(counterparties)
     .where(ilike(counterparties.name, `%${term}%`))
     .limit(20);
