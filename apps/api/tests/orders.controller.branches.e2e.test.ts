@@ -130,4 +130,108 @@ describe('orders controller branch e2e', () => {
     expect((upload.data as any)?.success).toBe(false);
     expect(String((upload.data as any)?.message ?? '')).toContain('Attachment must be under 10 MB');
   });
+
+  it('enforces inquiry status validation rules for confirm/cancel', async () => {
+    const seeded = await seedAuthBasics();
+    const login = await loginE2E(seeded.user.email, seeded.password);
+    const token = login.accessToken;
+
+    const created = await requestJson('/orders', {
+      method: 'POST',
+      token,
+      body: {
+        clientId: seeded.client.id,
+        vesselId: seeded.vessel.id,
+        placeId: seeded.place.id,
+      },
+    });
+
+    expect(created.status).toBe(200);
+    expect(created.data?.success).toBe(true);
+
+    const orderId = created.data?.data?.id as string;
+    expect(orderId).toBeTruthy();
+
+    const confirmWithoutItems = await requestJson(`/orders/${orderId}/status`, {
+      method: 'PUT',
+      token,
+      body: { status: 'CONFIRMED' },
+    });
+    expect(confirmWithoutItems.status).toBe(200);
+    expect(confirmWithoutItems.data?.success).toBe(false);
+    expect(String(confirmWithoutItems.data?.message ?? '')).toContain('Add at least one line item');
+
+    const cancelNoReason = await requestJson(`/orders/${orderId}/status`, {
+      method: 'PUT',
+      token,
+      body: { status: 'CANCELLED' },
+    });
+    expect(cancelNoReason.status).toBe(200);
+    expect(cancelNoReason.data?.success).toBe(false);
+    expect(String(cancelNoReason.data?.message ?? '')).toContain('Cancellation reason is required');
+
+    const cancelInvalidReason = await requestJson(`/orders/${orderId}/status`, {
+      method: 'PUT',
+      token,
+      body: { status: 'CANCELLED', lossReason: 'Not in configured list' },
+    });
+    expect(cancelInvalidReason.status).toBe(200);
+    expect(cancelInvalidReason.data?.success).toBe(false);
+    expect(String(cancelInvalidReason.data?.message ?? '')).toContain('Invalid cancellation reason');
+
+    const cancelValidReason = await requestJson(`/orders/${orderId}/status`, {
+      method: 'PUT',
+      token,
+      body: { status: 'CANCELLED', lossReason: 'Price not competitive' },
+    });
+    expect(cancelValidReason.status).toBe(200);
+    expect(cancelValidReason.data?.success).toBe(true);
+    expect(cancelValidReason.data?.data?.status).toBe('CANCELLED');
+    expect(cancelValidReason.data?.data?.lossReason).toBe('Price not competitive');
+  });
+
+  it('allows cancelling non-inquiry orders without cancellation reason', async () => {
+    const seeded = await seedAuthBasics();
+    const login = await loginE2E(seeded.user.email, seeded.password);
+    const token = login.accessToken;
+
+    const created = await requestJson('/orders', {
+      method: 'POST',
+      token,
+      body: {
+        clientId: seeded.client.id,
+        vesselId: seeded.vessel.id,
+        placeId: seeded.place.id,
+      },
+    });
+
+    const orderId = created.data?.data?.id as string;
+
+    const saveItems = await requestJson(`/orders/${orderId}/items`, {
+      method: 'PUT',
+      token,
+      body: {
+        items: [{ productType: 'MGO', quantity: '1', unit: 'MT' }],
+      },
+    });
+    expect(saveItems.status).toBe(200);
+    expect(saveItems.data?.success).toBe(true);
+
+    const confirm = await requestJson(`/orders/${orderId}/status`, {
+      method: 'PUT',
+      token,
+      body: { status: 'CONFIRMED' },
+    });
+    expect(confirm.status).toBe(200);
+    expect(confirm.data?.success).toBe(true);
+
+    const cancelConfirmedNoReason = await requestJson(`/orders/${orderId}/status`, {
+      method: 'PUT',
+      token,
+      body: { status: 'CANCELLED' },
+    });
+    expect(cancelConfirmedNoReason.status).toBe(200);
+    expect(cancelConfirmedNoReason.data?.success).toBe(true);
+    expect(cancelConfirmedNoReason.data?.data?.status).toBe('CANCELLED');
+  });
 });

@@ -1,0 +1,52 @@
+import { test, expect } from '@playwright/test';
+import { loginViaUi } from '../helpers/auth';
+
+test.describe.configure({ mode: 'serial' });
+
+async function expectStatusesForRoute(
+  page: import('@playwright/test').Page,
+  route: string,
+  expectedStatuses: string,
+): Promise<void> {
+  const responsePromise = page.waitForResponse((res) => {
+    if (res.request().method() !== 'GET') return false;
+    try {
+      const url = new URL(res.url());
+      if (!url.pathname.endsWith('/orders')) return false;
+      return url.searchParams.get('statuses') === expectedStatuses;
+    } catch {
+      return false;
+    }
+  });
+
+  await page.goto(route);
+  await responsePromise;
+}
+
+test('order list routes show Active, Completed and Cancelled views', async ({ page }) => {
+  await loginViaUi(page, {
+    email: process.env['E2E_TRADER_USER_EMAIL'] ?? 'trader@fueld.local',
+    password: process.env['E2E_TRADER_USER_PASSWORD'] ?? 'traderpassword123',
+  });
+
+  await page.goto('/trading/orders');
+  await expect(page.getByRole('heading', { level: 1, name: 'Active Orders' })).toBeVisible();
+
+  await page.goto('/trading/orders/completed');
+  await expect(page.getByRole('heading', { level: 1, name: 'Completed Orders' })).toBeVisible();
+
+  await page.goto('/trading/orders/cancelled');
+  await expect(page.getByRole('heading', { level: 1, name: 'Cancelled Orders' })).toBeVisible();
+});
+
+test('order routes request expected backend statuses', async ({ page }) => {
+  await loginViaUi(page, {
+    email: process.env['E2E_TRADER_USER_EMAIL'] ?? 'trader@fueld.local',
+    password: process.env['E2E_TRADER_USER_PASSWORD'] ?? 'traderpassword123',
+  });
+
+  await expectStatusesForRoute(page, '/trading/orders', 'CONFIRMED,DELIVERED,INVOICED');
+  await expectStatusesForRoute(page, '/trading/orders/completed', 'PAID');
+  await expectStatusesForRoute(page, '/trading/orders/cancelled', 'CANCELLED');
+  await expectStatusesForRoute(page, '/trading/inquiries', 'INQUIRY,OFFER');
+});

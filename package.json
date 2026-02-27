@@ -12,7 +12,9 @@
     "build:web": "bun run --filter @fueld/web build",
     "dev": "bun run dev:api & bun run dev:web",
     "test": "bun test apps/api/tests packages/types/tests",
-    "test:coverage": "bun test --coverage apps/api/tests packages/types/tests"
+    "test:coverage": "bun test --coverage apps/api/tests packages/types/tests",
+    "test:orders": "bun test apps/api/tests/orders*.test.ts apps/api/tests/orders*.e2e.test.ts",
+    "test:orders:coverage": "bun test --coverage apps/api/tests/orders*.test.ts apps/api/tests/orders*.e2e.test.ts"
   },
   "devDependencies": {
     "pdf-parse": "^2.4.5"
