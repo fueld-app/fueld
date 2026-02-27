@@ -644,16 +644,6 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
         }
       });
 
-    // Request prices once WS is authenticated
-    const authCheck = setInterval(() => {
-      if (this.wsService.authenticated()) {
-        clearInterval(authCheck);
-        this.wsService.send({ type: 'get-prices' });
-      }
-    }, 200);
-    // Safety: clear after 10s
-    setTimeout(() => clearInterval(authCheck), 10_000);
-
     // Send presence on every route navigation (with slight delay for TitleStrategy)
     this.routerSub = this.router.events
       .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))

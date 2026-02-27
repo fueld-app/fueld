@@ -94,6 +94,7 @@ function toDto(s: SessionInfo) {
 const sessions = new Map<string, SessionInfo>();
 const wsConnections = new Map<string, any>(); // socketId → ws object
 const adminSubscribers = new Set<string>(); // socketIds of admins subscribed
+const socketTopicSubscriptions = new Map<string, Set<string>>(); // socketId → subscribed topics
 
 let broadcastTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -144,7 +145,25 @@ export function removeSession(socketId: string): void {
   sessions.delete(socketId);
   wsConnections.delete(socketId);
   adminSubscribers.delete(socketId);
+  socketTopicSubscriptions.delete(socketId);
   scheduleBroadcast();
+}
+
+export function subscribeSocketTopic(socketId: string, topic: string): void {
+  const trimmed = topic.trim();
+  if (!trimmed) return;
+  const topics = socketTopicSubscriptions.get(socketId) ?? new Set<string>();
+  topics.add(trimmed);
+  socketTopicSubscriptions.set(socketId, topics);
+}
+
+export function unsubscribeSocketTopic(socketId: string, topic: string): void {
+  const topics = socketTopicSubscriptions.get(socketId);
+  if (!topics) return;
+  topics.delete(topic.trim());
+  if (topics.size === 0) {
+    socketTopicSubscriptions.delete(socketId);
+  }
 }
 
 /** Optional callback invoked when a user navigates to an entity detail page. */
@@ -337,10 +356,18 @@ export function sendToSocket(socketId: string, message: Record<string, unknown>)
  * Send a message to ALL WebSocket sessions for a given userId.
  * Used for user-specific real-time updates (e.g. WhatsApp QR codes).
  */
-export function sendToUserSockets(userId: string, message: Record<string, any>): void {
+export function sendToUserSockets(
+  userId: string,
+  message: Record<string, any>,
+  requiredTopic?: string,
+): void {
   const payload = JSON.stringify(message);
   for (const [socketId, session] of sessions.entries()) {
     if (session.userId === userId) {
+      if (requiredTopic) {
+        const topics = socketTopicSubscriptions.get(socketId);
+        if (!topics?.has(requiredTopic)) continue;
+      }
       const ws = wsConnections.get(socketId);
       if (ws) {
         try { ws.send(payload); } catch { /* closing */ }

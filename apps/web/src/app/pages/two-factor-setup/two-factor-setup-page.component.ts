@@ -540,6 +540,7 @@ export class TwoFactorSetupPageComponent implements OnInit, OnDestroy {
 
     // Load WhatsApp status
     this.loadWhatsAppStatus();
+    this.wsService.send({ type: 'whatsapp:subscribe' });
     // Subscribe to WhatsApp WebSocket events
     this.waSubs.push(
       this.wsService.on<string>('whatsapp:qr').subscribe((qr) => {
@@ -732,6 +733,7 @@ export class TwoFactorSetupPageComponent implements OnInit, OnDestroy {
   // ─── WhatsApp Methods ──────────────────────────────────────────────
 
   ngOnDestroy(): void {
+    this.wsService.send({ type: 'whatsapp:unsubscribe' });
     this.waSubs.forEach((s) => s.unsubscribe());
   }
 

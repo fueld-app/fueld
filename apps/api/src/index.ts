@@ -28,6 +28,8 @@ import {
   logCopyEvent,
   logPrintEvent,
   logScreenshotEvent,
+  subscribeSocketTopic,
+  unsubscribeSocketTopic,
   onEntityView,
   sendToSocket,
   extractClientIp,
@@ -432,6 +434,22 @@ export async function createApp(options: CreateAppOptions = {}) {
               const socketId = (ws.data as any).socketId;
               if (socketId) {
                 unsubscribeAdmin(socketId);
+              }
+              break;
+            }
+
+            case 'whatsapp:subscribe': {
+              const socketId = (ws.data as any).socketId;
+              if (socketId) {
+                subscribeSocketTopic(socketId, 'whatsapp');
+              }
+              break;
+            }
+
+            case 'whatsapp:unsubscribe': {
+              const socketId = (ws.data as any).socketId;
+              if (socketId) {
+                unsubscribeSocketTopic(socketId, 'whatsapp');
               }
               break;
             }

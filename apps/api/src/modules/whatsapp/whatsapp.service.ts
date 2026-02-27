@@ -199,10 +199,10 @@ export async function startWhatsAppSession(userId: string): Promise<{ qr?: strin
       try {
         const qrDataUrl = await QRCode.toDataURL(qr, { width: 256, margin: 2 });
         conn.qr = qrDataUrl;
-        sendToUserSockets(userId, { type: 'whatsapp:qr', data: qrDataUrl });
+        sendToUserSockets(userId, { type: 'whatsapp:qr', data: qrDataUrl }, 'whatsapp');
       } catch {
         conn.qr = qr; // Fallback to raw string
-        sendToUserSockets(userId, { type: 'whatsapp:qr', data: qr });
+        sendToUserSockets(userId, { type: 'whatsapp:qr', data: qr }, 'whatsapp');
       }
     }
 
@@ -225,7 +225,7 @@ export async function startWhatsAppSession(userId: string): Promise<{ qr?: strin
         .where(eq(whatsappSessions.userId, userId))
         .then(() => {});
 
-      sendToUserSockets(userId, { type: 'whatsapp:connected', data: { phoneNumber: phone } });
+      sendToUserSockets(userId, { type: 'whatsapp:connected', data: { phoneNumber: phone } }, 'whatsapp');
     }
 
     if (connection === 'close') {
@@ -238,7 +238,7 @@ export async function startWhatsAppSession(userId: string): Promise<{ qr?: strin
       if (loggedOut) {
         // User logged out from phone — clean up DB
         cleanupSession(userId);
-        sendToUserSockets(userId, { type: 'whatsapp:disconnected', data: { reason: 'logged_out' } });
+        sendToUserSockets(userId, { type: 'whatsapp:disconnected', data: { reason: 'logged_out' } }, 'whatsapp');
       } else {
         // Temporary disconnect — try to reconnect after a short delay
         setTimeout(() => {
