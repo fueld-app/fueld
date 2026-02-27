@@ -3,7 +3,7 @@ import { loginViaUi } from '../helpers/auth';
 import { closePdfPreviewIfOpen, waitForPdfResponse } from '../helpers/pdf';
 import { createInquiryViaApi } from '../helpers/trading';
 
-test('create inquiry, view PDFs, convert to order, add item, view order PDFs', async ({ page }) => {
+test('create inquiry, view offer PDF, convert to order, and verify order page', async ({ page }) => {
   test.setTimeout(90_000);
 
   await loginViaUi(page, {
