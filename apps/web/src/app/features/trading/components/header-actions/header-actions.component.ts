@@ -68,9 +68,8 @@ const ACTIONS: ActionItem[] = [
     <!-- Trigger button -->
     <button
       (click)="toggleMenu()"
-      class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm
-             font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50
-             focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm
+            font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors"
       [attr.aria-expanded]="isOpen()"
       aria-haspopup="true"
     >
@@ -83,17 +82,17 @@ const ACTIONS: ActionItem[] = [
     <!-- Dropdown -->
     @if (isOpen()) {
       <div
-        class="absolute right-0 z-50 mt-2 w-52 origin-top-right rounded-lg border border-gray-200 bg-white py-1 shadow-lg ring-1 ring-black/5"
+        class="absolute right-0 z-50 mt-1 w-56 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
         role="menu"
       >
         @for (action of displayActions(); track action.key) {
           <button
             (click)="onAction(action.key)"
-            class="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
             role="menuitem"
             [disabled]="loading() || action.disabled"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" [class]="'h-5 w-5 ' + action.color" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" [class]="'h-4 w-4 ' + action.color" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" [attr.d]="action.icon" />
             </svg>
             {{ action.label }}

@@ -106,7 +106,7 @@ interface TeamUserOption {
           }
         </select>
       </span>
-      <div detail-actions class="flex items-center gap-3">
+      <div detail-actions class="flex flex-wrap items-center gap-2">
         <app-header-actions
           [orderId]="orderId()"
           [status]="order()?.status ?? null"
@@ -115,6 +115,35 @@ interface TeamUserOption {
           [hasLineItems]="hasLineItems()"
           (actionTriggered)="onAction($event)"
         />
+        <div class="relative">
+          <button
+            (click)="settingsOpen.set(!settingsOpen())"
+            class="inline-flex items-center rounded-lg border border-gray-300 bg-white p-2 text-sm
+                   text-gray-500 shadow-sm hover:bg-gray-50 hover:text-gray-700 transition-colors"
+            title="Settings"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M7.84 1.804A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.804l.331 1.652a6.993 6.993 0 0 1 1.929 1.115l1.598-.54a1 1 0 0 1 1.186.447l1.18 2.044a1 1 0 0 1-.205 1.251l-1.267 1.113a7.047 7.047 0 0 1 0 2.228l1.267 1.113a1 1 0 0 1 .206 1.25l-1.18 2.045a1 1 0 0 1-1.187.447l-1.598-.54a6.993 6.993 0 0 1-1.929 1.115l-.33 1.652a1 1 0 0 1-.98.804H8.82a1 1 0 0 1-.98-.804l-.331-1.652a6.993 6.993 0 0 1-1.929-1.115l-1.598.54a1 1 0 0 1-1.186-.447l-1.18-2.044a1 1 0 0 1 .205-1.251l1.267-1.114a7.05 7.05 0 0 1 0-2.227L1.821 7.773a1 1 0 0 1-.206-1.25l1.18-2.045a1 1 0 0 1 1.187-.447l1.598.54A6.993 6.993 0 0 1 7.51 3.456l.33-1.652ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd" />
+            </svg>
+          </button>
+
+          @if (settingsOpen()) {
+            <div class="fixed inset-0 z-40" (click)="settingsOpen.set(false)"></div>
+            <div class="absolute right-0 z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
+              <label class="mb-1 block text-xs font-medium text-gray-500">Currency</label>
+              <select
+                [ngModel]="order()?.currency ?? 'USD'"
+                (ngModelChange)="onCurrencyChange($event); settingsOpen.set(false)"
+                class="w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900
+                       outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+              >
+                @for (c of configuredCurrencies(); track c.value) {
+                  <option [value]="c.value">{{ c.label }}</option>
+                }
+              </select>
+            </div>
+          }
+        </div>
       </div>
     </app-trading-detail-header>
 
@@ -735,6 +764,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   readonly noteTab = signal<'customer' | 'supplier'>('customer');
   readonly showCustomerPaymentNote = signal(false);
   readonly showSupplierPaymentNote = signal(false);
+  readonly settingsOpen = signal(false);
   readonly configuredProducts = signal<DropdownOption[]>([]);
   readonly configuredUnits = signal<DropdownOption[]>([]);
   readonly configuredCurrencies = signal<DropdownOption[]>([]);
@@ -1703,6 +1733,11 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     this.triggerAutosave();
   }
 
+  onCurrencyChange(currency: string): void {
+    this.order.update((o) => (o ? { ...o, currency } : o));
+    this.triggerAutosave();
+  }
+
   private triggerAutosave(): void {
     if (this.isPaidOrCancelled()) return;
     this.changeVersion.update((v) => v + 1);
@@ -1723,6 +1758,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
           salesRepId: o.salesRepId ?? null,
           invoicingCompanyId: o.invoicingCompanyId,
           bankAccountId: o.bankAccountId ?? null,
+          currency: o.currency,
           customerPaymentTermType: o.customerPaymentTermType ?? null,
           customerCreditDays: o.customerCreditDays ?? null,
           customerNote: o.customerNote ?? null,
@@ -1833,6 +1869,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
           salesRepId: o.salesRepId ?? null,
           invoicingCompanyId: o.invoicingCompanyId,
           bankAccountId: o.bankAccountId ?? null,
+          currency: o.currency,
           customerPaymentTermType: o.customerPaymentTermType ?? null,
           customerCreditDays: o.customerCreditDays ?? null,
           customerNote: o.customerNote ?? null,
@@ -1894,18 +1931,24 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
       || status === OrderStatus.Invoiced
       || status === OrderStatus.Paid;
     const documentTitle = isFinalInvoice ? 'Invoice' : 'Proforma Invoice';
+    const endpoint = isFinalInvoice
+      ? `${API_URL}/orders/${id}/invoice/pdf`
+      : `${API_URL}/orders/${id}/proforma/pdf`;
+    const fileName = isFinalInvoice
+      ? `Fueld_Invoice_${this.invoiceNumber()}.pdf`
+      : `Nomination_${this.order()?.orderNumber ?? id}.pdf`;
     const modal = this.pdfModal();
     if (!modal) return;
     modal.showLoading(documentTitle);
     try {
       const res = await firstValueFrom(
-        this.http.get(`${API_URL}/orders/${id}/invoice/pdf`, { responseType: 'blob', observe: 'response' }),
+        this.http.get(endpoint, { responseType: 'blob', observe: 'response' }),
       );
       const blob = res.body;
       if (!blob) throw new Error('Missing PDF body');
       modal.setBlob(
         blob,
-        `${isFinalInvoice ? 'Fueld_Invoice' : 'Fueld_Proforma'}_${this.invoiceNumber()}.pdf`,
+        fileName,
         this.buildVerifyUrlFromResponse(res),
       );
     } catch {
