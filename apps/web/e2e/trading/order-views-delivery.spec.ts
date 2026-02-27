@@ -25,8 +25,8 @@ async function expectStatusesForRoute(
 
 test('order list routes show Active, Completed and Cancelled views', async ({ page }) => {
   await loginViaUi(page, {
-    email: process.env['E2E_TRADER_USER_EMAIL'] ?? 'trader@fueld.local',
-    password: process.env['E2E_TRADER_USER_PASSWORD'] ?? 'traderpassword123',
+    email: process.env['E2E_TRADER5_USER_EMAIL'] ?? 'trader5@fueld.local',
+    password: process.env['E2E_TRADER5_USER_PASSWORD'] ?? 'trader5password123',
   });
 
   await page.goto('/trading/orders');
@@ -41,8 +41,8 @@ test('order list routes show Active, Completed and Cancelled views', async ({ pa
 
 test('order routes request expected backend statuses', async ({ page }) => {
   await loginViaUi(page, {
-    email: process.env['E2E_TRADER_USER_EMAIL'] ?? 'trader@fueld.local',
-    password: process.env['E2E_TRADER_USER_PASSWORD'] ?? 'traderpassword123',
+    email: process.env['E2E_TRADER5_USER_EMAIL'] ?? 'trader5@fueld.local',
+    password: process.env['E2E_TRADER5_USER_PASSWORD'] ?? 'trader5password123',
   });
 
   await expectStatusesForRoute(page, '/trading/orders', 'CONFIRMED,DELIVERED,INVOICED');

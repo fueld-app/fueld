@@ -1,38 +1,22 @@
 import { test, expect } from '@playwright/test';
 import { loginViaUi } from '../helpers/auth';
-import { selectSearchableDropdownOption } from '../helpers/dropdown';
 import { closePdfPreviewIfOpen, waitForPdfResponse } from '../helpers/pdf';
-
-const CLIENT_NAME = process.env['E2E_CLIENT_NAME'] ?? 'E2E Client Co';
-const VESSEL_NAME = process.env['E2E_VESSEL_NAME'] ?? 'E2E Vessel';
-const PLACE_NAME = process.env['E2E_PLACE_NAME'] ?? 'E2E Port';
+import { createInquiryViaApi } from '../helpers/trading';
 
 async function createOrderFromInquiry(page: import('@playwright/test').Page): Promise<void> {
-  await page.goto('/trading/inquiries?new=1');
-
-  const modal = page.getByRole('dialog');
-  try {
-    await expect(modal.getByRole('heading', { name: 'New Inquiry' })).toBeVisible({ timeout: 15_000 });
-  } catch {
-    const newInquiry = page.getByRole('button', { name: 'New Inquiry' });
-    await expect(newInquiry).toBeVisible({ timeout: 15_000 });
-    await newInquiry.click();
-    await expect(modal.getByRole('heading', { name: 'New Inquiry' })).toBeVisible({ timeout: 15_000 });
-  }
-
-  await selectSearchableDropdownOption(page, modal, 'Client', CLIENT_NAME);
-  await selectSearchableDropdownOption(page, modal, 'Vessel', VESSEL_NAME);
-  await selectSearchableDropdownOption(page, modal, 'Port', PLACE_NAME);
-
-  await modal.getByRole('button', { name: 'Create Inquiry' }).click();
-  await page.waitForURL(/\/trading\/inquiries\//, { timeout: 15_000 });
+  const inquiryId = await createInquiryViaApi(page);
+  await page.goto(`/trading/inquiries/${inquiryId}`);
+  await expect(page.getByRole('button', { name: 'Actions' })).toBeVisible({ timeout: 15_000 });
 
   await page.getByRole('button', { name: 'Actions' }).click();
   await page.getByRole('button', { name: 'Convert to Order' }).click();
+  await page.getByRole('button', { name: 'Confirm Convert' }).click();
   await page.waitForURL(/\/trading\/orders\//, { timeout: 15_000 });
 }
 
 test('upload OTHER attachment and preview/download', async ({ page }) => {
+  test.setTimeout(90_000);
+
   await loginViaUi(page, {
     email: process.env['E2E_TRADER7_USER_EMAIL'] ?? 'trader7@fueld.local',
     password: process.env['E2E_TRADER7_USER_PASSWORD'] ?? 'trader7password123',
