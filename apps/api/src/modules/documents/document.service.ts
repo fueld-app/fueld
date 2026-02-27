@@ -391,11 +391,23 @@ async function fetchOrderForInvoice(orderId: string) {
     db.query.orders.findFirst({
       where: eq(orders.id, orderId),
       with: {
-        client: true,
+        client: includeCompanyRegistrationNumber
+          ? true
+          : {
+              columns: {
+                companyRegistrationNumber: false,
+              },
+            },
         vessel: true,
         place: true,
         salesRep: true,
-        supplier: true,
+        supplier: includeCompanyRegistrationNumber
+          ? true
+          : {
+              columns: {
+                companyRegistrationNumber: false,
+              },
+            },
         invoicingCompany: includeCompanyRegistrationNumber
           ? true
           : {
