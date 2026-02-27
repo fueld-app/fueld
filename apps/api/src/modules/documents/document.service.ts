@@ -693,6 +693,7 @@ function buildInvoiceDocument(data: {
   createdAt: Date;
   companyName: string | null;
   vatNumber: string | null;
+  companyRegistrationNumber: string | null;
   fraudPreventionText: string | null;
   latePaymentInterest: string | null;
   verifyUrl?: string | null;
@@ -964,6 +965,12 @@ function buildInvoiceDocument(data: {
       if (data.companyEmail?.trim()) {
         middleTexts.push({ text: `Email : ${data.companyEmail.trim()}`, fontSize: 8, color: '#1a56db', link: `mailto:${data.companyEmail.trim()}` } as Content);
       }
+      if (data.companyRegistrationNumber?.trim()) {
+        middleTexts.push({ text: `Reg. No : ${data.companyRegistrationNumber.trim()}`, fontSize: 8, color: '#374151' } as Content);
+      }
+      if (data.vatNumber?.trim()) {
+        middleTexts.push({ text: `VAT No : ${data.vatNumber.trim()}`, fontSize: 8, color: '#374151' } as Content);
+      }
       return {
         margin: [40, 0, 40, 20] as [number, number, number, number],
         stack: [
@@ -1070,6 +1077,7 @@ export async function generateInvoicePdfBuffer(invoiceId: string): Promise<Buffe
     createdAt: invoice.createdAt,
     companyName: order.invoicingCompany?.name ?? null,
     vatNumber: order.invoicingCompany?.vatNumber ?? null,
+    companyRegistrationNumber: order.invoicingCompany?.companyRegistrationNumber ?? null,
     fraudPreventionText: order.invoicingCompany?.fraudPreventionText ?? null,
     latePaymentInterest: order.invoicingCompany?.latePaymentInterest ?? null,
     verifyUrl,
@@ -1188,6 +1196,7 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
     createdAt: invoice?.createdAt ?? order.createdAt,
     companyName: order.invoicingCompany?.name ?? null,
     vatNumber: order.invoicingCompany?.vatNumber ?? null,
+    companyRegistrationNumber: order.invoicingCompany?.companyRegistrationNumber ?? null,
     fraudPreventionText: order.invoicingCompany?.fraudPreventionText ?? null,
     latePaymentInterest: order.invoicingCompany?.latePaymentInterest ?? null,
     verifyUrl,
@@ -1276,6 +1285,8 @@ function buildOfferDocument(data: {
   companyAddress: string | null;
   companyPhone: string | null;
   companyEmail: string | null;
+  companyRegistrationNumber?: string | null;
+  vatNumber?: string | null;
   companyWebsite: string | null;
   companyLogoDataUrl: string | null;
   itemNotes: Array<{ label: string; note: string }>;
@@ -1426,6 +1437,12 @@ function buildOfferDocument(data: {
     }
     if (data.companyEmail?.trim()) {
       middleTexts.push({ text: data.companyEmail.trim(), fontSize: 8, color: '#1a56db', link: `mailto:${data.companyEmail.trim()}` } as Content);
+    }
+    if (data.companyRegistrationNumber?.trim()) {
+      middleTexts.push({ text: `Reg. No : ${data.companyRegistrationNumber.trim()}`, fontSize: 8, color: '#374151' } as Content);
+    }
+    if (data.vatNumber?.trim()) {
+      middleTexts.push({ text: `VAT No : ${data.vatNumber.trim()}`, fontSize: 8, color: '#374151' } as Content);
     }
 
     return {
@@ -1645,6 +1662,8 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
     companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
     companyEmail: order.invoicingCompany?.headOfficeEmail ?? null,
+    companyRegistrationNumber: order.invoicingCompany?.companyRegistrationNumber ?? null,
+    vatNumber: order.invoicingCompany?.vatNumber ?? null,
     companyWebsite: order.invoicingCompany?.website ?? null,
     companyLogoDataUrl,
     itemNotes: order.items
@@ -1731,6 +1750,7 @@ function buildProformaDocument(data: {
   companyAddress: string | null;
   companyPhone: string | null;
   companyEmail: string | null;
+  companyRegistrationNumber?: string | null;
   companyWebsite: string | null;
   companyLogoDataUrl: string | null;
   itemNotes: Array<{ label: string; note: string }>;
@@ -1870,6 +1890,12 @@ function buildProformaDocument(data: {
     }
     if (data.companyEmail?.trim()) {
       middleTexts.push({ text: data.companyEmail.trim(), fontSize: 8, color: '#1a56db', link: `mailto:${data.companyEmail.trim()}` } as Content);
+    }
+    if (data.companyRegistrationNumber?.trim()) {
+      middleTexts.push({ text: `Reg. No : ${data.companyRegistrationNumber.trim()}`, fontSize: 8, color: '#374151' } as Content);
+    }
+    if (data.vatNumber?.trim()) {
+      middleTexts.push({ text: `VAT No : ${data.vatNumber.trim()}`, fontSize: 8, color: '#374151' } as Content);
     }
 
     return {
@@ -2162,6 +2188,7 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
     companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
     companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
     companyEmail: order.invoicingCompany?.headOfficeEmail ?? null,
+    companyRegistrationNumber: order.invoicingCompany?.companyRegistrationNumber ?? null,
     companyWebsite: order.invoicingCompany?.website ?? null,
     companyLogoDataUrl,
     itemNotes: order.items

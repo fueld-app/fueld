@@ -112,7 +112,7 @@ interface LliSearchResult {
       </div>
     } @else {
       <app-trading-detail-header
-        title="Inquiry Detail"
+      title="Inquiry Detail"
         breadcrumbLabel="Inquiries"
         breadcrumbLink="/trading/inquiries"
         [entityNumber]="order()?.orderNumber ?? null"
@@ -557,8 +557,9 @@ interface LliSearchResult {
                 class="w-full sm:w-40 rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
                        focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
               >
-                <option value="BDR">BDR</option>
-                <option value="OTHER">Other</option>
+                @for (type of configuredAttachmentTypes(); track type) {
+                  <option [value]="type">{{ type }}</option>
+                }
               </select>
               <input
                 type="file"
@@ -898,7 +899,7 @@ interface LliSearchResult {
             <div>
               <label class="text-xs font-medium text-gray-500">Received at</label>
               <input
-                type="datetime-local"
+                type="date"
                 [ngModel]="paymentReceivedAt()"
                 (ngModelChange)="paymentReceivedAt.set($event)"
                 class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
@@ -1054,7 +1055,8 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   readonly supplierSearchLoading = signal(false);
   readonly attachments = signal<OrderAttachmentDto[]>([]);
   readonly uploadingAttachment = signal(false);
-  readonly attachmentType = signal<'BDR' | 'OTHER'>('OTHER');
+  readonly attachmentType = signal('OTHER');
+  readonly configuredAttachmentTypes = signal<string[]>(['BDR', 'OTHER']);
   selectedAttachment: File | null = null;
   readonly payments = signal<CustomerPaymentDto[]>([]);
   readonly paymentsLoading = signal(false);
@@ -1247,6 +1249,10 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
     const hour = map.get('hour') ?? '00';
     const minute = map.get('minute') ?? '00';
     return `${year}-${month}-${day}T${hour}:${minute}`;
+  }
+
+  formatDateForInput(date: Date, timeZone: string): string {
+    return this.formatDateTimeForInput(date, timeZone).split('T')[0] ?? '';
   }
 
   formatDateTimeForEmail(value: string): string {
@@ -1484,7 +1490,7 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
   private async loadReferenceData(): Promise<void> {
     try {
       // Load initial suppliers list
-      const [suppliersRes, usersRes, currenciesRes, cancelReasonsRes] = await Promise.all([
+      const [suppliersRes, usersRes, currenciesRes, cancelReasonsRes, attachmentTypesRes] = await Promise.all([
         firstValueFrom(
           this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
             `${API}/companies/local?type=SUPPLIER&limit=100`,
@@ -1499,6 +1505,9 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
         firstValueFrom(
           this.http.get<ApiResponse<InquiryCancelReasonSettingsDto>>(`${API}/admin/settings/my-inquiry-cancel-reasons`),
         ),
+        firstValueFrom(
+          this.http.get<ApiResponse<{ attachmentTypes: string[] }>>(`${API}/admin/settings/my-attachment-types`),
+        ),
       ]);
       if (suppliersRes.success) this.suppliers.set(suppliersRes.data.companies);
       if (usersRes.success) this.teamUsers.set(usersRes.data ?? []);
@@ -1507,6 +1516,12 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
       }
       if (cancelReasonsRes.success) {
         this.inquiryCancelReasons.set(cancelReasonsRes.data.reasons ?? []);
+      }
+      if (attachmentTypesRes.success && attachmentTypesRes.data.attachmentTypes.length) {
+        this.configuredAttachmentTypes.set(attachmentTypesRes.data.attachmentTypes);
+        if (!attachmentTypesRes.data.attachmentTypes.includes(this.attachmentType())) {
+          this.attachmentType.set(attachmentTypesRes.data.attachmentTypes[0]!);
+        }
       }
     } catch {
       // silently ignore
@@ -1755,7 +1770,7 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
     const currency = this.order()?.currency ?? 'USD';
     this.paymentAmount.set('');
     this.paymentCurrency.set(currency);
-    this.paymentReceivedAt.set(this.formatDateTimeForInput(new Date(), this.placeTimezone()));
+    this.paymentReceivedAt.set(this.formatDateForInput(new Date(), this.placeTimezone()));
     this.paymentMethod.set('');
     this.paymentNote.set('');
     this.paymentModalOpen.set(true);
@@ -1777,8 +1792,8 @@ export class InquiryDetailPageComponent implements OnInit, OnDestroy {
 
     this.paymentSaving.set(true);
     try {
-      const receivedAt = this.paymentReceivedAt();
-      const receivedIso = receivedAt ? new Date(receivedAt).toISOString() : undefined;
+      const receivedDate = this.paymentReceivedAt();
+      const receivedIso = receivedDate ? new Date(`${receivedDate}T12:00:00`).toISOString() : undefined;
       const currency = this.paymentCurrency().trim() || (this.order()?.currency ?? 'USD');
       const res = await firstValueFrom(
         this.http.post<ApiResponse<CustomerPaymentDto>>(`${API}/orders/${id}/payments`, {

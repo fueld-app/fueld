@@ -288,6 +288,17 @@ interface CompanySearchResultOption {
                         />
                       </div>
                       <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Company Registration Number</label>
+                        <input
+                          type="text"
+                          [ngModel]="companyRegistrationNumberDraft()"
+                          (ngModelChange)="companyRegistrationNumberDraft.set($event)"
+                          placeholder="e.g. 12345678"
+                          class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700
+                                 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                        />
+                      </div>
+                      <div>
                         <label class="block text-xs font-semibold text-gray-600 mb-1">Late Payment Interest <span class="text-gray-400 font-normal">(shown on invoices)</span></label>
                         <input
                           type="text"
@@ -528,6 +539,7 @@ export class OurCompaniesPageComponent implements OnInit {
   readonly customerTermsDraft = signal('');
   readonly supplierTermsDraft = signal('');
   readonly vatDraft = signal('');
+  readonly companyRegistrationNumberDraft = signal('');
   readonly fraudDraft = signal('');
   readonly latePaymentInterestDraft = signal('');
   readonly savingTerms = signal(false);
@@ -761,6 +773,7 @@ export class OurCompaniesPageComponent implements OnInit {
     this.customerTermsDraft.set(co?.customerTerms ?? '');
     this.supplierTermsDraft.set(co?.supplierTerms ?? '');
     this.vatDraft.set(co?.vatNumber ?? '');
+    this.companyRegistrationNumberDraft.set(co?.companyRegistrationNumber ?? '');
     this.fraudDraft.set(co?.fraudPreventionText ?? '');
     this.latePaymentInterestDraft.set(co?.latePaymentInterest ?? '');
     this.termsError.set('');
@@ -781,6 +794,7 @@ export class OurCompaniesPageComponent implements OnInit {
             customerTerms: this.customerTermsDraft().trim() || null,
             supplierTerms: this.supplierTermsDraft().trim() || null,
             vatNumber: this.vatDraft().trim() || null,
+            companyRegistrationNumber: this.companyRegistrationNumberDraft().trim() || null,
             fraudPreventionText: this.fraudDraft().trim() || null,
             latePaymentInterest: this.latePaymentInterestDraft().trim() || null,
           },

@@ -252,6 +252,9 @@ export async function startWhatsAppSession(userId: string): Promise<{ qr?: strin
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return; // Ignore history sync etc.
 
+    const waSettings = await getWhatsAppSettings();
+    if (!waSettings.enabled || !waSettings.incomingRfqEnabled) return;
+
     for (const msg of messages) {
       try {
         // Only process DMs (not group messages)

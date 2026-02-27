@@ -6,7 +6,6 @@ import type {
   CounterpartyType,
   InvoiceStatus,
   Role,
-  OrderAttachmentType,
 } from './enums';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -140,6 +139,7 @@ export interface CounterpartyDto {
   responsibleUserId?: string | null;
   responsibleUserName?: string | null;
   vatNumber?: string | null;
+  companyRegistrationNumber?: string | null;
   fraudPreventionText?: string | null;
   contactsCount?: number | null;
 }
@@ -543,6 +543,11 @@ export interface CompanyTypeSettingsDto {
   companyTypes: string[];
 }
 
+/** Admin settings for configurable attachment types */
+export interface AttachmentTypeSettingsDto {
+  attachmentTypes: string[];
+}
+
 /** Admin settings for configurable inquiry cancellation reasons */
 export interface InquiryCancelReasonSettingsDto {
   reasons: string[];
@@ -586,7 +591,7 @@ export interface CreateOrderItemDto {
 export interface OrderAttachmentDto {
   id: string;
   orderId: string;
-  type: OrderAttachmentType;
+  type: string;
   fileName: string;
   filePath: string;
   mimeType: string;
@@ -1008,6 +1013,7 @@ export interface OwnCompanyDto {
   customerTerms: string | null;
   supplierTerms: string | null;
   vatNumber: string | null;
+  companyRegistrationNumber: string | null;
   fraudPreventionText: string | null;
   latePaymentInterest: string | null;
 }

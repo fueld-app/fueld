@@ -66,6 +66,7 @@ export async function listOwnCompanies(): Promise<OwnCompanyDto[]> {
       customerTerms: counterparties.customerTerms,
       supplierTerms: counterparties.supplierTerms,
       vatNumber: counterparties.vatNumber,
+      companyRegistrationNumber: counterparties.companyRegistrationNumber,
       fraudPreventionText: counterparties.fraudPreventionText,
       latePaymentInterest: counterparties.latePaymentInterest,
     })
@@ -104,6 +105,7 @@ export async function updateOwnCompanyTerms(companyId: string, data: {
   customerTerms?: string | null;
   supplierTerms?: string | null;
   vatNumber?: string | null;
+  companyRegistrationNumber?: string | null;
   fraudPreventionText?: string | null;
   latePaymentInterest?: string | null;
 }): Promise<OwnCompanyDto> {
@@ -128,6 +130,11 @@ export async function updateOwnCompanyTerms(companyId: string, data: {
   }
   if (data.vatNumber !== undefined) {
     patch.vatNumber = data.vatNumber?.trim() ? data.vatNumber : null;
+  }
+  if (data.companyRegistrationNumber !== undefined) {
+    patch.companyRegistrationNumber = data.companyRegistrationNumber?.trim()
+      ? data.companyRegistrationNumber
+      : null;
   }
   if (data.fraudPreventionText !== undefined) {
     patch.fraudPreventionText = data.fraudPreventionText?.trim() ? data.fraudPreventionText : null;
@@ -380,6 +387,7 @@ export async function getUserCompanyAccess(userId: string): Promise<OwnCompanyDt
       customerTerms: counterparties.customerTerms,
       supplierTerms: counterparties.supplierTerms,
       vatNumber: counterparties.vatNumber,
+      companyRegistrationNumber: counterparties.companyRegistrationNumber,
       fraudPreventionText: counterparties.fraudPreventionText,
       latePaymentInterest: counterparties.latePaymentInterest,
     })
@@ -408,6 +416,7 @@ export async function getUserCompanyAccess(userId: string): Promise<OwnCompanyDt
       customerTerms: counterparties.customerTerms,
       supplierTerms: counterparties.supplierTerms,
       vatNumber: counterparties.vatNumber,
+      companyRegistrationNumber: counterparties.companyRegistrationNumber,
       fraudPreventionText: counterparties.fraudPreventionText,
       latePaymentInterest: counterparties.latePaymentInterest,
     })
@@ -806,6 +815,7 @@ export async function updateCurrencySettings(currencies: string[]): Promise<{ cu
 // ═══════════════════════════════════════════════════════════════════════
 
 const DEFAULT_COMPANY_TYPES = ['CLIENT', 'SUPPLIER', 'BARGE'];
+const DEFAULT_ATTACHMENT_TYPES = ['BDR', 'OTHER'];
 
 export async function getCompanyTypeSettings(): Promise<{ companyTypes: string[] }> {
   const tenant = await db.query.tenants.findFirst();
@@ -828,6 +838,43 @@ export async function updateCompanyTypeSettings(companyTypes: string[]): Promise
     .where(eq(tenants.id, tenant.id));
 
   return getCompanyTypeSettings();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  ATTACHMENT TYPE SETTINGS
+// ═══════════════════════════════════════════════════════════════════════
+
+export async function getAttachmentTypeSettings(): Promise<{ attachmentTypes: string[] }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  return { attachmentTypes: settings.attachmentTypes ?? DEFAULT_ATTACHMENT_TYPES };
+}
+
+export async function updateAttachmentTypeSettings(attachmentTypes: string[]): Promise<{ attachmentTypes: string[] }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const cleaned = Array.from(new Set(
+    attachmentTypes
+      .map((type) => type.trim().toUpperCase())
+      .filter((type) => type.length > 0),
+  ));
+
+  if (!cleaned.length) {
+    throw new Error('At least one attachment type is required');
+  }
+
+  const settings = { ...(tenant.settings as any) };
+  settings.attachmentTypes = cleaned;
+
+  await db
+    .update(tenants)
+    .set({ settings, updatedAt: new Date() })
+    .where(eq(tenants.id, tenant.id));
+
+  return getAttachmentTypeSettings();
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -877,7 +924,7 @@ export async function updateInquiryCancelReasonSettings(reasons: string[]): Prom
 //  WHATSAPP SETTINGS
 // ═══════════════════════════════════════════════════════════════════════
 
-export async function getWhatsAppSettings(): Promise<{ enabled: boolean; defaultGroupJid: string | null }> {
+export async function getWhatsAppSettings(): Promise<{ enabled: boolean; defaultGroupJid: string | null; incomingRfqEnabled: boolean }> {
   const tenant = await db.query.tenants.findFirst();
   if (!tenant) throw new Error('No tenant found');
 
@@ -885,16 +932,18 @@ export async function getWhatsAppSettings(): Promise<{ enabled: boolean; default
   return {
     enabled: settings.whatsappEnabled ?? false,
     defaultGroupJid: settings.whatsappDefaultGroupJid ?? null,
+    incomingRfqEnabled: settings.whatsappIncomingRfqEnabled ?? true,
   };
 }
 
-export async function updateWhatsAppSettings(data: { enabled?: boolean; defaultGroupJid?: string | null }): Promise<{ enabled: boolean; defaultGroupJid: string | null }> {
+export async function updateWhatsAppSettings(data: { enabled?: boolean; defaultGroupJid?: string | null; incomingRfqEnabled?: boolean }): Promise<{ enabled: boolean; defaultGroupJid: string | null; incomingRfqEnabled: boolean }> {
   const tenant = await db.query.tenants.findFirst();
   if (!tenant) throw new Error('No tenant found');
 
   const settings = { ...(tenant.settings as any) };
   if (data.enabled !== undefined) settings.whatsappEnabled = data.enabled;
   if (data.defaultGroupJid !== undefined) settings.whatsappDefaultGroupJid = data.defaultGroupJid;
+  if (data.incomingRfqEnabled !== undefined) settings.whatsappIncomingRfqEnabled = data.incomingRfqEnabled;
 
   await db
     .update(tenants)

@@ -38,6 +38,8 @@ import {
   updateCurrencySettings,
   getCompanyTypeSettings,
   updateCompanyTypeSettings,
+  getAttachmentTypeSettings,
+  updateAttachmentTypeSettings,
   getInquiryCancelReasonSettings,
   updateInquiryCancelReasonSettings,
   updateOwnCompanyTerms,
@@ -144,10 +146,11 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       customerTerms: t.Optional(t.Nullable(t.String())),
       supplierTerms: t.Optional(t.Nullable(t.String())),
       vatNumber: t.Optional(t.Nullable(t.String())),
+      companyRegistrationNumber: t.Optional(t.Nullable(t.String())),
       fraudPreventionText: t.Optional(t.Nullable(t.String())),
       latePaymentInterest: t.Optional(t.Nullable(t.String())),
     }),
-    detail: { tags: ['Admin Settings'], summary: 'Update own company terms, VAT, and fraud prevention text' },
+    detail: { tags: ['Admin Settings'], summary: 'Update own company terms, VAT, registration number, and fraud prevention text' },
   })
 
   // ═══════════════════════════════════════════════════════════════════
@@ -390,6 +393,18 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     }
   }, {
     detail: { tags: ['Admin Settings'], summary: 'Get company type options for current tenant' },
+  })
+
+  .get('/my-attachment-types', async () => {
+    try {
+      const data = await getAttachmentTypeSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get attachment type options for current tenant' },
   })
 
   .get('/my-inquiry-cancel-reasons', async () => {
@@ -1042,6 +1057,39 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   })
 
   // ═════════════════════════════════════════════════════════════════
+  //  ATTACHMENT TYPE SETTINGS
+  // ═════════════════════════════════════════════════════════════════
+
+  .get('/attachment-types', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getAttachmentTypeSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get configurable attachment type options' },
+  })
+
+  .put('/attachment-types', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateAttachmentTypeSettings(body.attachmentTypes);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      attachmentTypes: t.Array(t.String({ minLength: 1 })),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update configurable attachment type options' },
+  })
+
+  // ═════════════════════════════════════════════════════════════════
   //  INQUIRY CANCELLATION REASON SETTINGS
   // ═════════════════════════════════════════════════════════════════
 
@@ -1104,6 +1152,7 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     body: t.Object({
       enabled: t.Optional(t.Boolean()),
       defaultGroupJid: t.Optional(t.Nullable(t.String())),
+      incomingRfqEnabled: t.Optional(t.Boolean()),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update WhatsApp integration settings' },
   });

@@ -477,8 +477,9 @@ interface TeamUserOption {
               class="w-full sm:w-40 rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
                      focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
             >
-              <option value="BDR">BDR</option>
-              <option value="OTHER">Other</option>
+              @for (type of configuredAttachmentTypes(); track type) {
+                <option [value]="type">{{ type }}</option>
+              }
             </select>
             <input
               type="file"
@@ -596,7 +597,7 @@ interface TeamUserOption {
             <div>
               <label class="text-xs font-medium text-gray-500">Received at</label>
               <input
-                type="datetime-local"
+                type="date"
                 [ngModel]="paymentReceivedAt()"
                 (ngModelChange)="paymentReceivedAt.set($event)"
                 class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
@@ -716,7 +717,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   readonly placeSearchLoading = signal(false);
   readonly attachments = signal<OrderAttachmentDto[]>([]);
   readonly uploadingAttachment = signal(false);
-  readonly attachmentType = signal<'BDR' | 'OTHER'>('OTHER');
+  readonly attachmentType = signal('OTHER');
   selectedAttachment: File | null = null;
   readonly payments = signal<CustomerPaymentDto[]>([]);
   readonly paymentsLoading = signal(false);
@@ -737,6 +738,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   readonly configuredProducts = signal<DropdownOption[]>([]);
   readonly configuredUnits = signal<DropdownOption[]>([]);
   readonly configuredCurrencies = signal<DropdownOption[]>([]);
+  readonly configuredAttachmentTypes = signal<string[]>(['BDR', 'OTHER']);
 
   /** Whether the user has linked WhatsApp in Settings */
   readonly waLinked = signal(false);
@@ -923,6 +925,10 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     const hour = map.get('hour') ?? '00';
     const minute = map.get('minute') ?? '00';
     return `${year}-${month}-${day}T${hour}:${minute}`;
+  }
+
+  formatDateForInput(date: Date, timeZone: string): string {
+    return this.formatDateTimeForInput(date, timeZone).split('T')[0] ?? '';
   }
 
   constructor() {
@@ -1147,7 +1153,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     const currency = this.order()?.currency ?? 'USD';
     this.paymentAmount.set('');
     this.paymentCurrency.set(currency);
-    this.paymentReceivedAt.set(this.formatDateTimeForInput(new Date(), this.placeTimezone()));
+    this.paymentReceivedAt.set(this.formatDateForInput(new Date(), this.placeTimezone()));
     this.paymentMethod.set('');
     this.paymentNote.set('');
     this.paymentModalOpen.set(true);
@@ -1169,8 +1175,8 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
 
     this.paymentSaving.set(true);
     try {
-      const receivedAt = this.paymentReceivedAt();
-      const receivedIso = receivedAt ? new Date(receivedAt).toISOString() : undefined;
+      const receivedDate = this.paymentReceivedAt();
+      const receivedIso = receivedDate ? new Date(`${receivedDate}T12:00:00`).toISOString() : undefined;
       const currency = this.paymentCurrency().trim() || (this.order()?.currency ?? 'USD');
       const res = await firstValueFrom(
         this.http.post<ApiResponse<CustomerPaymentDto>>(`${API_URL}/orders/${id}/payments`, {
@@ -1198,7 +1204,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
 
   private async loadReferenceData(): Promise<void> {
     try {
-      const [suppliersRes, usersRes, productsRes, unitsRes, currenciesRes] = await Promise.all([
+      const [suppliersRes, usersRes, productsRes, unitsRes, currenciesRes, attachmentTypesRes] = await Promise.all([
         firstValueFrom(
           this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
             `${API_URL}/companies/local?type=SUPPLIER&limit=100`,
@@ -1216,6 +1222,9 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
         firstValueFrom(
           this.http.get<ApiResponse<{ currencies: string[] }>>(`${API_URL}/admin/settings/my-currencies`),
         ),
+        firstValueFrom(
+          this.http.get<ApiResponse<{ attachmentTypes: string[] }>>(`${API_URL}/admin/settings/my-attachment-types`),
+        ),
       ]);
       if (suppliersRes.success) this.suppliers.set(suppliersRes.data.companies);
       if (usersRes.success) this.teamUsers.set(usersRes.data ?? []);
@@ -1228,6 +1237,12 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
       if (currenciesRes.success) this.configuredCurrencies.set(
         currenciesRes.data.currencies.map((c) => ({ value: c, label: c })),
       );
+      if (attachmentTypesRes.success && attachmentTypesRes.data.attachmentTypes.length) {
+        this.configuredAttachmentTypes.set(attachmentTypesRes.data.attachmentTypes);
+        if (!attachmentTypesRes.data.attachmentTypes.includes(this.attachmentType())) {
+          this.attachmentType.set(attachmentTypesRes.data.attachmentTypes[0]!);
+        }
+      }
     } catch {
       // silently ignore
     }
@@ -1394,7 +1409,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
       if (res.success && res.data) {
         this.attachments.update((prev) => [res.data, ...prev]);
         this.selectedAttachment = null;
-        if (this.attachmentType() === 'BDR') {
+        if (this.attachmentType().toUpperCase() === 'BDR') {
           const confirmDelivered = confirm('BDR uploaded. Mark order as delivered?');
           if (confirmDelivered) {
             await this.setOrderStatus(OrderStatus.Delivered);

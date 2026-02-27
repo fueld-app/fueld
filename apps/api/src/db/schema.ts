@@ -116,9 +116,12 @@ export interface TenantSettings {
   companyTypes?: string[];
   // Configurable reasons required when cancelling inquiries
   inquiryCancelReasons?: string[];
+  // Configurable attachment types for order/inquiry attachments
+  attachmentTypes?: string[];
   // WhatsApp integration
   whatsappEnabled?: boolean;
   whatsappDefaultGroupJid?: string | null;
+  whatsappIncomingRfqEnabled?: boolean;
 }
 
 export const tenants = pgTable('tenants', {
@@ -272,6 +275,9 @@ export const counterparties = pgTable('counterparties', {
 
   // VAT number (displayed on invoices)
   vatNumber: text('vat_number'),
+
+  // Company registration number (displayed on document footers)
+  companyRegistrationNumber: text('company_registration_number'),
 
   // Fraud prevention notice (displayed on invoices)
   fraudPreventionText: text('fraud_prevention_text'),
@@ -558,7 +564,7 @@ export const orderItems = pgTable('order_items', {
 export const orderAttachments = pgTable('order_attachments', {
   id: uuid('id').defaultRandom().primaryKey(),
   orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
-  type: orderAttachmentTypeEnum('type').notNull().default('OTHER'),
+  type: text('type').notNull().default('OTHER'),
   fileName: text('file_name').notNull(),
   filePath: text('file_path').notNull(),
   mimeType: text('mime_type').notNull(),

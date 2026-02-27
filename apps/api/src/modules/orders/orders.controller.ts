@@ -33,7 +33,7 @@ import type { ApiResponse } from '@fueld/types';
 import { db } from '../../db';
 import { users } from '../../db/schema';
 import { eq } from 'drizzle-orm';
-import { getInquiryCancelReasonSettings } from '../admin/settings.service';
+import { getAttachmentTypeSettings, getInquiryCancelReasonSettings } from '../admin/settings.service';
 
 const PaymentTermTypeSchema = t.Union([
   t.Literal('CREDIT'),
@@ -487,6 +487,12 @@ export const ordersController = new Elysia({ prefix: '/orders' })
           return { success: false, data: null, message: 'Attachment must be under 10 MB' };
         }
 
+        const attachmentType = String(body.type ?? '').trim().toUpperCase();
+        const configuredAttachmentTypes = (await getAttachmentTypeSettings()).attachmentTypes;
+        if (!configuredAttachmentTypes.includes(attachmentType)) {
+          return { success: false, data: null, message: 'Invalid attachment type' };
+        }
+
         const ext = file.name.split('.').pop() ?? 'bin';
         const filename = `${orderId}-${crypto.randomUUID()}.${ext}`;
         const { join } = await import('path');
@@ -497,7 +503,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
 
         const record = await createOrderAttachment({
           orderId,
-          type: body.type,
+          type: attachmentType,
           fileName: file.name,
           filePath: `/uploads/attachments/${filename}`,
           mimeType: file.type,

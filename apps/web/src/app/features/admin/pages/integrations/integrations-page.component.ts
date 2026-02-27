@@ -677,6 +677,29 @@ import { API } from '@app/core/config/api';
                 </button>
               </div>
 
+              <!-- Incoming RFQ parsing toggle -->
+              @if (waEnabled()) {
+                <div class="mt-4 flex items-center justify-between">
+                  <div>
+                    <p class="text-sm font-medium text-gray-900">Enable Incoming RFQs</p>
+                    <p class="text-xs text-gray-500">Parse incoming WhatsApp DMs and create RFQs automatically.</p>
+                  </div>
+                  <button
+                    (click)="toggleWaIncomingRfq()"
+                    [disabled]="waSaving()"
+                    [class]="waIncomingRfqEnabled()
+                      ? 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-green-500 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50'
+                      : 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50'"
+                  >
+                    <span
+                      [class]="waIncomingRfqEnabled()
+                        ? 'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out translate-x-5'
+                        : 'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out translate-x-0'"
+                    ></span>
+                  </button>
+                </div>
+              }
+
               <!-- Default Group picker (visible when enabled) -->
               @if (waEnabled()) {
                 <div class="mt-5 border-t border-gray-100 pt-5">
@@ -829,6 +852,7 @@ export class IntegrationsPageComponent implements OnInit {
 
   // ── WhatsApp ─────────────────────────────────────────────────────
   readonly waEnabled = signal(false);
+  readonly waIncomingRfqEnabled = signal(true);
   readonly waDefaultGroupJid = signal<string | null>(null);
   readonly waGroups = signal<{ jid: string; name: string; participants: number }[]>([]);
   readonly waGroupsLoading = signal(false);
@@ -895,10 +919,11 @@ export class IntegrationsPageComponent implements OnInit {
 
       // Load WhatsApp settings
       const waRes = await firstValueFrom(
-        this.http.get<ApiResponse<{ enabled: boolean; defaultGroupJid: string | null }>>(`${API}/admin/settings/whatsapp`),
+        this.http.get<ApiResponse<{ enabled: boolean; defaultGroupJid: string | null; incomingRfqEnabled: boolean }>>(`${API}/admin/settings/whatsapp`),
       );
       if (waRes.success) {
         this.waEnabled.set(waRes.data.enabled);
+        this.waIncomingRfqEnabled.set(waRes.data.incomingRfqEnabled !== false);
         if (waRes.data.enabled) await this.loadWaGroups();
         this.waDefaultGroupJid.set(waRes.data.defaultGroupJid);
         this.syncWaGroupSearchText();
@@ -1151,16 +1176,40 @@ export class IntegrationsPageComponent implements OnInit {
 
     try {
       const res = await firstValueFrom(
-        this.http.put<ApiResponse<{ enabled: boolean; defaultGroupJid: string | null }>>(`${API}/admin/settings/whatsapp`, { enabled }),
+        this.http.put<ApiResponse<{ enabled: boolean; defaultGroupJid: string | null; incomingRfqEnabled: boolean }>>(`${API}/admin/settings/whatsapp`, { enabled }),
       );
       if (res.success) {
         this.waEnabled.set(res.data.enabled);
+        this.waIncomingRfqEnabled.set(res.data.incomingRfqEnabled !== false);
         this.waDefaultGroupJid.set(res.data.defaultGroupJid);
         this.waSaveSuccess.set(enabled ? 'WhatsApp integration enabled.' : 'WhatsApp integration disabled.');
         if (enabled) this.loadWaGroups();
       }
     } catch (err: any) {
       this.waSaveError.set(err?.error?.error ?? 'Failed to update WhatsApp settings.');
+    } finally {
+      this.waSaving.set(false);
+    }
+  }
+
+  async toggleWaIncomingRfq(): Promise<void> {
+    this.waSaving.set(true);
+    this.waSaveSuccess.set('');
+    this.waSaveError.set('');
+    const incomingRfqEnabled = !this.waIncomingRfqEnabled();
+
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<{ enabled: boolean; defaultGroupJid: string | null; incomingRfqEnabled: boolean }>>(`${API}/admin/settings/whatsapp`, { incomingRfqEnabled }),
+      );
+      if (res.success) {
+        this.waEnabled.set(res.data.enabled);
+        this.waIncomingRfqEnabled.set(res.data.incomingRfqEnabled !== false);
+        this.waDefaultGroupJid.set(res.data.defaultGroupJid);
+        this.waSaveSuccess.set(incomingRfqEnabled ? 'Incoming WhatsApp RFQ parsing enabled.' : 'Incoming WhatsApp RFQ parsing disabled.');
+      }
+    } catch (err: any) {
+      this.waSaveError.set(err?.error?.error ?? 'Failed to update WhatsApp RFQ setting.');
     } finally {
       this.waSaving.set(false);
     }
@@ -1173,11 +1222,13 @@ export class IntegrationsPageComponent implements OnInit {
 
     try {
       const res = await firstValueFrom(
-        this.http.put<ApiResponse<{ enabled: boolean; defaultGroupJid: string | null }>>(`${API}/admin/settings/whatsapp`, {
+        this.http.put<ApiResponse<{ enabled: boolean; defaultGroupJid: string | null; incomingRfqEnabled: boolean }>>(`${API}/admin/settings/whatsapp`, {
           defaultGroupJid: jid || null,
         }),
       );
       if (res.success) {
+        this.waEnabled.set(res.data.enabled);
+        this.waIncomingRfqEnabled.set(res.data.incomingRfqEnabled !== false);
         this.waDefaultGroupJid.set(res.data.defaultGroupJid);
         this.syncWaGroupSearchText();
         this.waSaveSuccess.set('Default group updated.');
