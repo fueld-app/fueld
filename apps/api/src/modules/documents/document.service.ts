@@ -340,43 +340,83 @@ const DEFAULT_BANK_DETAILS: BankDetails = {
 // ─── Data fetching ───────────────────────────────────────────────────
 
 async function fetchInvoiceData(invoiceId: string) {
-  const invoice = await db.query.invoices.findFirst({
-    where: eq(invoices.id, invoiceId),
-    with: {
-      order: {
-        with: {
-          client: true,
-          vessel: true,
-          place: true,
-          salesRep: true,
-          supplier: true,
-          invoicingCompany: true,
-          items: true,
+  const isMissingCompanyRegistrationColumnError = (error: unknown): boolean => {
+    if (!(error instanceof Error)) return false;
+    return /company_registration_number/i.test(error.message);
+  };
+
+  const queryInvoice = (includeCompanyRegistrationNumber: boolean) =>
+    db.query.invoices.findFirst({
+      where: eq(invoices.id, invoiceId),
+      with: {
+        order: {
+          with: {
+            client: true,
+            vessel: true,
+            place: true,
+            salesRep: true,
+            supplier: true,
+            invoicingCompany: includeCompanyRegistrationNumber
+              ? true
+              : {
+                  columns: {
+                    companyRegistrationNumber: false,
+                  },
+                },
+            items: true,
+          },
         },
       },
-    },
-  });
+    });
+
+  let invoice: Awaited<ReturnType<typeof queryInvoice>>;
+  try {
+    invoice = await queryInvoice(true);
+  } catch (error) {
+    if (!isMissingCompanyRegistrationColumnError(error)) throw error;
+    invoice = await queryInvoice(false);
+  }
 
   if (!invoice) throw new Error(`Invoice ${invoiceId} not found`);
   return invoice;
 }
 
 async function fetchOrderForInvoice(orderId: string) {
-  const order = await db.query.orders.findFirst({
-    where: eq(orders.id, orderId),
-    with: {
-      client: true,
-      vessel: true,
-      place: true,
-      salesRep: true,
-      supplier: true,
-      invoicingCompany: true,
-      customerContact: true,
-      supplierContact: true,
-      items: true,
-      invoices: true,
-    },
-  });
+  const isMissingCompanyRegistrationColumnError = (error: unknown): boolean => {
+    if (!(error instanceof Error)) return false;
+    return /company_registration_number/i.test(error.message);
+  };
+
+  const queryOrder = (includeCompanyRegistrationNumber: boolean) =>
+    db.query.orders.findFirst({
+      where: eq(orders.id, orderId),
+      with: {
+        client: true,
+        vessel: true,
+        place: true,
+        salesRep: true,
+        supplier: true,
+        invoicingCompany: includeCompanyRegistrationNumber
+          ? true
+          : {
+              columns: {
+                companyRegistrationNumber: false,
+              },
+            },
+        customerContact: true,
+        supplierContact: true,
+        items: true,
+        invoices: true,
+      },
+    });
+
+  let order: Awaited<ReturnType<typeof queryOrder>>;
+  try {
+    order = await queryOrder(true);
+  } catch (error) {
+    if (!isMissingCompanyRegistrationColumnError(error)) throw error;
+    order = await queryOrder(false);
+  }
 
   if (!order) throw new Error(`Order ${orderId} not found`);
   return order;
