@@ -101,6 +101,67 @@ interface SaveItemInput {
   deliveredQuantity?: string | null;
 }
 
+function isMissingCompanyRegistrationNumberColumnError(err: unknown): boolean {
+  return err instanceof Error && err.message.includes('company_registration_number');
+}
+
+const counterpartyLegacySelect = {
+  id: counterparties.id,
+  tenantId: counterparties.tenantId,
+  name: counterparties.name,
+  type: counterparties.type,
+  types: counterparties.types,
+  creditLimit: counterparties.creditLimit,
+  creditUsed: counterparties.creditUsed,
+  country: counterparties.country,
+  isOwnCompany: counterparties.isOwnCompany,
+  seasearcherId: counterparties.seasearcherId,
+  companyImo: counterparties.companyImo,
+  countryIso: counterparties.countryIso,
+  yearFormed: counterparties.yearFormed,
+  companyRoles: counterparties.companyRoles,
+  fleetSize: counterparties.fleetSize,
+  headOfficeAddress: counterparties.headOfficeAddress,
+  headOfficePhone: counterparties.headOfficePhone,
+  headOfficeEmail: counterparties.headOfficeEmail,
+  website: counterparties.website,
+  isSanctioned: counterparties.isSanctioned,
+  lastSynced: counterparties.lastSynced,
+  manualOverrides: counterparties.manualOverrides,
+  responsibleUserId: counterparties.responsibleUserId,
+  logoUrl: counterparties.logoUrl,
+  vatNumber: counterparties.vatNumber,
+  fraudPreventionText: counterparties.fraudPreventionText,
+  customerTerms: counterparties.customerTerms,
+  supplierTerms: counterparties.supplierTerms,
+  latePaymentInterest: counterparties.latePaymentInterest,
+  createdAt: counterparties.createdAt,
+  updatedAt: counterparties.updatedAt,
+};
+
+async function getCounterpartyById(counterpartyId: string | null | undefined) {
+  if (!counterpartyId) return null;
+
+  try {
+    const [row] = await db
+      .select()
+      .from(counterparties)
+      .where(eq(counterparties.id, counterpartyId))
+      .limit(1);
+    return row ?? null;
+  } catch (err) {
+    if (!isMissingCompanyRegistrationNumberColumnError(err)) throw err;
+
+    const [legacyRow] = await db
+      .select(counterpartyLegacySelect)
+      .from(counterparties)
+      .where(eq(counterparties.id, counterpartyId))
+      .limit(1);
+
+    return legacyRow ? { ...legacyRow, companyRegistrationNumber: null } : null;
+  }
+}
+
 function normalizeOrderNumberTemplate(template: string): string {
   const trimmed = template.trim();
   if (!trimmed) return '{YYYY}{MM}{DD}-{SEQ:6}';
@@ -311,12 +372,7 @@ export async function getOrderById(idOrNumber: string) {
   // Fetch relations in parallel
   const [client, vessel, place, salesRep, invoicingCompany, items, customerContact, supplierContact] =
     await Promise.all([
-      db
-        .select()
-        .from(counterparties)
-        .where(eq(counterparties.id, row.clientId))
-        .limit(1)
-        .then((r) => r[0] ?? null),
+      getCounterpartyById(row.clientId),
       db
         .select()
         .from(vessels)
@@ -338,12 +394,7 @@ export async function getOrderById(idOrNumber: string) {
             .then((r) => r[0] ?? null)
         : Promise.resolve(null),
       row.invoicingCompanyId
-        ? db
-            .select()
-            .from(counterparties)
-            .where(eq(counterparties.id, row.invoicingCompanyId))
-            .limit(1)
-            .then((r) => r[0] ?? null)
+        ? getCounterpartyById(row.invoicingCompanyId)
         : Promise.resolve(null),
       db.select().from(orderItems).where(eq(orderItems.orderId, row.id)),
       row.customerContactId
