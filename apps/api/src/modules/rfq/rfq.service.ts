@@ -86,12 +86,11 @@ export async function listAllRfqs(userId: string) {
 }
 
 /**
- * Dismiss (reject) an RFQ.
+ * Dismiss (delete) an RFQ.
  */
 export async function dismissRfq(rfqId: string, userId: string): Promise<boolean> {
   const result = await db
-    .update(incomingRfqs)
-    .set({ status: 'DISMISSED', updatedAt: new Date() })
+    .delete(incomingRfqs)
     .where(
       and(
         eq(incomingRfqs.id, rfqId),
