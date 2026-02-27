@@ -216,6 +216,7 @@ async function ensureTestSchemaCompat(): Promise<void> {
     ALTER TABLE counterparties
     ADD COLUMN IF NOT EXISTS customer_terms text,
     ADD COLUMN IF NOT EXISTS supplier_terms text,
+    ADD COLUMN IF NOT EXISTS company_registration_number text,
     ADD COLUMN IF NOT EXISTS late_payment_interest text
   `;
 
