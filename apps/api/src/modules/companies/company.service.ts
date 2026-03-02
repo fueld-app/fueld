@@ -280,20 +280,36 @@ export async function createCompany(data: {
 
   const primaryType = data.types[0] ?? 'CLIENT';
 
-  const [created] = await db
-    .insert(counterparties)
-    .values({
-      tenantId: tenantRow.id,
-      name: data.name,
-      type: primaryType as any,
-      types: data.types,
-      country: data.country,
-      countryIso: data.countryIso,
-      creditLimit: data.creditLimit ?? '0',
-      companyImo: data.companyImo,
-      seasearcherId: data.seasearcherId,
-    })
-    .returning();
+  const inserted = await db.execute(sql`
+    insert into counterparties (
+      tenant_id,
+      name,
+      type,
+      types,
+      country,
+      country_iso,
+      credit_limit,
+      company_imo,
+      seasearcher_id
+    ) values (
+      ${tenantRow.id},
+      ${data.name},
+      ${primaryType}::counterparty_type,
+      ${JSON.stringify(data.types)}::jsonb,
+      ${data.country ?? null},
+      ${data.countryIso ?? null},
+      ${data.creditLimit ?? '0'},
+      ${data.companyImo ?? null},
+      ${data.seasearcherId ?? null}
+    )
+    returning id
+  `);
+
+  const createdId = (inserted[0] as { id?: string } | undefined)?.id;
+  if (!createdId) throw new Error('Failed to create company');
+
+  const created = await getCompanyById(createdId);
+  if (!created) throw new Error('Failed to load created company');
 
   return created;
 }
