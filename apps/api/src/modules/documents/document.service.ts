@@ -2472,8 +2472,16 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
 }
 
 export const __documentTestUtils = {
+  trimTrailingSlash,
+  getPublicApiBaseUrl,
   parseTimezoneOffset,
   formatDateTimeForDisplay,
+  formatCustomerPaymentTerms,
+  computeDueDate,
   replaceCompanyNamePlaceholder,
   buildOfferForAccountOfText,
+  buildNotesSection,
+  buildInvoiceDocument,
+  buildOfferDocument,
+  buildProformaDocument,
 };
