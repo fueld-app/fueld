@@ -11,6 +11,7 @@ env:
   VPS_HOST: 139.162.157.31
   VPS_USER: deploy
   DOMAIN: riviera-marine.fueld.app
+  BUN_VERSION: '1.3.8'
 
 jobs:
   deploy:
@@ -29,7 +30,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: ${{ env.BUN_VERSION }}
 
       - name: Setup Node.js (for Angular CLI)
         uses: actions/setup-node@v4

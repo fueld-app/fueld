@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
-import { bankAccounts, counterparties } from '../src/db/schema';
+import { and, eq } from 'drizzle-orm';
+import { bankAccounts, counterparties, documentRevisions, tenants } from '../src/db/schema';
 import { getDb, seedAuthBasics, truncateAll } from './helpers/db';
 import { loginE2E, requestJson, requestRaw } from './helpers/e2e';
 
@@ -99,7 +100,7 @@ async function seedDocumentReadyOrder() {
   expect(saveItems.status).toBe(200);
   expect(saveItems.data?.success).toBe(true);
 
-  return { token, orderId };
+  return { token, orderId, tenantId: seeded.tenant.id };
 }
 
 describe('documents + verify controller e2e', () => {
@@ -211,5 +212,101 @@ describe('documents + verify controller e2e', () => {
     const missingToken = await requestRaw('/verify/token/not-a-real-token');
     expect(missingToken.status).toBe(404);
     expect((missingToken.data as any)?.success).toBe(false);
+  });
+
+  it('sends invoice email successfully via /invoice/send', async () => {
+    const { token, orderId } = await seedDocumentReadyOrder();
+
+    const originalFetch = globalThis.fetch;
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+
+    globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(url), init });
+      return new Response('', { status: 202 });
+    }) as typeof fetch;
+
+    try {
+      const sent = await requestJson(`/orders/${orderId}/invoice/send`, {
+        method: 'POST',
+        token,
+        body: {
+          accessToken: 'graph-access-token',
+          recipientEmail: 'finance@example.com',
+        },
+      });
+
+      expect(sent.status).toBe(200);
+      expect(sent.data?.success).toBe(true);
+      expect(String(sent.data?.message ?? '')).toContain('Invoice');
+      expect(String(sent.data?.message ?? '')).toContain('finance@example.com');
+
+      expect(calls.length).toBe(1);
+      expect(calls[0]?.url).toBe('https://graph.microsoft.com/v1.0/me/sendMail');
+
+      const graphPayload = JSON.parse(String(calls[0]?.init?.body));
+      expect(graphPayload.message.toRecipients[0].emailAddress.address).toBe('finance@example.com');
+      expect(String(graphPayload.message.subject)).toContain('Invoice');
+      expect(graphPayload.message.attachments?.length).toBe(1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it('verifies token successfully and returns 410 when revision has expired', async () => {
+    const { token, orderId, tenantId } = await seedDocumentReadyOrder();
+    const db = await getDb();
+
+    const offer = await requestRaw(`/orders/${orderId}/offer/pdf`, { token });
+    expect(offer.status).toBe(200);
+    const verifyToken = offer.headers.get('x-document-verify-token');
+    expect(verifyToken).toBeTruthy();
+
+    const proforma = await requestRaw(`/orders/${orderId}/proforma/pdf`, { token });
+    expect(proforma.status).toBe(200);
+
+    const invoice = await requestRaw(`/orders/${orderId}/invoice/pdf`, { token });
+    expect(invoice.status).toBe(200);
+
+    const tokenVerifyOk = await requestRaw(`/verify/token/${verifyToken}`);
+    expect(tokenVerifyOk.status).toBe(200);
+    expect(tokenVerifyOk.headers.get('content-type')).toContain('application/pdf');
+    expect(tokenVerifyOk.headers.get('x-document-reference')).toBeTruthy();
+
+    await db
+      .update(tenants)
+      .set({ settings: { documentVerificationLinkExpiryDays: 1 } })
+      .where(eq(tenants.id, tenantId));
+
+    await db
+      .update(documentRevisions)
+      .set({ issuedAt: new Date('2000-01-01T00:00:00.000Z') })
+      .where(eq(documentRevisions.tenantId, tenantId));
+
+    const expiredOffer = await requestRaw(`/verify/${orderId}/offer`);
+    expect(expiredOffer.status).toBe(410);
+    expect((expiredOffer.data as any)?.success).toBe(false);
+    expect(String((expiredOffer.data as any)?.message ?? '')).toContain('expired');
+
+    const expiredProforma = await requestRaw(`/verify/${orderId}/proforma-invoice`);
+    expect(expiredProforma.status).toBe(410);
+    expect((expiredProforma.data as any)?.success).toBe(false);
+    expect(String((expiredProforma.data as any)?.message ?? '')).toContain('expired');
+
+    const expiredInvoice = await requestRaw(`/verify/${orderId}/invoice`);
+    expect(expiredInvoice.status).toBe(410);
+    expect((expiredInvoice.data as any)?.success).toBe(false);
+    expect(String((expiredInvoice.data as any)?.message ?? '')).toContain('expired');
+
+    const expiredToken = await requestRaw(`/verify/token/${verifyToken}`);
+    expect(expiredToken.status).toBe(410);
+    expect((expiredToken.data as any)?.success).toBe(false);
+    expect(String((expiredToken.data as any)?.message ?? '')).toContain('expired');
+
+    const revisionByToken = await db
+      .select()
+      .from(documentRevisions)
+      .where(and(eq(documentRevisions.verifyToken, String(verifyToken)), eq(documentRevisions.tenantId, tenantId)))
+      .limit(1);
+    expect(revisionByToken.length).toBe(1);
   });
 });

@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'bun:test';
-import { __documentTestUtils } from '../src/modules/documents/document.service';
+
+const defaultTestDatabaseUrl = 'postgres://fueld:fueld@localhost:5432/fueld_test';
+if (!process.env.TEST_DATABASE_URL && !process.env.DATABASE_URL) {
+  process.env.TEST_DATABASE_URL = defaultTestDatabaseUrl;
+}
+if (!process.env.DATABASE_URL && process.env.TEST_DATABASE_URL) {
+  process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
+}
+
+const { __documentTestUtils } = await import('../src/modules/documents/document.service');
 
 function collectTextValues(node: unknown): string[] {
   const out: string[] = [];
@@ -76,9 +85,58 @@ const commonOfferInput = {
   docTitle: 'OFFER',
   verifyUrl: null,
   printMeta: null,
-} as const;
+};
 
 describe('document.service formatting helpers', () => {
+  it('resolves public API base URL from env precedence and fallbacks', () => {
+    const originalVerify = process.env.VERIFY_BASE_URL;
+    const originalPublic = process.env.PUBLIC_API_URL;
+    const originalApi = process.env.API_URL;
+    const originalApp = process.env.APP_URL;
+
+    try {
+      process.env.VERIFY_BASE_URL = 'https://verify.example.com///';
+      process.env.PUBLIC_API_URL = 'https://public.example.com';
+      process.env.API_URL = 'https://api.example.com';
+      process.env.APP_URL = 'https://app.example.com';
+      expect(__documentTestUtils.getPublicApiBaseUrl()).toBe('https://verify.example.com');
+
+      delete process.env.VERIFY_BASE_URL;
+      process.env.PUBLIC_API_URL = 'https://public.example.com///';
+      expect(__documentTestUtils.getPublicApiBaseUrl()).toBe('https://public.example.com');
+
+      delete process.env.PUBLIC_API_URL;
+      process.env.API_URL = 'https://api.example.com///';
+      expect(__documentTestUtils.getPublicApiBaseUrl()).toBe('https://api.example.com');
+
+      delete process.env.API_URL;
+      process.env.APP_URL = 'http://localhost:4200';
+      expect(__documentTestUtils.getPublicApiBaseUrl()).toBe('http://localhost:3000');
+
+      process.env.APP_URL = 'https://app.example.com';
+      expect(__documentTestUtils.getPublicApiBaseUrl()).toBe('https://app.example.com/api');
+
+      process.env.APP_URL = 'not a url';
+      expect(__documentTestUtils.getPublicApiBaseUrl()).toBe('http://localhost:3000');
+    } finally {
+      process.env.VERIFY_BASE_URL = originalVerify;
+      process.env.PUBLIC_API_URL = originalPublic;
+      process.env.API_URL = originalApi;
+      process.env.APP_URL = originalApp;
+    }
+  });
+
+  it('parses timezone offsets and formats date-time output', () => {
+    expect(__documentTestUtils.parseTimezoneOffset('UTC')).toBe(0);
+    expect(__documentTestUtils.parseTimezoneOffset('UTC+2')).toBe(120);
+    expect(__documentTestUtils.parseTimezoneOffset('GMT-05:30')).toBe(-330);
+    expect(__documentTestUtils.parseTimezoneOffset('Europe/Copenhagen')).toBeNull();
+
+    expect(__documentTestUtils.formatDateTimeForDisplay('2026-03-01T10:00:00.000Z', 'UTC+2')).toBe('01-03-2026 12:00 UTC+2');
+    expect(__documentTestUtils.formatDateTimeForDisplay('2026-03-01T10:00:00.000Z', null)).toBe('01-03-2026 10:00');
+    expect(__documentTestUtils.formatDateTimeForDisplay(null, 'UTC+2')).toBeNull();
+  });
+
   it('builds OFFER for-account-of text with vessel IMO and client name', () => {
     const text = __documentTestUtils.buildOfferForAccountOfText({
       title: 'OFFER',
@@ -166,6 +224,17 @@ describe('document.service formatting helpers', () => {
     expect(text).toContain('Terms text');
   });
 
+  it('returns no notes section when all note inputs are empty', () => {
+    const notes = __documentTestUtils.buildNotesSection({
+      customerNote: null,
+      termsAndConditions: null,
+      placeRemark: null,
+      itemNotes: [],
+    });
+
+    expect(notes).toHaveLength(0);
+  });
+
   it('builds offer document with expected title and account text', () => {
     const doc = __documentTestUtils.buildOfferDocument({
       ...commonOfferInput,
@@ -178,6 +247,29 @@ describe('document.service formatting helpers', () => {
     expect(text).toContain('Master and/or owner and/or charterers and/or MV Aurora (IMO: 1234567) and/or Acme Marine');
     expect(text).toContain('Payment terms:  ');
     expect(text).toContain('Best regards');
+  });
+
+  it('builds offer document OFFER branch with quantity range and unit-price text', () => {
+    const doc = __documentTestUtils.buildOfferDocument({
+      ...commonOfferInput,
+      docTitle: 'OFFER',
+      items: [
+        {
+          productType: 'MGO',
+          description: null,
+          quantity: '0',
+          quantityMin: '50',
+          quantityMax: '75',
+          unit: 'MT',
+          salesPrice: '612.5',
+        },
+      ],
+    });
+
+    const text = collectTextValues(doc).join(' | ');
+    expect(text).toContain('we are pleased to offer to you the following');
+    expect(text).toContain('50 - 75');
+    expect(text).toContain('USD/MT  612.50');
   });
 
   it('builds offer document nomination branch with verification block', () => {
@@ -249,6 +341,53 @@ describe('document.service formatting helpers', () => {
     expect(text).toContain('REMITTANCE INSTRUCTIONS');
     expect(text).toContain('Total amount due to Fueld Trading Ltd');
     expect(text).toContain('FRAUD PREVENTION');
+    expect(text).toContain('Verify domain: example.com');
+  });
+
+  it('builds invoice document without optional sections when values are missing', () => {
+    const doc = __documentTestUtils.buildInvoiceDocument({
+      invoiceNumber: 'INV-0002',
+      orderNumber: null,
+      dueDate: '2026-03-20',
+      clientName: 'Acme Marine',
+      clientCountry: null,
+      vesselName: 'Aurora',
+      vesselImo: null,
+      portName: 'Rotterdam',
+      salesRepName: null,
+      paymentTerms: null,
+      customerNote: null,
+      itemNotes: [],
+      items: [{ productType: 'MGO', quantity: '10', unit: 'MT', salesPrice: '700', costPrice: null }],
+      totalAmount: null,
+      bank: {
+        bankName: 'DNB',
+        accountName: null,
+        accountNumber: null,
+        iban: null,
+        swift: null,
+        currency: 'USD',
+        branchAddress: null,
+        intermediaryBank: null,
+      },
+      createdAt: new Date('2026-03-01T00:00:00.000Z'),
+      companyName: null,
+      vatNumber: null,
+      companyRegistrationNumber: null,
+      fraudPreventionText: null,
+      latePaymentInterest: null,
+      verifyUrl: null,
+      verifyLink: null,
+      companyLogoDataUrl: null,
+      companyAddress: null,
+      companyPhone: null,
+      companyEmail: null,
+      printMeta: null,
+    });
+
+    const text = collectTextValues(doc).join(' | ');
+    expect(text).toContain('Total amount due to Company');
+    expect(text).not.toContain('FRAUD PREVENTION');
   });
 
   it('builds proforma document with remittance and transformed terms text', () => {
@@ -316,5 +455,55 @@ describe('document.service formatting helpers', () => {
     expect(text).toContain('CASH ON DELIVERY');
     expect(text).toContain('REMITTANCE INSTRUCTIONS');
     expect(text).toContain('Total amount due to Fueld Trading Ltd');
+    expect(text).toContain('USD/MT  500.00');
+    expect(text).toContain('Verify domain: example.com');
+  });
+
+  it('builds proforma document with fallback company label in total when company missing', () => {
+    const doc = __documentTestUtils.buildProformaDocument({
+      orderNumber: null,
+      clientName: 'Acme Marine',
+      clientCountry: null,
+      clientAddress: null,
+      customerContactName: null,
+      customerContactRole: null,
+      customerContactPhone: null,
+      customerContactEmail: null,
+      vesselName: 'Aurora',
+      vesselImo: null,
+      portName: 'Rotterdam',
+      eta: null,
+      etd: null,
+      timezone: null,
+      currency: 'USD',
+      fromName: null,
+      fromEmail: null,
+      fromPhone: null,
+      paymentTerms: null,
+      customerNote: null,
+      termsAndConditions: null,
+      companyName: null,
+      companyAddress: null,
+      companyPhone: null,
+      companyEmail: null,
+      companyRegistrationNumber: null,
+      companyWebsite: null,
+      companyLogoDataUrl: null,
+      itemNotes: [],
+      items: [{ productType: 'MGO', description: null, quantity: '5', unit: 'MT', salesPrice: '700' }],
+      createdAt: new Date('2026-03-01T00:00:00.000Z'),
+      verifyUrl: null,
+      verifyLink: null,
+      fraudPreventionText: null,
+      bank: null,
+      vatNumber: null,
+      latePaymentInterest: null,
+      placeRemark: null,
+      printMeta: null,
+    });
+
+    const text = collectTextValues(doc).join(' | ');
+    expect(text).toContain('Total amount due to Company');
+    expect(text).toContain('MGO');
   });
 });
