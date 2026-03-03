@@ -662,6 +662,26 @@ function replaceCompanyNamePlaceholder(
   return result;
 }
 
+function buildOfferForAccountOfText(params: {
+  title: string;
+  vesselName: string;
+  vesselImo?: string | null;
+  clientName?: string | null;
+  companyName?: string | null;
+}): string {
+  const vesselRef = `${params.vesselName}${params.vesselImo ? ` (IMO: ${params.vesselImo})` : ''}`;
+  const vesselDisplay = params.vesselName.startsWith('MV ') ? vesselRef : `MV ${vesselRef}`;
+  const forAccountParts = params.title === 'NOMINATION'
+    ? [params.companyName?.trim() || 'Invoicing company']
+    : [`Master and/or owner and/or charterers and/or ${vesselDisplay}`];
+
+  if (params.title !== 'NOMINATION' && params.clientName) {
+    forAccountParts.push(`and/or ${params.clientName}`);
+  }
+
+  return forAccountParts.join(' ');
+}
+
 function buildNotesSection(params: {
   customerNote?: string | null;
   termsAndConditions?: string | null;
@@ -1445,12 +1465,13 @@ function buildOfferDocument(data: {
   }
 
   // "For account of" line
-  const vesselRef = `${data.vesselName}${data.vesselImo ? ` (IMO: ${data.vesselImo})` : ''}`;
-  const vesselDisplay = data.vesselName.startsWith('MV ') ? vesselRef : `MV ${vesselRef}`;
-  const forAccountParts = title === 'NOMINATION'
-    ? [data.companyName?.trim() || 'Invoicing company']
-    : [`Master and/or owner and/or charterers and/or ${vesselDisplay}`];
-  if (title !== 'NOMINATION' && data.clientName) forAccountParts.push(`and/or ${data.clientName}`);
+  const forAccountOfText = buildOfferForAccountOfText({
+    title,
+    vesselName: data.vesselName,
+    vesselImo: data.vesselImo,
+    clientName: data.clientName,
+    companyName: data.companyName,
+  });
 
   // ── Header (3 columns: client | title | logo+date/ref) ───────────
   const header = (currentPage: number, pageCount: number): Content => {
@@ -1595,7 +1616,7 @@ function buildOfferDocument(data: {
       { text: '', margin: [0, 10, 0, 0] } as Content,
 
       // For account of
-      { text: [{ text: 'For account of:  ', bold: true }, { text: forAccountParts.join(' ') }], margin: [0, 0, 0, 4] } as Content,
+      { text: [{ text: 'For account of:  ', bold: true }, { text: forAccountOfText }], margin: [0, 0, 0, 4] } as Content,
 
       // Payment terms
       ...(data.paymentTerms
@@ -2449,3 +2470,10 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
 
   return { buffer: canonicalBuffer, fileName, revision };
 }
+
+export const __documentTestUtils = {
+  parseTimezoneOffset,
+  formatDateTimeForDisplay,
+  replaceCompanyNamePlaceholder,
+  buildOfferForAccountOfText,
+};
