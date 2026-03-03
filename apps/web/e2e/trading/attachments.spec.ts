@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { loginViaUi } from '../helpers/auth';
-import { closePdfPreviewIfOpen, waitForPdfResponse } from '../helpers/pdf';
+import { closePdfPreviewIfOpen } from '../helpers/pdf';
 import { createInquiryViaApi } from '../helpers/trading';
 
 async function createOrderFromInquiry(page: import('@playwright/test').Page): Promise<void> {
@@ -53,15 +53,16 @@ test('upload OTHER attachment and preview/download', async ({ page }) => {
   // New attachment should appear; click to preview.
   await expect(page.getByRole('button', { name: fileName })).toBeVisible();
 
-  const pdf = waitForPdfResponse(page, '/uploads/');
   await page.getByRole('button', { name: fileName }).click();
-  await pdf;
 
-  // Assert modal shows Download and has a blob URL.
-  const modal = page.locator('app-pdf-preview-modal');
-  await expect(modal.getByRole('link', { name: 'Download' })).toBeVisible();
-  await expect(modal.getByRole('link', { name: 'Download' })).toHaveAttribute('href', /blob:/);
-  await expect(modal.getByRole('link', { name: 'Download' })).toHaveAttribute('download', /\.pdf$/);
+  // Assert modal is ready and Download has a blob URL.
+  const previewHeader = page.getByRole('heading', { name: fileName, exact: true });
+  await expect(previewHeader).toBeVisible();
+  const previewPanel = previewHeader.locator('..');
+  const downloadLink = previewPanel.getByRole('link', { name: 'Download' });
+  await expect(downloadLink).toBeVisible();
+  await expect(downloadLink).toHaveAttribute('href', /blob:/);
+  await expect(downloadLink).toHaveAttribute('download', /\.pdf$/);
 
   await closePdfPreviewIfOpen(page);
 });
