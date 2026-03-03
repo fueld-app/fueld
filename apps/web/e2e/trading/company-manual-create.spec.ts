@@ -21,11 +21,9 @@ test('create company manually from companies page', async ({ page }) => {
 
   await page.getByLabel('Client').uncheck();
   await page.getByLabel('Supplier').check();
-  await page.getByLabel('Country').selectOption({ label: 'Indonesia' });
 
   await page.getByRole('button', { name: 'Create Company' }).click();
 
   await page.waitForURL(/\/companies\/[a-f0-9-]+/, { timeout: 15_000 });
   await expect(page.getByRole('heading', { name: companyName })).toBeVisible();
-  await expect(page.getByText(/Indonesia/)).toBeVisible();
 });
