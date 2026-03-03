@@ -8,6 +8,11 @@ afterEach(() => {
 });
 
 describe('geoip', () => {
+  const uniqueIp = (lastOctet: number): string => {
+    const suffix = (Date.now() + Math.floor(Math.random() * 1000)) % 200;
+    return `198.51.${suffix}.${lastOctet}`;
+  };
+
   test('returns empty for null or private IP without network calls', async () => {
     let callCount = 0;
     globalThis.fetch = (async (_input: RequestInfo | URL, _init?: RequestInit) => {
@@ -23,12 +28,13 @@ describe('geoip', () => {
   });
 
   test('normalizes IPv4 with port and caches successful response', async () => {
-    const ipWithPort = '203.0.113.42:52314';
+    const baseIp = uniqueIp(42);
+    const ipWithPort = `${baseIp}:52314`;
     let callCount = 0;
     globalThis.fetch = (async (input: RequestInfo | URL, _init?: RequestInit) => {
       callCount += 1;
       const url = String(input);
-      expect(url).toContain('/203.0.113.42?fields=');
+      expect(url).toContain(`/${baseIp}?fields=`);
       return new Response(JSON.stringify({ status: 'success', countryCode: 'DK', city: 'Aarhus' }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -36,7 +42,7 @@ describe('geoip', () => {
     }) as unknown as typeof globalThis.fetch;
 
     const first = await lookupIp(ipWithPort);
-    const second = await lookupIp('203.0.113.42');
+    const second = await lookupIp(baseIp);
 
     expect(first).toEqual({ country: 'DK', city: 'Aarhus' });
     expect(second).toEqual({ country: 'DK', city: 'Aarhus' });
@@ -44,14 +50,15 @@ describe('geoip', () => {
   });
 
   test('returns empty when provider reports non-success and then uses cached empty', async () => {
+    const ip = uniqueIp(11);
     let callCount = 0;
     globalThis.fetch = (async (_input: RequestInfo | URL, _init?: RequestInit) => {
       callCount += 1;
       return new Response(JSON.stringify({ status: 'fail' }), { status: 200 });
     }) as unknown as typeof globalThis.fetch;
 
-    const first = await lookupIp('198.51.100.11');
-    const second = await lookupIp('198.51.100.11');
+    const first = await lookupIp(ip);
+    const second = await lookupIp(ip);
 
     expect(first).toEqual({ country: null, city: null });
     expect(second).toEqual({ country: null, city: null });
@@ -59,6 +66,7 @@ describe('geoip', () => {
   });
 
   test('lookupIpSync returns empty immediately and hydrates cache in background', async () => {
+    const ip = uniqueIp(21);
     let callCount = 0;
     globalThis.fetch = (async (_input: RequestInfo | URL, _init?: RequestInit) => {
       callCount += 1;
@@ -69,11 +77,11 @@ describe('geoip', () => {
       );
     }) as unknown as typeof globalThis.fetch;
 
-    const immediate = lookupIpSync('198.51.100.21');
+    const immediate = lookupIpSync(ip);
     expect(immediate).toEqual({ country: null, city: null });
 
     await new Promise((resolve) => setTimeout(resolve, 20));
-    const after = lookupIpSync('198.51.100.21');
+    const after = lookupIpSync(ip);
 
     expect(after).toEqual({ country: 'NO', city: 'Oslo' });
     expect(callCount).toBe(1);
