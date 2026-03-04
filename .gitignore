@@ -25,3 +25,4 @@ Thumbs.db
 
 # Runtime uploads (local/dev/test artifacts)
 apps/api/uploads/**
+uploads/**
