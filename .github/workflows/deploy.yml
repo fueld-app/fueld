@@ -24,8 +24,21 @@ jobs:
       cancel-in-progress: false
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
+        id: checkout
         uses: actions/checkout@v4
+        continue-on-error: true
+
+      - name: Fallback checkout via archive download
+        if: steps.checkout.outcome == 'failure'
+        run: |
+          curl -fL --retry 5 --retry-all-errors --retry-delay 3 \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}" \
+            -o repo.tar.gz
+          tar -xzf repo.tar.gz --strip-components=1
+          rm repo.tar.gz
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
