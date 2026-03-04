@@ -710,6 +710,56 @@ interface TeamUserOption {
       </div>
     }
 
+    @if (showCancelInquiryModal()) {
+      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-gray-900">Cancel inquiry</h3>
+            <button
+              type="button"
+              (click)="closeCancelInquiryModal()"
+              class="text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
+          </div>
+          <p class="mt-3 text-sm text-gray-600">
+            Select a reason for cancelling this inquiry.
+          </p>
+          <div class="mt-4">
+            <label class="text-xs font-medium text-gray-500">Cancellation reason</label>
+            <select
+              [ngModel]="selectedInquiryCancelReason()"
+              (ngModelChange)="selectedInquiryCancelReason.set($event)"
+              class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
+                     focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 bg-white"
+            >
+              @for (reason of availableInquiryCancelReasons(); track reason) {
+                <option [value]="reason">{{ reason }}</option>
+              }
+            </select>
+          </div>
+          <div class="mt-5 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              (click)="closeCancelInquiryModal()"
+              class="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              (click)="confirmCancelInquiry()"
+              [disabled]="cancellingInquiry()"
+              class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-700 disabled:opacity-50"
+            >
+              Confirm Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
     <!-- Send Email Modal -->
     <app-send-email-modal
       [invoiceNumber]="invoiceNumber()"
@@ -800,9 +850,14 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   readonly showSupplierPaymentNote = signal(false);
   readonly settingsOpen = signal(false);
   readonly showConvertToOrderModal = signal(false);
+  readonly showCancelInquiryModal = signal(false);
   readonly convertingToOrder = signal(false);
   readonly cancellingInquiry = signal(false);
   readonly inquiryCancelReasons = signal<string[]>([]);
+  readonly selectedInquiryCancelReason = signal('');
+  readonly availableInquiryCancelReasons = computed(() =>
+    this.inquiryCancelReasons().map((reason) => reason.trim()).filter(Boolean),
+  );
   readonly configuredProducts = signal<DropdownOption[]>([]);
   readonly configuredUnits = signal<DropdownOption[]>([]);
   readonly configuredCurrencies = signal<DropdownOption[]>([]);
@@ -1942,7 +1997,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
         this.openConvertToOrderModal();
         break;
       case 'cancel-inquiry':
-        void this.cancelInquiryWithDefaultReason();
+        this.openCancelInquiryModal();
         break;
       case 'send-email':
         if (!this.isResponsibleUser()) {
@@ -1970,6 +2025,28 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
 
   closeConvertToOrderModal(): void {
     this.showConvertToOrderModal.set(false);
+  }
+
+  openCancelInquiryModal(): void {
+    const status = this.order()?.status;
+    if (status !== OrderStatus.Inquiry && status !== OrderStatus.Offer) {
+      this.showToast('error', 'Only inquiries can be cancelled from this action.');
+      return;
+    }
+
+    const reasons = this.availableInquiryCancelReasons();
+    if (!reasons.length) {
+      this.showToast('error', 'No cancellation reasons configured. Please ask admin to configure reasons in Settings.');
+      return;
+    }
+
+    this.selectedInquiryCancelReason.set(reasons[0]!);
+    this.showCancelInquiryModal.set(true);
+  }
+
+  closeCancelInquiryModal(): void {
+    if (this.cancellingInquiry()) return;
+    this.showCancelInquiryModal.set(false);
   }
 
   async confirmConvertToOrder(): Promise<void> {
@@ -2001,7 +2078,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  private async cancelInquiryWithDefaultReason(): Promise<void> {
+  async confirmCancelInquiry(): Promise<void> {
     const id = this.orderId();
     if (!id) return;
 
@@ -2011,14 +2088,11 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const reason = this.inquiryCancelReasons()[0]?.trim();
+    const reason = this.selectedInquiryCancelReason().trim();
     if (!reason) {
-      this.showToast('error', 'No cancellation reasons configured. Please ask admin to configure reasons in Settings.');
+      this.showToast('error', 'Select a cancellation reason.');
       return;
     }
-
-    const confirmed = window.confirm(`Cancel inquiry with reason: ${reason}?`);
-    if (!confirmed) return;
 
     this.cancellingInquiry.set(true);
     try {
@@ -2030,6 +2104,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
       );
       if (res.success) {
         this.order.update((o) => (o ? { ...o, status: OrderStatus.Cancelled } : o));
+        this.showCancelInquiryModal.set(false);
         this.showToast('success', 'Inquiry cancelled.');
       } else {
         this.showToast('error', res.message ?? 'Failed to cancel inquiry.');
