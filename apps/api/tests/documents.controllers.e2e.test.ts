@@ -257,6 +257,297 @@ describe('documents + verify controller e2e', () => {
     }
   });
 
+  it('sends offer email via /send-email with correct PDF attachment', async () => {
+    const { token, orderId } = await seedDocumentReadyOrder();
+
+    const originalFetch = globalThis.fetch;
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(url), init });
+      return new Response('', { status: 202 });
+    }) as typeof fetch;
+
+    try {
+      const sent = await requestJson(`/orders/${orderId}/send-email`, {
+        method: 'POST',
+        token,
+        body: {
+          documentType: 'OFFER',
+          recipientEmail: 'buyer@example.com',
+          subject: 'Offer for MV TEST',
+          htmlBody: '<p>Offer body</p>',
+          accessToken: 'graph-offer-token',
+        },
+      });
+
+      expect(sent.status).toBe(200);
+      expect(sent.data?.success).toBe(true);
+      expect(String(sent.data?.message ?? '')).toContain('OFFER');
+      expect(sent.data?.channel).toBe('GRAPH');
+      expect(String(sent.data?.pdfFileName ?? '')).toContain('Offer_');
+
+      const graphPayload = JSON.parse(String(calls[0]?.init?.body));
+      expect(graphPayload.message.subject).toBe('Offer for MV TEST');
+      expect(graphPayload.message.attachments[0].contentType).toBe('application/pdf');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it('sends nomination email via /send-email', async () => {
+    const { token, orderId } = await seedDocumentReadyOrder();
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (_url: string | URL | Request, _init?: RequestInit) =>
+      new Response('', { status: 202 })) as typeof fetch;
+
+    try {
+      const sent = await requestJson(`/orders/${orderId}/send-email`, {
+        method: 'POST',
+        token,
+        body: {
+          documentType: 'NOMINATION',
+          recipientEmail: 'supplier@example.com',
+          subject: 'Nomination',
+          htmlBody: '<p>Nomination body</p>',
+          accessToken: 'graph-nom-token',
+        },
+      });
+
+      expect(sent.status).toBe(200);
+      expect(sent.data?.success).toBe(true);
+      expect(String(sent.data?.message ?? '')).toContain('NOMINATION');
+      expect(String(sent.data?.pdfFileName ?? '')).toContain('Nomination_');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it('sends proforma email via /send-email', async () => {
+    const { token, orderId } = await seedDocumentReadyOrder();
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (_url: string | URL | Request, _init?: RequestInit) =>
+      new Response('', { status: 202 })) as typeof fetch;
+
+    try {
+      const sent = await requestJson(`/orders/${orderId}/send-email`, {
+        method: 'POST',
+        token,
+        body: {
+          documentType: 'PROFORMA',
+          recipientEmail: 'accounting@example.com',
+          subject: 'Proforma Invoice',
+          htmlBody: '<p>Proforma body</p>',
+          accessToken: 'graph-proforma-token',
+        },
+      });
+
+      expect(sent.status).toBe(200);
+      expect(sent.data?.success).toBe(true);
+      expect(String(sent.data?.message ?? '')).toContain('PROFORMA');
+      expect(String(sent.data?.pdfFileName ?? '')).toContain('Proforma_Invoice_');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it('rejects send-email with invalid document type', async () => {
+    const { token, orderId } = await seedDocumentReadyOrder();
+
+    const res = await requestJson(`/orders/${orderId}/send-email`, {
+      method: 'POST',
+      token,
+      body: {
+        documentType: 'BOGUS_TYPE',
+        recipientEmail: 'test@example.com',
+        subject: 'Test',
+        htmlBody: '<p>test</p>',
+      },
+    });
+
+    // Elysia's typebox validation rejects unknown union values
+    expect(res.status).not.toBe(200);
+  });
+
+  it('rejects send-email with CC containing invalid email', async () => {
+    const { token, orderId } = await seedDocumentReadyOrder();
+
+    const res = await requestJson(`/orders/${orderId}/send-email`, {
+      method: 'POST',
+      token,
+      body: {
+        documentType: 'INVOICE',
+        recipientEmail: 'valid@example.com',
+        ccEmails: ['not-an-email'],
+        subject: 'Test',
+        htmlBody: '<p>test</p>',
+      },
+    });
+
+    // Should reject the invalid CC email via format: 'email' validation
+    expect(res.status).not.toBe(200);
+  });
+
+  it('returns pre-filled email defaults via /email-defaults for INVOICE', async () => {
+    const { token, orderId } = await seedDocumentReadyOrder();
+
+    const res = await requestJson(`/orders/${orderId}/email-defaults`, {
+      method: 'POST',
+      token,
+      body: { documentType: 'INVOICE' },
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.data?.success).toBe(true);
+
+    // Should return email metadata
+    expect(typeof res.data?.subject).toBe('string');
+    expect(typeof res.data?.htmlBody).toBe('string');
+    expect(typeof res.data?.senderName).toBe('string');
+    expect(typeof res.data?.senderEmail).toBe('string');
+    expect(Array.isArray(res.data?.ccEmails)).toBe(true);
+
+    // Subject should contain Invoice
+    expect(String(res.data?.subject ?? '')).toContain('Invoice');
+
+    // HTML body should contain vessel name and branding
+    expect(String(res.data?.htmlBody ?? '')).toContain('FUELD');
+    expect(String(res.data?.htmlBody ?? '')).toContain('Dear Customer');
+
+    // CC should include sender email
+    expect(res.data?.ccEmails?.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('returns pre-filled email defaults via /email-defaults for NOMINATION', async () => {
+    const { token, orderId } = await seedDocumentReadyOrder();
+
+    const res = await requestJson(`/orders/${orderId}/email-defaults`, {
+      method: 'POST',
+      token,
+      body: { documentType: 'NOMINATION' },
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.data?.success).toBe(true);
+    expect(String(res.data?.subject ?? '')).toContain('Nomination');
+    expect(String(res.data?.htmlBody ?? '')).toContain('Dear Supplier');
+  });
+
+  it('returns pre-filled email defaults via /email-defaults for OFFER', async () => {
+    const { token, orderId } = await seedDocumentReadyOrder();
+
+    const res = await requestJson(`/orders/${orderId}/email-defaults`, {
+      method: 'POST',
+      token,
+      body: { documentType: 'OFFER' },
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.data?.success).toBe(true);
+    expect(String(res.data?.subject ?? '')).toContain('Offer');
+    expect(String(res.data?.htmlBody ?? '')).toContain('Dear Customer');
+  });
+
+  it('returns pre-filled email defaults via /email-defaults for PROFORMA', async () => {
+    const { token, orderId } = await seedDocumentReadyOrder();
+
+    const res = await requestJson(`/orders/${orderId}/email-defaults`, {
+      method: 'POST',
+      token,
+      body: { documentType: 'PROFORMA' },
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.data?.success).toBe(true);
+    expect(String(res.data?.subject ?? '')).toContain('Proforma Invoice');
+    expect(String(res.data?.htmlBody ?? '')).toContain('Dear Customer');
+  });
+
+  it('returns 404 for /email-defaults on non-existent order', async () => {
+    const seeded = await seedAuthBasics();
+    const login = await loginE2E(seeded.user.email, seeded.password);
+    const token = login.accessToken as string;
+
+    const res = await requestJson('/orders/ORDER-DOES-NOT-EXIST/email-defaults', {
+      method: 'POST',
+      token,
+      body: { documentType: 'INVOICE' },
+    });
+
+    expect(res.data?.success).toBe(false);
+    expect(String(res.data?.message ?? '')).toContain('Order not found');
+  });
+
+  it('send-email validates missing prerequisites per document type', async () => {
+    const seeded = await seedAuthBasics();
+    const login = await loginE2E(seeded.user.email, seeded.password);
+    const token = login.accessToken as string;
+
+    // Create order with no invoicing company, no supplier, no bank account
+    const created = await requestJson('/orders', {
+      method: 'POST',
+      token,
+      body: {
+        clientId: seeded.client.id,
+        vesselId: seeded.vessel.id,
+        placeId: seeded.place.id,
+      },
+    });
+    const orderId = created.data?.data?.id as string;
+
+    // Add items so we pass the "no items" check
+    await requestJson(`/orders/${orderId}/items`, {
+      method: 'PUT',
+      token,
+      body: {
+        items: [{ productType: 'VLSFO', quantity: '100', unit: 'MT', salesPrice: '500' }],
+      },
+    });
+
+    // OFFER requires invoicingCompanyId
+    const offer = await requestJson(`/orders/${orderId}/send-email`, {
+      method: 'POST',
+      token,
+      body: {
+        documentType: 'OFFER',
+        recipientEmail: 'test@example.com',
+        subject: 'Test',
+        htmlBody: '<p>test</p>',
+      },
+    });
+    expect(offer.data?.success).toBe(false);
+    expect(String(offer.data?.message ?? '')).toContain('invoicing company');
+
+    // INVOICE requires bankAccountId
+    const invoice = await requestJson(`/orders/${orderId}/send-email`, {
+      method: 'POST',
+      token,
+      body: {
+        documentType: 'INVOICE',
+        recipientEmail: 'test@example.com',
+        subject: 'Test',
+        htmlBody: '<p>test</p>',
+      },
+    });
+    expect(invoice.data?.success).toBe(false);
+    expect(String(invoice.data?.message ?? '')).toContain('bank account');
+
+    // PROFORMA requires bankAccountId
+    const proforma = await requestJson(`/orders/${orderId}/send-email`, {
+      method: 'POST',
+      token,
+      body: {
+        documentType: 'PROFORMA',
+        recipientEmail: 'test@example.com',
+        subject: 'Test',
+        htmlBody: '<p>test</p>',
+      },
+    });
+    expect(proforma.data?.success).toBe(false);
+    expect(String(proforma.data?.message ?? '')).toContain('bank account');
+  });
+
   it('verifies token successfully and returns 410 when revision has expired', async () => {
     const { token, orderId, tenantId } = await seedDocumentReadyOrder();
     const db = await getDb();
