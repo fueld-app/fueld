@@ -130,6 +130,7 @@ describe('document.service formatting helpers', () => {
 
   it('parses timezone offsets and formats date-time output', () => {
     expect(__documentTestUtils.parseTimezoneOffset('UTC')).toBe(0);
+    expect(__documentTestUtils.parseTimezoneOffset('GMT')).toBe(0);
     expect(__documentTestUtils.parseTimezoneOffset('UTC+2')).toBe(120);
     expect(__documentTestUtils.parseTimezoneOffset('GMT-05:30')).toBe(-330);
     expect(__documentTestUtils.parseTimezoneOffset('Europe/Copenhagen')).toBeNull();
@@ -137,6 +138,39 @@ describe('document.service formatting helpers', () => {
     expect(__documentTestUtils.formatDateTimeForDisplay('2026-03-01T10:00:00.000Z', 'UTC+2')).toBe('01-03-2026 12:00 UTC+2');
     expect(__documentTestUtils.formatDateTimeForDisplay('2026-03-01T10:00:00.000Z', null)).toBe('01-03-2026 10:00');
     expect(__documentTestUtils.formatDateTimeForDisplay(null, 'UTC+2')).toBeNull();
+  });
+
+  it('formats numbers and phone helpers across edge branches', () => {
+    expect(__documentTestUtils.formatNumber(null)).toBe('—');
+    expect(__documentTestUtils.formatNumber('abc')).toBe('—');
+    expect(__documentTestUtils.formatNumber('1.2345', 3)).toBe('1.235');
+
+    expect(__documentTestUtils.formatPhoneDisplay(null)).toBeNull();
+    expect(__documentTestUtils.formatPhoneDisplay('+12')).toBe('+12');
+    expect(__documentTestUtils.formatPhoneDisplay('+18005551234')).toBe('+1 80 05 55 12 34');
+    expect(__documentTestUtils.formatPhoneDisplay('+4526131217')).toBe('+45 26 13 12 17');
+    expect(__documentTestUtils.formatPhoneDisplay('+358401234567')).toBe('+358 40 12 34 56 7');
+    expect(__documentTestUtils.phoneToTelUri('+45 26 13-12(17)')).toBe('tel:+4526131217');
+  });
+
+  it('builds phone/email text nodes with defaults and custom options', () => {
+    const phoneNode = __documentTestUtils.phoneTextNode('Direct Phone:  ', '+4526131217');
+    const emailNode = __documentTestUtils.emailTextNode('Direct Email:  ', 'ops@fueld.com', {
+      fontSize: 9,
+      margin: [0, 1, 0, 3],
+    });
+
+    const phoneText = collectTextValues(phoneNode).join(' | ');
+    const emailText = collectTextValues(emailNode).join(' | ');
+
+    expect(phoneText).toContain('Direct Phone:  ');
+    expect(phoneText).toContain('+45 26 13 12 17');
+    expect(emailText).toContain('Direct Email:  ');
+    expect(emailText).toContain('ops@fueld.com');
+
+    const emailRecord = emailNode as unknown as Record<string, unknown>;
+    expect(emailRecord.fontSize).toBe(9);
+    expect(emailRecord.margin).toEqual([0, 1, 0, 3]);
   });
 
   it('builds OFFER for-account-of text with vessel IMO and client name', () => {
@@ -507,6 +541,59 @@ describe('document.service formatting helpers', () => {
     const text = collectTextValues(doc).join(' | ');
     expect(text).toContain('Total amount due to Company');
     expect(text).toContain('MGO');
+  });
+
+  it('builds proforma header/logo branch and skips account append when client name empty', () => {
+    const doc = __documentTestUtils.buildProformaDocument({
+      orderNumber: 'ORD-LOGO',
+      clientName: '',
+      clientCountry: null,
+      clientAddress: null,
+      customerContactName: null,
+      customerContactRole: null,
+      customerContactPhone: null,
+      customerContactEmail: null,
+      vesselName: 'MV Aurora',
+      vesselImo: '1234567',
+      portName: 'Rotterdam',
+      eta: null,
+      etd: null,
+      timezone: null,
+      currency: 'USD',
+      fromName: null,
+      fromEmail: null,
+      fromPhone: null,
+      paymentTerms: null,
+      customerNote: null,
+      termsAndConditions: null,
+      companyName: 'Fueld Trading Ltd',
+      companyAddress: null,
+      companyPhone: null,
+      companyEmail: null,
+      companyRegistrationNumber: null,
+      companyWebsite: null,
+      companyLogoDataUrl: 'data:image/png;base64,abcd',
+      itemNotes: [],
+      items: [{ productType: 'MGO', description: null, quantity: '5', unit: 'MT', salesPrice: '700' }],
+      createdAt: new Date('2026-03-01T00:00:00.000Z'),
+      verifyUrl: null,
+      verifyLink: null,
+      fraudPreventionText: null,
+      bank: null,
+      vatNumber: null,
+      latePaymentInterest: null,
+      placeRemark: null,
+      printMeta: null,
+    });
+
+    expect(typeof doc.header).toBe('function');
+    const header = (doc.header as (currentPage: number, pageCount: number) => unknown)(1, 1);
+    const text = collectTextValues(doc).join(' | ');
+    const headerText = collectTextValues(header).join(' | ');
+
+    expect(headerText).toContain('PROFORMA INVOICE');
+    expect(text).toContain('Vessel:');
+    expect(text).toContain('MV Aurora (IMO: 1234567)');
   });
 
   it('loads logo data URL helper across empty/unsupported/missing/valid branches', () => {
