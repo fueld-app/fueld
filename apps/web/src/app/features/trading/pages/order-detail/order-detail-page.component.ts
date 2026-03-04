@@ -38,7 +38,7 @@ import {
   HeaderActionsComponent,
   type HeaderAction,
 } from '../../components/header-actions/header-actions.component';
-import { SendEmailModalComponent } from '../../components/send-email-modal/send-email-modal.component';
+import { SendEmailModalComponent, type SendEmailPayload, type DocumentEmailType } from '../../components/send-email-modal/send-email-modal.component';
 import type { DropdownOption } from '../../../../shared/components/searchable-dropdown/searchable-dropdown.component';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
@@ -767,9 +767,10 @@ interface TeamUserOption {
 
     <!-- Send Email Modal -->
     <app-send-email-modal
-      [invoiceNumber]="invoiceNumber()"
-      [vesselName]="vesselName()"
-      [portName]="portName()"
+      [documentType]="emailDocumentType()"
+      [senderName]="auth.userName()"
+      [senderEmail]="auth.userEmail()"
+      [pdfFileName]="emailPdfFileName()"
       [waLinked]="waLinked()"
       [defaultPhone]="customerContact()?.phone ?? null"
       (sendEmail)="onSendEmail($event)"
@@ -794,10 +795,17 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly http = inject(HttpClient);
-  private readonly auth = inject(AuthService);
+  protected readonly auth = inject(AuthService);
 
   readonly emailModal = viewChild(SendEmailModalComponent);
   readonly pdfModal = viewChild(PdfPreviewModalComponent);
+
+  // ─── Email compose state ─────────────────────────────────────────
+
+  /** Which document type is currently being composed for email */
+  readonly emailDocumentType = signal<'OFFER' | 'NOMINATION' | 'PROFORMA' | 'INVOICE'>('INVOICE');
+  /** Display name for the PDF attachment in the compose modal */
+  readonly emailPdfFileName = signal('');
 
   // ─── Route param ─────────────────────────────────────────────────
 
@@ -2021,7 +2029,19 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
           this.showToast('error', 'Only the responsible user can send this email.');
           break;
         }
-        this.emailModal()?.show();
+        this.openSendEmailModal('INVOICE');
+        break;
+      case 'send-offer':
+        this.openSendEmailModal('OFFER');
+        break;
+      case 'send-nomination':
+        this.openSendEmailModal('NOMINATION');
+        break;
+      case 'send-proforma':
+        this.openSendEmailModal('PROFORMA');
+        break;
+      case 'send-invoice':
+        this.openSendEmailModal('INVOICE');
         break;
       case 'mark-paid':
         this.markPaid();
@@ -2327,34 +2347,73 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     return token ? `${API_URL}/verify/token/${token}` : null;
   }
 
-  onSendEmail(recipientEmail: string): void {
+  // ── Open compose modal for any document type ───────────────────
+
+  openSendEmailModal(docType: DocumentEmailType): void {
     const id = this.orderId();
     if (!id) return;
-    if (!this.isResponsibleUser()) {
-      this.emailModal()?.done();
-      this.showToast('error', 'Only the responsible user can send this email.');
-      return;
-    }
+
+    this.emailDocumentType.set(docType);
+
+    // Fetch pre-filled email defaults from the API
+    this.http
+      .post<ApiResponse<{
+        recipientEmail: string;
+        recipientName: string;
+        ccEmails: string[];
+        subject: string;
+        htmlBody: string;
+        senderName: string;
+        senderEmail: string;
+      }>>(`${API_URL}/orders/${id}/email-defaults`, { documentType: docType })
+      .subscribe({
+        next: (res) => {
+          if (!res.success || !res.data) {
+            this.showToast('error', 'Failed to load email defaults.');
+            return;
+          }
+          const d = res.data;
+          this.emailPdfFileName.set(`${docType}_${this.order()?.orderNumber ?? id.slice(0, 8)}.pdf`);
+
+          // Open the compose modal with the pre-filled data
+          this.emailModal()?.showWith({
+            recipientEmail: d.recipientEmail,
+            ccEmails: d.ccEmails,
+            subject: d.subject,
+            htmlBody: d.htmlBody,
+          });
+        },
+        error: () => {
+          this.showToast('error', 'Failed to load email defaults.');
+        },
+      });
+  }
+
+  onSendEmail(payload: SendEmailPayload): void {
+    const id = this.orderId();
+    if (!id) return;
 
     this.http
-      .post<ApiResponse<{ success: boolean; message: string }>>(
-        `${API_URL}/orders/${id}/invoice/send`,
+      .post<ApiResponse<{ success: boolean; message: string; channel: string; pdfFileName: string }>>(
+        `${API_URL}/orders/${id}/send-email`,
         {
-          recipientEmail,
-          vesselName: this.vesselName(),
-          portName: this.portName(),
-          // In production, the O365 token would come from the auth layer
-          accessToken: 'placeholder-o365-token',
+          documentType: payload.documentType,
+          recipientEmail: payload.recipientEmail,
+          ccEmails: payload.ccEmails,
+          subject: payload.subject,
+          htmlBody: payload.htmlBody,
+          // O365 token would come from MSAL in the future — for now SMTP is used
         },
       )
       .subscribe({
-        next: () => {
+        next: (res) => {
           this.emailModal()?.done();
-          this.showToast('success', `Invoice sent to ${recipientEmail}`);
+          const channel = res.data?.channel === 'GRAPH' ? 'via Outlook' : 'via email';
+          this.showToast('success', `${payload.documentType} sent to ${payload.recipientEmail} ${channel}`);
         },
         error: () => {
           this.emailModal()?.done();
-          this.showToast('error', 'Failed to send email. Check O365 token.');
+          this.showToast('error', 'Failed to send email. Please check that SMTP is configured in Admin → Settings → Integrations.');
         },
       });
   }

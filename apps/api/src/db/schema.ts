@@ -1185,3 +1185,33 @@ export type NewBankAccount = typeof bankAccounts.$inferInsert;
 
 export type IncomingRfq = typeof incomingRfqs.$inferSelect;
 export type NewIncomingRfq = typeof incomingRfqs.$inferInsert;
+
+// ═══════════════════════════════════════════════════════════════════════
+//  EMAIL LOG (outbound document emails)
+// ═══════════════════════════════════════════════════════════════════════
+
+export const emailLog = pgTable('email_log', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').references(() => tenants.id),
+  orderId: uuid('order_id').references(() => orders.id, { onDelete: 'set null' }),
+  documentType: text('document_type').notNull(),        // 'OFFER' | 'NOMINATION' | 'PROFORMA' | 'INVOICE'
+  sentByUserId: uuid('sent_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+  sentFromEmail: text('sent_from_email').notNull(),
+  sentTo: text('sent_to').notNull(),
+  ccEmails: text('cc_emails'),                           // comma-separated
+  subject: text('subject').notNull(),
+  pdfFileName: text('pdf_file_name'),
+  channel: text('channel').notNull().default('SMTP'),     // 'SMTP' | 'GRAPH'
+  status: text('status').notNull().default('SENT'),       // 'SENT' | 'FAILED'
+  errorMessage: text('error_message'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const emailLogRelations = relations(emailLog, ({ one }) => ({
+  tenant: one(tenants, { fields: [emailLog.tenantId], references: [tenants.id] }),
+  order: one(orders, { fields: [emailLog.orderId], references: [orders.id] }),
+  sentByUser: one(users, { fields: [emailLog.sentByUserId], references: [users.id] }),
+}));
+
+export type EmailLog = typeof emailLog.$inferSelect;
+export type NewEmailLog = typeof emailLog.$inferInsert;

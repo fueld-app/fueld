@@ -76,13 +76,13 @@ async function getSmtpConfigFromDb(): Promise<SmtpConfig | null> {
   }
 }
 
-async function getSmtpConfig(): Promise<SmtpConfig | null> {
+export async function getSmtpConfig(): Promise<SmtpConfig | null> {
   const dbCfg = await getSmtpConfigFromDb();
   if (dbCfg) return dbCfg;
   return getSmtpConfigFromEnv();
 }
 
-async function getTransporter() {
+export async function getTransporter() {
   const cfg = await getSmtpConfig();
   if (!cfg) return null;
 

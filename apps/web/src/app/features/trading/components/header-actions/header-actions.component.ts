@@ -24,6 +24,10 @@ export type HeaderAction =
   | 'convert-to-order'
   | 'cancel-inquiry'
   | 'send-email'
+  | 'send-offer'
+  | 'send-nomination'
+  | 'send-proforma'
+  | 'send-invoice'
   | 'mark-delivered'
   | 'mark-paid';
 
@@ -34,6 +38,8 @@ interface ActionItem {
   color: string;
   disabled?: boolean;
 }
+
+const SEND_ICON = 'M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75';
 
 const ACTIONS: ActionItem[] = [
   {
@@ -66,12 +72,32 @@ const ACTIONS: ActionItem[] = [
     icon: 'M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z',
     color: 'text-red-500',
   },
+  // ─── Send Email actions (one per document type) ──────────────
   {
-    key: 'send-email',
-    label: 'Send Email',
-    icon: 'M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75',
+    key: 'send-offer',
+    label: 'Send Confirmation',
+    icon: SEND_ICON,
+    color: 'text-blue-600',
+  },
+  {
+    key: 'send-nomination',
+    label: 'Send Nomination',
+    icon: SEND_ICON,
+    color: 'text-purple-600',
+  },
+  {
+    key: 'send-proforma',
+    label: 'Send Proforma Invoice',
+    icon: SEND_ICON,
+    color: 'text-brand-600',
+  },
+  {
+    key: 'send-invoice',
+    label: 'Send Invoice',
+    icon: SEND_ICON,
     color: 'text-indigo-600',
   },
+  // ─── Workflow actions ────────────────────────────────────────
   {
     key: 'mark-delivered',
     label: 'Mark Delivered',
@@ -184,7 +210,9 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
             action.key === 'view-offer'
             || action.key === 'generate-invoice'
             || action.key === 'convert-to-order'
-            || action.key === 'cancel-inquiry',
+            || action.key === 'cancel-inquiry'
+            || action.key === 'send-offer'
+            || action.key === 'send-proforma',
           )
           .map((action) =>
             action.key === 'view-offer'
@@ -193,12 +221,18 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
                 ? { ...action, label: 'View Proforma Invoice', disabled: !hasBankAccount || !hasLineItems }
                 : action.key === 'convert-to-order'
                   ? { ...action, disabled: !hasLineItems }
-                  : action,
+                  : action.key === 'send-offer'
+                    ? { ...action, label: 'Send Offer', disabled: !hasInvoicingCompany || !hasLineItems }
+                    : action.key === 'send-proforma'
+                      ? { ...action, disabled: !hasBankAccount || !hasLineItems }
+                      : action,
           )
       : ACTIONS
           .filter((action) =>
             action.key !== 'convert-to-order'
             && action.key !== 'cancel-inquiry'
+            && action.key !== 'send-offer'
+            && action.key !== 'send-proforma'
             && (action.key !== 'mark-paid' || canMarkPaid),
           )
           .map((action) =>
@@ -212,8 +246,10 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
                 ? { ...action, disabled: !hasInvoicingCompany || !hasLineItems }
               : action.key === 'view-proforma'
                 ? { ...action, disabled: !hasSupplier || !hasLineItems }
-              : action.key === 'send-email'
-                ? { ...action, disabled: true }
+              : action.key === 'send-nomination'
+                ? { ...action, disabled: !hasSupplier || !hasLineItems }
+              : action.key === 'send-invoice'
+                ? { ...action, label: showInvoiceAsFinal ? 'Send Invoice' : 'Send Proforma Invoice', disabled: !hasBankAccount || !hasLineItems }
               : action.key === 'mark-delivered'
                 ? { ...action, disabled: !canMarkDelivered }
               : action.key === 'mark-paid'

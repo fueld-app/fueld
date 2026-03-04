@@ -4,12 +4,35 @@ import {
   input,
   output,
   signal,
+  computed,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 // ═══════════════════════════════════════════════════════════════════════
-//  Send Email Modal — Preview O365 draft before sending
+//  Send Email Modal — Compose & send document emails
 // ═══════════════════════════════════════════════════════════════════════
+//
+// Generic compose modal for sending any document type (offer, nomination,
+// proforma, invoice). Pre-fills from/to/cc/subject from the parent, and
+// lets the user edit before sending.
+// ═══════════════════════════════════════════════════════════════════════
+
+export type DocumentEmailType = 'OFFER' | 'NOMINATION' | 'PROFORMA' | 'INVOICE';
+
+export interface SendEmailPayload {
+  documentType: DocumentEmailType;
+  recipientEmail: string;
+  ccEmails: string[];
+  subject: string;
+  htmlBody: string;
+}
+
+const DOC_LABELS: Record<DocumentEmailType, string> = {
+  OFFER: 'Offer / Confirmation',
+  NOMINATION: 'Nomination',
+  PROFORMA: 'Proforma Invoice',
+  INVOICE: 'Invoice',
+};
 
 @Component({
   selector: 'app-send-email-modal',
@@ -21,14 +44,19 @@ import { FormsModule } from '@angular/forms';
       <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
         <!-- Modal panel -->
         <div
-          class="w-full max-w-lg rounded-2xl bg-white shadow-2xl"
+          class="w-full max-w-2xl rounded-2xl bg-white shadow-2xl"
           role="dialog"
           aria-modal="true"
           aria-labelledby="modal-title"
         >
           <!-- Header -->
           <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-            <h2 id="modal-title" class="text-lg font-semibold text-gray-900">Send Invoice</h2>
+            <div>
+              <h2 id="modal-title" class="text-lg font-semibold text-gray-900">
+                Send {{ docLabel() }}
+              </h2>
+              <p class="text-sm text-gray-500 mt-0.5">Compose email with PDF attachment</p>
+            </div>
             <button
               (click)="close()"
               class="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
@@ -41,43 +69,79 @@ import { FormsModule } from '@angular/forms';
           </div>
 
           <!-- Body -->
-          <div class="space-y-4 px-6 py-5">
-            <!-- To (email) -->
+          <div class="space-y-4 px-6 py-5 max-h-[70vh] overflow-y-auto">
+            <!-- From (read-only) -->
             <div>
-              <label for="email-to" class="block text-sm font-medium text-gray-700">Email address</label>
+              <label class="block text-sm font-medium text-gray-500">From</label>
+              <div class="mt-1 flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-700">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-5.5-2.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0ZM10 12a5.99 5.99 0 0 0-4.793 2.39A6.483 6.483 0 0 0 10 16.5a6.483 6.483 0 0 0 4.793-2.11A5.99 5.99 0 0 0 10 12Z" clip-rule="evenodd" />
+                </svg>
+                <span class="font-medium">{{ senderName() }}</span>
+                <span class="text-gray-400">&lt;{{ senderEmail() }}&gt;</span>
+              </div>
+            </div>
+
+            <!-- To -->
+            <div>
+              <label for="email-to" class="block text-sm font-medium text-gray-700">To</label>
               <input
                 id="email-to"
                 type="email"
                 [(ngModel)]="recipientEmail"
-                placeholder="client@company.com"
-                class="mt-1.5 w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm shadow-sm
+                placeholder="recipient@company.com"
+                class="mt-1 w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm shadow-sm
                        placeholder:text-gray-400 focus:border-brand-500 focus:outline-none
                        focus:ring-2 focus:ring-brand-500/20"
               />
             </div>
 
-            <!-- Subject (preview) -->
+            <!-- CC -->
             <div>
-              <label class="block text-sm font-medium text-gray-700">Subject</label>
-              <p class="mt-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-600">
-                Invoice {{ invoiceNumber() }} — Bunker Delivery ({{ vesselName() }})
-              </p>
+              <label for="email-cc" class="block text-sm font-medium text-gray-700">
+                CC
+                <span class="text-gray-400 font-normal text-xs">(comma-separated)</span>
+              </label>
+              <input
+                id="email-cc"
+                type="text"
+                [(ngModel)]="ccEmailsRaw"
+                placeholder="sales@company.com, colleague@company.com"
+                class="mt-1 w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm shadow-sm
+                       placeholder:text-gray-400 focus:border-brand-500 focus:outline-none
+                       focus:ring-2 focus:ring-brand-500/20"
+              />
             </div>
 
-            <!-- Preview body -->
+            <!-- Subject -->
             <div>
-              <label class="block text-sm font-medium text-gray-700">Preview</label>
-              <div class="mt-1.5 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
-                <p>Dear Customer,</p>
-                <p class="mt-2">
-                  Please find attached invoice <strong>{{ invoiceNumber() }}</strong>
-                  for bunker delivery to <strong>{{ vesselName() }}</strong>
-                  at <strong>{{ portName() }}</strong>.
-                </p>
-                <p class="mt-2 text-gray-400 text-xs">
-                  📎 {{ invoiceNumber() }}.pdf will be attached automatically
-                </p>
-              </div>
+              <label for="email-subject" class="block text-sm font-medium text-gray-700">Subject</label>
+              <input
+                id="email-subject"
+                type="text"
+                [(ngModel)]="subject"
+                class="mt-1 w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm shadow-sm
+                       placeholder:text-gray-400 focus:border-brand-500 focus:outline-none
+                       focus:ring-2 focus:ring-brand-500/20"
+              />
+            </div>
+
+            <!-- Email body preview -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Email body</label>
+              <div
+                class="mt-1 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600 max-h-48 overflow-y-auto"
+                [innerHTML]="htmlBody"
+              ></div>
+            </div>
+
+            <!-- Attachment -->
+            <div class="flex items-center gap-2 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-500 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M4.5 2A1.5 1.5 0 0 0 3 3.5v13A1.5 1.5 0 0 0 4.5 18h11a1.5 1.5 0 0 0 1.5-1.5V7.621a1.5 1.5 0 0 0-.44-1.06l-4.12-4.122A1.5 1.5 0 0 0 11.378 2H4.5Zm2.25 8.5a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5h-6.5Zm0 3a.75.75 0 0 0 0 1.5h6.5a.75.75 0 0 0 0-1.5h-6.5Z" clip-rule="evenodd" />
+              </svg>
+              <span class="font-medium">{{ pdfFileName() || 'Document.pdf' }}</span>
+              <span class="text-gray-400 text-xs">(auto-generated, attached on send)</span>
             </div>
 
             <!-- WhatsApp phone -->
@@ -91,16 +155,11 @@ import { FormsModule } from '@angular/forms';
                   type="tel"
                   [(ngModel)]="waPhoneNumber"
                   placeholder="+45 12345678"
-                  class="mt-1.5 w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm shadow-sm
+                  class="mt-1 w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm shadow-sm
                          placeholder:text-gray-400 focus:border-green-500 focus:outline-none
                          focus:ring-2 focus:ring-green-500/20"
                 />
               </div>
-            } @else {
-              <p class="text-sm text-gray-400">
-                <a href="/account/security" class="text-brand-600 underline hover:text-brand-700">Link WhatsApp in Settings</a>
-                to send invoices via WhatsApp.
-              </p>
             }
           </div>
 
@@ -116,7 +175,7 @@ import { FormsModule } from '@angular/forms';
             <!-- Send via WhatsApp -->
             @if (waLinked() && waPhoneNumber) {
               <button
-                (click)="sendWa()"
+                (click)="doSendWa()"
                 [disabled]="waSending()"
                 class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold
                        text-white shadow-sm transition-colors hover:bg-green-700 disabled:opacity-50
@@ -136,9 +195,9 @@ import { FormsModule } from '@angular/forms';
                 }
               </button>
             }
-            <!-- Send via O365 -->
+            <!-- Send email -->
             <button
-              (click)="send()"
+              (click)="doSend()"
               [disabled]="sending() || !recipientEmail"
               class="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold
                      text-white shadow-sm transition-colors hover:bg-brand-700 disabled:opacity-50
@@ -149,12 +208,12 @@ import { FormsModule } from '@angular/forms';
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                 </svg>
-                Sending...
+                Sending…
               } @else {
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                   <path d="M3.105 2.288a.75.75 0 0 0-.826.95l1.414 4.926A1.5 1.5 0 0 0 5.135 9.25h6.115a.75.75 0 0 1 0 1.5H5.135a1.5 1.5 0 0 0-1.442 1.086l-1.414 4.926a.75.75 0 0 0 .826.95 28.897 28.897 0 0 0 15.293-7.154.75.75 0 0 0 0-1.114A28.897 28.897 0 0 0 3.105 2.288Z" />
                 </svg>
-                Send via O365
+                Send Email
               }
             </button>
           </div>
@@ -164,41 +223,81 @@ import { FormsModule } from '@angular/forms';
   `,
 })
 export class SendEmailModalComponent {
-  readonly invoiceNumber = input<string>('');
-  readonly vesselName = input<string>('');
-  readonly portName = input<string>('');
+  // ── Inputs set by parent before calling show() ──
+  readonly documentType = input<DocumentEmailType>('INVOICE');
+  readonly senderName = input<string>('');
+  readonly senderEmail = input<string>('');
+  readonly pdfFileName = input<string>('');
   /** Whether the current user has linked WhatsApp in Settings */
   readonly waLinked = input(false);
   /** Pre-fill phone number from the contact person */
   readonly defaultPhone = input<string | null>(null);
-  readonly sendEmail = output<string>();
+
+  // ── Outputs ──
+  readonly sendEmail = output<SendEmailPayload>();
   readonly sendWhatsApp = output<string>();
 
+  // ── Internal state ──
   readonly open = signal(false);
   readonly sending = signal(false);
   readonly waSending = signal(false);
   recipientEmail = '';
+  ccEmailsRaw = '';
+  subject = '';
+  htmlBody = '';
   waPhoneNumber = '';
 
+  // Document type → human-readable label
+  readonly docLabel = computed(() => DOC_LABELS[this.documentType()] ?? 'Document');
+
+  /**
+   * Show the compose modal. The parent should pre-fill the fields
+   * by calling `showWith()` instead of `show()`.
+   */
   show(): void {
-    this.recipientEmail = '';
-    this.waPhoneNumber = this.defaultPhone() ?? '';
     this.sending.set(false);
     this.waSending.set(false);
     this.open.set(true);
+  }
+
+  /**
+   * Open the modal and prime all editable fields.
+   */
+  showWith(defaults: {
+    recipientEmail: string;
+    ccEmails: string[];
+    subject: string;
+    htmlBody: string;
+  }): void {
+    this.recipientEmail = defaults.recipientEmail;
+    this.ccEmailsRaw = defaults.ccEmails.join(', ');
+    this.subject = defaults.subject;
+    this.htmlBody = defaults.htmlBody;
+    this.waPhoneNumber = this.defaultPhone() ?? '';
+    this.show();
   }
 
   close(): void {
     this.open.set(false);
   }
 
-  send(): void {
+  doSend(): void {
     if (!this.recipientEmail) return;
     this.sending.set(true);
-    this.sendEmail.emit(this.recipientEmail);
+    const ccEmails = this.ccEmailsRaw
+      .split(',')
+      .map((e) => e.trim())
+      .filter((e) => e.length > 0);
+    this.sendEmail.emit({
+      documentType: this.documentType(),
+      recipientEmail: this.recipientEmail,
+      ccEmails,
+      subject: this.subject,
+      htmlBody: this.htmlBody,
+    });
   }
 
-  sendWa(): void {
+  doSendWa(): void {
     if (!this.waPhoneNumber) return;
     this.waSending.set(true);
     this.sendWhatsApp.emit(this.waPhoneNumber);

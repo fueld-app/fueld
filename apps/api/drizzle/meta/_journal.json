@@ -253,6 +253,13 @@
       "when": 1772363400000,
       "tag": "0035_timezone_iana_backfill",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1772449800000,
+      "tag": "0036_email_log",
+      "breakpoints": true
     }
   ]
 }

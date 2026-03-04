@@ -1,34 +1,60 @@
 // ═══════════════════════════════════════════════════════════════════════
-//  Mail Service — Microsoft Graph API Emailer
+//  Mail Service — Unified Document Email Sender
 // ═══════════════════════════════════════════════════════════════════════
 //
-// Sends emails using the logged-in user's O365 token via the
-// Microsoft Graph API. Falls back to a service-level token if
-// the user doesn't have one.
+// Sends document emails (offer, nomination, proforma, invoice) with
+// PDF attachments. Supports two channels:
+//   1. Microsoft Graph `/me/sendMail` — sends from user's own mailbox
+//   2. SMTP fallback — uses configured SMTP relay
+//
+// All sent emails are logged in the `email_log` table for audit.
 // ═══════════════════════════════════════════════════════════════════════
 
-interface SendMailOptions {
-  /** The O365 access token of the sending user. */
-  accessToken: string;
-  /** Recipient email address. */
-  to: string;
-  /** Email subject. */
+import { db } from '../../db';
+import { emailLog } from '../../db/schema';
+import { getSmtpConfig, getTransporter } from '../../lib/email';
+
+// ─── Types ───────────────────────────────────────────────────────────
+
+export type DocumentEmailType = 'OFFER' | 'NOMINATION' | 'PROFORMA' | 'INVOICE';
+
+export interface SendDocumentEmailOptions {
+  /** Document type being sent */
+  documentType: DocumentEmailType;
+  /** Order ID (for logging) */
+  orderId: string;
+  /** Tenant ID (for logging) */
+  tenantId: string;
+  /** User ID of the sender (for logging) */
+  sentByUserId: string;
+  /** Sender's email address */
+  senderEmail: string;
+  /** Sender's display name */
+  senderName: string;
+  /** Primary recipient email */
+  recipientEmail: string;
+  /** CC email addresses */
+  ccEmails: string[];
+  /** Email subject line */
   subject: string;
-  /** HTML body content. */
+  /** HTML email body */
   htmlBody: string;
-  /** Optional file attachment (e.g. an invoice PDF). */
-  attachment?: {
-    fileName: string;
-    contentBytes: string; // base64
-    contentType: string;
-  };
+  /** PDF attachment */
+  pdfBuffer: Buffer;
+  /** PDF file name */
+  pdfFileName: string;
+  /** Optional O365 access token — if provided, sends via Microsoft Graph */
+  accessToken?: string;
 }
+
+// ─── Microsoft Graph API ─────────────────────────────────────────────
 
 interface GraphMailPayload {
   message: {
     subject: string;
     body: { contentType: string; content: string };
     toRecipients: Array<{ emailAddress: { address: string } }>;
+    ccRecipients?: Array<{ emailAddress: { address: string } }>;
     attachments?: Array<{
       '@odata.type': string;
       name: string;
@@ -39,11 +65,9 @@ interface GraphMailPayload {
   saveToSentItems: boolean;
 }
 
-/**
- * Send an email via Microsoft Graph `/me/sendMail`.
- * The email is sent from the authenticated user's own mailbox.
- */
-export async function sendGraphMail(options: SendMailOptions): Promise<void> {
+async function sendViaGraph(options: SendDocumentEmailOptions): Promise<void> {
+  if (!options.accessToken) throw new Error('No O365 access token provided');
+
   const payload: GraphMailPayload = {
     message: {
       subject: options.subject,
@@ -52,21 +76,24 @@ export async function sendGraphMail(options: SendMailOptions): Promise<void> {
         content: options.htmlBody,
       },
       toRecipients: [
-        { emailAddress: { address: options.to } },
+        { emailAddress: { address: options.recipientEmail } },
+      ],
+      attachments: [
+        {
+          '@odata.type': '#microsoft.graph.fileAttachment',
+          name: options.pdfFileName,
+          contentType: 'application/pdf',
+          contentBytes: options.pdfBuffer.toString('base64'),
+        },
       ],
     },
     saveToSentItems: true,
   };
 
-  if (options.attachment) {
-    payload.message.attachments = [
-      {
-        '@odata.type': '#microsoft.graph.fileAttachment',
-        name: options.attachment.fileName,
-        contentType: options.attachment.contentType,
-        contentBytes: options.attachment.contentBytes,
-      },
-    ];
+  if (options.ccEmails.length > 0) {
+    payload.message.ccRecipients = options.ccEmails.map((email) => ({
+      emailAddress: { address: email },
+    }));
   }
 
   const res = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
@@ -85,48 +112,155 @@ export async function sendGraphMail(options: SendMailOptions): Promise<void> {
   }
 }
 
+// ─── SMTP Fallback ───────────────────────────────────────────────────
+
+async function sendViaSmtp(options: SendDocumentEmailOptions): Promise<void> {
+  const smtpCfg = await getSmtpConfig();
+  if (!smtpCfg) {
+    throw new Error('SMTP is not configured. Set up SMTP in Admin → Settings → Integrations, or provide an O365 token.');
+  }
+
+  const transporter = await getTransporter();
+  if (!transporter) {
+    throw new Error('Failed to create SMTP transport');
+  }
+
+  const fromAddress = `"${options.senderName}" <${smtpCfg.from}>`;
+
+  await transporter.sendMail({
+    from: fromAddress,
+    replyTo: `"${options.senderName}" <${options.senderEmail}>`,
+    to: options.recipientEmail,
+    cc: options.ccEmails.length > 0 ? options.ccEmails.join(', ') : undefined,
+    subject: options.subject,
+    html: options.htmlBody,
+    attachments: [
+      {
+        filename: options.pdfFileName,
+        content: options.pdfBuffer,
+        contentType: 'application/pdf',
+      },
+    ],
+  });
+}
+
+// ─── Unified Send + Log ─────────────────────────────────────────────
+
 /**
- * Send an invoice email with an attached PDF.
- *
- * @param accessToken  The sender's O365 access token
- * @param recipientEmail  Where to send the invoice
- * @param invoiceNumber  For the subject line
- * @param pdfBuffer  The generated PDF buffer
- * @param pdfFileName  e.g. "Fueld_Invoice_12345.pdf"
- * @param vesselName  For the email body
- * @param portName  For the email body
+ * Send a document email via the best available channel
+ * (Graph if O365 token is provided, SMTP otherwise).
+ * Logs the result to the email_log table.
  */
-export async function sendInvoiceEmail(params: {
-  accessToken: string;
-  recipientEmail: string;
-  invoiceNumber: string;
-  pdfBuffer: Buffer;
-  pdfFileName: string;
+export async function sendDocumentEmail(options: SendDocumentEmailOptions): Promise<{ channel: 'GRAPH' | 'SMTP' }> {
+  let channel: 'GRAPH' | 'SMTP' = 'SMTP';
+  let error: string | null = null;
+
+  try {
+    if (options.accessToken && options.accessToken !== 'placeholder-o365-token') {
+      channel = 'GRAPH';
+      await sendViaGraph(options);
+    } else {
+      channel = 'SMTP';
+      await sendViaSmtp(options);
+    }
+  } catch (err: any) {
+    error = err?.message ?? String(err);
+    // Log the failure, then re-throw
+    await logEmail(options, channel, 'FAILED', error);
+    throw err;
+  }
+
+  await logEmail(options, channel, 'SENT', null);
+  return { channel };
+}
+
+async function logEmail(
+  options: SendDocumentEmailOptions,
+  channel: 'GRAPH' | 'SMTP',
+  status: 'SENT' | 'FAILED',
+  errorMessage: string | null,
+): Promise<void> {
+  try {
+    await db.insert(emailLog).values({
+      tenantId: options.tenantId,
+      orderId: options.orderId,
+      documentType: options.documentType,
+      sentByUserId: options.sentByUserId,
+      sentFromEmail: options.senderEmail,
+      sentTo: options.recipientEmail,
+      ccEmails: options.ccEmails.length > 0 ? options.ccEmails.join(', ') : null,
+      subject: options.subject,
+      pdfFileName: options.pdfFileName,
+      channel,
+      status,
+      errorMessage,
+    });
+  } catch (logErr) {
+    console.error('[MailService] Failed to log email:', logErr);
+  }
+}
+
+// ─── Email HTML Templates ────────────────────────────────────────────
+
+export function buildDocumentEmailHtml(params: {
+  documentType: DocumentEmailType;
+  senderName: string;
   vesselName: string;
   portName: string;
+  orderNumber: string;
+  documentLabel?: string;
   paymentTerms?: string | null;
   customerNote?: string | null;
   itemNotes?: Array<{ label: string; note: string }>;
-}): Promise<void> {
-  const paymentTerms = params.paymentTerms ? `<tr><td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Payment terms:</td><td style="padding: 4px 0; font-weight: 600;">${params.paymentTerms}</td></tr>` : '';
+}): string {
+  const labels: Record<DocumentEmailType, { title: string; greeting: string; intro: string }> = {
+    OFFER: {
+      title: 'Offer / Confirmation',
+      greeting: 'Dear Customer',
+      intro: `Please find attached our offer for bunker delivery to <strong>${params.vesselName}</strong> at <strong>${params.portName}</strong>.`,
+    },
+    NOMINATION: {
+      title: 'Nomination',
+      greeting: 'Dear Supplier',
+      intro: `Please find attached our nomination for bunker delivery to <strong>${params.vesselName}</strong> at <strong>${params.portName}</strong>.`,
+    },
+    PROFORMA: {
+      title: 'Proforma Invoice',
+      greeting: 'Dear Customer',
+      intro: `Please find attached the proforma invoice for bunker delivery to <strong>${params.vesselName}</strong> at <strong>${params.portName}</strong>.`,
+    },
+    INVOICE: {
+      title: 'Invoice',
+      greeting: 'Dear Customer',
+      intro: `Please find attached the invoice for bunker delivery to <strong>${params.vesselName}</strong> at <strong>${params.portName}</strong>.`,
+    },
+  };
+
+  const l = labels[params.documentType];
+
+  const paymentTermsRow = params.paymentTerms
+    ? `<tr><td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Payment terms:</td><td style="padding: 4px 0; font-weight: 600;">${params.paymentTerms}</td></tr>`
+    : '';
+
   const customerNote = params.customerNote?.trim()
     ? `<p style="margin-top: 12px; white-space: pre-line;">${params.customerNote}</p>`
     : '';
+
   const itemNotes = params.itemNotes?.length
     ? `<ul style="margin: 8px 0 0 18px; padding: 0; color: #374151;">${params.itemNotes
-        .map((note) => `<li>${note.label}: ${note.note}</li>`)
+        .map((n) => `<li>${n.label}: ${n.note}</li>`)
         .join('')}</ul>`
     : '';
 
-  const htmlBody = `
+  return `
     <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: #1a56db; padding: 24px 32px; border-radius: 8px 8px 0 0;">
         <h1 style="color: #ffffff; margin: 0; font-size: 24px;">FUELD</h1>
         <p style="color: #bfdbfe; margin: 4px 0 0 0; font-size: 12px;">Bunker Trading Solutions</p>
       </div>
       <div style="background: #ffffff; padding: 32px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
-        <p>Dear Customer,</p>
-        <p>Please find attached invoice <strong>${params.invoiceNumber}</strong> for bunker delivery to:</p>
+        <p>${l.greeting},</p>
+        <p>${l.intro}</p>
         <table style="margin: 16px 0; border-collapse: collapse;">
           <tr>
             <td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Vessel:</td>
@@ -136,28 +270,37 @@ export async function sendInvoiceEmail(params: {
             <td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Port:</td>
             <td style="padding: 4px 0; font-weight: 600;">${params.portName}</td>
           </tr>
-          ${paymentTerms}
+          ${paymentTermsRow}
         </table>
         ${customerNote}
         ${itemNotes}
-        <p>If you have any questions regarding this invoice, please don't hesitate to reach out.</p>
-        <p style="margin-top: 24px;">Best regards,<br/><strong>Fueld Trading</strong></p>
+        <p>If you have any questions, please don't hesitate to reach out.</p>
+        <p style="margin-top: 24px;">Best regards,<br/><strong>${params.senderName}</strong></p>
       </div>
       <div style="text-align: center; padding: 16px; color: #9ca3af; font-size: 11px;">
         This email was sent via Fueld — Bunker Trading SaaS
       </div>
     </div>
   `;
+}
 
-  await sendGraphMail({
-    accessToken: params.accessToken,
-    to: params.recipientEmail,
-    subject: `Invoice ${params.invoiceNumber} — Bunker Delivery (${params.vesselName})`,
-    htmlBody,
-    attachment: {
-      fileName: params.pdfFileName,
-      contentBytes: params.pdfBuffer.toString('base64'),
-      contentType: 'application/pdf',
-    },
-  });
+export function buildDocumentEmailSubject(params: {
+  documentType: DocumentEmailType;
+  orderNumber: string;
+  vesselName: string;
+  portName: string;
+  invoiceNumber?: string;
+}): string {
+  const labels: Record<DocumentEmailType, string> = {
+    OFFER: 'Offer / Confirmation',
+    NOMINATION: 'Nomination',
+    PROFORMA: 'Proforma Invoice',
+    INVOICE: 'Invoice',
+  };
+
+  if (params.documentType === 'INVOICE' && params.invoiceNumber) {
+    return `Invoice ${params.invoiceNumber} — Bunker Delivery (${params.vesselName})`;
+  }
+
+  return `${labels[params.documentType]} — ${params.orderNumber} — ${params.vesselName}, ${params.portName}`;
 }
