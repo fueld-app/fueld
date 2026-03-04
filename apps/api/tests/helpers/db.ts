@@ -224,6 +224,37 @@ async function ensureTestSchemaCompat(): Promise<void> {
     ALTER TABLE places
     ADD COLUMN IF NOT EXISTS order_remark text
   `;
+
+  await sql`
+    ALTER TABLE places
+    ADD COLUMN IF NOT EXISTS timezone_legacy text
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS email_log (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      tenant_id uuid REFERENCES tenants(id),
+      order_id uuid REFERENCES orders(id) ON DELETE SET NULL,
+      document_type text NOT NULL,
+      sent_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+      sent_from_email text NOT NULL,
+      sent_to text NOT NULL,
+      cc_emails text,
+      subject text NOT NULL,
+      pdf_file_name text,
+      channel text NOT NULL DEFAULT 'SMTP',
+      status text NOT NULL DEFAULT 'SENT',
+      error_message text,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+
+  await sql`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS microsoft_refresh_token text,
+    ADD COLUMN IF NOT EXISTS microsoft_refresh_token_iv text,
+    ADD COLUMN IF NOT EXISTS microsoft_refresh_token_auth_tag text
+  `;
 }
 
 export async function truncateAll(): Promise<void> {
