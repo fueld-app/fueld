@@ -1,8 +1,19 @@
-import { beforeEach, describe, expect, it } from 'bun:test';
+import { beforeEach, afterEach, describe, expect, it, mock } from 'bun:test';
 import { and, eq } from 'drizzle-orm';
 import { bankAccounts, counterparties, documentRevisions, tenants } from '../src/db/schema';
 import { getDb, seedAuthBasics, truncateAll } from './helpers/db';
-import { loginE2E, requestJson, requestRaw } from './helpers/e2e';
+
+// ── Mock acquireGraphTokenForUser so send-email tests can use the Graph path ──
+let mockGraphToken: string | null = null;
+
+const originalModule = await import('../src/modules/auth/microsoft-oauth.service');
+mock.module('../src/modules/auth/microsoft-oauth.service', () => ({
+  ...originalModule,
+  acquireGraphTokenForUser: async () => mockGraphToken,
+}));
+
+// Import e2e helpers *after* mock is registered so the app picks it up
+const { loginE2E, requestJson, requestRaw } = await import('./helpers/e2e');
 
 async function seedDocumentReadyOrder() {
   const seeded = await seedAuthBasics();
@@ -218,6 +229,7 @@ describe('documents + verify controller e2e', () => {
 
   it('sends invoice email successfully via /send-email', async () => {
     const { token, orderId } = await seedDocumentReadyOrder();
+    mockGraphToken = 'graph-access-token';
 
     const originalFetch = globalThis.fetch;
     const calls: Array<{ url: string; init?: RequestInit }> = [];
@@ -236,7 +248,6 @@ describe('documents + verify controller e2e', () => {
           recipientEmail: 'finance@example.com',
           subject: 'Invoice Test',
           htmlBody: '<p>Invoice body</p>',
-          accessToken: 'graph-access-token',
         },
       });
 
@@ -254,11 +265,13 @@ describe('documents + verify controller e2e', () => {
       expect(graphPayload.message.attachments?.length).toBe(1);
     } finally {
       globalThis.fetch = originalFetch;
+      mockGraphToken = null;
     }
   });
 
   it('sends offer email via /send-email with correct PDF attachment', async () => {
     const { token, orderId } = await seedDocumentReadyOrder();
+    mockGraphToken = 'graph-offer-token';
 
     const originalFetch = globalThis.fetch;
     const calls: Array<{ url: string; init?: RequestInit }> = [];
@@ -276,7 +289,6 @@ describe('documents + verify controller e2e', () => {
           recipientEmail: 'buyer@example.com',
           subject: 'Offer for MV TEST',
           htmlBody: '<p>Offer body</p>',
-          accessToken: 'graph-offer-token',
         },
       });
 
@@ -291,11 +303,13 @@ describe('documents + verify controller e2e', () => {
       expect(graphPayload.message.attachments[0].contentType).toBe('application/pdf');
     } finally {
       globalThis.fetch = originalFetch;
+      mockGraphToken = null;
     }
   });
 
   it('sends nomination email via /send-email', async () => {
     const { token, orderId } = await seedDocumentReadyOrder();
+    mockGraphToken = 'graph-nom-token';
 
     const originalFetch = globalThis.fetch;
     globalThis.fetch = (async (_url: string | URL | Request, _init?: RequestInit) =>
@@ -310,7 +324,6 @@ describe('documents + verify controller e2e', () => {
           recipientEmail: 'supplier@example.com',
           subject: 'Nomination',
           htmlBody: '<p>Nomination body</p>',
-          accessToken: 'graph-nom-token',
         },
       });
 
@@ -320,11 +333,13 @@ describe('documents + verify controller e2e', () => {
       expect(String(sent.data?.pdfFileName ?? '')).toContain('Nomination_');
     } finally {
       globalThis.fetch = originalFetch;
+      mockGraphToken = null;
     }
   });
 
   it('sends proforma email via /send-email', async () => {
     const { token, orderId } = await seedDocumentReadyOrder();
+    mockGraphToken = 'graph-proforma-token';
 
     const originalFetch = globalThis.fetch;
     globalThis.fetch = (async (_url: string | URL | Request, _init?: RequestInit) =>
@@ -339,7 +354,6 @@ describe('documents + verify controller e2e', () => {
           recipientEmail: 'accounting@example.com',
           subject: 'Proforma Invoice',
           htmlBody: '<p>Proforma body</p>',
-          accessToken: 'graph-proforma-token',
         },
       });
 
@@ -349,6 +363,7 @@ describe('documents + verify controller e2e', () => {
       expect(String(sent.data?.pdfFileName ?? '')).toContain('Proforma_Invoice_');
     } finally {
       globalThis.fetch = originalFetch;
+      mockGraphToken = null;
     }
   });
 
