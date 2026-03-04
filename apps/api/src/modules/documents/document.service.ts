@@ -2481,6 +2481,7 @@ export const __documentTestUtils = {
   replaceCompanyNamePlaceholder,
   buildOfferForAccountOfText,
   buildNotesSection,
+  tryLoadLogoDataUrl,
   buildInvoiceDocument,
   buildOfferDocument,
   buildProformaDocument,

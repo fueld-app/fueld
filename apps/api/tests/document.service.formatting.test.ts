@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'bun:test';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const defaultTestDatabaseUrl = 'postgres://fueld:fueld@localhost:5432/fueld_test';
 if (!process.env.TEST_DATABASE_URL && !process.env.DATABASE_URL) {
@@ -505,5 +507,123 @@ describe('document.service formatting helpers', () => {
     const text = collectTextValues(doc).join(' | ');
     expect(text).toContain('Total amount due to Company');
     expect(text).toContain('MGO');
+  });
+
+  it('loads logo data URL helper across empty/unsupported/missing/valid branches', () => {
+    expect(__documentTestUtils.tryLoadLogoDataUrl(null)).toBeNull();
+    expect(__documentTestUtils.tryLoadLogoDataUrl('')).toBeNull();
+    expect(__documentTestUtils.tryLoadLogoDataUrl('/uploads/logos/company.svg')).toBeNull();
+    expect(__documentTestUtils.tryLoadLogoDataUrl('/uploads/logos/missing-logo.png')).toBeNull();
+
+    const logosDirCandidates = [
+      join(process.cwd(), 'uploads', 'logos'),
+      join(process.cwd(), 'apps', 'api', 'uploads', 'logos'),
+    ];
+    const fileName = `coverage-logo-${Date.now()}.png`;
+    const filePaths: string[] = [];
+
+    for (const logosDir of logosDirCandidates) {
+      const filePath = join(logosDir, fileName);
+      mkdirSync(logosDir, { recursive: true });
+      writeFileSync(filePath, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+      filePaths.push(filePath);
+    }
+
+    try {
+      const dataUrl = __documentTestUtils.tryLoadLogoDataUrl(`/uploads/logos/${fileName}`);
+      expect(dataUrl).toBeTruthy();
+      expect(String(dataUrl)).toContain('data:image/png;base64,');
+    } finally {
+      for (const filePath of filePaths) {
+        rmSync(filePath, { force: true });
+      }
+    }
+  });
+
+  it('renders offer header/footer print metadata and page-specific header content', () => {
+    const doc = __documentTestUtils.buildOfferDocument({
+      ...commonOfferInput,
+      companyLogoDataUrl: 'data:image/png;base64,abcd',
+      printMeta: {
+        issuedAt: new Date('2026-03-01T00:00:00.000Z'),
+        revisionNumber: 3,
+        verificationRef: 'OFF-20260301-R003',
+        fingerprintShort: 'ABCDEF123456',
+      },
+    });
+
+    expect(typeof doc.header).toBe('function');
+    expect(typeof doc.footer).toBe('function');
+
+    const firstHeader = (doc.header as (currentPage: number, pageCount: number) => unknown)(1, 2);
+    const secondHeader = (doc.header as (currentPage: number, pageCount: number) => unknown)(2, 2);
+    const footer = (doc.footer as (currentPage: number, pageCount: number) => unknown)(1, 2);
+
+    const firstHeaderText = collectTextValues(firstHeader).join(' | ');
+    const secondHeaderText = collectTextValues(secondHeader).join(' | ');
+    const footerText = collectTextValues(footer).join(' | ');
+
+    expect(firstHeaderText).toContain('Acme Marine');
+    expect(secondHeaderText).not.toContain('Acme Marine');
+    expect(footerText).toContain('Issued (UTC): 2026-03-01T00:00:00Z');
+    expect(footerText).toContain('Revision: 3');
+    expect(footerText).toContain('Ref: OFF-20260301-R003');
+    expect(footerText).toContain('Fingerprint: ABCDEF123456');
+  });
+
+  it('renders proforma footer print metadata branch', () => {
+    const doc = __documentTestUtils.buildProformaDocument({
+      orderNumber: 'ORD-001',
+      clientName: 'Acme Marine',
+      clientCountry: 'Denmark',
+      clientAddress: 'Harbor Street 1, Copenhagen',
+      customerContactName: null,
+      customerContactRole: null,
+      customerContactPhone: null,
+      customerContactEmail: null,
+      vesselName: 'Aurora',
+      vesselImo: '1234567',
+      portName: 'Rotterdam',
+      eta: null,
+      etd: null,
+      timezone: null,
+      currency: 'USD',
+      fromName: null,
+      fromEmail: null,
+      fromPhone: null,
+      paymentTerms: null,
+      customerNote: null,
+      termsAndConditions: null,
+      companyName: 'Fueld Trading Ltd',
+      companyAddress: 'Main Street 2, Oslo',
+      companyPhone: '+4799998888',
+      companyEmail: 'ops@fueld.com',
+      companyRegistrationNumber: 'NO123456',
+      companyWebsite: 'https://fueld.com',
+      companyLogoDataUrl: null,
+      itemNotes: [],
+      items: [{ productType: 'MGO', description: null, quantity: '5', unit: 'MT', salesPrice: '700' }],
+      createdAt: new Date('2026-03-01T00:00:00.000Z'),
+      verifyUrl: null,
+      verifyLink: null,
+      fraudPreventionText: null,
+      bank: null,
+      vatNumber: 'VAT-123',
+      latePaymentInterest: null,
+      placeRemark: null,
+      printMeta: {
+        issuedAt: new Date('2026-03-02T00:00:00.000Z'),
+        revisionNumber: 2,
+        verificationRef: 'PFI-20260302-R002',
+        fingerprintShort: 'FEDCBA654321',
+      },
+    });
+
+    expect(typeof doc.footer).toBe('function');
+    const footer = (doc.footer as (currentPage: number, pageCount: number) => unknown)(1, 1);
+    const footerText = collectTextValues(footer).join(' | ');
+    expect(footerText).toContain('Issued (UTC): 2026-03-02T00:00:00Z');
+    expect(footerText).toContain('Ref: PFI-20260302-R002');
+    expect(footerText).toContain('Fingerprint: FEDCBA654321');
   });
 });
