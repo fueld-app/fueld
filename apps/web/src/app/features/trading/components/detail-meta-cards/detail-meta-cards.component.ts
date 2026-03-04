@@ -1,6 +1,7 @@
 import {
   Component,
   ChangeDetectionStrategy,
+  computed,
   inject,
   input,
   output,
@@ -182,7 +183,7 @@ import {
           }
         </div>
         <div class="mt-3 border-t border-gray-100 pt-3">
-          <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">ETA</p>
+          <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">ETA @if (timezoneAbbr()) { <span class="normal-case text-gray-400">({{ timezoneAbbr() }})</span> }</p>
           @if (isReadonly()) {
             <p class="mt-1 text-sm font-semibold text-gray-900">
               {{ formatDateTimeLabel(eta()) }}
@@ -201,7 +202,7 @@ import {
         </div>
         @if (showEtd()) {
           <div class="mt-3 border-t border-gray-100 pt-3">
-            <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">ETD</p>
+            <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">ETD @if (timezoneAbbr()) { <span class="normal-case text-gray-400">({{ timezoneAbbr() }})</span> }</p>
             @if (isReadonly()) {
               <p class="mt-1 text-sm font-semibold text-gray-900">
                 {{ formatDateTimeLabel(etd()) }}
@@ -298,6 +299,20 @@ export class TradingDetailMetaCardsComponent {
   readonly etaMinDateTime = input<string>('');
   readonly timezone = input<string>('UTC');
   readonly showEtd = input<boolean>(true);
+
+  readonly timezoneAbbr = computed(() => {
+    const tz = this.timezone();
+    if (!tz || tz === 'UTC') return '';
+    try {
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz,
+        timeZoneName: 'short',
+      }).formatToParts(new Date());
+      return parts.find((p) => p.type === 'timeZoneName')?.value ?? '';
+    } catch {
+      return '';
+    }
+  });
 
   readonly invoicingCompanyId = input<string>('');
   readonly invoicingCompanyName = input<string>('-');
