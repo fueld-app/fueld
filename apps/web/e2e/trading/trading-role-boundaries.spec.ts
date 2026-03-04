@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/coverage';
 import { loginViaUi } from '../helpers/auth';
 
 test('limited user can access trading but is blocked from credit and admin routes', async ({ page }) => {

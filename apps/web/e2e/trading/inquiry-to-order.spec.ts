@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/coverage';
 import { loginViaUi } from '../helpers/auth';
 import { closePdfPreviewIfOpen, waitForPdfResponse } from '../helpers/pdf';
 import { createInquiryViaApi } from '../helpers/trading';

@@ -1,4 +1,5 @@
-import { test, expect, type APIResponse } from '@playwright/test';
+import { type APIResponse } from '@playwright/test';
+import { test, expect } from '../fixtures/coverage';
 import { loginViaUi } from '../helpers/auth';
 import { createInquiryViaApi } from '../helpers/trading';
 

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/coverage';
 
 test('2FA-enabled user is redirected to /login/2fa', async ({ page }) => {
   const email = process.env['E2E_2FA_USER_EMAIL'] ?? 'twofa@fueld.local';

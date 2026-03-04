@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/coverage';
 import { loginViaUi } from '../helpers/auth';
 
 const email = process.env['E2E_TRADER4_USER_EMAIL'] ?? 'trader4@fueld.local';

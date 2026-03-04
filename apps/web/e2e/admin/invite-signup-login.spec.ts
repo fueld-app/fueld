@@ -1,4 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
+import { test, expect } from '../fixtures/coverage';
 import { loginViaUi } from '../helpers/auth';
 
 const adminEmail = process.env['E2E_ADMIN3_EMAIL'] ?? 'admin3@fueld.local';
