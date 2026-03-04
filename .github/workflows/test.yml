@@ -86,7 +86,37 @@ jobs:
       - name: Install dependencies
         run: bun install
       - name: Build
-        run: cd apps/api && bun run build
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd apps/api
+          echo "Starting API build at $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+
+          bun run build > /tmp/api-build.log 2>&1 &
+          build_pid=$!
+          started_at=$(date +%s)
+          max_seconds=900
+
+          while kill -0 "$build_pid" 2>/dev/null; do
+            now=$(date +%s)
+            elapsed=$((now - started_at))
+            echo "API build still running... ${elapsed}s elapsed"
+
+            if (( elapsed >= max_seconds )); then
+              echo "API build exceeded ${max_seconds}s. Terminating and printing logs..."
+              kill -TERM "$build_pid" 2>/dev/null || true
+              sleep 5
+              kill -KILL "$build_pid" 2>/dev/null || true
+              echo "----- api build log (last 200 lines) -----"
+              tail -n 200 /tmp/api-build.log || true
+              exit 1
+            fi
+
+            sleep 30
+          done
+
+          wait "$build_pid"
+          echo "API build finished at $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 
   api-mocked:
     name: API (mocked)
