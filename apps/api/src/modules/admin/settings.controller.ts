@@ -52,6 +52,7 @@ import {
   setLLICredentials,
   setSmtpCredentials,
   setPushCredentials,
+  setMicrosoftCredentials,
 } from './integrations.service';
 import {
   generateAuthUrl,
@@ -496,6 +497,29 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       subject: t.String({ minLength: 1 }),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Set Web Push VAPID keys' },
+  })
+
+  .put('/integrations/microsoft', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      await setMicrosoftCredentials(
+        body.clientId,
+        body.clientSecret,
+        body.tenantId,
+        auth.sub,
+      );
+      return { success: true, data: { saved: true } } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      clientId: t.String({ minLength: 1 }),
+      clientSecret: t.String({ minLength: 1 }),
+      tenantId: t.String({ minLength: 1 }),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Set Microsoft 365 / Entra ID OAuth credentials' },
   })
 
   // ═══════════════════════════════════════════════════════════════════

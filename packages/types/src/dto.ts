@@ -1087,6 +1087,10 @@ export interface IntegrationStatusDto {
   // Push-specific (optional)
   pushPublicKey?: string | null;
   pushSubject?: string | null;
+
+  // Microsoft 365 / Entra ID (optional)
+  msClientId?: string | null;
+  msTenantId?: string | null;
 }
 
 export interface SetIntegrationCredentialsDto {

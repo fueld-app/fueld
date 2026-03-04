@@ -194,6 +194,49 @@ export async function getIntegrationStatus(): Promise<IntegrationStatusDto[]> {
     });
   }
 
+  // Microsoft 365 / Entra ID provider
+  const msRows = providers.get('MICROSOFT');
+  if (msRows?.length) {
+    const values = decodeRows(msRows);
+    const clientId = values.get('clientId') ?? null;
+    const tenantIdValue = values.get('tenantId') ?? null;
+    const configured = !!(clientId && values.get('clientSecret'));
+
+    let updatedBy: string | null = null;
+    const updaterId = msRows[0]?.updatedBy;
+    if (updaterId) {
+      const userRow = await db.query.users.findFirst({ where: eq(users.id, updaterId) });
+      updatedBy = userRow?.email ?? null;
+    }
+
+    results.push({
+      provider: 'MICROSOFT',
+      configured,
+      username: null,
+      updatedAt: msRows[0]?.updatedAt?.toISOString() ?? null,
+      updatedBy,
+      msClientId: clientId,
+      msTenantId: tenantIdValue,
+    });
+  } else {
+    // Fall back to tenant.settings (legacy)
+    const tenant = await db.query.tenants.findFirst();
+    const settings = (tenant?.settings ?? {}) as Record<string, unknown>;
+    const envClientId = settings['ssoClientId'] as string | undefined;
+    const envSecret = settings['ssoClientSecret'] as string | undefined;
+    const envTenantIdVal = settings['ssoTenantId'] as string | undefined;
+    const envConfigured = !!(envClientId && envSecret);
+    results.push({
+      provider: 'MICROSOFT',
+      configured: envConfigured,
+      username: null,
+      updatedAt: null,
+      updatedBy: envConfigured ? '(legacy settings)' : null,
+      msClientId: envClientId ?? null,
+      msTenantId: envTenantIdVal ?? null,
+    });
+  }
+
   // QuickBooks provider
   try {
     const qbStatus = await getQuickBooksStatus();
@@ -468,6 +511,112 @@ export async function getLLICredentialsFromDB(): Promise<{ username: string; pas
     username: decrypt(usernameRow.encryptedValue, usernameRow.iv, usernameRow.authTag),
     password: decrypt(passwordRow.encryptedValue, passwordRow.iv, passwordRow.authTag),
   };
+}
+
+// ─── Microsoft 365 / Entra ID ────────────────────────────────────────
+
+/**
+ * Store Microsoft integration credentials (encrypted).
+ */
+export async function setMicrosoftCredentials(
+  clientId: string,
+  clientSecret: string,
+  tenantIdValue: string,
+  userId: string,
+): Promise<void> {
+  const tenantId = await getTenantId();
+  const now = new Date();
+
+  const values: Record<string, string> = {
+    clientId,
+    clientSecret,
+    tenantId: tenantIdValue,
+  };
+
+  for (const [key, rawValue] of Object.entries(values)) {
+    const enc = encrypt(rawValue);
+    const existing = await db
+      .select({ id: integrationCredentials.id })
+      .from(integrationCredentials)
+      .where(and(
+        eq(integrationCredentials.tenantId, tenantId),
+        eq(integrationCredentials.provider, 'MICROSOFT'),
+        eq(integrationCredentials.key, key),
+      ))
+      .limit(1);
+
+    if (existing.length) {
+      await db
+        .update(integrationCredentials)
+        .set({
+          encryptedValue: enc.encrypted,
+          iv: enc.iv,
+          authTag: enc.authTag,
+          updatedBy: userId,
+          updatedAt: now,
+        })
+        .where(eq(integrationCredentials.id, existing[0].id));
+    } else {
+      await db.insert(integrationCredentials).values({
+        tenantId,
+        provider: 'MICROSOFT',
+        key,
+        encryptedValue: enc.encrypted,
+        iv: enc.iv,
+        authTag: enc.authTag,
+        updatedBy: userId,
+      });
+    }
+  }
+}
+
+/**
+ * Read Microsoft credentials from DB (decrypted).
+ * Falls back to tenant.settings for backward compatibility.
+ */
+export async function getMicrosoftCredentialsFromDB(): Promise<{
+  clientId: string;
+  clientSecret: string;
+  tenantId: string;
+} | null> {
+  const tid = await getTenantId();
+  const rows = await db
+    .select()
+    .from(integrationCredentials)
+    .where(
+      and(
+        eq(integrationCredentials.tenantId, tid),
+        eq(integrationCredentials.provider, 'MICROSOFT'),
+      ),
+    );
+
+  if (rows.length) {
+    const values = decodeRows(rows);
+    const clientId = values.get('clientId');
+    const clientSecret = values.get('clientSecret');
+    if (clientId && clientSecret) {
+      return {
+        clientId,
+        clientSecret,
+        tenantId: values.get('tenantId') ?? 'common',
+      };
+    }
+  }
+
+  // Fall back to tenant.settings (legacy)
+  const tenant = await db.query.tenants.findFirst();
+  const settings = (tenant?.settings ?? {}) as Record<string, unknown>;
+  const ssoClientId = settings['ssoClientId'] as string | undefined;
+  const ssoClientSecret = settings['ssoClientSecret'] as string | undefined;
+  if (ssoClientId && ssoClientSecret) {
+    return {
+      clientId: ssoClientId,
+      clientSecret: ssoClientSecret,
+      tenantId: (settings['ssoTenantId'] as string) ?? 'common',
+    };
+  }
+
+  return null;
 }
 
 // ─── Token cache helper (imported by lli.client.ts) ──────────────────

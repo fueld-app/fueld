@@ -25,6 +25,7 @@ import {
   validateReturnUrl,
   storeOneTimeCode,
   consumeOneTimeCode,
+  loadMicrosoftConfig,
   type MicrosoftSsoConfig,
 } from './microsoft-oauth.service';
 import { validateO365Token } from './o365.service';
@@ -612,12 +613,15 @@ export const authController = new Elysia({ prefix: '/auth' })
       const { tenants: tenantsTable } = await import('../../db/schema');
       const tenant = await database.query.tenants.findFirst();
       const s = (tenant?.settings ?? {}) as Record<string, unknown>;
+
+      // Resolve client ID / tenant ID from integration_credentials first
+      const config = await loadMicrosoftConfig();
       return {
         success: true,
         data: {
           ssoProvider: (s['ssoProvider'] as string) ?? 'none',
-          ssoClientId: (s['ssoClientId'] as string) ?? '',
-          ssoTenantId: (s['ssoTenantId'] as string) ?? '',
+          ssoClientId: config?.ssoClientId ?? (s['ssoClientId'] as string) ?? '',
+          ssoTenantId: config?.ssoTenantId ?? (s['ssoTenantId'] as string) ?? '',
           ssoEnabled: (s['ssoEnabled'] as boolean) ?? false,
         },
       } satisfies ApiResponse<unknown>;
@@ -646,16 +650,16 @@ export const authController = new Elysia({ prefix: '/auth' })
       const tenant = await database.query.tenants.findFirst();
       const s = (tenant?.settings ?? {}) as Record<string, unknown>;
 
-      if (!s['ssoEnabled'] || s['ssoProvider'] !== 'microsoft' || !s['ssoClientId'] || !s['ssoClientSecret']) {
+      if (!s['ssoEnabled'] || s['ssoProvider'] !== 'microsoft') {
         set.status = 400;
-        return { success: false, message: 'Microsoft SSO is not configured. Configure it in Admin → Security → SSO Settings.' };
+        return { success: false, message: 'Microsoft SSO is not enabled. Enable it in Admin → Security.' };
       }
 
-      const config: MicrosoftSsoConfig = {
-        ssoClientId: s['ssoClientId'] as string,
-        ssoClientSecret: s['ssoClientSecret'] as string,
-        ssoTenantId: s['ssoTenantId'] as string | undefined,
-      };
+      const config = await loadMicrosoftConfig();
+      if (!config) {
+        set.status = 400;
+        return { success: false, message: 'Microsoft credentials are not configured. Configure them in Admin → Integrations.' };
+      }
 
       const redirectUri = getMicrosoftRedirectUri();
       const authUrl = buildAuthorizationUrl(config, redirectUri, returnUrl);
@@ -683,17 +687,11 @@ export const authController = new Elysia({ prefix: '/auth' })
         // 1. Verify state (anti-CSRF + returnUrl)
         const state = verifyAndDecodeState(query.state);
 
-        // 2. Load tenant SSO config
-        const { db: database } = await import('../../db');
-        const { tenants: tenantsTable } = await import('../../db/schema');
-        const tenant = await database.query.tenants.findFirst();
-        const s = (tenant?.settings ?? {}) as Record<string, unknown>;
-
-        const config: MicrosoftSsoConfig = {
-          ssoClientId: s['ssoClientId'] as string,
-          ssoClientSecret: s['ssoClientSecret'] as string,
-          ssoTenantId: s['ssoTenantId'] as string | undefined,
-        };
+        // 2. Load Microsoft config from integration_credentials
+        const config = await loadMicrosoftConfig();
+        if (!config) {
+          throw new Error('Microsoft credentials not configured. Configure them in Admin → Integrations.');
+        }
 
         // 3. Exchange authorization code for tokens
         const redirectUri = getMicrosoftRedirectUri();

@@ -7,6 +7,7 @@ import {
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import type { ApiResponse, SecuritySettingsDto } from '@fueld/types';
 
@@ -15,7 +16,7 @@ import { API } from '@app/core/config/api';
 @Component({
   selector: 'app-security-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule],
+  imports: [FormsModule, RouterLink],
   template: `
     <div>
       <!-- Header -->
@@ -97,43 +98,10 @@ import { API } from '@app/core/config/api';
                   <span class="text-sm text-gray-700">Enable SSO authentication</span>
                 </label>
 
-                @if (ssoProvider() === 'microsoft') {
-                  <!-- Microsoft-specific fields -->
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Tenant ID (Directory ID)</label>
-                    <input
-                      type="text"
-                      [ngModel]="ssoTenantId()"
-                      (ngModelChange)="ssoTenantId.set($event)"
-                      placeholder="e.g. 72f988bf-86f1-41af-91ab-2d7cd011db47"
-                      class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                    />
-                    <p class="mt-1 text-xs text-gray-500">Found in Azure Portal → Microsoft Entra ID → Overview.</p>
-                  </div>
-                }
-
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Client ID (Application ID)</label>
-                  <input
-                    type="text"
-                    [ngModel]="ssoClientId()"
-                    (ngModelChange)="ssoClientId.set($event)"
-                    placeholder="e.g. 6731de76-14a6-49ae-97bc-6eba6914391e"
-                    class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                  />
-                </div>
-
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Client Secret</label>
-                  <input
-                    type="password"
-                    [ngModel]="ssoClientSecret()"
-                    (ngModelChange)="ssoClientSecret.set($event)"
-                    placeholder="Enter new secret to update..."
-                    class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                  />
-                  <p class="mt-1 text-xs text-gray-500">Leave empty to keep the existing secret. Secrets are encrypted at rest.</p>
-                </div>
+                <p class="text-sm text-gray-500">
+                  Configure credentials (Client ID, Secret, Tenant ID) in
+                  <a routerLink="/admin/integrations" class="text-brand-600 hover:underline font-medium">Admin → Integrations</a>.
+                </p>
               }
             </div>
             <div class="border-t border-gray-100 px-6 py-3 bg-gray-50/50 flex justify-end">
@@ -438,15 +406,9 @@ export class SecurityPageComponent implements OnInit {
     try {
       const body: Record<string, unknown> = {
         ssoProvider: this.ssoProvider(),
-        ssoClientId: this.ssoClientId(),
-        ssoTenantId: this.ssoTenantId(),
         ssoEnabled: this.ssoEnabled(),
       };
-      if (this.ssoClientSecret()) {
-        body['ssoClientSecret'] = this.ssoClientSecret();
-      }
       await firstValueFrom(this.http.put(`${API}/admin/security`, body));
-      this.ssoClientSecret.set('');
       this.showSuccess();
     } catch {
       // silent

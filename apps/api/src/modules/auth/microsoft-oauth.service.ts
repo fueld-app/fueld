@@ -271,6 +271,22 @@ export function getMicrosoftRedirectUri(): string {
 }
 
 /**
+ * Load Microsoft OAuth config from integration_credentials (encrypted DB table).
+ * Falls back to tenant.settings for backward compat.
+ * Used by auth.controller and acquireGraphTokenForUser.
+ */
+export async function loadMicrosoftConfig(): Promise<MicrosoftSsoConfig | null> {
+  const { getMicrosoftCredentialsFromDB } = await import('../admin/integrations.service');
+  const creds = await getMicrosoftCredentialsFromDB();
+  if (!creds) return null;
+  return {
+    ssoClientId: creds.clientId,
+    ssoClientSecret: creds.clientSecret,
+    ssoTenantId: creds.tenantId,
+  };
+}
+
+/**
  * Basic validation that returnUrl is a plausible frontend URL.
  * Prevents open redirect attacks.
  */
@@ -301,7 +317,7 @@ export async function acquireGraphTokenForUser(
 ): Promise<string | null> {
   // Lazy import to avoid circular deps
   const { db } = await import('../../db');
-  const { users, tenants } = await import('../../db/schema');
+  const { users } = await import('../../db/schema');
   const { eq } = await import('drizzle-orm');
 
   // 1. Get user's encrypted refresh token
@@ -323,21 +339,9 @@ export async function acquireGraphTokenForUser(
     return null; // No Microsoft account linked with refresh token
   }
 
-  // 2. Get tenant SSO config
-  const tenant = user.tenantId
-    ? await db.query.tenants.findFirst({ where: eq(tenants.id, user.tenantId) })
-    : await db.query.tenants.findFirst();
-
-  const settings = (tenant?.settings ?? {}) as Record<string, unknown>;
-  const ssoClientId = settings['ssoClientId'] as string | undefined;
-  const ssoClientSecret = settings['ssoClientSecret'] as string | undefined;
-  if (!ssoClientId || !ssoClientSecret) return null;
-
-  const config: MicrosoftSsoConfig = {
-    ssoClientId,
-    ssoClientSecret,
-    ssoTenantId: settings['ssoTenantId'] as string | undefined,
-  };
+  // 2. Get Microsoft config from integration_credentials (encrypted)
+  const config = await loadMicrosoftConfig();
+  if (!config) return null;
 
   // 3. Decrypt refresh token
   const refreshToken = decryptRefreshToken(
