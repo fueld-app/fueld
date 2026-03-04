@@ -185,7 +185,7 @@ describe('documents + verify controller e2e', () => {
         htmlBody: '<p>test</p>',
       },
     });
-    expect(sendMissing.status).toBe(200);
+    expect(sendMissing.status).toBe(404);
     expect(sendMissing.data?.success).toBe(false);
     expect(String(sendMissing.data?.message ?? '')).toContain('Order not found');
   });
