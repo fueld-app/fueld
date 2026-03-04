@@ -430,7 +430,12 @@ interface TeamUserOption {
           <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[520px] flex flex-col">
             <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Delivery Details</h3>
             <div class="mt-3">
-              <label class="mb-1 block text-xs font-medium text-gray-500">Delivered At</label>
+              <label class="mb-1 block text-xs font-medium text-gray-500">
+                Delivered At
+                @if (placeTimezoneAbbr()) {
+                  <span class="text-gray-400">({{ placeTimezoneAbbr() }})</span>
+                }
+              </label>
               <input
                 type="datetime-local"
                 [ngModel]="deliveredAtLocal()"
@@ -1000,6 +1005,18 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   );
 
   readonly placeTimezone = computed(() => this.port()?.timezone ?? 'UTC');
+  readonly placeTimezoneAbbr = computed(() => {
+    const tz = this.placeTimezone();
+    try {
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz,
+        timeZoneName: 'short',
+      }).formatToParts(new Date());
+      return parts.find((p) => p.type === 'timeZoneName')?.value ?? tz;
+    } catch {
+      return tz;
+    }
+  });
   readonly minDateTime = computed(() =>
     this.formatDateTimeForInput(new Date(), this.placeTimezone()),
   );

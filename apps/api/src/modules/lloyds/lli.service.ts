@@ -7,6 +7,7 @@ import { eq, ilike, or, and, sql, asc, desc } from 'drizzle-orm';
 import { db } from '../../db';
 import { vessels, places, counterparties, orders, portSuppliers, users, companyContacts } from '../../db/schema';
 import { lliGet, seasearcherPlaceSearch, seasearcherPlaceDetail, seasearcherNearbyVessels, seasearcherNearbyVesselsSpatial, seasearcherPortFacilities, seasearcherExpectedArrivals } from './lli.client';
+import { resolveIanaTimezone } from '../../utils/timezone';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Response types for LLI API
@@ -414,6 +415,13 @@ export async function importPlaceFromLli(lliPlaceId: string): Promise<{ id: stri
 
   const mapped = PLACE_TYPE_MAP[pd.type] ?? (pd.typeCode as any) ?? null;
 
+  // Resolve IANA timezone from coordinates, falling back to LLI timezone string
+  const ianaTimezone = resolveIanaTimezone(
+    pd.location?.lat ?? null,
+    pd.location?.lng ?? null,
+    pd.timezone || null,
+  );
+
   const [inserted] = await db
     .insert(places)
     .values({
@@ -424,7 +432,8 @@ export async function importPlaceFromLli(lliPlaceId: string): Promise<{ id: stri
       area: pd.area || null,
       subRegion: pd.subRegion || null,
       placeType: mapped,
-      timezone: pd.timezone || null,
+      timezone: ianaTimezone,
+      timezoneLegacy: pd.timezone || null,
       lat: pd.location?.lat ?? null,
       long: pd.location?.lng ?? null,
       unlocode: pd.unctadLocode || null,
@@ -741,6 +750,13 @@ export async function createPlace(data: {
   parentPlaceId?: string;
   parentPlaceName?: string;
 }) {
+  // Resolve IANA timezone from coordinates if not provided or not valid IANA
+  const ianaTimezone = resolveIanaTimezone(
+    data.lat ?? null,
+    data.long ?? null,
+    data.timezone ?? null,
+  );
+
   const [created] = await db
     .insert(places)
     .values({
@@ -750,7 +766,7 @@ export async function createPlace(data: {
       area: data.area ?? null,
       subRegion: data.subRegion ?? null,
       placeType: data.placeType ?? null,
-      timezone: data.timezone ?? null,
+      timezone: ianaTimezone,
       lat: data.lat ?? null,
       long: data.long ?? null,
       unlocode: data.unlocode ?? null,
@@ -796,7 +812,6 @@ export async function updateLocalPlace(
   if (data.area !== undefined) patch.area = data.area;
   if (data.subRegion !== undefined) patch.subRegion = data.subRegion;
   if (data.placeType !== undefined) patch.placeType = data.placeType;
-  if (data.timezone !== undefined) patch.timezone = data.timezone;
   if (data.lat !== undefined) patch.lat = data.lat;
   if (data.long !== undefined) patch.long = data.long;
   if (data.unlocode !== undefined) patch.unlocode = data.unlocode;
@@ -804,6 +819,22 @@ export async function updateLocalPlace(
   if (data.parentPlaceId !== undefined) patch.parentPlaceId = data.parentPlaceId;
   if (data.parentPlaceName !== undefined) patch.parentPlaceName = data.parentPlaceName;
   if (data.orderRemark !== undefined) patch.orderRemark = data.orderRemark;
+
+  // If timezone is explicitly set, use it directly (user has entered a valid IANA tz)
+  // If lat/long changed but timezone wasn't explicitly set, try to resolve from new coords
+  if (data.timezone !== undefined) {
+    patch.timezone = data.timezone;
+  } else if (data.lat !== undefined || data.long !== undefined) {
+    // Get existing place to fill in missing coord
+    const existing = await db.select({ lat: places.lat, long: places.long, timezone: places.timezone })
+      .from(places).where(eq(places.id, id)).limit(1);
+    if (existing.length > 0) {
+      const newLat = data.lat ?? existing[0].lat;
+      const newLong = data.long ?? existing[0].long;
+      const resolved = resolveIanaTimezone(newLat, newLong, existing[0].timezone);
+      if (resolved) patch.timezone = resolved;
+    }
+  }
 
   const [updated] = await db
     .update(places)
@@ -862,6 +893,11 @@ export async function syncPlaceFromSeasearcher(placeId: string): Promise<typeof 
 
   const mapped = PLACE_TYPE_MAP[pd.type] ?? (pd.typeCode as any) ?? null;
 
+  // Resolve IANA timezone from updated coordinates
+  const syncLat = pd.location?.lat ?? local.lat;
+  const syncLng = pd.location?.lng ?? local.long;
+  const ianaTimezone = resolveIanaTimezone(syncLat, syncLng, local.timezone);
+
   const [updated] = await db
     .update(places)
     .set({
@@ -871,9 +907,10 @@ export async function syncPlaceFromSeasearcher(placeId: string): Promise<typeof 
       area: pd.area || local.area,
       subRegion: pd.subRegion || local.subRegion,
       placeType: mapped ?? local.placeType,
-      timezone: pd.timezone || local.timezone,
-      lat: pd.location?.lat ?? local.lat,
-      long: pd.location?.lng ?? local.long,
+      timezone: ianaTimezone ?? local.timezone,
+      timezoneLegacy: pd.timezone || local.timezoneLegacy,
+      lat: syncLat,
+      long: syncLng,
       unlocode: pd.unctadLocode || local.unlocode,
       admiraltyChart: pd.admiraltyChart || local.admiraltyChart,
       parentPlaceName: pd.parentPlaceName ?? local.parentPlaceName,

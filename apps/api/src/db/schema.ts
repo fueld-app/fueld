@@ -356,7 +356,8 @@ export const places = pgTable('places', {
   area: text('area'),                                // e.g. "N Cont Europe"
   subRegion: text('sub_region'),                     // e.g. "Western Asia"
   placeType: placeTypeEnum('place_type'),            // POR / ANC / PSP / TER / FIL
-  timezone: text('timezone'),                        // e.g. "GMT +04H"
+  timezone: text('timezone'),                        // IANA timezone ID e.g. "Asia/Dubai"
+  timezoneLegacy: text('timezone_legacy'),            // Original LLI format e.g. "GMT +04H"
 
   // ── Geo ────────────────────────────────────────────────────────────
   lat: doublePrecision('lat'),

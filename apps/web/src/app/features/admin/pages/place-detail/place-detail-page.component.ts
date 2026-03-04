@@ -462,6 +462,9 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                     <div>
                       <dt class="text-gray-500">Timezone</dt>
                       <dd class="mt-0.5 font-medium text-gray-900">{{ place()!.timezone ?? '—' }}</dd>
+                      @if (place()!.timezone && !isValidIanaTimezone(place()!.timezone!)) {
+                        <dd class="mt-0.5 text-xs text-amber-600">⚠ Not a valid IANA timezone — dates may display incorrectly</dd>
+                      }
                     </div>
                   </dl>
                 } @else {
@@ -530,10 +533,19 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                       <input
                         [ngModel]="placeForm().timezone"
                         (ngModelChange)="updatePlaceForm('timezone', $event)"
-                        placeholder="GMT +04H"
+                        placeholder="e.g. Asia/Dubai, Europe/London"
+                        list="iana-timezones"
                         class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
                                focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                       />
+                      <datalist id="iana-timezones">
+                        @for (tz of commonTimezones; track tz) {
+                          <option [value]="tz">{{ tz }}</option>
+                        }
+                      </datalist>
+                      @if (placeForm().timezone && !isValidIanaTimezone(placeForm().timezone)) {
+                        <span class="text-xs text-amber-600">⚠ Not a recognized IANA timezone</span>
+                      }
                     </label>
                     <label class="space-y-1">
                       <span class="text-gray-500">UNLOCODE</span>
@@ -2116,6 +2128,30 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
       this.localTimeInterval = null;
     }
 
+    if (!timezone) {
+      this.localTime.set('');
+      return;
+    }
+
+    // Try IANA timezone first
+    if (this.isValidIanaTimezone(timezone)) {
+      const tick = () => {
+        const now = new Date();
+        const formatted = new Intl.DateTimeFormat('en-GB', {
+          timeZone: timezone,
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false,
+        }).format(now);
+        this.localTime.set(formatted);
+      };
+      tick();
+      this.localTimeInterval = setInterval(tick, 1000);
+      return;
+    }
+
+    // Legacy fixed-offset path
     const offsetMinutes = this.parseTimezoneOffset(timezone);
     if (offsetMinutes === null) {
       this.localTime.set('');
@@ -2135,6 +2171,57 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
     tick();
     this.localTimeInterval = setInterval(tick, 1000);
   }
+
+  /** Check if a string is a valid IANA timezone identifier. */
+  isValidIanaTimezone(tz: string): boolean {
+    try {
+      Intl.DateTimeFormat(undefined, { timeZone: tz });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Common IANA timezones for the datalist dropdown. */
+  readonly commonTimezones: string[] = [
+    'UTC',
+    'Europe/London',
+    'Europe/Paris',
+    'Europe/Berlin',
+    'Europe/Copenhagen',
+    'Europe/Oslo',
+    'Europe/Stockholm',
+    'Europe/Helsinki',
+    'Europe/Athens',
+    'Europe/Istanbul',
+    'Europe/Moscow',
+    'Africa/Cairo',
+    'Africa/Lagos',
+    'Africa/Johannesburg',
+    'Asia/Dubai',
+    'Asia/Muscat',
+    'Asia/Karachi',
+    'Asia/Kolkata',
+    'Asia/Dhaka',
+    'Asia/Bangkok',
+    'Asia/Singapore',
+    'Asia/Hong_Kong',
+    'Asia/Shanghai',
+    'Asia/Seoul',
+    'Asia/Tokyo',
+    'Australia/Perth',
+    'Australia/Sydney',
+    'Pacific/Auckland',
+    'America/New_York',
+    'America/Chicago',
+    'America/Denver',
+    'America/Los_Angeles',
+    'America/Anchorage',
+    'America/Sao_Paulo',
+    'America/Buenos_Aires',
+    'America/Panama',
+    'America/Houston',
+  ];
 
   private parseTimezoneOffset(tz: string | null): number | null {
     if (!tz) return null;

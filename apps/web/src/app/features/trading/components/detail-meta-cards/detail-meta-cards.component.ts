@@ -364,8 +364,36 @@ export class TradingDetailMetaCardsComponent {
   formatDateTimeLabel(dateStr: string | null | undefined): string {
     if (!dateStr) return '-';
     const date = new Date(dateStr);
+    const tz = this.timezone();
 
-    const fixedOffset = this.parseFixedOffsetMinutes(this.timezone());
+    // IANA timezone path (preferred)
+    const safeTimezone = this.normalizeTimeZone(tz);
+    if (safeTimezone !== 'UTC' || tz === 'UTC') {
+      // Check it's a valid IANA timezone (not a legacy "GMT +04H" that fell through to UTC)
+      try {
+        Intl.DateTimeFormat(undefined, { timeZone: tz });
+        const formatted = new Intl.DateTimeFormat('en-GB', {
+          timeZone: tz,
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+        }).format(date);
+
+        // Get timezone abbreviation
+        const abbrParts = new Intl.DateTimeFormat('en-US', {
+          timeZone: tz,
+          timeZoneName: 'short',
+        }).formatToParts(date);
+        const abbr = abbrParts.find((p) => p.type === 'timeZoneName')?.value ?? '';
+        return abbr ? `${formatted} ${abbr}` : formatted;
+      } catch { /* fall through to legacy path */ }
+    }
+
+    // Legacy fixed-offset path
+    const fixedOffset = this.parseFixedOffsetMinutes(tz);
     if (fixedOffset !== null) {
       const shifted = new Date(date.getTime() + fixedOffset * 60_000);
       const day = String(shifted.getUTCDate()).padStart(2, '0');
@@ -373,11 +401,12 @@ export class TradingDetailMetaCardsComponent {
       const year = shifted.getUTCFullYear();
       const hour = String(shifted.getUTCHours()).padStart(2, '0');
       const minute = String(shifted.getUTCMinutes()).padStart(2, '0');
-      return `${day} ${month} ${year}, ${hour}:${minute}`;
+      return `${day} ${month} ${year}, ${hour}:${minute} ${tz}`;
     }
 
+    // Fallback: UTC
     return new Intl.DateTimeFormat('en-GB', {
-      timeZone: this.normalizeTimeZone(this.timezone()),
+      timeZone: 'UTC',
       day: '2-digit',
       month: 'short',
       year: 'numeric',

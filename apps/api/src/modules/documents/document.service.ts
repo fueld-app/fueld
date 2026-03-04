@@ -603,6 +603,17 @@ function parseTimezoneOffset(tz: string | null | undefined): number | null {
   return sign * (hours * 60 + minutes);
 }
 
+/** Check if a string is a valid IANA timezone identifier. */
+function isIanaTimezone(tz: string | null | undefined): boolean {
+  if (!tz) return false;
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Compute invoice due date from payment terms.
  *  For CREDIT terms the due date is deliveryDate (ETA) + creditDays.
  *  Falls back to baseDate when ETA is not available.
@@ -629,6 +640,37 @@ function computeDueDate(
 function formatDateTimeForDisplay(value: string | null, tz: string | null | undefined): string | null {
   if (!value) return null;
   const date = new Date(value);
+  if (isNaN(date.getTime())) return null;
+
+  // ── IANA timezone path (preferred) ──────────────────────────────
+  if (tz && isIanaTimezone(tz)) {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: tz,
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(date);
+    const map = new Map(parts.map((p) => [p.type, p.value]));
+    const day = map.get('day') ?? '01';
+    const month = map.get('month') ?? '01';
+    const year = map.get('year') ?? '0000';
+    const hour = map.get('hour') ?? '00';
+    const minute = map.get('minute') ?? '00';
+
+    // Get timezone abbreviation (e.g. "HKT", "GST", "CET")
+    const abbrParts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      timeZoneName: 'short',
+    }).formatToParts(date);
+    const abbr = abbrParts.find((p) => p.type === 'timeZoneName')?.value ?? tz;
+
+    return `${day}-${month}-${year} ${hour}:${minute} ${abbr}`;
+  }
+
+  // ── Legacy fixed-offset path (fallback for old "GMT +04H" style) ─
   const offset = parseTimezoneOffset(tz ?? null);
   const local = offset === null ? date : new Date(date.getTime() + offset * 60_000);
   const year = String(local.getUTCFullYear()).padStart(4, '0');
