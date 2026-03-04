@@ -175,12 +175,14 @@ describe('documents + verify controller e2e', () => {
     expect(invoiceNoItems.status).toBe(400);
     expect((invoiceNoItems.data as any)?.success).toBe(false);
 
-    const sendMissing = await requestJson('/orders/ORDER-DOES-NOT-EXIST/invoice/send', {
+    const sendMissing = await requestJson('/orders/ORDER-DOES-NOT-EXIST/send-email', {
       method: 'POST',
       token,
       body: {
-        accessToken: 'token',
+        documentType: 'INVOICE',
         recipientEmail: 'finance@example.com',
+        subject: 'Test',
+        htmlBody: '<p>test</p>',
       },
     });
     expect(sendMissing.status).toBe(200);
@@ -214,7 +216,7 @@ describe('documents + verify controller e2e', () => {
     expect((missingToken.data as any)?.success).toBe(false);
   });
 
-  it('sends invoice email successfully via /invoice/send', async () => {
+  it('sends invoice email successfully via /send-email', async () => {
     const { token, orderId } = await seedDocumentReadyOrder();
 
     const originalFetch = globalThis.fetch;
@@ -226,18 +228,21 @@ describe('documents + verify controller e2e', () => {
     }) as typeof fetch;
 
     try {
-      const sent = await requestJson(`/orders/${orderId}/invoice/send`, {
+      const sent = await requestJson(`/orders/${orderId}/send-email`, {
         method: 'POST',
         token,
         body: {
-          accessToken: 'graph-access-token',
+          documentType: 'INVOICE',
           recipientEmail: 'finance@example.com',
+          subject: 'Invoice Test',
+          htmlBody: '<p>Invoice body</p>',
+          accessToken: 'graph-access-token',
         },
       });
 
       expect(sent.status).toBe(200);
       expect(sent.data?.success).toBe(true);
-      expect(String(sent.data?.message ?? '')).toContain('Invoice');
+      expect(String(sent.data?.message ?? '')).toContain('INVOICE');
       expect(String(sent.data?.message ?? '')).toContain('finance@example.com');
 
       expect(calls.length).toBe(1);
@@ -245,7 +250,7 @@ describe('documents + verify controller e2e', () => {
 
       const graphPayload = JSON.parse(String(calls[0]?.init?.body));
       expect(graphPayload.message.toRecipients[0].emailAddress.address).toBe('finance@example.com');
-      expect(String(graphPayload.message.subject)).toContain('Invoice');
+      expect(String(graphPayload.message.subject)).toBe('Invoice Test');
       expect(graphPayload.message.attachments?.length).toBe(1);
     } finally {
       globalThis.fetch = originalFetch;
