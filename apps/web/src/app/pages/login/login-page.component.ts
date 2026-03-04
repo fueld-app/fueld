@@ -156,7 +156,10 @@ import { AuthService } from '../../core/auth/auth.service';
               </div>
               <div class="mt-4 grid grid-cols-2 gap-3">
                 <button
-                  class="flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-all hover:bg-gray-50 hover:shadow-md"
+                  type="button"
+                  [disabled]="microsoftLoading() || !microsoftAvailable()"
+                  (click)="onMicrosoftLogin()"
+                  class="flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-all hover:bg-gray-50 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <svg class="h-5 w-5" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                     <rect x="1" y="1" width="9" height="9" fill="#f25022" />
@@ -164,7 +167,11 @@ import { AuthService } from '../../core/auth/auth.service';
                     <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
                     <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
                   </svg>
-                  Microsoft
+                  @if (microsoftLoading()) {
+                    Signing in…
+                  } @else {
+                    Microsoft
+                  }
                 </button>
                 <button
                   type="button"
@@ -203,8 +210,17 @@ export class LoginPageComponent {
   password = '';
   readonly loading = signal(false);
   readonly passkeyLoading = signal(false);
+  readonly microsoftLoading = signal(false);
+  readonly microsoftAvailable = signal(false);
   readonly errorMessage = signal('');
   readonly currentYear = new Date().getFullYear();
+
+  constructor() {
+    // Load SSO config to determine if Microsoft login is available
+    this.auth.initMsal().then(() => {
+      this.microsoftAvailable.set(this.auth.isMicrosoftSsoAvailable);
+    });
+  }
 
   /** URL to redirect to after successful login. */
   private get returnUrl(): string {
@@ -269,6 +285,22 @@ export class LoginPageComponent {
       this.errorMessage.set(msg);
     } finally {
       this.passkeyLoading.set(false);
+    }
+  }
+
+  async onMicrosoftLogin(): Promise<void> {
+    this.microsoftLoading.set(true);
+    this.errorMessage.set('');
+
+    try {
+      await this.auth.loginWithMicrosoft();
+      await this.router.navigateByUrl(this.returnUrl);
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : 'Microsoft login failed. Please try again.';
+      this.errorMessage.set(msg);
+    } finally {
+      this.microsoftLoading.set(false);
     }
   }
 }

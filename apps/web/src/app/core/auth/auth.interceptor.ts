@@ -18,8 +18,13 @@ const refreshSubject = new BehaviorSubject<string | null>(null);
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const authService = inject(AuthService);
 
-  // Don't attach auth to the refresh endpoint itself (avoids loops)
-  if (req.url.includes('/auth/refresh') || req.url.includes('/auth/login') || req.url.includes('/auth/register')) {
+  // Don't attach auth to public auth endpoints (avoids loops)
+  if (
+    req.url.includes('/auth/refresh') ||
+    req.url.includes('/auth/login') ||
+    req.url.includes('/auth/register') ||
+    req.url.includes('/auth/sso-config')
+  ) {
     return next(req);
   }
 

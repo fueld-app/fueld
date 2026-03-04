@@ -25,6 +25,8 @@ export interface SendEmailPayload {
   ccEmails: string[];
   subject: string;
   htmlBody: string;
+  /** O365 access token for sending via Microsoft Graph (if available). */
+  accessToken?: string;
 }
 
 const DOC_LABELS: Record<DocumentEmailType, string> = {

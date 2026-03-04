@@ -591,6 +591,32 @@ export const authController = new Elysia({ prefix: '/auth' })
     },
   )
 
+  // ── GET /auth/sso-config — public SSO config for the login page ──
+  .get(
+    '/sso-config',
+    async () => {
+      const { db: database } = await import('../../db');
+      const { tenants: tenantsTable } = await import('../../db/schema');
+      const tenant = await database.query.tenants.findFirst();
+      const s = (tenant?.settings ?? {}) as Record<string, unknown>;
+      return {
+        success: true,
+        data: {
+          ssoProvider: (s['ssoProvider'] as string) ?? 'none',
+          ssoClientId: (s['ssoClientId'] as string) ?? '',
+          ssoTenantId: (s['ssoTenantId'] as string) ?? '',
+          ssoEnabled: (s['ssoEnabled'] as boolean) ?? false,
+        },
+      } satisfies ApiResponse<unknown>;
+    },
+    {
+      detail: {
+        tags: ['Auth'],
+        summary: 'Get public SSO configuration (client ID + tenant ID) for the login page',
+      },
+    },
+  )
+
   // ── POST /auth/refresh ───────────────────────────────────────────
   .post(
     '/refresh',
