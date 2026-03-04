@@ -121,18 +121,19 @@ jobs:
   api-mocked:
     name: API (mocked)
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_USER: fueld
-          POSTGRES_PASSWORD: fueld
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
     env:
       TEST_DB_BASE_URL: postgres://fueld:fueld@localhost:5432
     steps:
+      - name: Start Postgres
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 3
+          max_attempts: 3
+          command: |
+            docker pull postgres:17-alpine
+            docker run -d --name postgres -p 5432:5432 \
+              -e POSTGRES_USER=fueld -e POSTGRES_PASSWORD=fueld -e POSTGRES_DB=postgres \
+              postgres:17-alpine
       - name: Checkout repository
         id: checkout
         uses: actions/checkout@v4
@@ -170,18 +171,19 @@ jobs:
   api-db:
     name: API (db)
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_USER: fueld
-          POSTGRES_PASSWORD: fueld
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
     env:
       TEST_DB_BASE_URL: postgres://fueld:fueld@localhost:5432
     steps:
+      - name: Start Postgres
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 3
+          max_attempts: 3
+          command: |
+            docker pull postgres:17-alpine
+            docker run -d --name postgres -p 5432:5432 \
+              -e POSTGRES_USER=fueld -e POSTGRES_PASSWORD=fueld -e POSTGRES_DB=postgres \
+              postgres:17-alpine
       - name: Checkout repository
         id: checkout
         uses: actions/checkout@v4
@@ -219,18 +221,19 @@ jobs:
   api-e2e:
     name: API (e2e)
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_USER: fueld
-          POSTGRES_PASSWORD: fueld
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
     env:
       TEST_DB_BASE_URL: postgres://fueld:fueld@localhost:5432
     steps:
+      - name: Start Postgres
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 3
+          max_attempts: 3
+          command: |
+            docker pull postgres:17-alpine
+            docker run -d --name postgres -p 5432:5432 \
+              -e POSTGRES_USER=fueld -e POSTGRES_PASSWORD=fueld -e POSTGRES_DB=postgres \
+              postgres:17-alpine
       - name: Checkout repository
         id: checkout
         uses: actions/checkout@v4

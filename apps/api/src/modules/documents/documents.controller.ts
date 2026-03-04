@@ -348,13 +348,15 @@ export const documentsController = new Elysia({ prefix: '/orders' })
 
       return {
         success: true,
-        recipientEmail,
-        recipientName,
-        ccEmails,
-        subject,
-        htmlBody,
-        senderName,
-        senderEmail: auth.email,
+        data: {
+          recipientEmail,
+          recipientName,
+          ccEmails,
+          subject,
+          htmlBody,
+          senderName,
+          senderEmail: auth.email,
+        },
       };
     },
     {
