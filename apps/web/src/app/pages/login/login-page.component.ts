@@ -216,8 +216,18 @@ export class LoginPageComponent {
   readonly currentYear = new Date().getFullYear();
 
   constructor() {
-    // Load SSO config to determine if Microsoft login is available
-    this.auth.initMsal().then(() => {
+    // Check if we're returning from a Microsoft OAuth redirect
+    const microsoftCode = this.route.snapshot.queryParamMap.get('microsoft_code');
+    const microsoftError = this.route.snapshot.queryParamMap.get('microsoft_error');
+
+    if (microsoftCode) {
+      this.handleMicrosoftCallback(microsoftCode);
+    } else if (microsoftError) {
+      this.errorMessage.set(microsoftError);
+    }
+
+    // Check if Microsoft SSO is available for this tenant
+    this.auth.checkMicrosoftSso().then(() => {
       this.microsoftAvailable.set(this.auth.isMicrosoftSsoAvailable);
     });
   }
@@ -292,8 +302,21 @@ export class LoginPageComponent {
     this.microsoftLoading.set(true);
     this.errorMessage.set('');
 
+    // Redirect to the backend, which redirects to Microsoft.
+    // Microsoft will redirect back to /auth/microsoft/callback,
+    // which then redirects here with ?microsoft_code=...
+    const returnUrl = window.location.origin + '/login' +
+      (this.returnUrl !== '/' ? `?returnUrl=${encodeURIComponent(this.returnUrl)}` : '');
+    this.auth.loginWithMicrosoft(returnUrl);
+    // Page will navigate away — no need to reset loading
+  }
+
+  private async handleMicrosoftCallback(code: string): Promise<void> {
+    this.microsoftLoading.set(true);
+    this.errorMessage.set('');
+
     try {
-      await this.auth.loginWithMicrosoft();
+      await this.auth.exchangeMicrosoftCode(code);
       await this.router.navigateByUrl(this.returnUrl);
     } catch (err: unknown) {
       const msg =

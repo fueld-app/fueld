@@ -13,6 +13,7 @@
 import { db } from '../../db';
 import { emailLog } from '../../db/schema';
 import { getSmtpConfig, getTransporter } from '../../lib/email';
+import { acquireGraphTokenForUser } from '../auth/microsoft-oauth.service';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -25,7 +26,7 @@ export interface SendDocumentEmailOptions {
   orderId: string;
   /** Tenant ID (for logging) */
   tenantId: string;
-  /** User ID of the sender (for logging) */
+  /** User ID of the sender (for logging and Graph token acquisition) */
   sentByUserId: string;
   /** Sender's email address */
   senderEmail: string;
@@ -43,8 +44,6 @@ export interface SendDocumentEmailOptions {
   pdfBuffer: Buffer;
   /** PDF file name */
   pdfFileName: string;
-  /** Optional O365 access token — if provided, sends via Microsoft Graph */
-  accessToken?: string;
 }
 
 // ─── Microsoft Graph API ─────────────────────────────────────────────
@@ -65,8 +64,7 @@ interface GraphMailPayload {
   saveToSentItems: boolean;
 }
 
-async function sendViaGraph(options: SendDocumentEmailOptions): Promise<void> {
-  if (!options.accessToken) throw new Error('No O365 access token provided');
+async function sendViaGraph(options: SendDocumentEmailOptions, accessToken: string): Promise<void> {
 
   const payload: GraphMailPayload = {
     message: {
@@ -99,7 +97,7 @@ async function sendViaGraph(options: SendDocumentEmailOptions): Promise<void> {
   const res = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${options.accessToken}`,
+      Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload),
@@ -147,8 +145,9 @@ async function sendViaSmtp(options: SendDocumentEmailOptions): Promise<void> {
 // ─── Unified Send + Log ─────────────────────────────────────────────
 
 /**
- * Send a document email via the best available channel
- * (Graph if O365 token is provided, SMTP otherwise).
+ * Send a document email via the best available channel.
+ * Tries Microsoft Graph first (using the user's stored refresh token),
+ * then falls back to SMTP.
  * Logs the result to the email_log table.
  */
 export async function sendDocumentEmail(options: SendDocumentEmailOptions): Promise<{ channel: 'GRAPH' | 'SMTP' }> {
@@ -156,9 +155,11 @@ export async function sendDocumentEmail(options: SendDocumentEmailOptions): Prom
   let error: string | null = null;
 
   try {
-    if (options.accessToken && options.accessToken !== 'placeholder-o365-token') {
+    // Try to acquire a Graph token from the user's stored Microsoft refresh token
+    const graphToken = await acquireGraphTokenForUser(options.sentByUserId);
+    if (graphToken) {
       channel = 'GRAPH';
-      await sendViaGraph(options);
+      await sendViaGraph(options, graphToken);
     } else {
       channel = 'SMTP';
       await sendViaSmtp(options);

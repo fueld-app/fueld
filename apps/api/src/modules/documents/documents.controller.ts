@@ -241,7 +241,6 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         htmlBody: body.htmlBody,
         pdfBuffer,
         pdfFileName,
-        accessToken: body.accessToken,
       });
 
       return {
@@ -264,7 +263,6 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         ccEmails: t.Optional(t.Array(t.String({ format: 'email' }), { description: 'CC email addresses' })),
         subject: t.String({ description: 'Email subject line' }),
         htmlBody: t.String({ description: 'HTML email body' }),
-        accessToken: t.Optional(t.String({ description: 'O365 access token for Graph API (falls back to SMTP if omitted)' })),
       }),
       detail: {
         tags: ['Documents'],

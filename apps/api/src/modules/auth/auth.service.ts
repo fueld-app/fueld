@@ -147,6 +147,34 @@ export async function storeRefreshToken(
     .where(eq(users.id, userId));
 }
 
+/**
+ * Store an encrypted Microsoft refresh token on the user record.
+ */
+export async function storeMicrosoftRefreshToken(
+  userId: string,
+  encryptedToken: { microsoftRefreshToken: string; microsoftRefreshTokenIv: string; microsoftRefreshTokenAuthTag: string },
+): Promise<void> {
+  await db
+    .update(users)
+    .set({ ...encryptedToken, updatedAt: new Date() })
+    .where(eq(users.id, userId));
+}
+
+/**
+ * Clear a user's stored Microsoft refresh token.
+ */
+export async function clearMicrosoftRefreshToken(userId: string): Promise<void> {
+  await db
+    .update(users)
+    .set({
+      microsoftRefreshToken: null,
+      microsoftRefreshTokenIv: null,
+      microsoftRefreshTokenAuthTag: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, userId));
+}
+
 export async function clearRefreshToken(userId: string): Promise<void> {
   await db
     .update(users)

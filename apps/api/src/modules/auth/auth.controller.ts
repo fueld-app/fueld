@@ -6,6 +6,7 @@ import {
   loginWithO365,
   registerUser,
   storeRefreshToken,
+  storeMicrosoftRefreshToken,
   clearRefreshToken,
   findUserById,
   findUserByEmail,
@@ -15,6 +16,18 @@ import {
   disable2fa,
   verify2faToken,
 } from './auth.service';
+import {
+  buildAuthorizationUrl,
+  exchangeCodeForTokens,
+  verifyAndDecodeState,
+  encryptRefreshToken,
+  getMicrosoftRedirectUri,
+  validateReturnUrl,
+  storeOneTimeCode,
+  consumeOneTimeCode,
+  type MicrosoftSsoConfig,
+} from './microsoft-oauth.service';
+import { validateO365Token } from './o365.service';
 import { resetPasswordWithToken } from './password-reset.service';
 import {
   listPasskeys,
@@ -613,6 +626,166 @@ export const authController = new Elysia({ prefix: '/auth' })
       detail: {
         tags: ['Auth'],
         summary: 'Get public SSO configuration (client ID + tenant ID) for the login page',
+      },
+    },
+  )
+
+  // ── GET /auth/microsoft/login — initiate Microsoft OAuth flow ────
+  .get(
+    '/microsoft/login',
+    async ({ query, set }) => {
+      const returnUrl = query.returnUrl;
+      if (!returnUrl || !validateReturnUrl(returnUrl)) {
+        set.status = 400;
+        return { success: false, message: 'Invalid or missing returnUrl parameter' };
+      }
+
+      // Load tenant SSO config
+      const { db: database } = await import('../../db');
+      const { tenants: tenantsTable } = await import('../../db/schema');
+      const tenant = await database.query.tenants.findFirst();
+      const s = (tenant?.settings ?? {}) as Record<string, unknown>;
+
+      if (!s['ssoEnabled'] || s['ssoProvider'] !== 'microsoft' || !s['ssoClientId'] || !s['ssoClientSecret']) {
+        set.status = 400;
+        return { success: false, message: 'Microsoft SSO is not configured. Configure it in Admin → Security → SSO Settings.' };
+      }
+
+      const config: MicrosoftSsoConfig = {
+        ssoClientId: s['ssoClientId'] as string,
+        ssoClientSecret: s['ssoClientSecret'] as string,
+        ssoTenantId: s['ssoTenantId'] as string | undefined,
+      };
+
+      const redirectUri = getMicrosoftRedirectUri();
+      const authUrl = buildAuthorizationUrl(config, redirectUri, returnUrl);
+
+      set.status = 302;
+      set.headers['location'] = authUrl;
+      return;
+    },
+    {
+      query: t.Object({
+        returnUrl: t.String(),
+      }),
+      detail: {
+        tags: ['Auth'],
+        summary: 'Redirect to Microsoft login page (Authorization Code Flow)',
+      },
+    },
+  )
+
+  // ── GET /auth/microsoft/callback — handle Microsoft redirect ─────
+  .get(
+    '/microsoft/callback',
+    async ({ query, set, jwtAccess, jwtRefresh }) => {
+      try {
+        // 1. Verify state (anti-CSRF + returnUrl)
+        const state = verifyAndDecodeState(query.state);
+
+        // 2. Load tenant SSO config
+        const { db: database } = await import('../../db');
+        const { tenants: tenantsTable } = await import('../../db/schema');
+        const tenant = await database.query.tenants.findFirst();
+        const s = (tenant?.settings ?? {}) as Record<string, unknown>;
+
+        const config: MicrosoftSsoConfig = {
+          ssoClientId: s['ssoClientId'] as string,
+          ssoClientSecret: s['ssoClientSecret'] as string,
+          ssoTenantId: s['ssoTenantId'] as string | undefined,
+        };
+
+        // 3. Exchange authorization code for tokens
+        const redirectUri = getMicrosoftRedirectUri();
+        const msTokens = await exchangeCodeForTokens(config, query.code, redirectUri);
+
+        // 4. Validate user profile via Graph API
+        const profile = await validateO365Token(msTokens.access_token);
+        if (!profile) {
+          const errorUrl = `${state.returnUrl}${state.returnUrl.includes('?') ? '&' : '?'}microsoft_error=${encodeURIComponent('Failed to retrieve Microsoft profile')}`;
+          set.status = 302;
+          set.headers['location'] = errorUrl;
+          return;
+        }
+
+        // 5. Create/link user (reuse existing O365 login logic)
+        const user = await loginWithO365(msTokens.access_token);
+
+        // 6. Store encrypted Microsoft refresh token
+        if (msTokens.refresh_token) {
+          const encrypted = encryptRefreshToken(msTokens.refresh_token);
+          await storeMicrosoftRefreshToken(user.id, encrypted);
+        }
+
+        // 7. Generate Fueld JWT tokens
+        const payload = userToPayload(user);
+        const fueldAccessToken = await jwtAccess.sign(payload);
+        const fueldRefreshToken = await jwtRefresh.sign(payload);
+        await storeRefreshToken(user.id, fueldRefreshToken);
+
+        // 8. Store one-time code and redirect to frontend
+        const code = storeOneTimeCode({
+          userId: user.id,
+          fueldAccessToken,
+          fueldRefreshToken,
+          user: sanitiseUser(user) as unknown as Record<string, unknown>,
+        });
+
+        const callbackUrl = `${state.returnUrl}${state.returnUrl.includes('?') ? '&' : '?'}microsoft_code=${code}`;
+        set.status = 302;
+        set.headers['location'] = callbackUrl;
+        return;
+      } catch (err) {
+        console.error('[MicrosoftOAuth] Callback error:', err);
+        // Try to extract returnUrl from state for error redirect
+        const errorMsg = err instanceof Error ? err.message : 'Microsoft login failed';
+        // Fallback: just return error (can't redirect without valid state)
+        set.status = 400;
+        return { success: false, message: errorMsg };
+      }
+    },
+    {
+      query: t.Object({
+        code: t.String(),
+        state: t.String(),
+        session_state: t.Optional(t.String()),
+      }),
+      detail: {
+        tags: ['Auth'],
+        summary: 'Microsoft OAuth callback — exchanges auth code for Fueld session',
+      },
+    },
+  )
+
+  // ── POST /auth/microsoft/exchange — redeem one-time code for tokens ─
+  .post(
+    '/microsoft/exchange',
+    async ({ body }) => {
+      const auth = consumeOneTimeCode(body.code);
+      if (!auth) {
+        return {
+          success: false,
+          data: null,
+          message: 'Invalid or expired code. Please try signing in again.',
+        } satisfies ApiResponse<null>;
+      }
+
+      return {
+        success: true,
+        data: {
+          user: auth.user,
+          accessToken: auth.fueldAccessToken,
+          refreshToken: auth.fueldRefreshToken,
+        },
+      } satisfies ApiResponse<unknown>;
+    },
+    {
+      body: t.Object({
+        code: t.String(),
+      }),
+      detail: {
+        tags: ['Auth'],
+        summary: 'Exchange a one-time Microsoft auth code for Fueld JWT tokens',
       },
     },
   )

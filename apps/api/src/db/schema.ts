@@ -184,6 +184,11 @@ export const users = pgTable('users', {
   // IP restriction (JSON array of allowed CIDR/IPs, null = unrestricted)
   allowedIps: text('allowed_ips'),
 
+  // Microsoft OAuth — encrypted refresh token for server-side Graph API access
+  microsoftRefreshToken: text('microsoft_refresh_token'),
+  microsoftRefreshTokenIv: text('microsoft_refresh_token_iv'),
+  microsoftRefreshTokenAuthTag: text('microsoft_refresh_token_auth_tag'),
+
   // Vacation / delegation
   isOnLeave: boolean('is_on_leave').notNull().default(false),
   leaveEndDate: date('leave_end_date'),

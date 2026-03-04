@@ -1,6 +1,16 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { sendDocumentEmail, buildDocumentEmailHtml, buildDocumentEmailSubject } from '../src/modules/documents/mail.service';
+import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import type { SendDocumentEmailOptions } from '../src/modules/documents/mail.service';
+
+// ── Mock the microsoft-oauth module before importing mail.service ──
+// This lets us control whether a Graph token is available.
+let mockGraphToken: string | null = null;
+
+mock.module('../src/modules/auth/microsoft-oauth.service', () => ({
+  acquireGraphTokenForUser: async () => mockGraphToken,
+}));
+
+const { sendDocumentEmail, buildDocumentEmailHtml, buildDocumentEmailSubject } =
+  await import('../src/modules/documents/mail.service');
 
 describe('documents mail service', () => {
   const originalFetch = globalThis.fetch;
@@ -12,6 +22,7 @@ describe('documents mail service', () => {
   beforeEach(() => {
     capturedUrl = null;
     capturedInit = null;
+    mockGraphToken = null; // Default: no Graph token (SMTP path)
   });
 
   afterEach(() => {
@@ -36,14 +47,15 @@ describe('documents mail service', () => {
 
   // ─── Graph channel tests ──────────────────────────────────────────
 
-  test('sendDocumentEmail sends via Graph when accessToken is provided', async () => {
+  test('sendDocumentEmail sends via Graph when user has stored Microsoft refresh token', async () => {
+    mockGraphToken = 'token-123';
     globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
       capturedUrl = String(url);
       capturedInit = init ?? null;
       return new Response('', { status: 202 });
     }) as typeof fetch;
 
-    const result = await sendDocumentEmail({ ...baseOptions, accessToken: 'token-123' });
+    const result = await sendDocumentEmail(baseOptions);
 
     expect(result.channel).toBe('GRAPH');
     expect(capturedUrl).toBe('https://graph.microsoft.com/v1.0/me/sendMail');
@@ -64,6 +76,7 @@ describe('documents mail service', () => {
   });
 
   test('sendDocumentEmail includes CC recipients in Graph payload', async () => {
+    mockGraphToken = 'token-cc';
     globalThis.fetch = (async (_url: string | URL | Request, init?: RequestInit) => {
       capturedInit = init ?? null;
       return new Response('', { status: 202 });
@@ -71,7 +84,6 @@ describe('documents mail service', () => {
 
     await sendDocumentEmail({
       ...baseOptions,
-      accessToken: 'token-cc',
       ccEmails: ['sales@example.com', 'ops@example.com'],
     });
 
@@ -82,18 +94,20 @@ describe('documents mail service', () => {
   });
 
   test('sendDocumentEmail omits ccRecipients when CC list is empty', async () => {
+    mockGraphToken = 'token-no-cc';
     globalThis.fetch = (async (_url: string | URL | Request, init?: RequestInit) => {
       capturedInit = init ?? null;
       return new Response('', { status: 202 });
     }) as typeof fetch;
 
-    await sendDocumentEmail({ ...baseOptions, accessToken: 'token-no-cc', ccEmails: [] });
+    await sendDocumentEmail({ ...baseOptions, ccEmails: [] });
 
     const payload = JSON.parse(String(capturedInit?.body));
     expect(payload.message.ccRecipients).toBeUndefined();
   });
 
   test('sendDocumentEmail throws on non-ok Graph response', async () => {
+    mockGraphToken = 'bad-token';
     const logs: string[] = [];
     console.error = ((...args: unknown[]) => {
       logs.push(args.map((value) => String(value)).join(' '));
@@ -103,15 +117,14 @@ describe('documents mail service', () => {
       new Response('graph error', { status: 500 })) as typeof fetch;
 
     await expect(
-      sendDocumentEmail({ ...baseOptions, accessToken: 'bad-token' }),
+      sendDocumentEmail(baseOptions),
     ).rejects.toThrow('Failed to send email via Graph API: 500');
 
     expect(logs.some((l) => l.includes('Graph API returned 500'))).toBe(true);
   });
 
-  test('sendDocumentEmail treats placeholder-o365-token as no token (SMTP fallback)', async () => {
-    // With the placeholder token, should attempt SMTP (not Graph)
-    // SMTP will fail because no config is set, but we verify it doesn't call Graph
+  test('sendDocumentEmail falls back to SMTP when no Graph token is available', async () => {
+    mockGraphToken = null; // No stored refresh token
     let graphCalled = false;
     globalThis.fetch = (async (_url: string | URL | Request, _init?: RequestInit) => {
       graphCalled = true;
@@ -122,25 +135,7 @@ describe('documents mail service', () => {
     console.error = (() => {}) as typeof console.error;
 
     await expect(
-      sendDocumentEmail({ ...baseOptions, accessToken: 'placeholder-o365-token' }),
-    ).rejects.toThrow(/SMTP/);
-
-    expect(graphCalled).toBe(false);
-  });
-
-  test('sendDocumentEmail falls back to SMTP when no accessToken is provided', async () => {
-    // Without accessToken, should attempt SMTP (not Graph)
-    let graphCalled = false;
-    globalThis.fetch = (async (_url: string | URL | Request, _init?: RequestInit) => {
-      graphCalled = true;
-      return new Response('', { status: 202 });
-    }) as typeof fetch;
-
-    // Suppress console.error from logEmail failures
-    console.error = (() => {}) as typeof console.error;
-
-    await expect(
-      sendDocumentEmail({ ...baseOptions }),
+      sendDocumentEmail(baseOptions),
     ).rejects.toThrow(/SMTP/);
 
     expect(graphCalled).toBe(false);

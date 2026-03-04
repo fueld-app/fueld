@@ -2393,45 +2393,28 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     const id = this.orderId();
     if (!id) return;
 
-    // Try to acquire a Microsoft Graph Mail.Send token if MSAL is available
-    const msal = this.auth.getMsal();
-    const sendWithToken = (accessToken?: string) => {
-      this.http
-        .post<ApiResponse<{ success: boolean; message: string; channel: string; pdfFileName: string }>>(
-          `${API_URL}/orders/${id}/send-email`,
-          {
-            documentType: payload.documentType,
-            recipientEmail: payload.recipientEmail,
-            ccEmails: payload.ccEmails,
-            subject: payload.subject,
-            htmlBody: payload.htmlBody,
-            ...(accessToken ? { accessToken } : {}),
-          },
-        )
-        .subscribe({
-          next: (res) => {
-            this.emailModal()?.done();
-            const channel = res.data?.channel === 'GRAPH' ? 'via Outlook' : 'via email';
-            this.showToast('success', `${payload.documentType} sent to ${payload.recipientEmail} ${channel}`);
-          },
-          error: () => {
-            this.emailModal()?.done();
-            this.showToast('error', 'Failed to send email. Please check that SMTP is configured in Admin → Settings → Integrations.');
-          },
-        });
-    };
-
-    if (msal.hasActiveAccount()) {
-      msal.acquireMailSendToken()
-        .then((token) => sendWithToken(token))
-        .catch(() => {
-          // If MSAL token acquisition fails, fall back to SMTP
-          console.warn('[SendEmail] Failed to acquire Graph token, falling back to SMTP');
-          sendWithToken();
-        });
-    } else {
-      sendWithToken();
-    }
+    this.http
+      .post<ApiResponse<{ success: boolean; message: string; channel: string; pdfFileName: string }>>(
+        `${API_URL}/orders/${id}/send-email`,
+        {
+          documentType: payload.documentType,
+          recipientEmail: payload.recipientEmail,
+          ccEmails: payload.ccEmails,
+          subject: payload.subject,
+          htmlBody: payload.htmlBody,
+        },
+      )
+      .subscribe({
+        next: (res) => {
+          this.emailModal()?.done();
+          const channel = res.data?.channel === 'GRAPH' ? 'via Outlook' : 'via email';
+          this.showToast('success', `${payload.documentType} sent to ${payload.recipientEmail} ${channel}`);
+        },
+        error: () => {
+          this.emailModal()?.done();
+          this.showToast('error', 'Failed to send email. Please check that SMTP is configured in Admin → Settings → Integrations.');
+        },
+      });
   }
 
   // ─── WhatsApp send handlers ──────────────────────────────────────

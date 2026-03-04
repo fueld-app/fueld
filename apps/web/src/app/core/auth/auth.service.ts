@@ -16,7 +16,6 @@ import type {
 import { firstValueFrom } from 'rxjs';
 import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
 import { WebSocketService } from '../websocket/websocket.service';
-import { MsalService } from './msal.service';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Auth Service — JWT Token Management & User State
@@ -86,15 +85,14 @@ export class AuthService {
   constructor(
     private readonly http: HttpClient,
     private readonly router: Router,
-    private readonly msal: MsalService,
   ) {
     // On page reload, refresh the access token then connect WebSocket
     // Only if we have both a user AND a refresh token (not just stale user data)
     const hasRefreshToken = !!localStorage.getItem(REFRESH_TOKEN_KEY);
     if (this.isAuthenticated() && hasRefreshToken) {
       setTimeout(() => this.refreshAndConnectWs(), 0);
-      // Also initialise MSAL for returning users (so Mail.Send tokens work)
-      setTimeout(() => this.initMsal(), 0);
+      // Also check if Microsoft SSO is available
+      setTimeout(() => this.checkMicrosoftSso(), 0);
     } else if (this.isAuthenticated() && !hasRefreshToken) {
       // Stale user data without tokens — clean up silently
       localStorage.removeItem(USER_KEY);
@@ -563,48 +561,51 @@ export class AuthService {
 
   // ─── Microsoft SSO Login ──────────────────────────────────────────
 
+  /** Signal: whether Microsoft SSO is enabled for this tenant. */
+  readonly microsoftSsoAvailable = signal(false);
+
   /**
-   * Initialise MSAL from the public SSO config endpoint.
-   * Safe to call multiple times — no-ops if already initialised.
+   * Check if Microsoft SSO is available by querying the public SSO config endpoint.
    */
-  async initMsal(): Promise<void> {
+  async checkMicrosoftSso(): Promise<void> {
     try {
       const res = await firstValueFrom(
-        this.http.get<{ success: boolean; data: { ssoProvider: string; ssoClientId: string; ssoTenantId: string; ssoEnabled: boolean } }>(
+        this.http.get<{ success: boolean; data: { ssoProvider: string; ssoEnabled: boolean } }>(
           `${API_URL}/auth/sso-config`,
         ),
       );
-      if (res.success && res.data) {
-        await this.msal.init(res.data);
+      if (res.success && res.data?.ssoProvider === 'microsoft' && res.data?.ssoEnabled) {
+        this.microsoftSsoAvailable.set(true);
       }
     } catch {
       // SSO config not available — that's fine, Microsoft login will be hidden
     }
   }
 
-  /** Whether Microsoft SSO is available and initialised. */
+  /** Whether Microsoft SSO is available and enabled. */
   get isMicrosoftSsoAvailable(): boolean {
-    return this.msal.available();
-  }
-
-  /** Get the MsalService instance (for direct Mail.Send token acquisition). */
-  getMsal(): MsalService {
-    return this.msal;
+    return this.microsoftSsoAvailable();
   }
 
   /**
-   * Login with Microsoft via MSAL popup → exchange token for Fueld session.
+   * Initiate Microsoft login by redirecting to the backend OAuth endpoint.
+   * The backend will redirect to Microsoft, then back to the returnUrl
+   * with a one-time code.
    */
-  async loginWithMicrosoft(): Promise<void> {
-    // Step 1: Get a Microsoft access token (User.Read scope) via popup
-    const authResult = await this.msal.loginPopup();
-    const msToken = authResult.accessToken;
+  loginWithMicrosoft(returnUrl: string): void {
+    const loginUrl = `${API_URL}/auth/microsoft/login?returnUrl=${encodeURIComponent(returnUrl)}`;
+    window.location.href = loginUrl;
+  }
 
-    // Step 2: Exchange it for Fueld JWT tokens via POST /auth/login/sso
+  /**
+   * Exchange a one-time Microsoft auth code for Fueld JWT tokens.
+   * Called by the login page when it detects ?microsoft_code=... in the URL.
+   */
+  async exchangeMicrosoftCode(code: string): Promise<void> {
     const res = await firstValueFrom(
       this.http.post<ApiResponse<LoginResponseDto>>(
-        `${API_URL}/auth/login/sso`,
-        { microsoftAccessToken: msToken },
+        `${API_URL}/auth/microsoft/exchange`,
+        { code },
       ),
     );
 
@@ -621,8 +622,6 @@ export class AuthService {
   logout(): void {
     this.clearRefreshTimer();
     this.wsService.disconnect();
-    // Clear MSAL cache too
-    this.msal.logout();
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
