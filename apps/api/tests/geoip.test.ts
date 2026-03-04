@@ -1,24 +1,32 @@
-import { afterEach, describe, expect, test } from 'bun:test';
-import { lookupIp, lookupIpSync } from '../src/modules/activity/geoip';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { __geoipTestUtils, lookupIp, lookupIpSync } from '../src/modules/activity/geoip';
 
-const originalFetch = globalThis.fetch;
+beforeEach(() => {
+  __geoipTestUtils.clearCache();
+});
 
 afterEach(() => {
-  globalThis.fetch = originalFetch;
+  __geoipTestUtils.clearCache();
+  __geoipTestUtils.resetFetchImpl();
 });
 
 describe('geoip', () => {
+  let sequence = 0;
+  const suiteSalt = (Date.now() ^ Math.floor(Math.random() * 1_000_000)) >>> 0;
+
   const uniqueIp = (lastOctet: number): string => {
-    const suffix = (Date.now() + Math.floor(Math.random() * 1000)) % 200;
-    return `198.51.${suffix}.${lastOctet}`;
+    sequence += 1;
+    const thirdOctet = ((suiteSalt >> 8) + sequence) % 256;
+    const fourthOctet = ((suiteSalt & 0xff) + lastOctet + sequence) % 256;
+    return `203.0.${thirdOctet}.${fourthOctet}`;
   };
 
-  test('returns empty for null or private IP without network calls', async () => {
+  test.serial('returns empty for null or private IP without network calls', async () => {
     let callCount = 0;
-    globalThis.fetch = (async (_input: RequestInfo | URL, _init?: RequestInit) => {
+    __geoipTestUtils.setFetchImpl((async (_input: RequestInfo | URL, _init?: RequestInit) => {
       callCount += 1;
       throw new Error('should not fetch');
-    }) as unknown as typeof globalThis.fetch;
+    }) as unknown as typeof globalThis.fetch);
 
     expect(await lookupIp(null)).toEqual({ country: null, city: null });
     expect(await lookupIp('127.0.0.1')).toEqual({ country: null, city: null });
@@ -27,11 +35,11 @@ describe('geoip', () => {
     expect(callCount).toBe(0);
   });
 
-  test('normalizes IPv4 with port and caches successful response', async () => {
+  test.serial('normalizes IPv4 with port and caches successful response', async () => {
     const baseIp = uniqueIp(42);
     const ipWithPort = `${baseIp}:52314`;
     let callCount = 0;
-    globalThis.fetch = (async (input: RequestInfo | URL, _init?: RequestInit) => {
+    __geoipTestUtils.setFetchImpl((async (input: RequestInfo | URL, _init?: RequestInit) => {
       callCount += 1;
       const url = String(input);
       expect(url).toContain(`/${baseIp}?fields=`);
@@ -39,7 +47,7 @@ describe('geoip', () => {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
-    }) as unknown as typeof globalThis.fetch;
+    }) as unknown as typeof globalThis.fetch);
 
     const first = await lookupIp(ipWithPort);
     const second = await lookupIp(baseIp);
@@ -49,13 +57,13 @@ describe('geoip', () => {
     expect(callCount).toBe(1);
   });
 
-  test('returns empty when provider reports non-success and then uses cached empty', async () => {
+  test.serial('returns empty when provider reports non-success and then uses cached empty', async () => {
     const ip = uniqueIp(11);
     let callCount = 0;
-    globalThis.fetch = (async (_input: RequestInfo | URL, _init?: RequestInit) => {
+    __geoipTestUtils.setFetchImpl((async (_input: RequestInfo | URL, _init?: RequestInit) => {
       callCount += 1;
       return new Response(JSON.stringify({ status: 'fail' }), { status: 200 });
-    }) as unknown as typeof globalThis.fetch;
+    }) as unknown as typeof globalThis.fetch);
 
     const first = await lookupIp(ip);
     const second = await lookupIp(ip);
@@ -65,17 +73,17 @@ describe('geoip', () => {
     expect(callCount).toBe(1);
   });
 
-  test('lookupIpSync returns empty immediately and hydrates cache in background', async () => {
+  test.serial('lookupIpSync returns empty immediately and hydrates cache in background', async () => {
     const ip = uniqueIp(21);
     let callCount = 0;
-    globalThis.fetch = (async (_input: RequestInfo | URL, _init?: RequestInit) => {
+    __geoipTestUtils.setFetchImpl((async (_input: RequestInfo | URL, _init?: RequestInit) => {
       callCount += 1;
       await new Promise((resolve) => setTimeout(resolve, 5));
       return new Response(
         JSON.stringify({ status: 'success', countryCode: 'NO', city: 'Oslo' }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       );
-    }) as unknown as typeof globalThis.fetch;
+    }) as unknown as typeof globalThis.fetch);
 
     const immediate = lookupIpSync(ip);
     expect(immediate).toEqual({ country: null, city: null });

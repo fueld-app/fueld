@@ -1445,13 +1445,6 @@ function buildOfferDocument(data: {
       { text: `${data.currency}/${item.unit}  ${formatNumber(item.salesPrice)}`, alignment: 'right' },
     ];
   });
-  const normalizedTableRows: TableCell[][] = tableRows.map((row) => {
-    const next = [...row];
-    while (next.length < tableHeader.length) {
-      next.push({ text: '' });
-    }
-    return next.slice(0, tableHeader.length);
-  });
 
   // Delivery date string
   let deliveryDateStr = '';
@@ -1602,7 +1595,7 @@ function buildOfferDocument(data: {
         table: {
           headerRows: 1,
           widths: ['*', 70, 35, 120],
-          body: [tableHeader, ...normalizedTableRows],
+          body: [tableHeader, ...tableRows],
         },
         layout: {
           hLineWidth: (i: number, node: { table: { body: unknown[] } }) =>
@@ -2030,13 +2023,6 @@ function buildProformaDocument(data: {
       { text: `${formatNumber(String(lineTotal), 2)} ${data.currency}`, alignment: 'right' },
     ];
   });
-  const normalizedTableRows: TableCell[][] = tableRows.map((row) => {
-    const next = [...row];
-    while (next.length < tableHeader.length) {
-      next.push({ text: '' });
-    }
-    return next.slice(0, tableHeader.length);
-  });
   const grandTotal = data.items.reduce((sum, item) => {
     const qty = parseFloat(item.quantity) || 0;
     const price = parseFloat(item.salesPrice ?? '0') || 0;
@@ -2186,7 +2172,7 @@ function buildProformaDocument(data: {
         table: {
           headerRows: 1,
           widths: ['*', 65, 35, 90, 110],
-          body: [tableHeader, ...normalizedTableRows],
+          body: [tableHeader, ...tableRows],
         },
         layout: {
           hLineWidth: (i: number, node: { table: { body: unknown[] } }) =>
@@ -2474,6 +2460,22 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
 export const __documentTestUtils = {
   trimTrailingSlash,
   getPublicApiBaseUrl,
+  sanitizePathSegment,
+  documentTypePrefix,
+  buildVerificationRef,
+  mapRevisionInfo,
+  getRevisionAbsolutePath,
+  resolveDocumentStreamTarget,
+  buildDocumentStreamKey,
+  toMs,
+  maxMs,
+  maxItemUpdatedAtMs,
+  persistDocumentRevision,
+  fetchInvoiceData,
+  fetchOrderForInvoice,
+  getCompanyRegistrationNumber,
+  loadOrderBankDetails,
+  overwriteDocumentRevisionArtifact,
   formatNumber,
   formatPhoneDisplay,
   phoneToTelUri,
@@ -2487,6 +2489,7 @@ export const __documentTestUtils = {
   buildOfferForAccountOfText,
   buildNotesSection,
   tryLoadLogoDataUrl,
+  createPdfBuffer,
   buildInvoiceDocument,
   buildOfferDocument,
   buildProformaDocument,

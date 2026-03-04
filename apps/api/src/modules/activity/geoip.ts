@@ -16,6 +16,7 @@ const EMPTY: GeoInfo = { country: null, city: null };
 
 const cache = new Map<string, { geo: GeoInfo; ts: number }>();
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+let testFetchImpl: typeof fetch | null = null;
 
 function getCached(ip: string): GeoInfo | null {
   const entry = cache.get(ip);
@@ -99,7 +100,8 @@ export async function lookupIp(ip: string | null): Promise<GeoInfo> {
   if (cached) return cached;
 
   try {
-    const res = await fetch(
+    const fetchImpl = testFetchImpl ?? fetch;
+    const res = await fetchImpl(
       `http://ip-api.com/json/${normalized}?fields=status,country,countryCode,city`,
       { signal: AbortSignal.timeout(3000) },
     );
@@ -140,3 +142,15 @@ export function lookupIpSync(ip: string | null): GeoInfo {
   lookupIp(ip).catch(() => {});
   return EMPTY;
 }
+
+export const __geoipTestUtils = {
+  clearCache(): void {
+    cache.clear();
+  },
+  setFetchImpl(fetchImpl: typeof fetch): void {
+    testFetchImpl = fetchImpl;
+  },
+  resetFetchImpl(): void {
+    testFetchImpl = null;
+  },
+};

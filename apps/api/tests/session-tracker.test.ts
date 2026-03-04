@@ -1,4 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, mock, test } from 'bun:test';
+import { __geoipTestUtils } from '../src/modules/activity/geoip';
 
 type SessionTrackerModule = typeof import('../src/modules/activity/session-tracker');
 let tracker: SessionTrackerModule;
@@ -42,21 +43,31 @@ beforeAll(async () => {
     },
   }));
 
-  mock.module('../src/modules/activity/geoip', () => ({
-    lookupIp: async () => geoLookupResponse,
-  }));
+  __geoipTestUtils.setFetchImpl((async () => new Response(JSON.stringify({
+    status: 'success',
+    countryCode: geoLookupResponse.country,
+    city: geoLookupResponse.city,
+  }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  })) as unknown as typeof globalThis.fetch);
 
   tracker = await import('../src/modules/activity/session-tracker');
+  // Restore global module mocking immediately after importing tracker
+  // so mocks don't leak into unrelated test files running in parallel.
+  mock.restore();
 });
 
 afterAll(() => {
-  mock.restore();
+  __geoipTestUtils.clearCache();
+  __geoipTestUtils.resetFetchImpl();
 });
 
 afterEach(async () => {
   resetTrackerState();
   loggedActivities.length = 0;
   geoLookupResponse = { country: null, city: null };
+  __geoipTestUtils.clearCache();
   await new Promise((resolve) => setTimeout(resolve, 320));
 });
 
