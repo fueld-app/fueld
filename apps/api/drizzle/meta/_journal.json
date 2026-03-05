@@ -260,6 +260,13 @@
       "when": 1772449800000,
       "tag": "0036_email_log",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1772536200000,
+      "tag": "0037_microsoft_refresh_tokens",
+      "breakpoints": true
     }
   ]
 }
