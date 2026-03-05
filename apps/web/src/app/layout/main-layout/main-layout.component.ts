@@ -21,6 +21,7 @@ import { WebSocketService } from '../../core/websocket/websocket.service';
 import { UserMenuComponent } from '../../shared/components/user-menu/user-menu.component';
 import type { ApiResponse, PlaceDto, VesselDto } from '@fueld/types';
 import { AppUpdateService } from '../../core/pwa/app-update.service';
+import { LlmHealthService } from '../../core/llm/llm-health.service';
 
 import { API } from '@app/core/config/api';
 
@@ -616,7 +617,8 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   private copyHandler: ((e: ClipboardEvent) => void) | null = null;
   private printHandler: (() => void) | null = null;
   private screenshotHandler: ((e: KeyboardEvent) => void) | null = null;
-  private llmHealthTimer: ReturnType<typeof setInterval> | null = null;
+
+  readonly llmHealth = inject(LlmHealthService);
 
   readonly sidebarOpen = signal(false);
   readonly commodityPrices = signal<CommodityPrice[]>([]);
@@ -639,7 +641,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
   // ─── LLM health (admin-only, polled) ────────────────────────────
   /** null = not yet checked, true/false = healthy/unhealthy */
-  readonly llmHealthy = signal<boolean | null>(null);
+  readonly llmHealthy = computed(() => this.llmHealth.healthy());
 
   private readonly updateReset = effect(() => {
     if (this.updateService.updateAvailable()) {
@@ -721,8 +723,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
     // Poll LLM health if admin (every 60s)
     if (this.auth.isAdmin()) {
-      this.pollLlmHealth();
-      this.llmHealthTimer = setInterval(() => this.pollLlmHealth(), 60_000);
+      this.llmHealth.startPolling();
     }
   }
 
@@ -738,9 +739,6 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     }
     if (this.screenshotHandler) {
       document.removeEventListener('keydown', this.screenshotHandler as EventListener);
-    }
-    if (this.llmHealthTimer) {
-      clearInterval(this.llmHealthTimer);
     }
   }
 
@@ -1014,17 +1012,6 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
       }
     } catch { /* ignore */ } finally {
       this.rfqLoading.set(false);
-    }
-  }
-
-  private async pollLlmHealth(): Promise<void> {
-    try {
-      const res = await firstValueFrom(
-        this.http.get<ApiResponse<{ healthy: boolean }>>(`${API}/admin/llm/health`),
-      );
-      this.llmHealthy.set(res.data?.healthy ?? false);
-    } catch {
-      this.llmHealthy.set(false);
     }
   }
 

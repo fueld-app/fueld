@@ -12,6 +12,7 @@ import { DatePipe, JsonPipe, DecimalPipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
 import type { ApiResponse } from '@fueld/types';
 import { API } from '@app/core/config/api';
+import { LlmHealthService } from '@app/core/llm/llm-health.service';
 
 // ─── Interfaces ──────────────────────────────────────────────────────
 
@@ -523,6 +524,7 @@ interface HfFile {
 })
 export class LlmPageComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
+  private readonly llmHealth = inject(LlmHealthService);
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private modelSearchTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -710,6 +712,7 @@ export class LlmPageComponent implements OnInit, OnDestroy {
       this.serverMessageSuccess.set(false);
     }
     await this.loadStatus();
+    this.llmHealth.refresh();
     this.starting.set(false);
   }
 
@@ -725,6 +728,7 @@ export class LlmPageComponent implements OnInit, OnDestroy {
       this.serverMessageSuccess.set(false);
     }
     await this.loadStatus();
+    this.llmHealth.refresh();
     this.stopping.set(false);
   }
 
