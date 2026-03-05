@@ -1207,6 +1207,7 @@ export const emailLog = pgTable('email_log', {
   sentFromEmail: text('sent_from_email').notNull(),
   sentTo: text('sent_to').notNull(),
   ccEmails: text('cc_emails'),                           // comma-separated
+  bccEmails: text('bcc_emails'),                         // comma-separated
   subject: text('subject').notNull(),
   pdfFileName: text('pdf_file_name'),
   channel: text('channel').notNull().default('SMTP'),     // 'SMTP' | 'GRAPH'
@@ -1223,3 +1224,48 @@ export const emailLogRelations = relations(emailLog, ({ one }) => ({
 
 export type EmailLog = typeof emailLog.$inferSelect;
 export type NewEmailLog = typeof emailLog.$inferInsert;
+
+// ═══════════════════════════════════════════════════════════════════════
+//  EMAIL TEMPLATES (global per tenant × document type)
+// ═══════════════════════════════════════════════════════════════════════
+
+export const emailTemplates = pgTable('email_templates', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  documentType: text('document_type').notNull(),          // 'OFFER' | 'NOMINATION' | 'PROFORMA' | 'INVOICE'
+  subjectTemplate: text('subject_template').notNull().default(''),
+  bodyTemplate: text('body_template').notNull().default(''),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  // DB-level UNIQUE(tenant_id, document_type) enforced by migration
+});
+
+export const emailTemplatesRelations = relations(emailTemplates, ({ one }) => ({
+  tenant: one(tenants, { fields: [emailTemplates.tenantId], references: [tenants.id] }),
+}));
+
+export type EmailTemplate = typeof emailTemplates.$inferSelect;
+export type NewEmailTemplate = typeof emailTemplates.$inferInsert;
+
+// ═══════════════════════════════════════════════════════════════════════
+//  EMAIL RULES (default CC/BCC per own company × document type)
+// ═══════════════════════════════════════════════════════════════════════
+
+export const emailRules = pgTable('email_rules', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  ownCompanyId: uuid('own_company_id').references(() => counterparties.id, { onDelete: 'cascade' }),  // NULL = all own companies
+  documentType: text('document_type'),                    // NULL = all document types
+  ruleType: text('rule_type').notNull(),                  // 'CC' | 'BCC'
+  email: text('email').notNull(),
+  label: text('label'),                                    // optional display label
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const emailRulesRelations = relations(emailRules, ({ one }) => ({
+  tenant: one(tenants, { fields: [emailRules.tenantId], references: [tenants.id] }),
+  ownCompany: one(counterparties, { fields: [emailRules.ownCompanyId], references: [counterparties.id] }),
+}));
+
+export type EmailRule = typeof emailRules.$inferSelect;
+export type NewEmailRule = typeof emailRules.$inferInsert;

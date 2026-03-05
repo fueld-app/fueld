@@ -771,6 +771,7 @@ interface TeamUserOption {
       [senderName]="auth.userName()"
       [senderEmail]="auth.userEmail()"
       [pdfFileName]="emailPdfFileName()"
+      [orderId]="orderId()"
       [waLinked]="waLinked()"
       [defaultPhone]="customerContact()?.phone ?? null"
       (sendEmail)="onSendEmail($event)"
@@ -2361,6 +2362,9 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
         recipientEmail: string;
         recipientName: string;
         ccEmails: string[];
+        bccEmails: string[];
+        defaultCcEmails: Array<{ email: string; label: string | null }>;
+        defaultBccEmails: Array<{ email: string; label: string | null }>;
         subject: string;
         htmlBody: string;
         senderName: string;
@@ -2379,6 +2383,9 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
           this.emailModal()?.showWith({
             recipientEmail: d.recipientEmail,
             ccEmails: d.ccEmails,
+            bccEmails: d.bccEmails ?? [],
+            defaultCcEmails: d.defaultCcEmails ?? [],
+            defaultBccEmails: d.defaultBccEmails ?? [],
             subject: d.subject,
             htmlBody: d.htmlBody,
           });
@@ -2400,6 +2407,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
           documentType: payload.documentType,
           recipientEmail: payload.recipientEmail,
           ccEmails: payload.ccEmails,
+          bccEmails: payload.bccEmails,
           subject: payload.subject,
           htmlBody: payload.htmlBody,
         },

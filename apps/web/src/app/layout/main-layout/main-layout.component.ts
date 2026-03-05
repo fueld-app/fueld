@@ -120,6 +120,7 @@ const NAVIGATION: NavItem[] = [
       { label: 'Security', route: '/admin/security' },
       { label: 'Settings', route: '/admin/settings' },
       { label: 'LLM / AI', route: '/admin/llm' },
+      { label: 'Email', route: '/admin/email' },
     ],
   },
 ];

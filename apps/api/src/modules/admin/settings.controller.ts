@@ -62,6 +62,15 @@ import {
   isAppConfigured as isQBAppConfigured,
 } from '../quickbooks/quickbooks.service';
 import { updateUserTeam } from './admin.service';
+import {
+  getEmailTemplates,
+  upsertEmailTemplate,
+  deleteEmailTemplate,
+  getEmailRules,
+  createEmailRule,
+  deleteEmailRule,
+  TEMPLATE_VARIABLES,
+} from './email-settings.service';
 import type { ApiResponse } from '@fueld/types';
 
 function requireAdmin(auth: { role: string } | undefined) {
@@ -1179,4 +1188,123 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       incomingRfqEnabled: t.Optional(t.Boolean()),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update WhatsApp integration settings' },
+  })
+
+  // ═════════════════════════════════════════════════════════════
+  //  EMAIL TEMPLATES
+  // ═════════════════════════════════════════════════════════════
+
+  .get('/email-templates', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getEmailTemplates(auth.tenantId);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'List all email templates for this tenant' },
+  })
+
+  .put('/email-templates/:documentType', async ({ auth, params, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await upsertEmailTemplate(auth.tenantId, params.documentType, body.subjectTemplate, body.bodyTemplate);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    params: t.Object({ documentType: t.String() }),
+    body: t.Object({
+      subjectTemplate: t.String(),
+      bodyTemplate: t.String(),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Create or update an email template' },
+  })
+
+  .delete('/email-templates/:documentType', async ({ auth, params }) => {
+    try {
+      requireAdmin(auth);
+      await deleteEmailTemplate(auth.tenantId, params.documentType);
+      return { success: true, data: null } satisfies ApiResponse<null>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    params: t.Object({ documentType: t.String() }),
+    detail: { tags: ['Admin Settings'], summary: 'Delete an email template' },
+  })
+
+  .get('/email-templates/variables', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      return { success: true, data: TEMPLATE_VARIABLES } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'List available template variables' },
+  })
+
+  // ═════════════════════════════════════════════════════════════
+  //  EMAIL RULES (default CC / BCC)
+  // ═════════════════════════════════════════════════════════════
+
+  .get('/email-rules', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getEmailRules(auth.tenantId);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'List all email rules for this tenant' },
+  })
+
+  .post('/email-rules', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await createEmailRule({
+        tenantId: auth.tenantId,
+        ownCompanyId: body.ownCompanyId,
+        documentType: body.documentType,
+        ruleType: body.ruleType as 'CC' | 'BCC',
+        email: body.email,
+        label: body.label,
+      });
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      ownCompanyId: t.Optional(t.Nullable(t.String())),
+      documentType: t.Optional(t.Nullable(t.String())),
+      ruleType: t.Union([t.Literal('CC'), t.Literal('BCC')]),
+      email: t.String({ format: 'email' }),
+      label: t.Optional(t.Nullable(t.String())),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Create an email rule (default CC/BCC)' },
+  })
+
+  .delete('/email-rules/:ruleId', async ({ auth, params }) => {
+    try {
+      requireAdmin(auth);
+      await deleteEmailRule(params.ruleId, auth.tenantId);
+      return { success: true, data: null } satisfies ApiResponse<null>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    params: t.Object({ ruleId: t.String() }),
+    detail: { tags: ['Admin Settings'], summary: 'Delete an email rule' },
   });

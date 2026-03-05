@@ -6,6 +6,7 @@ import { sendDocumentEmail, buildDocumentEmailHtml, buildDocumentEmailSubject, t
 import { resolveOrderId, getOrderById } from '../orders/orders.service';
 import { db } from '../../db';
 import { users, counterparties, invoices as invoicesTable } from '../../db/schema';
+import { getEmailTemplate, getApplicableEmailRules, renderTemplate, type TemplateVariables } from '../admin/email-settings.service';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Documents Controller
@@ -237,6 +238,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         senderName,
         recipientEmail: body.recipientEmail,
         ccEmails: body.ccEmails ?? [],
+        bccEmails: body.bccEmails ?? [],
         subject: body.subject,
         htmlBody: body.htmlBody,
         pdfBuffer,
@@ -261,6 +263,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         ], { description: 'Type of document to send' }),
         recipientEmail: t.String({ format: 'email', description: 'Primary recipient email address' }),
         ccEmails: t.Optional(t.Array(t.String({ format: 'email' }), { description: 'CC email addresses' })),
+        bccEmails: t.Optional(t.Array(t.String({ format: 'email' }), { description: 'BCC email addresses' })),
         subject: t.String({ description: 'Email subject line' }),
         htmlBody: t.String({ description: 'HTML email body' }),
       }),
@@ -292,6 +295,13 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       const portName = order.place?.name ?? 'Port';
       const orderNumber = order.orderNumber ?? orderId.slice(0, 8).toUpperCase();
 
+      const docLabels: Record<DocumentEmailType, string> = {
+        OFFER: 'Offer / Confirmation',
+        NOMINATION: 'Nomination',
+        PROFORMA: 'Proforma Invoice',
+        INVOICE: 'Invoice',
+      };
+
       // Determine recipient based on document type
       let recipientEmail = '';
       let recipientName = '';
@@ -310,6 +320,28 @@ export const documentsController = new Elysia({ prefix: '/orders' })
 
       // Build default CC list: sender's own email (so they get a copy)
       const ccEmails = [auth.email];
+      const bccEmails: string[] = [];
+
+      // ── Apply email rules (default CC/BCC from admin config) ──
+      const defaultCcEmails: Array<{ email: string; label: string | null }> = [];
+      const defaultBccEmails: Array<{ email: string; label: string | null }> = [];
+      try {
+        const rules = await getApplicableEmailRules(auth.tenantId, order.invoicingCompanyId ?? null, docType);
+        for (const rule of rules) {
+          if (rule.ruleType === 'CC') {
+            // Avoid duplicating the sender's own email
+            if (!ccEmails.includes(rule.email)) {
+              ccEmails.push(rule.email);
+            }
+            defaultCcEmails.push({ email: rule.email, label: rule.label });
+          } else if (rule.ruleType === 'BCC') {
+            bccEmails.push(rule.email);
+            defaultBccEmails.push({ email: rule.email, label: rule.label });
+          }
+        }
+      } catch (err) {
+        console.error('[Documents] Failed to load email rules:', err);
+      }
 
       // Payment terms
       const paymentTerms = order.customerPaymentTermType
@@ -329,22 +361,66 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         invoiceNumber = inv?.invoiceNumber ?? undefined;
       }
 
-      const subject = buildDocumentEmailSubject({ documentType: docType, orderNumber, vesselName, portName, invoiceNumber });
-      const htmlBody = buildDocumentEmailHtml({
-        documentType: docType,
-        senderName,
+      // ── Build subject and body — use admin template if available ──
+      const templateVars: TemplateVariables = {
         vesselName,
         portName,
         orderNumber,
-        paymentTerms,
-        customerNote: docType === 'NOMINATION' ? order.supplierNote ?? null : order.customerNote ?? null,
-        itemNotes: order.items
-          ?.filter((item: any) => item.customerNote)
-          .map((item: any) => ({
-            label: item.productType,
-            note: String(item.customerNote),
-          })) ?? [],
-      });
+        documentLabel: docLabels[docType],
+        senderName,
+        paymentTerms: paymentTerms ?? '',
+        customerNote: order.customerNote ?? '',
+        supplierNote: order.supplierNote ?? '',
+        invoiceNumber: invoiceNumber ?? '',
+      };
+
+      let subject: string;
+      let htmlBody: string;
+
+      try {
+        const template = await getEmailTemplate(auth.tenantId, docType);
+        if (template && template.subjectTemplate) {
+          subject = renderTemplate(template.subjectTemplate, templateVars);
+        } else {
+          subject = buildDocumentEmailSubject({ documentType: docType, orderNumber, vesselName, portName, invoiceNumber });
+        }
+        if (template && template.bodyTemplate) {
+          htmlBody = renderTemplate(template.bodyTemplate, templateVars);
+        } else {
+          htmlBody = buildDocumentEmailHtml({
+            documentType: docType,
+            senderName,
+            vesselName,
+            portName,
+            orderNumber,
+            paymentTerms,
+            customerNote: docType === 'NOMINATION' ? order.supplierNote ?? null : order.customerNote ?? null,
+            itemNotes: order.items
+              ?.filter((item: any) => item.customerNote)
+              .map((item: any) => ({
+                label: item.productType,
+                note: String(item.customerNote),
+              })) ?? [],
+          });
+        }
+      } catch {
+        subject = buildDocumentEmailSubject({ documentType: docType, orderNumber, vesselName, portName, invoiceNumber });
+        htmlBody = buildDocumentEmailHtml({
+          documentType: docType,
+          senderName,
+          vesselName,
+          portName,
+          orderNumber,
+          paymentTerms,
+          customerNote: docType === 'NOMINATION' ? order.supplierNote ?? null : order.customerNote ?? null,
+          itemNotes: order.items
+            ?.filter((item: any) => item.customerNote)
+            .map((item: any) => ({
+              label: item.productType,
+              note: String(item.customerNote),
+            })) ?? [],
+        });
+      }
 
       return {
         success: true,
@@ -352,6 +428,9 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           recipientEmail,
           recipientName,
           ccEmails,
+          bccEmails,
+          defaultCcEmails,
+          defaultBccEmails,
           subject,
           htmlBody,
           senderName,
@@ -372,6 +451,96 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       detail: {
         tags: ['Documents'],
         summary: 'Get pre-filled email defaults for a document type',
+        security: [{ bearerAuth: [] }],
+      },
+    },
+  )
+
+  // ── GET /orders/:id/contacts/search ────────────────────────────────
+  // Search contacts + emails for the order's customer/supplier (for typeahead)
+  .get(
+    '/:id/contacts/search',
+    async ({ params, query, auth, set }) => {
+      const orderId = await resolveOrderId(params.id);
+      if (!orderId) { set.status = 404; return { success: false, data: [], message: 'Order not found' }; }
+
+      const order = await getOrderById(orderId);
+      if (!order) { set.status = 404; return { success: false, data: [], message: 'Order not found' }; }
+
+      const q = (query.q ?? '').toLowerCase().trim();
+
+      // Gather all counterparty IDs related to this order
+      const companyIds = new Set<string>();
+      if (order.clientId) companyIds.add(order.clientId);
+      if (order.supplierId) companyIds.add(order.supplierId);
+
+      if (companyIds.size === 0) {
+        return { success: true, data: [] };
+      }
+
+      // Fetch contacts and emails from those companies
+      const { companyContacts, companyEmails } = await import('../../db/schema');
+      const { inArray } = await import('drizzle-orm');
+
+      const [contacts, emails] = await Promise.all([
+        db
+          .select({
+            id: companyContacts.id,
+            name: companyContacts.name,
+            email: companyContacts.email,
+            role: companyContacts.role,
+            counterpartyId: companyContacts.counterpartyId,
+          })
+          .from(companyContacts)
+          .where(inArray(companyContacts.counterpartyId, [...companyIds])),
+        db
+          .select({
+            id: companyEmails.id,
+            email: companyEmails.email,
+            label: companyEmails.label,
+            emailType: companyEmails.emailType,
+            counterpartyId: companyEmails.counterpartyId,
+          })
+          .from(companyEmails)
+          .where(inArray(companyEmails.counterpartyId, [...companyIds])),
+      ]);
+
+      // Merge into a flat list of {email, name/label, source}
+      const results: Array<{ email: string; name: string; source: 'contact' | 'company_email' }> = [];
+
+      for (const c of contacts) {
+        if (c.email) {
+          const label = c.name + (c.role ? ` (${c.role})` : '');
+          if (!q || label.toLowerCase().includes(q) || c.email.toLowerCase().includes(q)) {
+            results.push({ email: c.email, name: label, source: 'contact' });
+          }
+        }
+      }
+
+      for (const e of emails) {
+        const label = e.label || e.emailType || 'Email';
+        if (!q || label.toLowerCase().includes(q) || e.email.toLowerCase().includes(q)) {
+          results.push({ email: e.email, name: label, source: 'company_email' });
+        }
+      }
+
+      // Deduplicate by email
+      const seen = new Set<string>();
+      const deduped = results.filter((r) => {
+        const key = r.email.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+      return { success: true, data: deduped.slice(0, 20) };
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      query: t.Object({ q: t.Optional(t.String()) }),
+      detail: {
+        tags: ['Documents'],
+        summary: 'Search contacts for email typeahead',
         security: [{ bearerAuth: [] }],
       },
     },

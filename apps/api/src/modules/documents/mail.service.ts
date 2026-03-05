@@ -36,6 +36,8 @@ export interface SendDocumentEmailOptions {
   recipientEmail: string;
   /** CC email addresses */
   ccEmails: string[];
+  /** BCC email addresses */
+  bccEmails: string[];
   /** Email subject line */
   subject: string;
   /** HTML email body */
@@ -54,6 +56,7 @@ interface GraphMailPayload {
     body: { contentType: string; content: string };
     toRecipients: Array<{ emailAddress: { address: string } }>;
     ccRecipients?: Array<{ emailAddress: { address: string } }>;
+    bccRecipients?: Array<{ emailAddress: { address: string } }>;
     attachments?: Array<{
       '@odata.type': string;
       name: string;
@@ -94,6 +97,12 @@ async function sendViaGraph(options: SendDocumentEmailOptions, accessToken: stri
     }));
   }
 
+  if (options.bccEmails.length > 0) {
+    payload.message.bccRecipients = options.bccEmails.map((email) => ({
+      emailAddress: { address: email },
+    }));
+  }
+
   const res = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
     method: 'POST',
     headers: {
@@ -130,6 +139,7 @@ async function sendViaSmtp(options: SendDocumentEmailOptions): Promise<void> {
     replyTo: `"${options.senderName}" <${options.senderEmail}>`,
     to: options.recipientEmail,
     cc: options.ccEmails.length > 0 ? options.ccEmails.join(', ') : undefined,
+    bcc: options.bccEmails.length > 0 ? options.bccEmails.join(', ') : undefined,
     subject: options.subject,
     html: options.htmlBody,
     attachments: [
@@ -190,6 +200,7 @@ async function logEmail(
       sentFromEmail: options.senderEmail,
       sentTo: options.recipientEmail,
       ccEmails: options.ccEmails.length > 0 ? options.ccEmails.join(', ') : null,
+      bccEmails: options.bccEmails.length > 0 ? options.bccEmails.join(', ') : null,
       subject: options.subject,
       pdfFileName: options.pdfFileName,
       channel,

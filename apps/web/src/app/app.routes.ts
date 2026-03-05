@@ -315,6 +315,14 @@ export const routes: Routes = [
               ),
             title: 'Admin > LLM',
           },
+          {
+            path: 'email',
+            loadComponent: () =>
+              import('./features/admin/pages/email-settings/email-settings-page.component').then(
+                (m) => m.EmailSettingsPageComponent,
+              ),
+            title: 'Admin > Email',
+          },
         ],
       },
       // ── Account ──
