@@ -36,6 +36,12 @@ interface OAuthState {
   returnUrl: string;
   nonce: string;
   ts: number;
+  /** 'login' (default/SSO) or 'connect' (link account from settings) */
+  purpose?: 'login' | 'connect';
+  /** For 'connect' flow: the authenticated user's ID */
+  userId?: string;
+  /** For 'connect' flow: the user's Fueld email (for validation) */
+  userEmail?: string;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────
@@ -249,25 +255,59 @@ export function consumeOneTimeCode(code: string): PendingAuth | null {
 // ─── Redirect URI Helper ────────────────────────────────────────────
 
 /**
- * Determine the Microsoft OAuth redirect URI.
- * Uses APP_URL env var (the API's public-facing base URL).
+ * Derive the Microsoft OAuth redirect URI from the incoming request URL.
+ * Strips the path back to the API base and appends /auth/microsoft/callback.
  *
  * Examples:
- *   APP_URL=http://localhost:3000       → http://localhost:3000/auth/microsoft/callback
- *   APP_URL=https://api.fueld.com      → https://api.fueld.com/auth/microsoft/callback
- *   APP_URL=https://app.fueld.com/api  → https://app.fueld.com/api/auth/microsoft/callback
+ *   http://localhost:3000/auth/microsoft/login  → http://localhost:3000/auth/microsoft/callback
+ *   https://app.fueld.com/api/auth/microsoft/callback → https://app.fueld.com/api/auth/microsoft/callback
  */
-export function getMicrosoftRedirectUri(): string {
-  const appUrl = process.env['APP_URL'];
-  if (!appUrl) {
-    throw new Error(
-      'APP_URL environment variable is required for Microsoft OAuth. ' +
-      'Set it to the API\'s public-facing base URL (e.g. https://api.fueld.com).',
-    );
-  }
-  // Strip trailing slash
-  const base = appUrl.replace(/\/+$/, '');
-  return `${base}/auth/microsoft/callback`;
+export function getMicrosoftRedirectUri(requestUrl: string): string {
+  const url = new URL(requestUrl);
+  // Find where "/auth/microsoft" starts in the path to determine the API prefix
+  const authIdx = url.pathname.indexOf('/auth/microsoft');
+  const prefix = authIdx > 0 ? url.pathname.slice(0, authIdx) : '';
+  return `${url.origin}${prefix}/auth/microsoft/callback`;
+}
+
+/**
+ * Build a connect-purpose authorization URL.
+ * Reuses buildAuthorizationUrl but embeds purpose + userId in state.
+ */
+export function buildConnectAuthorizationUrl(
+  config: MicrosoftSsoConfig,
+  redirectUri: string,
+  returnUrl: string,
+  userId: string,
+  userEmail: string,
+  forceUserEmail: boolean,
+): string {
+  const tenantId = config.ssoTenantId || 'common';
+  const base = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize`;
+
+  const state = signState({
+    returnUrl,
+    nonce: randomBytes(16).toString('hex'),
+    ts: Date.now(),
+    purpose: 'connect',
+    userId,
+    userEmail,
+  });
+
+  const params = new URLSearchParams({
+    client_id: config.ssoClientId,
+    response_type: 'code',
+    redirect_uri: redirectUri,
+    scope: SCOPES.join(' '),
+    response_mode: 'query',
+    state,
+    // Pre-fill the email so users connect the correct account
+    login_hint: userEmail,
+    // If forced, don't let them switch accounts
+    ...(forceUserEmail ? { prompt: 'consent' } : { prompt: 'select_account' }),
+  });
+
+  return `${base}?${params.toString()}`;
 }
 
 /**

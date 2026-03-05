@@ -336,6 +336,71 @@ import { API } from '@app/core/config/api';
             </div>
           </div>
 
+          <!-- ════════════════════════════════════════════════════════ -->
+          <!--  Microsoft Email Policy                                  -->
+          <!-- ════════════════════════════════════════════════════════ -->
+          <div class="flex flex-col rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
+              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" viewBox="0 0 23 23" fill="currentColor">
+                  <path d="M1 1h10v10H1z"/>
+                  <path d="M12 1h10v10H12z"/>
+                  <path d="M1 12h10v10H1z"/>
+                  <path d="M12 12h10v10H12z"/>
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-semibold text-gray-900">Microsoft Email Policy</h3>
+                <p class="text-xs text-gray-500">Control which Microsoft accounts users can connect for sending emails.</p>
+              </div>
+            </div>
+            <div class="flex-1 px-6 py-5 space-y-5">
+              <!-- Force same email toggle -->
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-sm font-medium text-gray-900">Require matching email</p>
+                  <p class="text-xs text-gray-500">Users must connect the same Microsoft email as their Fueld account.</p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  (click)="microsoftForceEmail.set(!microsoftForceEmail())"
+                  [class]="microsoftForceEmail() ? 'bg-brand-600' : 'bg-gray-200'"
+                  class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
+                  [attr.aria-checked]="microsoftForceEmail()"
+                >
+                  <span
+                    [class]="microsoftForceEmail() ? 'translate-x-5' : 'translate-x-0'"
+                    class="pointer-events-none inline-block h-5 w-5 translate-y-0.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                  ></span>
+                </button>
+              </div>
+
+              <!-- Approved domains -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Approved email domains</label>
+                <input
+                  type="text"
+                  [ngModel]="approvedDomainsInput()"
+                  (ngModelChange)="approvedDomainsInput.set($event)"
+                  name="approvedDomains"
+                  placeholder="e.g. thebunkerfirm.com, fueld.com"
+                  class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                />
+                <p class="mt-1 text-xs text-gray-500">Comma-separated list of allowed email domains. Leave empty to allow any domain.</p>
+              </div>
+            </div>
+            <div class="border-t border-gray-100 px-6 py-3 bg-gray-50/50 flex justify-end">
+              <button
+                (click)="saveMicrosoftPolicy()"
+                [disabled]="saving()"
+                class="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
+              >
+                {{ saving() ? 'Saving...' : 'Save Email Policy' }}
+              </button>
+            </div>
+          </div>
+
           <!-- Success toast -->
           @if (saveSuccess()) {
             <div class="fixed bottom-6 right-6 rounded-lg bg-green-600 px-4 py-3 text-sm font-medium text-white shadow-lg animate-in fade-in slide-in-from-bottom-4">
@@ -373,6 +438,10 @@ export class SecurityPageComponent implements OnInit {
   readonly sessionTimeoutMinutes = signal(480);
   readonly documentVerificationLinkExpiryDays = signal(0);
 
+  // Microsoft Email Policy
+  readonly microsoftForceEmail = signal(false);
+  readonly approvedDomainsInput = signal('');
+
   ngOnInit(): void {
     this.loadSettings();
   }
@@ -393,6 +462,8 @@ export class SecurityPageComponent implements OnInit {
         this.tokenExpirationMinutes.set(res.data.tokenExpirationMinutes);
         this.sessionTimeoutMinutes.set(res.data.sessionTimeoutMinutes);
         this.documentVerificationLinkExpiryDays.set(res.data.documentVerificationLinkExpiryDays ?? 0);
+        this.microsoftForceEmail.set(res.data.microsoftConnectForceUserEmail ?? false);
+        this.approvedDomainsInput.set((res.data.approvedEmailDomains ?? []).join(', '));
       }
     } catch {
       // silent
@@ -456,6 +527,27 @@ export class SecurityPageComponent implements OnInit {
           tokenExpirationMinutes: this.tokenExpirationMinutes(),
           sessionTimeoutMinutes: this.sessionTimeoutMinutes(),
           documentVerificationLinkExpiryDays: this.documentVerificationLinkExpiryDays(),
+        }),
+      );
+      this.showSuccess();
+    } catch {
+      // silent
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  async saveMicrosoftPolicy(): Promise<void> {
+    this.saving.set(true);
+    try {
+      const domains = this.approvedDomainsInput()
+        .split(',')
+        .map((d) => d.trim())
+        .filter((d) => d.length > 0);
+      await firstValueFrom(
+        this.http.put(`${API}/admin/security`, {
+          microsoftConnectForceUserEmail: this.microsoftForceEmail(),
+          approvedEmailDomains: domains,
         }),
       );
       this.showSuccess();

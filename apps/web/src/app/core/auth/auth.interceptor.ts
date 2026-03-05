@@ -24,7 +24,8 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     req.url.includes('/auth/login') ||
     req.url.includes('/auth/register') ||
     req.url.includes('/auth/sso-config') ||
-    req.url.includes('/auth/microsoft/')
+    req.url.includes('/auth/microsoft/login') ||
+    req.url.includes('/auth/microsoft/callback')
   ) {
     return next(req);
   }

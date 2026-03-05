@@ -1134,6 +1134,8 @@ export interface SecuritySettingsDto {
   tokenExpirationMinutes: number;
   sessionTimeoutMinutes: number;
   documentVerificationLinkExpiryDays: number; // 0 = never expires
+  approvedEmailDomains: string[];             // Restrict Microsoft connect to these domains
+  microsoftConnectForceUserEmail: boolean;    // Force Microsoft connect to match Fueld email
 }
 
 export interface UpdateSecuritySettingsDto {
@@ -1148,6 +1150,8 @@ export interface UpdateSecuritySettingsDto {
   tokenExpirationMinutes?: number;
   sessionTimeoutMinutes?: number;
   documentVerificationLinkExpiryDays?: number;
+  approvedEmailDomains?: string[];
+  microsoftConnectForceUserEmail?: boolean;
 }
 
 // ═══════════════════════════════════════════════════════════════════════

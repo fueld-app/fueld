@@ -485,6 +485,92 @@ import type { PasskeyDto, ApiResponse } from '@fueld/types';
           </div>
         }
       </div>
+
+      <!-- ═══════════════════════════════════════════════════════════ -->
+      <!--  Microsoft 365                                              -->
+      <!-- ═══════════════════════════════════════════════════════════ -->
+      <div class="flex flex-col rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div class="flex items-start gap-3">
+          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" viewBox="0 0 23 23" fill="currentColor">
+              <path d="M1 1h10v10H1z"/>
+              <path d="M12 1h10v10H12z"/>
+              <path d="M1 12h10v10H1z"/>
+              <path d="M12 12h10v10H12z"/>
+            </svg>
+          </div>
+          <div>
+            <h2 class="text-lg font-bold text-gray-900">Microsoft 365</h2>
+            <p class="mt-1 text-sm text-gray-500">
+              Connect your Microsoft account to send emails via Outlook directly from Fueld.
+            </p>
+          </div>
+        </div>
+
+        @if (msError()) {
+          <div class="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">
+            {{ msError() }}
+          </div>
+        }
+
+        @if (msSuccess()) {
+          <div class="mt-3 rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 text-sm text-green-700">
+            {{ msSuccess() }}
+          </div>
+        }
+
+        @if (msLoading()) {
+          <div class="mt-4 flex items-center gap-3 text-sm text-gray-400">
+            <svg class="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            Checking Microsoft status…
+          </div>
+        } @else if (msConnected()) {
+          <div class="mt-4 flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 p-4">
+            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-100">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-600" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
+              </svg>
+            </div>
+            <div class="flex-1">
+              <p class="text-sm font-semibold text-green-900">Microsoft account connected</p>
+              <p class="text-sm text-green-700">Emails will be sent via your Outlook mailbox.</p>
+            </div>
+          </div>
+
+          <button
+            (click)="disconnectMicrosoft()"
+            [disabled]="msDisconnecting()"
+            class="mt-4 rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-600
+                   hover:bg-red-50 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50"
+          >
+            @if (msDisconnecting()) { Disconnecting… } @else { Disconnect Microsoft }
+          </button>
+        } @else if (!msConfigured()) {
+          <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+            <p class="text-sm text-amber-700">
+              Microsoft integration has not been configured yet. Ask an administrator to set it up in Admin → Integrations.
+            </p>
+          </div>
+        } @else {
+          <button
+            (click)="connectMicrosoft()"
+            class="mt-4 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white
+                   shadow-sm transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500
+                   focus:ring-offset-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 23 23" fill="currentColor">
+              <path d="M1 1h10v10H1z"/>
+              <path d="M12 1h10v10H12z"/>
+              <path d="M1 12h10v10H1z"/>
+              <path d="M12 12h10v10H12z"/>
+            </svg>
+            Connect Microsoft Account
+          </button>
+        }
+      </div>
       </div>
     </div>
   `,
@@ -534,6 +620,14 @@ export class TwoFactorSetupPageComponent implements OnInit, OnDestroy {
   readonly waError = signal('');
   private waSubs: Subscription[] = [];
 
+  // Microsoft 365 state
+  readonly msConnected = signal(false);
+  readonly msConfigured = signal(true);  // assume configured until status check
+  readonly msLoading = signal(true);
+  readonly msDisconnecting = signal(false);
+  readonly msError = signal('');
+  readonly msSuccess = signal('');
+
   async ngOnInit(): Promise<void> {
     // Load phone
     this.phoneValue = this.auth.userPhone() || '';
@@ -558,6 +652,29 @@ export class TwoFactorSetupPageComponent implements OnInit, OnDestroy {
         this.waQrDataUrl.set('');
       }),
     );
+
+    // ── Microsoft 365 status ──
+    this.loadMicrosoftStatus();
+    // Check if we just returned from the Microsoft connect flow
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('microsoft_connected') === 'true') {
+      this.msConnected.set(true);
+      this.msLoading.set(false);
+      this.msSuccess.set('Microsoft account connected successfully.');
+      setTimeout(() => this.msSuccess.set(''), 5000);
+      // Clean up URL
+      const url = new URL(window.location.href);
+      url.searchParams.delete('microsoft_connected');
+      window.history.replaceState({}, '', url.toString());
+    }
+    if (params.get('microsoft_error')) {
+      this.msLoading.set(false);
+      this.msError.set(decodeURIComponent(params.get('microsoft_error')!));
+      // Clean up URL
+      const url = new URL(window.location.href);
+      url.searchParams.delete('microsoft_error');
+      window.history.replaceState({}, '', url.toString());
+    }
 
     const user = this.auth.user();
     if (user?.is2faEnabled) {
@@ -727,6 +844,63 @@ export class TwoFactorSetupPageComponent implements OnInit, OnDestroy {
       this.passkeyError.set(
         err instanceof Error ? err.message : 'Failed to remove passkey.',
       );
+    }
+  }
+
+  // ─── Microsoft 365 Methods ──────────────────────────────────────────
+
+  async loadMicrosoftStatus(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ connected: boolean; configured: boolean }>>(
+          `${API_URL}/auth/microsoft/status`,
+        ),
+      );
+      if (res.success && res.data) {
+        this.msConnected.set(res.data.connected);
+        this.msConfigured.set(res.data.configured);
+      }
+    } catch {
+      // Silently fail — will show "not connected" state
+    } finally {
+      this.msLoading.set(false);
+    }
+  }
+
+  async connectMicrosoft(): Promise<void> {
+    this.msError.set('');
+    try {
+      const returnUrl = window.location.origin + '/account/settings';
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ redirectUrl: string }>>(
+          `${API_URL}/auth/microsoft/connect`,
+          { params: { returnUrl } },
+        ),
+      );
+      if (res.success && res.data?.redirectUrl) {
+        window.location.href = res.data.redirectUrl;
+      } else {
+        this.msError.set('Failed to initiate Microsoft connection.');
+      }
+    } catch (err: any) {
+      this.msError.set(err?.error?.message ?? 'Failed to connect Microsoft account.');
+    }
+  }
+
+  async disconnectMicrosoft(): Promise<void> {
+    this.msDisconnecting.set(true);
+    this.msError.set('');
+    try {
+      await firstValueFrom(
+        this.http.delete<ApiResponse<null>>(`${API_URL}/auth/microsoft/connection`),
+      );
+      this.msConnected.set(false);
+      this.msSuccess.set('Microsoft account disconnected.');
+      setTimeout(() => this.msSuccess.set(''), 4000);
+    } catch (err: any) {
+      this.msError.set(err?.error?.message ?? 'Failed to disconnect Microsoft account.');
+    } finally {
+      this.msDisconnecting.set(false);
     }
   }
 

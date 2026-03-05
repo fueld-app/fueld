@@ -118,6 +118,9 @@ export interface TenantSettings {
   inquiryCancelReasons?: string[];
   // Configurable attachment types for order/inquiry attachments
   attachmentTypes?: string[];
+  // Microsoft email sending
+  approvedEmailDomains?: string[];            // Restrict Microsoft connect to these domains (empty/null = any)
+  microsoftConnectForceUserEmail?: boolean;    // Force Microsoft connect to match the user's Fueld email
   // WhatsApp integration
   whatsappEnabled?: boolean;
   whatsappDefaultGroupJid?: string | null;

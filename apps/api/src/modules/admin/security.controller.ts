@@ -24,6 +24,8 @@ async function getSecuritySettings(): Promise<SecuritySettingsDto> {
     tokenExpirationMinutes: s.tokenExpirationMinutes ?? 15,
     sessionTimeoutMinutes: s.sessionTimeoutMinutes ?? 480,
     documentVerificationLinkExpiryDays: s.documentVerificationLinkExpiryDays ?? 0,
+    approvedEmailDomains: s.approvedEmailDomains ?? [],
+    microsoftConnectForceUserEmail: s.microsoftConnectForceUserEmail ?? false,
   };
 }
 
@@ -54,6 +56,8 @@ async function updateSecuritySettings(
     tokenExpirationMinutes: merged.tokenExpirationMinutes ?? 15,
     sessionTimeoutMinutes: merged.sessionTimeoutMinutes ?? 480,
     documentVerificationLinkExpiryDays: merged.documentVerificationLinkExpiryDays ?? 0,
+    approvedEmailDomains: merged.approvedEmailDomains ?? [],
+    microsoftConnectForceUserEmail: merged.microsoftConnectForceUserEmail ?? false,
   };
 }
 
@@ -101,6 +105,17 @@ export const securityController = new Elysia({ prefix: '/admin/security' })
       if (body.documentVerificationLinkExpiryDays !== undefined) {
         patch.documentVerificationLinkExpiryDays = Math.max(0, Math.min(3650, body.documentVerificationLinkExpiryDays));
       }
+      if (body.approvedEmailDomains !== undefined) {
+        // Trim, lowercase, deduplicate, strip leading @
+        patch.approvedEmailDomains = [...new Set(
+          body.approvedEmailDomains
+            .map((d: string) => d.trim().toLowerCase().replace(/^@/, ''))
+            .filter((d: string) => d.length > 0),
+        )];
+      }
+      if (body.microsoftConnectForceUserEmail !== undefined) {
+        patch.microsoftConnectForceUserEmail = body.microsoftConnectForceUserEmail;
+      }
 
       const settings = await updateSecuritySettings(patch);
       return { success: true, data: settings };
@@ -118,6 +133,8 @@ export const securityController = new Elysia({ prefix: '/admin/security' })
         tokenExpirationMinutes: t.Optional(t.Number()),
         sessionTimeoutMinutes: t.Optional(t.Number()),
         documentVerificationLinkExpiryDays: t.Optional(t.Number()),
+        approvedEmailDomains: t.Optional(t.Array(t.String())),
+        microsoftConnectForceUserEmail: t.Optional(t.Boolean()),
       }),
     },
   );

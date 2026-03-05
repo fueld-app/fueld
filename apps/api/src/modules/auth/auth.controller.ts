@@ -7,6 +7,7 @@ import {
   registerUser,
   storeRefreshToken,
   storeMicrosoftRefreshToken,
+  clearMicrosoftRefreshToken,
   clearRefreshToken,
   findUserById,
   findUserByEmail,
@@ -18,6 +19,7 @@ import {
 } from './auth.service';
 import {
   buildAuthorizationUrl,
+  buildConnectAuthorizationUrl,
   exchangeCodeForTokens,
   verifyAndDecodeState,
   encryptRefreshToken,
@@ -46,6 +48,7 @@ import type {
   AuthenticationResponseJSON,
 } from '@simplewebauthn/server';
 import type { ApiResponse } from '@fueld/types';
+import type { TenantSettings } from '../../db/schema';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -637,7 +640,7 @@ export const authController = new Elysia({ prefix: '/auth' })
   // ── GET /auth/microsoft/login — initiate Microsoft OAuth flow ────
   .get(
     '/microsoft/login',
-    async ({ query, set }) => {
+    async ({ query, set, request }) => {
       const returnUrl = query.returnUrl;
       if (!returnUrl || !validateReturnUrl(returnUrl)) {
         set.status = 400;
@@ -661,7 +664,7 @@ export const authController = new Elysia({ prefix: '/auth' })
         return { success: false, message: 'Microsoft credentials are not configured. Configure them in Admin → Integrations.' };
       }
 
-      const redirectUri = getMicrosoftRedirectUri();
+      const redirectUri = getMicrosoftRedirectUri(request.url);
       const authUrl = buildAuthorizationUrl(config, redirectUri, returnUrl);
 
       set.status = 302;
@@ -682,7 +685,7 @@ export const authController = new Elysia({ prefix: '/auth' })
   // ── GET /auth/microsoft/callback — handle Microsoft redirect ─────
   .get(
     '/microsoft/callback',
-    async ({ query, set, jwtAccess, jwtRefresh }) => {
+    async ({ query, set, jwtAccess, jwtRefresh, request }) => {
       try {
         // 1. Verify state (anti-CSRF + returnUrl)
         const state = verifyAndDecodeState(query.state);
@@ -694,9 +697,64 @@ export const authController = new Elysia({ prefix: '/auth' })
         }
 
         // 3. Exchange authorization code for tokens
-        const redirectUri = getMicrosoftRedirectUri();
+        const redirectUri = getMicrosoftRedirectUri(request.url);
         const msTokens = await exchangeCodeForTokens(config, query.code, redirectUri);
 
+        // ── CONNECT flow: just store the refresh token on the existing user ──
+        if (state.purpose === 'connect' && state.userId) {
+          // Validate the Microsoft email matches policy
+          const { validateO365Token: getProfile } = await import('./o365.service');
+          const msProfile = await getProfile(msTokens.access_token);
+          if (!msProfile) {
+            const errUrl = `${state.returnUrl}${state.returnUrl.includes('?') ? '&' : '?'}microsoft_error=${encodeURIComponent('Failed to retrieve Microsoft profile.')}`;
+            set.status = 302;
+            set.headers['location'] = errUrl;
+            return;
+          }
+
+          const msEmail = (msProfile.mail ?? msProfile.userPrincipalName).toLowerCase();
+          const userEmail = state.userEmail?.toLowerCase();
+
+          // Load tenant settings for domain / force-email restrictions
+          const { db: database } = await import('../../db');
+          const { tenants: tenantsTable } = await import('../../db/schema');
+          const tenant = await database.query.tenants.findFirst();
+          const tenantSettings = (tenant?.settings ?? {}) as TenantSettings;
+
+          // Check 1: Microsoft email must match the user's Fueld email
+          if (tenantSettings.microsoftConnectForceUserEmail && userEmail && msEmail !== userEmail) {
+            const errUrl = `${state.returnUrl}${state.returnUrl.includes('?') ? '&' : '?'}microsoft_error=${encodeURIComponent(`You must connect the same email as your Fueld account (${userEmail}). You signed in with ${msEmail}.`)}`;
+            set.status = 302;
+            set.headers['location'] = errUrl;
+            return;
+          }
+
+          // Check 2: Microsoft email domain must be in approved list
+          const approvedDomains = tenantSettings.approvedEmailDomains;
+          if (approvedDomains && approvedDomains.length > 0) {
+            const msDomain = msEmail.split('@')[1];
+            const allowed = approvedDomains.map((d: string) => d.toLowerCase().trim());
+            if (!allowed.includes(msDomain)) {
+              const errUrl = `${state.returnUrl}${state.returnUrl.includes('?') ? '&' : '?'}microsoft_error=${encodeURIComponent(`Email domain @${msDomain} is not in the approved list. Allowed: ${allowed.map((d: string) => '@' + d).join(', ')}`)}`;
+              set.status = 302;
+              set.headers['location'] = errUrl;
+              return;
+            }
+          }
+
+          if (msTokens.refresh_token) {
+            const encrypted = encryptRefreshToken(msTokens.refresh_token);
+            await storeMicrosoftRefreshToken(state.userId, encrypted);
+          }
+
+          const separator = state.returnUrl.includes('?') ? '&' : '?';
+          const callbackUrl = `${state.returnUrl}${separator}microsoft_connected=true`;
+          set.status = 302;
+          set.headers['location'] = callbackUrl;
+          return;
+        }
+
+        // ── LOGIN flow (default): full SSO sign-in ──
         // 4. Validate user profile via Graph API
         const profile = await validateO365Token(msTokens.access_token);
         if (!profile) {
@@ -1334,5 +1392,138 @@ export const authController = new Elysia({ prefix: '/auth' })
     },
     {
       detail: { tags: ['Auth'], summary: 'Remove user avatar', security: [{ bearerAuth: [] }] },
+    },
+  )
+
+  // ── GET /auth/microsoft/connect — initiate OAuth to link Microsoft (no SSO required) ──
+  .get(
+    '/microsoft/connect',
+    async ({ query, headers, set, jwtAccess, request }) => {
+      // Require authentication
+      const authHeader = headers['authorization'];
+      if (!authHeader?.startsWith('Bearer ')) {
+        set.status = 401;
+        return { success: false, message: 'Missing authorization header' };
+      }
+      const decoded = extractPayload(await jwtAccess.verify(authHeader.slice(7)));
+      if (!decoded) {
+        set.status = 401;
+        return { success: false, message: 'Invalid token' };
+      }
+
+      const returnUrl = query.returnUrl;
+      if (!returnUrl || !validateReturnUrl(returnUrl)) {
+        set.status = 400;
+        return { success: false, message: 'Invalid or missing returnUrl parameter' };
+      }
+
+      const config = await loadMicrosoftConfig();
+      if (!config) {
+        set.status = 400;
+        return { success: false, message: 'Microsoft credentials are not configured. Ask an admin to set them up in Admin → Integrations.' };
+      }
+
+      // Load tenant settings for force-email policy
+      const { db: database } = await import('../../db');
+      const { tenants: tenantsTable } = await import('../../db/schema');
+      const tenant = await database.query.tenants.findFirst();
+      const tenantSettings = (tenant?.settings ?? {}) as TenantSettings;
+      const forceUserEmail = tenantSettings.microsoftConnectForceUserEmail ?? false;
+
+      const redirectUri = getMicrosoftRedirectUri(request.url);
+      const authUrl = buildConnectAuthorizationUrl(config, redirectUri, returnUrl, decoded.sub, decoded.email, forceUserEmail);
+
+      return {
+        success: true,
+        data: { redirectUrl: authUrl },
+      } satisfies ApiResponse<unknown>;
+    },
+    {
+      query: t.Object({
+        returnUrl: t.String(),
+      }),
+      detail: {
+        tags: ['Auth'],
+        summary: 'Get Microsoft authorization URL to link account for Graph email sending',
+        security: [{ bearerAuth: [] }],
+      },
+    },
+  )
+
+  // ── GET /auth/microsoft/status — check if current user has Microsoft connected ──
+  .get(
+    '/microsoft/status',
+    async ({ headers, jwtAccess, set }) => {
+      const authHeader = headers['authorization'];
+      if (!authHeader?.startsWith('Bearer ')) {
+        set.status = 401;
+        return { success: false, data: null, message: 'Missing authorization header' } satisfies ApiResponse<null>;
+      }
+      const decoded = extractPayload(await jwtAccess.verify(authHeader.slice(7)));
+      if (!decoded) {
+        set.status = 401;
+        return { success: false, data: null, message: 'Invalid token' } satisfies ApiResponse<null>;
+      }
+
+      const { db } = await import('../../db');
+      const { users } = await import('../../db/schema');
+      const { eq } = await import('drizzle-orm');
+
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, decoded.sub),
+        columns: { microsoftRefreshToken: true },
+      });
+
+      const connected = !!user?.microsoftRefreshToken;
+
+      // Also check if Microsoft credentials are configured (admin side)
+      const config = await loadMicrosoftConfig();
+
+      return {
+        success: true,
+        data: {
+          connected,
+          configured: !!config,
+        },
+      } satisfies ApiResponse<unknown>;
+    },
+    {
+      detail: {
+        tags: ['Auth'],
+        summary: 'Check if the current user has a linked Microsoft account',
+        security: [{ bearerAuth: [] }],
+      },
+    },
+  )
+
+  // ── DELETE /auth/microsoft/connection — disconnect Microsoft account ──
+  .delete(
+    '/microsoft/connection',
+    async ({ headers, jwtAccess, set }) => {
+      const authHeader = headers['authorization'];
+      if (!authHeader?.startsWith('Bearer ')) {
+        set.status = 401;
+        return { success: false, data: null, message: 'Missing authorization header' } satisfies ApiResponse<null>;
+      }
+      const decoded = extractPayload(await jwtAccess.verify(authHeader.slice(7)));
+      if (!decoded) {
+        set.status = 401;
+        return { success: false, data: null, message: 'Invalid token' } satisfies ApiResponse<null>;
+      }
+
+      await clearMicrosoftRefreshToken(decoded.sub);
+
+      return {
+        success: true,
+        data: null,
+        message: 'Microsoft account disconnected',
+      } satisfies ApiResponse<null>;
+    },
+    {
+      detail: {
+        tags: ['Auth'],
+        summary: 'Disconnect Microsoft account (remove stored refresh token)',
+        security: [{ bearerAuth: [] }],
+      },
     },
   );
