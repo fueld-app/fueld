@@ -203,6 +203,13 @@ interface HfFile {
                 {{ installing() ? 'Installing…' : 'Install / Update' }}
               </button>
             </div>
+            <div class="flex items-center gap-2 mt-2">
+              <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+                <input type="checkbox" [checked]="buildFromSource()" (change)="buildFromSource.set(!buildFromSource())" class="rounded border-gray-300">
+                Build from source
+              </label>
+              <span class="text-xs text-gray-400">Use if pre-built binary fails (requires cmake, g++ on server)</span>
+            </div>
           </div>
         </div>
         @if (installStatus(); as is) {
@@ -551,6 +558,7 @@ export class LlmPageComponent implements OnInit, OnDestroy {
   readonly installing = signal(false);
   readonly installLog = signal<string | null>(null);
   readonly showInstallLog = signal(false);
+  readonly buildFromSource = signal(false);
 
   // Server management
   readonly starting = signal(false);
@@ -698,7 +706,8 @@ export class LlmPageComponent implements OnInit, OnDestroy {
     this.serverMessage.set(null);
     try {
       const version = this.selectedVersion() || undefined;
-      const res = await firstValueFrom(this.http.post<ApiResponse<{ log: string; success: boolean }>>(`${API}/admin/llm/install`, { version }));
+      const buildFromSource = this.buildFromSource();
+      const res = await firstValueFrom(this.http.post<ApiResponse<{ log: string; success: boolean }>>(`${API}/admin/llm/install`, { version, buildFromSource }));
       this.installLog.set(res.data?.log ?? 'No output');
       this.serverMessage.set(res.data?.success ? 'Installation complete' : 'Installation failed');
       this.serverMessageSuccess.set(res.data?.success ?? false);

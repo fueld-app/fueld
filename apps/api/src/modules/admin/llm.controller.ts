@@ -305,6 +305,7 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
       requireAdmin(auth);
 
       const version = body.version ?? DEFAULT_LLAMA_CPP_VERSION;
+      const buildFromSource = body.buildFromSource === true;
       const paths = getLlmPaths();
 
       // Stop server if running before replacing binary
@@ -312,7 +313,7 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
       try { Bun.spawn(['pkill', '-f', 'llama-server'], { stdout: 'ignore', stderr: 'ignore' }); await new Promise(r => setTimeout(r, 500)); } catch { /* ok */ }
 
       // Remove entire bin directory to clean up old version completely
-      const { writeFile, mkdir, rm, copyFile, readdir: readdirAsync } = await import('fs/promises');
+      const { writeFile, mkdir, rm } = await import('fs/promises');
       try {
         await rm(paths.binDir, { recursive: true, force: true });
       } catch { /* ok */ }
@@ -322,69 +323,159 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
       const log: string[] = [];
 
       try {
-        // Detect platform
-        const os = process.platform === 'darwin' ? 'macos' : 'linux';
-        const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
-        const assetName = os === 'macos'
-          ? `llama-${version}-bin-macos-${arch}.tar.gz`
-          : `llama-${version}-bin-ubuntu-${arch}.tar.gz`;
-        const url = `https://github.com/ggml-org/llama.cpp/releases/download/${version}/${assetName}`;
+        if (buildFromSource) {
+          // ── Build from source ──────────────────────────────────────
+          log.push(`Building llama.cpp ${version} from source...`);
 
-        log.push(`Downloading ${assetName} from GitHub...`);
-        log.push(`URL: ${url}`);
+          // Check prerequisites
+          for (const cmd of ['git', 'cmake', 'g++', 'make']) {
+            const check = Bun.spawnSync(['which', cmd], { stdout: 'pipe', stderr: 'pipe' });
+            if (check.exitCode !== 0) {
+              return {
+                success: false,
+                data: { log: `Missing build dependency: ${cmd}. Install with: sudo apt-get install -y git cmake g++ make`, success: false },
+              };
+            }
+          }
 
-        const res = await fetch(url, { signal: AbortSignal.timeout(600_000) });
-        if (!res.ok) {
-          return { success: false, data: { log: `Download failed: HTTP ${res.status} from ${url}`, success: false } };
-        }
+          const tmpDir = join(paths.scriptDir, '.tmp-build');
+          try { await rm(tmpDir, { recursive: true, force: true }); } catch { /* ok */ }
+          await mkdir(tmpDir, { recursive: true });
 
-        // Write tarball to temp file
-        const tmpDir = join(paths.scriptDir, '.tmp-install');
-        await mkdir(tmpDir, { recursive: true });
-        const tarPath = join(tmpDir, assetName);
-        await Bun.write(tarPath, res);
-        log.push(`Downloaded ${Math.round(statSync(tarPath).size / 1024 / 1024)} MB`);
+          // Shallow clone at the specific tag
+          log.push(`Cloning llama.cpp at tag ${version}...`);
+          const clone = Bun.spawnSync(
+            ['git', 'clone', '--depth', '1', '--branch', version, 'https://github.com/ggml-org/llama.cpp.git', 'llama.cpp'],
+            { cwd: tmpDir, stdout: 'pipe', stderr: 'pipe', timeout: 120_000 },
+          );
+          if (clone.exitCode !== 0) {
+            await rm(tmpDir, { recursive: true, force: true });
+            return { success: false, data: { log: `git clone failed: ${clone.stderr.toString().slice(-500)}`, success: false } };
+          }
 
-        // Extract
-        const extractDir = join(tmpDir, 'extract');
-        await mkdir(extractDir, { recursive: true });
-        const tar = Bun.spawnSync(['tar', '-xzf', tarPath, '-C', extractDir]);
-        if (tar.exitCode !== 0) {
+          const srcDir = join(tmpDir, 'llama.cpp');
+          const buildDir = join(srcDir, 'build');
+
+          // Configure with cmake
+          log.push('Running cmake configure...');
+          const cmake = Bun.spawnSync(
+            ['cmake', '-B', 'build', '-DCMAKE_BUILD_TYPE=Release', '-DLLAMA_BUILD_SERVER=ON'],
+            { cwd: srcDir, stdout: 'pipe', stderr: 'pipe', timeout: 120_000 },
+          );
+          if (cmake.exitCode !== 0) {
+            const err = cmake.stderr.toString().slice(-1000);
+            await rm(tmpDir, { recursive: true, force: true });
+            return { success: false, data: { log: `cmake configure failed:\n${err}`, success: false } };
+          }
+          log.push('cmake configure OK');
+
+          // Build (use nproc for parallel jobs)
+          const nproc = Bun.spawnSync(['nproc'], { stdout: 'pipe' });
+          const jobs = nproc.stdout.toString().trim() || '2';
+          log.push(`Building with ${jobs} parallel jobs (this may take a few minutes)...`);
+          const make = Bun.spawnSync(
+            ['cmake', '--build', 'build', '--config', 'Release', '-j', jobs],
+            { cwd: srcDir, stdout: 'pipe', stderr: 'pipe', timeout: 600_000 },
+          );
+          if (make.exitCode !== 0) {
+            const err = make.stderr.toString().slice(-1000);
+            await rm(tmpDir, { recursive: true, force: true });
+            return { success: false, data: { log: `Build failed:\n${err}`, success: false } };
+          }
+          log.push('Build completed');
+
+          // Find and copy llama-server binary
+          const find = Bun.spawnSync(['find', buildDir, '-name', 'llama-server', '-type', 'f']);
+          const foundBin = find.stdout.toString().trim().split('\n')[0];
+          if (!foundBin) {
+            await rm(tmpDir, { recursive: true, force: true });
+            return { success: false, data: { log: 'llama-server binary not found after build', success: false } };
+          }
+
+          const { copyFileSync, chmodSync } = await import('fs');
+          copyFileSync(foundBin, paths.binary);
+          chmodSync(paths.binary, 0o755);
+          log.push(`Installed llama-server to ${paths.binary}`);
+
+          // Copy all shared libs from build directory
+          const findLibs = Bun.spawnSync([
+            'find', buildDir,
+            '(', '-name', '*.so', '-o', '-name', '*.so.*', '-o', '-name', '*.dylib', ')',
+            '(', '-type', 'f', '-o', '-type', 'l', ')',
+          ]);
+          const libFiles = findLibs.stdout.toString().trim().split('\n').filter(Boolean);
+          for (const libPath of libFiles) {
+            const libName = require('path').basename(libPath);
+            copyFileSync(libPath, join(paths.binDir, libName));
+            log.push(`  → copied ${libName}`);
+          }
+
+          // Clean up
           await rm(tmpDir, { recursive: true, force: true });
-          return { success: false, data: { log: `tar extraction failed: ${tar.stderr.toString()}`, success: false } };
-        }
 
-        // Find llama-server binary in extracted archive
-        const find = Bun.spawnSync(['find', extractDir, '-name', 'llama-server', '-type', 'f']);
-        const foundBin = find.stdout.toString().trim().split('\n')[0];
-        if (!foundBin) {
+        } else {
+          // ── Download pre-built binary ──────────────────────────────
+          const os = process.platform === 'darwin' ? 'macos' : 'linux';
+          const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
+          const assetName = os === 'macos'
+            ? `llama-${version}-bin-macos-${arch}.tar.gz`
+            : `llama-${version}-bin-ubuntu-${arch}.tar.gz`;
+          const url = `https://github.com/ggml-org/llama.cpp/releases/download/${version}/${assetName}`;
+
+          log.push(`Downloading ${assetName} from GitHub...`);
+          log.push(`URL: ${url}`);
+
+          const res = await fetch(url, { signal: AbortSignal.timeout(600_000) });
+          if (!res.ok) {
+            return { success: false, data: { log: `Download failed: HTTP ${res.status} from ${url}`, success: false } };
+          }
+
+          // Write tarball to temp file
+          const tmpDir = join(paths.scriptDir, '.tmp-install');
+          await mkdir(tmpDir, { recursive: true });
+          const tarPath = join(tmpDir, assetName);
+          await Bun.write(tarPath, res);
+          log.push(`Downloaded ${Math.round(statSync(tarPath).size / 1024 / 1024)} MB`);
+
+          // Extract
+          const extractDir = join(tmpDir, 'extract');
+          await mkdir(extractDir, { recursive: true });
+          const tar = Bun.spawnSync(['tar', '-xzf', tarPath, '-C', extractDir]);
+          if (tar.exitCode !== 0) {
+            await rm(tmpDir, { recursive: true, force: true });
+            return { success: false, data: { log: `tar extraction failed: ${tar.stderr.toString()}`, success: false } };
+          }
+
+          // Find llama-server binary in extracted archive
+          const find = Bun.spawnSync(['find', extractDir, '-name', 'llama-server', '-type', 'f']);
+          const foundBin = find.stdout.toString().trim().split('\n')[0];
+          if (!foundBin) {
+            await rm(tmpDir, { recursive: true, force: true });
+            return { success: false, data: { log: 'llama-server binary not found in archive', success: false } };
+          }
+
+          // Copy binary
+          const { copyFileSync, chmodSync } = await import('fs');
+          copyFileSync(foundBin, paths.binary);
+          chmodSync(paths.binary, 0o755);
+          log.push(`Installed llama-server to ${paths.binary}`);
+
+          // Copy ALL shared libraries from the extracted archive (recursive)
+          const findLibs = Bun.spawnSync([
+            'find', extractDir,
+            '(', '-name', '*.so', '-o', '-name', '*.so.*', '-o', '-name', '*.dylib', ')',
+            '(', '-type', 'f', '-o', '-type', 'l', ')',
+          ]);
+          const libFiles = findLibs.stdout.toString().trim().split('\n').filter(Boolean);
+          for (const libPath of libFiles) {
+            const libName = require('path').basename(libPath);
+            copyFileSync(libPath, join(paths.binDir, libName));
+            log.push(`  → copied ${libName}`);
+          }
+
+          // Clean up temp
           await rm(tmpDir, { recursive: true, force: true });
-          return { success: false, data: { log: 'llama-server binary not found in archive', success: false } };
         }
-
-        // Copy binary
-        const { copyFileSync, chmodSync } = await import('fs');
-        copyFileSync(foundBin, paths.binary);
-        chmodSync(paths.binary, 0o755);
-        log.push(`Installed llama-server to ${paths.binary}`);
-
-        // Copy ALL shared libraries from the extracted archive (recursive)
-        // Include symlinks (-type l) — versioned .so symlinks like libmtmd.so.0 are critical
-        // copyFileSync dereferences symlinks automatically, creating real file copies
-        const findLibs = Bun.spawnSync([
-          'find', extractDir,
-          '(', '-name', '*.so', '-o', '-name', '*.so.*', '-o', '-name', '*.dylib', ')',
-          '(', '-type', 'f', '-o', '-type', 'l', ')',
-        ]);
-        const libFiles = findLibs.stdout.toString().trim().split('\n').filter(Boolean);
-        for (const libPath of libFiles) {
-          const libName = require('path').basename(libPath);
-          copyFileSync(libPath, join(paths.binDir, libName));
-          log.push(`  → copied ${libName}`);
-        }
-
-        // Clean up temp
-        await rm(tmpDir, { recursive: true, force: true });
 
         // Write version marker
         await writeFile(join(paths.binDir, '.llama-cpp-version'), version, 'utf-8');
@@ -398,7 +489,14 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
           if (!hasBackend) log.push(`\n⚠ WARNING: no ggml-cpu backend found — server will not start!`);
         } catch { /* ok */ }
 
-        log.push(`\n✓ llama-server ${version} installed successfully`);
+        // Log CPU info for diagnostics
+        try {
+          const cpuInfo = Bun.spawnSync(['sh', '-c', 'grep "model name" /proc/cpuinfo | head -1'], { stdout: 'pipe' });
+          const cpuModel = cpuInfo.stdout.toString().trim();
+          if (cpuModel) log.push(`\nCPU: ${cpuModel}`);
+        } catch { /* ok */ }
+
+        log.push(`\n✓ llama-server ${version} installed successfully${buildFromSource ? ' (built from source)' : ''}`);
 
         return { success: true, data: { log: log.join('\n'), success: true } };
       } catch (err) {
@@ -412,6 +510,7 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
     {
       body: t.Object({
         version: t.Optional(t.String()),
+        buildFromSource: t.Optional(t.Boolean()),
       }),
       detail: { tags: ['Admin', 'LLM'], summary: 'Install/update llama-server binary' },
     },
