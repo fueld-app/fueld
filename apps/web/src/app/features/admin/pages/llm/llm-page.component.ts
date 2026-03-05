@@ -340,6 +340,11 @@ interface HfFile {
         }
         @if (modelMessage(); as msg) {
           <p class="mt-2 text-sm" [class]="modelMessageSuccess() ? 'text-green-700' : 'text-red-700'">{{ msg }}</p>
+          @if (modelDownloadProgress(); as prog) {
+            <div class="mt-1 w-full bg-gray-200 rounded-full h-2">
+              <div class="bg-blue-600 h-2 rounded-full transition-all duration-500" [style.width.%]="prog.progressPct ?? 0"></div>
+            </div>
+          }
         }
       </div>
 
@@ -546,6 +551,7 @@ export class LlmPageComponent implements OnInit, OnDestroy {
   readonly repoFiles = signal<HfFile[]>([]);
   readonly repoFilesLoading = signal(false);
   readonly modelInstalling = signal(false);
+  readonly modelDownloadProgress = signal<{ downloadedMb: number; totalMb: number | null; progressPct: number | null; elapsedSec: number | null } | null>(null);
   readonly modelRemoving = signal(false);
   readonly modelMessage = signal<string | null>(null);
   readonly modelMessageSuccess = signal(false);
@@ -748,23 +754,60 @@ export class LlmPageComponent implements OnInit, OnDestroy {
 
   async installModel(repoId: string, filename: string): Promise<void> {
     this.modelInstalling.set(true);
-    this.modelMessage.set('Downloading model… this may take a few minutes');
+    this.modelMessage.set('Starting download…');
     this.modelMessageSuccess.set(true);
+    this.modelDownloadProgress.set(null);
     try {
-      const res = await firstValueFrom(this.http.post<ApiResponse<{ filename: string; sizeMb: number }>>(`${API}/admin/llm/models/install`, { repoId, filename }));
-      if (res.success) {
-        this.modelMessage.set(`Installed ${res.data?.filename} (${res.data?.sizeMb} MB)`);
-        this.modelMessageSuccess.set(true);
-        this.selectedRepo.set(null);
-        this.repoFiles.set([]);
-      } else {
+      const res = await firstValueFrom(this.http.post<ApiResponse<{ message: string }>>(`${API}/admin/llm/models/install`, { repoId, filename }));
+      if (!res.success) {
         this.modelMessage.set((res as any).error ?? 'Install failed');
         this.modelMessageSuccess.set(false);
+        this.modelInstalling.set(false);
+        return;
+      }
+
+      // Poll download status every 2s
+      const poll = async (): Promise<boolean> => {
+        try {
+          const s = await firstValueFrom(this.http.get<ApiResponse<{
+            status: string; downloadedMb: number; totalMb: number | null;
+            progressPct: number | null; sizeMb: number | null;
+            error: string | null; elapsedSec: number | null;
+          }>>(`${API}/admin/llm/models/download-status`));
+          const d = s.data!;
+          if (d.status === 'downloading') {
+            this.modelDownloadProgress.set({ downloadedMb: d.downloadedMb, totalMb: d.totalMb, progressPct: d.progressPct, elapsedSec: d.elapsedSec });
+            const pct = d.progressPct != null ? ` (${d.progressPct}%)` : '';
+            this.modelMessage.set(`Downloading… ${d.downloadedMb}${d.totalMb ? '/' + d.totalMb : ''} MB${pct}`);
+            return false; // not done
+          } else if (d.status === 'done') {
+            this.modelMessage.set(`Installed ${filename} (${d.sizeMb} MB)`);
+            this.modelMessageSuccess.set(true);
+            this.selectedRepo.set(null);
+            this.repoFiles.set([]);
+            return true;
+          } else if (d.status === 'error') {
+            this.modelMessage.set(d.error ?? 'Download failed');
+            this.modelMessageSuccess.set(false);
+            return true;
+          }
+          return false;
+        } catch {
+          return false;
+        }
+      };
+
+      // Poll loop
+      for (let i = 0; i < 300; i++) { // max 10 min (300 * 2s)
+        await new Promise(r => setTimeout(r, 2000));
+        const done = await poll();
+        if (done) break;
       }
     } catch (err: any) {
       this.modelMessage.set(err?.error?.error ?? err?.error?.message ?? 'Install failed');
       this.modelMessageSuccess.set(false);
     }
+    this.modelDownloadProgress.set(null);
     await Promise.all([this.loadStatus(), this.loadInstallStatus()]);
     this.modelInstalling.set(false);
   }

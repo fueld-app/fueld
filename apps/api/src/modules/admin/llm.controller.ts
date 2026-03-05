@@ -183,14 +183,12 @@ let _serverProcess: ReturnType<typeof Bun.spawn> | null = null;
 
 function isServerProcessAlive(): boolean {
   if (!_serverProcess) return false;
-  // The process hasn't exited yet
   return _serverProcess.exitCode === null;
 }
 
 async function stopServerProcess(): Promise<boolean> {
   if (_serverProcess && isServerProcessAlive()) {
     _serverProcess.kill();
-    // Wait a moment for it to actually stop
     await new Promise((r) => setTimeout(r, 500));
     _serverProcess = null;
     return true;
@@ -198,6 +196,25 @@ async function stopServerProcess(): Promise<boolean> {
   _serverProcess = null;
   return false;
 }
+
+// ─── Model download state ───────────────────────────────────────────
+
+interface ModelDownloadState {
+  status: 'idle' | 'downloading' | 'done' | 'error';
+  filename: string | null;
+  repoId: string | null;
+  totalBytes: number | null;
+  downloadedBytes: number;
+  sizeMb: number | null;
+  error: string | null;
+  startedAt: number | null;
+}
+
+let _modelDownload: ModelDownloadState = {
+  status: 'idle', filename: null, repoId: null,
+  totalBytes: null, downloadedBytes: 0, sizeMb: null,
+  error: null, startedAt: null,
+};
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -884,7 +901,7 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
     },
   )
 
-  // ─── POST /admin/llm/models/install — download a GGUF model ───────
+  // ─── POST /admin/llm/models/install — start downloading a GGUF model (async) ─
   .post(
     '/models/install',
     async ({ auth, body }) => {
@@ -895,11 +912,16 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
         return { success: false, data: null, error: 'repoId and filename are required' };
       }
 
+      if (_modelDownload.status === 'downloading') {
+        return { success: false, data: null, error: 'A download is already in progress' };
+      }
+
       const paths = getLlmPaths();
-      const { mkdir, unlink, readdir } = await import('fs/promises');
+      const { mkdir } = await import('fs/promises');
       await mkdir(paths.modelDir, { recursive: true });
 
-      // Check size limit
+      // Check size limit via HEAD
+      let totalBytes: number | null = null;
       try {
         const headRes = await fetch(
           `https://huggingface.co/${repoId}/resolve/main/${filename}`,
@@ -907,60 +929,115 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
         );
         const contentLength = headRes.headers.get('content-length');
         if (contentLength) {
-          const sizeMb = Math.round(parseInt(contentLength) / 1024 / 1024);
+          totalBytes = parseInt(contentLength);
+          const sizeMb = Math.round(totalBytes / 1024 / 1024);
           if (sizeMb > MAX_MODEL_SIZE_MB) {
             return {
               success: false,
               data: null,
-              error: `Model is ${sizeMb} MB, exceeds limit of ${MAX_MODEL_SIZE_MB} MB. Adjust MAX_MODEL_SIZE_MB env var to increase.`,
+              error: `Model is ${sizeMb} MB, exceeds limit of ${MAX_MODEL_SIZE_MB} MB.`,
             };
           }
         }
-      } catch { /* If HEAD fails, proceed anyway */ }
+      } catch { /* proceed anyway */ }
 
-      // Remove any existing model files
-      try {
-        const existingFiles = await readdir(paths.modelDir);
-        for (const f of existingFiles) {
-          if (f.endsWith('.gguf')) {
-            await unlink(join(paths.modelDir, f));
+      // Start background download
+      _modelDownload = {
+        status: 'downloading', filename, repoId,
+        totalBytes, downloadedBytes: 0, sizeMb: null,
+        error: null, startedAt: Date.now(),
+      };
+
+      // Fire-and-forget — the actual download runs in the background
+      (async () => {
+        try {
+          const { unlink, readdir } = await import('fs/promises');
+
+          // Remove existing .gguf files
+          try {
+            const existing = await readdir(paths.modelDir);
+            for (const f of existing) {
+              if (f.endsWith('.gguf')) await unlink(join(paths.modelDir, f));
+            }
+          } catch { /* ok */ }
+
+          const url = `https://huggingface.co/${repoId}/resolve/main/${filename}`;
+          const res = await fetch(url, { signal: AbortSignal.timeout(600_000) });
+          if (!res.ok) {
+            _modelDownload.status = 'error';
+            _modelDownload.error = `Download failed: HTTP ${res.status}`;
+            return;
           }
+
+          // Stream download with progress tracking
+          const modelPath = join(paths.modelDir, filename);
+          const writer = Bun.file(modelPath).writer();
+          const reader = res.body?.getReader();
+          if (!reader) {
+            _modelDownload.status = 'error';
+            _modelDownload.error = 'No response body';
+            return;
+          }
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            writer.write(value);
+            _modelDownload.downloadedBytes += value.byteLength;
+          }
+          await writer.end();
+
+          const sizeMb = Math.round(statSync(modelPath).size / 1024 / 1024);
+          _modelDownload.status = 'done';
+          _modelDownload.sizeMb = sizeMb;
+        } catch (err) {
+          _modelDownload.status = 'error';
+          _modelDownload.error = err instanceof Error ? err.message : String(err);
+          // Clean up partial
+          try { const { unlink } = await import('fs/promises'); await unlink(join(paths.modelDir, filename)); } catch { /* ok */ }
         }
-      } catch { /* ok */ }
+      })();
 
-      // Download the model
-      const modelPath = join(paths.modelDir, filename);
-      const url = `https://huggingface.co/${repoId}/resolve/main/${filename}`;
-
-      try {
-        const res = await fetch(url, { signal: AbortSignal.timeout(600_000) }); // 10 min timeout
-        if (!res.ok) {
-          return { success: false, data: null, error: `Download failed: HTTP ${res.status}` };
-        }
-
-        await Bun.write(modelPath, res);
-
-        const sizeMb = Math.round(statSync(modelPath).size / 1024 / 1024);
-        return {
-          success: true,
-          data: { filename, sizeMb, repoId },
-        };
-      } catch (err) {
-        // Clean up partial download
-        try { await unlink(modelPath); } catch { /* ok */ }
-        return {
-          success: false,
-          data: null,
-          error: `Download failed: ${err instanceof Error ? err.message : String(err)}`,
-        };
-      }
+      return {
+        success: true,
+        data: { message: 'Download started', filename, repoId, totalBytes },
+      };
     },
     {
       body: t.Object({
         repoId: t.String({ maxLength: 200 }),
         filename: t.String({ maxLength: 200 }),
       }),
-      detail: { tags: ['Admin', 'LLM'], summary: 'Download and install a GGUF model' },
+      detail: { tags: ['Admin', 'LLM'], summary: 'Start downloading a GGUF model (async)' },
+    },
+  )
+
+  // ─── GET /admin/llm/models/download-status — poll download progress ─
+  .get(
+    '/models/download-status',
+    ({ auth }) => {
+      requireAdmin(auth);
+      const d = _modelDownload;
+      const progressPct = d.totalBytes && d.totalBytes > 0
+        ? Math.round((d.downloadedBytes / d.totalBytes) * 100)
+        : null;
+      return {
+        success: true,
+        data: {
+          status: d.status,
+          filename: d.filename,
+          repoId: d.repoId,
+          totalMb: d.totalBytes ? Math.round(d.totalBytes / 1024 / 1024) : null,
+          downloadedMb: Math.round(d.downloadedBytes / 1024 / 1024),
+          progressPct,
+          sizeMb: d.sizeMb,
+          error: d.error,
+          elapsedSec: d.startedAt ? Math.round((Date.now() - d.startedAt) / 1000) : null,
+        },
+      };
+    },
+    {
+      detail: { tags: ['Admin', 'LLM'], summary: 'Poll model download progress' },
     },
   )
 
