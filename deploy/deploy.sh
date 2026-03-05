@@ -62,9 +62,15 @@ else
   exit 1
 fi
 
-# ─── 3b. Ensure LLM directories exist ─────────────────────────────────
+# ─── 3b. Ensure LLM directories and build tools exist ─────────────────
 mkdir -p "$APP_DIR/llm/bin" "$APP_DIR/llm/models"
 log "LLM directories ensured"
+
+# Install build tools needed for 'build from source' (idempotent)
+if ! command -v cmake &>/dev/null || ! command -v g++ &>/dev/null; then
+  log "Installing cmake, g++, make for LLM build-from-source..."
+  sudo apt-get install -y -qq cmake g++ make 2>/dev/null || warn "Could not install build tools (non-fatal)"
+fi
 
 # ─── 3c. Patch systemd unit if ReadWritePaths is missing /opt/fueld/llm ─
 UNIT_FILE="/etc/systemd/system/fueld-api@.service"
