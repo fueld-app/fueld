@@ -15,6 +15,7 @@ import { creditController } from './modules/credit/credit.controller';
 import { adminController, inviteController } from './modules/admin/admin.controller';
 import { settingsController } from './modules/admin/settings.controller';
 import { securityController } from './modules/admin/security.controller';
+import { llmController } from './modules/admin/llm.controller';
 import { activityController, adminActivityController } from './modules/activity/activity.controller';
 import { ordersController } from './modules/orders/orders.controller';
 import { commentsController } from './modules/comments/comments.controller';
@@ -287,6 +288,7 @@ export async function createApp(options: CreateAppOptions = {}) {
     .use(ordersController)
     .use(commentsController)
     .use(securityController)
+    .use(llmController)
     .use(pushController)
     .use(whatsappController)
     .use(rfqController)

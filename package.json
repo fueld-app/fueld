@@ -14,7 +14,9 @@
     "test": "bun test apps/api/tests packages/types/tests",
     "test:coverage": "bun test --coverage apps/api/tests packages/types/tests",
     "test:orders": "bun test apps/api/tests/orders*.test.ts apps/api/tests/orders*.e2e.test.ts",
-    "test:orders:coverage": "bun test --coverage apps/api/tests/orders*.test.ts apps/api/tests/orders*.e2e.test.ts"
+    "test:orders:coverage": "bun test --coverage apps/api/tests/orders*.test.ts apps/api/tests/orders*.e2e.test.ts",
+    "llm:setup": "bash scripts/llm/setup.sh",
+    "llm:start": "bash scripts/llm/start.sh"
   },
   "devDependencies": {
     "pdf-parse": "^2.4.5"

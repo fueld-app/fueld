@@ -14,6 +14,18 @@ import makeWASocket, {
   type WAMessage,
 } from '@whiskeysockets/baileys';
 import QRCode from 'qrcode';
+
+// Minimal logger that only emits warn+ to silence Baileys' verbose info logs
+const baileysLogger = {
+  level: 'warn',
+  fatal: (...args: any[]) => console.error('[baileys:fatal]', ...args),
+  error: () => {},  // Suppress — we handle errors in connection.update
+  warn: () => {},   // Suppress routine warnings (pre-keys, old counters)
+  info: () => {},
+  debug: () => {},
+  trace: () => {},
+  child: () => baileysLogger,
+} as any;
 import { eq, and } from 'drizzle-orm';
 import { db } from '../../db';
 import { whatsappSessions, whatsappKeys } from '../../db/schema';
@@ -32,6 +44,8 @@ interface UserConnection {
 }
 
 const connections = new Map<string, UserConnection>();
+const reconnectAttempts = new Map<string, number>();
+const MAX_RECONNECT_ATTEMPTS = 5;
 
 // ─── Buffer Revival (JSONB round-trip loses Buffer types) ────────────
 
@@ -181,6 +195,7 @@ export async function startWhatsAppSession(userId: string): Promise<{ qr?: strin
   const sock = makeWASocket({
     version,
     auth: state,
+    logger: baileysLogger,
     printQRInTerminal: false,
     browser: ['Fueld', 'Desktop', '1.0.0'],
     generateHighQualityLinkPreview: false,
@@ -209,6 +224,7 @@ export async function startWhatsAppSession(userId: string): Promise<{ qr?: strin
     if (connection === 'open') {
       conn.status = 'connected';
       conn.qr = undefined;
+      reconnectAttempts.delete(userId);
 
       // Extract phone number from socket user
       const jid = sock.user?.id;
@@ -237,13 +253,24 @@ export async function startWhatsAppSession(userId: string): Promise<{ qr?: strin
 
       if (loggedOut) {
         // User logged out from phone — clean up DB
+        reconnectAttempts.delete(userId);
         cleanupSession(userId);
         sendToUserSockets(userId, { type: 'whatsapp:disconnected', data: { reason: 'logged_out' } }, 'whatsapp');
       } else {
-        // Temporary disconnect — try to reconnect after a short delay
-        setTimeout(() => {
-          startWhatsAppSession(userId).catch(() => {});
-        }, 5000);
+        // Temporary disconnect — reconnect with exponential backoff
+        const attempts = reconnectAttempts.get(userId) ?? 0;
+        if (attempts < MAX_RECONNECT_ATTEMPTS) {
+          const delay = Math.min(5000 * Math.pow(2, attempts), 60000);
+          reconnectAttempts.set(userId, attempts + 1);
+          console.log(`[whatsapp] Reconnecting ${userId} in ${delay / 1000}s (attempt ${attempts + 1}/${MAX_RECONNECT_ATTEMPTS})`);
+          setTimeout(() => {
+            startWhatsAppSession(userId).catch(() => {});
+          }, delay);
+        } else {
+          console.warn(`[whatsapp] Giving up reconnecting ${userId} after ${MAX_RECONNECT_ATTEMPTS} attempts`);
+          reconnectAttempts.delete(userId);
+          sendToUserSockets(userId, { type: 'whatsapp:disconnected', data: { reason: 'max_retries' } }, 'whatsapp');
+        }
       }
     }
   });

@@ -118,6 +118,7 @@ const NAVIGATION: NavItem[] = [
       { label: 'Activity Log', route: '/admin/activity' },
       { label: 'Security', route: '/admin/security' },
       { label: 'Settings', route: '/admin/settings' },
+      { label: 'LLM / AI', route: '/admin/llm' },
     ],
   },
 ];
@@ -218,7 +219,23 @@ const NAVIGATION: NavItem[] = [
 
       <!-- Sidebar footer -->
       <div class="border-t border-sidebar-hover px-4 py-3">
-        <p class="text-xs text-sidebar-text/60">Fueld v0.1.0</p>
+        <div class="flex items-center justify-between">
+          <p class="text-xs text-sidebar-text/60">Fueld v0.1.0</p>
+          @if (llmHealthy() !== null) {
+            <a routerLink="/admin/llm" class="group flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] transition-colors hover:bg-sidebar-hover"
+              [title]="llmHealthy() ? 'LLM Online' : 'LLM Offline'">
+              <span class="relative flex h-2 w-2">
+                @if (llmHealthy()) {
+                  <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60"></span>
+                  <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-400"></span>
+                } @else {
+                  <span class="relative inline-flex h-2 w-2 rounded-full bg-red-400"></span>
+                }
+              </span>
+              <span class="text-sidebar-text/50 group-hover:text-sidebar-text/80">AI</span>
+            </a>
+          }
+        </div>
       </div>
     </aside>
 
@@ -599,6 +616,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   private copyHandler: ((e: ClipboardEvent) => void) | null = null;
   private printHandler: (() => void) | null = null;
   private screenshotHandler: ((e: KeyboardEvent) => void) | null = null;
+  private llmHealthTimer: ReturnType<typeof setInterval> | null = null;
 
   readonly sidebarOpen = signal(false);
   readonly commodityPrices = signal<CommodityPrice[]>([]);
@@ -618,6 +636,10 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   readonly pasteText = signal('');
   readonly pasteError = signal<string | null>(null);
   readonly pasteSubmitting = signal(false);
+
+  // ─── LLM health (admin-only, polled) ────────────────────────────
+  /** null = not yet checked, true/false = healthy/unhealthy */
+  readonly llmHealthy = signal<boolean | null>(null);
 
   private readonly updateReset = effect(() => {
     if (this.updateService.updateAvailable()) {
@@ -696,6 +718,12 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
     // Load pending RFQs on startup
     this.loadPendingRfqs();
+
+    // Poll LLM health if admin (every 60s)
+    if (this.auth.isAdmin()) {
+      this.pollLlmHealth();
+      this.llmHealthTimer = setInterval(() => this.pollLlmHealth(), 60_000);
+    }
   }
 
   ngOnDestroy(): void {
@@ -710,6 +738,9 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     }
     if (this.screenshotHandler) {
       document.removeEventListener('keydown', this.screenshotHandler as EventListener);
+    }
+    if (this.llmHealthTimer) {
+      clearInterval(this.llmHealthTimer);
     }
   }
 
@@ -983,6 +1014,17 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
       }
     } catch { /* ignore */ } finally {
       this.rfqLoading.set(false);
+    }
+  }
+
+  private async pollLlmHealth(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ healthy: boolean }>>(`${API}/admin/llm/health`),
+      );
+      this.llmHealthy.set(res.data?.healthy ?? false);
+    } catch {
+      this.llmHealthy.set(false);
     }
   }
 

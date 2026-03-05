@@ -63,7 +63,7 @@ if ! id "$DEPLOY_USER" &>/dev/null; then
   chmod 700 /home/$DEPLOY_USER/.ssh
   chmod 600 /home/$DEPLOY_USER/.ssh/authorized_keys 2>/dev/null || true
   # Allow deploy user to restart services without password
-  echo "$DEPLOY_USER ALL=(ALL) NOPASSWD: /bin/systemctl restart fueld-api@*, /bin/systemctl start fueld-api@*, /bin/systemctl stop fueld-api@*, /bin/systemctl reload nginx, /bin/systemctl status fueld-api@*, /usr/bin/tee" > /etc/sudoers.d/fueld-deploy
+  echo "$DEPLOY_USER ALL=(ALL) NOPASSWD: /bin/systemctl restart fueld-api@*, /bin/systemctl start fueld-api@*, /bin/systemctl stop fueld-api@*, /bin/systemctl reload nginx, /bin/systemctl status fueld-api@*, /bin/systemctl restart fueld-llm, /bin/systemctl start fueld-llm, /bin/systemctl stop fueld-llm, /usr/bin/tee, /bin/systemctl reset-failed *" > /etc/sudoers.d/fueld-deploy
   chmod 440 /etc/sudoers.d/fueld-deploy
   echo "  ✓ Deploy user created"
 else
@@ -100,7 +100,7 @@ fi
 
 # ─── 8. Create application directories ───────────────────────────────
 echo "▶ Creating application directories..."
-mkdir -p /opt/fueld/{blue,green,web,drizzle,geoip-data,uploads/avatars,uploads/logos}
+mkdir -p /opt/fueld/{blue,green,web,drizzle,geoip-data,uploads/avatars,uploads/logos,llm/bin,llm/models,llm/scripts}
 chown -R $DEPLOY_USER:$DEPLOY_USER /opt/fueld
 
 # Write active slot
@@ -145,6 +145,8 @@ MIGRATIONS_DIR=/opt/fueld/drizzle
 # GeoIP data directory (geoip-lite)
 GEODATADIR=/opt/fueld/geoip-data
 
+# Local LLM (llama-server)
+LLM_BASE_URL=http://127.0.0.1:8081
 
 # Lloyd's List Intelligence (optional)
 # LLI_USERNAME=
@@ -207,8 +209,45 @@ KillSignal=SIGTERM
 WantedBy=multi-user.target
 UNIT
 
+# ─── LLM service (llama-server) ───────────────────────────────────────
+cat > /etc/systemd/system/fueld-llm.service <<'UNIT'
+[Unit]
+Description=Fueld LLM (llama-server)
+After=network.target
+
+[Service]
+Type=simple
+User=deploy
+Group=deploy
+WorkingDirectory=/opt/fueld/llm
+Environment=LD_LIBRARY_PATH=/opt/fueld/llm/bin
+
+ExecStart=/opt/fueld/llm/bin/llama-server \
+  --model /opt/fueld/llm/models/Qwen3.5-0.8B-Q4_K_M.gguf \
+  --host 127.0.0.1 \
+  --port 8081 \
+  --ctx-size 2048 \
+  --threads 2 \
+  --parallel 1 \
+  --flash-attn auto \
+  --cont-batching \
+  --log-disable
+
+Restart=always
+RestartSec=5
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+MemoryMax=1G
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
 systemctl daemon-reload
-echo "  ✓ Systemd template unit installed (fueld-api@blue, fueld-api@green)"
+systemctl enable fueld-llm
+echo "  ✓ Systemd units installed (fueld-api@blue, fueld-api@green, fueld-llm)"
 
 # ─── 11. Nginx ───────────────────────────────────────────────────────
 echo "▶ Configuring Nginx..."

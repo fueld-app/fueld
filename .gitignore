@@ -26,3 +26,7 @@ Thumbs.db
 # Runtime uploads (local/dev/test artifacts)
 apps/api/uploads/**
 uploads/**
+
+# Local LLM binaries & models (large files, downloaded by scripts/llm/setup.sh)
+scripts/llm/bin/
+scripts/llm/models/

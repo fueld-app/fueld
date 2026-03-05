@@ -307,6 +307,14 @@ export const routes: Routes = [
               ),
             title: 'Admin > Settings',
           },
+          {
+            path: 'llm',
+            loadComponent: () =>
+              import('./features/admin/pages/llm/llm-page.component').then(
+                (m) => m.LlmPageComponent,
+              ),
+            title: 'Admin > LLM',
+          },
         ],
       },
       // ── Account ──
