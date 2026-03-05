@@ -707,12 +707,45 @@ export class LlmPageComponent implements OnInit, OnDestroy {
     try {
       const version = this.selectedVersion() || undefined;
       const buildFromSource = this.buildFromSource();
-      const res = await firstValueFrom(this.http.post<ApiResponse<{ log: string; success: boolean }>>(`${API}/admin/llm/install`, { version, buildFromSource }));
-      this.installLog.set(res.data?.log ?? 'No output');
-      this.serverMessage.set(res.data?.success ? 'Installation complete' : 'Installation failed');
-      this.serverMessageSuccess.set(res.data?.success ?? false);
+      const res = await firstValueFrom(this.http.post<ApiResponse<{ message: string }>>(`${API}/admin/llm/install`, { version, buildFromSource }));
+
+      if (!res.success) {
+        this.installLog.set(res.message ?? 'Install failed');
+        this.serverMessage.set('Installation failed');
+        this.serverMessageSuccess.set(false);
+        this.installing.set(false);
+        return;
+      }
+
+      this.serverMessage.set(res.data?.message ?? 'Installing…');
+      this.serverMessageSuccess.set(true);
+
+      // Poll install progress every 3s
+      for (let i = 0; i < 200; i++) { // up to ~10 min
+        await new Promise(r => setTimeout(r, 3000));
+        try {
+          const progress = await firstValueFrom(this.http.get<ApiResponse<{ status: string; step: string; log: string; error: string | null }>>(`${API}/admin/llm/install/progress`));
+          const d = progress.data;
+          if (d) {
+            this.installLog.set(d.log || d.step || 'Working…');
+            this.serverMessage.set(d.step || 'Installing…');
+            this.serverMessageSuccess.set(d.status !== 'error');
+
+            if (d.status === 'done') {
+              this.serverMessage.set('Installation complete');
+              this.serverMessageSuccess.set(true);
+              break;
+            }
+            if (d.status === 'error') {
+              this.serverMessage.set('Installation failed');
+              this.serverMessageSuccess.set(false);
+              break;
+            }
+          }
+        } catch { /* poll error, keep trying */ }
+      }
     } catch (err: any) {
-      this.installLog.set(err?.error?.message ?? 'Install request failed');
+      this.installLog.set(err?.error?.error ?? err?.error?.message ?? 'Install request failed');
       this.serverMessage.set('Installation failed');
       this.serverMessageSuccess.set(false);
     }
