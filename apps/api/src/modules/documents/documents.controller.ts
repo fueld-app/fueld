@@ -1,11 +1,12 @@
 import { Elysia, t } from 'elysia';
 import { eq } from 'drizzle-orm';
 import { authGuard } from '../auth/auth.guard';
-import { generateNominationPdfBuffer, generateOrderInvoicePdfBuffer, generateOfferPdfBuffer, generateProformaInvoicePdfBuffer } from './document.service';
+import { generateNominationPdfBuffer, generateOrderInvoicePdfBuffer, generateOfferPdfBuffer, generateProformaInvoicePdfBuffer, tryLoadLogoDataUrl } from './document.service';
 import { sendDocumentEmail, buildDocumentEmailHtml, buildDocumentEmailSubject, type DocumentEmailType } from './mail.service';
 import { resolveOrderId, getOrderById } from '../orders/orders.service';
 import { db } from '../../db';
-import { users, counterparties, invoices as invoicesTable } from '../../db/schema';
+import { users, counterparties, invoices as invoicesTable, companyContacts, companyEmails } from '../../db/schema';
+import { inArray } from 'drizzle-orm';
 import { getEmailTemplate, getApplicableEmailRules, renderTemplate, type TemplateVariables } from '../admin/email-settings.service';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -295,7 +296,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       const portName = order.place?.name ?? 'Port';
       const orderNumber = order.orderNumber ?? orderId.slice(0, 8).toUpperCase();
       const companyName = order.invoicingCompany?.name ?? null;
-      const companyLogoUrl = order.invoicingCompany?.logoUrl ?? null;
+      const companyLogoUrl = tryLoadLogoDataUrl(order.invoicingCompany?.logoUrl ?? null);
 
       const docLabels: Record<DocumentEmailType, string> = {
         OFFER: 'Offer / Confirmation',
@@ -486,8 +487,6 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       }
 
       // Fetch contacts and emails from those companies
-      const { companyContacts, companyEmails } = await import('../../db/schema');
-      const { inArray } = await import('drizzle-orm');
 
       const [contacts, emails] = await Promise.all([
         db

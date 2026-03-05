@@ -14,7 +14,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
-import { Subject, debounceTime, distinctUntilChanged, switchMap, of, takeUntil } from 'rxjs';
+import { Subject, debounceTime, distinctUntilChanged, switchMap, of, takeUntil, catchError } from 'rxjs';
 import { API_URL } from '@app/core/config/api';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -75,7 +75,7 @@ interface ContactSuggestion {
           (focus)="onFocus()"
           (blur)="onBlur()"
           (keydown)="onKeydown($event)"
-          (input)="onInput()"
+          (input)="onInput($event)"
           class="min-w-[120px] flex-1 border-none bg-transparent p-0 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-0"
         />
       }
@@ -149,6 +149,7 @@ export class EmailTagInputComponent implements OnInit, OnDestroy {
             { params: { q } },
           ).pipe(
             switchMap((res) => of(res.success ? res.data : [])),
+            catchError(() => of([] as ContactSuggestion[])),
           );
         }),
         takeUntil(this.destroy$),
@@ -196,8 +197,8 @@ export class EmailTagInputComponent implements OnInit, OnDestroy {
     }, 200);
   }
 
-  onInput(): void {
-    const val = this.inputValue.trim();
+  onInput(event: Event): void {
+    const val = ((event.target as HTMLInputElement).value ?? '').trim();
     this.search$.next(val);
     this.showDropdown.set(val.length > 0);
   }

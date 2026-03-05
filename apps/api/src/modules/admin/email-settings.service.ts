@@ -105,11 +105,11 @@ export async function createEmailRule(data: {
     .insert(emailRules)
     .values({
       tenantId: data.tenantId,
-      ownCompanyId: data.ownCompanyId ?? null,
-      documentType: data.documentType ?? null,
+      ownCompanyId: data.ownCompanyId || null,
+      documentType: data.documentType || null,
       ruleType: data.ruleType,
       email: data.email,
-      label: data.label ?? null,
+      label: data.label || null,
     })
     .returning();
   return rule;

@@ -765,7 +765,7 @@ function buildNotesSection(params: {
   return notes;
 }
 
-function tryLoadLogoDataUrl(logoUrl: string | null | undefined): string | null {
+export function tryLoadLogoDataUrl(logoUrl: string | null | undefined): string | null {
   const raw = (logoUrl ?? '').trim();
   if (!raw) return null;
 
