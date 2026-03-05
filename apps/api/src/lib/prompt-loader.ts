@@ -42,11 +42,22 @@ const cache = new Map<string, CacheEntry>();
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
-/** Resolve the prompts directory (relative to this file's location). */
+/** Resolve the prompts directory at runtime (not compile-time). */
 function getPromptsDir(): string {
-  // This file lives at apps/api/src/lib/prompt-loader.ts
-  // Prompts dir is at apps/api/prompts/
-  return join(import.meta.dir, '../../prompts');
+  if (process.env['PROMPTS_DIR']) {
+    return process.env['PROMPTS_DIR'];
+  }
+  // Try candidate paths — process.cwd() is /opt/fueld in production
+  const cwd = process.cwd();
+  const candidates = [
+    join(cwd, 'prompts'),                      // production: /opt/fueld/prompts
+    join(cwd, 'apps', 'api', 'prompts'),        // dev: workspace root
+  ];
+  // Return first existing dir, or default to production path
+  for (const c of candidates) {
+    try { if (require('fs').existsSync(c)) return c; } catch { /* ok */ }
+  }
+  return join(cwd, 'prompts');
 }
 
 function slugFromFilename(filename: string): string {

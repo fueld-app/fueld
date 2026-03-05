@@ -62,9 +62,9 @@ else
   exit 1
 fi
 
-# ─── 3b. Ensure LLM directories and build tools exist ─────────────────
-mkdir -p "$APP_DIR/llm/bin" "$APP_DIR/llm/models"
-log "LLM directories ensured"
+# ─── 3b. Ensure LLM + prompts directories exist ──────────────────────
+mkdir -p "$APP_DIR/llm/bin" "$APP_DIR/llm/models" "$APP_DIR/prompts"
+log "LLM + prompts directories ensured"
 
 # Ensure sudoers is up-to-date (always run — covers apt-get, daemon-reload, etc.)
 SUDOERS_LINE="deploy ALL=(ALL) NOPASSWD: /bin/systemctl restart fueld-api@*, /bin/systemctl start fueld-api@*, /bin/systemctl stop fueld-api@*, /bin/systemctl reload nginx, /bin/systemctl daemon-reload, /bin/systemctl status fueld-api@*, /bin/systemctl restart fueld-llm, /bin/systemctl start fueld-llm, /bin/systemctl stop fueld-llm, /usr/sbin/nginx -t, /usr/bin/tee, /bin/systemctl reset-failed *, /usr/bin/apt-get"
@@ -76,16 +76,26 @@ if ! command -v cmake &>/dev/null || ! command -v g++ &>/dev/null; then
   sudo apt-get install -y -qq cmake g++ make || warn "Could not install build tools (non-fatal)"
 fi
 
-# ─── 3c. Patch systemd unit if ReadWritePaths is missing /opt/fueld/llm ─
+# ─── 3c. Patch systemd unit ReadWritePaths if missing dirs ───────────
 UNIT_FILE="/etc/systemd/system/fueld-api@.service"
-if [ -f "$UNIT_FILE" ] && ! grep -q '/opt/fueld/llm' "$UNIT_FILE"; then
-  log "Patching systemd unit to add /opt/fueld/llm to ReadWritePaths..."
-
-  # Patch the unit file (read into variable first to avoid read/write race on same file)
-  PATCHED=$(sed 's|ReadWritePaths=\(.*\)/tmp|ReadWritePaths=\1/opt/fueld/llm /tmp|' "$UNIT_FILE")
-  echo "$PATCHED" | sudo tee "$UNIT_FILE" > /dev/null
-  sudo systemctl daemon-reload
-  log "Systemd unit patched and reloaded"
+NEED_RELOAD=false
+if [ -f "$UNIT_FILE" ]; then
+  if ! grep -q '/opt/fueld/llm' "$UNIT_FILE"; then
+    log "Patching systemd unit to add /opt/fueld/llm to ReadWritePaths..."
+    PATCHED=$(sed 's|ReadWritePaths=\(.*\)/tmp|ReadWritePaths=\1/opt/fueld/llm /tmp|' "$UNIT_FILE")
+    echo "$PATCHED" | sudo tee "$UNIT_FILE" > /dev/null
+    NEED_RELOAD=true
+  fi
+  if ! grep -q '/opt/fueld/prompts' "$UNIT_FILE"; then
+    log "Patching systemd unit to add /opt/fueld/prompts to ReadWritePaths..."
+    PATCHED=$(sed 's|ReadWritePaths=\(.*\)/tmp|ReadWritePaths=\1/opt/fueld/prompts /tmp|' "$UNIT_FILE")
+    echo "$PATCHED" | sudo tee "$UNIT_FILE" > /dev/null
+    NEED_RELOAD=true
+  fi
+  if [ "$NEED_RELOAD" = true ]; then
+    sudo systemctl daemon-reload
+    log "Systemd unit patched and reloaded"
+  fi
 fi
 
 # ─── 4. Start new slot ───────────────────────────────────────────────

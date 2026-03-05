@@ -198,7 +198,7 @@ MemoryMax=1G
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/fueld/uploads /opt/fueld/.env /opt/fueld/llm /tmp
+ReadWritePaths=/opt/fueld/uploads /opt/fueld/.env /opt/fueld/llm /opt/fueld/prompts /tmp
 PrivateTmp=true
 
 # Graceful shutdown
