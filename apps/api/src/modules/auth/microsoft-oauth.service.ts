@@ -257,13 +257,19 @@ export function consumeOneTimeCode(code: string): PendingAuth | null {
 /**
  * Derive the Microsoft OAuth redirect URI from the incoming request URL.
  * Strips the path back to the API base and appends /auth/microsoft/callback.
+ * Forces HTTPS in production (behind Cloudflare/nginx reverse proxy, the
+ * internal request comes in as HTTP but the public URL must be HTTPS).
  *
  * Examples:
  *   http://localhost:3000/auth/microsoft/login  → http://localhost:3000/auth/microsoft/callback
- *   https://app.fueld.com/api/auth/microsoft/callback → https://app.fueld.com/api/auth/microsoft/callback
+ *   http://riviera-marine.fueld.app/auth/microsoft/login → https://riviera-marine.fueld.app/auth/microsoft/callback
  */
 export function getMicrosoftRedirectUri(requestUrl: string): string {
   const url = new URL(requestUrl);
+  // Force HTTPS for non-localhost (production behind reverse proxy)
+  if (url.hostname !== 'localhost' && url.hostname !== '127.0.0.1') {
+    url.protocol = 'https:';
+  }
   // Find where "/auth/microsoft" starts in the path to determine the API prefix
   const authIdx = url.pathname.indexOf('/auth/microsoft');
   const prefix = authIdx > 0 ? url.pathname.slice(0, authIdx) : '';
