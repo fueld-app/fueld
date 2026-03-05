@@ -31,7 +31,7 @@ import { API_URL } from '@app/core/config/api';
 //  - WhatsApp send option
 // ═══════════════════════════════════════════════════════════════════════
 
-export type DocumentEmailType = 'OFFER' | 'NOMINATION' | 'PROFORMA' | 'INVOICE';
+export type DocumentEmailType = 'OFFER' | 'CONFIRMATION' | 'NOMINATION' | 'PROFORMA' | 'INVOICE';
 
 export interface SendEmailPayload {
   documentType: DocumentEmailType;
@@ -43,7 +43,8 @@ export interface SendEmailPayload {
 }
 
 const DOC_LABELS: Record<DocumentEmailType, string> = {
-  OFFER: 'Offer / Confirmation',
+  OFFER: 'Offer',
+  CONFIRMATION: 'Confirmation',
   NOMINATION: 'Nomination',
   PROFORMA: 'Proforma Invoice',
   INVOICE: 'Invoice',
@@ -706,6 +707,7 @@ export class SendEmailModalComponent {
     const docType = this.documentType();
     const pdfEndpoints: Record<DocumentEmailType, string> = {
       OFFER: 'offer',
+      CONFIRMATION: 'offer',
       NOMINATION: 'nomination',
       PROFORMA: 'proforma',
       INVOICE: 'invoice',

@@ -25,6 +25,7 @@ export type HeaderAction =
   | 'cancel-inquiry'
   | 'send-email'
   | 'send-offer'
+  | 'send-confirmation'
   | 'send-nomination'
   | 'send-proforma'
   | 'send-invoice'
@@ -75,6 +76,12 @@ const ACTIONS: ActionItem[] = [
   // ─── Send Email actions (one per document type) ──────────────
   {
     key: 'send-offer',
+    label: 'Send Offer',
+    icon: SEND_ICON,
+    color: 'text-blue-600',
+  },
+  {
+    key: 'send-confirmation',
     label: 'Send Confirmation',
     icon: SEND_ICON,
     color: 'text-blue-600',
@@ -222,7 +229,7 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
                 : action.key === 'convert-to-order'
                   ? { ...action, disabled: !hasLineItems }
                   : action.key === 'send-offer'
-                    ? { ...action, label: 'Send Offer', disabled: !hasInvoicingCompany || !hasLineItems }
+                    ? { ...action, disabled: !hasInvoicingCompany || !hasLineItems }
                     : action.key === 'send-proforma'
                       ? { ...action, disabled: !hasBankAccount || !hasLineItems }
                       : action,
@@ -248,6 +255,8 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
                 ? { ...action, disabled: !hasSupplier || !hasLineItems }
               : action.key === 'send-nomination'
                 ? { ...action, disabled: !hasSupplier || !hasLineItems }
+              : action.key === 'send-confirmation'
+                ? { ...action, disabled: !hasInvoicingCompany || !hasLineItems }
               : action.key === 'send-invoice'
                 ? { ...action, label: showInvoiceAsFinal ? 'Send Invoice' : 'Send Proforma Invoice', disabled: !hasBankAccount || !hasLineItems }
               : action.key === 'mark-delivered'

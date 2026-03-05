@@ -195,7 +195,8 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       let pdfFileName: string;
 
       switch (docType) {
-        case 'OFFER': {
+        case 'OFFER':
+        case 'CONFIRMATION': {
           if (!order.invoicingCompanyId) { set.status = 400; return { success: false, message: 'Select an invoicing company first' }; }
           const result = await generateOfferPdfBuffer(orderId);
           pdfBuffer = result.buffer;
@@ -258,6 +259,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       body: t.Object({
         documentType: t.Union([
           t.Literal('OFFER'),
+          t.Literal('CONFIRMATION'),
           t.Literal('NOMINATION'),
           t.Literal('PROFORMA'),
           t.Literal('INVOICE'),
@@ -299,7 +301,8 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       const companyLogoUrl = tryLoadLogoDataUrl(order.invoicingCompany?.logoUrl ?? null);
 
       const docLabels: Record<DocumentEmailType, string> = {
-        OFFER: 'Offer / Confirmation',
+        OFFER: 'Offer',
+        CONFIRMATION: 'Confirmation',
         NOMINATION: 'Nomination',
         PROFORMA: 'Proforma Invoice',
         INVOICE: 'Invoice',
@@ -451,6 +454,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       body: t.Object({
         documentType: t.Union([
           t.Literal('OFFER'),
+          t.Literal('CONFIRMATION'),
           t.Literal('NOMINATION'),
           t.Literal('PROFORMA'),
           t.Literal('INVOICE'),

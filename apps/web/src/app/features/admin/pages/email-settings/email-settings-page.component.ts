@@ -15,7 +15,7 @@ import { API } from '@app/core/config/api';
 //  Admin  ›  Email Settings  —  Templates & CC/BCC Rules
 // ═══════════════════════════════════════════════════════════════════════
 
-type DocumentType = 'OFFER' | 'NOMINATION' | 'PROFORMA' | 'INVOICE';
+type DocumentType = 'OFFER' | 'CONFIRMATION' | 'NOMINATION' | 'PROFORMA' | 'INVOICE';
 
 interface EmailTemplate {
   id: string;
@@ -39,10 +39,11 @@ interface TemplateVariable {
   example: string;
 }
 
-const DOC_TYPES: DocumentType[] = ['OFFER', 'NOMINATION', 'PROFORMA', 'INVOICE'];
+const DOC_TYPES: DocumentType[] = ['OFFER', 'CONFIRMATION', 'NOMINATION', 'PROFORMA', 'INVOICE'];
 
 const DOC_LABELS: Record<DocumentType, string> = {
-  OFFER: 'Offer / Confirmation',
+  OFFER: 'Offer',
+  CONFIRMATION: 'Confirmation',
   NOMINATION: 'Nomination',
   PROFORMA: 'Proforma Invoice',
   INVOICE: 'Invoice',

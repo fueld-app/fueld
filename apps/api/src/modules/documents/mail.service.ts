@@ -17,7 +17,7 @@ import { acquireGraphTokenForUser } from '../auth/microsoft-oauth.service';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
-export type DocumentEmailType = 'OFFER' | 'NOMINATION' | 'PROFORMA' | 'INVOICE';
+export type DocumentEmailType = 'OFFER' | 'CONFIRMATION' | 'NOMINATION' | 'PROFORMA' | 'INVOICE';
 
 export interface SendDocumentEmailOptions {
   /** Document type being sent */
@@ -229,9 +229,14 @@ export function buildDocumentEmailHtml(params: {
 }): string {
   const labels: Record<DocumentEmailType, { title: string; greeting: string; intro: string }> = {
     OFFER: {
-      title: 'Offer / Confirmation',
+      title: 'Offer',
       greeting: 'Dear Customer',
       intro: `Please find attached our offer for bunker delivery to <strong>${params.vesselName}</strong> at <strong>${params.portName}</strong>.`,
+    },
+    CONFIRMATION: {
+      title: 'Confirmation',
+      greeting: 'Dear Customer',
+      intro: `Please find attached our confirmation for bunker delivery to <strong>${params.vesselName}</strong> at <strong>${params.portName}</strong>.`,
     },
     NOMINATION: {
       title: 'Nomination',
@@ -310,7 +315,8 @@ export function buildDocumentEmailSubject(params: {
   invoiceNumber?: string;
 }): string {
   const labels: Record<DocumentEmailType, string> = {
-    OFFER: 'Offer / Confirmation',
+    OFFER: 'Offer',
+    CONFIRMATION: 'Confirmation',
     NOMINATION: 'Nomination',
     PROFORMA: 'Proforma Invoice',
     INVOICE: 'Invoice',
