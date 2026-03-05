@@ -331,7 +331,7 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
         log.push(`Downloading ${assetName} from GitHub...`);
         log.push(`URL: ${url}`);
 
-        const res = await fetch(url, { signal: AbortSignal.timeout(120_000) });
+        const res = await fetch(url, { signal: AbortSignal.timeout(600_000) });
         if (!res.ok) {
           return { success: false, data: { log: `Download failed: HTTP ${res.status} from ${url}`, success: false } };
         }
