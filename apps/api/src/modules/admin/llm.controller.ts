@@ -56,12 +56,14 @@ function getLlmPaths() {
 function getInstalledModel(): { filename: string; sizeMb: number; path: string } | null {
   const paths = getLlmPaths();
   try {
-    const files = readdirSync(paths.modelDir);
-    const gguf = files.find((f) => f.endsWith('.gguf'));
-    if (!gguf) return null;
-    const fullPath = join(paths.modelDir, gguf);
-    const sizeMb = Math.round(statSync(fullPath).size / 1024 / 1024);
-    return { filename: gguf, sizeMb, path: fullPath };
+    const files = readdirSync(paths.modelDir).filter((f) => f.endsWith('.gguf')).sort();
+    if (files.length === 0) return null;
+    const firstFile = files[0];
+    const fullPath = join(paths.modelDir, firstFile);
+    // Sum all .gguf files (handles split models)
+    const totalBytes = files.reduce((sum, f) => sum + statSync(join(paths.modelDir, f)).size, 0);
+    const sizeMb = Math.round(totalBytes / 1024 / 1024);
+    return { filename: firstFile, sizeMb, path: fullPath };
   } catch {
     return null;
   }
@@ -887,14 +889,56 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
         const model = (await res.json()) as HfModelResult;
         const siblings = model.siblings ?? [];
 
-        const ggufFiles = siblings
+        const ggufRaw = siblings
           .filter((s) => s.rfilename.endsWith('.gguf'))
           .map((s) => ({
             filename: s.rfilename,
             sizeMb: s.size ? Math.round(s.size / 1024 / 1024) : null,
+            sizeBytes: s.size ?? null,
             downloadUrl: `https://huggingface.co/${repoId}/resolve/main/${s.rfilename}`,
-            tooLarge: s.size ? Math.round(s.size / 1024 / 1024) > MAX_MODEL_SIZE_MB : false,
           }));
+
+        // Group split GGUF files (e.g. model-00001-of-00003.gguf) into a single entry
+        const splitRegex = /^(.+)-(\d{5})-of-(\d{5})\.gguf$/;
+        const splitGroups = new Map<string, typeof ggufRaw>();
+        const singleFiles: typeof ggufRaw = [];
+
+        for (const f of ggufRaw) {
+          const m = f.filename.match(splitRegex);
+          if (m) {
+            const key = m[1]; // base name without part number
+            if (!splitGroups.has(key)) splitGroups.set(key, []);
+            splitGroups.get(key)!.push(f);
+          } else {
+            singleFiles.push(f);
+          }
+        }
+
+        const ggufFiles = [
+          // Single files
+          ...singleFiles.map((f) => ({
+            filename: f.filename,
+            sizeMb: f.sizeMb,
+            downloadUrl: f.downloadUrl,
+            tooLarge: f.sizeMb ? f.sizeMb > MAX_MODEL_SIZE_MB : false,
+            splitParts: null as number | null,
+            splitTotalMb: null as number | null,
+          })),
+          // Split groups — show as single entry with part 1 filename
+          ...Array.from(splitGroups.entries()).map(([base, parts]) => {
+            parts.sort((a, b) => a.filename.localeCompare(b.filename));
+            const totalBytes = parts.reduce((sum, p) => sum + (p.sizeBytes ?? 0), 0);
+            const totalMb = Math.round(totalBytes / 1024 / 1024);
+            return {
+              filename: parts[0].filename, // first part (the one to pass to install)
+              sizeMb: parts[0].sizeMb,
+              downloadUrl: parts[0].downloadUrl,
+              tooLarge: totalMb > MAX_MODEL_SIZE_MB,
+              splitParts: parts.length,
+              splitTotalMb: totalMb,
+            };
+          }),
+        ];
 
         return { success: true, data: { repoId, files: ggufFiles, maxModelSizeMb: MAX_MODEL_SIZE_MB } };
       } catch (err) {
@@ -932,22 +976,39 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
       const { mkdir } = await import('fs/promises');
       await mkdir(paths.modelDir, { recursive: true });
 
-      // Check size limit via HEAD
+      // Detect split GGUF files (e.g. model-00001-of-00003.gguf)
+      const splitMatch = filename.match(/^(.+)-(\d{5})-of-(\d{5})\.gguf$/);
+      const filesToDownload: string[] = [];
+      if (splitMatch) {
+        const base = splitMatch[1];
+        const totalParts = parseInt(splitMatch[3]);
+        for (let i = 1; i <= totalParts; i++) {
+          filesToDownload.push(`${base}-${String(i).padStart(5, '0')}-of-${splitMatch[3]}.gguf`);
+        }
+      } else {
+        filesToDownload.push(filename);
+      }
+
+      // Check total size limit via HEAD on all parts
       let totalBytes: number | null = null;
       try {
-        const headRes = await fetch(
-          `https://huggingface.co/${repoId}/resolve/main/${filename}`,
-          { method: 'HEAD', signal: AbortSignal.timeout(10_000) },
-        );
-        const contentLength = headRes.headers.get('content-length');
-        if (contentLength) {
-          totalBytes = parseInt(contentLength);
-          const sizeMb = Math.round(totalBytes / 1024 / 1024);
+        let sum = 0;
+        for (const f of filesToDownload) {
+          const headRes = await fetch(
+            `https://huggingface.co/${repoId}/resolve/main/${f}`,
+            { method: 'HEAD', signal: AbortSignal.timeout(10_000) },
+          );
+          const cl = headRes.headers.get('content-length');
+          if (cl) sum += parseInt(cl);
+        }
+        if (sum > 0) {
+          totalBytes = sum;
+          const sizeMb = Math.round(sum / 1024 / 1024);
           if (sizeMb > MAX_MODEL_SIZE_MB) {
             return {
               success: false,
               data: null,
-              error: `Model is ${sizeMb} MB, exceeds limit of ${MAX_MODEL_SIZE_MB} MB.`,
+              error: `Model is ${sizeMb} MB (${filesToDownload.length} parts), exceeds limit of ${MAX_MODEL_SIZE_MB} MB.`,
             };
           }
         }
@@ -960,7 +1021,7 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
         error: null, startedAt: Date.now(),
       };
 
-      // Fire-and-forget — the actual download runs in the background
+      // Fire-and-forget — download all parts sequentially in the background
       (async () => {
         try {
           const { unlink, readdir } = await import('fs/promises');
@@ -973,46 +1034,63 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
             }
           } catch { /* ok */ }
 
-          const url = `https://huggingface.co/${repoId}/resolve/main/${filename}`;
-          const res = await fetch(url, { signal: AbortSignal.timeout(600_000) });
-          if (!res.ok) {
-            _modelDownload.status = 'error';
-            _modelDownload.error = `Download failed: HTTP ${res.status}`;
-            return;
+          // Download each part
+          for (const partFilename of filesToDownload) {
+            const url = `https://huggingface.co/${repoId}/resolve/main/${partFilename}`;
+            const res = await fetch(url, { signal: AbortSignal.timeout(600_000) });
+            if (!res.ok) {
+              _modelDownload.status = 'error';
+              _modelDownload.error = `Download failed for ${partFilename}: HTTP ${res.status}`;
+              return;
+            }
+
+            const modelPath = join(paths.modelDir, partFilename);
+            const writer = Bun.file(modelPath).writer();
+            const reader = res.body?.getReader();
+            if (!reader) {
+              _modelDownload.status = 'error';
+              _modelDownload.error = `No response body for ${partFilename}`;
+              return;
+            }
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              writer.write(value);
+              _modelDownload.downloadedBytes += value.byteLength;
+            }
+            await writer.end();
           }
 
-          // Stream download with progress tracking
-          const modelPath = join(paths.modelDir, filename);
-          const writer = Bun.file(modelPath).writer();
-          const reader = res.body?.getReader();
-          if (!reader) {
-            _modelDownload.status = 'error';
-            _modelDownload.error = 'No response body';
-            return;
+          // Calculate total size of all downloaded files
+          let totalSize = 0;
+          for (const f of filesToDownload) {
+            try { totalSize += statSync(join(paths.modelDir, f)).size; } catch { /* ok */ }
           }
-
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            writer.write(value);
-            _modelDownload.downloadedBytes += value.byteLength;
-          }
-          await writer.end();
-
-          const sizeMb = Math.round(statSync(modelPath).size / 1024 / 1024);
+          const sizeMb = Math.round(totalSize / 1024 / 1024);
           _modelDownload.status = 'done';
           _modelDownload.sizeMb = sizeMb;
         } catch (err) {
           _modelDownload.status = 'error';
           _modelDownload.error = err instanceof Error ? err.message : String(err);
-          // Clean up partial
-          try { const { unlink } = await import('fs/promises'); await unlink(join(paths.modelDir, filename)); } catch { /* ok */ }
+          // Clean up partial downloads
+          try {
+            const { unlink } = await import('fs/promises');
+            for (const f of filesToDownload) {
+              try { await unlink(join(paths.modelDir, f)); } catch { /* ok */ }
+            }
+          } catch { /* ok */ }
         }
       })();
 
       return {
         success: true,
-        data: { message: 'Download started', filename, repoId, totalBytes },
+        data: {
+          message: filesToDownload.length > 1
+            ? `Download started (${filesToDownload.length} parts)`
+            : 'Download started',
+          filename, repoId, totalBytes, parts: filesToDownload.length,
+        },
       };
     },
     {

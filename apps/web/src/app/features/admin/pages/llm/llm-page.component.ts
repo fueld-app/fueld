@@ -89,6 +89,8 @@ interface HfFile {
   sizeMb: number | null;
   downloadUrl: string;
   tooLarge: boolean;
+  splitParts: number | null;
+  splitTotalMb: number | null;
 }
 
 // ─── Component ───────────────────────────────────────────────────────
@@ -317,7 +319,11 @@ interface HfFile {
                   <div class="flex items-center justify-between px-3 py-2 text-sm">
                     <div>
                       <span class="font-mono text-xs">{{ f.filename }}</span>
-                      @if (f.sizeMb != null) { <span class="text-gray-400 ml-2">{{ f.sizeMb }} MB</span> }
+                      @if (f.splitParts) {
+                        <span class="text-gray-400 ml-2">{{ f.splitParts }} parts · {{ f.splitTotalMb }} MB</span>
+                      } @else if (f.sizeMb != null) {
+                        <span class="text-gray-400 ml-2">{{ f.sizeMb }} MB</span>
+                      }
                     </div>
                     @if (f.tooLarge) {
                       <span class="text-xs text-red-600">Too large</span>
