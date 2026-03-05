@@ -31,13 +31,15 @@ function getLlmPaths() {
   if (process.env['LLM_SCRIPT_DIR']) {
     scriptDir = resolve(process.env['LLM_SCRIPT_DIR']);
   } else {
-    // Try candidate paths: production (/opt/fueld/llm) then dev (../../scripts/llm from cwd)
+    // Try candidate paths in order of preference
+    const cwd = process.cwd();
     const candidates = [
-      '/opt/fueld/llm',
-      join(process.cwd(), '..', '..', 'scripts', 'llm'),
-      join(process.cwd(), 'scripts', 'llm'),
+      '/opt/fueld/llm',                                    // production (managed by setup-vps.sh)
+      join(cwd, 'llm'),                                    // production cwd fallback
+      join(cwd, '..', '..', 'scripts', 'llm'),             // dev: cwd=apps/api
+      join(cwd, 'scripts', 'llm'),                         // dev: cwd=workspace root
     ];
-    scriptDir = candidates.find((c) => existsSync(c)) ?? candidates[0];
+    scriptDir = candidates.find((c) => existsSync(c)) ?? '/opt/fueld/llm';
   }
   const binDir = process.env['LLM_BIN_DIR'] ?? join(scriptDir, 'bin');
   const modelDir = process.env['LLM_MODEL_DIR'] ?? join(scriptDir, 'models');

@@ -62,6 +62,10 @@ else
   exit 1
 fi
 
+# ─── 3b. Ensure LLM directories exist ─────────────────────────────────
+mkdir -p "$APP_DIR/llm/bin" "$APP_DIR/llm/models"
+log "LLM directories ensured"
+
 # ─── 4. Start new slot ───────────────────────────────────────────────
 log "Starting fueld-api@${NEXT_SLOT}..."
 sudo systemctl stop "fueld-api@${NEXT_SLOT}" 2>/dev/null || true

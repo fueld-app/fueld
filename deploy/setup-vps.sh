@@ -147,6 +147,7 @@ GEODATADIR=/opt/fueld/geoip-data
 
 # Local LLM (llama-server)
 LLM_BASE_URL=http://127.0.0.1:8081
+LLM_SCRIPT_DIR=/opt/fueld/llm
 
 # Lloyd's List Intelligence (optional)
 # LLI_USERNAME=
@@ -197,7 +198,7 @@ MemoryMax=1G
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/fueld/uploads /opt/fueld/.env /tmp
+ReadWritePaths=/opt/fueld/uploads /opt/fueld/.env /opt/fueld/llm /tmp
 PrivateTmp=true
 
 # Graceful shutdown
