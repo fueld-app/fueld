@@ -245,10 +245,30 @@ interface HfFile {
             }
           }
         </div>
-        @if (showInstallLog() && installLog(); as log) {
+        @if (showInstallLog()) {
           <div class="mt-4">
             <button (click)="showInstallLog.set(!showInstallLog())" class="text-sm text-blue-600 hover:underline mb-1">Toggle log</button>
-            <pre class="bg-gray-900 text-green-400 text-xs p-4 rounded-md overflow-x-auto max-h-64 overflow-y-auto">{{ log }}</pre>
+            @if (installProgress(); as ip) {
+              <div class="mb-2 space-y-1">
+                @if (ip.elapsedSec !== null) {
+                  <span class="text-xs text-gray-500">Elapsed: {{ formatDuration(ip.elapsedSec) }}</span>
+                }
+                @if (ip.buildCurrent !== null && ip.buildTotal !== null && ip.buildTotal > 0) {
+                  <div class="flex items-center gap-2">
+                    <div class="flex-1 bg-gray-200 rounded-full h-2.5">
+                      <div class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" [style.width.%]="(ip.buildCurrent / ip.buildTotal) * 100"></div>
+                    </div>
+                    <span class="text-xs text-gray-600 font-mono whitespace-nowrap">{{ ip.buildCurrent }}/{{ ip.buildTotal }}</span>
+                    @if (ip.elapsedSec && ip.buildCurrent > 0) {
+                      <span class="text-xs text-gray-500 whitespace-nowrap">~{{ formatDuration(Math.round((ip.elapsedSec / ip.buildCurrent) * (ip.buildTotal - ip.buildCurrent))) }} left</span>
+                    }
+                  </div>
+                }
+              </div>
+            }
+            @if (installLog(); as log) {
+              <pre class="bg-gray-900 text-green-400 text-xs p-4 rounded-md overflow-x-auto max-h-64 overflow-y-auto">{{ log }}</pre>
+            }
           </div>
         }
       </div>
@@ -559,6 +579,7 @@ export class LlmPageComponent implements OnInit, OnDestroy {
   readonly installLog = signal<string | null>(null);
   readonly showInstallLog = signal(false);
   readonly buildFromSource = signal(false);
+  readonly installProgress = signal<{ buildCurrent: number | null; buildTotal: number | null; elapsedSec: number | null } | null>(null);
 
   // Server management
   readonly starting = signal(false);
@@ -704,6 +725,7 @@ export class LlmPageComponent implements OnInit, OnDestroy {
     this.installLog.set(null);
     this.showInstallLog.set(true);
     this.serverMessage.set(null);
+    this.installProgress.set(null);
     try {
       const version = this.selectedVersion() || undefined;
       const buildFromSource = this.buildFromSource();
@@ -721,15 +743,16 @@ export class LlmPageComponent implements OnInit, OnDestroy {
       this.serverMessageSuccess.set(true);
 
       // Poll install progress every 3s
-      for (let i = 0; i < 200; i++) { // up to ~10 min
+      for (let i = 0; i < 600; i++) { // up to ~30 min
         await new Promise(r => setTimeout(r, 3000));
         try {
-          const progress = await firstValueFrom(this.http.get<ApiResponse<{ status: string; step: string; log: string; error: string | null }>>(`${API}/admin/llm/install/progress`));
+          const progress = await firstValueFrom(this.http.get<ApiResponse<{ status: string; step: string; log: string; error: string | null; elapsedSec: number | null; buildCurrent: number | null; buildTotal: number | null }>>(`${API}/admin/llm/install/progress`));
           const d = progress.data;
           if (d) {
             this.installLog.set(d.log || d.step || 'Working…');
             this.serverMessage.set(d.step || 'Installing…');
             this.serverMessageSuccess.set(d.status !== 'error');
+            this.installProgress.set({ buildCurrent: d.buildCurrent, buildTotal: d.buildTotal, elapsedSec: d.elapsedSec });
 
             if (d.status === 'done') {
               this.serverMessage.set('Installation complete');
@@ -751,6 +774,18 @@ export class LlmPageComponent implements OnInit, OnDestroy {
     }
     await Promise.all([this.loadStatus(), this.loadInstallStatus()]);
     this.installing.set(false);
+    this.installProgress.set(null);
+  }
+
+  // ── Utilities ─────────────────────────────────────────────────────
+
+  readonly Math = Math;
+
+  formatDuration(sec: number | null): string {
+    if (sec === null || sec < 0) return '--';
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return m > 0 ? `${m}m ${s}s` : `${s}s`;
   }
 
   // ── Server start / stop ───────────────────────────────────────────

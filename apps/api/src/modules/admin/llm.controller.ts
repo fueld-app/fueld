@@ -228,10 +228,15 @@ interface InstallState {
   log: string[];
   error: string | null;
   startedAt: number | null;
+  /** cmake build progress: current file number */
+  buildCurrent: number | null;
+  /** cmake build progress: total files to compile */
+  buildTotal: number | null;
 }
 
 let _installState: InstallState = {
   status: 'idle', step: '', log: [], error: null, startedAt: null,
+  buildCurrent: null, buildTotal: null,
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -350,6 +355,8 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
         log: [],
         error: null,
         startedAt: Date.now(),
+        buildCurrent: null,
+        buildTotal: null,
       };
 
       // Fire-and-forget — the actual install runs in the background.
@@ -435,17 +442,74 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
             const nprocResult = await run(['nproc']);
             const jobs = nprocResult.stdout.trim() || '2';
             _installState.step = `Compiling (${jobs} jobs)…`;
+            _installState.buildCurrent = 0;
+            _installState.buildTotal = null;
             log.push(`Building with ${jobs} parallel jobs (this may take a few minutes)...`);
-            const make = await run(
+
+            // Stream cmake build to get real-time [X/Y] progress
+            const makeProc = Bun.spawn(
               ['cmake', '--build', 'build', '--config', 'Release', '-j', jobs],
-              { cwd: srcDir, timeoutMs: 600_000 },
+              { cwd: srcDir, stdout: 'pipe', stderr: 'pipe' },
             );
-            if (make.exitCode !== 0) {
-              const err = make.stderr.slice(-1000);
+
+            // cmake outputs progress like "[ 42%] Building CXX..." or "[123/456]" to stdout
+            // Read stdout line-by-line to parse progress
+            const progressRegex = /^\[\s*(\d+)\/(\d+)\]/;
+            const percentRegex = /^\[\s*(\d+)%\]/;
+            let lastStdout = '';
+            let lastStderr = '';
+
+            async function streamLines(reader: ReadableStream<Uint8Array>, onLine: (line: string) => void): Promise<string> {
+              const chunks: string[] = [];
+              let buffer = '';
+              for await (const chunk of reader) {
+                const text = typeof chunk === 'string' ? chunk : new TextDecoder().decode(chunk);
+                chunks.push(text);
+                buffer += text;
+                const lines = buffer.split('\n');
+                buffer = lines.pop() ?? '';
+                for (const line of lines) onLine(line);
+              }
+              if (buffer) onLine(buffer);
+              return chunks.join('');
+            }
+
+            const [makeStdout, makeStderr] = await Promise.all([
+              streamLines(makeProc.stdout as ReadableStream<Uint8Array>, (line) => {
+                lastStdout = line;
+                const m = progressRegex.exec(line);
+                if (m) {
+                  _installState.buildCurrent = parseInt(m[1], 10);
+                  _installState.buildTotal = parseInt(m[2], 10);
+                  _installState.step = `Compiling [${m[1]}/${m[2]}]…`;
+                } else {
+                  const pm = percentRegex.exec(line);
+                  if (pm) {
+                    const pct = parseInt(pm[1], 10);
+                    _installState.buildCurrent = pct;
+                    _installState.buildTotal = 100;
+                    _installState.step = `Compiling ${pct}%…`;
+                  }
+                }
+              }),
+              streamLines(makeProc.stderr as ReadableStream<Uint8Array>, (line) => {
+                lastStderr = line;
+              }),
+            ]);
+
+            // Wait for process with timeout
+            const makeTimeout = setTimeout(() => { makeProc.kill(); }, 600_000);
+            await makeProc.exited;
+            clearTimeout(makeTimeout);
+
+            if (makeProc.exitCode !== 0) {
+              const err = makeStderr.slice(-1000);
               await rm(tmpDir, { recursive: true, force: true });
               throw new Error(`Build failed:\n${err}`);
             }
             log.push('Build completed');
+            _installState.buildCurrent = null;
+            _installState.buildTotal = null;
 
             _installState.step = 'Copying binaries…';
             const find = await run(['find', buildDir, '-name', 'llama-server', '-type', 'f']);
@@ -584,6 +648,9 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
     '/install/progress',
     ({ auth }) => {
       requireAdmin(auth);
+      const elapsedSec = _installState.startedAt
+        ? Math.round((Date.now() - _installState.startedAt) / 1000)
+        : null;
       return {
         success: true,
         data: {
@@ -592,6 +659,9 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
           log: _installState.log.join('\n'),
           error: _installState.error,
           startedAt: _installState.startedAt,
+          elapsedSec,
+          buildCurrent: _installState.buildCurrent,
+          buildTotal: _installState.buildTotal,
         },
       };
     },
