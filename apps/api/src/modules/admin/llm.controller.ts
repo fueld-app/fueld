@@ -444,9 +444,7 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
             '--ctx-size', process.env['LLM_CTX'] ?? '2048',
             '--threads', process.env['LLM_THREADS'] ?? '2',
             '--parallel', process.env['LLM_PARALLEL'] ?? '1',
-            '--flash-attn', 'auto',
             '--cont-batching',
-            '--log-disable',
           ],
           {
             cwd: paths.scriptDir,
@@ -455,19 +453,33 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
               DYLD_LIBRARY_PATH: dyldPath,
               LD_LIBRARY_PATH: ldPath,
             },
-            stdout: 'ignore',
-            stderr: 'ignore',
+            stdout: 'pipe',
+            stderr: 'pipe',
           },
         );
+
+        // Collect stderr in background for diagnostics
+        let stderrOutput = '';
+        const stderrReader = (async () => {
+          try {
+            const stderr = _serverProcess!.stderr;
+            if (stderr && typeof stderr !== 'number') {
+              const text = await new Response(stderr as ReadableStream).text();
+              stderrOutput = text.slice(-2000); // keep last 2KB
+            }
+          } catch { /* ok */ }
+        })();
 
         // Wait for the server to become healthy (up to 20s)
         let healthy = false;
         for (let i = 0; i < 20; i++) {
           await new Promise((r) => setTimeout(r, 1000));
           if (!isServerProcessAlive()) {
+            await stderrReader; // ensure we captured the output
+            const errMsg = stderrOutput.trim();
             return {
               success: false,
-              data: { started: false, message: `Server process exited with code ${_serverProcess?.exitCode}` },
+              data: { started: false, message: `Server process exited with code ${_serverProcess?.exitCode}${errMsg ? '\n\n' + errMsg : ''}` },
             };
           }
           if (await llm.isHealthy()) {

@@ -218,7 +218,14 @@ interface HfFile {
             {{ stopping() ? 'Stopping…' : '■ Stop' }}
           </button>
           @if (serverMessage(); as msg) {
-            <span class="text-sm" [class]="serverMessageSuccess() ? 'text-green-700' : 'text-red-700'">{{ msg }}</span>
+            @if (msg.includes('\\n')) {
+              <div class="w-full mt-2">
+                <p class="text-sm font-medium" [class]="serverMessageSuccess() ? 'text-green-700' : 'text-red-700'">{{ msg.split('\\n')[0] }}</p>
+                <pre class="bg-gray-900 text-red-400 text-xs p-3 rounded-md overflow-x-auto max-h-48 overflow-y-auto mt-1 whitespace-pre-wrap">{{ msg.split('\\n').slice(1).join('\\n').trim() }}</pre>
+              </div>
+            } @else {
+              <span class="text-sm" [class]="serverMessageSuccess() ? 'text-green-700' : 'text-red-700'">{{ msg }}</span>
+            }
           }
         </div>
         @if (showInstallLog() && installLog(); as log) {
