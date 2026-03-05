@@ -224,6 +224,8 @@ export function buildDocumentEmailHtml(params: {
   paymentTerms?: string | null;
   customerNote?: string | null;
   itemNotes?: Array<{ label: string; note: string }>;
+  companyName?: string | null;
+  companyLogoUrl?: string | null;
 }): string {
   const labels: Record<DocumentEmailType, { title: string; greeting: string; intro: string }> = {
     OFFER: {
@@ -264,11 +266,15 @@ export function buildDocumentEmailHtml(params: {
         .join('')}</ul>`
     : '';
 
+  const companyName = params.companyName?.trim() || 'FUELD';
+  const logoHtml = params.companyLogoUrl
+    ? `<img src="${params.companyLogoUrl}" alt="${companyName}" style="max-height: 40px; max-width: 180px; margin-bottom: 4px;" />`
+    : `<h1 style="color: #ffffff; margin: 0; font-size: 24px;">${companyName}</h1>`;
+
   return `
     <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: #1a56db; padding: 24px 32px; border-radius: 8px 8px 0 0;">
-        <h1 style="color: #ffffff; margin: 0; font-size: 24px;">FUELD</h1>
-        <p style="color: #bfdbfe; margin: 4px 0 0 0; font-size: 12px;">Bunker Trading Solutions</p>
+        ${logoHtml}
       </div>
       <div style="background: #ffffff; padding: 32px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
         <p>${l.greeting},</p>
@@ -290,7 +296,7 @@ export function buildDocumentEmailHtml(params: {
         <p style="margin-top: 24px;">Best regards,<br/><strong>${params.senderName}</strong></p>
       </div>
       <div style="text-align: center; padding: 16px; color: #9ca3af; font-size: 11px;">
-        This email was sent via Fueld — Bunker Trading SaaS
+        Sent by ${companyName}
       </div>
     </div>
   `;

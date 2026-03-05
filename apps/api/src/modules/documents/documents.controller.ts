@@ -294,6 +294,8 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       const vesselName = order.vessel?.name ?? 'Vessel';
       const portName = order.place?.name ?? 'Port';
       const orderNumber = order.orderNumber ?? orderId.slice(0, 8).toUpperCase();
+      const companyName = order.invoicingCompany?.name ?? null;
+      const companyLogoUrl = order.invoicingCompany?.logoUrl ?? null;
 
       const docLabels: Record<DocumentEmailType, string> = {
         OFFER: 'Offer / Confirmation',
@@ -368,6 +370,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         orderNumber,
         documentLabel: docLabels[docType],
         senderName,
+        companyName: companyName ?? '',
         paymentTerms: paymentTerms ?? '',
         customerNote: order.customerNote ?? '',
         supplierNote: order.supplierNote ?? '',
@@ -395,6 +398,8 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             orderNumber,
             paymentTerms,
             customerNote: docType === 'NOMINATION' ? order.supplierNote ?? null : order.customerNote ?? null,
+            companyName,
+            companyLogoUrl,
             itemNotes: order.items
               ?.filter((item: any) => item.customerNote)
               .map((item: any) => ({
@@ -413,6 +418,8 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           orderNumber,
           paymentTerms,
           customerNote: docType === 'NOMINATION' ? order.supplierNote ?? null : order.customerNote ?? null,
+          companyName,
+          companyLogoUrl,
           itemNotes: order.items
             ?.filter((item: any) => item.customerNote)
             .map((item: any) => ({

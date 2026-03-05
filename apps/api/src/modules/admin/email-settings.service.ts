@@ -129,6 +129,7 @@ export interface TemplateVariables {
   orderNumber: string;
   documentLabel: string;
   senderName: string;
+  companyName: string;
   paymentTerms: string;
   customerNote: string;
   supplierNote: string;
@@ -153,6 +154,7 @@ export const TEMPLATE_VARIABLES = [
   { key: 'orderNumber', label: 'Order number', example: '20260209-000001' },
   { key: 'documentLabel', label: 'Document type label', example: 'Offer / Confirmation' },
   { key: 'senderName', label: 'Sender name', example: 'John Smith' },
+  { key: 'companyName', label: 'Invoicing company name', example: 'Riviera Marine Ltd' },
   { key: 'paymentTerms', label: 'Payment terms', example: 'Credit 30 days' },
   { key: 'customerNote', label: 'Customer note', example: 'Please confirm by EOD' },
   { key: 'supplierNote', label: 'Supplier note / remark', example: 'Deliver before 16:00' },
