@@ -39,6 +39,7 @@ describe('documents mail service', () => {
     senderName: 'Test Sender',
     recipientEmail: 'customer@example.com',
     ccEmails: [],
+    bccEmails: [],
     subject: 'Test Subject',
     htmlBody: '<p>Hello</p>',
     pdfBuffer: Buffer.from('fake-pdf'),

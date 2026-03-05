@@ -29,6 +29,7 @@ export type HeaderAction =
   | 'send-nomination'
   | 'send-proforma'
   | 'send-invoice'
+  | 'send-inquiry'
   | 'mark-delivered'
   | 'mark-paid';
 
@@ -74,6 +75,12 @@ const ACTIONS: ActionItem[] = [
     color: 'text-red-500',
   },
   // ─── Send Email actions (one per document type) ──────────────
+  {
+    key: 'send-inquiry',
+    label: 'Send Inquiry to Suppliers',
+    icon: 'M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5',
+    color: 'text-teal-600',
+  },
   {
     key: 'send-offer',
     label: 'Send Offer',
@@ -219,7 +226,8 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
             || action.key === 'convert-to-order'
             || action.key === 'cancel-inquiry'
             || action.key === 'send-offer'
-            || action.key === 'send-proforma',
+            || action.key === 'send-proforma'
+            || action.key === 'send-inquiry',
           )
           .map((action) =>
             action.key === 'view-offer'
@@ -232,7 +240,9 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
                     ? { ...action, disabled: !hasInvoicingCompany || !hasLineItems }
                     : action.key === 'send-proforma'
                       ? { ...action, disabled: !hasBankAccount || !hasLineItems }
-                      : action,
+                      : action.key === 'send-inquiry'
+                        ? { ...action, disabled: !hasLineItems }
+                        : action,
           )
       : ACTIONS
           .filter((action) =>

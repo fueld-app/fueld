@@ -39,6 +39,7 @@ import {
   type HeaderAction,
 } from '../../components/header-actions/header-actions.component';
 import { SendEmailModalComponent, type SendEmailPayload, type DocumentEmailType, type SendWhatsAppPayload } from '../../components/send-email-modal/send-email-modal.component';
+import { SendInquiryModalComponent, type SendInquiryPayload } from '../../components/send-inquiry-modal/send-inquiry-modal.component';
 import type { DropdownOption } from '../../../../shared/components/searchable-dropdown/searchable-dropdown.component';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
@@ -71,6 +72,7 @@ interface TeamUserOption {
     OrderItemsComponent,
     HeaderActionsComponent,
     SendEmailModalComponent,
+    SendInquiryModalComponent,
     CommentsCardComponent,
     ActivityTimelineComponent,
     PdfPreviewModalComponent,
@@ -778,6 +780,13 @@ interface TeamUserOption {
       (sendWhatsApp)="onSendInvoiceWhatsApp($event)"
     />
 
+    <!-- Send Inquiry Modal -->
+    <app-send-inquiry-modal
+      [orderId]="orderId()"
+      [portName]="port()?.name ?? ''"
+      (sendInquiry)="onSendInquiry($event)"
+    />
+
     <!-- PDF Preview Modal -->
     <app-pdf-preview-modal [waLinked]="waLinked()" [defaultPhone]="customerContact()?.phone ?? null" (sendWhatsApp)="onSendPdfWhatsApp($event)" />
   `,
@@ -800,6 +809,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
 
   readonly emailModal = viewChild(SendEmailModalComponent);
   readonly pdfModal = viewChild(PdfPreviewModalComponent);
+  readonly inquiryModal = viewChild(SendInquiryModalComponent);
 
   // ─── Email compose state ─────────────────────────────────────────
 
@@ -2047,6 +2057,9 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
       case 'send-invoice':
         this.openSendEmailModal('INVOICE');
         break;
+      case 'send-inquiry':
+        this.openSendInquiryModal();
+        break;
       case 'mark-paid':
         this.markPaid();
         break;
@@ -2352,6 +2365,48 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   }
 
   // ── Open compose modal for any document type ───────────────────
+
+  openSendInquiryModal(): void {
+    if (!this.hasLineItems()) {
+      this.showToast('error', 'Add at least one line item before sending inquiries.');
+      return;
+    }
+    this.inquiryModal()?.show();
+  }
+
+  onSendInquiry(payload: SendInquiryPayload): void {
+    const id = this.orderId();
+    if (!id) return;
+
+    this.http
+      .post<{ success: boolean; message: string; data: Array<{ supplierId: string; supplierName: string; email: string; success: boolean; error?: string }> }>(
+        `${API_URL}/orders/${id}/inquiry/send`,
+        {
+          suppliers: payload.suppliers,
+          subject: payload.subject,
+          htmlBody: payload.htmlBody,
+        },
+      )
+      .subscribe({
+        next: (res) => {
+          this.inquiryModal()?.done();
+          if (res.success) {
+            const successCount = res.data?.filter((r: any) => r.success).length ?? 0;
+            const total = res.data?.length ?? 0;
+            this.showToast('success', `Inquiry sent to ${successCount}/${total} suppliers`);
+            if (successCount > 0) {
+              this.inquiryModal()?.close();
+            }
+          } else {
+            this.showToast('error', res.message || 'Failed to send inquiries');
+          }
+        },
+        error: () => {
+          this.inquiryModal()?.done();
+          this.showToast('error', 'Failed to send inquiry emails. Check SMTP settings in Admin.');
+        },
+      });
+  }
 
   openSendEmailModal(docType: DocumentEmailType): void {
     const id = this.orderId();

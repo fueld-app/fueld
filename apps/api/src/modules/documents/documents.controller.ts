@@ -1,11 +1,12 @@
 import { Elysia, t } from 'elysia';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { authGuard } from '../auth/auth.guard';
 import { generateNominationPdfBuffer, generateOrderInvoicePdfBuffer, generateOfferPdfBuffer, generateProformaInvoicePdfBuffer, tryLoadLogoDataUrl } from './document.service';
-import { sendDocumentEmail, buildDocumentEmailHtml, buildDocumentEmailSubject, type DocumentEmailType } from './mail.service';
+import { sendDocumentEmail, buildDocumentEmailHtml, buildDocumentEmailSubject, buildInquiryEmailHtml, type DocumentEmailType } from './mail.service';
 import { resolveOrderId, getOrderById } from '../orders/orders.service';
+import { getPortSuppliers } from '../lloyds/lli.service';
 import { db } from '../../db';
-import { users, counterparties, invoices as invoicesTable, companyContacts, companyEmails } from '../../db/schema';
+import { users, counterparties, invoices as invoicesTable, companyContacts, companyEmails, supplierInquiries, portSuppliers } from '../../db/schema';
 import { inArray } from 'drizzle-orm';
 import { getEmailTemplate, getApplicableEmailRules, renderTemplate, type TemplateVariables } from '../admin/email-settings.service';
 
@@ -307,6 +308,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         NOMINATION: 'Nomination',
         PROFORMA: 'Proforma Invoice',
         INVOICE: 'Invoice',
+        INQUIRY: 'Inquiry',
       };
 
       // Determine recipient based on document type
@@ -565,6 +567,368 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       detail: {
         tags: ['Documents'],
         summary: 'Search contacts for email typeahead',
+        security: [{ bearerAuth: [] }],
+      },
+    },
+  )
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  SUPPLIER INQUIRY — send RFQ emails to multiple port suppliers
+  // ══════════════════════════════════════════════════════════════════════
+
+  // ── GET /orders/:id/inquiry/suppliers ──────────────────────────────
+  // Returns port suppliers for the order's place + their inquiry status
+  .get(
+    '/:id/inquiry/suppliers',
+    async ({ params, set }) => {
+      const orderId = await resolveOrderId(params.id);
+      if (!orderId) { set.status = 404; return { success: false, message: 'Order not found' }; }
+
+      const order = await getOrderById(orderId);
+      if (!order) { set.status = 404; return { success: false, message: 'Order not found' }; }
+
+      // Fetch port suppliers for this place
+      const suppliers = await getPortSuppliers(order.placeId);
+
+      // Fetch existing supplier inquiries for this order
+      const existingInquiries = await db
+        .select()
+        .from(supplierInquiries)
+        .where(eq(supplierInquiries.orderId, orderId));
+
+      const inquiryMap = new Map(existingInquiries.map(i => [i.supplierId, i]));
+
+      // For each supplier, try to find their 'inquiry' type email, falling back to primary or first email
+      const supplierCompanyIds = [...new Set(suppliers.map(s => s.companyId))];
+      let supplierEmails: Array<{ counterpartyId: string; email: string; emailType: string; isPrimary: boolean }> = [];
+      if (supplierCompanyIds.length > 0) {
+        supplierEmails = await db
+          .select({
+            counterpartyId: companyEmails.counterpartyId,
+            email: companyEmails.email,
+            emailType: companyEmails.emailType,
+            isPrimary: companyEmails.isPrimary,
+          })
+          .from(companyEmails)
+          .where(inArray(companyEmails.counterpartyId, supplierCompanyIds));
+      }
+
+      // Group emails by company
+      const emailsByCompany = new Map<string, typeof supplierEmails>();
+      for (const e of supplierEmails) {
+        const list = emailsByCompany.get(e.counterpartyId) ?? [];
+        list.push(e);
+        emailsByCompany.set(e.counterpartyId, list);
+      }
+
+      const data = suppliers.map(s => {
+        const inquiry = inquiryMap.get(s.companyId);
+        const emails = emailsByCompany.get(s.companyId) ?? [];
+        // Prefer 'inquiry' type → isPrimary → first available
+        const inquiryEmail = emails.find(e => e.emailType === 'inquiry')
+          ?? emails.find(e => e.isPrimary)
+          ?? emails[0];
+
+        return {
+          portSupplierId: s.id,
+          supplierId: s.companyId,
+          supplierName: s.companyName,
+          contactId: s.contactId,
+          contactName: s.contactName,
+          products: s.products,
+          note: s.note,
+          email: inquiryEmail?.email ?? null,
+          inquiryStatus: inquiry?.status ?? null,
+          inquirySentAt: inquiry?.sentAt?.toISOString() ?? null,
+        };
+      });
+
+      return { success: true, data };
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: {
+        tags: ['Documents'],
+        summary: 'List port suppliers for this order with inquiry status',
+        security: [{ bearerAuth: [] }],
+      },
+    },
+  )
+
+  // ── POST /orders/:id/inquiry/defaults ─────────────────────────────
+  // Returns pre-filled subject + body for the inquiry email
+  .post(
+    '/:id/inquiry/defaults',
+    async ({ params, auth, set }) => {
+      const orderId = await resolveOrderId(params.id);
+      if (!orderId) { set.status = 404; return { success: false, message: 'Order not found' }; }
+
+      const order = await getOrderById(orderId);
+      if (!order) { set.status = 404; return { success: false, message: 'Order not found' }; }
+
+      const [sender] = await db.select({ name: users.name }).from(users).where(eq(users.id, auth.userId)).limit(1);
+      const senderName = sender?.name ?? 'Fueld User';
+
+      const vesselName = order.vessel?.name ?? 'Vessel';
+      const vesselImo = order.vessel?.imo ?? null;
+      const portName = order.place?.name ?? 'Port';
+      const orderNumber = order.orderNumber ?? orderId.slice(0, 8).toUpperCase();
+      const companyName = order.invoicingCompany?.name ?? null;
+      const companyLogoUrl = tryLoadLogoDataUrl(order.invoicingCompany?.logoUrl ?? null);
+      const brandColor = order.invoicingCompany?.brandColor ?? null;
+
+      // Fetch supplier terms from the invoicing (own) company
+      let supplierTerms: string | null = null;
+      if (order.invoicingCompanyId) {
+        const [ownCo] = await db
+          .select({ supplierTerms: counterparties.supplierTerms })
+          .from(counterparties)
+          .where(eq(counterparties.id, order.invoicingCompanyId))
+          .limit(1);
+        supplierTerms = ownCo?.supplierTerms ?? null;
+      }
+
+      const formatDate = (iso: string | null) => {
+        if (!iso) return null;
+        const d = new Date(iso);
+        return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      };
+
+      // Try admin template first
+      const templateVars: TemplateVariables = {
+        vesselName,
+        portName,
+        orderNumber,
+        documentLabel: 'Inquiry',
+        senderName,
+        companyName: companyName ?? '',
+        paymentTerms: '',
+        customerNote: '',
+        supplierNote: '',
+        invoiceNumber: '',
+      };
+
+      let subject: string;
+      let htmlBody: string;
+
+      try {
+        const template = await getEmailTemplate(auth.tenantId, 'INQUIRY');
+        if (template?.subjectTemplate) {
+          subject = renderTemplate(template.subjectTemplate, templateVars);
+        } else {
+          subject = `Inquiry ${portName} – ${vesselName}`;
+        }
+        if (template?.bodyTemplate) {
+          htmlBody = renderTemplate(template.bodyTemplate, templateVars);
+        } else {
+          htmlBody = buildInquiryEmailHtml({
+            senderName,
+            vesselName,
+            vesselImo,
+            portName,
+            etaFormatted: formatDate(order.eta),
+            etdFormatted: formatDate(order.etd),
+            companyName,
+            companyLogoUrl,
+            brandColor,
+            supplierTerms,
+            items: order.items.map((i: any) => ({
+              quantity: i.quantity,
+              unit: i.unit,
+              productType: i.productType,
+              description: i.description,
+            })),
+          });
+        }
+      } catch {
+        subject = `Inquiry ${portName} – ${vesselName}`;
+        htmlBody = buildInquiryEmailHtml({
+          senderName,
+          vesselName,
+          vesselImo,
+          portName,
+          etaFormatted: formatDate(order.eta),
+          etdFormatted: formatDate(order.etd),
+          companyName,
+          companyLogoUrl,
+          brandColor,
+          supplierTerms,
+          items: order.items.map((i: any) => ({
+            quantity: i.quantity,
+            unit: i.unit,
+            productType: i.productType,
+            description: i.description,
+          })),
+        });
+      }
+
+      return {
+        success: true,
+        data: {
+          subject,
+          htmlBody,
+          senderName,
+          senderEmail: auth.email,
+          supplierTerms,
+        },
+      };
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: {
+        tags: ['Documents'],
+        summary: 'Get pre-filled defaults for supplier inquiry email',
+        security: [{ bearerAuth: [] }],
+      },
+    },
+  )
+
+  // ── POST /orders/:id/inquiry/send ─────────────────────────────────
+  // Send inquiry emails to selected suppliers (one email each)
+  .post(
+    '/:id/inquiry/send',
+    async ({ params, body, auth, set }) => {
+      const orderId = await resolveOrderId(params.id);
+      if (!orderId) { set.status = 404; return { success: false, message: 'Order not found' }; }
+
+      const order = await getOrderById(orderId);
+      if (!order) { set.status = 404; return { success: false, message: 'Order not found' }; }
+
+      if (!order.items?.length) {
+        set.status = 400;
+        return { success: false, message: 'Add at least one line item before sending inquiries' };
+      }
+
+      const [sender] = await db.select({ name: users.name }).from(users).where(eq(users.id, auth.userId)).limit(1);
+      const senderName = sender?.name ?? 'Fueld User';
+      const senderEmail = auth.email;
+
+      // Apply CC/BCC rules for INQUIRY type
+      const ccEmails: string[] = [];
+      const bccEmails: string[] = [];
+      try {
+        const rules = await getApplicableEmailRules(auth.tenantId, order.invoicingCompanyId ?? null, 'INQUIRY');
+        for (const rule of rules) {
+          if (rule.ruleType === 'CC') ccEmails.push(rule.email);
+          else if (rule.ruleType === 'BCC') bccEmails.push(rule.email);
+        }
+      } catch (err) {
+        console.error('[Documents] Failed to load inquiry email rules:', err);
+      }
+
+      const results: Array<{ supplierId: string; supplierName: string; email: string; success: boolean; error?: string }> = [];
+
+      for (const supplier of body.suppliers) {
+        try {
+          await sendDocumentEmail({
+            documentType: 'INQUIRY',
+            orderId,
+            tenantId: auth.tenantId,
+            sentByUserId: auth.userId,
+            senderEmail,
+            senderName,
+            recipientEmail: supplier.email,
+            ccEmails,
+            bccEmails,
+            subject: body.subject,
+            htmlBody: body.htmlBody,
+            // No PDF attachment for inquiry
+          });
+
+          // Record in supplier_inquiries table
+          await db.insert(supplierInquiries).values({
+            orderId,
+            supplierId: supplier.supplierId,
+            contactId: supplier.contactId ?? null,
+            email: supplier.email,
+            subject: body.subject,
+            status: 'SENT',
+            sentByUserId: auth.userId,
+          }).onConflictDoUpdate({
+            target: [supplierInquiries.orderId, supplierInquiries.supplierId],
+            set: {
+              email: supplier.email,
+              contactId: supplier.contactId ?? null,
+              subject: body.subject,
+              status: 'SENT',
+              sentByUserId: auth.userId,
+              sentAt: new Date(),
+              updatedAt: new Date(),
+            },
+          });
+
+          results.push({ supplierId: supplier.supplierId, supplierName: supplier.supplierName, email: supplier.email, success: true });
+        } catch (err: any) {
+          console.error(`[Documents] Failed to send inquiry to ${supplier.email}:`, err);
+          results.push({ supplierId: supplier.supplierId, supplierName: supplier.supplierName, email: supplier.email, success: false, error: err.message });
+        }
+      }
+
+      const successCount = results.filter(r => r.success).length;
+      return {
+        success: true,
+        message: `Sent inquiry to ${successCount}/${results.length} suppliers`,
+        data: results,
+      };
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({
+        suppliers: t.Array(t.Object({
+          supplierId: t.String(),
+          supplierName: t.String(),
+          email: t.String({ format: 'email' }),
+          contactId: t.Optional(t.String()),
+        })),
+        subject: t.String(),
+        htmlBody: t.String(),
+      }),
+      detail: {
+        tags: ['Documents'],
+        summary: 'Send inquiry emails to selected suppliers',
+        security: [{ bearerAuth: [] }],
+      },
+    },
+  )
+
+  // ── GET /orders/:id/inquiry/sent ──────────────────────────────────
+  // List previously sent supplier inquiries for this order
+  .get(
+    '/:id/inquiry/sent',
+    async ({ params, set }) => {
+      const orderId = await resolveOrderId(params.id);
+      if (!orderId) { set.status = 404; return { success: false, message: 'Order not found' }; }
+
+      const rows = await db
+        .select({
+          id: supplierInquiries.id,
+          supplierId: supplierInquiries.supplierId,
+          supplierName: counterparties.name,
+          contactId: supplierInquiries.contactId,
+          email: supplierInquiries.email,
+          subject: supplierInquiries.subject,
+          status: supplierInquiries.status,
+          sentAt: supplierInquiries.sentAt,
+          sentByUserId: supplierInquiries.sentByUserId,
+        })
+        .from(supplierInquiries)
+        .innerJoin(counterparties, eq(supplierInquiries.supplierId, counterparties.id))
+        .where(eq(supplierInquiries.orderId, orderId))
+        .orderBy(supplierInquiries.sentAt);
+
+      return {
+        success: true,
+        data: rows.map(r => ({
+          ...r,
+          sentAt: r.sentAt?.toISOString() ?? null,
+        })),
+      };
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: {
+        tags: ['Documents'],
+        summary: 'List sent supplier inquiries for this order',
         security: [{ bearerAuth: [] }],
       },
     },

@@ -1272,3 +1272,31 @@ export const emailRulesRelations = relations(emailRules, ({ one }) => ({
 
 export type EmailRule = typeof emailRules.$inferSelect;
 export type NewEmailRule = typeof emailRules.$inferInsert;
+
+// ═══════════════════════════════════════════════════════════════════════
+//  SUPPLIER INQUIRIES (outbound inquiry emails sent to suppliers per order)
+// ═══════════════════════════════════════════════════════════════════════
+
+export const supplierInquiries = pgTable('supplier_inquiries', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
+  supplierId: uuid('supplier_id').notNull().references(() => counterparties.id, { onDelete: 'cascade' }),
+  contactId: uuid('contact_id').references(() => companyContacts.id, { onDelete: 'set null' }),
+  email: text('email').notNull(),
+  subject: text('subject').notNull(),
+  status: text('status').notNull().default('SENT'),  // 'SENT' | 'QUOTED' | 'DECLINED' | 'NO_REPLY'
+  sentByUserId: uuid('sent_by_user_id').references(() => users.id),
+  sentAt: timestamp('sent_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const supplierInquiriesRelations = relations(supplierInquiries, ({ one }) => ({
+  order: one(orders, { fields: [supplierInquiries.orderId], references: [orders.id] }),
+  supplier: one(counterparties, { fields: [supplierInquiries.supplierId], references: [counterparties.id] }),
+  contact: one(companyContacts, { fields: [supplierInquiries.contactId], references: [companyContacts.id] }),
+  sentByUser: one(users, { fields: [supplierInquiries.sentByUserId], references: [users.id] }),
+}));
+
+export type SupplierInquiry = typeof supplierInquiries.$inferSelect;
+export type NewSupplierInquiry = typeof supplierInquiries.$inferInsert;

@@ -29,7 +29,7 @@ function isLightColor(hex: string): boolean {
 
 // ─── Types ───────────────────────────────────────────────────────────
 
-export type DocumentEmailType = 'OFFER' | 'CONFIRMATION' | 'NOMINATION' | 'PROFORMA' | 'INVOICE';
+export type DocumentEmailType = 'OFFER' | 'CONFIRMATION' | 'NOMINATION' | 'PROFORMA' | 'INVOICE' | 'INQUIRY';
 
 export interface SendDocumentEmailOptions {
   /** Document type being sent */
@@ -54,10 +54,10 @@ export interface SendDocumentEmailOptions {
   subject: string;
   /** HTML email body */
   htmlBody: string;
-  /** PDF attachment */
-  pdfBuffer: Buffer;
+  /** PDF attachment (optional — inquiry emails don't have attachments) */
+  pdfBuffer?: Buffer;
   /** PDF file name */
-  pdfFileName: string;
+  pdfFileName?: string;
 }
 
 // ─── Microsoft Graph API ─────────────────────────────────────────────
@@ -91,14 +91,16 @@ async function sendViaGraph(options: SendDocumentEmailOptions, accessToken: stri
       toRecipients: [
         { emailAddress: { address: options.recipientEmail } },
       ],
-      attachments: [
-        {
-          '@odata.type': '#microsoft.graph.fileAttachment',
-          name: options.pdfFileName,
-          contentType: 'application/pdf',
-          contentBytes: options.pdfBuffer.toString('base64'),
-        },
-      ],
+      ...(options.pdfBuffer && options.pdfFileName ? {
+        attachments: [
+          {
+            '@odata.type': '#microsoft.graph.fileAttachment',
+            name: options.pdfFileName,
+            contentType: 'application/pdf',
+            contentBytes: options.pdfBuffer.toString('base64'),
+          },
+        ],
+      } : {}),
     },
     saveToSentItems: true,
   };
@@ -154,13 +156,15 @@ async function sendViaSmtp(options: SendDocumentEmailOptions): Promise<void> {
     bcc: options.bccEmails.length > 0 ? options.bccEmails.join(', ') : undefined,
     subject: options.subject,
     html: options.htmlBody,
-    attachments: [
-      {
-        filename: options.pdfFileName,
-        content: options.pdfBuffer,
-        contentType: 'application/pdf',
-      },
-    ],
+    ...(options.pdfBuffer && options.pdfFileName ? {
+      attachments: [
+        {
+          filename: options.pdfFileName,
+          content: options.pdfBuffer,
+          contentType: 'application/pdf',
+        },
+      ],
+    } : {}),
   });
 }
 
@@ -214,7 +218,7 @@ async function logEmail(
       ccEmails: options.ccEmails.length > 0 ? options.ccEmails.join(', ') : null,
       bccEmails: options.bccEmails.length > 0 ? options.bccEmails.join(', ') : null,
       subject: options.subject,
-      pdfFileName: options.pdfFileName,
+      pdfFileName: options.pdfFileName ?? null,
       channel,
       status,
       errorMessage,
@@ -225,6 +229,8 @@ async function logEmail(
 }
 
 // ─── Email HTML Templates ────────────────────────────────────────────
+
+export type InquiryEmailType = 'INQUIRY';
 
 export function buildDocumentEmailHtml(params: {
   documentType: DocumentEmailType;
@@ -265,6 +271,11 @@ export function buildDocumentEmailHtml(params: {
       title: 'Invoice',
       greeting: 'Dear Customer',
       intro: `Please find attached the invoice for bunker delivery to <strong>${params.vesselName}</strong> at <strong>${params.portName}</strong>.`,
+    },
+    INQUIRY: {
+      title: 'Inquiry',
+      greeting: 'Good day',
+      intro: `Please offer for the following:`,
     },
   };
 
@@ -339,6 +350,7 @@ export function buildDocumentEmailSubject(params: {
     NOMINATION: 'Nomination',
     PROFORMA: 'Proforma Invoice',
     INVOICE: 'Invoice',
+    INQUIRY: 'Inquiry',
   };
 
   if (params.documentType === 'INVOICE' && params.invoiceNumber) {
@@ -346,4 +358,86 @@ export function buildDocumentEmailSubject(params: {
   }
 
   return `${labels[params.documentType]} — ${params.orderNumber} — ${params.vesselName}, ${params.portName}`;
+}
+
+// ─── Inquiry-specific Email HTML ─────────────────────────────────────
+
+export function buildInquiryEmailHtml(params: {
+  senderName: string;
+  vesselName: string;
+  vesselImo?: string | null;
+  portName: string;
+  etaFormatted?: string | null;
+  etdFormatted?: string | null;
+  companyName?: string | null;
+  companyLogoUrl?: string | null;
+  brandColor?: string | null;
+  supplierTerms?: string | null;
+  items: Array<{ quantity: string; unit: string; productType: string; description?: string | null }>;
+}): string {
+  const companyName = params.companyName?.trim() || 'FUELD';
+  const headerBg = params.brandColor?.trim() || '#ffffff';
+  const isLightBg = isLightColor(headerBg);
+  const headerTextColor = isLightBg ? '#111827' : '#ffffff';
+  const accentColor = (headerBg.toLowerCase() === '#ffffff' || headerBg.toLowerCase() === '#fff') ? '#1e3a5f' : headerBg;
+  const logoHtml = params.companyLogoUrl
+    ? `<img src="${params.companyLogoUrl}" alt="${companyName}" style="max-height: 40px; max-width: 180px; margin-bottom: 4px;" />`
+    : `<h1 style="color: ${headerTextColor}; margin: 0; font-size: 24px;">${companyName}</h1>`;
+
+  const vesselLabel = params.vesselImo
+    ? `${params.vesselName} (IMO: ${params.vesselImo})`
+    : params.vesselName;
+
+  const deliveryLabel = params.etaFormatted && params.etdFormatted
+    ? `${params.etaFormatted} to ${params.etdFormatted}`
+    : params.etaFormatted || params.etdFormatted || '';
+
+  const itemsHtml = params.items
+    .map((i) => {
+      const desc = i.description ? ` ${i.description}` : '';
+      return `<li>${i.quantity} ${i.unit} ${i.productType}${desc}</li>`;
+    })
+    .join('');
+
+  const termsHtml = params.supplierTerms?.trim()
+    ? `<p style="margin-top: 16px; font-size: 13px; color: #6b7280;">${params.supplierTerms}</p>`
+    : '';
+
+  return `
+    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 8px;">
+      <div style="height: 4px; background: ${accentColor}; border-radius: 8px 8px 0 0;"></div>
+      <div style="background: ${headerBg}; padding: 24px 32px;">
+        ${logoHtml}
+      </div>
+      <div style="background: #ffffff; padding: 32px; border-top: 1px solid #e5e7eb;">
+        <p>Good day,</p>
+        <p>Please offer for the following:</p>
+        <table style="margin: 16px 0; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Vessel:</td>
+            <td style="padding: 4px 0; font-weight: 600;">${vesselLabel}</td>
+          </tr>
+          <tr>
+            <td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Place:</td>
+            <td style="padding: 4px 0; font-weight: 600;">${params.portName}</td>
+          </tr>
+          ${deliveryLabel ? `<tr>
+            <td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Delivery:</td>
+            <td style="padding: 4px 0; font-weight: 600;">${deliveryLabel}</td>
+          </tr>` : ''}
+          <tr>
+            <td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Account:</td>
+            <td style="padding: 4px 0; font-weight: 600;">${companyName}</td>
+          </tr>
+        </table>
+        ${itemsHtml ? `<ul style="margin: 8px 0 0 18px; padding: 0; color: #374151;">${itemsHtml}</ul>` : ''}
+        ${termsHtml}
+        <p>If you have any questions, please don't hesitate to reach out.</p>
+        <p style="margin-top: 24px;">Best regards,<br/><strong>${params.senderName}</strong></p>
+      </div>
+      <div style="text-align: center; padding: 16px; color: #9ca3af; font-size: 11px;">
+        Sent by ${companyName}
+      </div>
+    </div>
+  `;
 }
