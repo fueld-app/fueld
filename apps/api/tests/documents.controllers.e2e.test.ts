@@ -416,22 +416,23 @@ describe('documents + verify controller e2e', () => {
     expect(res.status).toBe(200);
     expect(res.data?.success).toBe(true);
 
+    const d = res.data?.data;
     // Should return email metadata
-    expect(typeof res.data?.subject).toBe('string');
-    expect(typeof res.data?.htmlBody).toBe('string');
-    expect(typeof res.data?.senderName).toBe('string');
-    expect(typeof res.data?.senderEmail).toBe('string');
-    expect(Array.isArray(res.data?.ccEmails)).toBe(true);
+    expect(typeof d?.subject).toBe('string');
+    expect(typeof d?.htmlBody).toBe('string');
+    expect(typeof d?.senderName).toBe('string');
+    expect(typeof d?.senderEmail).toBe('string');
+    expect(Array.isArray(d?.ccEmails)).toBe(true);
 
     // Subject should contain Invoice
-    expect(String(res.data?.subject ?? '')).toContain('Invoice');
+    expect(String(d?.subject ?? '')).toContain('Invoice');
 
     // HTML body should contain vessel name and branding
-    expect(String(res.data?.htmlBody ?? '')).toContain('FUELD');
-    expect(String(res.data?.htmlBody ?? '')).toContain('Dear Customer');
+    expect(String(d?.htmlBody ?? '')).toContain('FUELD');
+    expect(String(d?.htmlBody ?? '')).toContain('Dear Customer');
 
     // CC should include sender email
-    expect(res.data?.ccEmails?.length).toBeGreaterThanOrEqual(1);
+    expect(d?.ccEmails?.length).toBeGreaterThanOrEqual(1);
   });
 
   it('returns pre-filled email defaults via /email-defaults for NOMINATION', async () => {
@@ -445,8 +446,8 @@ describe('documents + verify controller e2e', () => {
 
     expect(res.status).toBe(200);
     expect(res.data?.success).toBe(true);
-    expect(String(res.data?.subject ?? '')).toContain('Nomination');
-    expect(String(res.data?.htmlBody ?? '')).toContain('Dear Supplier');
+    expect(String(res.data?.data?.subject ?? '')).toContain('Nomination');
+    expect(String(res.data?.data?.htmlBody ?? '')).toContain('Dear Supplier');
   });
 
   it('returns pre-filled email defaults via /email-defaults for OFFER', async () => {
@@ -460,8 +461,8 @@ describe('documents + verify controller e2e', () => {
 
     expect(res.status).toBe(200);
     expect(res.data?.success).toBe(true);
-    expect(String(res.data?.subject ?? '')).toContain('Offer');
-    expect(String(res.data?.htmlBody ?? '')).toContain('Dear Customer');
+    expect(String(res.data?.data?.subject ?? '')).toContain('Offer');
+    expect(String(res.data?.data?.htmlBody ?? '')).toContain('Dear Customer');
   });
 
   it('returns pre-filled email defaults via /email-defaults for PROFORMA', async () => {
@@ -475,8 +476,8 @@ describe('documents + verify controller e2e', () => {
 
     expect(res.status).toBe(200);
     expect(res.data?.success).toBe(true);
-    expect(String(res.data?.subject ?? '')).toContain('Proforma Invoice');
-    expect(String(res.data?.htmlBody ?? '')).toContain('Dear Customer');
+    expect(String(res.data?.data?.subject ?? '')).toContain('Proforma Invoice');
+    expect(String(res.data?.data?.htmlBody ?? '')).toContain('Dear Customer');
   });
 
   it('returns 404 for /email-defaults on non-existent order', async () => {
