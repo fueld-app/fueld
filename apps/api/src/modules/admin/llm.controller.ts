@@ -48,8 +48,6 @@ function getLlmPaths() {
     scriptDir,
     binDir,
     modelDir,
-    setupScript: join(scriptDir, 'setup.sh'),
-    startScript: join(scriptDir, 'start.sh'),
     binary: join(binDir, 'llama-server'),
   };
 }
@@ -292,51 +290,90 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
       try { Bun.spawn(['pkill', '-f', 'llama-server'], { stdout: 'ignore', stderr: 'ignore' }); await new Promise(r => setTimeout(r, 500)); } catch { /* ok */ }
 
       // Remove entire bin directory to clean up old version completely
-      const { unlink, readdir, writeFile, mkdir, rm } = await import('fs/promises');
+      const { writeFile, mkdir, rm, copyFile, readdir: readdirAsync } = await import('fs/promises');
       try {
         await rm(paths.binDir, { recursive: true, force: true });
       } catch { /* ok */ }
       await mkdir(paths.binDir, { recursive: true });
+      await mkdir(paths.modelDir, { recursive: true });
+
+      const log: string[] = [];
 
       try {
-        // Use setup.sh with the requested version
-        const proc = Bun.spawn(['bash', paths.setupScript], {
-          cwd: paths.scriptDir,
-          env: {
-            ...process.env,
-            LLM_BIN_DIR: paths.binDir,
-            LLM_MODEL_DIR: paths.modelDir,
-            LLAMA_CPP_VERSION: version,
-            SKIP_MODEL_DOWNLOAD: '1', // Only install binary — model managed separately
-          },
-          stdout: 'pipe',
-          stderr: 'pipe',
-        });
+        // Detect platform
+        const os = process.platform === 'darwin' ? 'macos' : 'linux';
+        const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
+        const assetName = os === 'macos'
+          ? `llama-${version}-bin-macos-${arch}.tar.gz`
+          : `llama-${version}-bin-ubuntu-${arch}.tar.gz`;
+        const url = `https://github.com/ggml-org/llama.cpp/releases/download/${version}/${assetName}`;
 
-        const [stdout, stderr] = await Promise.all([
-          new Response(proc.stdout).text(),
-          new Response(proc.stderr).text(),
-        ]);
-        const exitCode = await proc.exited;
+        log.push(`Downloading ${assetName} from GitHub...`);
+        log.push(`URL: ${url}`);
 
-        const log = [stdout, stderr].filter(Boolean).join('\n').trim();
-
-        if (exitCode === 0) {
-          // Write version marker
-          await writeFile(join(paths.binDir, '.llama-cpp-version'), version, 'utf-8');
+        const res = await fetch(url, { signal: AbortSignal.timeout(120_000) });
+        if (!res.ok) {
+          return { success: false, data: { log: `Download failed: HTTP ${res.status} from ${url}`, success: false } };
         }
 
-        return {
-          success: exitCode === 0,
-          data: { log, success: exitCode === 0 },
-        };
+        // Write tarball to temp file
+        const tmpDir = join(paths.scriptDir, '.tmp-install');
+        await mkdir(tmpDir, { recursive: true });
+        const tarPath = join(tmpDir, assetName);
+        await Bun.write(tarPath, res);
+        log.push(`Downloaded ${Math.round(statSync(tarPath).size / 1024 / 1024)} MB`);
+
+        // Extract
+        const extractDir = join(tmpDir, 'extract');
+        await mkdir(extractDir, { recursive: true });
+        const tar = Bun.spawnSync(['tar', '-xzf', tarPath, '-C', extractDir]);
+        if (tar.exitCode !== 0) {
+          await rm(tmpDir, { recursive: true, force: true });
+          return { success: false, data: { log: `tar extraction failed: ${tar.stderr.toString()}`, success: false } };
+        }
+
+        // Find llama-server binary in extracted archive
+        const find = Bun.spawnSync(['find', extractDir, '-name', 'llama-server', '-type', 'f']);
+        const foundBin = find.stdout.toString().trim().split('\n')[0];
+        if (!foundBin) {
+          await rm(tmpDir, { recursive: true, force: true });
+          return { success: false, data: { log: 'llama-server binary not found in archive', success: false } };
+        }
+
+        // Copy binary
+        const { copyFileSync, chmodSync } = await import('fs');
+        copyFileSync(foundBin, paths.binary);
+        chmodSync(paths.binary, 0o755);
+        log.push(`Installed llama-server to ${paths.binary}`);
+
+        // Copy companion shared libraries (.dylib, .so)
+        const binSourceDir = require('path').dirname(foundBin);
+        const libDirs = [binSourceDir, join(binSourceDir, '..', 'lib')];
+        for (const dir of libDirs) {
+          try {
+            const files = readdirSync(dir);
+            for (const f of files) {
+              if (f.endsWith('.dylib') || f.endsWith('.so') || f.match(/\.so\./)) {
+                copyFileSync(join(dir, f), join(paths.binDir, f));
+                log.push(`  → copied ${f}`);
+              }
+            }
+          } catch { /* dir may not exist */ }
+        }
+
+        // Clean up temp
+        await rm(tmpDir, { recursive: true, force: true });
+
+        // Write version marker
+        await writeFile(join(paths.binDir, '.llama-cpp-version'), version, 'utf-8');
+        log.push(`\n✓ llama-server ${version} installed successfully`);
+
+        return { success: true, data: { log: log.join('\n'), success: true } };
       } catch (err) {
+        log.push(`\nFailed: ${err instanceof Error ? err.message : String(err)}`);
         return {
           success: false,
-          data: {
-            log: `Failed to run setup.sh: ${err instanceof Error ? err.message : String(err)}`,
-            success: false,
-          },
+          data: { log: log.join('\n'), success: false },
         };
       }
     },
