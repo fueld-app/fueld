@@ -66,20 +66,20 @@ fi
 mkdir -p "$APP_DIR/llm/bin" "$APP_DIR/llm/models"
 log "LLM directories ensured"
 
+# Ensure sudoers is up-to-date (always run — covers apt-get, daemon-reload, etc.)
+SUDOERS_LINE="deploy ALL=(ALL) NOPASSWD: /bin/systemctl restart fueld-api@*, /bin/systemctl start fueld-api@*, /bin/systemctl stop fueld-api@*, /bin/systemctl reload nginx, /bin/systemctl daemon-reload, /bin/systemctl status fueld-api@*, /bin/systemctl restart fueld-llm, /bin/systemctl start fueld-llm, /bin/systemctl stop fueld-llm, /usr/sbin/nginx -t, /usr/bin/tee, /bin/systemctl reset-failed *, /usr/bin/apt-get"
+echo "$SUDOERS_LINE" | sudo tee /etc/sudoers.d/fueld-deploy > /dev/null
+
 # Install build tools needed for 'build from source' (idempotent)
 if ! command -v cmake &>/dev/null || ! command -v g++ &>/dev/null; then
   log "Installing cmake, g++, make for LLM build-from-source..."
-  sudo apt-get install -y -qq cmake g++ make 2>/dev/null || warn "Could not install build tools (non-fatal)"
+  sudo apt-get install -y -qq cmake g++ make || warn "Could not install build tools (non-fatal)"
 fi
 
 # ─── 3c. Patch systemd unit if ReadWritePaths is missing /opt/fueld/llm ─
 UNIT_FILE="/etc/systemd/system/fueld-api@.service"
 if [ -f "$UNIT_FILE" ] && ! grep -q '/opt/fueld/llm' "$UNIT_FILE"; then
   log "Patching systemd unit to add /opt/fueld/llm to ReadWritePaths..."
-
-  # Ensure sudoers allows daemon-reload (sudo tee is already allowed generically)
-  log "Ensuring sudoers allows daemon-reload..."
-  echo "deploy ALL=(ALL) NOPASSWD: /bin/systemctl restart fueld-api@*, /bin/systemctl start fueld-api@*, /bin/systemctl stop fueld-api@*, /bin/systemctl reload nginx, /bin/systemctl daemon-reload, /bin/systemctl status fueld-api@*, /bin/systemctl restart fueld-llm, /bin/systemctl start fueld-llm, /bin/systemctl stop fueld-llm, /usr/sbin/nginx -t, /usr/bin/tee, /bin/systemctl reset-failed *" | sudo tee /etc/sudoers.d/fueld-deploy > /dev/null
 
   # Patch the unit file (read into variable first to avoid read/write race on same file)
   PATCHED=$(sed 's|ReadWritePaths=\(.*\)/tmp|ReadWritePaths=\1/opt/fueld/llm /tmp|' "$UNIT_FILE")
