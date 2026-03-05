@@ -66,6 +66,15 @@ fi
 mkdir -p "$APP_DIR/llm/bin" "$APP_DIR/llm/models"
 log "LLM directories ensured"
 
+# ─── 3c. Patch systemd unit if ReadWritePaths is missing /opt/fueld/llm ─
+UNIT_FILE="/etc/systemd/system/fueld-api@.service"
+if [ -f "$UNIT_FILE" ] && ! grep -q '/opt/fueld/llm' "$UNIT_FILE"; then
+  log "Patching systemd unit to add /opt/fueld/llm to ReadWritePaths..."
+  sudo sed -i 's|ReadWritePaths=\(.*\)/tmp|ReadWritePaths=\1/opt/fueld/llm /tmp|' "$UNIT_FILE"
+  sudo systemctl daemon-reload
+  log "Systemd unit patched and reloaded"
+fi
+
 # ─── 4. Start new slot ───────────────────────────────────────────────
 log "Starting fueld-api@${NEXT_SLOT}..."
 sudo systemctl stop "fueld-api@${NEXT_SLOT}" 2>/dev/null || true
