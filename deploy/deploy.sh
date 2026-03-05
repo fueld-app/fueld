@@ -70,7 +70,14 @@ log "LLM directories ensured"
 UNIT_FILE="/etc/systemd/system/fueld-api@.service"
 if [ -f "$UNIT_FILE" ] && ! grep -q '/opt/fueld/llm' "$UNIT_FILE"; then
   log "Patching systemd unit to add /opt/fueld/llm to ReadWritePaths..."
-  sudo sed -i 's|ReadWritePaths=\(.*\)/tmp|ReadWritePaths=\1/opt/fueld/llm /tmp|' "$UNIT_FILE"
+
+  # Ensure sudoers allows daemon-reload (sudo tee is already allowed generically)
+  log "Ensuring sudoers allows daemon-reload..."
+  echo "deploy ALL=(ALL) NOPASSWD: /bin/systemctl restart fueld-api@*, /bin/systemctl start fueld-api@*, /bin/systemctl stop fueld-api@*, /bin/systemctl reload nginx, /bin/systemctl daemon-reload, /bin/systemctl status fueld-api@*, /bin/systemctl restart fueld-llm, /bin/systemctl start fueld-llm, /bin/systemctl stop fueld-llm, /usr/sbin/nginx -t, /usr/bin/tee, /bin/systemctl reset-failed *" | sudo tee /etc/sudoers.d/fueld-deploy > /dev/null
+
+  # Patch the unit file (read into variable first to avoid read/write race on same file)
+  PATCHED=$(sed 's|ReadWritePaths=\(.*\)/tmp|ReadWritePaths=\1/opt/fueld/llm /tmp|' "$UNIT_FILE")
+  echo "$PATCHED" | sudo tee "$UNIT_FILE" > /dev/null
   sudo systemctl daemon-reload
   log "Systemd unit patched and reloaded"
 fi

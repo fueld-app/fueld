@@ -63,7 +63,7 @@ if ! id "$DEPLOY_USER" &>/dev/null; then
   chmod 700 /home/$DEPLOY_USER/.ssh
   chmod 600 /home/$DEPLOY_USER/.ssh/authorized_keys 2>/dev/null || true
   # Allow deploy user to restart services without password
-  echo "$DEPLOY_USER ALL=(ALL) NOPASSWD: /bin/systemctl restart fueld-api@*, /bin/systemctl start fueld-api@*, /bin/systemctl stop fueld-api@*, /bin/systemctl reload nginx, /bin/systemctl status fueld-api@*, /bin/systemctl restart fueld-llm, /bin/systemctl start fueld-llm, /bin/systemctl stop fueld-llm, /usr/bin/tee, /bin/systemctl reset-failed *" > /etc/sudoers.d/fueld-deploy
+  echo "$DEPLOY_USER ALL=(ALL) NOPASSWD: /bin/systemctl restart fueld-api@*, /bin/systemctl start fueld-api@*, /bin/systemctl stop fueld-api@*, /bin/systemctl reload nginx, /bin/systemctl daemon-reload, /bin/systemctl status fueld-api@*, /bin/systemctl restart fueld-llm, /bin/systemctl start fueld-llm, /bin/systemctl stop fueld-llm, /usr/sbin/nginx -t, /usr/bin/tee, /usr/bin/tee /etc/systemd/system/fueld-api@.service, /bin/systemctl reset-failed *" > /etc/sudoers.d/fueld-deploy
   chmod 440 /etc/sudoers.d/fueld-deploy
   echo "  ✓ Deploy user created"
 else
