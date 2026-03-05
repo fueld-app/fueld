@@ -299,6 +299,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       const orderNumber = order.orderNumber ?? orderId.slice(0, 8).toUpperCase();
       const companyName = order.invoicingCompany?.name ?? null;
       const companyLogoUrl = tryLoadLogoDataUrl(order.invoicingCompany?.logoUrl ?? null);
+      const brandColor = order.invoicingCompany?.brandColor ?? null;
 
       const docLabels: Record<DocumentEmailType, string> = {
         OFFER: 'Offer',
@@ -404,6 +405,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             customerNote: docType === 'NOMINATION' ? order.supplierNote ?? null : order.customerNote ?? null,
             companyName,
             companyLogoUrl,
+            brandColor,
             itemNotes: order.items
               ?.filter((item: any) => item.customerNote)
               .map((item: any) => ({
@@ -424,6 +426,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           customerNote: docType === 'NOMINATION' ? order.supplierNote ?? null : order.customerNote ?? null,
           companyName,
           companyLogoUrl,
+          brandColor,
           itemNotes: order.items
             ?.filter((item: any) => item.customerNote)
             .map((item: any) => ({

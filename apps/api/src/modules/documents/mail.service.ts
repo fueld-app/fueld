@@ -15,6 +15,18 @@ import { emailLog } from '../../db/schema';
 import { getSmtpConfig, getTransporter } from '../../lib/email';
 import { acquireGraphTokenForUser } from '../auth/microsoft-oauth.service';
 
+// ─── Helpers ─────────────────────────────────────────────────────────
+
+/** Returns true if a hex color is "light" (should use dark text). */
+function isLightColor(hex: string): boolean {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.substring(0, 2), 16) || 0;
+  const g = parseInt(h.substring(2, 4), 16) || 0;
+  const b = parseInt(h.substring(4, 6), 16) || 0;
+  // Relative luminance threshold (W3C)
+  return (r * 299 + g * 587 + b * 114) / 1000 > 186;
+}
+
 // ─── Types ───────────────────────────────────────────────────────────
 
 export type DocumentEmailType = 'OFFER' | 'CONFIRMATION' | 'NOMINATION' | 'PROFORMA' | 'INVOICE';
@@ -226,6 +238,7 @@ export function buildDocumentEmailHtml(params: {
   itemNotes?: Array<{ label: string; note: string }>;
   companyName?: string | null;
   companyLogoUrl?: string | null;
+  brandColor?: string | null;
 }): string {
   const labels: Record<DocumentEmailType, { title: string; greeting: string; intro: string }> = {
     OFFER: {
@@ -272,13 +285,16 @@ export function buildDocumentEmailHtml(params: {
     : '';
 
   const companyName = params.companyName?.trim() || 'FUELD';
+  const headerBg = params.brandColor?.trim() || '#ffffff';
+  const isLightBg = isLightColor(headerBg);
+  const headerTextColor = isLightBg ? '#111827' : '#ffffff';
   const logoHtml = params.companyLogoUrl
     ? `<img src="${params.companyLogoUrl}" alt="${companyName}" style="max-height: 40px; max-width: 180px; margin-bottom: 4px;" />`
-    : `<h1 style="color: #ffffff; margin: 0; font-size: 24px;">${companyName}</h1>`;
+    : `<h1 style="color: ${headerTextColor}; margin: 0; font-size: 24px;">${companyName}</h1>`;
 
   return `
     <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background: #1a56db; padding: 24px 32px; border-radius: 8px 8px 0 0;">
+      <div style="background: ${headerBg}; padding: 24px 32px; border-radius: 8px 8px 0 0;">
         ${logoHtml}
       </div>
       <div style="background: #ffffff; padding: 32px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">

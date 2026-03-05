@@ -1010,6 +1010,7 @@ export interface OwnCompanyDto {
   country: string | null;
   countryIso: string | null;
   logoUrl: string | null;
+  brandColor: string | null;
   customerTerms: string | null;
   supplierTerms: string | null;
   vatNumber: string | null;

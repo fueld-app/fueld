@@ -310,6 +310,25 @@ interface CompanySearchResultOption {
                         />
                       </div>
                       <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Email Header Color <span class="text-gray-400 font-normal">(hex, e.g. #1a56db)</span></label>
+                        <div class="flex items-center gap-2">
+                          <input
+                            type="color"
+                            [ngModel]="brandColorDraft() || '#ffffff'"
+                            (ngModelChange)="brandColorDraft.set($event)"
+                            class="h-9 w-12 cursor-pointer rounded border border-gray-300 p-0.5"
+                          />
+                          <input
+                            type="text"
+                            [ngModel]="brandColorDraft()"
+                            (ngModelChange)="brandColorDraft.set($event)"
+                            placeholder="#ffffff"
+                            class="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700
+                                   focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                          />
+                        </div>
+                      </div>
+                      <div>
                         <label class="block text-xs font-semibold text-gray-600 mb-1">Fraud Prevention Notice <span class="text-gray-400 font-normal">(shown on invoices)</span></label>
                         <textarea
                           rows="4"
@@ -542,6 +561,7 @@ export class OurCompaniesPageComponent implements OnInit {
   readonly companyRegistrationNumberDraft = signal('');
   readonly fraudDraft = signal('');
   readonly latePaymentInterestDraft = signal('');
+  readonly brandColorDraft = signal('');
   readonly savingTerms = signal(false);
   readonly termsError = signal('');
   readonly termsSaved = signal(false);
@@ -776,6 +796,7 @@ export class OurCompaniesPageComponent implements OnInit {
     this.companyRegistrationNumberDraft.set(co?.companyRegistrationNumber ?? '');
     this.fraudDraft.set(co?.fraudPreventionText ?? '');
     this.latePaymentInterestDraft.set(co?.latePaymentInterest ?? '');
+    this.brandColorDraft.set(co?.brandColor ?? '');
     this.termsError.set('');
     this.termsSaved.set(false);
   }
@@ -797,6 +818,7 @@ export class OurCompaniesPageComponent implements OnInit {
             companyRegistrationNumber: this.companyRegistrationNumberDraft().trim() || null,
             fraudPreventionText: this.fraudDraft().trim() || null,
             latePaymentInterest: this.latePaymentInterestDraft().trim() || null,
+            brandColor: this.brandColorDraft().trim() || null,
           },
         ),
       );

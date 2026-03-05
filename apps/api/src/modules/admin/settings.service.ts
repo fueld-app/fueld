@@ -57,6 +57,7 @@ const OWN_COMPANY_SELECT = {
   country: counterparties.country,
   countryIso: counterparties.countryIso,
   logoUrl: counterparties.logoUrl,
+  brandColor: counterparties.brandColor,
   customerTerms: counterparties.customerTerms,
   supplierTerms: counterparties.supplierTerms,
   vatNumber: counterparties.vatNumber,
@@ -71,6 +72,7 @@ const OWN_COMPANY_SELECT_LEGACY = {
   country: counterparties.country,
   countryIso: counterparties.countryIso,
   logoUrl: counterparties.logoUrl,
+  brandColor: counterparties.brandColor,
   customerTerms: counterparties.customerTerms,
   supplierTerms: counterparties.supplierTerms,
   vatNumber: counterparties.vatNumber,
@@ -85,7 +87,7 @@ function isMissingCompanyRegistrationNumberColumnError(err: unknown): boolean {
 function withLegacyRegistrationNumber(
   rows: Array<Omit<OwnCompanyDto, 'companyRegistrationNumber'>>,
 ): OwnCompanyDto[] {
-  return rows.map((row) => ({ ...row, companyRegistrationNumber: null }));
+  return rows.map((row) => ({ ...row, companyRegistrationNumber: null, brandColor: row.brandColor ?? null }));
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -145,6 +147,7 @@ export async function updateOwnCompanyTerms(companyId: string, data: {
   companyRegistrationNumber?: string | null;
   fraudPreventionText?: string | null;
   latePaymentInterest?: string | null;
+  brandColor?: string | null;
 }): Promise<OwnCompanyDto> {
   const [row] = await db
     .select({
@@ -178,6 +181,9 @@ export async function updateOwnCompanyTerms(companyId: string, data: {
   }
   if (data.latePaymentInterest !== undefined) {
     patch.latePaymentInterest = data.latePaymentInterest?.trim() ? data.latePaymentInterest : null;
+  }
+  if (data.brandColor !== undefined) {
+    patch.brandColor = data.brandColor?.trim() ? data.brandColor : null;
   }
 
   try {

@@ -130,6 +130,7 @@ const counterpartyLegacySelect = {
   manualOverrides: counterparties.manualOverrides,
   responsibleUserId: counterparties.responsibleUserId,
   logoUrl: counterparties.logoUrl,
+  brandColor: counterparties.brandColor,
   vatNumber: counterparties.vatNumber,
   fraudPreventionText: counterparties.fraudPreventionText,
   customerTerms: counterparties.customerTerms,

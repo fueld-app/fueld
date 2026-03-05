@@ -281,6 +281,9 @@ export const counterparties = pgTable('counterparties', {
   // Company logo (for own companies — used in PDF generation)
   logoUrl: text('logo_url'),
 
+  // Brand color (hex, e.g. '#1a56db') — used as email header background
+  brandColor: text('brand_color'),
+
   // VAT number (displayed on invoices)
   vatNumber: text('vat_number'),
 
