@@ -367,11 +367,12 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
         log.push(`Installed llama-server to ${paths.binary}`);
 
         // Copy ALL shared libraries from the extracted archive (recursive)
-        // This handles different archive layouts and backend plugin directories
+        // Include symlinks (-type l) — versioned .so symlinks like libmtmd.so.0 are critical
+        // copyFileSync dereferences symlinks automatically, creating real file copies
         const findLibs = Bun.spawnSync([
           'find', extractDir,
           '(', '-name', '*.so', '-o', '-name', '*.so.*', '-o', '-name', '*.dylib', ')',
-          '-type', 'f',
+          '(', '-type', 'f', '-o', '-type', 'l', ')',
         ]);
         const libFiles = findLibs.stdout.toString().trim().split('\n').filter(Boolean);
         for (const libPath of libFiles) {
