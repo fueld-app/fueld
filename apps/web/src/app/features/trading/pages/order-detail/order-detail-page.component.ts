@@ -804,7 +804,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   // ─── Email compose state ─────────────────────────────────────────
 
   /** Which document type is currently being composed for email */
-  readonly emailDocumentType = signal<'OFFER' | 'CONFIRMATION' | 'NOMINATION' | 'PROFORMA' | 'INVOICE'>('INVOICE');
+  readonly emailDocumentType = signal<DocumentEmailType>('INVOICE');
   /** Display name for the PDF attachment in the compose modal */
   readonly emailPdfFileName = signal('');
 
