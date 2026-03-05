@@ -27,9 +27,18 @@ const MAX_MODEL_SIZE_MB = Number(process.env['MAX_MODEL_SIZE_MB'] ?? 4096); // 4
 
 /** Resolve script/bin/model paths based on env vars or defaults */
 function getLlmPaths() {
-  const scriptDir = resolve(
-    process.env['LLM_SCRIPT_DIR'] ?? join(process.cwd(), '..', '..', 'scripts', 'llm'),
-  );
+  let scriptDir: string;
+  if (process.env['LLM_SCRIPT_DIR']) {
+    scriptDir = resolve(process.env['LLM_SCRIPT_DIR']);
+  } else {
+    // Try candidate paths: production (/opt/fueld/llm) then dev (../../scripts/llm from cwd)
+    const candidates = [
+      '/opt/fueld/llm',
+      join(process.cwd(), '..', '..', 'scripts', 'llm'),
+      join(process.cwd(), 'scripts', 'llm'),
+    ];
+    scriptDir = candidates.find((c) => existsSync(c)) ?? candidates[0];
+  }
   const binDir = process.env['LLM_BIN_DIR'] ?? join(scriptDir, 'bin');
   const modelDir = process.env['LLM_MODEL_DIR'] ?? join(scriptDir, 'models');
 
