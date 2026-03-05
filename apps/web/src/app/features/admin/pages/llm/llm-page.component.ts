@@ -36,6 +36,7 @@ interface LlmInstallStatus {
   modelSizeMb: number | null;
   llamaCppVersion: string | null;
   maxModelSizeMb: number;
+  binFiles: string[];
 }
 
 interface TestResult {
@@ -209,6 +210,12 @@ interface HfFile {
             <span>Binary: <strong [class]="is.binaryInstalled ? 'text-green-700' : 'text-red-700'">{{ is.binaryInstalled ? '✓' : '✗' }}</strong></span>
             <span>Model: <strong [class]="is.modelInstalled ? 'text-green-700' : 'text-red-700'">{{ is.modelInstalled ? is.modelFilename ?? '✓' : '✗' }}</strong></span>
             @if (is.llamaCppVersion) { <span>Version: <strong>{{ is.llamaCppVersion }}</strong></span> }
+            @if (is.binFiles?.length) {
+              <details class="text-xs text-gray-500">
+                <summary class="cursor-pointer hover:text-gray-700">{{ is.binFiles.length }} files in bin/</summary>
+                <div class="mt-1 font-mono">{{ is.binFiles.join(', ') }}</div>
+              </details>
+            }
           </div>
         }
         <div class="flex items-center gap-3">

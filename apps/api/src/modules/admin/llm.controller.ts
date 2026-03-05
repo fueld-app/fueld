@@ -130,6 +130,7 @@ export interface LlmInstallStatus {
   modelSizeMb: number | null;
   llamaCppVersion: string | null;
   maxModelSizeMb: number;
+  binFiles: string[];
 }
 
 export interface LlmTestResult {
@@ -265,6 +266,7 @@ function getInstallStatus(): LlmInstallStatus {
     modelSizeMb: model?.sizeMb ?? null,
     llamaCppVersion: getInstalledLlamaCppVersion(),
     maxModelSizeMb: MAX_MODEL_SIZE_MB,
+    binFiles: (() => { try { return readdirSync(paths.binDir).sort(); } catch { return []; } })(),
   };
 }
 
@@ -386,6 +388,16 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
 
         // Write version marker
         await writeFile(join(paths.binDir, '.llama-cpp-version'), version, 'utf-8');
+
+        // Log final bin directory contents for diagnostics
+        try {
+          const binContents = readdirSync(paths.binDir).sort();
+          log.push(`\nBin directory (${paths.binDir}):`);
+          for (const f of binContents) log.push(`  ${f}`);
+          const hasBackend = binContents.some(f => f.includes('ggml-cpu'));
+          if (!hasBackend) log.push(`\n⚠ WARNING: no ggml-cpu backend found — server will not start!`);
+        } catch { /* ok */ }
+
         log.push(`\n✓ llama-server ${version} installed successfully`);
 
         return { success: true, data: { log: log.join('\n'), success: true } };
@@ -426,6 +438,21 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
           data: { started: false, message: 'Binary or model not installed. Run install first.' },
         };
       }
+
+      // Pre-flight: check for CPU backend
+      try {
+        const binContents = readdirSync(paths.binDir);
+        const hasBackend = binContents.some(f => f.includes('ggml-cpu'));
+        if (!hasBackend) {
+          return {
+            success: false,
+            data: {
+              started: false,
+              message: `No CPU backend found in ${paths.binDir}. Files: ${binContents.sort().join(', ')}. Re-install the binary.`,
+            },
+          };
+        }
+      } catch { /* proceed anyway */ }
 
       // Stop any lingering managed process
       await stopServerProcess();
