@@ -33,6 +33,12 @@ interface EmailRule {
   label: string | null;
 }
 
+interface TemplateVariable {
+  key: string;
+  label: string;
+  example: string;
+}
+
 const DOC_TYPES: DocumentType[] = ['OFFER', 'NOMINATION', 'PROFORMA', 'INVOICE'];
 
 const DOC_LABELS: Record<DocumentType, string> = {
@@ -80,10 +86,11 @@ const DOC_LABELS: Record<DocumentType, string> = {
               <summary class="cursor-pointer text-sm font-medium text-gray-600 select-none">
                 Available template variables
               </summary>
-              <div class="mt-2 grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
-                @for (v of templateVariables(); track v) {
-                  <div>
-                    <code class="font-mono text-xs text-brand-700" [textContent]="wrapVar(v)"></code>
+              <div class="mt-2 grid grid-cols-2 gap-x-8 gap-y-1.5 text-sm">
+                @for (v of templateVariables(); track v.key) {
+                  <div class="flex items-baseline gap-2">
+                    <code class="font-mono text-xs text-brand-700 shrink-0" [textContent]="wrapVar(v.key)"></code>
+                    <span class="text-gray-400 text-xs truncate">{{ v.label }}</span>
                   </div>
                 }
               </div>
@@ -332,7 +339,7 @@ export class EmailSettingsPageComponent implements OnInit {
   readonly templates = signal<EmailTemplate[]>([]);
   readonly rules = signal<EmailRule[]>([]);
   readonly ownCompanies = signal<OwnCompanyDto[]>([]);
-  readonly templateVariables = signal<string[]>([]);
+  readonly templateVariables = signal<TemplateVariable[]>([]);
   readonly savingTemplate = signal<DocumentType | null>(null);
   readonly savedTemplate = signal<DocumentType | null>(null);
   readonly addingRule = signal(false);
@@ -373,7 +380,7 @@ export class EmailSettingsPageComponent implements OnInit {
         firstValueFrom(this.http.get<ApiResponse<EmailTemplate[]>>(`${API}/admin/settings/email-templates`)),
         firstValueFrom(this.http.get<ApiResponse<EmailRule[]>>(`${API}/admin/settings/email-rules`)),
         firstValueFrom(this.http.get<ApiResponse<OwnCompanyDto[]>>(`${API}/companies/own`)),
-        firstValueFrom(this.http.get<ApiResponse<string[]>>(`${API}/admin/settings/email-templates/variables`)),
+        firstValueFrom(this.http.get<ApiResponse<TemplateVariable[]>>(`${API}/admin/settings/email-templates/variables`)),
       ]);
 
       if (templatesRes.success) {
