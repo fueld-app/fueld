@@ -352,9 +352,42 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
         startedAt: Date.now(),
       };
 
-      // Fire-and-forget — the actual install runs in the background
+      // Fire-and-forget — the actual install runs in the background.
+      // IMPORTANT: use async Bun.spawn (not spawnSync) so the event loop
+      // stays free to serve progress-poll requests while building.
       (async () => {
         const log = _installState.log;
+
+        /** Run a command asynchronously, stream output to install log. */
+        async function run(
+          cmd: string[],
+          opts: { cwd?: string; timeoutMs?: number } = {},
+        ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+          const proc = Bun.spawn(cmd, {
+            cwd: opts.cwd,
+            stdout: 'pipe',
+            stderr: 'pipe',
+          });
+
+          // Stream stdout/stderr into log array in real-time
+          const [stdout, stderr] = await Promise.all([
+            new Response(proc.stdout).text(),
+            new Response(proc.stderr).text(),
+          ]);
+
+          // If timeout requested, race against it
+          if (opts.timeoutMs) {
+            const timer = new Promise<never>((_, reject) =>
+              setTimeout(() => { proc.kill(); reject(new Error(`Command timed out after ${opts.timeoutMs}ms: ${cmd.join(' ')}`)); }, opts.timeoutMs),
+            );
+            await Promise.race([proc.exited, timer]);
+          } else {
+            await proc.exited;
+          }
+
+          return { exitCode: proc.exitCode ?? 1, stdout, stderr };
+        }
+
         try {
           const { writeFile, mkdir, rm } = await import('fs/promises');
 
@@ -373,49 +406,50 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
             await mkdir(tmpDir, { recursive: true });
 
             log.push(`Cloning llama.cpp at tag ${version}...`);
-            const clone = Bun.spawnSync(
+            const clone = await run(
               ['git', 'clone', '--depth', '1', '--branch', version, 'https://github.com/ggml-org/llama.cpp.git', 'llama.cpp'],
-              { cwd: tmpDir, stdout: 'pipe', stderr: 'pipe', timeout: 120_000 },
+              { cwd: tmpDir, timeoutMs: 120_000 },
             );
             if (clone.exitCode !== 0) {
               await rm(tmpDir, { recursive: true, force: true });
-              throw new Error(`git clone failed: ${clone.stderr.toString().slice(-500)}`);
+              throw new Error(`git clone failed: ${clone.stderr.slice(-500)}`);
             }
+            log.push('Clone OK');
 
             const srcDir = join(tmpDir, 'llama.cpp');
             const buildDir = join(srcDir, 'build');
 
             _installState.step = 'Running cmake configure…';
             log.push('Running cmake configure...');
-            const cmake = Bun.spawnSync(
+            const cmake = await run(
               ['cmake', '-B', 'build', '-DCMAKE_BUILD_TYPE=Release', '-DLLAMA_BUILD_SERVER=ON'],
-              { cwd: srcDir, stdout: 'pipe', stderr: 'pipe', timeout: 120_000 },
+              { cwd: srcDir, timeoutMs: 120_000 },
             );
             if (cmake.exitCode !== 0) {
-              const err = cmake.stderr.toString().slice(-1000);
+              const err = cmake.stderr.slice(-1000);
               await rm(tmpDir, { recursive: true, force: true });
               throw new Error(`cmake configure failed:\n${err}`);
             }
             log.push('cmake configure OK');
 
-            const nproc = Bun.spawnSync(['nproc'], { stdout: 'pipe' });
-            const jobs = nproc.stdout.toString().trim() || '2';
+            const nprocResult = await run(['nproc']);
+            const jobs = nprocResult.stdout.trim() || '2';
             _installState.step = `Compiling (${jobs} jobs)…`;
             log.push(`Building with ${jobs} parallel jobs (this may take a few minutes)...`);
-            const make = Bun.spawnSync(
+            const make = await run(
               ['cmake', '--build', 'build', '--config', 'Release', '-j', jobs],
-              { cwd: srcDir, stdout: 'pipe', stderr: 'pipe', timeout: 600_000 },
+              { cwd: srcDir, timeoutMs: 600_000 },
             );
             if (make.exitCode !== 0) {
-              const err = make.stderr.toString().slice(-1000);
+              const err = make.stderr.slice(-1000);
               await rm(tmpDir, { recursive: true, force: true });
               throw new Error(`Build failed:\n${err}`);
             }
             log.push('Build completed');
 
             _installState.step = 'Copying binaries…';
-            const find = Bun.spawnSync(['find', buildDir, '-name', 'llama-server', '-type', 'f']);
-            const foundBin = find.stdout.toString().trim().split('\n')[0];
+            const find = await run(['find', buildDir, '-name', 'llama-server', '-type', 'f']);
+            const foundBin = find.stdout.trim().split('\n')[0];
             if (!foundBin) {
               await rm(tmpDir, { recursive: true, force: true });
               throw new Error('llama-server binary not found after build');
@@ -426,12 +460,12 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
             chmodSync(paths.binary, 0o755);
             log.push(`Installed llama-server to ${paths.binary}`);
 
-            const findLibs = Bun.spawnSync([
+            const findLibs = await run([
               'find', buildDir,
               '(', '-name', '*.so', '-o', '-name', '*.so.*', '-o', '-name', '*.dylib', ')',
               '(', '-type', 'f', '-o', '-type', 'l', ')',
             ]);
-            const libFiles = findLibs.stdout.toString().trim().split('\n').filter(Boolean);
+            const libFiles = findLibs.stdout.trim().split('\n').filter(Boolean);
             for (const libPath of libFiles) {
               const libName = require('path').basename(libPath);
               copyFileSync(libPath, join(paths.binDir, libName));
@@ -465,14 +499,14 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
             _installState.step = 'Extracting…';
             const extractDir = join(tmpDir, 'extract');
             await mkdir(extractDir, { recursive: true });
-            const tar = Bun.spawnSync(['tar', '-xzf', tarPath, '-C', extractDir]);
+            const tar = await run(['tar', '-xzf', tarPath, '-C', extractDir]);
             if (tar.exitCode !== 0) {
               await rm(tmpDir, { recursive: true, force: true });
-              throw new Error(`tar extraction failed: ${tar.stderr.toString()}`);
+              throw new Error(`tar extraction failed: ${tar.stderr}`);
             }
 
-            const find = Bun.spawnSync(['find', extractDir, '-name', 'llama-server', '-type', 'f']);
-            const foundBin = find.stdout.toString().trim().split('\n')[0];
+            const find = await run(['find', extractDir, '-name', 'llama-server', '-type', 'f']);
+            const foundBin = find.stdout.trim().split('\n')[0];
             if (!foundBin) {
               await rm(tmpDir, { recursive: true, force: true });
               throw new Error('llama-server binary not found in archive');
@@ -484,12 +518,12 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
             chmodSync(paths.binary, 0o755);
             log.push(`Installed llama-server to ${paths.binary}`);
 
-            const findLibs = Bun.spawnSync([
+            const findLibs = await run([
               'find', extractDir,
               '(', '-name', '*.so', '-o', '-name', '*.so.*', '-o', '-name', '*.dylib', ')',
               '(', '-type', 'f', '-o', '-type', 'l', ')',
             ]);
-            const libFiles = findLibs.stdout.toString().trim().split('\n').filter(Boolean);
+            const libFiles = findLibs.stdout.trim().split('\n').filter(Boolean);
             for (const libPath of libFiles) {
               const libName = require('path').basename(libPath);
               copyFileSync(libPath, join(paths.binDir, libName));
@@ -513,8 +547,8 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
 
           // Log CPU info
           try {
-            const cpuInfo = Bun.spawnSync(['sh', '-c', 'grep "model name" /proc/cpuinfo | head -1'], { stdout: 'pipe' });
-            const cpuModel = cpuInfo.stdout.toString().trim();
+            const cpuInfo = await run(['sh', '-c', 'grep "model name" /proc/cpuinfo | head -1']);
+            const cpuModel = cpuInfo.stdout.trim();
             if (cpuModel) log.push(`\nCPU: ${cpuModel}`);
           } catch { /* ok */ }
 
