@@ -38,7 +38,7 @@ import {
   HeaderActionsComponent,
   type HeaderAction,
 } from '../../components/header-actions/header-actions.component';
-import { SendEmailModalComponent, type SendEmailPayload, type DocumentEmailType } from '../../components/send-email-modal/send-email-modal.component';
+import { SendEmailModalComponent, type SendEmailPayload, type DocumentEmailType, type SendWhatsAppPayload } from '../../components/send-email-modal/send-email-modal.component';
 import type { DropdownOption } from '../../../../shared/components/searchable-dropdown/searchable-dropdown.component';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
@@ -2444,25 +2444,45 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  /** Send invoice PDF via WhatsApp from the email modal */
-  async onSendInvoiceWhatsApp(phone: string): Promise<void> {
+  /** Send document PDF via WhatsApp from the email modal */
+  async onSendInvoiceWhatsApp(payload: SendWhatsAppPayload): Promise<void> {
     const id = this.orderId();
     if (!id) return;
+
+    const pdfEndpoints: Record<DocumentEmailType, string> = {
+      OFFER: 'offer',
+      CONFIRMATION: 'offer',
+      NOMINATION: 'nomination',
+      PROFORMA: 'proforma',
+      INVOICE: 'invoice',
+    };
+    const docLabels: Record<DocumentEmailType, string> = {
+      OFFER: 'Offer',
+      CONFIRMATION: 'Confirmation',
+      NOMINATION: 'Nomination',
+      PROFORMA: 'Proforma Invoice',
+      INVOICE: 'Invoice',
+    };
+
     try {
       const blob = await firstValueFrom(
-        this.http.get(`${API_URL}/orders/${id}/invoice/pdf`, { responseType: 'blob' }),
+        this.http.get(`${API_URL}/orders/${id}/${pdfEndpoints[payload.documentType]}/pdf`, { responseType: 'blob' }),
       );
       const base64 = await this.blobToBase64(blob);
+      const orderNum = this.order()?.orderNumber ?? id;
+      const label = docLabels[payload.documentType];
+      const fileName = `${label.replace(/\s+/g, '_')}_${orderNum}.pdf`;
+
       await firstValueFrom(
         this.http.post<ApiResponse<{ success: boolean }>>(`${API_URL}/whatsapp/send`, {
-          phone,
-          message: `Invoice ${this.invoiceNumber()} — Bunker Delivery (${this.vesselName()})`,
+          phone: payload.phone,
+          message: payload.bodyText || `${label} — ${orderNum}`,
           pdfBase64: base64,
-          pdfFileName: `Fueld_Invoice_${this.invoiceNumber()}.pdf`,
+          pdfFileName: fileName,
         }),
       );
       this.emailModal()?.waDone();
-      this.showToast('success', `Invoice sent via WhatsApp to ${phone}`);
+      this.showToast('success', `${label} sent via WhatsApp to ${payload.phone}`);
     } catch {
       this.emailModal()?.waDone();
       this.showToast('error', 'Failed to send via WhatsApp. Is your device linked?');

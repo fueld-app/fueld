@@ -42,6 +42,12 @@ export interface SendEmailPayload {
   htmlBody: string;
 }
 
+export interface SendWhatsAppPayload {
+  phone: string;
+  documentType: DocumentEmailType;
+  bodyText: string;
+}
+
 const DOC_LABELS: Record<DocumentEmailType, string> = {
   OFFER: 'Offer',
   CONFIRMATION: 'Confirmation',
@@ -550,7 +556,7 @@ export class SendEmailModalComponent {
 
   // ── Outputs ──
   readonly sendEmail = output<SendEmailPayload>();
-  readonly sendWhatsApp = output<string>();
+  readonly sendWhatsApp = output<SendWhatsAppPayload>();
 
   // ── ViewChildren ──
   private readonly toInput = viewChild<EmailTagInputComponent>('toInput');
@@ -765,7 +771,16 @@ export class SendEmailModalComponent {
   doSendWa(): void {
     if (!this.waPhoneNumber) return;
     this.waSending.set(true);
-    this.sendWhatsApp.emit(this.waPhoneNumber);
+    this.onBodyInput();
+    // Strip HTML to plain text for WhatsApp
+    const tmp = document.createElement('div');
+    tmp.innerHTML = this.htmlBody;
+    const bodyText = (tmp.textContent || tmp.innerText || '').trim();
+    this.sendWhatsApp.emit({
+      phone: this.waPhoneNumber,
+      documentType: this.documentType(),
+      bodyText,
+    });
   }
 
   /** Called by parent after the API call completes. */

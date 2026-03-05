@@ -484,6 +484,17 @@ export const documentsController = new Elysia({ prefix: '/orders' })
 
       const q = (query.q ?? '').toLowerCase().trim();
 
+      // Fuzzy sequential-character match (like VS Code's fuzzy finder).
+      // "jon" matches "Johnathan" because j→o→(skip h)→n all appear in order.
+      function fuzzyMatch(query: string, text: string): boolean {
+        const t = text.toLowerCase();
+        let qi = 0;
+        for (let ti = 0; ti < t.length && qi < query.length; ti++) {
+          if (t[ti] === query[qi]) qi++;
+        }
+        return qi === query.length;
+      }
+
       // Gather all counterparty IDs related to this order
       const companyIds = new Set<string>();
       if (order.clientId) companyIds.add(order.clientId);
@@ -524,7 +535,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       for (const c of contacts) {
         if (c.email) {
           const label = c.name + (c.role ? ` (${c.role})` : '');
-          if (!q || label.toLowerCase().includes(q) || c.email.toLowerCase().includes(q)) {
+          if (!q || fuzzyMatch(q, label) || fuzzyMatch(q, c.email)) {
             results.push({ email: c.email, name: label, source: 'contact' });
           }
         }
@@ -532,7 +543,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
 
       for (const e of emails) {
         const label = e.label || e.emailType || 'Email';
-        if (!q || label.toLowerCase().includes(q) || e.email.toLowerCase().includes(q)) {
+        if (!q || fuzzyMatch(q, label) || fuzzyMatch(q, e.email)) {
           results.push({ email: e.email, name: label, source: 'company_email' });
         }
       }

@@ -288,16 +288,19 @@ export function buildDocumentEmailHtml(params: {
   const headerBg = params.brandColor?.trim() || '#ffffff';
   const isLightBg = isLightColor(headerBg);
   const headerTextColor = isLightBg ? '#111827' : '#ffffff';
+  // Always show a colored accent bar at the top; use brand color unless it's white/unset
+  const accentColor = (headerBg.toLowerCase() === '#ffffff' || headerBg.toLowerCase() === '#fff') ? '#1e3a5f' : headerBg;
   const logoHtml = params.companyLogoUrl
     ? `<img src="${params.companyLogoUrl}" alt="${companyName}" style="max-height: 40px; max-width: 180px; margin-bottom: 4px;" />`
     : `<h1 style="color: ${headerTextColor}; margin: 0; font-size: 24px;">${companyName}</h1>`;
 
   return `
-    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background: ${headerBg}; padding: 24px 32px; border-radius: 8px 8px 0 0;">
+    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 8px;">
+      <div style="height: 4px; background: ${accentColor}; border-radius: 8px 8px 0 0;"></div>
+      <div style="background: ${headerBg}; padding: 24px 32px;">
         ${logoHtml}
       </div>
-      <div style="background: #ffffff; padding: 32px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
+      <div style="background: #ffffff; padding: 32px; border-top: 1px solid #e5e7eb;">
         <p>${l.greeting},</p>
         <p>${l.intro}</p>
         <table style="margin: 16px 0; border-collapse: collapse;">
