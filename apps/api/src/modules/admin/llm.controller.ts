@@ -89,6 +89,7 @@ function getInstalledLlamaCppVersion(): string | null {
           ...process.env,
           DYLD_LIBRARY_PATH: [paths.binDir, process.env['DYLD_LIBRARY_PATH']].filter(Boolean).join(':'),
           LD_LIBRARY_PATH: [paths.binDir, process.env['LD_LIBRARY_PATH']].filter(Boolean).join(':'),
+          GGML_BACKEND_PATH: paths.binDir,
         },
         timeout: 5_000,
       });
@@ -365,19 +366,18 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
         chmodSync(paths.binary, 0o755);
         log.push(`Installed llama-server to ${paths.binary}`);
 
-        // Copy companion shared libraries (.dylib, .so)
-        const binSourceDir = require('path').dirname(foundBin);
-        const libDirs = [binSourceDir, join(binSourceDir, '..', 'lib')];
-        for (const dir of libDirs) {
-          try {
-            const files = readdirSync(dir);
-            for (const f of files) {
-              if (f.endsWith('.dylib') || f.endsWith('.so') || f.match(/\.so\./)) {
-                copyFileSync(join(dir, f), join(paths.binDir, f));
-                log.push(`  → copied ${f}`);
-              }
-            }
-          } catch { /* dir may not exist */ }
+        // Copy ALL shared libraries from the extracted archive (recursive)
+        // This handles different archive layouts and backend plugin directories
+        const findLibs = Bun.spawnSync([
+          'find', extractDir,
+          '(', '-name', '*.so', '-o', '-name', '*.so.*', '-o', '-name', '*.dylib', ')',
+          '-type', 'f',
+        ]);
+        const libFiles = findLibs.stdout.toString().trim().split('\n').filter(Boolean);
+        for (const libPath of libFiles) {
+          const libName = require('path').basename(libPath);
+          copyFileSync(libPath, join(paths.binDir, libName));
+          log.push(`  → copied ${libName}`);
         }
 
         // Clean up temp
@@ -454,6 +454,7 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
               ...process.env,
               DYLD_LIBRARY_PATH: dyldPath,
               LD_LIBRARY_PATH: ldPath,
+              GGML_BACKEND_PATH: binDir,
             },
             stdout: 'pipe',
             stderr: 'pipe',
