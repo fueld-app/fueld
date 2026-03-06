@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
+import { CreditApplicationReviewDecision, CreditApplicationStatus } from '@fueld/types';
 import {
   counterparties,
   creditApplications,
@@ -91,7 +92,7 @@ describe('createCreditApplication', () => {
     expect(app.requestedCurrency).toBe('USD');
     expect(app.requestedDays).toBe(30);
     expect(app.reason).toBe('New customer needs credit');
-    expect(app.status).toBe('PENDING');
+    expect(app.status).toBe(CreditApplicationStatus.Pending);
     expect(app.requestedByUserId).toBe(user.id);
     expect(app.requestedByName).toBe('Test User');
     expect(app.reviews).toEqual([]);
@@ -492,7 +493,7 @@ describe('getCreditApplicationById', () => {
     expect(fetched).not.toBeNull();
     expect(fetched!.reviews.length).toBe(1);
     expect(fetched!.reviews[0]!.reviewerName).toBe('Credit Manager');
-    expect(fetched!.reviews[0]!.decision).toBe('APPROVED');
+    expect(fetched!.reviews[0]!.decision).toBe(CreditApplicationReviewDecision.Approved);
     expect(fetched!.reviews[0]!.comment).toBe('Looks good');
   });
 });
@@ -572,7 +573,7 @@ describe('cancelCreditApplication', () => {
 
     const cancelled = await cancelCreditApplication(app.id, user.id);
     expect(cancelled).not.toBeNull();
-    expect(cancelled!.status).toBe('CANCELLED');
+    expect(cancelled!.status).toBe(CreditApplicationStatus.Cancelled);
     expect(cancelled!.resolvedAt).not.toBeNull();
   });
 
@@ -669,7 +670,7 @@ describe('cancelCreditApplication', () => {
     );
 
     const result = await cancelCreditApplication(app.id, admin!.id, 'ADMIN');
-    expect(result?.status).toBe('CANCELLED');
+    expect(result?.status).toBe(CreditApplicationStatus.Cancelled);
   });
 
   it('allows credit manager to cancel another user application', async () => {
@@ -693,7 +694,7 @@ describe('cancelCreditApplication', () => {
     );
 
     const result = await cancelCreditApplication(app.id, cm!.id, 'CREDITMANAGER');
-    expect(result?.status).toBe('CANCELLED');
+    expect(result?.status).toBe(CreditApplicationStatus.Cancelled);
   });
 });
 
@@ -724,7 +725,7 @@ describe('submitReview', () => {
 
     const reviewed = await submitReview(app.id, reviewer!.id, 'APPROVED', 'Approved');
     expect(reviewed).not.toBeNull();
-    expect(reviewed!.status).toBe('APPROVED');
+    expect(reviewed!.status).toBe(CreditApplicationStatus.Approved);
     expect(reviewed!.resolvedAt).not.toBeNull();
     expect(reviewed!.reviews.length).toBe(1);
   });
@@ -750,7 +751,7 @@ describe('submitReview', () => {
     );
 
     const reviewed = await submitReview(app.id, reviewer!.id, 'REJECTED', 'Too risky');
-    expect(reviewed!.status).toBe('REJECTED');
+    expect(reviewed!.status).toBe(CreditApplicationStatus.Rejected);
     expect(reviewed!.resolvedAt).not.toBeNull();
   });
 
@@ -777,12 +778,12 @@ describe('submitReview', () => {
 
     // First approval — should stay pending
     const after1 = await submitReview(app.id, cm1!.id, 'APPROVED');
-    expect(after1!.status).toBe('PENDING');
+    expect(after1!.status).toBe(CreditApplicationStatus.Pending);
     expect(after1!.reviews.length).toBe(1);
 
     // Second approval — should be approved
     const after2 = await submitReview(app.id, cm2!.id, 'APPROVED');
-    expect(after2!.status).toBe('APPROVED');
+    expect(after2!.status).toBe(CreditApplicationStatus.Approved);
     expect(after2!.resolvedAt).not.toBeNull();
     expect(after2!.reviews.length).toBe(2);
   });
@@ -810,11 +811,11 @@ describe('submitReview', () => {
 
     // First rejection — should stay pending (need requiredApprovals rejections for majority)
     const after1 = await submitReview(app.id, cm1!.id, 'REJECTED');
-    expect(after1!.status).toBe('PENDING');
+    expect(after1!.status).toBe(CreditApplicationStatus.Pending);
 
     // Second rejection — meets majority threshold
     const after2 = await submitReview(app.id, cm2!.id, 'REJECTED');
-    expect(after2!.status).toBe('REJECTED');
+    expect(after2!.status).toBe(CreditApplicationStatus.Rejected);
     expect(after2!.resolvedAt).not.toBeNull();
   });
 
@@ -840,10 +841,10 @@ describe('submitReview', () => {
     );
 
     const after1 = await submitReview(app.id, cm1!.id, 'APPROVED');
-    expect(after1!.status).toBe('PENDING');
+    expect(after1!.status).toBe(CreditApplicationStatus.Pending);
 
     const after2 = await submitReview(app.id, cm2!.id, 'REJECTED');
-    expect(after2!.status).toBe('PENDING'); // 1 approve, 1 reject, need 3
+    expect(after2!.status).toBe(CreditApplicationStatus.Pending); // 1 approve, 1 reject, need 3
   });
 
   it('throws when same reviewer reviews twice', async () => {

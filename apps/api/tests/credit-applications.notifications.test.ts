@@ -46,8 +46,12 @@ function createTestApp() {
   return new Elysia().use(authModule.authController).use(creditApplicationsControllerModule.creditApplicationsController);
 }
 
+type TestAppHandle = {
+  handle: (request: Request) => Promise<Response>;
+};
+
 async function requestJson(
-  app: Elysia,
+  app: TestAppHandle,
   path: string,
   options: { method?: string; body?: unknown; token?: string } = {},
 ) {
@@ -69,7 +73,7 @@ async function requestJson(
   return { status: response.status, data };
 }
 
-async function login(app: Elysia, email: string, password: string) {
+async function login(app: TestAppHandle, email: string, password: string) {
   const res = await requestJson(app, '/auth/login', {
     method: 'POST',
     body: { email, password },
