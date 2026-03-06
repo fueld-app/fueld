@@ -199,6 +199,35 @@ describe('admin settings.service', () => {
     expect((await updateCompanyTypeSettings(['CLIENT', 'SUPPLIER'])).companyTypes).toEqual(['CLIENT', 'SUPPLIER']);
   });
 
+  it('persists WhatsApp first inquiry group sharing settings', async () => {
+    await seedBasics();
+    const {
+      getWhatsAppSettings,
+      updateWhatsAppSettings,
+    } = await loadSettingsService();
+
+    const defaults = await getWhatsAppSettings();
+    expect(defaults.enabled).toBe(false);
+    expect(defaults.defaultGroupJid).toBeNull();
+    expect(defaults.incomingRfqEnabled).toBe(true);
+    expect(defaults.firstInquiryGroupNotificationEnabled).toBe(true);
+
+    const updated = await updateWhatsAppSettings({
+      enabled: true,
+      defaultGroupJid: '120363001234567890@g.us',
+      incomingRfqEnabled: false,
+      firstInquiryGroupNotificationEnabled: false,
+    });
+
+    expect(updated.enabled).toBe(true);
+    expect(updated.defaultGroupJid).toBe('120363001234567890@g.us');
+    expect(updated.incomingRfqEnabled).toBe(false);
+    expect(updated.firstInquiryGroupNotificationEnabled).toBe(false);
+
+    const reloaded = await getWhatsAppSettings();
+    expect(reloaded).toEqual(updated);
+  });
+
   it('falls back to own companies when user team has no assigned companies', async () => {
     const { tenant, user, client } = await seedBasics();
     const db = await getDb();

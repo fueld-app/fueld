@@ -401,4 +401,44 @@ describe('settings controller e2e', () => {
     const qbAfter = itemsAfter.find((item) => item.provider === 'QUICKBOOKS');
     expect(qbAfter?.configured).toBe(false);
   });
+
+  it('supports WhatsApp settings roundtrip including first inquiry sharing', async () => {
+    const seeded = await seedAuthBasics();
+    const db = await getDb();
+
+    await db
+      .update(users)
+      .set({ role: 'ADMIN', updatedAt: new Date() })
+      .where(eq(users.id, seeded.user.id));
+
+    const login = await loginE2E(seeded.user.email, seeded.password);
+    const token = login.accessToken;
+
+    const initial = await requestJson('/admin/settings/whatsapp', { token });
+    expect(initial.status).toBe(200);
+    expect(initial.data?.success).toBe(true);
+    expect(initial.data?.data?.firstInquiryGroupNotificationEnabled).toBe(true);
+
+    const updated = await requestJson('/admin/settings/whatsapp', {
+      method: 'PUT',
+      token,
+      body: {
+        enabled: true,
+        defaultGroupJid: '120363001234567890@g.us',
+        incomingRfqEnabled: false,
+        firstInquiryGroupNotificationEnabled: false,
+      },
+    });
+    expect(updated.status).toBe(200);
+    expect(updated.data?.success).toBe(true);
+    expect(updated.data?.data?.enabled).toBe(true);
+    expect(updated.data?.data?.defaultGroupJid).toBe('120363001234567890@g.us');
+    expect(updated.data?.data?.incomingRfqEnabled).toBe(false);
+    expect(updated.data?.data?.firstInquiryGroupNotificationEnabled).toBe(false);
+
+    const fetched = await requestJson('/admin/settings/whatsapp', { token });
+    expect(fetched.status).toBe(200);
+    expect(fetched.data?.success).toBe(true);
+    expect(fetched.data?.data?.firstInquiryGroupNotificationEnabled).toBe(false);
+  });
 });

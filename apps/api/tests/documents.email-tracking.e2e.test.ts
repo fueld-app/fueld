@@ -807,6 +807,45 @@ describe('email tracking, inquiry send & WhatsApp group notifications', () => {
       }
     });
 
+    it('does NOT send WhatsApp when first inquiry group sharing is disabled', async () => {
+      const { token, orderId, tenantId, supplier } = await seedDocumentReadyOrder();
+      const db = await getDb();
+
+      await db
+        .update(tenants)
+        .set({
+          settings: {
+            whatsappEnabled: true,
+            whatsappDefaultGroupJid: '120363001234567890@g.us',
+            whatsappFirstInquiryGroupNotificationEnabled: false,
+          },
+        })
+        .where(eq(tenants.id, tenantId));
+
+      mockGraphToken = 'graph-token';
+      const stub = stubGraphFetch();
+
+      try {
+        await requestJson(`/orders/${orderId}/inquiry/send`, {
+          method: 'POST',
+          token,
+          body: {
+            suppliers: [
+              { supplierId: supplier.id, supplierName: 'Supplier Co', email: 'sup@example.com' },
+            ],
+            subject: 'Disabled first inquiry WA',
+            htmlBody: '<p>inquiry</p>',
+          },
+        });
+
+        await new Promise(r => setTimeout(r, 200));
+        expect(whatsappGroupCalls.length).toBe(0);
+      } finally {
+        stub.restore();
+        mockGraphToken = null;
+      }
+    });
+
     it('WhatsApp message includes product details with quantities', async () => {
       const { token, orderId, tenantId, supplier } = await seedDocumentReadyOrder();
       const db = await getDb();
