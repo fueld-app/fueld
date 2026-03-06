@@ -1,7 +1,7 @@
 import webpush from 'web-push';
 import { db } from '../../db';
 import { integrationCredentials, pushSubscriptions } from '../../db/schema';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { decrypt } from '../../lib/crypto';
 
 interface SubscriptionKeys {
@@ -127,6 +127,53 @@ export async function sendTestNotification(userId: string, tenantId: string): Pr
             p256dh: sub.p256dh,
             auth: sub.auth,
           },
+        },
+        payload,
+      );
+      sent++;
+    } catch (err: any) {
+      const status = err?.statusCode ?? err?.status;
+      if (status === 404 || status === 410) {
+        await db
+          .delete(pushSubscriptions)
+          .where(eq(pushSubscriptions.endpoint, sub.endpoint));
+      }
+    }
+  }
+
+  return sent;
+}
+
+/**
+ * Send a push notification to all subscriptions for a list of user IDs.
+ * Used for role-based or targeted notifications (e.g., credit applications).
+ */
+export async function sendNotificationToUsers(
+  userIds: string[],
+  notification: { title: string; body: string; url?: string },
+): Promise<number> {
+  if (!userIds.length) return 0;
+  const tenantId = await getTenantId();
+  const config = await ensureVapidConfigured(tenantId);
+  if (!config) return 0;
+
+  const subs = await db.query.pushSubscriptions.findMany({
+    where: inArray(pushSubscriptions.userId, userIds),
+  });
+
+  let sent = 0;
+  const payload = JSON.stringify({
+    title: notification.title,
+    body: notification.body,
+    data: { url: notification.url },
+  });
+
+  for (const sub of subs) {
+    try {
+      await webpush.sendNotification(
+        {
+          endpoint: sub.endpoint,
+          keys: { p256dh: sub.p256dh, auth: sub.auth },
         },
         payload,
       );

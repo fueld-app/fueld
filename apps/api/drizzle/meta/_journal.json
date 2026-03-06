@@ -267,6 +267,34 @@
       "when": 1772536200000,
       "tag": "0037_microsoft_refresh_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1772622600000,
+      "tag": "0038_email_templates_and_rules",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1772709000000,
+      "tag": "0039_brand_color",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1772795400000,
+      "tag": "0040_supplier_inquiries",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1772881800000,
+      "tag": "0041_credit_applications",
+      "breakpoints": true
     }
   ]
 }

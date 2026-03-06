@@ -6,6 +6,8 @@ import type {
   CounterpartyType,
   InvoiceStatus,
   Role,
+  CreditApplicationStatus,
+  CreditApplicationReviewDecision,
 } from './enums';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -947,6 +949,72 @@ export interface UpdateCreditLineDto {
   notes?: string | null;
   counterpartyIds?: string[];
   ownCompanyIds?: string[];
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  CREDIT APPLICATIONS (trader → credit manager approval workflow)
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface CreditApplicationReviewDto {
+  id: string;
+  applicationId: string;
+  reviewerUserId: string;
+  reviewerName: string;
+  decision: CreditApplicationReviewDecision;
+  comment: string | null;
+  decidedAt: string;
+}
+
+export interface CreditApplicationDto {
+  id: string;
+  tenantId: string;
+  type: CreditLineType;
+  counterpartyId: string;
+  counterpartyName: string;
+  orderId: string | null;
+  orderReference: string | null;
+  creditLineId: string | null;
+  requestedAmount: string;
+  requestedCurrency: string;
+  requestedDays: number | null;
+  reason: string | null;
+  status: CreditApplicationStatus;
+  requestedByUserId: string;
+  requestedByName: string;
+  reviews: CreditApplicationReviewDto[];
+  resolvedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateCreditApplicationDto {
+  type: CreditLineType;
+  counterpartyId: string;
+  orderId?: string;
+  creditLineId?: string;
+  requestedAmount: string;
+  requestedCurrency: string;
+  requestedDays?: number;
+  reason?: string;
+}
+
+export interface ReviewCreditApplicationDto {
+  decision: CreditApplicationReviewDecision;
+  comment?: string;
+}
+
+export interface CreditApplicationSettingsDto {
+  requiredApprovals: number;
+  autoApplyOnApproval: boolean;
+  immediateRejection: boolean;
+  notifyCreditManagers: boolean;
+}
+
+export interface UpdateCreditApplicationSettingsDto {
+  requiredApprovals?: number;
+  autoApplyOnApproval?: boolean;
+  immediateRejection?: boolean;
+  notifyCreditManagers?: boolean;
 }
 
 // ═══════════════════════════════════════════════════════════════════════

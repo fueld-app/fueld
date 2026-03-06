@@ -125,6 +125,13 @@ export interface TenantSettings {
   whatsappEnabled?: boolean;
   whatsappDefaultGroupJid?: string | null;
   whatsappIncomingRfqEnabled?: boolean;
+  // Credit applications
+  creditApplicationSettings?: {
+    requiredApprovals: number;          // how many credit managers must approve (default 1)
+    autoApplyOnApproval: boolean;       // auto-create/update credit line when approved
+    immediateRejection: boolean;        // reject immediately on first rejection (vs wait for all)
+    notifyCreditManagers: boolean;      // send push notifications on new applications
+  };
 }
 
 export const tenants = pgTable('tenants', {
@@ -749,6 +756,69 @@ export const creditLineCounterparties = pgTable('credit_line_counterparties', {
   creditLineId: uuid('credit_line_id').notNull().references(() => creditLines.id, { onDelete: 'cascade' }),
   counterpartyId: uuid('counterparty_id').notNull().references(() => counterparties.id, { onDelete: 'cascade' }),
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+//  16c. CREDIT APPLICATIONS (trader → credit manager approval workflow)
+// ═══════════════════════════════════════════════════════════════════════
+
+export const creditApplicationStatusEnum = pgEnum('credit_application_status', [
+  'PENDING',
+  'APPROVED',
+  'REJECTED',
+  'CANCELLED',
+]);
+
+export const creditApplicationReviewDecisionEnum = pgEnum('credit_application_review_decision', [
+  'APPROVED',
+  'REJECTED',
+]);
+
+export const creditApplications = pgTable('credit_applications', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  type: creditLineTypeEnum('type').notNull(),                                           // SUPPLIER or CUSTOMER
+  counterpartyId: uuid('counterparty_id').notNull().references(() => counterparties.id),
+  orderId: uuid('order_id').references(() => orders.id, { onDelete: 'set null' }),      // optional: initiated from an order
+  creditLineId: uuid('credit_line_id').references(() => creditLines.id, { onDelete: 'set null' }), // optional: increase existing line
+  requestedAmount: numeric('requested_amount', { precision: 14, scale: 2 }).notNull(),
+  requestedCurrency: text('requested_currency').notNull().default('USD'),
+  requestedDays: integer('requested_days'),
+  reason: text('reason'),
+  status: creditApplicationStatusEnum('status').notNull().default('PENDING'),
+  requestedByUserId: uuid('requested_by_user_id').notNull().references(() => users.id),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const creditApplicationRelations = relations(creditApplications, ({ one, many }) => ({
+  tenant: one(tenants, { fields: [creditApplications.tenantId], references: [tenants.id] }),
+  counterparty: one(counterparties, { fields: [creditApplications.counterpartyId], references: [counterparties.id] }),
+  order: one(orders, { fields: [creditApplications.orderId], references: [orders.id] }),
+  creditLine: one(creditLines, { fields: [creditApplications.creditLineId], references: [creditLines.id] }),
+  requestedBy: one(users, { fields: [creditApplications.requestedByUserId], references: [users.id] }),
+  reviews: many(creditApplicationReviews),
+}));
+
+export type CreditApplication = typeof creditApplications.$inferSelect;
+export type NewCreditApplication = typeof creditApplications.$inferInsert;
+
+export const creditApplicationReviews = pgTable('credit_application_reviews', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  applicationId: uuid('application_id').notNull().references(() => creditApplications.id, { onDelete: 'cascade' }),
+  reviewerUserId: uuid('reviewer_user_id').notNull().references(() => users.id),
+  decision: creditApplicationReviewDecisionEnum('decision').notNull(),
+  comment: text('comment'),
+  decidedAt: timestamp('decided_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const creditApplicationReviewRelations = relations(creditApplicationReviews, ({ one }) => ({
+  application: one(creditApplications, { fields: [creditApplicationReviews.applicationId], references: [creditApplications.id] }),
+  reviewer: one(users, { fields: [creditApplicationReviews.reviewerUserId], references: [users.id] }),
+}));
+
+export type CreditApplicationReview = typeof creditApplicationReviews.$inferSelect;
+export type NewCreditApplicationReview = typeof creditApplicationReviews.$inferInsert;
 
 // ═══════════════════════════════════════════════════════════════════════
 //  17. INVITATIONS

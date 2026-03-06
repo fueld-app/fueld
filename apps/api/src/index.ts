@@ -12,6 +12,7 @@ import { lloydsController } from './modules/lloyds';
 import { companiesController } from './modules/companies/companies.controller';
 import { vesselsController } from './modules/vessels/vessels.controller';
 import { creditController } from './modules/credit/credit.controller';
+import { creditApplicationsController } from './modules/credit/credit-applications.controller';
 import { adminController, inviteController } from './modules/admin/admin.controller';
 import { settingsController } from './modules/admin/settings.controller';
 import { securityController } from './modules/admin/security.controller';
@@ -280,6 +281,7 @@ export async function createApp(options: CreateAppOptions = {}) {
     .use(companiesController)
     .use(vesselsController)
     .use(creditController)
+    .use(creditApplicationsController)
     .use(adminController)
     .use(settingsController)
     .use(inviteController)

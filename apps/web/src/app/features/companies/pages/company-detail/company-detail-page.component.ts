@@ -25,6 +25,7 @@ import { AuthService } from '../../../../core/auth/auth.service';
 import { ActivityTimelineComponent } from '../../../../shared/components/activity-timeline/activity-timeline.component';
 import { LastEditedBadgeComponent } from '../../../../shared/components/last-edited-badge/last-edited-badge.component';
 import { CommentsCardComponent } from '../../../../shared/components/comments-card/comments-card.component';
+import { CreditApplicationModalComponent } from '../../../credit/components/credit-application-modal.component';
 import { API } from '@app/core/config/api';
 
 interface CompanyEnrichment {
@@ -285,7 +286,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
 @Component({
   selector: 'app-company-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, FormsModule, RouterLink, ActivityTimelineComponent, LastEditedBadgeComponent, CommentsCardComponent],
+  imports: [DatePipe, FormsModule, RouterLink, ActivityTimelineComponent, LastEditedBadgeComponent, CommentsCardComponent, CreditApplicationModalComponent],
   styles: [`
     :host ::ng-deep .leaflet-container { font-family: inherit; }
     .fleet-map-fullscreen {
@@ -668,6 +669,15 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                         </dd>
                       } @else {
                         <dd class="mt-0.5 font-medium text-gray-900">\${{ company()!.creditLimit }}</dd>
+                      }
+                      @if (!editing()) {
+                        <button (click)="showCreditApplicationModal.set(true)"
+                          class="mt-1 inline-flex items-center gap-1 rounded-md bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100 transition-colors">
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+                          </svg>
+                          Request Credit
+                        </button>
                       }
                     </div>
                     <div>
@@ -1936,6 +1946,18 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
           {{ toast()!.message }}
         </div>
       }
+
+      <!-- Credit Application Modal -->
+      @if (company()) {
+        <app-credit-application-modal
+          [open]="showCreditApplicationModal()"
+          [counterpartyId]="company()!.id"
+          [counterpartyName]="company()!.name"
+          [defaultType]="company()!.types.includes('CLIENT') ? 'CUSTOMER' : 'SUPPLIER'"
+          (closed)="showCreditApplicationModal.set(false)"
+          (submitted)="onCreditApplicationSubmitted()"
+        />
+      }
     </div>
   `,
 })
@@ -1967,6 +1989,9 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly responsibleUserId = signal<string | null>(null);
   readonly savingResponsible = signal(false);
   readonly toast = signal<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Credit application
+  readonly showCreditApplicationModal = signal(false);
 
   // Company Vessels
   readonly companyVessels = signal<VesselCompanyDto[]>([]);
@@ -3509,5 +3534,9 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     } finally {
       this.savingResponsible.set(false);
     }
+  }
+
+  onCreditApplicationSubmitted() {
+    this.showToast('success', 'Credit application submitted successfully');
   }
 }

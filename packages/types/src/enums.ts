@@ -63,3 +63,17 @@ export enum Role {
   Teamlead = 'TEAMLEAD',
   CreditManager = 'CREDITMANAGER',
 }
+
+/** Credit application lifecycle status. */
+export enum CreditApplicationStatus {
+  Pending = 'PENDING',
+  Approved = 'APPROVED',
+  Rejected = 'REJECTED',
+  Cancelled = 'CANCELLED',
+}
+
+/** Credit application review decision. */
+export enum CreditApplicationReviewDecision {
+  Approved = 'APPROVED',
+  Rejected = 'REJECTED',
+}

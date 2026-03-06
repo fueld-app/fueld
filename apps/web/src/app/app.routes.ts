@@ -165,11 +165,11 @@ export const routes: Routes = [
       // ── Credit ──
       {
         path: 'credit',
-        canActivate: [creditGuard],
         children: [
-          { path: '', redirectTo: 'suppliers', pathMatch: 'full' as const },
+          { path: '', redirectTo: 'applications', pathMatch: 'full' as const },
           {
             path: 'suppliers',
+            canActivate: [creditGuard],
             loadComponent: () =>
               import('./features/credit/pages/supplier-credit/supplier-credit-page.component').then(
                 (m) => m.SupplierCreditPageComponent,
@@ -178,11 +178,20 @@ export const routes: Routes = [
           },
           {
             path: 'customers',
+            canActivate: [creditGuard],
             loadComponent: () =>
               import('./features/credit/pages/customer-credit/customer-credit-page.component').then(
                 (m) => m.CustomerCreditPageComponent,
               ),
             title: 'Credit > Customers',
+          },
+          {
+            path: 'applications',
+            loadComponent: () =>
+              import('./features/credit/pages/credit-applications/credit-applications-page.component').then(
+                (m) => m.CreditApplicationsPageComponent,
+              ),
+            title: 'Credit > Applications',
           },
         ],
       },
@@ -322,6 +331,14 @@ export const routes: Routes = [
                 (m) => m.EmailSettingsPageComponent,
               ),
             title: 'Admin > Email',
+          },
+          {
+            path: 'credit',
+            loadComponent: () =>
+              import('./features/admin/pages/credit-settings/credit-settings-page.component').then(
+                (m) => m.CreditSettingsPageComponent,
+              ),
+            title: 'Admin > Credit Settings',
           },
         ],
       },

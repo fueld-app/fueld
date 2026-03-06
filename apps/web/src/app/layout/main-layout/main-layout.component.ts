@@ -60,7 +60,7 @@ interface NavItem {
   label: string;
   icon: string;
   route?: string;
-  children?: { label: string; route: string }[];
+  children?: { label: string; route: string; allowedRoles?: string[] }[];
   adminOnly?: boolean;
   /** When set, item is visible to these roles (and always to ADMIN). */
   allowedRoles?: string[];
@@ -85,10 +85,10 @@ const NAVIGATION: NavItem[] = [
   {
     label: 'Credit',
     icon: 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z',
-    allowedRoles: ['ADMIN', 'CREDITMANAGER'],
     children: [
-      { label: 'Suppliers', route: '/credit/suppliers' },
-      { label: 'Customers', route: '/credit/customers' },
+      { label: 'Applications', route: '/credit/applications' },
+      { label: 'Suppliers', route: '/credit/suppliers', allowedRoles: ['ADMIN', 'CREDITMANAGER'] },
+      { label: 'Customers', route: '/credit/customers', allowedRoles: ['ADMIN', 'CREDITMANAGER'] },
     ],
   },
   {
@@ -121,6 +121,7 @@ const NAVIGATION: NavItem[] = [
       { label: 'Settings', route: '/admin/settings' },
       { label: 'LLM / AI', route: '/admin/llm' },
       { label: 'Email', route: '/admin/email' },
+      { label: 'Credit Settings', route: '/admin/credit' },
     ],
   },
 ];
@@ -203,6 +204,7 @@ const NAVIGATION: NavItem[] = [
               @if (isGroupOpen(item.label)) {
                 <div class="ml-5 mt-1 space-y-0.5 border-l border-sidebar-hover pl-4">
                   @for (child of item.children; track child.label) {
+                    @if (!child.allowedRoles || child.allowedRoles.includes('ADMIN') && auth.isAdmin() || child.allowedRoles.includes(auth.userRole())) {
                     <a
                       [routerLink]="child.route"
                       routerLinkActive="text-sidebar-text-active bg-sidebar-active"
@@ -211,6 +213,7 @@ const NAVIGATION: NavItem[] = [
                     >
                       {{ child.label }}
                     </a>
+                    }
                   }
                 </div>
               }
@@ -606,7 +609,7 @@ const NAVIGATION: NavItem[] = [
   `,
 })
 export class MainLayoutComponent implements OnInit, OnDestroy {
-  private readonly auth = inject(AuthService);
+  protected readonly auth = inject(AuthService);
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
   private readonly wsService = inject(WebSocketService);

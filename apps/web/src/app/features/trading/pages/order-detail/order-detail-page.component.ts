@@ -50,6 +50,7 @@ import { EmailHistoryCardComponent } from '../../../../shared/components/email-h
 import { TradingDetailHeaderComponent } from '../../components/detail-header/detail-header.component';
 import { TradingDetailMetaCardsComponent } from '../../components/detail-meta-cards/detail-meta-cards.component';
 import { AuthService } from '../../../../core/auth/auth.service';
+import { CreditApplicationModalComponent } from '../../../credit/components/credit-application-modal.component';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Order Detail Page — Full order view with editable items grid
@@ -80,6 +81,7 @@ interface TeamUserOption {
     PdfPreviewModalComponent,
     TradingDetailHeaderComponent,
     TradingDetailMetaCardsComponent,
+    CreditApplicationModalComponent,
   ],
   template: `
     <app-trading-detail-header
@@ -250,8 +252,16 @@ interface TeamUserOption {
                 Available: {{ customerCreditSummary()!.available | number : '1.2-2' }}
                 {{ customerCreditSummary()!.currency }} · Max {{ customerCreditSummary()!.maxDays }} days
               </span>
+              @if (!isReadonly()) {
+                <button (click)="showCreditApplicationModal.set(true)"
+                  class="ml-2 text-xs text-brand-600 hover:text-brand-700 underline">Request Increase</button>
+              }
             } @else {
               <span>No credit line on file.</span>
+              @if (!isReadonly()) {
+                <button (click)="showCreditApplicationModal.set(true)"
+                  class="ml-1 text-xs text-brand-600 hover:text-brand-700 underline">Request Credit</button>
+              }
             }
           </div>
         }
@@ -792,6 +802,19 @@ interface TeamUserOption {
 
     <!-- PDF Preview Modal -->
     <app-pdf-preview-modal [waLinked]="waLinked()" [defaultPhone]="customerContact()?.phone ?? null" (sendWhatsApp)="onSendPdfWhatsApp($event)" />
+
+    <!-- Credit Application Modal -->
+    @if (order()?.clientId) {
+      <app-credit-application-modal
+        [open]="showCreditApplicationModal()"
+        [counterpartyId]="order()!.clientId"
+        [counterpartyName]="clientName()"
+        [orderId]="orderId()"
+        defaultType="CUSTOMER"
+        (closed)="showCreditApplicationModal.set(false)"
+        (submitted)="onCreditApplicationSubmitted()"
+      />
+    }
   `,
   styles: [
     `
@@ -2591,6 +2614,15 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
       return;
     }
     this.openPaymentModal();
+  }
+
+  // ─── Credit Application ──────────────────────────────────────────
+
+  readonly showCreditApplicationModal = signal(false);
+
+  onCreditApplicationSubmitted(): void {
+    // Reload credit lines after application is submitted
+    this.loadCustomerCreditLines(this.order()?.clientId);
   }
 
   // ─── Toast ───────────────────────────────────────────────────────
