@@ -341,12 +341,13 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   private readonly newInquiryModal = inject(NewInquiryModalService);
   private queryParamSub?: Subscription;
 
-  readonly mode = input<'inquiries' | 'active-orders' | 'completed-orders' | 'cancelled-orders'>('inquiries');
+  readonly mode = input<'inquiries' | 'active-orders' | 'completed-orders' | 'cancelled-orders' | undefined>('inquiries');
+  readonly resolvedMode = computed(() => this.mode() ?? 'inquiries');
 
-  readonly isOrders = computed(() => this.mode() !== 'inquiries');
-  readonly isActiveOrders = computed(() => this.mode() === 'active-orders');
-  readonly isCompletedOrders = computed(() => this.mode() === 'completed-orders');
-  readonly isCancelledOrders = computed(() => this.mode() === 'cancelled-orders');
+  readonly isOrders = computed(() => this.resolvedMode() !== 'inquiries');
+  readonly isActiveOrders = computed(() => this.resolvedMode() === 'active-orders');
+  readonly isCompletedOrders = computed(() => this.resolvedMode() === 'completed-orders');
+  readonly isCancelledOrders = computed(() => this.resolvedMode() === 'cancelled-orders');
   readonly baseRoute = computed(() => (
     this.isActiveOrders()
       ? '/trading/orders'
@@ -445,20 +446,22 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   );
   private lastHandledNewInquiryRequestId = 0;
 
+  constructor() {
+    effect(() => {
+      const requestId = this.newInquiryModal.requestId();
+      if (requestId > this.lastHandledNewInquiryRequestId) {
+        this.showNewInquiryModal.set(true);
+        this.lastHandledNewInquiryRequestId = requestId;
+      }
+    });
+  }
+
   // ─── Lifecycle ────────────────────────────────────────────────────
 
   ngOnInit(): void {
     this.loadInquiries();
     if (!this.isOrders()) {
       this.loadDropdownData();
-
-      effect(() => {
-        const requestId = this.newInquiryModal.requestId();
-        if (requestId > this.lastHandledNewInquiryRequestId) {
-          this.showNewInquiryModal.set(true);
-          this.lastHandledNewInquiryRequestId = requestId;
-        }
-      });
 
       // Auto-open modal when navigated with ?new=1 (e.g. from navbar button)
       this.queryParamSub = this.route.queryParamMap.subscribe((params) => {

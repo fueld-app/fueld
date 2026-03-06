@@ -759,10 +759,12 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
   openNewInquiry(): void {
     this.newInquiryModal.requestOpen();
-
-    if (this.router.url.split('?')[0] !== '/trading/inquiries') {
-      this.router.navigate(['/trading/inquiries']);
-    }
+    this.router.navigate(['/trading/inquiries'], {
+      queryParams: {
+        new: '1',
+        requestId: String(Date.now()),
+      },
+    });
   }
 
   readonly openGroups = signal<Set<string>>(new Set());
