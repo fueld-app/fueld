@@ -1,4 +1,5 @@
 import postgres from 'postgres';
+import { drizzle } from 'drizzle-orm/postgres-js';
 import * as schema from '../../src/db/schema';
 import { existsSync } from 'fs';
 import { join } from 'path';
@@ -75,6 +76,15 @@ function getSql() {
   return sql!;
 }
 
+let dbInstance: ReturnType<typeof drizzle<typeof schema>> | undefined;
+
+function getDbInstance() {
+  if (!dbInstance) {
+    dbInstance = drizzle(getSql(), { schema });
+  }
+  return dbInstance;
+}
+
 function getTruncateTables() {
   return [
     'activity_logs',
@@ -135,9 +145,7 @@ function resolveMigrationsDir(): string {
 async function ensureMigrationsApplied(): Promise<void> {
   if (!migrationsPromise) {
     migrationsPromise = (async () => {
-      // Import the real app DB so migrations use the same driver/config as production.
-      const { db } = await import('../../src/db');
-      await migrate(db, { migrationsFolder: resolveMigrationsDir() });
+      await migrate(getDbInstance(), { migrationsFolder: resolveMigrationsDir() });
     })();
   }
 
@@ -381,7 +389,7 @@ export async function closeDb(): Promise<void> {
 }
 
 export async function seedBasics() {
-  const { db } = await import('../../src/db');
+  const db = getDbInstance();
   const [tenant] = await db
     .insert(schema.tenants)
     .values({ name: 'Test Tenant', domain: 'test.local' })
@@ -435,7 +443,7 @@ export const TEST_PASSWORD = 'Passw0rd!';
 
 export async function seedAuthBasics(password = TEST_PASSWORD) {
   const seeded = await seedBasics();
-  const { db } = await import('../../src/db');
+  const db = getDbInstance();
   const { users } = await import('../../src/db/schema');
   const { eq } = await import('drizzle-orm');
   const { hashPassword } = await import('../../src/modules/auth/password.service');
@@ -449,6 +457,5 @@ export async function seedAuthBasics(password = TEST_PASSWORD) {
 }
 
 export async function getDb() {
-  const { db } = await import('../../src/db');
-  return db;
+  return getDbInstance();
 }

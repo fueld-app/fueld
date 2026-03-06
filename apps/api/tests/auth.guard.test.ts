@@ -3,11 +3,8 @@ import { Elysia } from 'elysia';
 import { eq } from 'drizzle-orm';
 import { users } from '../src/db/schema';
 import { getDb, seedBasics, truncateAll } from './helpers/db';
+import { authGuard } from '../src/modules/auth/auth.guard';
 import { jwtAccessPlugin } from '../src/modules/auth/jwt.setup';
-
-async function loadAuthGuard() {
-  return import('../src/modules/auth/auth.guard');
-}
 
 async function signAccessToken(payload: Record<string, unknown>): Promise<string> {
   const app = new Elysia()
@@ -19,7 +16,6 @@ async function signAccessToken(payload: Record<string, unknown>): Promise<string
 }
 
 async function buildApp() {
-  const { authGuard } = await loadAuthGuard();
   return new Elysia()
     .use(authGuard)
     .get('/protected', ({ auth }) => ({

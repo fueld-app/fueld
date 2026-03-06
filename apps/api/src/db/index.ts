@@ -2,7 +2,23 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from './schema';
 
-const DATABASE_URL = process.env['TEST_DATABASE_URL'] ?? process.env['DATABASE_URL'];
+const DEFAULT_TEST_DATABASE_URL = 'postgres://fueld:fueld@localhost:5432/fueld_test';
+
+function resolveDatabaseUrl(): string | undefined {
+  const explicit = process.env['TEST_DATABASE_URL'] ?? process.env['DATABASE_URL'];
+  if (explicit) return explicit;
+
+  const isRunningTests = process.argv.includes('test') || process.argv.some((arg) => arg.endsWith('.test.ts'));
+  if (isRunningTests) {
+    process.env['NODE_ENV'] = process.env['NODE_ENV'] ?? 'test';
+    process.env['DATABASE_URL'] = DEFAULT_TEST_DATABASE_URL;
+    return DEFAULT_TEST_DATABASE_URL;
+  }
+
+  return undefined;
+}
+
+const DATABASE_URL = resolveDatabaseUrl();
 
 if (!DATABASE_URL) {
   throw new Error('DATABASE_URL environment variable is required');
