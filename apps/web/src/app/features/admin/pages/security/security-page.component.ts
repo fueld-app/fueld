@@ -1,11 +1,14 @@
 import {
   Component,
   ChangeDetectionStrategy,
+  computed,
   signal,
   inject,
   OnInit,
+  ElementRef,
+  viewChild,
 } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -379,21 +382,53 @@ import { API } from '@app/core/config/api';
               <!-- Approved domains -->
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Approved email domains</label>
-                <input
-                  type="text"
-                  [ngModel]="approvedDomainsInput()"
-                  (ngModelChange)="approvedDomainsInput.set($event)"
-                  name="approvedDomains"
-                  placeholder="e.g. thebunkerfirm.com, fueld.com"
-                  class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                />
-                <p class="mt-1 text-xs text-gray-500">Comma-separated list of allowed email domains. Leave empty to allow any domain.</p>
+                <div
+                  class="flex min-h-[42px] w-full flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors"
+                  [class]="approvedDomainsError() ? 'border-red-300 bg-red-50/30' : approvedDomainsFocused() ? 'border-brand-500 ring-1 ring-brand-500' : 'border-gray-300'"
+                  (click)="focusApprovedDomainsInput()"
+                >
+                  @for (domain of approvedDomains(); track domain) {
+                    <span class="inline-flex max-w-full items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
+                      <span class="truncate">{{ domain }}</span>
+                      <button
+                        type="button"
+                        class="inline-flex h-4 w-4 items-center justify-center rounded-full text-blue-500 transition hover:bg-blue-100 hover:text-blue-700"
+                        (click)="removeApprovedDomain(domain); $event.stopPropagation()"
+                        [disabled]="saving()"
+                        aria-label="Remove approved domain"
+                      >
+                        <svg class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+                        </svg>
+                      </button>
+                    </span>
+                  }
+
+                  <input
+                    #approvedDomainInputEl
+                    type="text"
+                    [ngModel]="approvedDomainsDraft()"
+                    (ngModelChange)="onApprovedDomainsDraftChange($event)"
+                    (focus)="approvedDomainsFocused.set(true)"
+                    (blur)="approvedDomainsFocused.set(false); commitApprovedDomainsDraft()"
+                    (keydown)="onApprovedDomainsKeydown($event)"
+                    (paste)="onApprovedDomainsPaste($event)"
+                    name="approvedDomains"
+                    placeholder="{{ approvedDomains().length === 0 ? 'Type a domain and press Enter' : 'Add another domain' }}"
+                    class="min-w-[180px] flex-1 border-none bg-transparent p-0 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-0"
+                  />
+                </div>
+                @if (approvedDomainsError()) {
+                  <p class="mt-1 text-xs text-red-600">{{ approvedDomainsError() }}</p>
+                } @else {
+                  <p class="mt-1 text-xs text-gray-500">Press Enter, comma, or paste a list to add domains. Leave empty to allow any domain.</p>
+                }
               </div>
             </div>
             <div class="border-t border-gray-100 px-6 py-3 bg-gray-50/50 flex justify-end">
               <button
                 (click)="saveMicrosoftPolicy()"
-                [disabled]="saving()"
+                [disabled]="saving() || hasApprovedDomainsValidationError()"
                 class="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
               >
                 {{ saving() ? 'Saving...' : 'Save Email Policy' }}
@@ -440,7 +475,13 @@ export class SecurityPageComponent implements OnInit {
 
   // Microsoft Email Policy
   readonly microsoftForceEmail = signal(false);
-  readonly approvedDomainsInput = signal('');
+  readonly approvedDomains = signal<string[]>([]);
+  readonly approvedDomainsDraft = signal('');
+  readonly approvedDomainsError = signal<string | null>(null);
+  readonly approvedDomainsFocused = signal(false);
+  readonly hasApprovedDomainsValidationError = computed(() => this.approvedDomainsError() !== null);
+
+  private readonly approvedDomainInputEl = viewChild<ElementRef<HTMLInputElement>>('approvedDomainInputEl');
 
   ngOnInit(): void {
     this.loadSettings();
@@ -463,7 +504,9 @@ export class SecurityPageComponent implements OnInit {
         this.sessionTimeoutMinutes.set(res.data.sessionTimeoutMinutes);
         this.documentVerificationLinkExpiryDays.set(res.data.documentVerificationLinkExpiryDays ?? 0);
         this.microsoftForceEmail.set(res.data.microsoftConnectForceUserEmail ?? false);
-        this.approvedDomainsInput.set((res.data.approvedEmailDomains ?? []).join(', '));
+        this.approvedDomains.set([...(res.data.approvedEmailDomains ?? [])].map((domain) => domain.trim().toLowerCase()));
+        this.approvedDomainsDraft.set('');
+        this.approvedDomainsError.set(null);
       }
     } catch {
       // silent
@@ -538,24 +581,107 @@ export class SecurityPageComponent implements OnInit {
   }
 
   async saveMicrosoftPolicy(): Promise<void> {
+    if (!this.commitApprovedDomainsDraft()) {
+      this.focusApprovedDomainsInput();
+      return;
+    }
+
     this.saving.set(true);
     try {
-      const domains = this.approvedDomainsInput()
-        .split(',')
-        .map((d) => d.trim())
-        .filter((d) => d.length > 0);
       await firstValueFrom(
         this.http.put(`${API}/admin/security`, {
           microsoftConnectForceUserEmail: this.microsoftForceEmail(),
-          approvedEmailDomains: domains,
+          approvedEmailDomains: this.approvedDomains(),
         }),
       );
       this.showSuccess();
-    } catch {
-      // silent
+    } catch (error) {
+      const message = error instanceof HttpErrorResponse
+        ? error.error?.message
+        : null;
+      if (typeof message === 'string' && message.length > 0) {
+        this.approvedDomainsError.set(message);
+      }
     } finally {
       this.saving.set(false);
     }
+  }
+
+  focusApprovedDomainsInput(): void {
+    this.approvedDomainInputEl()?.nativeElement?.focus();
+  }
+
+  onApprovedDomainsDraftChange(value: string): void {
+    this.approvedDomainsDraft.set(value);
+    this.approvedDomainsError.set(this.getApprovedDomainValidationMessage(value));
+  }
+
+  onApprovedDomainsKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Enter' || event.key === ',' || event.key === 'Tab') {
+      event.preventDefault();
+      this.commitApprovedDomainsDraft();
+      return;
+    }
+
+    if (event.key === 'Backspace' && this.approvedDomainsDraft().trim() === '') {
+      const domains = this.approvedDomains();
+      if (domains.length > 0) {
+        this.removeApprovedDomain(domains[domains.length - 1]);
+      }
+    }
+  }
+
+  onApprovedDomainsPaste(event: ClipboardEvent): void {
+    const pastedText = event.clipboardData?.getData('text')?.trim() ?? '';
+    if (!pastedText || !/[\n,;]/.test(pastedText)) {
+      return;
+    }
+
+    event.preventDefault();
+    const entries = pastedText
+      .split(/[\n,;]+/)
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0);
+
+    for (const entry of entries) {
+      if (!this.addApprovedDomain(entry)) {
+        this.approvedDomainsDraft.set(entry);
+        return;
+      }
+    }
+
+    this.approvedDomainsDraft.set('');
+    this.approvedDomainsError.set(null);
+  }
+
+  removeApprovedDomain(domain: string): void {
+    this.approvedDomains.update((domains) => domains.filter((item) => item !== domain));
+    this.approvedDomainsError.set(this.getApprovedDomainValidationMessage(this.approvedDomainsDraft()));
+  }
+
+  commitApprovedDomainsDraft(): boolean {
+    const rawValue = this.approvedDomainsDraft();
+    const entries = rawValue
+      .split(/[\n,;]+/)
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0);
+
+    if (entries.length === 0) {
+      this.approvedDomainsDraft.set('');
+      this.approvedDomainsError.set(null);
+      return true;
+    }
+
+    for (const entry of entries) {
+      if (!this.addApprovedDomain(entry)) {
+        this.approvedDomainsDraft.set(entry);
+        return false;
+      }
+    }
+
+    this.approvedDomainsDraft.set('');
+    this.approvedDomainsError.set(null);
+    return true;
   }
 
   formatDuration(minutes: number): string {
@@ -568,5 +694,53 @@ export class SecurityPageComponent implements OnInit {
   private showSuccess(): void {
     this.saveSuccess.set(true);
     setTimeout(() => this.saveSuccess.set(false), 3000);
+  }
+
+  private addApprovedDomain(value: string): boolean {
+    const message = this.getApprovedDomainValidationMessage(value);
+    if (message) {
+      this.approvedDomainsError.set(message);
+      return false;
+    }
+
+    const normalized = this.normalizeApprovedDomain(value);
+    this.approvedDomains.update((domains) => [...domains, normalized]);
+    this.approvedDomainsError.set(null);
+    return true;
+  }
+
+  private getApprovedDomainValidationMessage(value: string): string | null {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    const normalized = this.normalizeApprovedDomain(trimmed);
+
+    if (normalized.includes('://')) {
+      return 'Enter only the domain, without http:// or https://.';
+    }
+
+    if (normalized.includes('@')) {
+      return 'Enter only the domain, not a full email address.';
+    }
+
+    if (/\s|\//.test(normalized)) {
+      return 'Enter a valid domain like example.com.';
+    }
+
+    if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i.test(normalized)) {
+      return 'Enter a valid domain like example.com.';
+    }
+
+    if (this.approvedDomains().includes(normalized)) {
+      return 'This domain has already been added.';
+    }
+
+    return null;
+  }
+
+  private normalizeApprovedDomain(value: string): string {
+    return value.trim().toLowerCase().replace(/^@/, '').replace(/\.+$/, '');
   }
 }

@@ -9,6 +9,16 @@ import { db } from '../../db';
 import { tenants, type TenantSettings } from '../../db/schema';
 import type { ApiResponse, SecuritySettingsDto } from '@fueld/types';
 
+function normalizeApprovedEmailDomain(domain: string): string {
+  return domain.trim().toLowerCase().replace(/^@/, '').replace(/\.+$/, '');
+}
+
+function isValidApprovedEmailDomain(domain: string): boolean {
+  if (!domain || domain.includes('@') || domain.includes('://')) return false;
+  if (/\s|\//.test(domain)) return false;
+  return /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i.test(domain);
+}
+
 /** Read security settings from tenant (never exposes secrets). */
 async function getSecuritySettings(): Promise<SecuritySettingsDto> {
   const tenant = await db.query.tenants.findFirst();
@@ -106,12 +116,21 @@ export const securityController = new Elysia({ prefix: '/admin/security' })
         patch.documentVerificationLinkExpiryDays = Math.max(0, Math.min(3650, body.documentVerificationLinkExpiryDays));
       }
       if (body.approvedEmailDomains !== undefined) {
-        // Trim, lowercase, deduplicate, strip leading @
-        patch.approvedEmailDomains = [...new Set(
-          body.approvedEmailDomains
-            .map((d: string) => d.trim().toLowerCase().replace(/^@/, ''))
-            .filter((d: string) => d.length > 0),
-        )];
+        const domains = body.approvedEmailDomains
+          .map((d: string) => normalizeApprovedEmailDomain(d))
+          .filter((d: string) => d.length > 0);
+
+        const invalidDomain = domains.find((domain) => !isValidApprovedEmailDomain(domain));
+        if (invalidDomain) {
+          set.status = 400;
+          return {
+            success: false,
+            data: null as any,
+            message: `Invalid approved email domain: ${invalidDomain}`,
+          };
+        }
+
+        patch.approvedEmailDomains = [...new Set(domains)];
       }
       if (body.microsoftConnectForceUserEmail !== undefined) {
         patch.microsoftConnectForceUserEmail = body.microsoftConnectForceUserEmail;
