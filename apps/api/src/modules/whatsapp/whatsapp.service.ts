@@ -421,6 +421,56 @@ export async function listWhatsAppGroups(userId: string): Promise<WhatsAppGroup[
 
 // ─── Send Message ────────────────────────────────────────────────────
 
+/**
+ * Send a WhatsApp message to a group by its JID.
+ * Uses the specified user's connected session.
+ * If the user doesn't have a session, tries any connected session.
+ */
+export async function sendWhatsAppGroupMessage(
+  userId: string,
+  groupJid: string,
+  text: string,
+): Promise<{ success: boolean; message: string }> {
+  // Find a connected session — prefer the specified user, then fall back to any
+  let conn = connections.get(userId);
+  if (!conn || conn.status !== 'connected') {
+    // Try to reconnect the specified user first
+    try {
+      const result = await startWhatsAppSession(userId);
+      if (result.status === 'connected') {
+        conn = connections.get(userId);
+      }
+    } catch {}
+
+    // Fall back to any connected session
+    if (!conn || conn.status !== 'connected') {
+      for (const [, c] of connections) {
+        if (c.status === 'connected' && c.socket) {
+          conn = c;
+          break;
+        }
+      }
+    }
+  }
+
+  if (!conn?.socket) {
+    return { success: false, message: 'No WhatsApp session connected. Cannot send group message.' };
+  }
+
+  // Ensure the JID ends with @g.us (bail if it's invalid)
+  if (!groupJid.endsWith('@g.us')) {
+    return { success: false, message: `Invalid group JID: ${groupJid}` };
+  }
+
+  try {
+    await conn.socket.sendMessage(groupJid, { text });
+    return { success: true, message: `Group message sent to ${groupJid}` };
+  } catch (err: any) {
+    console.error(`[WhatsApp] Failed to send group message to ${groupJid}:`, err.message);
+    return { success: false, message: err?.message ?? 'Failed to send group message' };
+  }
+}
+
 export async function sendWhatsAppMessage(
   userId: string,
   recipientPhone: string,

@@ -46,6 +46,7 @@ import { firstValueFrom } from 'rxjs';
 import { CommentsCardComponent } from '../../../../shared/components/comments-card/comments-card.component';
 import { PdfPreviewModalComponent } from '../../../../shared/components/pdf-preview-modal/pdf-preview-modal.component';
 import { ActivityTimelineComponent } from '../../../../shared/components/activity-timeline/activity-timeline.component';
+import { EmailHistoryCardComponent } from '../../../../shared/components/email-history-card/email-history-card.component';
 import { TradingDetailHeaderComponent } from '../../components/detail-header/detail-header.component';
 import { TradingDetailMetaCardsComponent } from '../../components/detail-meta-cards/detail-meta-cards.component';
 import { AuthService } from '../../../../core/auth/auth.service';
@@ -75,6 +76,7 @@ interface TeamUserOption {
     SendInquiryModalComponent,
     CommentsCardComponent,
     ActivityTimelineComponent,
+    EmailHistoryCardComponent,
     PdfPreviewModalComponent,
     TradingDetailHeaderComponent,
     TradingDetailMetaCardsComponent,
@@ -561,7 +563,8 @@ interface TeamUserOption {
         }
       </div>
       @if (order()?.id) {
-        <div class="mt-6">
+        <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <app-email-history-card [orderId]="order()!.id" />
           <app-activity-timeline entityType="order" [entityId]="order()!.id" />
         </div>
       }

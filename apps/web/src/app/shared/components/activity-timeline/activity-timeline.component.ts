@@ -83,6 +83,11 @@ interface ActivityItem {
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022 1.005 11.36A2.75 2.75 0 0 0 7.765 20h4.47a2.75 2.75 0 0 0 2.742-2.53l.954-10.788c.793-.122 1.577-.221 2.367-.298a.75.75 0 0 0-.23-1.482c-.781.122-1.57.22-2.365.298v-.443A2.75 2.75 0 0 0 12.75 1h-4Z" clip-rule="evenodd" />
                   </svg>
+                } @else if (item.action === 'EMAIL_SENT') {
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M3 4a2 2 0 0 0-2 2v1.161l8.441 4.221a1.25 1.25 0 0 0 1.118 0L19 7.162V6a2 2 0 0 0-2-2H3Z" />
+                    <path d="m19 8.839-7.77 3.885a2.75 2.75 0 0 1-2.46 0L1 8.839V14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.839Z" />
+                  </svg>
                 } @else {
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
                     <path d="M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />
@@ -275,6 +280,8 @@ export class ActivityTimelineComponent implements OnInit, OnDestroy {
         return 'printed this page';
       case 'SCREENSHOT':
         return 'took a screenshot';
+      case 'EMAIL_SENT':
+        return 'sent an email';
       default:
         return action.toLowerCase();
     }
@@ -287,6 +294,12 @@ export class ActivityTimelineComponent implements OnInit, OnDestroy {
     field: 'Field',
     responsibleUserId: 'User',
     contactId: 'Contact',
+    documentType: 'Type',
+    recipientEmail: 'To',
+    recipients: 'Suppliers',
+    channel: 'Channel',
+    subject: 'Subject',
+    count: 'Count',
   };
 
   private readonly META_SKIP = new Set(['httpMethod', 'httpPath', 'userAgent', 'clientIp']);
@@ -311,6 +324,8 @@ export class ActivityTimelineComponent implements OnInit, OnDestroy {
         return 'bg-blue-100 text-blue-600';
       case 'DELETE':
         return 'bg-red-100 text-red-600';
+      case 'EMAIL_SENT':
+        return 'bg-indigo-100 text-indigo-600';
       default:
         return 'bg-gray-100 text-gray-500';
     }
@@ -330,6 +345,8 @@ export class ActivityTimelineComponent implements OnInit, OnDestroy {
         return 'bg-rose-50 text-rose-700';
       case 'VIEW':
         return 'bg-gray-100 text-gray-600';
+      case 'EMAIL_SENT':
+        return 'bg-indigo-50 text-indigo-700';
       default:
         return 'bg-gray-100 text-gray-600';
     }

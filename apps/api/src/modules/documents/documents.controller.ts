@@ -1,13 +1,14 @@
 import { Elysia, t } from 'elysia';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, desc, inArray } from 'drizzle-orm';
 import { authGuard } from '../auth/auth.guard';
 import { generateNominationPdfBuffer, generateOrderInvoicePdfBuffer, generateOfferPdfBuffer, generateProformaInvoicePdfBuffer, tryLoadLogoDataUrl } from './document.service';
 import { sendDocumentEmail, buildDocumentEmailHtml, buildDocumentEmailSubject, buildInquiryEmailHtml, type DocumentEmailType } from './mail.service';
 import { resolveOrderId, getOrderById } from '../orders/orders.service';
 import { getPortSuppliers } from '../lloyds/lli.service';
+import { logActivity } from '../activity/activity.service';
+import { sendWhatsAppGroupMessage } from '../whatsapp/whatsapp.service';
 import { db } from '../../db';
-import { users, counterparties, invoices as invoicesTable, companyContacts, companyEmails, supplierInquiries, portSuppliers } from '../../db/schema';
-import { inArray } from 'drizzle-orm';
+import { users, counterparties, invoices as invoicesTable, companyContacts, companyEmails, supplierInquiries, portSuppliers, emailLog, tenants } from '../../db/schema';
 import { getEmailTemplate, getApplicableEmailRules, renderTemplate, type TemplateVariables } from '../admin/email-settings.service';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -247,6 +248,20 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         pdfBuffer,
         pdfFileName,
       });
+
+      // Log to activity timeline
+      logActivity({
+        userId: auth.userId,
+        action: 'EMAIL_SENT',
+        entityType: 'order',
+        entityId: orderId,
+        metadata: {
+          documentType: docType,
+          recipientEmail: body.recipientEmail,
+          channel,
+          subject: body.subject,
+        },
+      }).catch(() => {});
 
       return {
         success: true,
@@ -803,6 +818,14 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       const senderName = sender?.name ?? 'Fueld User';
       const senderEmail = auth.email;
 
+      // Check if this is the first inquiry batch for this order (for WhatsApp notification)
+      const existingInquiries = await db
+        .select({ id: supplierInquiries.id })
+        .from(supplierInquiries)
+        .where(eq(supplierInquiries.orderId, orderId))
+        .limit(1);
+      const isFirstInquiry = existingInquiries.length === 0;
+
       // Apply CC/BCC rules for INQUIRY type
       const ccEmails: string[] = [];
       const bccEmails: string[] = [];
@@ -865,6 +888,67 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       }
 
       const successCount = results.filter(r => r.success).length;
+      const successfulSuppliers = results.filter(r => r.success);
+
+      // Log to activity timeline
+      if (successCount > 0) {
+        logActivity({
+          userId: auth.userId,
+          action: 'EMAIL_SENT',
+          entityType: 'order',
+          entityId: orderId,
+          metadata: {
+            documentType: 'INQUIRY',
+            recipients: successfulSuppliers.map(s => s.supplierName).join(', '),
+            count: successCount,
+            subject: body.subject,
+          },
+        }).catch(() => {});
+      }
+
+      // Send WhatsApp group notification on first inquiry (configurable)
+      if (isFirstInquiry && successCount > 0) {
+        try {
+          const [tenant] = await db
+            .select({ settings: tenants.settings })
+            .from(tenants)
+            .where(eq(tenants.id, auth.tenantId))
+            .limit(1);
+          const settings = tenant?.settings as any;
+          const groupJid = settings?.whatsappDefaultGroupJid;
+          const waEnabled = settings?.whatsappEnabled !== false;
+
+          if (waEnabled && groupJid) {
+            const vesselName = order.vessel?.name ?? 'Unknown Vessel';
+            const vesselImo = order.vessel?.imo ? ` (IMO: ${order.vessel.imo})` : '';
+            const portName = order.place?.name ?? 'Unknown Port';
+            const supplierList = successfulSuppliers.map(s => s.supplierName).join(', ');
+            const productLines = order.items.map((i: any) => `  • ${i.quantity} ${i.unit} ${i.productType}${i.description ? ' – ' + i.description : ''}`).join('\n');
+
+            const waText = [
+              `📋 *Inquiry Sent*`,
+              ``,
+              `*Vessel:* ${vesselName}${vesselImo}`,
+              `*Port:* ${portName}`,
+              order.eta ? `*ETA:* ${new Date(order.eta).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}` : null,
+              order.etd ? `*ETD:* ${new Date(order.etd).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}` : null,
+              ``,
+              `*Products:*`,
+              productLines,
+              ``,
+              `*Suppliers (${successCount}):* ${supplierList}`,
+              `*Sent by:* ${senderName}`,
+            ].filter(Boolean).join('\n');
+
+            sendWhatsAppGroupMessage(auth.userId, groupJid, waText).catch((err) => {
+              console.error('[Documents] Failed to send WhatsApp group notification:', err);
+            });
+          }
+        } catch (err) {
+          console.error('[Documents] Failed to check WhatsApp group settings:', err);
+        }
+      }
+
       return {
         success: true,
         message: `Sent inquiry to ${successCount}/${results.length} suppliers`,
@@ -929,6 +1013,53 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       detail: {
         tags: ['Documents'],
         summary: 'List sent supplier inquiries for this order',
+        security: [{ bearerAuth: [] }],
+      },
+    },
+  )
+
+  // ── GET /orders/:id/email-log ─────────────────────────────────────
+  // Full email history for this order (all document types)
+  .get(
+    '/:id/email-log',
+    async ({ params, set }) => {
+      const orderId = await resolveOrderId(params.id);
+      if (!orderId) { set.status = 404; return { success: false, message: 'Order not found' }; }
+
+      const rows = await db
+        .select({
+          id: emailLog.id,
+          documentType: emailLog.documentType,
+          sentFromEmail: emailLog.sentFromEmail,
+          sentTo: emailLog.sentTo,
+          ccEmails: emailLog.ccEmails,
+          subject: emailLog.subject,
+          pdfFileName: emailLog.pdfFileName,
+          channel: emailLog.channel,
+          status: emailLog.status,
+          errorMessage: emailLog.errorMessage,
+          sentByUserId: emailLog.sentByUserId,
+          sentByName: users.name,
+          createdAt: emailLog.createdAt,
+        })
+        .from(emailLog)
+        .leftJoin(users, eq(emailLog.sentByUserId, users.id))
+        .where(eq(emailLog.orderId, orderId))
+        .orderBy(desc(emailLog.createdAt));
+
+      return {
+        success: true,
+        data: rows.map(r => ({
+          ...r,
+          createdAt: r.createdAt.toISOString(),
+        })),
+      };
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: {
+        tags: ['Documents'],
+        summary: 'Get all email log entries for this order',
         security: [{ bearerAuth: [] }],
       },
     },
