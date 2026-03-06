@@ -89,6 +89,27 @@ async function main(): Promise<void> {
     )[0]!;
   }
 
+  // Defensive re-read: some local test DB states can have stale assumptions
+  // after repeated truncate/seed cycles. Always confirm the tenant row exists
+  // before inserting any users that reference it.
+  let confirmedTenant = await db.query.tenants.findFirst({
+    where: eq(schema.tenants.id, tenant.id),
+  });
+
+  if (!confirmedTenant) {
+    confirmedTenant = (
+      await db
+        .insert(schema.tenants)
+        .values({
+          name: tenantName,
+          domain: `${tenantDomain}-${Date.now()}`,
+        })
+        .returning()
+    )[0]!;
+  }
+
+  tenant = confirmedTenant;
+
   const passwordHash = await hashPassword(password);
   const admin2PasswordHash = await hashPassword(admin2Password);
   const admin3PasswordHash = await hashPassword(admin3Password);

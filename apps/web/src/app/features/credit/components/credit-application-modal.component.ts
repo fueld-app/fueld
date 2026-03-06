@@ -58,7 +58,7 @@ import { API } from '@app/core/config/api';
                 <!-- Amount -->
                 <div>
                   <label class="block text-sm font-medium text-gray-700">Requested Amount *</label>
-                  <input type="number" step="0.01" [ngModel]="amount()" (ngModelChange)="amount.set($event)"
+                  <input type="number" step="0.01" [ngModel]="amount()" (ngModelChange)="amount.set(normalizeAmountInput($event))"
                     placeholder="100000"
                     class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
                 </div>
@@ -78,7 +78,7 @@ import { API } from '@app/core/config/api';
               <!-- Days -->
               <div>
                 <label class="block text-sm font-medium text-gray-700">Credit Period (days)</label>
-                <input type="number" [ngModel]="days()" (ngModelChange)="days.set($event)"
+                <input type="number" [ngModel]="days()" (ngModelChange)="days.set(normalizeDaysInput($event))"
                   placeholder="30"
                   class="mt-1 w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
               </div>
@@ -120,6 +120,16 @@ import { API } from '@app/core/config/api';
 })
 export class CreditApplicationModalComponent {
   private readonly http = inject(HttpClient);
+
+  normalizeAmountInput(value: unknown): string {
+    return value == null ? '' : String(value);
+  }
+
+  normalizeDaysInput(value: unknown): number | null {
+    if (value === '' || value == null) return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
 
   /** Whether the modal is visible. */
   readonly open = input(false);
@@ -175,10 +185,10 @@ export class CreditApplicationModalComponent {
       const body: CreateCreditApplicationDto = {
         type: this.type(),
         counterpartyId: this.counterpartyId(),
-        requestedAmount: this.amount(),
+        requestedAmount: String(this.amount()),
         requestedCurrency: this.currency(),
       };
-      if (this.days()) body.requestedDays = this.days()!;
+      if (this.days() !== null && this.days() !== undefined) body.requestedDays = Number(this.days());
       if (this.reason()) body.reason = this.reason();
       if (this.orderId()) body.orderId = this.orderId();
       if (this.creditLineId()) body.creditLineId = this.creditLineId();
