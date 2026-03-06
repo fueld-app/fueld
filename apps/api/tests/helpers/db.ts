@@ -217,7 +217,11 @@ async function ensureTestSchemaCompat(): Promise<void> {
     ADD COLUMN IF NOT EXISTS customer_terms text,
     ADD COLUMN IF NOT EXISTS supplier_terms text,
     ADD COLUMN IF NOT EXISTS company_registration_number text,
-    ADD COLUMN IF NOT EXISTS late_payment_interest text
+    ADD COLUMN IF NOT EXISTS late_payment_interest text,
+    ADD COLUMN IF NOT EXISTS logo_url text,
+    ADD COLUMN IF NOT EXISTS brand_color text,
+    ADD COLUMN IF NOT EXISTS vat_number text,
+    ADD COLUMN IF NOT EXISTS fraud_prevention_text text
   `;
 
   await sql`
