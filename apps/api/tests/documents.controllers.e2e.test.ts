@@ -428,7 +428,7 @@ describe('documents + verify controller e2e', () => {
     expect(String(d?.subject ?? '')).toContain('Invoice');
 
     // HTML body should contain vessel name and branding
-    expect(String(d?.htmlBody ?? '')).toContain('FUELD');
+    expect(String(d?.htmlBody ?? '')).toContain('Fueld');
     expect(String(d?.htmlBody ?? '')).toContain('Dear Customer');
 
     // CC should include sender email

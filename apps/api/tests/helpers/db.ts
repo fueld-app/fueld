@@ -92,6 +92,8 @@ function getTruncateTables() {
     'credit_line_companies',
     'credit_line_counterparties',
     'credit_lines',
+    'supplier_inquiries',
+    'email_rules',
     'order_items',
     'orders',
     'order_number_sequences',
@@ -258,6 +260,33 @@ async function ensureTestSchemaCompat(): Promise<void> {
     ADD COLUMN IF NOT EXISTS microsoft_refresh_token text,
     ADD COLUMN IF NOT EXISTS microsoft_refresh_token_iv text,
     ADD COLUMN IF NOT EXISTS microsoft_refresh_token_auth_tag text
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS email_rules (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      own_company_id uuid REFERENCES counterparties(id) ON DELETE CASCADE,
+      document_type text,
+      rule_type text NOT NULL,
+      email text NOT NULL,
+      label text,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS supplier_inquiries (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      order_id uuid NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+      supplier_id uuid NOT NULL REFERENCES counterparties(id) ON DELETE CASCADE,
+      supplier_name text NOT NULL,
+      supplier_email text NOT NULL,
+      subject text NOT NULL,
+      sent_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )
   `;
 }
 
