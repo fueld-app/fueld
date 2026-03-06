@@ -976,7 +976,7 @@ export async function updateInquiryCancelReasonSettings(reasons: string[]): Prom
 //  WHATSAPP SETTINGS
 // ═══════════════════════════════════════════════════════════════════════
 
-export async function getWhatsAppSettings(): Promise<{ enabled: boolean; defaultGroupJid: string | null; incomingRfqEnabled: boolean }> {
+export async function getWhatsAppSettings(): Promise<{ enabled: boolean; defaultGroupJid: string | null; incomingRfqEnabled: boolean; firstInquiryGroupNotificationEnabled: boolean }> {
   const tenant = await db.query.tenants.findFirst();
   if (!tenant) throw new Error('No tenant found');
 
@@ -985,10 +985,11 @@ export async function getWhatsAppSettings(): Promise<{ enabled: boolean; default
     enabled: settings.whatsappEnabled ?? false,
     defaultGroupJid: settings.whatsappDefaultGroupJid ?? null,
     incomingRfqEnabled: settings.whatsappIncomingRfqEnabled ?? true,
+    firstInquiryGroupNotificationEnabled: settings.whatsappFirstInquiryGroupNotificationEnabled ?? true,
   };
 }
 
-export async function updateWhatsAppSettings(data: { enabled?: boolean; defaultGroupJid?: string | null; incomingRfqEnabled?: boolean }): Promise<{ enabled: boolean; defaultGroupJid: string | null; incomingRfqEnabled: boolean }> {
+export async function updateWhatsAppSettings(data: { enabled?: boolean; defaultGroupJid?: string | null; incomingRfqEnabled?: boolean; firstInquiryGroupNotificationEnabled?: boolean }): Promise<{ enabled: boolean; defaultGroupJid: string | null; incomingRfqEnabled: boolean; firstInquiryGroupNotificationEnabled: boolean }> {
   const tenant = await db.query.tenants.findFirst();
   if (!tenant) throw new Error('No tenant found');
 
@@ -996,6 +997,9 @@ export async function updateWhatsAppSettings(data: { enabled?: boolean; defaultG
   if (data.enabled !== undefined) settings.whatsappEnabled = data.enabled;
   if (data.defaultGroupJid !== undefined) settings.whatsappDefaultGroupJid = data.defaultGroupJid;
   if (data.incomingRfqEnabled !== undefined) settings.whatsappIncomingRfqEnabled = data.incomingRfqEnabled;
+  if (data.firstInquiryGroupNotificationEnabled !== undefined) {
+    settings.whatsappFirstInquiryGroupNotificationEnabled = data.firstInquiryGroupNotificationEnabled;
+  }
 
   await db
     .update(tenants)

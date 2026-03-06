@@ -1188,6 +1188,7 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       enabled: t.Optional(t.Boolean()),
       defaultGroupJid: t.Optional(t.Nullable(t.String())),
       incomingRfqEnabled: t.Optional(t.Boolean()),
+      firstInquiryGroupNotificationEnabled: t.Optional(t.Boolean()),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update WhatsApp integration settings' },
   })

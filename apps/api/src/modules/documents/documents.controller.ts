@@ -919,8 +919,9 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           const settings = tenant?.settings as any;
           const groupJid = settings?.whatsappDefaultGroupJid;
           const waEnabled = settings?.whatsappEnabled !== false;
+          const firstInquiryGroupNotificationEnabled = settings?.whatsappFirstInquiryGroupNotificationEnabled !== false;
 
-          if (waEnabled && groupJid) {
+          if (waEnabled && firstInquiryGroupNotificationEnabled && groupJid) {
             const vesselName = order.vessel?.name ?? 'Unknown Vessel';
             const vesselImo = order.vessel?.imo ? ` (IMO: ${order.vessel.imo})` : '';
             const portName = order.place?.name ?? 'Unknown Port';

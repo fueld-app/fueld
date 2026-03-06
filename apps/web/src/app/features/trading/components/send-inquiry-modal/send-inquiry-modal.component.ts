@@ -11,6 +11,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { DomSanitizer, type SafeHtml } from '@angular/platform-browser';
 import { API_URL } from '@app/core/config/api';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -219,7 +220,7 @@ export interface SendInquiryPayload {
                 <div
                   #bodyEditor
                   contenteditable="true"
-                  class="min-h-[200px] max-h-[300px] overflow-y-auto px-4 py-3 text-sm text-gray-900 focus:outline-none"
+                  class="inquiry-email-canvas min-h-[200px] max-h-[300px] overflow-y-auto px-4 py-3 text-sm text-gray-900 focus:outline-none"
                   (input)="onBodyInput()"
                 ></div>
               </div>
@@ -231,12 +232,8 @@ export interface SendInquiryPayload {
                 <summary class="cursor-pointer text-sm text-gray-500 hover:text-gray-700 select-none">
                   Preview email
                 </summary>
-                <div class="mt-2 border border-gray-200 rounded-lg overflow-hidden">
-                  <iframe
-                    class="w-full border-0"
-                    style="height: 400px"
-                    [srcdoc]="htmlBody()"
-                  ></iframe>
+                <div class="mt-2 rounded-lg border border-gray-200 bg-white p-4">
+                  <div class="inquiry-email-canvas min-h-[200px] overflow-auto" [innerHTML]="previewHtml()"></div>
                 </div>
               </details>
             }
@@ -305,10 +302,21 @@ export interface SendInquiryPayload {
       background-color: #e5e7eb;
       color: #111827;
     }
+    .inquiry-email-canvas {
+      word-break: break-word;
+    }
+    .inquiry-email-canvas :where(img) {
+      max-width: 100%;
+      height: auto;
+    }
+    .inquiry-email-canvas :where(table) {
+      max-width: 100%;
+    }
   `],
 })
 export class SendInquiryModalComponent {
   private readonly http = inject(HttpClient);
+  private readonly sanitizer = inject(DomSanitizer);
 
   readonly orderId = input.required<string>();
   readonly portName = input<string>('');
@@ -322,6 +330,7 @@ export class SendInquiryModalComponent {
   readonly suppliers = signal<SupplierRow[]>([]);
   readonly subject = signal('');
   readonly htmlBody = signal('');
+  readonly previewHtml = computed<SafeHtml>(() => this.sanitizer.bypassSecurityTrustHtml(this.htmlBody()));
 
   readonly bodyEditor = viewChild<ElementRef<HTMLDivElement>>('bodyEditor');
 

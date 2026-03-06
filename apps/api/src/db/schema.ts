@@ -125,6 +125,7 @@ export interface TenantSettings {
   whatsappEnabled?: boolean;
   whatsappDefaultGroupJid?: string | null;
   whatsappIncomingRfqEnabled?: boolean;
+  whatsappFirstInquiryGroupNotificationEnabled?: boolean;
   // Credit applications
   creditApplicationSettings?: {
     requiredApprovals: number;          // how many credit managers must approve (default 1)

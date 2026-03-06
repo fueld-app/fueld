@@ -798,12 +798,34 @@ import { API } from '@app/core/config/api';
                 </div>
               }
 
+              @if (waEnabled()) {
+                <div class="mt-4 flex items-center justify-between">
+                  <div>
+                    <p class="text-sm font-medium text-gray-900">Share first inquiry to group</p>
+                    <p class="text-xs text-gray-500">Post the first successful inquiry batch to the configured default WhatsApp group.</p>
+                  </div>
+                  <button
+                    (click)="toggleWaFirstInquiryGroupNotification()"
+                    [disabled]="waSaving()"
+                    [class]="waFirstInquiryGroupNotificationEnabled()
+                      ? 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-green-500 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50'
+                      : 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50'"
+                  >
+                    <span
+                      [class]="waFirstInquiryGroupNotificationEnabled()
+                        ? 'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out translate-x-5'
+                        : 'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out translate-x-0'"
+                    ></span>
+                  </button>
+                </div>
+              }
+
               <!-- Default Group picker (visible when enabled) -->
               @if (waEnabled()) {
                 <div class="mt-5 border-t border-gray-100 pt-5">
                   <label class="block text-sm font-medium text-gray-700">Default Group</label>
                   <p class="mt-0.5 text-xs text-gray-500">
-                    WhatsApp group for automatic RFQ sharing. Requires a user to have WhatsApp linked.
+                    Used when first inquiry sharing is enabled. Requires a user to have WhatsApp linked.
                   </p>
                   <div class="relative mt-2 flex items-center gap-2">
                     <!-- Typeahead input -->
@@ -959,6 +981,7 @@ export class IntegrationsPageComponent implements OnInit {
   // ── WhatsApp ─────────────────────────────────────────────────────
   readonly waEnabled = signal(false);
   readonly waIncomingRfqEnabled = signal(true);
+  readonly waFirstInquiryGroupNotificationEnabled = signal(true);
   readonly waDefaultGroupJid = signal<string | null>(null);
   readonly waGroups = signal<{ jid: string; name: string; participants: number }[]>([]);
   readonly waGroupsLoading = signal(false);
@@ -1030,11 +1053,12 @@ export class IntegrationsPageComponent implements OnInit {
 
       // Load WhatsApp settings
       const waRes = await firstValueFrom(
-        this.http.get<ApiResponse<{ enabled: boolean; defaultGroupJid: string | null; incomingRfqEnabled: boolean }>>(`${API}/admin/settings/whatsapp`),
+        this.http.get<ApiResponse<{ enabled: boolean; defaultGroupJid: string | null; incomingRfqEnabled: boolean; firstInquiryGroupNotificationEnabled: boolean }>>(`${API}/admin/settings/whatsapp`),
       );
       if (waRes.success) {
         this.waEnabled.set(waRes.data.enabled);
         this.waIncomingRfqEnabled.set(waRes.data.incomingRfqEnabled !== false);
+        this.waFirstInquiryGroupNotificationEnabled.set(waRes.data.firstInquiryGroupNotificationEnabled !== false);
         if (waRes.data.enabled) await this.loadWaGroups();
         this.waDefaultGroupJid.set(waRes.data.defaultGroupJid);
         this.syncWaGroupSearchText();
@@ -1326,11 +1350,12 @@ export class IntegrationsPageComponent implements OnInit {
 
     try {
       const res = await firstValueFrom(
-        this.http.put<ApiResponse<{ enabled: boolean; defaultGroupJid: string | null; incomingRfqEnabled: boolean }>>(`${API}/admin/settings/whatsapp`, { enabled }),
+        this.http.put<ApiResponse<{ enabled: boolean; defaultGroupJid: string | null; incomingRfqEnabled: boolean; firstInquiryGroupNotificationEnabled: boolean }>>(`${API}/admin/settings/whatsapp`, { enabled }),
       );
       if (res.success) {
         this.waEnabled.set(res.data.enabled);
         this.waIncomingRfqEnabled.set(res.data.incomingRfqEnabled !== false);
+        this.waFirstInquiryGroupNotificationEnabled.set(res.data.firstInquiryGroupNotificationEnabled !== false);
         this.waDefaultGroupJid.set(res.data.defaultGroupJid);
         this.waSaveSuccess.set(enabled ? 'WhatsApp integration enabled.' : 'WhatsApp integration disabled.');
         if (enabled) this.loadWaGroups();
@@ -1350,11 +1375,12 @@ export class IntegrationsPageComponent implements OnInit {
 
     try {
       const res = await firstValueFrom(
-        this.http.put<ApiResponse<{ enabled: boolean; defaultGroupJid: string | null; incomingRfqEnabled: boolean }>>(`${API}/admin/settings/whatsapp`, { incomingRfqEnabled }),
+        this.http.put<ApiResponse<{ enabled: boolean; defaultGroupJid: string | null; incomingRfqEnabled: boolean; firstInquiryGroupNotificationEnabled: boolean }>>(`${API}/admin/settings/whatsapp`, { incomingRfqEnabled }),
       );
       if (res.success) {
         this.waEnabled.set(res.data.enabled);
         this.waIncomingRfqEnabled.set(res.data.incomingRfqEnabled !== false);
+        this.waFirstInquiryGroupNotificationEnabled.set(res.data.firstInquiryGroupNotificationEnabled !== false);
         this.waDefaultGroupJid.set(res.data.defaultGroupJid);
         this.waSaveSuccess.set(incomingRfqEnabled ? 'Incoming WhatsApp RFQ parsing enabled.' : 'Incoming WhatsApp RFQ parsing disabled.');
       }
@@ -1372,19 +1398,48 @@ export class IntegrationsPageComponent implements OnInit {
 
     try {
       const res = await firstValueFrom(
-        this.http.put<ApiResponse<{ enabled: boolean; defaultGroupJid: string | null; incomingRfqEnabled: boolean }>>(`${API}/admin/settings/whatsapp`, {
+        this.http.put<ApiResponse<{ enabled: boolean; defaultGroupJid: string | null; incomingRfqEnabled: boolean; firstInquiryGroupNotificationEnabled: boolean }>>(`${API}/admin/settings/whatsapp`, {
           defaultGroupJid: jid || null,
         }),
       );
       if (res.success) {
         this.waEnabled.set(res.data.enabled);
         this.waIncomingRfqEnabled.set(res.data.incomingRfqEnabled !== false);
+        this.waFirstInquiryGroupNotificationEnabled.set(res.data.firstInquiryGroupNotificationEnabled !== false);
         this.waDefaultGroupJid.set(res.data.defaultGroupJid);
         this.syncWaGroupSearchText();
         this.waSaveSuccess.set('Default group updated.');
       }
     } catch (err: any) {
       this.waSaveError.set(err?.error?.error ?? 'Failed to update default group.');
+    } finally {
+      this.waSaving.set(false);
+    }
+  }
+
+  async toggleWaFirstInquiryGroupNotification(): Promise<void> {
+    this.waSaving.set(true);
+    this.waSaveSuccess.set('');
+    this.waSaveError.set('');
+    const firstInquiryGroupNotificationEnabled = !this.waFirstInquiryGroupNotificationEnabled();
+
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<{ enabled: boolean; defaultGroupJid: string | null; incomingRfqEnabled: boolean; firstInquiryGroupNotificationEnabled: boolean }>>(`${API}/admin/settings/whatsapp`, {
+          firstInquiryGroupNotificationEnabled,
+        }),
+      );
+      if (res.success) {
+        this.waEnabled.set(res.data.enabled);
+        this.waIncomingRfqEnabled.set(res.data.incomingRfqEnabled !== false);
+        this.waFirstInquiryGroupNotificationEnabled.set(res.data.firstInquiryGroupNotificationEnabled !== false);
+        this.waDefaultGroupJid.set(res.data.defaultGroupJid);
+        this.waSaveSuccess.set(firstInquiryGroupNotificationEnabled
+          ? 'First inquiry group sharing enabled.'
+          : 'First inquiry group sharing disabled.');
+      }
+    } catch (err: any) {
+      this.waSaveError.set(err?.error?.error ?? 'Failed to update inquiry sharing setting.');
     } finally {
       this.waSaving.set(false);
     }
