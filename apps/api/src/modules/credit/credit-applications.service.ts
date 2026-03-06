@@ -145,6 +145,8 @@ export async function listCreditApplications(query?: {
   status?: CreditApplicationStatus;
   type?: CreditLineType;
   counterpartyId?: string;
+  requesterUserId?: string;
+  requesterRole?: string;
   page?: number;
   limit?: number;
 }) {
@@ -161,6 +163,13 @@ export async function listCreditApplications(query?: {
   }
   if (query?.counterpartyId) {
     conditions.push(eq(creditApplications.counterpartyId, query.counterpartyId));
+  }
+  if (
+    query?.requesterUserId
+    && query.requesterRole !== 'ADMIN'
+    && query.requesterRole !== 'CREDITMANAGER'
+  ) {
+    conditions.push(eq(creditApplications.requestedByUserId, query.requesterUserId));
   }
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
@@ -254,7 +263,11 @@ export async function createCreditApplication(
 //  CANCEL APPLICATION (requester or admin cancels)
 // ═══════════════════════════════════════════════════════════════════════
 
-export async function cancelCreditApplication(id: string, userId: string): Promise<CreditApplicationDto | null> {
+export async function cancelCreditApplication(
+  id: string,
+  userId: string,
+  userRole?: string,
+): Promise<CreditApplicationDto | null> {
   const [app] = await db
     .select()
     .from(creditApplications)
@@ -262,6 +275,9 @@ export async function cancelCreditApplication(id: string, userId: string): Promi
     .limit(1);
 
   if (!app || app.status !== 'PENDING') return null;
+
+  const canCancel = app.requestedByUserId === userId || userRole === 'ADMIN' || userRole === 'CREDITMANAGER';
+  if (!canCancel) return null;
 
   // Only the requester or admins/credit managers can cancel
   const [updated] = await db

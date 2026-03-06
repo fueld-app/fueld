@@ -355,6 +355,97 @@ describe('listCreditApplications', () => {
     const result = await listCreditApplications({ limit: 500 });
     expect(result.pageSize).toBe(100);
   });
+
+  it('returns newest applications first', async () => {
+    const { user, client } = await seedBasics();
+    const { createCreditApplication, listCreditApplications } = await loadService();
+
+    const older = await createCreditApplication(
+      { type: 'CUSTOMER', counterpartyId: client.id, requestedAmount: '1000.00', requestedCurrency: 'USD' },
+      user.id,
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    const newer = await createCreditApplication(
+      { type: 'CUSTOMER', counterpartyId: client.id, requestedAmount: '2000.00', requestedCurrency: 'USD' },
+      user.id,
+    );
+
+    const result = await listCreditApplications();
+    expect(result.items[0]!.id).toBe(newer.id);
+    expect(result.items[1]!.id).toBe(older.id);
+  });
+
+  it('scopes trader listing to their own applications when requester context is provided', async () => {
+    const { tenant, user, client } = await seedBasics();
+    const db = await getDb();
+    const { createCreditApplication, listCreditApplications } = await loadService();
+
+    const [otherTrader] = await db
+      .insert(users)
+      .values({
+        tenantId: tenant.id,
+        email: 'other-trader@test.local',
+        name: 'Other Trader',
+        role: 'TRADER',
+      })
+      .returning();
+
+    const mine = await createCreditApplication(
+      { type: 'CUSTOMER', counterpartyId: client.id, requestedAmount: '1000.00', requestedCurrency: 'USD' },
+      user.id,
+    );
+    await createCreditApplication(
+      { type: 'CUSTOMER', counterpartyId: client.id, requestedAmount: '2000.00', requestedCurrency: 'USD' },
+      otherTrader!.id,
+    );
+
+    const result = await listCreditApplications({ requesterUserId: user.id, requesterRole: 'TRADER' });
+    expect(result.total).toBe(1);
+    expect(result.items[0]!.id).toBe(mine.id);
+  });
+
+  it('allows credit managers to list all applications when requester context is provided', async () => {
+    const { tenant, user, client } = await seedBasics();
+    const db = await getDb();
+    const { createCreditApplication, listCreditApplications } = await loadService();
+
+    const [otherTrader] = await db
+      .insert(users)
+      .values({
+        tenantId: tenant.id,
+        email: 'other-trader@test.local',
+        name: 'Other Trader',
+        role: 'TRADER',
+      })
+      .returning();
+
+    const [creditManager] = await db
+      .insert(users)
+      .values({
+        tenantId: tenant.id,
+        email: 'cm@test.local',
+        name: 'Credit Manager',
+        role: 'CREDITMANAGER',
+      })
+      .returning();
+
+    await createCreditApplication(
+      { type: 'CUSTOMER', counterpartyId: client.id, requestedAmount: '1000.00', requestedCurrency: 'USD' },
+      user.id,
+    );
+    await createCreditApplication(
+      { type: 'CUSTOMER', counterpartyId: client.id, requestedAmount: '2000.00', requestedCurrency: 'USD' },
+      otherTrader!.id,
+    );
+
+    const result = await listCreditApplications({
+      requesterUserId: creditManager!.id,
+      requesterRole: 'CREDITMANAGER',
+    });
+    expect(result.total).toBe(2);
+  });
 });
 
 describe('getCreditApplicationById', () => {
@@ -431,6 +522,38 @@ describe('countPendingApplications', () => {
     await cancelCreditApplication(app2.id, user.id);
     expect(await countPendingApplications()).toBe(1);
   });
+
+  it('decreases pending count after approval and rejection', async () => {
+    const { tenant, user, client } = await seedBasics();
+    const db = await getDb();
+    const { createCreditApplication, countPendingApplications, submitReview } = await loadService();
+
+    const [cm1] = await db
+      .insert(users)
+      .values({ tenantId: tenant.id, email: 'cm1@test.local', name: 'CM1', role: 'CREDITMANAGER' })
+      .returning();
+    const [cm2] = await db
+      .insert(users)
+      .values({ tenantId: tenant.id, email: 'cm2@test.local', name: 'CM2', role: 'CREDITMANAGER' })
+      .returning();
+
+    const approved = await createCreditApplication(
+      { type: 'CUSTOMER', counterpartyId: client.id, requestedAmount: '1000.00', requestedCurrency: 'USD' },
+      user.id,
+    );
+    const rejected = await createCreditApplication(
+      { type: 'CUSTOMER', counterpartyId: client.id, requestedAmount: '2000.00', requestedCurrency: 'USD' },
+      user.id,
+    );
+
+    expect(await countPendingApplications()).toBe(2);
+
+    await submitReview(approved.id, cm1!.id, 'APPROVED');
+    expect(await countPendingApplications()).toBe(1);
+
+    await submitReview(rejected.id, cm2!.id, 'REJECTED');
+    expect(await countPendingApplications()).toBe(0);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -499,6 +622,78 @@ describe('cancelCreditApplication', () => {
 
     const result = await cancelCreditApplication(app.id, user.id);
     expect(result).toBeNull();
+  });
+
+  it('returns null when unrelated trader tries to cancel application', async () => {
+    const { tenant, user, client } = await seedBasics();
+    const db = await getDb();
+    const { createCreditApplication, cancelCreditApplication } = await loadService();
+
+    const [otherTrader] = await db
+      .insert(users)
+      .values({
+        tenantId: tenant.id,
+        email: 'other-trader@test.local',
+        name: 'Other Trader',
+        role: 'TRADER',
+      })
+      .returning();
+
+    const app = await createCreditApplication(
+      { type: 'CUSTOMER', counterpartyId: client.id, requestedAmount: '1000.00', requestedCurrency: 'USD' },
+      user.id,
+    );
+
+    const result = await cancelCreditApplication(app.id, otherTrader!.id, 'TRADER');
+    expect(result).toBeNull();
+  });
+
+  it('allows admin to cancel another user application', async () => {
+    const { tenant, user, client } = await seedBasics();
+    const db = await getDb();
+    const { createCreditApplication, cancelCreditApplication } = await loadService();
+
+    const [admin] = await db
+      .insert(users)
+      .values({
+        tenantId: tenant.id,
+        email: 'admin@test.local',
+        name: 'Admin',
+        role: 'ADMIN',
+      })
+      .returning();
+
+    const app = await createCreditApplication(
+      { type: 'CUSTOMER', counterpartyId: client.id, requestedAmount: '1000.00', requestedCurrency: 'USD' },
+      user.id,
+    );
+
+    const result = await cancelCreditApplication(app.id, admin!.id, 'ADMIN');
+    expect(result?.status).toBe('CANCELLED');
+  });
+
+  it('allows credit manager to cancel another user application', async () => {
+    const { tenant, user, client } = await seedBasics();
+    const db = await getDb();
+    const { createCreditApplication, cancelCreditApplication } = await loadService();
+
+    const [cm] = await db
+      .insert(users)
+      .values({
+        tenantId: tenant.id,
+        email: 'cm@test.local',
+        name: 'Credit Manager',
+        role: 'CREDITMANAGER',
+      })
+      .returning();
+
+    const app = await createCreditApplication(
+      { type: 'CUSTOMER', counterpartyId: client.id, requestedAmount: '1000.00', requestedCurrency: 'USD' },
+      user.id,
+    );
+
+    const result = await cancelCreditApplication(app.id, cm!.id, 'CREDITMANAGER');
+    expect(result?.status).toBe('CANCELLED');
   });
 });
 
@@ -870,6 +1065,82 @@ describe('auto-apply credit line on approval', () => {
     const lines = await db.select().from(creditLines);
     expect(lines.length).toBe(1);
     expect(lines[0]!.periodDays).toBe(30);
+  });
+
+  it('creates supplier credit lines when supplier applications are approved', async () => {
+    const { tenant, user } = await seedBasics();
+    const db = await getDb();
+    const { createCreditApplication, submitReview } = await loadService();
+
+    const [supplier] = await db
+      .insert(counterparties)
+      .values({
+        tenantId: tenant.id,
+        name: 'Supplier Auto Apply',
+        type: 'SUPPLIER',
+        types: ['SUPPLIER'],
+      })
+      .returning();
+    const [reviewer] = await db
+      .insert(users)
+      .values({ tenantId: tenant.id, email: 'cm@test.local', name: 'CM', role: 'CREDITMANAGER' })
+      .returning();
+
+    const app = await createCreditApplication(
+      {
+        type: 'SUPPLIER',
+        counterpartyId: supplier!.id,
+        requestedAmount: '9000.00',
+        requestedCurrency: 'USD',
+      },
+      user.id,
+    );
+
+    await submitReview(app.id, reviewer!.id, 'APPROVED');
+
+    const lines = await db.select().from(creditLines);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]!.type).toBe('SUPPLIER');
+  });
+
+  it('preserves existing credit period when requestedDays is omitted on line increase', async () => {
+    const { tenant, user, client } = await seedBasics();
+    const db = await getDb();
+    const { createCreditApplication, submitReview } = await loadService();
+    const { createCreditLine } = await import('../src/modules/credit/credit.service');
+
+    const existingLine = await createCreditLine({
+      type: 'CUSTOMER',
+      counterpartyIds: [client.id],
+      creditAmount: '1000.00',
+      currency: 'USD',
+      periodDays: 45,
+    });
+    const [reviewer] = await db
+      .insert(users)
+      .values({ tenantId: tenant.id, email: 'cm@test.local', name: 'CM', role: 'CREDITMANAGER' })
+      .returning();
+
+    const app = await createCreditApplication(
+      {
+        type: 'CUSTOMER',
+        counterpartyId: client.id,
+        creditLineId: existingLine!.id,
+        requestedAmount: '7000.00',
+        requestedCurrency: 'EUR',
+      },
+      user.id,
+    );
+
+    await submitReview(app.id, reviewer!.id, 'APPROVED');
+
+    const [updated] = await db
+      .select()
+      .from(creditLines)
+      .where(eq(creditLines.id, existingLine!.id));
+    expect(updated!.creditAmount).toBe('7000.00');
+    expect(updated!.currency).toBe('EUR');
+    expect(updated!.periodDays).toBe(45);
   });
 });
 

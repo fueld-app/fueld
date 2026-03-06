@@ -4,36 +4,37 @@ import { counterparties, users } from '../src/db/schema';
 import { getDb, seedAuthBasics, truncateAll } from './helpers/db';
 import { loginE2E, requestJson } from './helpers/e2e';
 
-async function seedCreditManagerUser(tenantId: string, email = 'cm@test.local', name = 'Credit Manager') {
+async function seedUserWithRole(
+  tenantId: string,
+  role: 'TRADER' | 'CREDITMANAGER' | 'ADMIN',
+  email: string,
+  name: string,
+) {
   const db = await getDb();
   const { hashPassword } = await import('../src/modules/auth/password.service');
-  const [cm] = await db
+  const [user] = await db
     .insert(users)
     .values({
       tenantId,
       email,
       name,
-      role: 'CREDITMANAGER',
+      role,
       passwordHash: await hashPassword('Passw0rd!'),
     })
     .returning();
-  return cm!;
+  return user!;
+}
+
+async function seedCreditManagerUser(tenantId: string, email = 'cm@test.local', name = 'Credit Manager') {
+  return seedUserWithRole(tenantId, 'CREDITMANAGER', email, name);
 }
 
 async function seedAdminUser(tenantId: string, email = 'admin@test.local', name = 'Admin') {
-  const db = await getDb();
-  const { hashPassword } = await import('../src/modules/auth/password.service');
-  const [admin] = await db
-    .insert(users)
-    .values({
-      tenantId,
-      email,
-      name,
-      role: 'ADMIN',
-      passwordHash: await hashPassword('Passw0rd!'),
-    })
-    .returning();
-  return admin!;
+  return seedUserWithRole(tenantId, 'ADMIN', email, name);
+}
+
+async function seedTraderUser(tenantId: string, email = 'other-trader@test.local', name = 'Other Trader') {
+  return seedUserWithRole(tenantId, 'TRADER', email, name);
 }
 
 describe('credit applications controller e2e', () => {
@@ -174,6 +175,44 @@ describe('credit applications controller e2e', () => {
     expect(res.data.success === false || res.status >= 400).toBe(true);
   });
 
+  it('rejects invalid application type', async () => {
+    const seeded = await seedAuthBasics();
+    const login = await loginE2E(seeded.user.email, seeded.password);
+
+    const res = await requestJson('/credit/applications', {
+      method: 'POST',
+      token: login.accessToken!,
+      body: {
+        type: 'INVALID',
+        counterpartyId: seeded.client.id,
+        requestedAmount: '1000.00',
+        requestedCurrency: 'USD',
+      },
+    });
+
+    expect(res.status).not.toBe(200);
+  });
+
+  it('rejects settings values outside allowed range', async () => {
+    const seeded = await seedAuthBasics();
+    const admin = await seedAdminUser(seeded.tenant.id);
+    const login = await loginE2E(admin.email, 'Passw0rd!');
+
+    const tooLow = await requestJson('/credit/applications/settings', {
+      method: 'PATCH',
+      token: login.accessToken!,
+      body: { requiredApprovals: 0 },
+    });
+    expect(tooLow.status).not.toBe(200);
+
+    const tooHigh = await requestJson('/credit/applications/settings', {
+      method: 'PATCH',
+      token: login.accessToken!,
+      body: { requiredApprovals: 11 },
+    });
+    expect(tooHigh.status).not.toBe(200);
+  });
+
   // ─── List & Filter ─────────────────────────────────────────────
 
   it('lists applications with status filter', async () => {
@@ -246,6 +285,48 @@ describe('credit applications controller e2e', () => {
 
     const page2 = await requestJson('/credit/applications?page=2&limit=2', { token });
     expect(page2.data.data.items.length).toBe(1);
+  });
+
+  it('shows traders only their own applications while credit managers see all', async () => {
+    const seeded = await seedAuthBasics();
+    const otherTrader = await seedTraderUser(seeded.tenant.id);
+    const cm = await seedCreditManagerUser(seeded.tenant.id);
+
+    const trader1Login = await loginE2E(seeded.user.email, seeded.password);
+    const trader2Login = await loginE2E(otherTrader.email, 'Passw0rd!');
+    const cmLogin = await loginE2E(cm.email, 'Passw0rd!');
+
+    const first = await requestJson('/credit/applications', {
+      method: 'POST',
+      token: trader1Login.accessToken!,
+      body: {
+        type: 'CUSTOMER',
+        counterpartyId: seeded.client.id,
+        requestedAmount: '1111.00',
+        requestedCurrency: 'USD',
+      },
+    });
+    const second = await requestJson('/credit/applications', {
+      method: 'POST',
+      token: trader2Login.accessToken!,
+      body: {
+        type: 'CUSTOMER',
+        counterpartyId: seeded.client.id,
+        requestedAmount: '2222.00',
+        requestedCurrency: 'USD',
+      },
+    });
+
+    const trader1List = await requestJson('/credit/applications', { token: trader1Login.accessToken! });
+    expect(trader1List.data.data.total).toBe(1);
+    expect(trader1List.data.data.items[0].id).toBe(first.data.data.id);
+
+    const trader2List = await requestJson('/credit/applications', { token: trader2Login.accessToken! });
+    expect(trader2List.data.data.total).toBe(1);
+    expect(trader2List.data.data.items[0].id).toBe(second.data.data.id);
+
+    const cmList = await requestJson('/credit/applications', { token: cmLogin.accessToken! });
+    expect(cmList.data.data.total).toBe(2);
   });
 
   // ─── Get Single Application ────────────────────────────────────
@@ -347,6 +428,59 @@ describe('credit applications controller e2e', () => {
       token,
     });
     expect(res.data.success).toBe(false);
+  });
+
+  it('blocks unrelated trader from cancelling another user application', async () => {
+    const seeded = await seedAuthBasics();
+    const otherTrader = await seedTraderUser(seeded.tenant.id);
+
+    const ownerLogin = await loginE2E(seeded.user.email, seeded.password);
+    const otherLogin = await loginE2E(otherTrader.email, 'Passw0rd!');
+
+    const created = await requestJson('/credit/applications', {
+      method: 'POST',
+      token: ownerLogin.accessToken!,
+      body: {
+        type: 'CUSTOMER',
+        counterpartyId: seeded.client.id,
+        requestedAmount: '1000.00',
+        requestedCurrency: 'USD',
+      },
+    });
+
+    const res = await requestJson(`/credit/applications/${created.data.data.id}/cancel`, {
+      method: 'POST',
+      token: otherLogin.accessToken!,
+    });
+
+    expect(res.data.success).toBe(false);
+  });
+
+  it('allows admin to cancel another user application', async () => {
+    const seeded = await seedAuthBasics();
+    const admin = await seedAdminUser(seeded.tenant.id);
+
+    const ownerLogin = await loginE2E(seeded.user.email, seeded.password);
+    const adminLogin = await loginE2E(admin.email, 'Passw0rd!');
+
+    const created = await requestJson('/credit/applications', {
+      method: 'POST',
+      token: ownerLogin.accessToken!,
+      body: {
+        type: 'CUSTOMER',
+        counterpartyId: seeded.client.id,
+        requestedAmount: '1000.00',
+        requestedCurrency: 'USD',
+      },
+    });
+
+    const res = await requestJson(`/credit/applications/${created.data.data.id}/cancel`, {
+      method: 'POST',
+      token: adminLogin.accessToken!,
+    });
+
+    expect(res.data.success).toBe(true);
+    expect(res.data.data.status).toBe('CANCELLED');
   });
 
   // ─── Review Application ────────────────────────────────────────
@@ -538,6 +672,32 @@ describe('credit applications controller e2e', () => {
     expect(res.data.success).toBe(false);
   });
 
+  it('rejects invalid review decision', async () => {
+    const seeded = await seedAuthBasics();
+    const cm = await seedCreditManagerUser(seeded.tenant.id);
+    const traderLogin = await loginE2E(seeded.user.email, seeded.password);
+    const cmLogin = await loginE2E(cm.email, 'Passw0rd!');
+
+    const created = await requestJson('/credit/applications', {
+      method: 'POST',
+      token: traderLogin.accessToken!,
+      body: {
+        type: 'CUSTOMER',
+        counterpartyId: seeded.client.id,
+        requestedAmount: '1000.00',
+        requestedCurrency: 'USD',
+      },
+    });
+
+    const res = await requestJson(`/credit/applications/${created.data.data.id}/review`, {
+      method: 'POST',
+      token: cmLogin.accessToken!,
+      body: { decision: 'MAYBE' },
+    });
+
+    expect(res.status).not.toBe(200);
+  });
+
   // ─── Multi-approval workflow ───────────────────────────────────
 
   it('full multi-approval workflow: requires 2 approvals', async () => {
@@ -597,5 +757,58 @@ describe('credit applications controller e2e', () => {
     // Verify pending count dropped
     const count = await requestJson('/credit/applications/pending-count', { token: traderToken });
     expect(count.data.data.count).toBe(0);
+  });
+
+  it('pending count decreases after approval and rejection flows', async () => {
+    const seeded = await seedAuthBasics();
+    const cm1 = await seedCreditManagerUser(seeded.tenant.id, 'cm1@test.local', 'CM One');
+    const cm2 = await seedCreditManagerUser(seeded.tenant.id, 'cm2@test.local', 'CM Two');
+
+    const traderLogin = await loginE2E(seeded.user.email, seeded.password);
+    const traderToken = traderLogin.accessToken!;
+
+    const approved = await requestJson('/credit/applications', {
+      method: 'POST',
+      token: traderToken,
+      body: {
+        type: 'CUSTOMER',
+        counterpartyId: seeded.client.id,
+        requestedAmount: '5000.00',
+        requestedCurrency: 'USD',
+      },
+    });
+    const rejected = await requestJson('/credit/applications', {
+      method: 'POST',
+      token: traderToken,
+      body: {
+        type: 'CUSTOMER',
+        counterpartyId: seeded.client.id,
+        requestedAmount: '6000.00',
+        requestedCurrency: 'USD',
+      },
+    });
+
+    const before = await requestJson('/credit/applications/pending-count', { token: traderToken });
+    expect(before.data.data.count).toBe(2);
+
+    const cm1Login = await loginE2E(cm1.email, 'Passw0rd!');
+    await requestJson(`/credit/applications/${approved.data.data.id}/review`, {
+      method: 'POST',
+      token: cm1Login.accessToken!,
+      body: { decision: 'APPROVED' },
+    });
+
+    const mid = await requestJson('/credit/applications/pending-count', { token: traderToken });
+    expect(mid.data.data.count).toBe(1);
+
+    const cm2Login = await loginE2E(cm2.email, 'Passw0rd!');
+    await requestJson(`/credit/applications/${rejected.data.data.id}/review`, {
+      method: 'POST',
+      token: cm2Login.accessToken!,
+      body: { decision: 'REJECTED' },
+    });
+
+    const after = await requestJson('/credit/applications/pending-count', { token: traderToken });
+    expect(after.data.data.count).toBe(0);
   });
 });

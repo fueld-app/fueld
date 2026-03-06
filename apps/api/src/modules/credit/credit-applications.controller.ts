@@ -34,11 +34,13 @@ export const creditApplicationsController = new Elysia({ prefix: '/credit/applic
   // Any authenticated user can list (traders see their own, credit managers see all)
   .get(
     '/',
-    async ({ query }) => {
+    async ({ query, auth }) => {
       const results = await listCreditApplications({
         status: query.status as any,
         type: query.type as any,
         counterpartyId: query.counterpartyId,
+        requesterUserId: auth.sub,
+        requesterRole: auth.role,
         page: query.page ? parseInt(query.page) : undefined,
         limit: query.limit ? parseInt(query.limit) : undefined,
       });
@@ -221,7 +223,7 @@ export const creditApplicationsController = new Elysia({ prefix: '/credit/applic
   .post(
     '/:id/cancel',
     async ({ auth, params }) => {
-      const app = await cancelCreditApplication(params.id, auth.sub);
+      const app = await cancelCreditApplication(params.id, auth.sub, auth.role);
       if (!app) {
         return { success: false, data: null, message: 'Application not found or cannot be cancelled' };
       }
