@@ -145,7 +145,7 @@ import { API } from '@app/core/config/api';
           <!-- ════════════════════════════════════════════════════════ -->
           <!--  SMTP (Invite Emails)                                 -->
           <!-- ════════════════════════════════════════════════════════ -->
-          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-visible">
+          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
             <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
               <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-600" viewBox="0 0 20 20" fill="currentColor">
@@ -710,7 +710,7 @@ import { API } from '@app/core/config/api';
           <!-- ════════════════════════════════════════════════════════ -->
           <!--  WhatsApp Integration                                  -->
           <!-- ════════════════════════════════════════════════════════ -->
-          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-visible">
             <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
               <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-50">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-600" viewBox="0 0 24 24" fill="currentColor">
