@@ -53,6 +53,21 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Generate build metadata
+        run: |
+          APP_VERSION=$(cat VERSION)
+          SHORT_SHA=$(git rev-parse --short=7 HEAD)
+          BRANCH_NAME=${GITHUB_REF_NAME:-main}
+          BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          DEPLOY_VERSION="${APP_VERSION}+deploy.${GITHUB_RUN_NUMBER}.sha.${SHORT_SHA}"
+          APP_VERSION="$APP_VERSION" \
+          GIT_SHA="$GITHUB_SHA" \
+          GIT_BRANCH="$BRANCH_NAME" \
+          BUILD_TIME="$BUILD_TIME" \
+          DEPLOY_VERSION="$DEPLOY_VERSION" \
+          GITHUB_RUN_NUMBER="$GITHUB_RUN_NUMBER" \
+          bun run build:meta
+
       # ─── Build API binary ─────────────────────────────────────────
       - name: Build API (standalone binary)
         run: |
@@ -101,6 +116,12 @@ jobs:
           scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             deploy/deploy.sh \
             ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/opt/fueld/staging/deploy.sh
+
+      - name: Upload build metadata
+        run: |
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            build-info.json \
+            ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/opt/fueld/staging/build-info.json
 
       - name: Execute deployment
         run: |

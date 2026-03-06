@@ -43,7 +43,7 @@ const cache = new Map<string, CacheEntry>();
 // ─── Helpers ─────────────────────────────────────────────────────────
 
 /** Resolve the prompts directory at runtime (not compile-time). */
-function getPromptsDir(): string {
+export function getPromptsDir(): string {
   if (process.env['PROMPTS_DIR']) {
     return process.env['PROMPTS_DIR'];
   }

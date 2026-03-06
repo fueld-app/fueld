@@ -14,6 +14,7 @@ import { vesselsController } from './modules/vessels/vessels.controller';
 import { creditController } from './modules/credit/credit.controller';
 import { creditApplicationsController } from './modules/credit/credit-applications.controller';
 import { adminController, inviteController } from './modules/admin/admin.controller';
+import { backupController } from './modules/admin/backup.controller';
 import { settingsController } from './modules/admin/settings.controller';
 import { securityController } from './modules/admin/security.controller';
 import { llmController } from './modules/admin/llm.controller';
@@ -48,6 +49,9 @@ import { pushController } from './modules/push/push.controller';
 import { whatsappController } from './modules/whatsapp/whatsapp.controller';
 import { rfqController } from './modules/rfq/rfq.controller';
 import { reconnectStoredSessions as reconnectWhatsAppSessions } from './modules/whatsapp/whatsapp.service';
+import { getBuildInfo } from './lib/build-info';
+import { assertCredentialsEncryptionConfig } from './lib/crypto';
+import { isRestoreModeActive } from './modules/admin/backup-state';
 
 function resolveMigrationsDir(): string {
   const env = process.env['MIGRATIONS_DIR'];
@@ -210,9 +214,13 @@ export interface CreateAppOptions {
 }
 
 export async function createApp(options: CreateAppOptions = {}) {
+  assertCredentialsEncryptionConfig();
+
   if (options.runMigrations !== false) {
     await runPendingMigrations();
   }
+
+  const buildInfo = getBuildInfo();
 
   const app = new Elysia()
     .use(
@@ -220,7 +228,7 @@ export async function createApp(options: CreateAppOptions = {}) {
         documentation: {
           info: {
             title: 'Fueld API',
-            version: '0.0.1',
+            version: buildInfo.appVersion,
             description: 'Bunker Trading SaaS — REST API',
           },
           tags: [
@@ -256,13 +264,38 @@ export async function createApp(options: CreateAppOptions = {}) {
         ],
       }),
     )
+    .onBeforeHandle({ as: 'global' }, ({ request, set }) => {
+      const pathname = new URL(request.url).pathname;
+
+      if (isRestoreModeActive() && pathname !== '/health' && pathname !== '/admin/backup/status') {
+        set.status = 503;
+        return {
+          success: false,
+          data: null,
+          message: 'Backup restore in progress. Try again later.',
+        } satisfies ApiResponse<null>;
+      }
+    })
     .get(
       '/health',
-      (): ApiResponse<{ status: string; uptime: number }> => ({
+      (): ApiResponse<{
+        status: string;
+        uptime: number;
+        appVersion: string;
+        deployVersion: string;
+        gitSha: string;
+        backupFormatVersion: number;
+        restoreInProgress: boolean;
+      }> => ({
         success: true,
         data: {
           status: 'ok',
           uptime: process.uptime(),
+          appVersion: buildInfo.appVersion,
+          deployVersion: buildInfo.deployVersion,
+          gitSha: buildInfo.gitSha,
+          backupFormatVersion: buildInfo.backupFormatVersion,
+          restoreInProgress: isRestoreModeActive(),
         },
       }),
       {
@@ -283,6 +316,7 @@ export async function createApp(options: CreateAppOptions = {}) {
     .use(creditController)
     .use(creditApplicationsController)
     .use(adminController)
+    .use(backupController)
     .use(settingsController)
     .use(inviteController)
     .use(activityController)

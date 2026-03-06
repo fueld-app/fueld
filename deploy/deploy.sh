@@ -66,9 +66,22 @@ fi
 mkdir -p "$APP_DIR/llm/bin" "$APP_DIR/llm/models" "$APP_DIR/prompts"
 log "LLM + prompts directories ensured"
 
+# ─── 3c. Deploy build metadata ───────────────────────────────────────
+if [ -f "$APP_DIR/staging/build-info.json" ]; then
+  mv "$APP_DIR/staging/build-info.json" "$APP_DIR/build-info.json"
+  log "Build metadata deployed"
+fi
+
 # Ensure sudoers is up-to-date (always run — covers apt-get, daemon-reload, etc.)
 SUDOERS_LINE="deploy ALL=(ALL) NOPASSWD: /bin/systemctl restart fueld-api@*, /bin/systemctl start fueld-api@*, /bin/systemctl stop fueld-api@*, /bin/systemctl reload nginx, /bin/systemctl daemon-reload, /bin/systemctl status fueld-api@*, /bin/systemctl restart fueld-llm, /bin/systemctl start fueld-llm, /bin/systemctl stop fueld-llm, /usr/sbin/nginx -t, /usr/bin/tee, /bin/systemctl reset-failed *, /usr/bin/apt-get"
 echo "$SUDOERS_LINE" | sudo tee /etc/sudoers.d/fueld-deploy > /dev/null
+
+# Install PostgreSQL client tools needed for backup/export/restore (idempotent)
+if ! command -v pg_dump &>/dev/null || ! command -v psql &>/dev/null; then
+  log "Installing PostgreSQL client tools for backup/export/restore..."
+  sudo apt-get update -qq || warn "Could not refresh apt package index (continuing)"
+  sudo apt-get install -y -qq postgresql-client || warn "Could not install postgresql-client automatically"
+fi
 
 # Install build tools needed for 'build from source' (idempotent)
 if ! command -v cmake &>/dev/null || ! command -v g++ &>/dev/null; then
@@ -76,7 +89,7 @@ if ! command -v cmake &>/dev/null || ! command -v g++ &>/dev/null; then
   sudo apt-get install -y -qq cmake g++ make || warn "Could not install build tools (non-fatal)"
 fi
 
-# ─── 3c. Patch systemd unit ReadWritePaths if missing dirs ───────────
+# ─── 3d. Patch systemd unit ReadWritePaths if missing dirs ───────────
 UNIT_FILE="/etc/systemd/system/fueld-api@.service"
 NEED_RELOAD=false
 if [ -f "$UNIT_FILE" ]; then

@@ -112,7 +112,15 @@ Common/optional:
   - `LLI_USERNAME`, `LLI_PASSWORD`
 - QuickBooks:
   - `QB_CLIENT_ID`, `QB_CLIENT_SECRET`, `QB_REDIRECT_URI`, `QB_ENVIRONMENT`
-- `CREDENTIALS_ENCRYPTION_KEY` — optional explicit key for encrypting stored credentials (otherwise derived)
+- `CREDENTIALS_ENCRYPTION_KEY` — required in production for encrypting stored credentials and for backup/restore portability across VPS moves. In local development, the API can still fall back to a deterministic key derived from `DATABASE_URL`.
+
+### Backup & versioning
+
+- Admin backup/restore lives under the web admin area at `/admin/backup`.
+- Exported archives include the PostgreSQL dump, managed uploads, and prompt markdown files. LLM model binaries are intentionally excluded in v1.
+- Restores are destructive full replacements. The target instance must have the same schema version and the same `CREDENTIALS_ENCRYPTION_KEY` as the source instance.
+- Semantic app version is stored in the repository `VERSION` file.
+- Each deploy also generates `build-info.json`, which the API exposes through `/health` and uses for backup manifest metadata.
 
 ### Web
 

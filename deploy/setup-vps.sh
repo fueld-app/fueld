@@ -31,7 +31,7 @@ echo "▶ Installing Nginx, Certbot, utilities..."
 apt-get install -y -qq \
   nginx \
   certbot python3-certbot-nginx python3-certbot-dns-cloudflare \
-  postgresql postgresql-contrib \
+  postgresql postgresql-client postgresql-contrib \
   curl unzip jq git ufw fail2ban
 
 # ─── 3. Firewall ─────────────────────────────────────────────────────
@@ -113,6 +113,7 @@ echo "  ✓ /opt/fueld directory structure created"
 echo "▶ Generating application secrets..."
 JWT_ACCESS=$(openssl rand -base64 48)
 JWT_REFRESH=$(openssl rand -base64 48)
+CREDENTIALS_ENCRYPTION_KEY=$(openssl rand -hex 32)
 
 cat > /opt/fueld/.env <<EOF
 # ═══════════════════════════════════════════════════════════════
@@ -125,6 +126,9 @@ DATABASE_URL=postgres://$DB_USER:$DB_PASSWORD@localhost:5432/$DB_NAME
 # JWT (persistent across deploys → sessions survive restarts)
 JWT_ACCESS_SECRET=$JWT_ACCESS
 JWT_REFRESH_SECRET=$JWT_REFRESH
+
+# Encryption for stored third-party credentials (MUST stay stable across restores/deploys)
+CREDENTIALS_ENCRYPTION_KEY=$CREDENTIALS_ENCRYPTION_KEY
 
 # Application
 PORT=3000

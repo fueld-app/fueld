@@ -29,6 +29,88 @@ export interface PaginatedResponse<T> {
   pageSize: number;
 }
 
+export interface BackupManifestDto {
+  backupFormatVersion: number;
+  createdAt: string;
+  appVersion: string;
+  deployVersion: string;
+  gitSha: string;
+  gitBranch: string;
+  schemaVersion: string;
+  database: {
+    engine: 'postgresql';
+    dumpFile: string;
+    migrationTags: string[];
+    latestMigrationTag: string | null;
+  };
+  contents: {
+    uploadsIncluded: boolean;
+    promptsIncluded: boolean;
+    llmModelsIncluded: boolean;
+    managedPaths: string[];
+    uploadFileCount?: number;
+    uploadBytes?: number;
+    promptFileCount?: number;
+    promptBytes?: number;
+  };
+  restorePolicy: {
+    mode: 'replace-all';
+    deleteTargetOnlyFiles: boolean;
+    requiresConfirmationPhrase: boolean;
+    confirmationPhrase: string;
+  };
+  crypto: {
+    passwordRequired: boolean;
+    algorithm: 'aes-256-gcm';
+    kdf: 'scrypt';
+  };
+}
+
+export interface BackupCapabilitiesDto {
+  ready: boolean;
+  runtime: {
+    mode: 'production' | 'development' | 'test' | 'unknown';
+  };
+  commands: {
+    pgDump: boolean;
+    psql: boolean;
+    tar: boolean;
+  };
+  current: {
+    appVersion: string;
+    deployVersion: string;
+    backupFormatVersion: number;
+    schemaVersion: string;
+    latestMigrationTag: string | null;
+  };
+  paths: {
+    promptsDir: string;
+    uploadsRoot: string;
+  };
+  prerequisites: {
+    credentialsEncryptionKeyConfigured: boolean;
+    credentialsEncryptionKeyRequired: boolean;
+    credentialEncryptionAvailable: boolean;
+    databaseUrlConfigured: boolean;
+  };
+}
+
+export interface BackupValidationDto {
+  fileName: string;
+  fileSize: number;
+  compatible: boolean;
+  issues: string[];
+  warnings: string[];
+  manifest: BackupManifestDto | null;
+}
+
+export interface BackupStatusDto {
+  restoreInProgress: boolean;
+  startedAt: string | null;
+  message: string | null;
+  confirmationPhrase: string;
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  USER
 // ═══════════════════════════════════════════════════════════════════════

@@ -325,6 +325,14 @@ export const routes: Routes = [
             title: 'Admin > LLM',
           },
           {
+            path: 'backup',
+            loadComponent: () =>
+              import('./features/admin/pages/backup/backup-page.component').then(
+                (m) => m.BackupPageComponent,
+              ),
+            title: 'Admin > Backup',
+          },
+          {
             path: 'email',
             loadComponent: () =>
               import('./features/admin/pages/email-settings/email-settings-page.component').then(

@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { decrypt, encrypt } from '../src/lib/crypto';
+import { assertCredentialsEncryptionConfig, decrypt, encrypt } from '../src/lib/crypto';
 
 const ORIGINAL_ENV = {
   CREDENTIALS_ENCRYPTION_KEY: process.env.CREDENTIALS_ENCRYPTION_KEY,
   DATABASE_URL: process.env.DATABASE_URL,
+  NODE_ENV: process.env.NODE_ENV,
 };
 
 afterEach(() => {
@@ -17,6 +18,12 @@ afterEach(() => {
     delete process.env.DATABASE_URL;
   } else {
     process.env.DATABASE_URL = ORIGINAL_ENV.DATABASE_URL;
+  }
+
+  if (ORIGINAL_ENV.NODE_ENV === undefined) {
+    delete process.env.NODE_ENV;
+  } else {
+    process.env.NODE_ENV = ORIGINAL_ENV.NODE_ENV;
   }
 });
 
@@ -61,5 +68,15 @@ describe('crypto lib', () => {
     const tamperedTag = `${payload.authTag.slice(0, -1)}${payload.authTag.endsWith('0') ? '1' : '0'}`;
 
     expect(() => decrypt(payload.encrypted, payload.iv, tamperedTag)).toThrow();
+  });
+
+  test('production requires explicit credentials encryption key', () => {
+    process.env.NODE_ENV = 'production';
+    delete process.env.CREDENTIALS_ENCRYPTION_KEY;
+    process.env.DATABASE_URL = 'postgres://user:pass@localhost:5432/fueld_test';
+
+    expect(() => assertCredentialsEncryptionConfig()).toThrow(
+      'CREDENTIALS_ENCRYPTION_KEY must be set in production',
+    );
   });
 });
