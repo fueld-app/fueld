@@ -1,7 +1,11 @@
-import { Component, ChangeDetectionStrategy, inject, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
+import {
+  AppHealthService,
+  formatAppVersionLabel,
+} from '../../core/runtime/app-health.service';
 
 @Component({
   selector: 'app-login-page',
@@ -196,6 +200,9 @@ import { AuthService } from '../../core/auth/auth.service';
           <p class="mt-8 text-center text-xs text-gray-400">
             &copy; {{ currentYear }} Fueld &middot; All rights reserved
           </p>
+          <p class="mt-2 text-center text-xs text-gray-400" [title]="versionLabel()">
+            {{ versionLabel() }}
+          </p>
         </div>
       </div>
     </div>
@@ -205,6 +212,7 @@ export class LoginPageComponent {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly appHealth = inject(AppHealthService);
 
   email = '';
   password = '';
@@ -214,8 +222,11 @@ export class LoginPageComponent {
   readonly microsoftAvailable = signal(false);
   readonly errorMessage = signal('');
   readonly currentYear = new Date().getFullYear();
+  readonly versionLabel = computed(() => formatAppVersionLabel(this.appHealth.health()));
 
   constructor() {
+    void this.appHealth.refresh();
+
     // Check if we're returning from a Microsoft OAuth redirect
     const microsoftCode = this.route.snapshot.queryParamMap.get('microsoft_code');
     const microsoftError = this.route.snapshot.queryParamMap.get('microsoft_error');

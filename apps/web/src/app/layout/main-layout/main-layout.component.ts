@@ -23,6 +23,10 @@ import type { ApiResponse, PlaceDto, VesselDto } from '@fueld/types';
 import { AppUpdateService } from '../../core/pwa/app-update.service';
 import { LlmHealthService } from '../../core/llm/llm-health.service';
 import { NewInquiryModalService } from '../../core/trading/new-inquiry-modal.service';
+import {
+  AppHealthService,
+  formatAppVersionLabel,
+} from '../../core/runtime/app-health.service';
 
 import { API } from '@app/core/config/api';
 
@@ -227,7 +231,7 @@ const NAVIGATION: NavItem[] = [
       <!-- Sidebar footer -->
       <div class="border-t border-sidebar-hover px-4 py-3">
         <div class="flex items-center justify-between">
-          <p class="text-xs text-sidebar-text/60">Fueld v0.1.0</p>
+          <p class="truncate text-xs text-sidebar-text/60" [title]="footerVersion()">{{ footerVersion() }}</p>
           @if (llmHealthy() !== null) {
             <a routerLink="/admin/llm" class="group flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] transition-colors hover:bg-sidebar-hover"
               [title]="llmHealthy() ? 'LLM Online' : 'LLM Offline'">
@@ -617,6 +621,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   private readonly wsService = inject(WebSocketService);
   private readonly titleService = inject(Title);
   private readonly updateService = inject(AppUpdateService);
+  private readonly appHealthService = inject(AppHealthService);
   private routerSub: Subscription | null = null;
   private priceSub: Subscription | null = null;
   private rfqSub: Subscription | null = null;
@@ -633,9 +638,11 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   readonly eurChange = signal<number>(0);
   readonly eurChangePercent = signal<number>(0);
   readonly updateDismissed = signal(false);
+  readonly appHealth = this.appHealthService.health;
   readonly showUpdateToast = computed(() =>
     this.updateService.updateAvailable() && !this.updateDismissed(),
   );
+  readonly footerVersion = computed(() => formatAppVersionLabel(this.appHealth()));
 
   // ─── RFQ panel ──────────────────────────────────────────────────
   readonly rfqPanelOpen = signal(false);
@@ -657,6 +664,8 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   });
 
   ngOnInit(): void {
+    void this.appHealthService.refresh();
+
     // Subscribe to commodity price updates from WebSocket
     this.priceSub = this.wsService
       .on<{ prices: CommodityPrice[]; fxRates?: FxRatesPayload }>('prices')

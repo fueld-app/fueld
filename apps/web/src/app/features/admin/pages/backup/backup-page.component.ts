@@ -16,6 +16,7 @@ import type {
   BackupValidationDto,
 } from '@fueld/types';
 import { API } from '@app/core/config/api';
+import { AppHealthService } from '@app/core/runtime/app-health.service';
 
 @Component({
   selector: 'app-backup-page',
@@ -90,6 +91,30 @@ import { API } from '@app/core/config/api';
                     : 'Local development can fall back to DATABASE_URL, but an explicit key is recommended for portable restores.' }}
                 </p>
               </div>
+
+              @if (appHealth(); as health) {
+                <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 md:col-span-2">
+                  <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Build Info</p>
+                  <dl class="mt-3 grid gap-3 text-sm md:grid-cols-2 xl:grid-cols-4">
+                    <div>
+                      <dt class="text-gray-500">Build time</dt>
+                      <dd class="mt-1 text-gray-900">{{ health.buildTime | date:'medium' }}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-gray-500">Git SHA</dt>
+                      <dd class="mt-1 font-mono text-gray-900" [title]="health.gitSha">{{ shortSha(health.gitSha) }}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-gray-500">Schema version</dt>
+                      <dd class="mt-1 font-mono text-gray-900">{{ caps.current.schemaVersion }}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-gray-500">Deploy version</dt>
+                      <dd class="mt-1 font-mono text-gray-900" [title]="health.deployVersion">{{ health.deployVersion }}</dd>
+                    </div>
+                  </dl>
+                </div>
+              }
             </div>
 
             <div class="mt-4 rounded-xl border border-dashed border-gray-300 p-4 text-sm text-gray-600">
@@ -257,6 +282,7 @@ export class BackupPageComponent implements OnInit {
   protected readonly badClass = 'text-red-700';
 
   private readonly http = inject(HttpClient);
+  private readonly appHealthService = inject(AppHealthService);
 
   protected readonly loading = signal(false);
   protected readonly exporting = signal(false);
@@ -267,6 +293,7 @@ export class BackupPageComponent implements OnInit {
   protected readonly status = signal<BackupStatusDto | null>(null);
   protected readonly validation = signal<BackupValidationDto | null>(null);
   protected readonly selectedFile = signal<File | null>(null);
+  protected readonly appHealth = this.appHealthService.health;
 
   protected exportPassword = '';
   protected importPassword = '';
@@ -296,6 +323,10 @@ export class BackupPageComponent implements OnInit {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  }
+
+  protected shortSha(gitSha: string): string {
+    return gitSha.length > 12 ? gitSha.slice(0, 12) : gitSha;
   }
 
   protected canExport(): boolean {
@@ -329,6 +360,7 @@ export class BackupPageComponent implements OnInit {
       const [statusRes, capsRes] = await Promise.all([
         firstValueFrom(this.http.get<ApiResponse<BackupStatusDto>>(`${API}/admin/backup/status`)),
         firstValueFrom(this.http.get<ApiResponse<BackupCapabilitiesDto>>(`${API}/admin/backup/capabilities`)),
+        this.appHealthService.refresh(true),
       ]);
 
       if (!statusRes.success) throw new Error(statusRes.message ?? 'Failed to load backup status');

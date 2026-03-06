@@ -284,6 +284,7 @@ export async function createApp(options: CreateAppOptions = {}) {
         appVersion: string;
         deployVersion: string;
         gitSha: string;
+        buildTime: string;
         backupFormatVersion: number;
         restoreInProgress: boolean;
       }> => ({
@@ -294,6 +295,7 @@ export async function createApp(options: CreateAppOptions = {}) {
           appVersion: buildInfo.appVersion,
           deployVersion: buildInfo.deployVersion,
           gitSha: buildInfo.gitSha,
+          buildTime: buildInfo.buildTime,
           backupFormatVersion: buildInfo.backupFormatVersion,
           restoreInProgress: isRestoreModeActive(),
         },
