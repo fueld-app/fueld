@@ -136,7 +136,6 @@ describe('dashboard.service', () => {
         unit: 'MT',
         salesPrice: '100',
         costPrice: '80',
-        profit: '200.0000',
       },
     ]);
 
@@ -155,7 +154,6 @@ describe('dashboard.service', () => {
         unit: 'MT',
         salesPrice: '110',
         costPrice: '90',
-        profit: '400.0000',
       },
     ]);
 
@@ -198,7 +196,7 @@ describe('dashboard.service', () => {
       salesRepId: user.id,
     });
     await saveOrderItems(ownOrder.id, [
-      { productType: 'VLSFO', quantity: '5', unit: 'MT', salesPrice: '200', costPrice: '190', profit: '50.0000' },
+      { productType: 'VLSFO', quantity: '5', unit: 'MT', salesPrice: '200', costPrice: '190' },
     ]);
 
     const delegatedOrder = await createOrder({
@@ -209,7 +207,7 @@ describe('dashboard.service', () => {
       salesRepId: delegator.id,
     });
     await saveOrderItems(delegatedOrder.id, [
-      { productType: 'LSMGO', quantity: '7', unit: 'MT', salesPrice: '300', costPrice: '250', profit: '350.0000' },
+      { productType: 'LSMGO', quantity: '7', unit: 'MT', salesPrice: '300', costPrice: '250' },
     ]);
 
     const stats = await getTeamStats(tenant.id, user.id);
