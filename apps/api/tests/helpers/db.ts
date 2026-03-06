@@ -89,6 +89,8 @@ function getTruncateTables() {
     'teams',
     'company_emails',
     'company_contacts',
+    'credit_application_reviews',
+    'credit_applications',
     'credit_line_companies',
     'credit_line_counterparties',
     'credit_lines',
@@ -286,6 +288,50 @@ async function ensureTestSchemaCompat(): Promise<void> {
       subject text NOT NULL,
       sent_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
       created_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+
+  // Credit application enums / tables
+  await sql`DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'credit_application_status') THEN
+      CREATE TYPE credit_application_status AS ENUM ('PENDING','APPROVED','REJECTED','CANCELLED');
+    END IF;
+  END $$`;
+
+  await sql`DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'credit_application_review_decision') THEN
+      CREATE TYPE credit_application_review_decision AS ENUM ('APPROVED','REJECTED');
+    END IF;
+  END $$`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS credit_applications (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      type credit_line_type NOT NULL,
+      counterparty_id uuid NOT NULL REFERENCES counterparties(id) ON DELETE CASCADE,
+      order_id uuid REFERENCES orders(id) ON DELETE SET NULL,
+      credit_line_id uuid REFERENCES credit_lines(id) ON DELETE SET NULL,
+      requested_amount numeric(14,2) NOT NULL,
+      requested_currency text NOT NULL DEFAULT 'USD',
+      requested_days integer,
+      reason text,
+      status credit_application_status NOT NULL DEFAULT 'PENDING',
+      requested_by_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      resolved_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS credit_application_reviews (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      application_id uuid NOT NULL REFERENCES credit_applications(id) ON DELETE CASCADE,
+      reviewer_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      decision credit_application_review_decision NOT NULL,
+      comment text,
+      decided_at timestamptz NOT NULL DEFAULT now()
     )
   `;
 }
