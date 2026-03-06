@@ -238,6 +238,9 @@ async function ensureTestSchemaCompat(): Promise<void> {
     ADD COLUMN IF NOT EXISTS timezone_legacy text
   `;
 
+  // Drop stale email_log (may be missing bcc_emails from old compat shim)
+  await sql`DROP TABLE IF EXISTS email_log CASCADE`;
+
   await sql`
     CREATE TABLE IF NOT EXISTS email_log (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -248,6 +251,7 @@ async function ensureTestSchemaCompat(): Promise<void> {
       sent_from_email text NOT NULL,
       sent_to text NOT NULL,
       cc_emails text,
+      bcc_emails text,
       subject text NOT NULL,
       pdf_file_name text,
       channel text NOT NULL DEFAULT 'SMTP',
@@ -277,18 +281,28 @@ async function ensureTestSchemaCompat(): Promise<void> {
     )
   `;
 
+  // Drop stale supplier_inquiries (may have wrong columns from old compat shim)
+  await sql`DROP TABLE IF EXISTS supplier_inquiries CASCADE`;
+
   await sql`
     CREATE TABLE IF NOT EXISTS supplier_inquiries (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-      tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
       order_id uuid NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
       supplier_id uuid NOT NULL REFERENCES counterparties(id) ON DELETE CASCADE,
-      supplier_name text NOT NULL,
-      supplier_email text NOT NULL,
+      contact_id uuid REFERENCES company_contacts(id) ON DELETE SET NULL,
+      email text NOT NULL,
       subject text NOT NULL,
-      sent_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
-      created_at timestamptz NOT NULL DEFAULT now()
+      status text NOT NULL DEFAULT 'SENT',
+      sent_by_user_id uuid REFERENCES users(id),
+      sent_at timestamptz NOT NULL DEFAULT now(),
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
     )
+  `;
+
+  await sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_supplier_inquiries_order_supplier
+      ON supplier_inquiries(order_id, supplier_id)
   `;
 
   // Credit application enums / tables

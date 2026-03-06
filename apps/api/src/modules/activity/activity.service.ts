@@ -132,6 +132,7 @@ function parsePlatform(ua: string | null): string | null {
 
 export interface LogActivityParams {
   userId: string;
+  tenantId?: string;
   action: string;
   entityType: string | null;
   entityId: string | null;
@@ -152,11 +153,15 @@ export interface LogActivityParams {
 /** Insert an activity log entry (fire-and-forget). */
 export async function logActivity(params: LogActivityParams): Promise<void> {
   try {
-    const tenant = await db.query.tenants.findFirst();
-    if (!tenant) return;
+    let tenantId = params.tenantId;
+    if (!tenantId) {
+      const tenant = await db.query.tenants.findFirst();
+      if (!tenant) return;
+      tenantId = tenant.id;
+    }
 
     await db.insert(activityLogs).values({
-      tenantId: tenant.id,
+      tenantId,
       userId: params.userId,
       action: params.action,
       entityType: params.entityType ?? 'unknown',

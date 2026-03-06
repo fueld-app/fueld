@@ -252,6 +252,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       // Log to activity timeline
       logActivity({
         userId: auth.userId,
+        tenantId: auth.tenantId,
         action: 'EMAIL_SENT',
         entityType: 'order',
         entityId: orderId,
@@ -894,6 +895,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       if (successCount > 0) {
         logActivity({
           userId: auth.userId,
+          tenantId: auth.tenantId,
           action: 'EMAIL_SENT',
           entityType: 'order',
           entityId: orderId,

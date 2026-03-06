@@ -158,7 +158,7 @@ describe('documents mail service', () => {
       orderNumber: 'ORD-001',
       vesselName: 'MV TEST',
       portName: 'Singapore',
-    })).toBe('Offer / Confirmation — ORD-001 — MV TEST, Singapore');
+    })).toBe('Offer — ORD-001 — MV TEST, Singapore');
 
     expect(buildDocumentEmailSubject({
       documentType: 'NOMINATION',
