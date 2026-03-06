@@ -22,6 +22,7 @@ import { UserMenuComponent } from '../../shared/components/user-menu/user-menu.c
 import type { ApiResponse, PlaceDto, VesselDto } from '@fueld/types';
 import { AppUpdateService } from '../../core/pwa/app-update.service';
 import { LlmHealthService } from '../../core/llm/llm-health.service';
+import { NewInquiryModalService } from '../../core/trading/new-inquiry-modal.service';
 
 import { API } from '@app/core/config/api';
 
@@ -120,6 +121,7 @@ const NAVIGATION: NavItem[] = [
       { label: 'Security', route: '/admin/security' },
       { label: 'Settings', route: '/admin/settings' },
       { label: 'LLM / AI', route: '/admin/llm' },
+      { label: 'Backup / Restore', route: '/admin/backup' },
       { label: 'Email', route: '/admin/email' },
       { label: 'Credit Settings', route: '/admin/credit' },
     ],
@@ -623,6 +625,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   private screenshotHandler: ((e: KeyboardEvent) => void) | null = null;
 
   readonly llmHealth = inject(LlmHealthService);
+  private readonly newInquiryModal = inject(NewInquiryModalService);
 
   readonly sidebarOpen = signal(false);
   readonly commodityPrices = signal<CommodityPrice[]>([]);
@@ -755,7 +758,11 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   }
 
   openNewInquiry(): void {
-    this.router.navigate(['/trading/inquiries'], { queryParams: { new: '1' } });
+    this.newInquiryModal.requestOpen();
+
+    if (this.router.url.split('?')[0] !== '/trading/inquiries') {
+      this.router.navigate(['/trading/inquiries']);
+    }
   }
 
   readonly openGroups = signal<Set<string>>(new Set());

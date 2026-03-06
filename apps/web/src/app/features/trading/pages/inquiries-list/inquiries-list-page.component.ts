@@ -2,6 +2,7 @@ import {
   Component,
   ChangeDetectionStrategy,
   signal,
+  effect,
   inject,
   OnInit,
   OnDestroy,
@@ -25,6 +26,7 @@ import { firstValueFrom } from 'rxjs';
 // ═══════════════════════════════════════════════════════════════════════
 
 import { API } from '@app/core/config/api';
+import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.service';
 
 interface CompanySearchResult {
   source: 'local' | 'seasearcher';
@@ -336,6 +338,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly newInquiryModal = inject(NewInquiryModalService);
   private queryParamSub?: Subscription;
 
   readonly mode = input<'inquiries' | 'active-orders' | 'completed-orders' | 'cancelled-orders'>('inquiries');
@@ -440,6 +443,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   readonly canCreateInquiry = computed(
     () => !!this.newClientId() && !!this.newVesselId() && !!this.newPlaceId(),
   );
+  private lastHandledNewInquiryRequestId = 0;
 
   // ─── Lifecycle ────────────────────────────────────────────────────
 
@@ -447,6 +451,14 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
     this.loadInquiries();
     if (!this.isOrders()) {
       this.loadDropdownData();
+
+      effect(() => {
+        const requestId = this.newInquiryModal.requestId();
+        if (requestId > this.lastHandledNewInquiryRequestId) {
+          this.showNewInquiryModal.set(true);
+          this.lastHandledNewInquiryRequestId = requestId;
+        }
+      });
 
       // Auto-open modal when navigated with ?new=1 (e.g. from navbar button)
       this.queryParamSub = this.route.queryParamMap.subscribe((params) => {
