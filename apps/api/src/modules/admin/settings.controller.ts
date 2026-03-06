@@ -494,6 +494,7 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
         body.privateKey,
         body.subject,
         auth.sub,
+        auth.tenantId,
       );
       return { success: true, data: { saved: true } } satisfies ApiResponse<unknown>;
     } catch (err) {

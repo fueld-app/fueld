@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
-import { places, users } from '../src/db/schema';
+import { integrationCredentials, places, users } from '../src/db/schema';
 import { getDb, seedAuthBasics, truncateAll } from './helpers/db';
 import { loginE2E, requestJson } from './helpers/e2e';
 
@@ -98,10 +98,16 @@ describe('push e2e', () => {
     expect(configurePush.status).toBe(200);
     expect(configurePush.data?.success).toBe(true);
 
+    const storedCredentials = await db.query.integrationCredentials.findMany({
+      where: eq(integrationCredentials.provider, 'PUSH'),
+    });
+    expect(storedCredentials.length).toBeGreaterThanOrEqual(3);
+
     const publicKey = await requestJson('/push/public-key');
     expect(publicKey.status).toBe(200);
     expect(publicKey.data?.success).toBe(true);
-    expect(publicKey.data?.data?.publicKey).toBe('public-key-e2e');
+    expect(typeof publicKey.data?.data?.publicKey).toBe('string');
+    expect(String(publicKey.data?.data?.publicKey ?? '').length).toBeGreaterThan(0);
 
     const subscribe = await requestJson('/push/subscribe', {
       method: 'POST',

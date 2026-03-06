@@ -174,12 +174,11 @@ export async function getPipelineSummary(tenantId: string): Promise<PipelineSumm
   const results = await db
     .select({
       status: orders.status,
-      count: sql<number>`count(*)`.as('count'),
-      totalValue: sql<string>`coalesce(sum(
-        (select sum(oi.sales_price::numeric * oi.quantity::numeric) from order_items oi where oi.order_id = ${orders.id})
-      ), 0)`.as('total_value'),
+      count: sql<number>`count(distinct ${orders.id})`.as('count'),
+      totalValue: sql<string>`coalesce(sum(${orderItems.salesPrice}::numeric * ${orderItems.quantity}::numeric), 0)`.as('total_value'),
     })
     .from(orders)
+    .leftJoin(orderItems, eq(orderItems.orderId, orders.id))
     .where(eq(orders.tenantId, tenantId))
     .groupBy(orders.status);
 

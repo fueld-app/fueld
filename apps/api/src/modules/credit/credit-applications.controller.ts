@@ -156,7 +156,7 @@ export const creditApplicationsController = new Elysia({ prefix: '/credit/applic
                 title: 'New Credit Application',
                 body: `${auth.email ?? 'A trader'} submitted a credit application for ${app.counterpartyName} (${app.requestedCurrency} ${Number(app.requestedAmount).toLocaleString()})`,
                 url: `/credit/applications`,
-              });
+              }, auth.tenantId);
             }
           }
         } catch (e) {

@@ -322,8 +322,9 @@ export async function setPushCredentials(
   privateKey: string,
   subject: string,
   userId: string,
+  tenantId?: string,
 ): Promise<void> {
-  const tenantId = await getTenantId();
+  const resolvedTenantId = tenantId ?? await getTenantId();
   const now = new Date();
 
   const values: Record<string, string> = {
@@ -338,7 +339,7 @@ export async function setPushCredentials(
       .select({ id: integrationCredentials.id })
       .from(integrationCredentials)
       .where(and(
-        eq(integrationCredentials.tenantId, tenantId),
+        eq(integrationCredentials.tenantId, resolvedTenantId),
         eq(integrationCredentials.provider, 'PUSH'),
         eq(integrationCredentials.key, key),
       ))
@@ -357,7 +358,7 @@ export async function setPushCredentials(
         .where(eq(integrationCredentials.id, existing[0].id));
     } else {
       await db.insert(integrationCredentials).values({
-        tenantId,
+        tenantId: resolvedTenantId,
         provider: 'PUSH',
         key,
         encryptedValue: enc.encrypted,

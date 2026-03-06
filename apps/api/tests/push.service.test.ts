@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import { encrypt } from '../src/lib/crypto';
-import { integrationCredentials, pushSubscriptions } from '../src/db/schema';
+import { integrationCredentials, pushSubscriptions, tenants } from '../src/db/schema';
 import { getDb, seedBasics, truncateAll } from './helpers/db';
 
 type PushServiceModule = typeof import('../src/modules/push/push.service');
@@ -43,8 +43,8 @@ beforeEach(async () => {
 });
 
 describe('push.service', () => {
-  it('getVapidPublicKey throws when no tenant exists', async () => {
-    await expect(pushService.getVapidPublicKey()).rejects.toThrow('No tenant found');
+  it('getVapidPublicKey returns null when no push public key is configured', async () => {
+    await expect(pushService.getVapidPublicKey()).resolves.toBeNull();
   });
 
   it('getVapidPublicKey returns null when VAPID credentials are missing', async () => {
@@ -90,6 +90,42 @@ describe('push.service', () => {
 
     const key = await pushService.getVapidPublicKey();
     expect(key).toBe('pub-key-1');
+  });
+
+  it('getVapidPublicKey returns the most recently updated configured key', async () => {
+    const seededA = await seedBasics();
+    const db = await getDb();
+    const [tenantB] = await db.insert(tenants).values({
+      name: 'Second Test Tenant',
+      domain: 'test-2.local',
+    }).returning();
+
+    const older = encrypt('pub-key-old');
+    const newer = encrypt('pub-key-new');
+
+    await db.insert(integrationCredentials).values([
+      {
+        tenantId: seededA.tenant.id,
+        provider: 'PUSH',
+        key: 'publicKey',
+        encryptedValue: older.encrypted,
+        iv: older.iv,
+        authTag: older.authTag,
+        updatedAt: new Date('2026-03-01T00:00:00.000Z'),
+      },
+      {
+        tenantId: tenantB.id,
+        provider: 'PUSH',
+        key: 'publicKey',
+        encryptedValue: newer.encrypted,
+        iv: newer.iv,
+        authTag: newer.authTag,
+        updatedAt: new Date('2026-03-02T00:00:00.000Z'),
+      },
+    ]);
+
+    const key = await pushService.getVapidPublicKey();
+    expect(key).toBe('pub-key-new');
   });
 
   it('upsertSubscription inserts and updates a subscription by endpoint', async () => {

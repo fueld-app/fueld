@@ -1,7 +1,7 @@
 import webpush from 'web-push';
 import { db } from '../../db';
 import { integrationCredentials, pushSubscriptions } from '../../db/schema';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { decrypt } from '../../lib/crypto';
 
 interface SubscriptionKeys {
@@ -64,9 +64,22 @@ async function ensureVapidConfigured(tenantId: string): Promise<VapidConfig | nu
 }
 
 export async function getVapidPublicKey(): Promise<string | null> {
-  const tenantId = await getTenantId();
-  const config = await loadVapidConfig(tenantId);
-  return config?.publicKey ?? null;
+  const [row] = await db
+    .select({
+      encryptedValue: integrationCredentials.encryptedValue,
+      iv: integrationCredentials.iv,
+      authTag: integrationCredentials.authTag,
+    })
+    .from(integrationCredentials)
+    .where(and(
+      eq(integrationCredentials.provider, 'PUSH'),
+      eq(integrationCredentials.key, 'publicKey'),
+    ))
+    .orderBy(desc(integrationCredentials.updatedAt), desc(integrationCredentials.createdAt))
+    .limit(1);
+
+  if (!row) return null;
+  return decrypt(row.encryptedValue, row.iv, row.authTag);
 }
 
 export async function upsertSubscription(
@@ -151,10 +164,11 @@ export async function sendTestNotification(userId: string, tenantId: string): Pr
 export async function sendNotificationToUsers(
   userIds: string[],
   notification: { title: string; body: string; url?: string },
+  tenantId?: string,
 ): Promise<number> {
   if (!userIds.length) return 0;
-  const tenantId = await getTenantId();
-  const config = await ensureVapidConfigured(tenantId);
+  const resolvedTenantId = tenantId ?? await getTenantId();
+  const config = await ensureVapidConfigured(resolvedTenantId);
   if (!config) return 0;
 
   const subs = await db.query.pushSubscriptions.findMany({

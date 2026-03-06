@@ -81,6 +81,7 @@ function getTruncateTables() {
     'entity_comments',
     'password_reset_tokens',
     'integration_credentials',
+    'push_subscriptions',
     'bank_accounts',
     'user_company_overrides',
     'company_group_members',
