@@ -87,10 +87,24 @@ test('cancel inquiry shows all configured reasons and sends selected reason', as
   });
 
   const inquiryId = await createInquiryViaApi(page);
+  const cancelReasonsLoaded = page.waitForResponse(
+    (response) => response.url().includes('/admin/settings/my-inquiry-cancel-reasons')
+      && response.request().method() === 'GET',
+  );
   await page.goto(`/trading/inquiries/${inquiryId}`);
+  await cancelReasonsLoaded;
 
-  await page.getByRole('button', { name: 'Actions' }).click();
-  await page.getByRole('menuitem', { name: 'Cancel Inquiry' }).click();
+  await expect(page.getByRole('heading', { name: 'Inquiry Detail' })).toBeVisible();
+  await expect(page.getByText('INQUIRY', { exact: true })).toBeVisible();
+  await expect(page.locator('app-order-items tbody tr').first()).toBeVisible();
+
+  const actionsButton = page.getByRole('button', { name: 'Actions' });
+  const cancelInquiryMenuItem = page.getByRole('menuitem', { name: 'Cancel Inquiry' });
+
+  await expect(actionsButton).toBeVisible();
+  await actionsButton.click();
+  await expect(cancelInquiryMenuItem).toBeVisible();
+  await cancelInquiryMenuItem.click();
 
   await expect(page.getByRole('heading', { level: 3, name: 'Cancel inquiry' })).toBeVisible();
 
