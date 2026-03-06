@@ -2409,6 +2409,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
         `${API_URL}/orders/${id}/inquiry/send`,
         {
           suppliers: payload.suppliers,
+          bccEmails: payload.bccEmails,
           subject: payload.subject,
           htmlBody: payload.htmlBody,
         },

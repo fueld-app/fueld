@@ -840,6 +840,13 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         console.error('[Documents] Failed to load inquiry email rules:', err);
       }
 
+      const mergedBccEmails = [...new Map(
+        [...bccEmails, ...(body.bccEmails ?? [])]
+          .map((email) => email.trim().toLowerCase())
+          .filter((email) => email.length > 0)
+          .map((email) => [email.toLowerCase(), email] as const),
+      ).values()];
+
       const results: Array<{ supplierId: string; supplierName: string; email: string; success: boolean; error?: string }> = [];
 
       for (const supplier of body.suppliers) {
@@ -853,7 +860,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             senderName,
             recipientEmail: supplier.email,
             ccEmails,
-            bccEmails,
+            bccEmails: mergedBccEmails,
             subject: body.subject,
             htmlBody: body.htmlBody,
             // No PDF attachment for inquiry
@@ -967,6 +974,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           email: t.String({ format: 'email' }),
           contactId: t.Optional(t.String()),
         })),
+        bccEmails: t.Optional(t.Array(t.String({ format: 'email' }))),
         subject: t.String(),
         htmlBody: t.String(),
       }),

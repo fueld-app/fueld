@@ -9,7 +9,7 @@ mock.module('../src/modules/auth/microsoft-oauth.service', () => ({
   acquireGraphTokenForUser: async () => mockGraphToken,
 }));
 
-const { sendDocumentEmail, buildDocumentEmailHtml, buildDocumentEmailSubject } =
+const { sendDocumentEmail, buildDocumentEmailHtml, buildDocumentEmailSubject, buildInquiryEmailHtml } =
   await import('../src/modules/documents/mail.service');
 
 describe('documents mail service', () => {
@@ -304,5 +304,23 @@ describe('documents mail service', () => {
     expect(html).toContain('<li>VLSFO: Max 0.5% sulfur</li>');
     expect(html).toContain('<li>MGO: DMA grade</li>');
     expect(html).toContain('<li>HSFO: Pipe delivery only</li>');
+  });
+
+  test('buildInquiryEmailHtml omits supplier terms from the default inquiry body', () => {
+    const html = buildInquiryEmailHtml({
+      senderName: 'Trader',
+      vesselName: 'MV TEST',
+      vesselImo: '1234567',
+      portName: 'Singapore',
+      etaFormatted: '01 Mar 2026',
+      etdFormatted: '02 Mar 2026',
+      companyName: 'Fueld Trading Ltd',
+      supplierTerms: 'These terms should stay hidden for now.',
+      items: [{ quantity: '100.00', unit: 'MT', productType: 'VLSFO', description: 'Local specs' }],
+    });
+
+    expect(html).toContain('Please offer for the following');
+    expect(html).toContain('100.00 MT VLSFO Local specs');
+    expect(html).not.toContain('These terms should stay hidden for now.');
   });
 });

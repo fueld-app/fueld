@@ -12,6 +12,7 @@ import {
   bankAccounts,
   counterparties,
   emailLog,
+  emailRules,
   supplierInquiries,
   tenants,
 } from '../src/db/schema';
@@ -621,6 +622,50 @@ describe('email tracking, inquiry send & WhatsApp group notifications', () => {
 
         const recipients = logs.map(l => l.sentTo).sort();
         expect(recipients).toEqual(['sup1@example.com', 'sup2@example.com']);
+      } finally {
+        stub.restore();
+        mockGraphToken = null;
+      }
+    });
+
+    it('merges manual BCC emails with configured inquiry BCC rules', async () => {
+      const { token, orderId, supplier, tenantId, invoicingCompany } = await seedDocumentReadyOrder();
+      const db = await getDb();
+
+      await db.insert(emailRules).values({
+        tenantId,
+        ownCompanyId: invoicingCompany.id,
+        documentType: 'INQUIRY',
+        ruleType: 'BCC',
+        email: 'ops@example.com',
+        label: 'Ops',
+      });
+
+      mockGraphToken = 'graph-token';
+      const stub = stubGraphFetch();
+
+      try {
+        await requestJson(`/orders/${orderId}/inquiry/send`, {
+          method: 'POST',
+          token,
+          body: {
+            suppliers: [
+              { supplierId: supplier.id, supplierName: 'Supplier Co', email: 'sup1@example.com' },
+            ],
+            bccEmails: ['manual@example.com', 'OPS@example.com'],
+            subject: 'Inquiry Subject',
+            htmlBody: '<p>body</p>',
+          },
+        });
+
+        const logs = await db
+          .select()
+          .from(emailLog)
+          .where(eq(emailLog.orderId, orderId));
+
+        expect(logs.length).toBe(1);
+        expect(logs[0]!.bccEmails).toContain('manual@example.com');
+        expect(logs[0]!.bccEmails).toContain('ops@example.com');
       } finally {
         stub.restore();
         mockGraphToken = null;

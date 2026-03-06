@@ -12,6 +12,10 @@ import {
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { DomSanitizer, type SafeHtml } from '@angular/platform-browser';
+import {
+  EmailTagInputComponent,
+  type EmailTag,
+} from '../../../../shared/components/email-tag-input/email-tag-input.component';
 import { API_URL } from '@app/core/config/api';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -41,6 +45,7 @@ export interface SendInquiryPayload {
     email: string;
     contactId?: string;
   }>;
+  bccEmails: string[];
   subject: string;
   htmlBody: string;
 }
@@ -48,7 +53,7 @@ export interface SendInquiryPayload {
 @Component({
   selector: 'app-send-inquiry-modal',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule],
+  imports: [FormsModule, EmailTagInputComponent],
   template: `
     @if (open()) {
       <!-- Backdrop -->
@@ -194,6 +199,19 @@ export interface SendInquiryPayload {
               />
             </div>
 
+            <!-- BCC -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700">BCC</label>
+              <div class="mt-1">
+                <app-email-tag-input
+                  #bccInput
+                  [orderId]="orderId()"
+                  placeholder="Add BCC..."
+                  (tagsChange)="bccTags.set($event)"
+                />
+              </div>
+            </div>
+
             <!-- Body editor -->
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Email Body</label>
@@ -330,6 +348,7 @@ export class SendInquiryModalComponent {
   readonly suppliers = signal<SupplierRow[]>([]);
   readonly subject = signal('');
   readonly htmlBody = signal('');
+  readonly bccTags = signal<EmailTag[]>([]);
   readonly previewHtml = computed<SafeHtml>(() => this.sanitizer.bypassSecurityTrustHtml(this.htmlBody()));
 
   readonly bodyEditor = viewChild<ElementRef<HTMLDivElement>>('bodyEditor');
@@ -344,6 +363,7 @@ export class SendInquiryModalComponent {
   /** Open the modal and load suppliers + email defaults */
   show(): void {
     this.open.set(true);
+    this.bccTags.set([]);
     this.loadSuppliers();
     this.loadDefaults();
   }
@@ -351,6 +371,7 @@ export class SendInquiryModalComponent {
   close(): void {
     this.open.set(false);
     this.sending.set(false);
+    this.bccTags.set([]);
     this.closed.emit();
   }
 
@@ -453,6 +474,7 @@ export class SendInquiryModalComponent {
         email: s.emailOverride || s.email!,
         contactId: s.contactId ?? undefined,
       })),
+      bccEmails: this.bccTags().map((tag) => tag.email),
       subject: this.subject(),
       htmlBody: this.htmlBody(),
     });

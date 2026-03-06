@@ -399,10 +399,6 @@ export function buildInquiryEmailHtml(params: {
     })
     .join('');
 
-  const termsHtml = params.supplierTerms?.trim()
-    ? `<p style="margin-top: 16px; font-size: 13px; color: #6b7280;">${params.supplierTerms}</p>`
-    : '';
-
   return `
     <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 8px;">
       <div style="height: 4px; background: ${accentColor}; border-radius: 8px 8px 0 0;"></div>
@@ -431,7 +427,6 @@ export function buildInquiryEmailHtml(params: {
           </tr>
         </table>
         ${itemsHtml ? `<ul style="margin: 8px 0 0 18px; padding: 0; color: #374151;">${itemsHtml}</ul>` : ''}
-        ${termsHtml}
         <p>If you have any questions, please don't hesitate to reach out.</p>
         <p style="margin-top: 24px;">Best regards,<br/><strong>${params.senderName}</strong></p>
       </div>
