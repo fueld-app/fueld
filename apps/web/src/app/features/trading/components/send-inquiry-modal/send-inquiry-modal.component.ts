@@ -45,7 +45,7 @@ export interface SendInquiryPayload {
     email: string;
     contactId?: string;
   }>;
-  bccEmails: string[];
+  recipientEmails: string[];
   subject: string;
   htmlBody: string;
 }
@@ -199,17 +199,18 @@ export interface SendInquiryPayload {
               />
             </div>
 
-            <!-- BCC -->
+            <!-- Additional recipients -->
             <div>
-              <label class="block text-sm font-medium text-gray-700">BCC</label>
+              <label class="block text-sm font-medium text-gray-700">Additional recipients</label>
               <div class="mt-1">
                 <app-email-tag-input
-                  #bccInput
+                  #recipientInput
                   [orderId]="orderId()"
-                  placeholder="Add BCC..."
-                  (tagsChange)="bccTags.set($event)"
+                  placeholder="Add recipient..."
+                  (tagsChange)="recipientTags.set($event)"
                 />
               </div>
+              <p class="mt-1 text-xs text-gray-500">Each address here receives its own separate email, just like a selected supplier.</p>
             </div>
 
             <!-- Body editor -->
@@ -260,10 +261,10 @@ export interface SendInquiryPayload {
           <!-- Footer -->
           <div class="flex items-center justify-between border-t border-gray-200 px-6 py-4 shrink-0 bg-gray-50 rounded-b-2xl">
             <span class="text-sm text-gray-500">
-              @if (selectedCount() > 0) {
-                {{ selectedCount() }} supplier{{ selectedCount() === 1 ? '' : 's' }} will receive individual emails
+              @if (totalRecipientCount() > 0) {
+                {{ totalRecipientCount() }} email{{ totalRecipientCount() === 1 ? '' : 's' }} will be sent
               } @else {
-                Select at least one supplier to send
+                Select at least one recipient to send
               }
             </span>
             <div class="flex items-center gap-3">
@@ -277,7 +278,7 @@ export interface SendInquiryPayload {
               <button
                 type="button"
                 (click)="send()"
-                [disabled]="sending() || selectedCount() === 0 || !subject()"
+                [disabled]="sending() || totalRecipientCount() === 0 || !subject()"
                 class="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white
                   hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
@@ -348,12 +349,13 @@ export class SendInquiryModalComponent {
   readonly suppliers = signal<SupplierRow[]>([]);
   readonly subject = signal('');
   readonly htmlBody = signal('');
-  readonly bccTags = signal<EmailTag[]>([]);
+  readonly recipientTags = signal<EmailTag[]>([]);
   readonly previewHtml = computed<SafeHtml>(() => this.sanitizer.bypassSecurityTrustHtml(this.htmlBody()));
 
   readonly bodyEditor = viewChild<ElementRef<HTMLDivElement>>('bodyEditor');
 
   readonly selectedCount = computed(() => this.suppliers().filter(s => s.selected).length);
+  readonly totalRecipientCount = computed(() => this.selectedCount() + this.recipientTags().length);
   readonly allSelected = computed(() => {
     const list = this.suppliers().filter(s => s.email || s.emailOverride);
     return list.length > 0 && list.every(s => s.selected);
@@ -363,7 +365,7 @@ export class SendInquiryModalComponent {
   /** Open the modal and load suppliers + email defaults */
   show(): void {
     this.open.set(true);
-    this.bccTags.set([]);
+    this.recipientTags.set([]);
     this.loadSuppliers();
     this.loadDefaults();
   }
@@ -371,7 +373,7 @@ export class SendInquiryModalComponent {
   close(): void {
     this.open.set(false);
     this.sending.set(false);
-    this.bccTags.set([]);
+    this.recipientTags.set([]);
     this.closed.emit();
   }
 
@@ -464,7 +466,7 @@ export class SendInquiryModalComponent {
 
   send(): void {
     const selected = this.suppliers().filter(s => s.selected);
-    if (selected.length === 0) return;
+    if (selected.length === 0 && this.recipientTags().length === 0) return;
 
     this.sending.set(true);
     this.sendInquiry.emit({
@@ -474,7 +476,7 @@ export class SendInquiryModalComponent {
         email: s.emailOverride || s.email!,
         contactId: s.contactId ?? undefined,
       })),
-      bccEmails: this.bccTags().map((tag) => tag.email),
+      recipientEmails: this.recipientTags().map((tag) => tag.email),
       subject: this.subject(),
       htmlBody: this.htmlBody(),
     });

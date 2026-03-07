@@ -840,16 +840,42 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         console.error('[Documents] Failed to load inquiry email rules:', err);
       }
 
-      const mergedBccEmails = [...new Map(
-        [...bccEmails, ...(body.bccEmails ?? [])]
+      const normalizedRecipientEmails = [...new Map(
+        (body.recipientEmails ?? [])
           .map((email) => email.trim().toLowerCase())
           .filter((email) => email.length > 0)
           .map((email) => [email.toLowerCase(), email] as const),
       ).values()];
 
-      const results: Array<{ supplierId: string; supplierName: string; email: string; success: boolean; error?: string }> = [];
+      const supplierTargets = body.suppliers.map((supplier) => ({
+        type: 'supplier' as const,
+        supplierId: supplier.supplierId,
+        supplierName: supplier.supplierName,
+        email: supplier.email,
+        contactId: supplier.contactId,
+        resultId: supplier.supplierId,
+        label: supplier.supplierName,
+      }));
 
-      for (const supplier of body.suppliers) {
+      const seenEmails = new Set(supplierTargets.map((supplier) => supplier.email.toLowerCase()));
+      const recipientTargets = normalizedRecipientEmails
+        .filter((email) => {
+          if (seenEmails.has(email)) return false;
+          seenEmails.add(email);
+          return true;
+        })
+        .map((email) => ({
+          type: 'recipient' as const,
+          email,
+          resultId: `recipient:${email}`,
+          label: email,
+        }));
+
+      const inquiryTargets = [...supplierTargets, ...recipientTargets];
+
+      const results: Array<{ recipientId: string; recipientName: string; email: string; success: boolean; error?: string }> = [];
+
+      for (const target of inquiryTargets) {
         try {
           await sendDocumentEmail({
             documentType: 'INQUIRY',
@@ -858,45 +884,51 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             sentByUserId: auth.userId,
             senderEmail,
             senderName,
-            recipientEmail: supplier.email,
+            recipientEmail: target.email,
             ccEmails,
-            bccEmails: mergedBccEmails,
+            bccEmails,
             subject: body.subject,
             htmlBody: body.htmlBody,
             // No PDF attachment for inquiry
           });
 
-          // Record in supplier_inquiries table
-          await db.insert(supplierInquiries).values({
-            orderId,
-            supplierId: supplier.supplierId,
-            contactId: supplier.contactId ?? null,
-            email: supplier.email,
-            subject: body.subject,
-            status: 'SENT',
-            sentByUserId: auth.userId,
-          }).onConflictDoUpdate({
-            target: [supplierInquiries.orderId, supplierInquiries.supplierId],
-            set: {
-              email: supplier.email,
-              contactId: supplier.contactId ?? null,
+          if (target.type === 'supplier') {
+            await db.insert(supplierInquiries).values({
+              orderId,
+              supplierId: target.supplierId,
+              contactId: target.contactId ?? null,
+              email: target.email,
               subject: body.subject,
               status: 'SENT',
               sentByUserId: auth.userId,
-              sentAt: new Date(),
-              updatedAt: new Date(),
-            },
-          });
+            }).onConflictDoUpdate({
+              target: [supplierInquiries.orderId, supplierInquiries.supplierId],
+              set: {
+                email: target.email,
+                contactId: target.contactId ?? null,
+                subject: body.subject,
+                status: 'SENT',
+                sentByUserId: auth.userId,
+                sentAt: new Date(),
+                updatedAt: new Date(),
+              },
+            });
+          }
 
-          results.push({ supplierId: supplier.supplierId, supplierName: supplier.supplierName, email: supplier.email, success: true });
+          results.push({ recipientId: target.resultId, recipientName: target.label, email: target.email, success: true });
         } catch (err: any) {
-          console.error(`[Documents] Failed to send inquiry to ${supplier.email}:`, err);
-          results.push({ supplierId: supplier.supplierId, supplierName: supplier.supplierName, email: supplier.email, success: false, error: err.message });
+          console.error(`[Documents] Failed to send inquiry to ${target.email}:`, err);
+          results.push({ recipientId: target.resultId, recipientName: target.label, email: target.email, success: false, error: err.message });
         }
       }
 
       const successCount = results.filter(r => r.success).length;
-      const successfulSuppliers = results.filter(r => r.success);
+      const successfulSuppliers = supplierTargets.filter((supplier) =>
+        results.some((result) => result.success && result.recipientId === supplier.resultId),
+      );
+      const successfulRecipients = inquiryTargets.filter((target) =>
+        results.some((result) => result.success && result.recipientId === target.resultId),
+      );
 
       // Log to activity timeline
       if (successCount > 0) {
@@ -908,7 +940,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           entityId: orderId,
           metadata: {
             documentType: 'INQUIRY',
-            recipients: successfulSuppliers.map(s => s.supplierName).join(', '),
+            recipients: successfulRecipients.map((recipient) => recipient.label).join(', '),
             count: successCount,
             subject: body.subject,
           },
@@ -916,7 +948,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       }
 
       // Send WhatsApp group notification on first inquiry (configurable)
-      if (isFirstInquiry && successCount > 0) {
+      if (isFirstInquiry && successfulSuppliers.length > 0) {
         try {
           const [tenant] = await db
             .select({ settings: tenants.settings })
@@ -946,7 +978,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
               `*Products:*`,
               productLines,
               ``,
-              `*Suppliers (${successCount}):* ${supplierList}`,
+              `*Suppliers (${successfulSuppliers.length}):* ${supplierList}`,
               `*Sent by:* ${senderName}`,
             ].filter(Boolean).join('\n');
 
@@ -961,7 +993,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
 
       return {
         success: true,
-        message: `Sent inquiry to ${successCount}/${results.length} suppliers`,
+        message: `Sent inquiry to ${successCount}/${results.length} recipients`,
         data: results,
       };
     },
@@ -974,7 +1006,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           email: t.String({ format: 'email' }),
           contactId: t.Optional(t.String()),
         })),
-        bccEmails: t.Optional(t.Array(t.String({ format: 'email' }))),
+        recipientEmails: t.Optional(t.Array(t.String({ format: 'email' }))),
         subject: t.String(),
         htmlBody: t.String(),
       }),

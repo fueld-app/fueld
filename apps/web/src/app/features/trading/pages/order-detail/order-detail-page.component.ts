@@ -2405,11 +2405,11 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     if (!id) return;
 
     this.http
-      .post<{ success: boolean; message: string; data: Array<{ supplierId: string; supplierName: string; email: string; success: boolean; error?: string }> }>(
+      .post<{ success: boolean; message: string; data: Array<{ recipientId: string; recipientName: string; email: string; success: boolean; error?: string }> }>(
         `${API_URL}/orders/${id}/inquiry/send`,
         {
           suppliers: payload.suppliers,
-          bccEmails: payload.bccEmails,
+          recipientEmails: payload.recipientEmails,
           subject: payload.subject,
           htmlBody: payload.htmlBody,
         },
@@ -2420,7 +2420,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
           if (res.success) {
             const successCount = res.data?.filter((r: any) => r.success).length ?? 0;
             const total = res.data?.length ?? 0;
-            this.showToast('success', `Inquiry sent to ${successCount}/${total} suppliers`);
+            this.showToast('success', `Inquiry sent to ${successCount}/${total} recipients`);
             if (successCount > 0) {
               this.inquiryModal()?.close();
             }

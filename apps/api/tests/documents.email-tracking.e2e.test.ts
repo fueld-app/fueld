@@ -628,7 +628,7 @@ describe('email tracking, inquiry send & WhatsApp group notifications', () => {
       }
     });
 
-    it('merges manual BCC emails with configured inquiry BCC rules', async () => {
+    it('sends additional recipients as separate emails and keeps supplier tracking supplier-only', async () => {
       const { token, orderId, supplier, tenantId, invoicingCompany } = await seedDocumentReadyOrder();
       const db = await getDb();
 
@@ -637,8 +637,8 @@ describe('email tracking, inquiry send & WhatsApp group notifications', () => {
         ownCompanyId: invoicingCompany.id,
         documentType: 'INQUIRY',
         ruleType: 'BCC',
-        email: 'ops@example.com',
-        label: 'Ops',
+        email: 'audit@example.com',
+        label: 'Audit',
       });
 
       mockGraphToken = 'graph-token';
@@ -652,7 +652,7 @@ describe('email tracking, inquiry send & WhatsApp group notifications', () => {
             suppliers: [
               { supplierId: supplier.id, supplierName: 'Supplier Co', email: 'sup1@example.com' },
             ],
-            bccEmails: ['manual@example.com', 'OPS@example.com'],
+            recipientEmails: ['manual@example.com', 'watcher@example.com'],
             subject: 'Inquiry Subject',
             htmlBody: '<p>body</p>',
           },
@@ -663,9 +663,23 @@ describe('email tracking, inquiry send & WhatsApp group notifications', () => {
           .from(emailLog)
           .where(eq(emailLog.orderId, orderId));
 
-        expect(logs.length).toBe(1);
-        expect(logs[0]!.bccEmails).toContain('manual@example.com');
-        expect(logs[0]!.bccEmails).toContain('ops@example.com');
+        const inquiries = await db
+          .select()
+          .from(supplierInquiries)
+          .where(eq(supplierInquiries.orderId, orderId));
+
+        expect(logs.length).toBe(3);
+        expect(logs.map((log) => log.sentTo).sort()).toEqual([
+          'manual@example.com',
+          'sup1@example.com',
+          'watcher@example.com',
+        ]);
+        expect(logs.every((log) => ((log.bccEmails ?? []) as string[]).includes('audit@example.com'))).toBe(true);
+        expect(logs.some((log) => ((log.bccEmails ?? []) as string[]).includes('manual@example.com'))).toBe(false);
+        expect(logs.some((log) => ((log.bccEmails ?? []) as string[]).includes('watcher@example.com'))).toBe(false);
+
+        expect(inquiries.length).toBe(1);
+        expect(inquiries[0]!.supplierId).toBe(supplier.id);
       } finally {
         stub.restore();
         mockGraphToken = null;
