@@ -165,6 +165,14 @@ interface UserOption {
   email: string;
 }
 
+interface LocalPlaceOption {
+  id: string;
+  name: string;
+  country: string | null;
+}
+
+const SUPPLY_PORT_PRODUCT_OPTIONS = ['VLSFO', 'LSMGO', 'IFO380', 'MGO', 'LUBE'] as const;
+
 interface FleetVessel {
   id: string;
   imo: string;
@@ -1181,9 +1189,8 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
             }
 
             <!-- Supplies At (ports where this company is a supplier) -->
-            @if (supplyPortsLoading() || supplyPorts().length) {
               <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-11">
-                <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
+                <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between gap-3">
                   <h2 class="text-sm font-semibold text-gray-700">
                     Supplies At
                     @if (supplyPorts().length) {
@@ -1192,7 +1199,127 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                       </span>
                     }
                   </h2>
+                  <button
+                    type="button"
+                    (click)="openAddSupplyPort()"
+                    class="rounded-md bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 hover:bg-brand-100 transition-colors"
+                  >
+                    + Add place
+                  </button>
                 </div>
+                @if (showAddSupplyPort()) {
+                  <div class="border-b border-gray-100 px-5 py-4 bg-gray-50/50">
+                    <div class="space-y-3">
+                      <div class="relative">
+                        @if (selectedSupplyPlace()) {
+                          <div class="flex items-center justify-between rounded-md border border-brand-300 bg-brand-50 px-3 py-2 text-sm">
+                            <div>
+                              <span class="font-medium text-brand-800">{{ selectedSupplyPlace()!.name }}</span>
+                              @if (selectedSupplyPlace()!.country) {
+                                <span class="ml-1 text-xs text-brand-700/80">{{ selectedSupplyPlace()!.country }}</span>
+                              }
+                            </div>
+                            <button
+                              type="button"
+                              (click)="clearSelectedSupplyPlace()"
+                              class="ml-2 text-brand-400 hover:text-brand-600 transition-colors"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                              </svg>
+                            </button>
+                          </div>
+                        } @else {
+                          <input
+                            [ngModel]="supplyPlaceSearch()"
+                            (ngModelChange)="onSupplyPlaceSearch($event)"
+                            placeholder="Search local place..."
+                            class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                          />
+                          @if (supplyPlaceResults().length) {
+                            <div class="absolute z-10 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
+                              @for (place of supplyPlaceResults(); track place.id) {
+                                <button
+                                  type="button"
+                                  (click)="selectSupplyPlace(place)"
+                                  class="w-full px-3 py-2 text-left text-sm hover:bg-brand-50 transition-colors flex items-center justify-between"
+                                >
+                                  <span class="font-medium text-gray-900">{{ place.name }}</span>
+                                  @if (place.country) {
+                                    <span class="text-xs text-gray-400">{{ place.country }}</span>
+                                  }
+                                </button>
+                              }
+                            </div>
+                          }
+                        }
+                      </div>
+
+                      <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">Contact Person</label>
+                        @if (contactsLoading()) {
+                          <div class="text-xs text-gray-400 py-1">Loading contacts...</div>
+                        } @else if (contacts().length) {
+                          <select
+                            [ngModel]="supplyPortForm().contactId"
+                            (ngModelChange)="supplyPortForm.set({ ...supplyPortForm(), contactId: $event || null })"
+                            class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                          >
+                            <option [ngValue]="null">— None —</option>
+                            @for (contact of contacts(); track contact.id) {
+                              <option [ngValue]="contact.id">{{ contact.name }}@if (contact.role) { ({{ contact.role }}) }</option>
+                            }
+                          </select>
+                        } @else {
+                          <div class="text-xs text-gray-400 py-1">No contacts on file</div>
+                        }
+                      </div>
+
+                      <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">Products</label>
+                        <div class="flex flex-wrap gap-1.5">
+                          @for (prod of supplyPortProductOptions; track prod) {
+                            <button
+                              type="button"
+                              (click)="toggleSupplyPortProduct(prod)"
+                              [class]="supplyPortForm().products.includes(prod)
+                                ? 'rounded-full px-2.5 py-1 text-xs font-medium bg-brand-600 text-white ring-1 ring-brand-600 transition-colors'
+                                : 'rounded-full px-2.5 py-1 text-xs font-medium bg-white text-gray-600 ring-1 ring-gray-300 hover:ring-brand-400 hover:text-brand-700 transition-colors'"
+                            >
+                              {{ prod }}
+                            </button>
+                          }
+                        </div>
+                      </div>
+
+                      <textarea
+                        [ngModel]="supplyPortForm().note"
+                        (ngModelChange)="supplyPortForm.set({ ...supplyPortForm(), note: $event })"
+                        placeholder="Notes"
+                        rows="2"
+                        class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                      ></textarea>
+
+                      <div class="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          (click)="cancelAddSupplyPort()"
+                          class="rounded-md border border-gray-200 px-3 py-1 text-xs text-gray-600 hover:bg-gray-50 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          (click)="saveSupplyPort()"
+                          [disabled]="savingSupplyPort() || !selectedSupplyPlace()"
+                          class="rounded-md bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                        >
+                          {{ savingSupplyPort() ? 'Adding...' : 'Add' }}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                }
                 @if (supplyPortsLoading()) {
                   <div class="flex items-center justify-center py-6">
                     <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
@@ -1200,6 +1327,8 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                       <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                     </svg>
                   </div>
+                } @else if (!supplyPorts().length) {
+                  <div class="px-5 py-6 text-center text-sm text-gray-400">No supply ports added for this company</div>
                 } @else {
                   <div class="divide-y divide-gray-50 max-h-[300px] overflow-y-auto">
                     @for (sp of supplyPorts(); track sp.id) {
@@ -1225,7 +1354,6 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                   </div>
                 }
               </div>
-            }
 
             <!-- Orders -->
             <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-[13]">
@@ -2088,6 +2216,19 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   // Supply ports
   readonly supplyPorts = signal<SupplyPortDto[]>([]);
   readonly supplyPortsLoading = signal(false);
+  readonly showAddSupplyPort = signal(false);
+  readonly supplyPlaceSearch = signal('');
+  readonly supplyPlaceResults = signal<LocalPlaceOption[]>([]);
+  readonly selectedSupplyPlace = signal<LocalPlaceOption | null>(null);
+  readonly supplyPortForm = signal<{ placeId: string; contactId: string | null; products: string[]; note: string }>({
+    placeId: '',
+    contactId: null,
+    products: [],
+    note: '',
+  });
+  readonly savingSupplyPort = signal(false);
+  readonly supplyPortProductOptions = SUPPLY_PORT_PRODUCT_OPTIONS;
+  private supplyPlaceSearchTimeout: ReturnType<typeof setTimeout> | null = null;
 
   // Company Emails
   readonly companyEmails = signal<CompanyEmailDto[]>([]);
@@ -2183,6 +2324,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
       this.fleetMap.remove();
       this.fleetMap = null;
     }
+    if (this.supplyPlaceSearchTimeout) clearTimeout(this.supplyPlaceSearchTimeout);
     this.routeSub?.unsubscribe();
     this.syncSub?.unsubscribe();
     this.conflictsSub?.unsubscribe();
@@ -2208,6 +2350,12 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     this.seizures.set(null);
     this.sanctions.set(null);
     this.contacts.set([]);
+    this.supplyPorts.set([]);
+    this.showAddSupplyPort.set(false);
+    this.selectedSupplyPlace.set(null);
+    this.supplyPlaceSearch.set('');
+    this.supplyPlaceResults.set([]);
+    this.supplyPortForm.set({ placeId: '', contactId: null, products: [], note: '' });
     this.editing.set(false);
     this.showAddVessel.set(false);
     this.editingVesselAssocId.set(null);
@@ -3368,6 +3516,104 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
       console.error('Failed to load supply ports:', err);
     } finally {
       this.supplyPortsLoading.set(false);
+    }
+  }
+
+  openAddSupplyPort(): void {
+    this.showAddSupplyPort.set(true);
+    this.selectedSupplyPlace.set(null);
+    this.supplyPlaceSearch.set('');
+    this.supplyPlaceResults.set([]);
+    this.supplyPortForm.set({ placeId: '', contactId: null, products: [], note: '' });
+  }
+
+  cancelAddSupplyPort(): void {
+    this.showAddSupplyPort.set(false);
+    this.selectedSupplyPlace.set(null);
+    this.supplyPlaceSearch.set('');
+    this.supplyPlaceResults.set([]);
+    this.supplyPortForm.set({ placeId: '', contactId: null, products: [], note: '' });
+  }
+
+  onSupplyPlaceSearch(term: string): void {
+    this.supplyPlaceSearch.set(term);
+    if (this.supplyPlaceSearchTimeout) clearTimeout(this.supplyPlaceSearchTimeout);
+    if (term.trim().length < 2) {
+      this.supplyPlaceResults.set([]);
+      return;
+    }
+
+    this.supplyPlaceSearchTimeout = setTimeout(async () => {
+      try {
+        const res = await firstValueFrom(
+          this.http.get<ApiResponse<{ places: LocalPlaceOption[]; total: number }>>(
+            `${API}/lloyds/places/local?search=${encodeURIComponent(term)}&limit=15`,
+          ),
+        );
+        const existingPlaceIds = new Set(this.supplyPorts().map((port) => port.placeId));
+        this.supplyPlaceResults.set(
+          res.success && res.data
+            ? res.data.places.filter((place) => !existingPlaceIds.has(place.id))
+            : [],
+        );
+      } catch {
+        this.supplyPlaceResults.set([]);
+      }
+    }, 250);
+  }
+
+  selectSupplyPlace(place: LocalPlaceOption): void {
+    this.selectedSupplyPlace.set(place);
+    this.supplyPlaceSearch.set('');
+    this.supplyPlaceResults.set([]);
+    this.supplyPortForm.set({ ...this.supplyPortForm(), placeId: place.id });
+  }
+
+  clearSelectedSupplyPlace(): void {
+    this.selectedSupplyPlace.set(null);
+    this.supplyPlaceSearch.set('');
+    this.supplyPlaceResults.set([]);
+    this.supplyPortForm.set({ ...this.supplyPortForm(), placeId: '' });
+  }
+
+  toggleSupplyPortProduct(product: string): void {
+    const current = this.supplyPortForm().products;
+    const next = current.includes(product)
+      ? current.filter((value) => value !== product)
+      : [...current, product];
+    this.supplyPortForm.set({ ...this.supplyPortForm(), products: next });
+  }
+
+  async saveSupplyPort(): Promise<void> {
+    const companyId = this.company()?.id;
+    const selectedPlace = this.selectedSupplyPlace();
+    const form = this.supplyPortForm();
+    if (!companyId || !selectedPlace || !form.placeId) return;
+
+    this.savingSupplyPort.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<unknown>>(`${API}/lloyds/places/local/${form.placeId}/suppliers`, {
+          companyId,
+          contactId: form.contactId,
+          products: form.products,
+          note: form.note.trim() || undefined,
+        }),
+      );
+
+      if (!res.success) {
+        this.showToast('error', res.message ?? 'Failed to add supply port.');
+        return;
+      }
+
+      this.showToast('success', `Added ${selectedPlace.name} to supply ports.`);
+      this.cancelAddSupplyPort();
+      await this.loadSupplyPorts(companyId);
+    } catch (err) {
+      console.error('Failed to add supply port:', err);
+      this.showToast('error', 'Failed to add supply port.');
+    } finally {
+      this.savingSupplyPort.set(false);
     }
   }
 
