@@ -228,6 +228,42 @@ describe('admin settings.service', () => {
     expect(reloaded).toEqual(updated);
   });
 
+  it('persists inquiry settings including disabled states', async () => {
+    await seedBasics();
+    const {
+      getInquirySettings,
+      updateInquirySettings,
+    } = await loadSettingsService();
+
+    const defaults = await getInquirySettings();
+    expect(defaults.supplierResponseUrlEnabled).toBe(true);
+    expect(defaults.autoMarkNoReplyAfterHours).toBe(168);
+
+    const disabled = await updateInquirySettings({
+      supplierResponseUrlEnabled: false,
+      autoMarkNoReplyAfterHours: null,
+    });
+
+    expect(disabled.supplierResponseUrlEnabled).toBe(false);
+    expect(disabled.autoMarkNoReplyAfterHours).toBeNull();
+
+    const reloadedDisabled = await getInquirySettings();
+    expect(reloadedDisabled.supplierResponseUrlEnabled).toBe(false);
+    expect(reloadedDisabled.autoMarkNoReplyAfterHours).toBeNull();
+
+    const enabledAgain = await updateInquirySettings({
+      supplierResponseUrlEnabled: true,
+      autoMarkNoReplyAfterHours: 24,
+    });
+
+    expect(enabledAgain.supplierResponseUrlEnabled).toBe(true);
+    expect(enabledAgain.autoMarkNoReplyAfterHours).toBe(24);
+
+    const reloadedEnabled = await getInquirySettings();
+    expect(reloadedEnabled.supplierResponseUrlEnabled).toBe(true);
+    expect(reloadedEnabled.autoMarkNoReplyAfterHours).toBe(24);
+  });
+
   it('falls back to own companies when user team has no assigned companies', async () => {
     const { tenant, user, client } = await seedBasics();
     const db = await getDb();

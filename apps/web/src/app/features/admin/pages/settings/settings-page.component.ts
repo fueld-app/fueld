@@ -13,6 +13,11 @@ import type { ApiResponse, OrderNumberSettingsDto, VesselCompanyRoleSettingsDto,
 
 import { API } from '@app/core/config/api';
 
+interface InquirySettingsDto {
+  supplierResponseUrlEnabled: boolean;
+  autoMarkNoReplyAfterHours: number | null;
+}
+
 @Component({
   selector: 'app-settings-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -518,6 +523,107 @@ import { API } from '@app/core/config/api';
           </div>
 
           <!-- ════════════════════════════════════════════════════════ -->
+          <!--  Supplier Inquiry Settings                              -->
+          <!-- ════════════════════════════════════════════════════════ -->
+          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
+              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-sky-50">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-sky-600" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M4 4.75A2.75 2.75 0 0 1 6.75 2h10.5A2.75 2.75 0 0 1 20 4.75v10.5A2.75 2.75 0 0 1 17.25 18H9.56l-4.78 3.52A.75.75 0 0 1 3.6 20.9V18.8A2.75 2.75 0 0 1 2 16.25V4.75A2.75 2.75 0 0 1 4.75 2Zm2.75 1.5a1.25 1.25 0 0 0-1.25 1.25v7.95c0 .69.56 1.25 1.25 1.25h10.5c.69 0 1.25-.56 1.25-1.25V7.5c0-.69-.56-1.25-1.25-1.25H6.75Z" />
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-semibold text-gray-900">Supplier Inquiry Settings</h3>
+                <p class="text-xs text-gray-500">Control supplier response links and automatic no-reply handling for inquiries.</p>
+              </div>
+            </div>
+
+            <div class="p-6">
+              @if (inquirySaveSuccess()) {
+                <div class="mb-4 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                  </svg>
+                  {{ inquirySaveSuccess() }}
+                </div>
+              }
+              @if (inquirySaveError()) {
+                <div class="mb-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                  </svg>
+                  {{ inquirySaveError() }}
+                </div>
+              }
+
+              <div class="flex items-center justify-between gap-4">
+                <div>
+                  <p class="text-sm font-medium text-gray-900">Enable supplier response link</p>
+                  <p class="text-xs text-gray-500">Include the public quote URL in inquiry emails so suppliers can submit line-item prices directly.</p>
+                </div>
+                <button
+                  (click)="toggleInquiryResponseUrl()"
+                  [disabled]="inquirySaving()"
+                  [class]="inquiryResponseUrlEnabled()
+                    ? 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-sky-500 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:opacity-50'
+                    : 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:opacity-50'"
+                >
+                  <span
+                    [class]="inquiryResponseUrlEnabled()
+                      ? 'pointer-events-none inline-block h-5 w-5 translate-x-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'
+                      : 'pointer-events-none inline-block h-5 w-5 translate-x-0 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'"
+                  ></span>
+                </button>
+              </div>
+
+              <div class="mt-5 border-t border-gray-100 pt-5">
+                <div class="flex items-center justify-between gap-4">
+                  <div>
+                    <p class="text-sm font-medium text-gray-900">Auto-mark stale inquiries as no reply</p>
+                    <p class="text-xs text-gray-500">Convert unanswered inquiries from SENT to NO_REPLY after the configured number of hours.</p>
+                  </div>
+                  <button
+                    (click)="toggleInquiryAutoNoReply()"
+                    [disabled]="inquirySaving()"
+                    [class]="inquiryAutoNoReplyEnabled()
+                      ? 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-sky-500 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:opacity-50'
+                      : 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:opacity-50'"
+                  >
+                    <span
+                      [class]="inquiryAutoNoReplyEnabled()
+                        ? 'pointer-events-none inline-block h-5 w-5 translate-x-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'
+                        : 'pointer-events-none inline-block h-5 w-5 translate-x-0 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'"
+                    ></span>
+                  </button>
+                </div>
+
+                @if (inquiryAutoNoReplyEnabled()) {
+                  <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+                    <div class="w-full sm:w-40">
+                      <label class="block text-sm font-medium text-gray-700">Hours</label>
+                      <input
+                        type="number"
+                        min="1"
+                        [ngModel]="inquiryAutoNoReplyHours()"
+                        (ngModelChange)="setInquiryAutoNoReplyHours($event)"
+                        class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      (click)="saveInquiryAutoNoReplyHours()"
+                      [disabled]="inquirySaving()"
+                      class="inline-flex items-center justify-center rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-sky-700 disabled:opacity-50"
+                    >
+                      Save no-reply timing
+                    </button>
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- ════════════════════════════════════════════════════════ -->
           <!--  Inquiry Cancel Reasons                                 -->
           <!-- ════════════════════════════════════════════════════════ -->
           <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
@@ -795,6 +901,12 @@ export class SettingsPageComponent implements OnInit {
   readonly inquiryCancelReasons = signal<string[]>([]);
   readonly inquiryCancelReasonsSaving = signal(false);
   readonly inquiryCancelReasonsSaved = signal(false);
+  readonly inquiryResponseUrlEnabled = signal(true);
+  readonly inquiryAutoNoReplyEnabled = signal(true);
+  readonly inquiryAutoNoReplyHours = signal('168');
+  readonly inquirySaving = signal(false);
+  readonly inquirySaveSuccess = signal('');
+  readonly inquirySaveError = signal('');
 
   readonly livePreview = computed(() => {
     const tmpl = this.template();
@@ -828,6 +940,7 @@ export class SettingsPageComponent implements OnInit {
     this.loadCurrencies();
     this.loadCompanyTypes();
     this.loadAttachmentTypes();
+    this.loadInquirySettings();
     this.loadInquiryCancelReasons();
   }
 
@@ -1362,6 +1475,84 @@ export class SettingsPageComponent implements OnInit {
     } finally {
       this.attachmentTypesSaving.set(false);
     }
+  }
+
+  // ─── Supplier inquiry settings ───────────────────────────────────
+
+  private async loadInquirySettings(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<InquirySettingsDto>>(`${API}/admin/settings/inquiry`),
+      );
+      if (res.success) {
+        this.applyInquirySettings(res.data);
+      }
+    } catch {
+      this.showToast('error', 'Failed to load supplier inquiry settings.');
+    }
+  }
+
+  private applyInquirySettings(settings: InquirySettingsDto): void {
+    this.inquiryResponseUrlEnabled.set(settings.supplierResponseUrlEnabled !== false);
+    const autoMarkNoReplyAfterHours = settings.autoMarkNoReplyAfterHours;
+    this.inquiryAutoNoReplyEnabled.set(autoMarkNoReplyAfterHours !== null && autoMarkNoReplyAfterHours > 0);
+    this.inquiryAutoNoReplyHours.set(String(autoMarkNoReplyAfterHours ?? 168));
+  }
+
+  private async updateInquirySettings(payload: Partial<InquirySettingsDto>, successMessage: string): Promise<void> {
+    this.inquirySaving.set(true);
+    this.inquirySaveSuccess.set('');
+    this.inquirySaveError.set('');
+
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<InquirySettingsDto>>(`${API}/admin/settings/inquiry`, payload),
+      );
+      if (res.success) {
+        this.applyInquirySettings(res.data);
+        this.inquirySaveSuccess.set(successMessage);
+      } else {
+        this.inquirySaveError.set(res.message ?? 'Failed to update inquiry settings.');
+      }
+    } catch {
+      this.inquirySaveError.set('Failed to update inquiry settings.');
+    } finally {
+      this.inquirySaving.set(false);
+    }
+  }
+
+  async toggleInquiryResponseUrl(): Promise<void> {
+    await this.updateInquirySettings(
+      { supplierResponseUrlEnabled: !this.inquiryResponseUrlEnabled() },
+      !this.inquiryResponseUrlEnabled() ? 'Supplier response links enabled.' : 'Supplier response links disabled.',
+    );
+  }
+
+  async toggleInquiryAutoNoReply(): Promise<void> {
+    const enabled = !this.inquiryAutoNoReplyEnabled();
+    const parsedHours = Number(String(this.inquiryAutoNoReplyHours()).trim() || '168');
+    await this.updateInquirySettings(
+      { autoMarkNoReplyAfterHours: enabled ? Math.max(1, Math.round(parsedHours || 168)) : null },
+      enabled ? 'Automatic no-reply handling enabled.' : 'Automatic no-reply handling disabled.',
+    );
+  }
+
+  async saveInquiryAutoNoReplyHours(): Promise<void> {
+    const parsedHours = Number(String(this.inquiryAutoNoReplyHours()).trim());
+    if (!Number.isFinite(parsedHours) || parsedHours < 1) {
+      this.inquirySaveSuccess.set('');
+      this.inquirySaveError.set('No-reply timing must be at least 1 hour.');
+      return;
+    }
+
+    await this.updateInquirySettings(
+      { autoMarkNoReplyAfterHours: Math.round(parsedHours) },
+      'No-reply timing updated.',
+    );
+  }
+
+  setInquiryAutoNoReplyHours(value: unknown): void {
+    this.inquiryAutoNoReplyHours.set(String(value ?? ''));
   }
 
   // ─── Inquiry cancellation reasons ────────────────────────────────

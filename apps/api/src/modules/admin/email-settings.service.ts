@@ -134,13 +134,18 @@ export interface TemplateVariables {
   customerNote: string;
   supplierNote: string;
   invoiceNumber: string;
+  supplierName?: string;
+  contactName?: string;
+  name?: string;
+  quoteFormUrl?: string;
 }
 
 /**
- * Render a template string by replacing {{variable}} placeholders.
+ * Render a template string by replacing {{variable}} and ${variable} placeholders.
  */
 export function renderTemplate(template: string, vars: TemplateVariables): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => {
+  return template.replace(/\{\{(\w+)\}\}|\$\{(\w+)\}/g, (_, moustacheKey: string, dollarKey: string) => {
+    const key = moustacheKey || dollarKey;
     return (vars as any)[key] ?? '';
   });
 }
@@ -159,4 +164,8 @@ export const TEMPLATE_VARIABLES = [
   { key: 'customerNote', label: 'Customer note', example: 'Please confirm by EOD' },
   { key: 'supplierNote', label: 'Supplier note / remark', example: 'Deliver before 16:00' },
   { key: 'invoiceNumber', label: 'Invoice number', example: 'INV-2026-001' },
+  { key: 'supplierName', label: 'Supplier company name', example: 'Shell Marine Fuels' },
+  { key: 'contactName', label: 'Supplier contact name', example: 'Jane Bunker' },
+  { key: 'name', label: 'Preferred greeting name', example: 'Jane Bunker' },
+  { key: 'quoteFormUrl', label: 'Secure supplier quote form URL', example: 'https://app.fueld.com/supplier-quote/abc123' },
 ];

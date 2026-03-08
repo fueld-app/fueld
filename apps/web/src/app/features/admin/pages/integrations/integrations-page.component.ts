@@ -1456,7 +1456,6 @@ export class IntegrationsPageComponent implements OnInit {
     this.waGroupDropdownOpen.set(false);
     this.onWaGroupChange('');
   }
-
   syncWaGroupSearchText(): void {
     const jid = this.waDefaultGroupJid();
     if (!jid) {

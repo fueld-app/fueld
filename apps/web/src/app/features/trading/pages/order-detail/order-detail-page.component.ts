@@ -39,7 +39,7 @@ import {
   type HeaderAction,
 } from '../../components/header-actions/header-actions.component';
 import { SendEmailModalComponent, type SendEmailPayload, type DocumentEmailType, type SendWhatsAppPayload } from '../../components/send-email-modal/send-email-modal.component';
-import { SendInquiryModalComponent, type SendInquiryPayload } from '../../components/send-inquiry-modal/send-inquiry-modal.component';
+import { SendInquiryModalComponent, type SendInquiryPayload, type SendInquiryWhatsAppPayload } from '../../components/send-inquiry-modal/send-inquiry-modal.component';
 import type { DropdownOption } from '../../../../shared/components/searchable-dropdown/searchable-dropdown.component';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
@@ -62,6 +62,101 @@ interface TeamUserOption {
   id: string;
   name: string;
   email: string;
+}
+
+interface InquirySupplierPerformance {
+  deliveredCountOverall: number;
+  deliveredCountAtPlace: number;
+  lastDeliveredAtOverall: string | null;
+  lastDeliveredAtPlace: string | null;
+  sentCount: number;
+  quotedCount: number;
+  declinedCount: number;
+  noReplyCount: number;
+  respondedCount: number;
+  deliverableCount: number;
+  nonDeliverableCount: number;
+  averageResponseHours: number | null;
+}
+
+interface InquirySupplierComparisonRow {
+  portSupplierId: string;
+  supplierId: string;
+  supplierName: string;
+  contactId: string | null;
+  contactName: string | null;
+  phone?: string | null;
+  products: string[];
+  note: string | null;
+  email: string | null;
+  inquiryStatus: string | null;
+  inquirySentAt: string | null;
+  performance: InquirySupplierPerformance;
+}
+
+interface SupplierInquiryReplyItem {
+  orderItemId: string;
+  productType: string;
+  quantity: string;
+  unit: string;
+  description: string | null;
+  price: string | null;
+  currency: string;
+  note: string | null;
+}
+
+interface SupplierInquiryReplyRow {
+  id: string;
+  supplierId: string;
+  supplierName: string;
+  contactId: string | null;
+  contactName: string | null;
+  email: string;
+  status: 'SENT' | 'QUOTED' | 'DECLINED' | 'NO_REPLY';
+  sentAt: string | null;
+  responseDeadlineAt: string | null;
+  reminderSentAt: string | null;
+  reminderCount: number;
+  respondedAt: string | null;
+  quotedAt: string | null;
+  canDeliver: boolean | null;
+  declineReason: string | null;
+  quoteValidUntil: string | null;
+  deliveryWindow: string | null;
+  supplierPaymentTerms: string | null;
+  supplierComment: string | null;
+  responseHours: number | null;
+  quoteLineCount: number;
+  items: SupplierInquiryReplyItem[];
+}
+
+interface InquiryQuoteMatrixCell {
+  supplierInquiryId: string;
+  supplierId: string;
+  supplierName: string;
+  status: SupplierInquiryReplyRow['status'];
+  price: string | null;
+  currency: string;
+  note: string | null;
+  responseHours: number | null;
+  isSelectedSupplier: boolean;
+}
+
+interface InquiryQuoteMatrixRow {
+  orderItemId: string;
+  productType: string;
+  quantity: string;
+  unit: string;
+  description: string | null;
+  cells: InquiryQuoteMatrixCell[];
+}
+
+interface InquiryReplyRecommendation {
+  bestOverall: boolean;
+  lowestComparable: boolean;
+  mostComplete: boolean;
+  fastest: boolean;
+  score: number;
 }
 
 @Component({
@@ -424,10 +519,454 @@ interface TeamUserOption {
       </div>
     </app-trading-detail-meta-cards>
 
+    @if (isInquiryContext()) {
+      <div class="mt-4 grid gap-4 lg:grid-cols-2 lg:items-stretch">
+        <div class="flex h-full flex-col overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-emerald-50 shadow-sm lg:order-1">
+        <div class="border-b border-slate-200/70 px-5 py-4">
+          <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Inquiry intelligence</div>
+              <h3 class="mt-1 text-base font-semibold text-slate-900">Supplier Comparison Context</h3>
+              <p class="mt-1 text-sm text-slate-500">Delivery history and quote hit-rate for suppliers at this port.</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 text-xs">
+              <span class="inline-flex items-center rounded-full border border-slate-200 bg-white/80 px-2.5 py-1 font-medium text-slate-600">
+                {{ rankedInquirySuppliers().length }} supplier{{ rankedInquirySuppliers().length === 1 ? '' : 's' }} ranked
+              </span>
+              @if (selectedSupplierComparison()) {
+                <span class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700">
+                  Reviewing {{ selectedSupplierComparison()!.supplierName }}
+                </span>
+              }
+            </div>
+          </div>
+        </div>
+
+        @if (inquirySupplierContextLoading()) {
+          <div class="px-5 py-5 text-sm text-slate-400">Loading supplier comparison context...</div>
+        } @else if (rankedInquirySuppliers().length === 0) {
+          <div class="px-5 py-5 text-sm text-slate-400">No supplier history available for this inquiry yet.</div>
+        } @else {
+          <div class="grid gap-3 px-5 py-5 lg:grid-cols-2">
+            @for (supplier of rankedInquirySuppliers(); track supplier.supplierId) {
+              <div
+                class="rounded-2xl border px-4 py-3 shadow-sm transition-all"
+                [class.border-emerald-300]="selectedSupplierComparison()?.supplierId === supplier.supplierId"
+                [class.bg-emerald-50/80]="selectedSupplierComparison()?.supplierId === supplier.supplierId"
+                [class.border-slate-200]="selectedSupplierComparison()?.supplierId !== supplier.supplierId"
+                [class.bg-white]="selectedSupplierComparison()?.supplierId !== supplier.supplierId"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="truncate text-sm font-semibold text-slate-900">{{ supplier.supplierName }}</span>
+                      @if (isTopInquirySupplier(supplier)) {
+                        <span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">Best history here</span>
+                      }
+                      @if (selectedSupplierComparison()?.supplierId === supplier.supplierId) {
+                        <span class="inline-flex items-center rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Selected</span>
+                      }
+                    </div>
+                    @if (supplier.products.length) {
+                      <div class="mt-1 flex flex-wrap gap-1">
+                        @for (product of supplier.products; track product) {
+                          <span class="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">{{ product }}</span>
+                        }
+                      </div>
+                    }
+                  </div>
+                  @if (supplier.inquiryStatus) {
+                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
+                      [class]="statusBadgeClass(supplier.inquiryStatus)">
+                      {{ supplier.inquiryStatus }}
+                    </span>
+                  }
+                </div>
+
+                <div class="mt-3 flex flex-wrap gap-1.5">
+                  @if (supplier.performance.deliveredCountOverall > 0) {
+                    <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-200">{{ supplier.performance.deliveredCountOverall }} delivered</span>
+                  }
+                  @if (supplier.performance.deliveredCountAtPlace > 0) {
+                    <span class="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-blue-200">{{ supplier.performance.deliveredCountAtPlace }} at this place</span>
+                  }
+                  @if (quoteRateLabel(supplier.performance)) {
+                    <span class="inline-flex items-center rounded-full bg-fuchsia-50 px-2 py-0.5 text-[10px] font-medium text-fuchsia-700 ring-1 ring-fuchsia-200">{{ quoteRateLabel(supplier.performance) }}</span>
+                  }
+                  @if (averageResponseLabel(supplier.performance)) {
+                    <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-amber-200">{{ averageResponseLabel(supplier.performance) }}</span>
+                  }
+                  @if (deliverabilityLabel(supplier.performance)) {
+                    <span class="inline-flex items-center rounded-full bg-teal-50 px-2 py-0.5 text-[10px] font-medium text-teal-700 ring-1 ring-teal-200">{{ deliverabilityLabel(supplier.performance) }}</span>
+                  }
+                  @if (supplierPerformanceSummary(supplier.performance)) {
+                    <span class="inline-flex items-center rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-600 ring-1 ring-slate-200">{{ supplierPerformanceSummary(supplier.performance) }}</span>
+                  }
+                </div>
+
+                @if (supplier.inquirySentAt) {
+                  <div class="mt-3 border-t border-slate-200/70 pt-2 text-[11px] text-slate-400">Inquiry sent {{ formatHistoryDate(supplier.inquirySentAt) }}</div>
+                }
+
+                @if (!isReadonly()) {
+                  <div class="mt-3 flex justify-end">
+                    <button
+                      type="button"
+                      (click)="applyComparisonSupplier(supplier)"
+                      [disabled]="selectedSupplierComparison()?.supplierId === supplier.supplierId"
+                      class="inline-flex items-center rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors"
+                      [class.bg-brand-600]="selectedSupplierComparison()?.supplierId !== supplier.supplierId"
+                      [class.text-white]="selectedSupplierComparison()?.supplierId !== supplier.supplierId"
+                      [class.hover:bg-brand-700]="selectedSupplierComparison()?.supplierId !== supplier.supplierId"
+                      [class.bg-slate-100]="selectedSupplierComparison()?.supplierId === supplier.supplierId"
+                      [class.text-slate-500]="selectedSupplierComparison()?.supplierId === supplier.supplierId"
+                    >
+                      {{ selectedSupplierComparison()?.supplierId === supplier.supplierId ? 'Selected supplier' : 'Set as supplier' }}
+                    </button>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+        </div>
+
+      @if (sortedInquiryReplies().length > 0) {
+        <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm lg:order-3 lg:col-span-2">
+          <div class="border-b border-slate-200 px-5 py-4">
+          <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Line comparison</div>
+              <h3 class="mt-1 text-base font-semibold text-slate-900">Quote Matrix</h3>
+              <p class="mt-1 text-sm text-slate-500">Compare all supplier responses by line item in one grid.</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 text-xs">
+              <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 font-medium text-slate-600">
+                {{ sortedInquiryReplies().length }} repl{{ sortedInquiryReplies().length === 1 ? 'y' : 'ies' }}
+              </span>
+              <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 font-medium text-slate-600">
+                {{ inquiryQuoteMatrixRows().length }} line{{ inquiryQuoteMatrixRows().length === 1 ? '' : 's' }}
+              </span>
+            </div>
+          </div>
+          </div>
+
+          <div class="overflow-x-auto px-5 py-4">
+            <table class="min-w-full border-separate border-spacing-0 text-sm">
+              <thead>
+                <tr>
+                  <th class="sticky left-0 z-10 min-w-64 border-b border-slate-200 bg-white px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Line item</th>
+                  @for (reply of sortedInquiryReplies(); track reply.id) {
+                    <th class="min-w-52 border-b border-slate-200 px-4 py-3 text-left align-top"
+                      [class.bg-slate-50]="order()?.supplierId === reply.supplierId">
+                      <div class="flex items-center gap-2">
+                        <span class="font-semibold text-slate-900">{{ reply.supplierName }}</span>
+                        @if (order()?.supplierId === reply.supplierId) {
+                          <span class="inline-flex items-center rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Selected</span>
+                        }
+                      </div>
+                      <div class="mt-2 flex flex-wrap gap-1.5">
+                        @if (inquiryReplyRecommendation(reply.id)?.bestOverall) {
+                          <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 ring-1 ring-emerald-200">Best overall</span>
+                        }
+                        @if (inquiryReplyRecommendation(reply.id)?.lowestComparable) {
+                          <span class="inline-flex items-center rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-700 ring-1 ring-sky-200">Lowest total</span>
+                        }
+                        @if (inquiryReplyRecommendation(reply.id)?.mostComplete) {
+                          <span class="inline-flex items-center rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-700 ring-1 ring-violet-200">Most complete</span>
+                        }
+                        @if (inquiryReplyRecommendation(reply.id)?.fastest) {
+                          <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 ring-1 ring-amber-200">Fastest</span>
+                        }
+                      </div>
+                      <div class="mt-1 text-[11px] text-slate-500">{{ inquiryReplySummary(reply) }}</div>
+                      <div class="mt-1 text-[11px] text-slate-400">Score {{ inquiryReplyRecommendation(reply.id)?.score ?? 0 | number : '1.0-1' }}</div>
+                      @if (reply.responseHours !== null) {
+                        <div class="mt-1 text-[11px] text-slate-400">{{ responseHoursLabel(reply.responseHours) }} response</div>
+                      }
+                    </th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (matrixRow of inquiryQuoteMatrixRows(); track matrixRow.orderItemId) {
+                  <tr>
+                    <td class="sticky left-0 z-10 border-b border-slate-100 bg-white px-4 py-3 align-top">
+                      <div class="font-semibold text-slate-900">{{ matrixRow.productType }}</div>
+                      <div class="mt-1 text-xs text-slate-500">{{ matrixRow.quantity }} {{ matrixRow.unit }}@if (matrixRow.description) { · {{ matrixRow.description }} }</div>
+                    </td>
+                    @for (cell of matrixRow.cells; track cell.supplierInquiryId) {
+                      <td class="border-b border-slate-100 px-4 py-3 align-top"
+                        [class.bg-slate-50]="cell.isSelectedSupplier">
+                        @if (cell.price !== null) {
+                          <div class="font-semibold text-slate-900">{{ cell.price }} {{ cell.currency }}</div>
+                          @if (cell.note) {
+                            <div class="mt-1 text-xs text-slate-500">{{ cell.note }}</div>
+                          }
+                        } @else {
+                          <div class="font-medium text-slate-500">{{ cell.note || inquiryQuoteMatrixCellLabel(cell.status) }}</div>
+                        }
+                      </td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+
+        <div class="flex h-full flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm lg:order-2">
+        <div class="border-b border-slate-200 px-5 py-4">
+          <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Manual capture</div>
+              <h3 class="mt-1 text-base font-semibold text-slate-900">Supplier Replies</h3>
+              <p class="mt-1 text-sm text-slate-500">Record manual supplier replies and line-item quotes so future ranking reflects actual responsiveness.</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 text-xs">
+              <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 font-medium text-slate-600">
+                {{ sortedInquiryReplies().length }} supplier{{ sortedInquiryReplies().length === 1 ? '' : 's' }} contacted
+              </span>
+            </div>
+          </div>
+        </div>
+
+        @if (inquiryRepliesLoading()) {
+          <div class="px-5 py-5 text-sm text-slate-400">Loading supplier replies...</div>
+        } @else if (sortedInquiryReplies().length === 0) {
+          <div class="px-5 py-5 text-sm text-slate-400">No supplier inquiries have been sent yet.</div>
+        } @else {
+          <div class="flex-1 space-y-3 px-5 py-5">
+            @for (reply of sortedInquiryReplies(); track reply.id) {
+              <div class="rounded-2xl border border-slate-200 bg-gradient-to-b from-white to-slate-50/50 p-4 shadow-sm">
+                <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div class="min-w-0">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="text-sm font-semibold text-slate-900">{{ reply.supplierName }}</span>
+                      <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium" [class]="statusBadgeClass(reply.status)">{{ reply.status }}</span>
+                      @if (order()?.supplierId === reply.supplierId) {
+                        <span class="inline-flex items-center rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Selected supplier</span>
+                      }
+                    </div>
+                    <div class="mt-1 text-xs text-slate-500">
+                      {{ reply.email }}
+                      @if (reply.contactName) {
+                        <span> • {{ reply.contactName }}</span>
+                      }
+                    </div>
+                    @if (reply.sentAt) {
+                      <div class="mt-1 text-[11px] text-slate-400">Sent {{ formatHistoryDateTime(reply.sentAt) }}</div>
+                    }
+                    @if (reply.responseDeadlineAt) {
+                      <div class="mt-1 text-[11px] text-slate-400">Reply by {{ formatHistoryDateTime(reply.responseDeadlineAt) }}</div>
+                    }
+                  </div>
+
+                  <div class="flex flex-wrap items-center gap-2">
+                    @if (reply.responseHours !== null) {
+                      <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-amber-200">{{ responseHoursLabel(reply.responseHours) }} response</span>
+                    }
+                    @if (reply.canDeliver === true) {
+                      <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-200">Can deliver</span>
+                    }
+                    @if (reply.canDeliver === false) {
+                      <span class="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-medium text-rose-700 ring-1 ring-rose-200">Cannot deliver</span>
+                    }
+                    @if (reply.reminderSentAt) {
+                      <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 ring-1 ring-slate-200">Reminder sent</span>
+                    }
+                    @if (!isReadonly()) {
+                      <button
+                        type="button"
+                        (click)="isEditingInquiryReply(reply) ? cancelInquiryReplyEditor() : openInquiryReplyEditor(reply)"
+                        class="inline-flex items-center rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900"
+                      >
+                        {{ isEditingInquiryReply(reply) ? 'Close editor' : 'Record reply' }}
+                      </button>
+                    }
+                  </div>
+                </div>
+
+                <div class="mt-3 rounded-xl border border-slate-200/80 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                  {{ inquiryReplySummary(reply) }}
+                </div>
+
+                @if (reply.status === 'QUOTED' && !isEditingInquiryReply(reply) && (reply.deliveryWindow || reply.supplierPaymentTerms || reply.quoteValidUntil || reply.supplierComment)) {
+                  <div class="mt-3 grid gap-2 md:grid-cols-2">
+                    @if (reply.deliveryWindow) {
+                      <div class="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-600"><span class="font-medium text-slate-900">Delivery window:</span> {{ reply.deliveryWindow }}</div>
+                    }
+                    @if (reply.supplierPaymentTerms) {
+                      <div class="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-600"><span class="font-medium text-slate-900">Payment terms:</span> {{ reply.supplierPaymentTerms }}</div>
+                    }
+                    @if (reply.quoteValidUntil) {
+                      <div class="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-600"><span class="font-medium text-slate-900">Valid until:</span> {{ formatHistoryDateTime(reply.quoteValidUntil) }}</div>
+                    }
+                    @if (reply.supplierComment) {
+                      <div class="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-600 md:col-span-2"><span class="font-medium text-slate-900">Comment:</span> {{ reply.supplierComment }}</div>
+                    }
+                  </div>
+                }
+
+                @if (reply.status === 'QUOTED' && !isEditingInquiryReply(reply)) {
+                  <div class="mt-3 grid gap-2 md:grid-cols-2">
+                    @for (item of reply.items; track item.orderItemId) {
+                        <div class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm">
+                        <div class="font-medium text-slate-900">{{ item.productType }}</div>
+                        <div class="mt-1 text-xs text-slate-500">{{ item.quantity }} {{ item.unit }}@if (item.description) { · {{ item.description }} }</div>
+                        <div class="mt-2 text-sm font-semibold text-slate-900">{{ item.price || '—' }}@if (item.price) { {{ item.currency }} }</div>
+                        @if (item.note) {
+                          <div class="mt-1 text-xs text-slate-500">{{ item.note }}</div>
+                        }
+                      </div>
+                    }
+                  </div>
+                }
+
+                @if (isEditingInquiryReply(reply)) {
+                  <div class="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Reply status</div>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                      @for (status of inquiryReplyStatuses; track status) {
+                        <button
+                          type="button"
+                          (click)="setInquiryReplyStatus(status)"
+                          class="rounded-full px-3 py-1.5 text-xs font-semibold transition-colors"
+                          [class.bg-slate-900]="inquiryReplyStatus() === status"
+                          [class.text-white]="inquiryReplyStatus() === status"
+                          [class.bg-white]="inquiryReplyStatus() !== status"
+                          [class.text-slate-600]="inquiryReplyStatus() !== status"
+                          [class.ring-1]="inquiryReplyStatus() !== status"
+                          [class.ring-slate-200]="inquiryReplyStatus() !== status"
+                        >
+                          {{ status === 'SENT' ? 'Awaiting' : status === 'NO_REPLY' ? 'No reply' : status }}
+                        </button>
+                      }
+                    </div>
+
+                    @if (inquiryReplyStatus() === 'QUOTED' || inquiryReplyStatus() === 'DECLINED') {
+                      <div class="mt-4">
+                        <label class="block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Responded at</label>
+                        <input
+                          type="datetime-local"
+                          [ngModel]="inquiryReplyRespondedAt()"
+                          (ngModelChange)="inquiryReplyRespondedAt.set($event)"
+                          class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 md:w-72"
+                        />
+                      </div>
+                    }
+
+                    @if (inquiryReplyStatus() === 'QUOTED') {
+                      <div class="mt-4 grid gap-3 md:grid-cols-2">
+                        @for (item of reply.items; track item.orderItemId) {
+                          <div class="rounded-xl border border-slate-200 bg-white p-3">
+                            <div class="text-sm font-semibold text-slate-900">{{ item.productType }}</div>
+                            <div class="mt-1 text-xs text-slate-500">{{ item.quantity }} {{ item.unit }}@if (item.description) { · {{ item.description }} }</div>
+                            <label class="mt-3 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Price ({{ item.currency }})</label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.0001"
+                              [ngModel]="inquiryReplyPrices()[item.orderItemId] || ''"
+                              (ngModelChange)="setInquiryReplyPrice(item.orderItemId, $event)"
+                              class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-right text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                            />
+                            <label class="mt-3 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Line note</label>
+                            <textarea
+                              rows="2"
+                              [ngModel]="inquiryReplyNotes()[item.orderItemId] || ''"
+                              (ngModelChange)="setInquiryReplyNote(item.orderItemId, $event)"
+                              class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                              placeholder="Optional note or skip reason"
+                            ></textarea>
+                          </div>
+                        }
+                      </div>
+
+                      <div class="mt-4 grid gap-3 md:grid-cols-2">
+                        <div>
+                          <label class="block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Quote valid until</label>
+                          <input
+                            type="datetime-local"
+                            [ngModel]="inquiryReplyQuoteValidUntil()"
+                            (ngModelChange)="inquiryReplyQuoteValidUntil.set($event)"
+                            class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                          />
+                        </div>
+                        <div>
+                          <label class="block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Delivery window</label>
+                          <input
+                            type="text"
+                            [ngModel]="inquiryReplyDeliveryWindow()"
+                            (ngModelChange)="inquiryReplyDeliveryWindow.set($event)"
+                            class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                          />
+                        </div>
+                        <div>
+                          <label class="block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Payment terms</label>
+                          <input
+                            type="text"
+                            [ngModel]="inquiryReplySupplierPaymentTerms()"
+                            (ngModelChange)="inquiryReplySupplierPaymentTerms.set($event)"
+                            class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                          />
+                        </div>
+                        <div class="md:col-span-2">
+                          <label class="block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Comment</label>
+                          <textarea
+                            rows="3"
+                            [ngModel]="inquiryReplySupplierComment()"
+                            (ngModelChange)="inquiryReplySupplierComment.set($event)"
+                            class="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                          ></textarea>
+                        </div>
+                      </div>
+                    }
+
+                    @if (inquiryReplyStatus() === 'DECLINED') {
+                      <div class="mt-4">
+                        <label class="block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Decline reason</label>
+                        <textarea
+                          rows="3"
+                          [ngModel]="inquiryReplyDeclineReason()"
+                          (ngModelChange)="inquiryReplyDeclineReason.set($event)"
+                          class="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                          placeholder="Why could the supplier not deliver?"
+                        ></textarea>
+                      </div>
+                    }
+
+                    <div class="mt-4 flex flex-wrap justify-end gap-2">
+                      <button
+                        type="button"
+                        (click)="cancelInquiryReplyEditor()"
+                        class="inline-flex items-center rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900"
+                      >Cancel</button>
+                      <button
+                        type="button"
+                        (click)="saveInquiryReply(reply)"
+                        [disabled]="inquiryRepliesSavingId() === reply.id || !canSaveInquiryReply(reply)"
+                        class="inline-flex items-center rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {{ inquiryRepliesSavingId() === reply.id ? 'Saving...' : 'Save reply' }}
+                      </button>
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+      </div>
+      </div>
+    }
+
     <!-- ═════════════════════════════════════════════════════════════ -->
     <!--  Editable Items Grid                                         -->
     <!-- ═════════════════════════════════════════════════════════════ -->
     <app-order-items
+      class="mt-4 block"
       [items]="itemRows()"
       [readonly]="isReadonly()"
       [allowDeliveredEdit]="allowDeliveredEdit()"
@@ -439,7 +978,7 @@ interface TeamUserOption {
 
     <!-- Delivery + Payments + Attachments + Comments -->
     @if (allowDeliveredEdit() || orderId() || order()?.id) {
-      <div class="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         @if (allowDeliveredEdit()) {
           <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[520px] flex flex-col">
             <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Delivery Details</h3>
@@ -573,7 +1112,7 @@ interface TeamUserOption {
         }
       </div>
       @if (order()?.id) {
-        <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
           <app-email-history-card [orderId]="order()!.id" />
           <app-activity-timeline entityType="order" [entityId]="order()!.id" />
         </div>
@@ -797,7 +1336,9 @@ interface TeamUserOption {
     <app-send-inquiry-modal
       [orderId]="orderId()"
       [portName]="port()?.name ?? ''"
+      [waLinked]="waLinked()"
       (sendInquiry)="onSendInquiry($event)"
+      (sendWhatsAppInquiry)="onSendInquiryWhatsApp($event)"
     />
 
     <!-- PDF Preview Modal -->
@@ -915,6 +1456,22 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
 
   /** Whether the user has linked WhatsApp in Settings */
   readonly waLinked = signal(false);
+  readonly inquirySupplierContextLoading = signal(false);
+  readonly inquirySupplierContext = signal<InquirySupplierComparisonRow[]>([]);
+  readonly inquiryRepliesLoading = signal(false);
+  readonly inquiryRepliesSavingId = signal<string | null>(null);
+  readonly inquiryReplies = signal<SupplierInquiryReplyRow[]>([]);
+  readonly editingInquiryReplyId = signal<string | null>(null);
+  readonly inquiryReplyStatuses = ['SENT', 'QUOTED', 'DECLINED', 'NO_REPLY'] as const;
+  readonly inquiryReplyStatus = signal<'SENT' | 'QUOTED' | 'DECLINED' | 'NO_REPLY'>('SENT');
+  readonly inquiryReplyRespondedAt = signal('');
+  readonly inquiryReplyDeclineReason = signal('');
+  readonly inquiryReplyPrices = signal<Record<string, string>>({});
+  readonly inquiryReplyNotes = signal<Record<string, string>>({});
+  readonly inquiryReplyQuoteValidUntil = signal('');
+  readonly inquiryReplyDeliveryWindow = signal('');
+  readonly inquiryReplySupplierPaymentTerms = signal('');
+  readonly inquiryReplySupplierComment = signal('');
 
   // ─── Terms UI (collapsed by default) ─────────────────────────────
 
@@ -923,11 +1480,11 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   readonly showSupplierTermsFull = signal(false);
 
   readonly customerTermsText = computed(() =>
-    this.renderCompanyTerms(this.selectedOwnCompany()?.customerTerms, this.selectedOwnCompany()?.name) || '',
+    this.renderCompanyTerms(this.selectedOwnCompany()?.customerTerms, 'customer') || '',
   );
 
   readonly supplierTermsText = computed(() =>
-    this.renderCompanyTerms(this.selectedOwnCompany()?.supplierTerms, this.selectedOwnCompany()?.name) || '',
+    this.renderCompanyTerms(this.selectedOwnCompany()?.supplierTerms, 'supplier') || '',
   );
 
   // ─── Contact persons ─────────────────────────────────────────────
@@ -981,7 +1538,6 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
       || status === OrderStatus.Invoiced;
   });
 
-  /** deliveredAt formatted for <input type="datetime-local"> */
   readonly deliveredAtLocal = computed(() => {
     const iso = this.order()?.deliveredAt;
     if (!iso) return '';
@@ -1110,6 +1666,117 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   });
 
   readonly canUseSupplierCredit = computed(() => !!this.supplierCreditSummary());
+
+  readonly rankedInquirySuppliers = computed(() =>
+    [...this.inquirySupplierContext()].sort((left, right) => this.compareInquirySupplierPerformance(left, right)).slice(0, 6),
+  );
+
+  readonly selectedSupplierComparison = computed(() => {
+    const supplierId = this.order()?.supplierId ?? null;
+    if (supplierId) {
+      return this.inquirySupplierContext().find((row) => row.supplierId === supplierId) ?? null;
+    }
+    return this.rankedInquirySuppliers()[0] ?? null;
+  });
+
+  readonly sortedInquiryReplies = computed(() => {
+    const selectedSupplierId = this.order()?.supplierId ?? null;
+    return [...this.inquiryReplies()].sort((left, right) => {
+      const selectedDiff = Number(right.supplierId === selectedSupplierId) - Number(left.supplierId === selectedSupplierId);
+      if (selectedDiff !== 0) return selectedDiff;
+      const rightSentAt = right.sentAt ? Date.parse(right.sentAt) : 0;
+      const leftSentAt = left.sentAt ? Date.parse(left.sentAt) : 0;
+      return rightSentAt - leftSentAt;
+    });
+  });
+
+  readonly inquiryQuoteMatrixRows = computed<InquiryQuoteMatrixRow[]>(() => {
+    const replies = this.sortedInquiryReplies();
+    if (replies.length === 0) return [];
+
+    const itemOrder = this.itemRows().map((item) => item.id);
+    const replyItemMap = new Map<string, Map<string, SupplierInquiryReplyItem>>(
+      replies.map((reply) => [
+        reply.id,
+        new Map(reply.items.map((item) => [item.orderItemId, item])),
+      ]),
+    );
+    const fallbackItems = replies.flatMap((reply) => reply.items);
+    const orderItemIds = itemOrder.length > 0
+      ? itemOrder
+      : Array.from(new Set(fallbackItems.map((item) => item.orderItemId)));
+    const selectedSupplierId = this.order()?.supplierId ?? null;
+    const defaultCurrency = this.order()?.currency ?? 'USD';
+
+    return orderItemIds.map((orderItemId) => {
+      const localItem = this.itemRows().find((item) => item.id === orderItemId);
+      const fallbackItem = fallbackItems.find((item) => item.orderItemId === orderItemId) ?? null;
+
+      return {
+        orderItemId,
+        productType: fallbackItem?.productType ?? localItem?.productType ?? '',
+        quantity: fallbackItem?.quantity ?? String(localItem?.quantity ?? ''),
+        unit: fallbackItem?.unit ?? localItem?.unit ?? '',
+        description: fallbackItem?.description ?? localItem?.description ?? null,
+        cells: replies.map((reply) => {
+          const replyItem = replyItemMap.get(reply.id)?.get(orderItemId) ?? null;
+          return {
+            supplierInquiryId: reply.id,
+            supplierId: reply.supplierId,
+            supplierName: reply.supplierName,
+            status: reply.status,
+            price: replyItem?.price ?? null,
+            currency: replyItem?.currency ?? fallbackItem?.currency ?? defaultCurrency,
+            note: replyItem?.note ?? null,
+            responseHours: reply.responseHours,
+            isSelectedSupplier: selectedSupplierId === reply.supplierId,
+          };
+        }),
+      };
+    });
+  });
+
+  readonly inquiryReplyRecommendations = computed(() => {
+    const replies = this.sortedInquiryReplies();
+    const recommendations = new Map<string, InquiryReplyRecommendation>();
+    if (replies.length === 0) return recommendations;
+
+    const totals = replies.map((reply) => ({
+      id: reply.id,
+      lineCount: reply.quoteLineCount,
+      total: reply.items.reduce((sum, item) => sum + Number(item.price ?? 0), 0),
+      responseHours: reply.responseHours,
+    }));
+
+    const maxLineCount = Math.max(...totals.map((entry) => entry.lineCount), 0);
+    const minComparableTotal = Math.min(...totals.filter((entry) => entry.lineCount > 0).map((entry) => entry.total), Number.POSITIVE_INFINITY);
+    const minResponseHours = Math.min(...totals.filter((entry) => entry.responseHours != null).map((entry) => entry.responseHours as number), Number.POSITIVE_INFINITY);
+
+    const scored = totals.map((entry) => {
+      const responseScore = entry.responseHours == null ? 0 : Math.max(0, 48 - Math.min(48, entry.responseHours));
+      const totalScore = Number.isFinite(minComparableTotal) && entry.lineCount > 0
+        ? Math.max(0, minComparableTotal === 0 ? 10 : (minComparableTotal / Math.max(entry.total, minComparableTotal)) * 10)
+        : 0;
+      return {
+        ...entry,
+        score: Number((entry.lineCount * 10 + responseScore + totalScore).toFixed(1)),
+      };
+    });
+
+    const bestScore = Math.max(...scored.map((entry) => entry.score), 0);
+
+    for (const entry of scored) {
+      recommendations.set(entry.id, {
+        bestOverall: entry.score === bestScore && bestScore > 0,
+        lowestComparable: Number.isFinite(minComparableTotal) && entry.lineCount > 0 && entry.total === minComparableTotal,
+        mostComplete: entry.lineCount > 0 && entry.lineCount === maxLineCount,
+        fastest: Number.isFinite(minResponseHours) && entry.responseHours === minResponseHours,
+        score: entry.score,
+      });
+    }
+
+    return recommendations;
+  });
 
   formatDateTimeForInput(date: Date, timeZone: string): string {
     const fixedOffset = this.parseFixedOffsetMinutes(timeZone);
@@ -1256,7 +1923,6 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
 
         await this.normalizeDetailRoute(d.status, id);
 
-        // Set contact person data
         if (d.customerContact) this.customerContact.set(d.customerContact);
         if (d.supplierContact) this.supplierContact.set(d.supplierContact);
 
@@ -1294,18 +1960,19 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
         await this.loadCustomerCreditLines(d.clientId);
         await this.loadSupplierCreditLines(d.supplierId);
         await this.loadReferenceData();
-        // Load contacts for the client & supplier companies
         await this.loadCompanyContacts('customer', d.clientId);
         if (d.supplierId) await this.loadCompanyContacts('supplier', d.supplierId);
+        await Promise.all([
+          this.loadInquirySupplierContext(),
+          this.loadInquiryReplies(),
+        ]);
       }
 
       if (ownRes.success) this.ownCompanies.set(ownRes.data);
 
-      // Load bank accounts for the invoicing company
       const invoicingId = this.order()?.invoicingCompanyId;
       if (invoicingId) this.loadBankAccounts(invoicingId);
 
-      // Auto-expand note fields if they already have content
       if (this.order()?.customerNote) this.showCustomerPaymentNote.set(true);
       if (this.order()?.supplierNote) this.showSupplierPaymentNote.set(true);
 
@@ -1326,6 +1993,54 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
       if (res.success) this.attachments.set(res.data ?? []);
     } catch {
       this.attachments.set([]);
+    }
+  }
+
+  private async loadInquirySupplierContext(): Promise<void> {
+    const id = this.orderId();
+    if (!id || !this.isInquiryContext()) {
+      this.inquirySupplierContext.set([]);
+      return;
+    }
+
+    this.inquirySupplierContextLoading.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<InquirySupplierComparisonRow[]>>(`${API_URL}/orders/${id}/inquiry/suppliers`),
+      );
+      if (res.success) {
+        this.inquirySupplierContext.set(res.data ?? []);
+      } else {
+        this.inquirySupplierContext.set([]);
+      }
+    } catch {
+      this.inquirySupplierContext.set([]);
+    } finally {
+      this.inquirySupplierContextLoading.set(false);
+    }
+  }
+
+  private async loadInquiryReplies(): Promise<void> {
+    const id = this.orderId();
+    if (!id || !this.isInquiryContext()) {
+      this.inquiryReplies.set([]);
+      return;
+    }
+
+    this.inquiryRepliesLoading.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<SupplierInquiryReplyRow[]>>(`${API_URL}/orders/${id}/inquiry/sent`),
+      );
+      if (res.success) {
+        this.inquiryReplies.set(res.data ?? []);
+      } else {
+        this.inquiryReplies.set([]);
+      }
+    } catch {
+      this.inquiryReplies.set([]);
+    } finally {
+      this.inquiryRepliesLoading.set(false);
     }
   }
 
@@ -1554,12 +2269,37 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     this.triggerAutosave();
   }
 
-  renderCompanyTerms(template: string | null | undefined, companyName: string | null | undefined): string {
+  renderCompanyTerms(template: string | null | undefined, context: 'customer' | 'supplier'): string {
     const raw = (template ?? '').trim();
     if (!raw) return '';
-    const name = (companyName ?? '').trim();
-    if (!name) return raw;
-    return raw.split('${companyName}').join(name);
+
+    const documentName = this.isInquiryContext() ? 'Offer' : 'Confirmation';
+    const replacements: Record<string, string> = {
+      companyName: (this.selectedOwnCompany()?.name ?? '').trim(),
+      documentName,
+      offerOrConfirmation: documentName,
+      paymentTerms: this.normalizeTermsReplacement(
+        context === 'customer' ? this.formatCustomerPaymentTerms() : this.formatSupplierPaymentTerms(),
+      ),
+      customerNote: this.normalizeTermsReplacement(this.order()?.customerNote ?? ''),
+      supplierNote: this.normalizeTermsReplacement(this.order()?.supplierNote ?? ''),
+      invoiceNumber: this.normalizeTermsReplacement(this.invoiceNumber()),
+      orderNumber: this.normalizeTermsReplacement(this.order()?.orderNumber ?? ''),
+      vesselName: this.normalizeTermsReplacement(this.vessel()?.name ?? ''),
+      portName: this.normalizeTermsReplacement(this.port()?.name ?? ''),
+    };
+
+    let rendered = raw;
+    for (const [key, value] of Object.entries(replacements)) {
+      rendered = rendered.replace(new RegExp(`\\$\\{${key}\\}|\\{\\{${key}\\}\\}`, 'g'), value);
+    }
+
+    return rendered;
+  }
+
+  private normalizeTermsReplacement(value: string | null | undefined): string {
+    const trimmed = String(value ?? '').trim();
+    return trimmed === '-' ? '' : trimmed;
   }
 
   onCustomerCreditDaysChange(value: number | string): void {
@@ -1909,6 +2649,264 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     void this.loadSupplierCreditLines(supplierId);
     void this.loadCompanyContacts('supplier', supplierId);
     this.triggerAutosave();
+  }
+
+  applyComparisonSupplier(row: InquirySupplierComparisonRow): void {
+    this.onSupplierChange(row.supplierId);
+    this.showToast('success', `Selected ${row.supplierName} as supplier.`);
+  }
+
+  openInquiryReplyEditor(row: SupplierInquiryReplyRow): void {
+    this.editingInquiryReplyId.set(row.id);
+    this.inquiryReplyStatus.set(row.status);
+    this.inquiryReplyRespondedAt.set(this.formatDateTimeInput(row.respondedAt));
+    this.inquiryReplyDeclineReason.set(row.declineReason ?? '');
+    this.inquiryReplyPrices.set(
+      Object.fromEntries(row.items.map((item) => [item.orderItemId, item.price ?? ''])),
+    );
+    this.inquiryReplyNotes.set(
+      Object.fromEntries(row.items.map((item) => [item.orderItemId, item.note ?? ''])),
+    );
+    this.inquiryReplyQuoteValidUntil.set(this.formatDateTimeInput(row.quoteValidUntil));
+    this.inquiryReplyDeliveryWindow.set(row.deliveryWindow ?? '');
+    this.inquiryReplySupplierPaymentTerms.set(row.supplierPaymentTerms ?? '');
+    this.inquiryReplySupplierComment.set(row.supplierComment ?? '');
+  }
+
+  cancelInquiryReplyEditor(): void {
+    this.editingInquiryReplyId.set(null);
+    this.inquiryReplyStatus.set('SENT');
+    this.inquiryReplyRespondedAt.set('');
+    this.inquiryReplyDeclineReason.set('');
+    this.inquiryReplyPrices.set({});
+    this.inquiryReplyNotes.set({});
+    this.inquiryReplyQuoteValidUntil.set('');
+    this.inquiryReplyDeliveryWindow.set('');
+    this.inquiryReplySupplierPaymentTerms.set('');
+    this.inquiryReplySupplierComment.set('');
+  }
+
+  isEditingInquiryReply(row: SupplierInquiryReplyRow): boolean {
+    return this.editingInquiryReplyId() === row.id;
+  }
+
+  setInquiryReplyStatus(status: 'SENT' | 'QUOTED' | 'DECLINED' | 'NO_REPLY'): void {
+    this.inquiryReplyStatus.set(status);
+    if (status === 'SENT' || status === 'NO_REPLY') {
+      this.inquiryReplyRespondedAt.set('');
+      this.inquiryReplyDeclineReason.set('');
+    }
+    if (status !== 'DECLINED') {
+      this.inquiryReplyDeclineReason.set('');
+    }
+  }
+
+  setInquiryReplyPrice(orderItemId: string, value: string): void {
+    this.inquiryReplyPrices.update((current) => ({ ...current, [orderItemId]: String(value ?? '') }));
+  }
+
+  setInquiryReplyNote(orderItemId: string, value: string): void {
+    this.inquiryReplyNotes.update((current) => ({ ...current, [orderItemId]: String(value ?? '') }));
+  }
+
+  canSaveInquiryReply(row: SupplierInquiryReplyRow): boolean {
+    const status = this.inquiryReplyStatus();
+    if (status === 'QUOTED') {
+      return !!this.inquiryReplyRespondedAt()
+        && row.items.some((item) => String(this.inquiryReplyPrices()[item.orderItemId] ?? '').trim().length > 0);
+    }
+    if (status === 'DECLINED') {
+      return !!this.inquiryReplyRespondedAt() && this.inquiryReplyDeclineReason().trim().length > 0;
+    }
+    return true;
+  }
+
+  async saveInquiryReply(row: SupplierInquiryReplyRow): Promise<void> {
+    const id = this.orderId();
+    if (!id) return;
+
+    this.inquiryRepliesSavingId.set(row.id);
+    try {
+      const status = this.inquiryReplyStatus();
+      const res = await firstValueFrom(
+        this.http.patch<ApiResponse<{ updated: boolean }>>(`${API_URL}/orders/${id}/inquiry/sent/${row.id}`, {
+          status,
+          respondedAt: status === 'QUOTED' || status === 'DECLINED'
+            ? this.toIsoFromDateTimeInput(this.inquiryReplyRespondedAt())
+            : null,
+          declineReason: status === 'DECLINED' ? this.inquiryReplyDeclineReason().trim() : null,
+          quoteValidUntil: status === 'QUOTED' ? this.toIsoFromDateTimeInput(this.inquiryReplyQuoteValidUntil()) : null,
+          deliveryWindow: status === 'QUOTED' ? this.inquiryReplyDeliveryWindow().trim() : null,
+          supplierPaymentTerms: status === 'QUOTED' ? this.inquiryReplySupplierPaymentTerms().trim() : null,
+          supplierComment: status === 'QUOTED' ? this.inquiryReplySupplierComment().trim() : null,
+          items: status === 'QUOTED'
+            ? row.items.map((item) => ({
+              orderItemId: item.orderItemId,
+              price: String(this.inquiryReplyPrices()[item.orderItemId] ?? '').trim() || null,
+              note: String(this.inquiryReplyNotes()[item.orderItemId] ?? '').trim() || null,
+            }))
+            : [],
+        }),
+      );
+      if (!res.success) {
+        this.showToast('error', res.message ?? 'Failed to save supplier reply.');
+        return;
+      }
+
+      await Promise.all([
+        this.loadInquiryReplies(),
+        this.loadInquirySupplierContext(),
+      ]);
+      this.cancelInquiryReplyEditor();
+      this.showToast('success', `Updated supplier reply for ${row.supplierName}.`);
+    } catch {
+      this.showToast('error', 'Failed to save supplier reply.');
+    } finally {
+      this.inquiryRepliesSavingId.set(null);
+    }
+  }
+
+  statusBadgeClass(status: string): string {
+    switch (status) {
+      case 'SENT': return 'bg-blue-100 text-blue-700';
+      case 'QUOTED': return 'bg-green-100 text-green-700';
+      case 'DECLINED': return 'bg-red-100 text-red-700';
+      case 'NO_REPLY': return 'bg-gray-100 text-gray-500';
+      default: return 'bg-gray-100 text-gray-500';
+    }
+  }
+
+  formatHistoryDate(iso: string): string {
+    return new Date(iso).toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+  }
+
+  formatHistoryDateTime(iso: string): string {
+    return new Date(iso).toLocaleString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
+  quoteRateLabel(performance: InquirySupplierPerformance): string {
+    if (performance.sentCount <= 0 || performance.quotedCount <= 0) return '';
+    return `${Math.round((performance.quotedCount / performance.sentCount) * 100)}% quote rate`;
+  }
+
+  averageResponseLabel(performance: InquirySupplierPerformance): string {
+    if (performance.averageResponseHours == null || performance.respondedCount <= 0) return '';
+    if (performance.averageResponseHours >= 24) {
+      return `${Number((performance.averageResponseHours / 24).toFixed(1))}d avg reply`;
+    }
+    return `${Number(performance.averageResponseHours.toFixed(1))}h avg reply`;
+  }
+
+  deliverabilityLabel(performance: InquirySupplierPerformance): string {
+    const responseCount = performance.deliverableCount + performance.nonDeliverableCount;
+    if (responseCount <= 0) return '';
+    return `${Math.round((performance.deliverableCount / responseCount) * 100)}% deliverable`;
+  }
+
+  inquiryReplySummary(row: SupplierInquiryReplyRow): string {
+    if (row.status === 'QUOTED' && row.quoteLineCount > 0) {
+      const totalLines = row.items.length;
+      return `${row.quoteLineCount}/${totalLines} line${totalLines === 1 ? '' : 's'} quoted`;
+    }
+    if (row.status === 'DECLINED' && row.declineReason) {
+      return row.declineReason;
+    }
+    if (row.status === 'NO_REPLY') {
+      return 'Marked as no reply';
+    }
+    return 'Awaiting supplier response';
+  }
+
+  inquiryQuoteMatrixCellLabel(status: SupplierInquiryReplyRow['status']): string {
+    if (status === 'DECLINED') return 'Declined';
+    if (status === 'NO_REPLY') return 'No reply';
+    return 'Awaiting reply';
+  }
+
+  inquiryReplyRecommendation(inquiryId: string): InquiryReplyRecommendation | null {
+    return this.inquiryReplyRecommendations().get(inquiryId) ?? null;
+  }
+
+  responseHoursLabel(hours: number | null): string {
+    if (hours == null) return '';
+    if (hours >= 24) {
+      return `${Number((hours / 24).toFixed(1))} days`;
+    }
+    return `${Number(hours.toFixed(1))} hours`;
+  }
+
+  supplierPerformanceSummary(performance: InquirySupplierPerformance): string {
+    if (performance.lastDeliveredAtPlace) {
+      return `Last here ${this.formatHistoryDate(performance.lastDeliveredAtPlace)}`;
+    }
+    if (performance.lastDeliveredAtOverall) {
+      return `Last served ${this.formatHistoryDate(performance.lastDeliveredAtOverall)}`;
+    }
+    if (performance.noReplyCount > 0) {
+      return `${performance.noReplyCount} no reply`;
+    }
+    if (performance.declinedCount > 0) {
+      return `${performance.declinedCount} declined`;
+    }
+    return '';
+  }
+
+  isTopInquirySupplier(row: InquirySupplierComparisonRow): boolean {
+    const topRow = this.rankedInquirySuppliers()[0];
+    return !!topRow && topRow.supplierId === row.supplierId && this.inquirySupplierScore(row.performance) > 0;
+  }
+
+  private compareInquirySupplierPerformance(left: InquirySupplierComparisonRow, right: InquirySupplierComparisonRow): number {
+    const scoreDiff = this.inquirySupplierScore(right.performance) - this.inquirySupplierScore(left.performance);
+    if (scoreDiff !== 0) return scoreDiff;
+    return left.supplierName.localeCompare(right.supplierName);
+  }
+
+  private inquirySupplierScore(performance: InquirySupplierPerformance): number {
+    const quoteRate = performance.sentCount > 0 ? performance.quotedCount / performance.sentCount : 0;
+    const deliverabilityRate = performance.deliverableCount + performance.nonDeliverableCount > 0
+      ? performance.deliverableCount / (performance.deliverableCount + performance.nonDeliverableCount)
+      : 0;
+    const responseBonus = performance.averageResponseHours == null
+      ? 0
+      : Math.max(0, 72 - Math.min(72, performance.averageResponseHours)) * 5;
+    const lastAtPlace = performance.lastDeliveredAtPlace ? Date.parse(performance.lastDeliveredAtPlace) : 0;
+    const lastOverall = performance.lastDeliveredAtOverall ? Date.parse(performance.lastDeliveredAtOverall) : 0;
+    return performance.deliveredCountAtPlace * 1000
+      + performance.deliveredCountOverall * 100
+      + Math.round(quoteRate * 100) * 10
+      + Math.round(deliverabilityRate * 100) * 8
+      + Math.round(responseBonus)
+      + Math.floor(lastAtPlace / 86400000)
+      + Math.floor(lastOverall / 86400000 / 10);
+  }
+
+  private formatDateTimeInput(iso: string | null): string {
+    if (!iso) return '';
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return '';
+    const year = String(date.getFullYear()).padStart(4, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  }
+
+  private toIsoFromDateTimeInput(value: string): string | null {
+    if (!value) return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
   }
 
   onVesselChange(vesselId: string): void {
@@ -2412,6 +3410,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
           recipientEmails: payload.recipientEmails,
           subject: payload.subject,
           htmlBody: payload.htmlBody,
+          responseDeadlineAt: payload.responseDeadlineAt,
         },
       )
       .subscribe({
@@ -2422,6 +3421,10 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
             const total = res.data?.length ?? 0;
             this.showToast('success', `Inquiry sent to ${successCount}/${total} recipients`);
             if (successCount > 0) {
+              void Promise.all([
+                this.loadInquiryReplies(),
+                this.loadInquirySupplierContext(),
+              ]);
               this.inquiryModal()?.close();
             }
           } else {
@@ -2433,6 +3436,39 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
           this.showToast('error', 'Failed to send inquiry emails. Check SMTP settings in Admin.');
         },
       });
+  }
+
+  async onSendInquiryWhatsApp(payload: SendInquiryWhatsAppPayload): Promise<void> {
+    if (payload.recipients.length === 0) return;
+
+    const message = payload.bodyText?.trim() || payload.subject?.trim() || `Inquiry — ${this.order()?.orderNumber ?? ''}`;
+
+    try {
+      const results = await Promise.allSettled(
+        payload.recipients.map((recipient) =>
+          firstValueFrom(
+            this.http.post<ApiResponse<{ success: boolean }>>(`${API_URL}/whatsapp/send`, {
+              phone: recipient.phone,
+              message,
+            }),
+          ),
+        ),
+      );
+
+      const successCount = results.filter((result) => result.status === 'fulfilled').length;
+      this.inquiryModal()?.waDone();
+
+      if (successCount > 0) {
+        this.showToast('success', `Inquiry sent via WhatsApp to ${successCount}/${payload.recipients.length} recipients`);
+        this.inquiryModal()?.close();
+        return;
+      }
+
+      this.showToast('error', 'Failed to send inquiry via WhatsApp. Is your device linked?');
+    } catch {
+      this.inquiryModal()?.waDone();
+      this.showToast('error', 'Failed to send inquiry via WhatsApp. Is your device linked?');
+    }
   }
 
   openSendEmailModal(docType: DocumentEmailType): void {

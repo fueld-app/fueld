@@ -19,7 +19,7 @@ import {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [SearchableDropdownComponent, FormsModule],
   template: `
-    <div class="mb-8 grid gap-4 grid-cols-1 min-[900px]:grid-cols-2 min-[1600px]:grid-cols-4">
+    <div class="mb-4 grid gap-4 grid-cols-1 min-[900px]:grid-cols-2 min-[1600px]:grid-cols-4">
       <!-- Client + Customer Contact + Customer Payment -->
       <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <button

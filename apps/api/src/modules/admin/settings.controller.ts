@@ -42,6 +42,8 @@ import {
   updateAttachmentTypeSettings,
   getInquiryCancelReasonSettings,
   updateInquiryCancelReasonSettings,
+  getInquirySettings,
+  updateInquirySettings,
   updateOwnCompanyTerms,
   getWhatsAppSettings,
   updateWhatsAppSettings,
@@ -1155,6 +1157,40 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       reasons: t.Array(t.String({ minLength: 1 })),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update configurable inquiry cancellation reasons' },
+  })
+
+  // ═════════════════════════════════════════════════════════════
+  //  INQUIRY SETTINGS
+  // ═════════════════════════════════════════════════════════════
+
+  .get('/inquiry', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getInquirySettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get inquiry settings' },
+  })
+
+  .put('/inquiry', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateInquirySettings(body);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      supplierResponseUrlEnabled: t.Optional(t.Boolean()),
+      autoMarkNoReplyAfterHours: t.Optional(t.Nullable(t.Number())),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update inquiry settings' },
   })
 
   // ═════════════════════════════════════════════════════════════

@@ -105,6 +105,7 @@ function getTruncateTables() {
     'credit_line_companies',
     'credit_line_counterparties',
     'credit_lines',
+    'supplier_inquiry_item_quotes',
     'supplier_inquiries',
     'email_rules',
     'order_items',
@@ -302,6 +303,19 @@ async function ensureTestSchemaCompat(): Promise<void> {
       email text NOT NULL,
       subject text NOT NULL,
       status text NOT NULL DEFAULT 'SENT',
+      quote_token_hash text,
+      quote_token_expires_at timestamptz,
+      response_deadline_at timestamptz,
+      reminder_sent_at timestamptz,
+      reminder_count integer NOT NULL DEFAULT 0,
+      responded_at timestamptz,
+      quoted_at timestamptz,
+      can_deliver boolean,
+      decline_reason text,
+      quote_valid_until timestamptz,
+      delivery_window text,
+      supplier_payment_terms text,
+      supplier_comment text,
       sent_by_user_id uuid REFERENCES users(id),
       sent_at timestamptz NOT NULL DEFAULT now(),
       created_at timestamptz NOT NULL DEFAULT now(),
@@ -312,6 +326,45 @@ async function ensureTestSchemaCompat(): Promise<void> {
   await sql`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_supplier_inquiries_order_supplier
       ON supplier_inquiries(order_id, supplier_id)
+  `;
+
+  await sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_supplier_inquiries_quote_token_hash
+      ON supplier_inquiries(quote_token_hash)
+      WHERE quote_token_hash IS NOT NULL
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS supplier_inquiry_item_quotes (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      supplier_inquiry_id uuid NOT NULL REFERENCES supplier_inquiries(id) ON DELETE CASCADE,
+      order_item_id uuid NOT NULL REFERENCES order_items(id) ON DELETE CASCADE,
+      price numeric(12, 4),
+      currency text NOT NULL,
+      note text,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+
+  await sql`
+    ALTER TABLE supplier_inquiry_item_quotes
+    ADD COLUMN IF NOT EXISTS order_item_id uuid REFERENCES order_items(id) ON DELETE CASCADE,
+    ADD COLUMN IF NOT EXISTS price numeric(12, 4),
+    ADD COLUMN IF NOT EXISTS currency text,
+    ADD COLUMN IF NOT EXISTS note text,
+    ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now(),
+    ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now()
+  `;
+
+  await sql`
+    ALTER TABLE supplier_inquiry_item_quotes
+    ALTER COLUMN price DROP NOT NULL
+  `;
+
+  await sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_supplier_inquiry_item_quotes_unique
+      ON supplier_inquiry_item_quotes(supplier_inquiry_id, order_item_id)
   `;
 
   // Credit application enums / tables

@@ -173,6 +173,25 @@ describe('settings controller e2e', () => {
     expect(companyTypes.status).toBe(200);
     expect(companyTypes.data?.success).toBe(true);
 
+    const inquirySettingsDisabled = await requestJson('/admin/settings/inquiry', {
+      method: 'PUT',
+      token,
+      body: {
+        supplierResponseUrlEnabled: false,
+        autoMarkNoReplyAfterHours: null,
+      },
+    });
+    expect(inquirySettingsDisabled.status).toBe(200);
+    expect(inquirySettingsDisabled.data?.success).toBe(true);
+    expect(inquirySettingsDisabled.data?.data?.supplierResponseUrlEnabled).toBe(false);
+    expect(inquirySettingsDisabled.data?.data?.autoMarkNoReplyAfterHours).toBeNull();
+
+    const inquirySettingsReloaded = await requestJson('/admin/settings/inquiry', { token });
+    expect(inquirySettingsReloaded.status).toBe(200);
+    expect(inquirySettingsReloaded.data?.success).toBe(true);
+    expect(inquirySettingsReloaded.data?.data?.supplierResponseUrlEnabled).toBe(false);
+    expect(inquirySettingsReloaded.data?.data?.autoMarkNoReplyAfterHours).toBeNull();
+
     const roles = await requestJson('/admin/settings/vessel-company-roles', {
       method: 'PUT',
       token,

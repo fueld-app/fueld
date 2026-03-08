@@ -8,12 +8,55 @@ import { getPortSuppliers } from '../lloyds/lli.service';
 import { logActivity } from '../activity/activity.service';
 import { sendWhatsAppGroupMessage } from '../whatsapp/whatsapp.service';
 import { db } from '../../db';
-import { users, counterparties, invoices as invoicesTable, companyContacts, companyEmails, supplierInquiries, portSuppliers, emailLog, tenants } from '../../db/schema';
+import { users, counterparties, invoices as invoicesTable, companyContacts, companyEmails, supplierInquiries, supplierInquiryItemQuotes, portSuppliers, emailLog, tenants, orders } from '../../db/schema';
 import { getEmailTemplate, getApplicableEmailRules, renderTemplate, type TemplateVariables } from '../admin/email-settings.service';
+import { getInquirySettings } from '../admin/settings.service';
+import { applyStaleSupplierInquiryStatuses, createSupplierQuoteToken, getSupplierQuoteExpiryDate, getSupplierQuoteFormUrl, getSupplierInquiryOrderContext, saveSupplierInquiryResponse } from './supplier-inquiry.service';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Documents Controller
 // ═══════════════════════════════════════════════════════════════════════
+
+function buildInquiryTemplateVariables(params: {
+  vesselName: string;
+  portName: string;
+  orderNumber: string;
+  senderName: string;
+  companyName: string;
+  supplierName?: string | null;
+  contactName?: string | null;
+  quoteFormUrl?: string | null;
+}): TemplateVariables {
+  const preferredName = params.contactName?.trim() || params.supplierName?.trim() || 'there';
+  const quoteFormUrl = params.quoteFormUrl == null ? '${quoteFormUrl}' : params.quoteFormUrl.trim();
+  return {
+    vesselName: params.vesselName,
+    portName: params.portName,
+    orderNumber: params.orderNumber,
+    documentLabel: 'Inquiry',
+    senderName: params.senderName,
+    companyName: params.companyName,
+    paymentTerms: '',
+    customerNote: '',
+    supplierNote: '',
+    invoiceNumber: '',
+    supplierName: params.supplierName?.trim() || '${supplierName}',
+    contactName: params.contactName?.trim() || '${contactName}',
+    name: preferredName,
+    quoteFormUrl,
+  };
+}
+
+function calculateInquiryResponseHours(sentAt: Date | null, respondedAt: Date | null): number | null {
+  if (!sentAt || !respondedAt) return null;
+  const diffMs = respondedAt.getTime() - sentAt.getTime();
+  if (!Number.isFinite(diffMs) || diffMs < 0) return null;
+  return Number((diffMs / 3_600_000).toFixed(2));
+}
+
+function getDefaultInquiryResponseDeadline(): string {
+  return new Date(Date.now() + (48 * 3_600_000)).toISOString();
+}
 
 export const documentsController = new Elysia({ prefix: '/orders' })
   // ── Require authentication for all routes ──
@@ -398,6 +441,10 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         customerNote: order.customerNote ?? '',
         supplierNote: order.supplierNote ?? '',
         invoiceNumber: invoiceNumber ?? '',
+        supplierName: '',
+        contactName: '',
+        name: '',
+        quoteFormUrl: '',
       };
 
       let subject: string;
@@ -603,6 +650,8 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       const order = await getOrderById(orderId);
       if (!order) { set.status = 404; return { success: false, message: 'Order not found' }; }
 
+      await applyStaleSupplierInquiryStatuses({ orderId });
+
       // Fetch port suppliers for this place
       const suppliers = await getPortSuppliers(order.placeId);
 
@@ -617,16 +666,132 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       // For each supplier, try to find their 'inquiry' type email, falling back to primary or first email
       const supplierCompanyIds = [...new Set(suppliers.map(s => s.companyId))];
       let supplierEmails: Array<{ counterpartyId: string; email: string; emailType: string; isPrimary: boolean }> = [];
+      let supplierContacts: Array<{ counterpartyId: string; id: string; name: string; role: string | null; email: string | null; phone: string | null }> = [];
       if (supplierCompanyIds.length > 0) {
-        supplierEmails = await db
-          .select({
-            counterpartyId: companyEmails.counterpartyId,
-            email: companyEmails.email,
-            emailType: companyEmails.emailType,
-            isPrimary: companyEmails.isPrimary,
-          })
-          .from(companyEmails)
-          .where(inArray(companyEmails.counterpartyId, supplierCompanyIds));
+        [supplierEmails, supplierContacts] = await Promise.all([
+          db
+            .select({
+              counterpartyId: companyEmails.counterpartyId,
+              email: companyEmails.email,
+              emailType: companyEmails.emailType,
+              isPrimary: companyEmails.isPrimary,
+            })
+            .from(companyEmails)
+            .where(inArray(companyEmails.counterpartyId, supplierCompanyIds)),
+          db
+            .select({
+              counterpartyId: companyContacts.counterpartyId,
+              id: companyContacts.id,
+              name: companyContacts.name,
+              role: companyContacts.role,
+              email: companyContacts.email,
+              phone: companyContacts.phone,
+            })
+            .from(companyContacts)
+            .where(inArray(companyContacts.counterpartyId, supplierCompanyIds)),
+        ]);
+      }
+
+      const historicalDeliveredOrders = supplierCompanyIds.length > 0
+        ? await db
+            .select({
+              supplierId: orders.supplierId,
+              placeId: orders.placeId,
+              deliveredAt: orders.deliveredAt,
+              updatedAt: orders.updatedAt,
+            })
+            .from(orders)
+            .where(
+              and(
+                inArray(orders.supplierId, supplierCompanyIds),
+                inArray(orders.status, ['DELIVERED', 'INVOICED', 'PAID']),
+              ),
+            )
+        : [];
+
+      const historicalInquiryOutcomes = supplierCompanyIds.length > 0
+        ? await db
+            .select({
+              supplierId: supplierInquiries.supplierId,
+              status: supplierInquiries.status,
+              sentAt: supplierInquiries.sentAt,
+              respondedAt: supplierInquiries.respondedAt,
+              canDeliver: supplierInquiries.canDeliver,
+            })
+            .from(supplierInquiries)
+            .where(inArray(supplierInquiries.supplierId, supplierCompanyIds))
+        : [];
+
+      const performanceBySupplier = new Map<string, {
+        deliveredCountOverall: number;
+        deliveredCountAtPlace: number;
+        lastDeliveredAtOverall: string | null;
+        lastDeliveredAtPlace: string | null;
+        sentCount: number;
+        quotedCount: number;
+        declinedCount: number;
+        noReplyCount: number;
+        respondedCount: number;
+        deliverableCount: number;
+        nonDeliverableCount: number;
+        averageResponseHours: number | null;
+        totalResponseHours: number;
+      }>();
+
+      for (const supplierId of supplierCompanyIds) {
+        performanceBySupplier.set(supplierId, {
+          deliveredCountOverall: 0,
+          deliveredCountAtPlace: 0,
+          lastDeliveredAtOverall: null,
+          lastDeliveredAtPlace: null,
+          sentCount: 0,
+          quotedCount: 0,
+          declinedCount: 0,
+          noReplyCount: 0,
+          respondedCount: 0,
+          deliverableCount: 0,
+          nonDeliverableCount: 0,
+          averageResponseHours: null,
+          totalResponseHours: 0,
+        });
+      }
+
+      for (const historicalOrder of historicalDeliveredOrders) {
+        if (!historicalOrder.supplierId) continue;
+        const stats = performanceBySupplier.get(historicalOrder.supplierId);
+        if (!stats) continue;
+
+        const deliveredIso = (historicalOrder.deliveredAt ?? historicalOrder.updatedAt)?.toISOString() ?? null;
+        stats.deliveredCountOverall += 1;
+        if (deliveredIso && (!stats.lastDeliveredAtOverall || deliveredIso > stats.lastDeliveredAtOverall)) {
+          stats.lastDeliveredAtOverall = deliveredIso;
+        }
+
+        if (historicalOrder.placeId === order.placeId) {
+          stats.deliveredCountAtPlace += 1;
+          if (deliveredIso && (!stats.lastDeliveredAtPlace || deliveredIso > stats.lastDeliveredAtPlace)) {
+            stats.lastDeliveredAtPlace = deliveredIso;
+          }
+        }
+      }
+
+      for (const inquiry of historicalInquiryOutcomes) {
+        const stats = performanceBySupplier.get(inquiry.supplierId);
+        if (!stats) continue;
+        stats.sentCount += 1;
+        if (inquiry.status === 'QUOTED') stats.quotedCount += 1;
+        else if (inquiry.status === 'DECLINED') stats.declinedCount += 1;
+        else if (inquiry.status === 'NO_REPLY') stats.noReplyCount += 1;
+        if (inquiry.respondedAt) {
+          stats.respondedCount += 1;
+          const responseHours = calculateInquiryResponseHours(inquiry.sentAt, inquiry.respondedAt);
+          if (responseHours !== null) {
+            stats.totalResponseHours += responseHours;
+            stats.averageResponseHours = Number((stats.totalResponseHours / stats.respondedCount).toFixed(2));
+          }
+        }
+        if (inquiry.canDeliver === true) stats.deliverableCount += 1;
+        else if (inquiry.canDeliver === false) stats.nonDeliverableCount += 1;
       }
 
       // Group emails by company
@@ -637,25 +802,110 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         emailsByCompany.set(e.counterpartyId, list);
       }
 
-      const data = suppliers.map(s => {
-        const inquiry = inquiryMap.get(s.companyId);
-        const emails = emailsByCompany.get(s.companyId) ?? [];
-        // Prefer 'inquiry' type → isPrimary → first available
-        const inquiryEmail = emails.find(e => e.emailType === 'inquiry')
-          ?? emails.find(e => e.isPrimary)
-          ?? emails[0];
+      const contactsByCompany = new Map<string, typeof supplierContacts>();
+      for (const contact of supplierContacts) {
+        const list = contactsByCompany.get(contact.counterpartyId) ?? [];
+        list.push(contact);
+        contactsByCompany.set(contact.counterpartyId, list);
+      }
 
-        return {
-          portSupplierId: s.id,
-          supplierId: s.companyId,
-          supplierName: s.companyName,
-          contactId: s.contactId,
-          contactName: s.contactName,
-          products: s.products,
-          note: s.note,
-          email: inquiryEmail?.email ?? null,
+      const groupedSuppliers = new Map<string, {
+        portSupplierId: string;
+        supplierId: string;
+        supplierName: string;
+        contactId: string | null;
+        contactName: string | null;
+        products: Set<string>;
+        note: string | null;
+        inquiryStatus: string | null;
+        inquirySentAt: string | null;
+      }>();
+
+      for (const supplier of suppliers) {
+        const inquiry = inquiryMap.get(supplier.companyId);
+        const existing = groupedSuppliers.get(supplier.companyId);
+        if (existing) {
+          for (const product of supplier.products ?? []) {
+            existing.products.add(product);
+          }
+          if (!existing.contactId && supplier.contactId) existing.contactId = supplier.contactId;
+          if (!existing.contactName && supplier.contactName) existing.contactName = supplier.contactName;
+          if (!existing.note && supplier.note) existing.note = supplier.note;
+          if (!existing.inquiryStatus && inquiry?.status) existing.inquiryStatus = inquiry.status;
+          if (!existing.inquirySentAt && inquiry?.sentAt) existing.inquirySentAt = inquiry.sentAt.toISOString();
+          continue;
+        }
+
+        groupedSuppliers.set(supplier.companyId, {
+          portSupplierId: supplier.id,
+          supplierId: supplier.companyId,
+          supplierName: supplier.companyName,
+          contactId: supplier.contactId,
+          contactName: supplier.contactName,
+          products: new Set(supplier.products ?? []),
+          note: supplier.note,
           inquiryStatus: inquiry?.status ?? null,
           inquirySentAt: inquiry?.sentAt?.toISOString() ?? null,
+        });
+      }
+
+      const data = [...groupedSuppliers.values()].map((supplier) => {
+        const emails = emailsByCompany.get(supplier.supplierId) ?? [];
+        const contacts = contactsByCompany.get(supplier.supplierId) ?? [];
+        const preferredContact = (supplier.contactId ? contacts.find((contact) => contact.id === supplier.contactId) : null)
+          ?? contacts.find((contact) => !!contact.email)
+          ?? contacts[0]
+          ?? null;
+        const preferredPhoneContact = (supplier.contactId ? contacts.find((contact) => contact.id === supplier.contactId && !!contact.phone) : null)
+          ?? contacts.find((contact) => !!contact.phone)
+          ?? null;
+        const inquiryEmail = emails.find(e => e.emailType === 'inquiry')
+          ?? emails.find(e => e.isPrimary)
+          ?? emails[0]
+          ?? null;
+        const preferredEmail = inquiryEmail?.email ?? preferredContact?.email ?? null;
+
+        return {
+          portSupplierId: supplier.portSupplierId,
+          supplierId: supplier.supplierId,
+          supplierName: supplier.supplierName,
+          contactId: preferredContact?.id ?? supplier.contactId,
+          contactName: preferredContact?.name ?? supplier.contactName,
+          phone: preferredPhoneContact?.phone ?? null,
+          waContactId: preferredPhoneContact?.id ?? null,
+          waContactName: preferredPhoneContact?.name ?? null,
+          products: [...supplier.products],
+          note: supplier.note,
+          email: preferredEmail,
+          inquiryStatus: supplier.inquiryStatus,
+          inquirySentAt: supplier.inquirySentAt,
+          performance: performanceBySupplier.get(supplier.supplierId) ?? {
+            deliveredCountOverall: 0,
+            deliveredCountAtPlace: 0,
+            lastDeliveredAtOverall: null,
+            lastDeliveredAtPlace: null,
+            sentCount: 0,
+            quotedCount: 0,
+            declinedCount: 0,
+            noReplyCount: 0,
+            respondedCount: 0,
+            deliverableCount: 0,
+            nonDeliverableCount: 0,
+            averageResponseHours: null,
+            totalResponseHours: 0,
+          },
+          companyEmails: emails.map((email) => ({
+            email: email.email,
+            emailType: email.emailType,
+            isPrimary: email.isPrimary,
+          })),
+          contacts: contacts.map((contact) => ({
+            id: contact.id,
+            name: contact.name,
+            role: contact.role,
+            email: contact.email,
+            phone: contact.phone,
+          })),
         };
       });
 
@@ -692,6 +942,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       const companyName = order.invoicingCompany?.name ?? null;
       const companyLogoUrl = tryLoadLogoDataUrl(order.invoicingCompany?.logoUrl ?? null);
       const brandColor = order.invoicingCompany?.brandColor ?? null;
+      const inquirySettings = await getInquirySettings();
 
       // Fetch supplier terms from the invoicing (own) company
       let supplierTerms: string | null = null;
@@ -711,18 +962,16 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       };
 
       // Try admin template first
-      const templateVars: TemplateVariables = {
+      const templateVars = buildInquiryTemplateVariables({
         vesselName,
         portName,
         orderNumber,
-        documentLabel: 'Inquiry',
         senderName,
         companyName: companyName ?? '',
-        paymentTerms: '',
-        customerNote: '',
-        supplierNote: '',
-        invoiceNumber: '',
-      };
+        supplierName: '${supplierName}',
+        contactName: '${contactName}',
+        quoteFormUrl: inquirySettings.supplierResponseUrlEnabled ? '${quoteFormUrl}' : '',
+      });
 
       let subject: string;
       let htmlBody: string;
@@ -748,6 +997,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             companyLogoUrl,
             brandColor,
             supplierTerms,
+            includeSupplierQuoteLink: inquirySettings.supplierResponseUrlEnabled,
             items: order.items.map((i: any) => ({
               quantity: i.quantity,
               unit: i.unit,
@@ -769,6 +1019,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           companyLogoUrl,
           brandColor,
           supplierTerms,
+          includeSupplierQuoteLink: inquirySettings.supplierResponseUrlEnabled,
           items: order.items.map((i: any) => ({
             quantity: i.quantity,
             unit: i.unit,
@@ -786,6 +1037,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           senderName,
           senderEmail: auth.email,
           supplierTerms,
+          responseDeadlineAt: getDefaultInquiryResponseDeadline(),
         },
       };
     },
@@ -818,14 +1070,15 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       const [sender] = await db.select({ name: users.name }).from(users).where(eq(users.id, auth.userId)).limit(1);
       const senderName = sender?.name ?? 'Fueld User';
       const senderEmail = auth.email;
+      const inquirySettings = await getInquirySettings();
 
       // Check if this is the first inquiry batch for this order (for WhatsApp notification)
       const existingInquiries = await db
-        .select({ id: supplierInquiries.id })
+        .select({ id: supplierInquiries.id, supplierId: supplierInquiries.supplierId })
         .from(supplierInquiries)
-        .where(eq(supplierInquiries.orderId, orderId))
-        .limit(1);
+        .where(eq(supplierInquiries.orderId, orderId));
       const isFirstInquiry = existingInquiries.length === 0;
+      const existingInquiryBySupplierId = new Map(existingInquiries.map((inquiry) => [inquiry.supplierId, inquiry]));
 
       // Apply CC/BCC rules for INQUIRY type
       const ccEmails: string[] = [];
@@ -853,6 +1106,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         supplierName: supplier.supplierName,
         email: supplier.email,
         contactId: supplier.contactId,
+        contactName: supplier.contactName,
         resultId: supplier.supplierId,
         label: supplier.supplierName,
       }));
@@ -877,6 +1131,21 @@ export const documentsController = new Elysia({ prefix: '/orders' })
 
       for (const target of inquiryTargets) {
         try {
+          const quoteToken = target.type === 'supplier' && inquirySettings.supplierResponseUrlEnabled ? createSupplierQuoteToken() : null;
+          const quoteTokenExpiresAt = quoteToken ? getSupplierQuoteExpiryDate() : null;
+          const templateVars = buildInquiryTemplateVariables({
+            vesselName: order.vessel?.name ?? 'Vessel',
+            portName: order.place?.name ?? 'Port',
+            orderNumber: order.orderNumber ?? orderId.slice(0, 8).toUpperCase(),
+            senderName,
+            companyName: order.invoicingCompany?.name ?? 'Fueld',
+            supplierName: target.type === 'supplier' ? target.supplierName : '',
+            contactName: target.type === 'supplier' ? (target.contactName ?? null) : null,
+            quoteFormUrl: quoteToken ? getSupplierQuoteFormUrl(quoteToken.rawToken) : '',
+          });
+          const renderedSubject = renderTemplate(body.subject, templateVars);
+          const renderedHtmlBody = renderTemplate(body.htmlBody, templateVars);
+
           await sendDocumentEmail({
             documentType: 'INQUIRY',
             orderId,
@@ -887,32 +1156,59 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             recipientEmail: target.email,
             ccEmails,
             bccEmails,
-            subject: body.subject,
-            htmlBody: body.htmlBody,
+            subject: renderedSubject,
+            htmlBody: renderedHtmlBody,
             // No PDF attachment for inquiry
           });
 
           if (target.type === 'supplier') {
-            await db.insert(supplierInquiries).values({
-              orderId,
-              supplierId: target.supplierId,
-              contactId: target.contactId ?? null,
-              email: target.email,
-              subject: body.subject,
-              status: 'SENT',
-              sentByUserId: auth.userId,
-            }).onConflictDoUpdate({
-              target: [supplierInquiries.orderId, supplierInquiries.supplierId],
-              set: {
-                email: target.email,
+            const existingInquiry = existingInquiryBySupplierId.get(target.supplierId);
+            if (existingInquiry) {
+              await db.delete(supplierInquiryItemQuotes).where(eq(supplierInquiryItemQuotes.supplierInquiryId, existingInquiry.id));
+              await db
+                .update(supplierInquiries)
+                .set({
+                  email: target.email,
+                  contactId: target.contactId ?? null,
+                  subject: renderedSubject,
+                  status: 'SENT',
+                  quoteTokenHash: quoteToken?.tokenHash ?? null,
+                  quoteTokenExpiresAt: quoteTokenExpiresAt,
+                  responseDeadlineAt: body.responseDeadlineAt ? new Date(body.responseDeadlineAt) : null,
+                  reminderSentAt: null,
+                  reminderCount: 0,
+                  respondedAt: null,
+                  quotedAt: null,
+                  canDeliver: null,
+                  declineReason: null,
+                  quoteValidUntil: null,
+                  deliveryWindow: null,
+                  supplierPaymentTerms: null,
+                  supplierComment: null,
+                  sentByUserId: auth.userId,
+                  sentAt: new Date(),
+                  updatedAt: new Date(),
+                })
+                .where(eq(supplierInquiries.id, existingInquiry.id));
+            } else {
+              const [createdInquiry] = await db.insert(supplierInquiries).values({
+                orderId,
+                supplierId: target.supplierId,
                 contactId: target.contactId ?? null,
-                subject: body.subject,
+                email: target.email,
+                subject: renderedSubject,
                 status: 'SENT',
+                quoteTokenHash: quoteToken?.tokenHash ?? null,
+                quoteTokenExpiresAt: quoteTokenExpiresAt,
+                responseDeadlineAt: body.responseDeadlineAt ? new Date(body.responseDeadlineAt) : null,
+                reminderSentAt: null,
+                reminderCount: 0,
                 sentByUserId: auth.userId,
-                sentAt: new Date(),
-                updatedAt: new Date(),
-              },
-            });
+              }).returning({ id: supplierInquiries.id, supplierId: supplierInquiries.supplierId });
+              if (createdInquiry) {
+                existingInquiryBySupplierId.set(createdInquiry.supplierId, createdInquiry);
+              }
+            }
           }
 
           results.push({ recipientId: target.resultId, recipientName: target.label, email: target.email, success: true });
@@ -1005,10 +1301,12 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           supplierName: t.String(),
           email: t.String({ format: 'email' }),
           contactId: t.Optional(t.String()),
+          contactName: t.Optional(t.String()),
         })),
         recipientEmails: t.Optional(t.Array(t.String({ format: 'email' }))),
         subject: t.String(),
         htmlBody: t.String(),
+        responseDeadlineAt: t.Optional(t.Nullable(t.String())),
       }),
       detail: {
         tags: ['Documents'],
@@ -1026,28 +1324,85 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       const orderId = await resolveOrderId(params.id);
       if (!orderId) { set.status = 404; return { success: false, message: 'Order not found' }; }
 
+      await applyStaleSupplierInquiryStatuses({ orderId });
+
       const rows = await db
         .select({
           id: supplierInquiries.id,
           supplierId: supplierInquiries.supplierId,
           supplierName: counterparties.name,
           contactId: supplierInquiries.contactId,
+          contactName: companyContacts.name,
           email: supplierInquiries.email,
           subject: supplierInquiries.subject,
           status: supplierInquiries.status,
           sentAt: supplierInquiries.sentAt,
+          responseDeadlineAt: supplierInquiries.responseDeadlineAt,
+          reminderSentAt: supplierInquiries.reminderSentAt,
+          reminderCount: supplierInquiries.reminderCount,
+          respondedAt: supplierInquiries.respondedAt,
+          quotedAt: supplierInquiries.quotedAt,
+          canDeliver: supplierInquiries.canDeliver,
+          declineReason: supplierInquiries.declineReason,
+          quoteValidUntil: supplierInquiries.quoteValidUntil,
+          deliveryWindow: supplierInquiries.deliveryWindow,
+          supplierPaymentTerms: supplierInquiries.supplierPaymentTerms,
+          supplierComment: supplierInquiries.supplierComment,
           sentByUserId: supplierInquiries.sentByUserId,
         })
         .from(supplierInquiries)
         .innerJoin(counterparties, eq(supplierInquiries.supplierId, counterparties.id))
+        .leftJoin(companyContacts, eq(supplierInquiries.contactId, companyContacts.id))
         .where(eq(supplierInquiries.orderId, orderId))
         .orderBy(supplierInquiries.sentAt);
+
+      const orderContext = await getSupplierInquiryOrderContext(orderId);
+      if (!orderContext) {
+        set.status = 404;
+        return { success: false, message: 'Order not found' };
+      }
+
+      const quoteCounts = rows.length > 0
+        ? await db
+            .select({
+              supplierInquiryId: supplierInquiryItemQuotes.supplierInquiryId,
+              orderItemId: supplierInquiryItemQuotes.orderItemId,
+              price: supplierInquiryItemQuotes.price,
+              currency: supplierInquiryItemQuotes.currency,
+              note: supplierInquiryItemQuotes.note,
+            })
+            .from(supplierInquiryItemQuotes)
+            .where(inArray(supplierInquiryItemQuotes.supplierInquiryId, rows.map((row) => row.id)))
+        : [];
+      const quoteCountByInquiryId = new Map<string, number>();
+      const quoteItemsByInquiryId = new Map<string, Array<{ orderItemId: string; price: string | null; currency: string; note: string | null }>>();
+      for (const quote of quoteCounts) {
+        if (quote.price !== null) {
+          quoteCountByInquiryId.set(quote.supplierInquiryId, (quoteCountByInquiryId.get(quote.supplierInquiryId) ?? 0) + 1);
+        }
+        const items = quoteItemsByInquiryId.get(quote.supplierInquiryId) ?? [];
+        items.push({ orderItemId: quote.orderItemId, price: quote.price, currency: quote.currency, note: quote.note ?? null });
+        quoteItemsByInquiryId.set(quote.supplierInquiryId, items);
+      }
 
       return {
         success: true,
         data: rows.map(r => ({
           ...r,
           sentAt: r.sentAt?.toISOString() ?? null,
+          responseDeadlineAt: r.responseDeadlineAt?.toISOString() ?? null,
+          reminderSentAt: r.reminderSentAt?.toISOString() ?? null,
+          respondedAt: r.respondedAt?.toISOString() ?? null,
+          quotedAt: r.quotedAt?.toISOString() ?? null,
+          quoteValidUntil: r.quoteValidUntil?.toISOString() ?? null,
+          responseHours: calculateInquiryResponseHours(r.sentAt, r.respondedAt),
+          quoteLineCount: quoteCountByInquiryId.get(r.id) ?? 0,
+          items: orderContext.items.map((item) => ({
+            ...item,
+            price: quoteItemsByInquiryId.get(r.id)?.find((quote) => quote.orderItemId === item.orderItemId)?.price ?? null,
+            currency: quoteItemsByInquiryId.get(r.id)?.find((quote) => quote.orderItemId === item.orderItemId)?.currency ?? item.currency,
+            note: quoteItemsByInquiryId.get(r.id)?.find((quote) => quote.orderItemId === item.orderItemId)?.note ?? null,
+          })),
         })),
       };
     },
@@ -1056,6 +1411,69 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       detail: {
         tags: ['Documents'],
         summary: 'List sent supplier inquiries for this order',
+        security: [{ bearerAuth: [] }],
+      },
+    },
+  )
+
+  .patch(
+    '/:id/inquiry/sent/:inquiryId',
+    async ({ params, body, set }) => {
+      const orderId = await resolveOrderId(params.id);
+      if (!orderId) { set.status = 404; return { success: false, message: 'Order not found' }; }
+
+      const [inquiry] = await db
+        .select()
+        .from(supplierInquiries)
+        .where(and(eq(supplierInquiries.id, params.inquiryId), eq(supplierInquiries.orderId, orderId)))
+        .limit(1);
+      if (!inquiry) {
+        set.status = 404;
+        return { success: false, message: 'Supplier inquiry not found' };
+      }
+
+      const result = await saveSupplierInquiryResponse({
+        inquiry,
+        status: body.status,
+        respondedAt: body.respondedAt ?? null,
+        declineReason: body.declineReason ?? null,
+        quoteValidUntil: body.quoteValidUntil ?? null,
+        deliveryWindow: body.deliveryWindow ?? null,
+        supplierPaymentTerms: body.supplierPaymentTerms ?? null,
+        supplierComment: body.supplierComment ?? null,
+        items: body.items ?? [],
+      });
+      if (!result.success) {
+        set.status = 400;
+        return { success: false, message: result.message };
+      }
+
+      return { success: true, data: { updated: true } };
+    },
+    {
+      params: t.Object({ id: t.String(), inquiryId: t.String() }),
+      body: t.Object({
+        status: t.Union([
+          t.Literal('SENT'),
+          t.Literal('QUOTED'),
+          t.Literal('DECLINED'),
+          t.Literal('NO_REPLY'),
+        ]),
+        respondedAt: t.Optional(t.Nullable(t.String())),
+        declineReason: t.Optional(t.Nullable(t.String())),
+        quoteValidUntil: t.Optional(t.Nullable(t.String())),
+        deliveryWindow: t.Optional(t.Nullable(t.String())),
+        supplierPaymentTerms: t.Optional(t.Nullable(t.String())),
+        supplierComment: t.Optional(t.Nullable(t.String())),
+        items: t.Array(t.Object({
+          orderItemId: t.String(),
+          price: t.Optional(t.Nullable(t.String())),
+          note: t.Optional(t.Nullable(t.String())),
+        })),
+      }),
+      detail: {
+        tags: ['Documents'],
+        summary: 'Update supplier inquiry response from order detail',
         security: [{ bearerAuth: [] }],
       },
     },

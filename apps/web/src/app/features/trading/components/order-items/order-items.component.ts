@@ -51,32 +51,34 @@ export interface OrderItemRow {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, DecimalPipe, SearchableDropdownComponent],
   template: `
-    <!-- ═════════════════════════════════════════════════════════════ -->
-    <!--  Add row button                                              -->
-    <!-- ═════════════════════════════════════════════════════════════ -->
-    <div class="mb-4 flex items-center justify-between">
-      <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">
-        Line Items
-      </h3>
-      @if (!readonly()) {
-        <button
-          (click)="addRow()"
-          class="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold
-                 text-white shadow-sm transition-colors hover:bg-brand-700 focus:outline-none
-                 focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-            <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
-          </svg>
-          Add Item
-        </button>
-      }
-    </div>
+    <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+      <!-- ═══════════════════════════════════════════════════════════ -->
+      <!--  Shared header                                             -->
+      <!-- ═══════════════════════════════════════════════════════════ -->
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3">
+        <div>
+          <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-700">Line Items</h3>
+          <p class="mt-1 text-xs text-gray-500">{{ rows().length }} item{{ rows().length === 1 ? '' : 's' }} in this {{ readonly() ? 'document' : 'deal' }}</p>
+        </div>
+        @if (!readonly()) {
+          <button
+            (click)="addRow()"
+            class="inline-flex items-center gap-2 rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold
+                   text-gray-700 shadow-sm transition-colors hover:border-brand-300 hover:text-brand-700 focus:outline-none
+                   focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+            </svg>
+            New line item
+          </button>
+        }
+      </div>
 
     <!-- ═════════════════════════════════════════════════════════════ -->
     <!--  Desktop Table (hidden on mobile)                            -->
     <!-- ═════════════════════════════════════════════════════════════ -->
-    <div class="hidden md:block overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+    <div class="hidden overflow-x-auto md:block">
       <table class="w-full text-sm">
         <thead>
           <tr class="border-b border-gray-200 bg-gray-50/80">
@@ -91,13 +93,13 @@ export interface OrderItemRow {
             <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[140px]">Sell</th>
             <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Profit ({{ baseCurrency }})</th>
             @if (!readonly()) {
-              <th class="px-4 py-3 w-12"></th>
+              <th class="w-0 p-0"></th>
             }
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100">
           @for (row of rows(); track row.id; let i = $index) {
-            <tr class="group transition-colors hover:bg-gray-50/50">
+            <tr class="group relative transition-colors hover:bg-gray-50/50">
               <!-- Product -->
               <td class="px-4 py-2">
                 @if (readonly()) {
@@ -273,10 +275,10 @@ export interface OrderItemRow {
 
               <!-- Delete -->
               @if (!readonly()) {
-                <td class="px-2 py-2">
+                <td class="relative w-0 p-0">
                   <button
                     (click)="removeRow(i)"
-                    class="rounded-md p-1 text-gray-300 opacity-0 transition-all hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
+                    class="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-gray-300 opacity-0 transition-all hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
                     aria-label="Remove item"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -308,10 +310,10 @@ export interface OrderItemRow {
             <tr class="border-t-2 border-gray-200 bg-gray-50/50 font-semibold">
               <td class="px-4 py-3 text-right text-gray-600">Totals</td>
               <td></td>
-              <td class="px-4 py-3 text-right tabular-nums text-gray-900">{{ totalQty() | number:'1.3-3' }}</td>
+              <td class="px-4 py-3 text-right tabular-nums text-gray-900">{{ totalQty() | number:'1.0-3' }}</td>
               <td></td>
               @if (allowDeliveredEdit()) {
-                <td class="px-4 py-3 text-right tabular-nums text-gray-900">{{ totalDeliveredQty() | number:'1.3-3' }}</td>
+                <td class="px-4 py-3 text-right tabular-nums text-gray-900">{{ totalDeliveredQty() | number:'1.0-3' }}</td>
               }
               <td class="px-4 py-3 text-right tabular-nums text-gray-600">{{ totalCost() | number:'1.2-2' }} {{ baseCurrency }}</td>
               <td class="px-4 py-3 text-right tabular-nums text-gray-600">{{ totalRevenue() | number:'1.2-2' }} {{ baseCurrency }}</td>
@@ -321,7 +323,7 @@ export interface OrderItemRow {
               >
                 {{ totalProfit() | number:'1.2-2' }} {{ baseCurrency }}
               </td>
-              @if (!readonly()) { <td></td> }
+              @if (!readonly()) { <td class="w-0 p-0"></td> }
             </tr>
           </tfoot>
         }
@@ -331,7 +333,7 @@ export interface OrderItemRow {
     <!-- ═════════════════════════════════════════════════════════════ -->
     <!--  Mobile Cards (visible only on mobile)                       -->
     <!-- ═════════════════════════════════════════════════════════════ -->
-    <div class="space-y-3 md:hidden">
+    <div class="space-y-3 bg-gray-50/40 p-4 md:hidden">
       @for (row of rows(); track row.id; let i = $index) {
         <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
           <!-- Card header -->
@@ -563,6 +565,7 @@ export interface OrderItemRow {
           </div>
         </div>
       }
+    </div>
     </div>
   `,
 })

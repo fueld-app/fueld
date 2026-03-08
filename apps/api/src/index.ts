@@ -6,6 +6,8 @@ import { join } from 'path';
 import type { ApiResponse } from '@fueld/types';
 import { authController } from './modules/auth';
 import { documentsController } from './modules/documents/documents.controller';
+import { supplierQuoteController } from './modules/documents/supplier-quote.controller';
+import { startInquiryReminderJob } from './modules/documents/supplier-inquiry.service';
 import { verifyController } from './modules/documents/verify.controller';
 import { dashboardController } from './modules/dashboard/dashboard.controller';
 import { lloydsController } from './modules/lloyds';
@@ -310,6 +312,7 @@ export async function createApp(options: CreateAppOptions = {}) {
     })
     .use(authController)
     .use(documentsController)
+    .use(supplierQuoteController)
     .use(verifyController)
     .use(dashboardController)
     .use(lloydsController)
@@ -601,6 +604,7 @@ export async function createApp(options: CreateAppOptions = {}) {
   if (options.enableBackgroundJobs !== false) {
     startPruneJob();
     startPricePolling();
+    startInquiryReminderJob();
     registerAutoSyncHooks();
     reconnectWhatsAppSessions();
   }

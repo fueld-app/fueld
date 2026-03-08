@@ -658,6 +658,53 @@ export interface OrderItemDto {
   deliveredQuantity?: string | null;
 }
 
+export interface SupplierInquiryItemQuoteDto {
+  orderItemId: string;
+  productType: ProductType;
+  quantity: string;
+  unit: string;
+  description: string | null;
+  price: string | null;
+  currency: string;
+  note?: string | null;
+}
+
+export interface PublicSupplierInquiryDto {
+  supplierName: string;
+  contactName: string | null;
+  vesselName: string;
+  vesselImo: string | null;
+  portName: string;
+  eta: string | null;
+  etd: string | null;
+  orderNumber: string | null;
+  status: string;
+  canDeliver: boolean | null;
+  declineReason: string | null;
+  responseDeadlineAt: string | null;
+  quoteSubmittedAt: string | null;
+  quoteValidUntil: string | null;
+  deliveryWindow: string | null;
+  supplierPaymentTerms: string | null;
+  supplierComment: string | null;
+  currency: string;
+  items: SupplierInquiryItemQuoteDto[];
+}
+
+export interface SubmitSupplierInquiryQuoteDto {
+  canDeliver: boolean;
+  declineReason?: string | null;
+  quoteValidUntil?: string | null;
+  deliveryWindow?: string | null;
+  supplierPaymentTerms?: string | null;
+  supplierComment?: string | null;
+  items: Array<{
+    orderItemId: string;
+    price?: string | null;
+    note?: string | null;
+  }>;
+}
+
 export interface CreateOrderItemDto {
   productType: ProductType;
   quantity: string;

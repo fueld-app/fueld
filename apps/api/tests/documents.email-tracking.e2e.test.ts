@@ -5,14 +5,20 @@
  * 3. POST /orders/:id/inquiry/send — inquiry e2e (sending, supplier_inquiries tracking,
  *    WhatsApp group notification on first inquiry)
  * 4. GET /orders/:id/inquiry/sent — inquiry sent listing
+ * 5. PATCH /orders/:id/inquiry/sent/:inquiryId — internal trader reply capture
  */
 import { beforeEach, describe, expect, it, mock } from 'bun:test';
 import { eq } from 'drizzle-orm';
 import {
   bankAccounts,
+  companyEmails,
   counterparties,
   emailLog,
   emailRules,
+  orders,
+  places,
+  portSuppliers,
+  supplierInquiryItemQuotes,
   supplierInquiries,
   tenants,
 } from '../src/db/schema';
@@ -158,6 +164,9 @@ async function seedDocumentReadyOrder() {
     orderId,
     tenantId: seeded.tenant.id,
     userId: seeded.user.id,
+    place: seeded.place,
+    client: seeded.client,
+    vessel: seeded.vessel,
     supplier: supplier!,
     supplier2: supplier2!,
     invoicingCompany: invoicingCompany!,
@@ -535,6 +544,281 @@ describe('email tracking, inquiry send & WhatsApp group notifications', () => {
         expect(rows[0]!.subject).toBe('RFQ');
         expect(rows[0]!.status).toBe('SENT');
         expect(rows[0]!.sentAt).toBeTruthy();
+        expect(rows[0]!.quoteTokenHash).toBeTruthy();
+        expect(rows[0]!.quoteTokenExpiresAt).toBeTruthy();
+      } finally {
+        stub.restore();
+        mockGraphToken = null;
+      }
+    });
+
+    it('stores a response deadline when provided', async () => {
+      const { token, orderId, supplier } = await seedDocumentReadyOrder();
+      mockGraphToken = 'graph-token';
+      const stub = stubGraphFetch();
+
+      try {
+        await requestJson(`/orders/${orderId}/inquiry/send`, {
+          method: 'POST',
+          token,
+          body: {
+            suppliers: [
+              { supplierId: supplier.id, supplierName: 'Supplier Co', email: 'supplier@example.com' },
+            ],
+            subject: 'RFQ',
+            htmlBody: '<p>inquiry</p>',
+            responseDeadlineAt: '2026-03-12T10:00:00.000Z',
+          },
+        });
+
+        const db = await getDb();
+        const rows = await db
+          .select()
+          .from(supplierInquiries)
+          .where(eq(supplierInquiries.orderId, orderId));
+
+        expect(rows[0]!.responseDeadlineAt?.toISOString()).toBe('2026-03-12T10:00:00.000Z');
+      } finally {
+        stub.restore();
+        mockGraphToken = null;
+      }
+    });
+
+    it('allows supplier quote submission through the public token link', async () => {
+      const { token, orderId, supplier } = await seedDocumentReadyOrder();
+      mockGraphToken = 'graph-token';
+      const stub = stubGraphFetch();
+
+      try {
+        const sendRes = await requestJson(`/orders/${orderId}/inquiry/send`, {
+          method: 'POST',
+          token,
+          body: {
+            suppliers: [
+              { supplierId: supplier.id, supplierName: 'Supplier Co', email: 'supplier@example.com' },
+            ],
+            subject: 'RFQ for ${name}',
+            htmlBody: '<p>Good day ${name},</p><p>Submit here: ${quoteFormUrl}</p>',
+          },
+        });
+
+        expect(sendRes.status).toBe(200);
+        expect(stub.calls.length).toBe(1);
+
+        const graphPayload = JSON.parse(String(stub.calls[0]!.init?.body ?? '{}')) as any;
+        const htmlBody = String(graphPayload.message?.body?.content ?? '');
+        const tokenMatch = htmlBody.match(/supplier-quote\/([a-f0-9]{48})/i);
+        expect(tokenMatch).toBeTruthy();
+        const publicToken = tokenMatch?.[1] ?? '';
+
+        const publicGet = await requestJson(`/supplier-inquiries/${publicToken}`);
+        expect(publicGet.status).toBe(200);
+        expect(publicGet.data?.success).toBe(true);
+        expect(publicGet.data?.data?.items?.length).toBe(2);
+
+        const publicPost = await requestJson(`/supplier-inquiries/${publicToken}/quote`, {
+          method: 'POST',
+          body: {
+            canDeliver: true,
+            items: publicGet.data.data.items.map((item: any, index: number) => ({
+              orderItemId: item.orderItemId,
+              price: index === 0 ? '450.50' : '610.00',
+            })),
+          },
+        });
+
+        expect(publicPost.status).toBe(200);
+        expect(publicPost.data?.success).toBe(true);
+
+        const db = await getDb();
+        const inquiryRows = await db
+          .select()
+          .from(supplierInquiries)
+          .where(eq(supplierInquiries.orderId, orderId));
+        expect(inquiryRows.length).toBe(1);
+        expect(inquiryRows[0]!.status).toBe('QUOTED');
+        expect(inquiryRows[0]!.respondedAt).toBeTruthy();
+        expect(inquiryRows[0]!.quotedAt).toBeTruthy();
+        expect(inquiryRows[0]!.canDeliver).toBe(true);
+
+        const quoteRows = await db
+          .select()
+          .from(supplierInquiryItemQuotes)
+          .where(eq(supplierInquiryItemQuotes.supplierInquiryId, inquiryRows[0]!.id));
+        expect(quoteRows.length).toBe(2);
+      } finally {
+        stub.restore();
+        mockGraphToken = null;
+      }
+    });
+
+    it('accepts partial quotes with qualifiers and notes', async () => {
+      const { token, orderId, supplier } = await seedDocumentReadyOrder();
+      mockGraphToken = 'graph-token';
+      const stub = stubGraphFetch();
+
+      try {
+        await requestJson(`/orders/${orderId}/inquiry/send`, {
+          method: 'POST',
+          token,
+          body: {
+            suppliers: [
+              { supplierId: supplier.id, supplierName: 'Supplier Co', email: 'supplier@example.com' },
+            ],
+            subject: 'RFQ for ${name}',
+            htmlBody: '<p>Good day ${name},</p><p>Submit here: ${quoteFormUrl}</p>',
+          },
+        });
+
+        const graphPayload = JSON.parse(String(stub.calls[0]!.init?.body ?? '{}')) as any;
+        const htmlBody = String(graphPayload.message?.body?.content ?? '');
+        const tokenMatch = htmlBody.match(/supplier-quote\/([a-f0-9]{48})/i);
+        const publicToken = tokenMatch?.[1] ?? '';
+
+        const publicGet = await requestJson(`/supplier-inquiries/${publicToken}`);
+        expect(publicGet.status).toBe(200);
+
+        const publicPost = await requestJson(`/supplier-inquiries/${publicToken}/quote`, {
+          method: 'POST',
+          body: {
+            canDeliver: true,
+            quoteValidUntil: '2026-03-10T12:00:00.000Z',
+            deliveryWindow: '12 Mar AM barge',
+            supplierPaymentTerms: 'Net 30 days',
+            supplierComment: 'Subject to terminal slot confirmation',
+            items: publicGet.data.data.items.map((item: any, index: number) => ({
+              orderItemId: item.orderItemId,
+              price: index === 0 ? '450.50' : null,
+              note: index === 1 ? 'Not available ex-pipe' : null,
+            })),
+          },
+        });
+
+        expect(publicPost.status).toBe(200);
+        expect(publicPost.data?.success).toBe(true);
+
+        const sentRes = await requestJson(`/orders/${orderId}/inquiry/sent`, { token });
+        const inquiry = (sentRes.data?.data as any[])[0];
+        expect(inquiry.quoteLineCount).toBe(1);
+        expect(inquiry.deliveryWindow).toBe('12 Mar AM barge');
+        expect(inquiry.supplierPaymentTerms).toBe('Net 30 days');
+        expect(inquiry.supplierComment).toBe('Subject to terminal slot confirmation');
+        expect(inquiry.quoteValidUntil).toBe('2026-03-10T12:00:00.000Z');
+        expect(inquiry.items[1].price).toBeNull();
+        expect(inquiry.items[1].note).toBe('Not available ex-pipe');
+      } finally {
+        stub.restore();
+        mockGraphToken = null;
+      }
+    });
+
+    it('sends one automatic reminder before the response deadline', async () => {
+      const { token, orderId, supplier } = await seedDocumentReadyOrder();
+      const { processPendingInquiryReminders } = await import('../src/modules/documents/supplier-inquiry.service');
+      mockGraphToken = 'graph-token';
+      const stub = stubGraphFetch();
+
+      try {
+        await requestJson(`/orders/${orderId}/inquiry/send`, {
+          method: 'POST',
+          token,
+          body: {
+            suppliers: [
+              { supplierId: supplier.id, supplierName: 'Supplier Co', email: 'supplier@example.com' },
+            ],
+            subject: 'Reminder RFQ',
+            htmlBody: '<p>body</p>',
+            responseDeadlineAt: new Date(Date.now() + (2 * 3_600_000)).toISOString(),
+          },
+        });
+
+        const db = await getDb();
+        const [inquiry] = await db
+          .select()
+          .from(supplierInquiries)
+          .where(eq(supplierInquiries.orderId, orderId));
+
+        await db
+          .update(supplierInquiries)
+          .set({ sentAt: new Date(Date.now() - (2 * 3_600_000)) })
+          .where(eq(supplierInquiries.id, inquiry!.id));
+
+        const sentCount = await processPendingInquiryReminders();
+        expect(sentCount).toBe(1);
+        expect(stub.calls).toHaveLength(2);
+
+        const refreshed = await db
+          .select()
+          .from(supplierInquiries)
+          .where(eq(supplierInquiries.id, inquiry!.id));
+        expect(refreshed[0]!.reminderSentAt).toBeTruthy();
+        expect(refreshed[0]!.reminderCount).toBe(1);
+
+        const logs = await db
+          .select()
+          .from(emailLog)
+          .where(eq(emailLog.orderId, orderId));
+        expect(logs.map((row) => row.subject)).toContain('Reminder: Reminder RFQ');
+      } finally {
+        stub.restore();
+        mockGraphToken = null;
+      }
+    });
+
+    it('omits supplier response links when disabled in inquiry settings', async () => {
+      const { token, orderId, supplier, tenantId } = await seedDocumentReadyOrder();
+      const db = await getDb();
+      mockGraphToken = 'graph-token';
+      const stub = stubGraphFetch();
+
+      await db
+        .update(tenants)
+        .set({
+          settings: {
+            inquirySettings: {
+              supplierResponseUrlEnabled: false,
+              autoMarkNoReplyAfterHours: 168,
+            },
+          },
+        })
+        .where(eq(tenants.id, tenantId));
+
+      try {
+        const defaultsRes = await requestJson(`/orders/${orderId}/inquiry/defaults`, {
+          method: 'POST',
+          token,
+          body: {},
+        });
+
+        expect(defaultsRes.status).toBe(200);
+        expect(String(defaultsRes.data?.data?.htmlBody ?? '')).not.toContain('Submit quote online');
+        expect(String(defaultsRes.data?.data?.htmlBody ?? '')).not.toContain('${quoteFormUrl}');
+
+        await requestJson(`/orders/${orderId}/inquiry/send`, {
+          method: 'POST',
+          token,
+          body: {
+            suppliers: [
+              { supplierId: supplier.id, supplierName: 'Supplier Co', email: 'supplier@example.com' },
+            ],
+            subject: 'RFQ for ${name}',
+            htmlBody: '<p>Submit here: ${quoteFormUrl}</p>',
+          },
+        });
+
+        expect(stub.calls.length).toBe(1);
+        const graphPayload = JSON.parse(String(stub.calls[0]!.init?.body ?? '{}')) as any;
+        const htmlBody = String(graphPayload.message?.body?.content ?? '');
+        expect(htmlBody).not.toContain('supplier-quote/');
+        expect(htmlBody).not.toContain('${quoteFormUrl}');
+
+        const rows = await db
+          .select()
+          .from(supplierInquiries)
+          .where(eq(supplierInquiries.orderId, orderId));
+        expect(rows).toHaveLength(1);
+        expect(rows[0]!.quoteTokenHash).toBeNull();
+        expect(rows[0]!.quoteTokenExpiresAt).toBeNull();
       } finally {
         stub.restore();
         mockGraphToken = null;
@@ -1004,6 +1288,64 @@ describe('email tracking, inquiry send & WhatsApp group notifications', () => {
         expect(data[0].subject).toBe('Inquiry sub');
         expect(data[0].status).toBe('SENT');
         expect(data[0].sentAt).toBeTruthy();
+        expect(data[0].responseHours).toBeNull();
+        expect(data[0].items).toHaveLength(2);
+        expect(data[0].items[0]?.orderItemId).toBeTruthy();
+      } finally {
+        stub.restore();
+        mockGraphToken = null;
+      }
+    });
+
+    it('auto-marks stale sent inquiries as no reply', async () => {
+      const { token, orderId, supplier, tenantId } = await seedDocumentReadyOrder();
+      const db = await getDb();
+      mockGraphToken = 'graph-token';
+      const stub = stubGraphFetch();
+
+      await db
+        .update(tenants)
+        .set({
+          settings: {
+            inquirySettings: {
+              supplierResponseUrlEnabled: true,
+              autoMarkNoReplyAfterHours: 1,
+            },
+          },
+        })
+        .where(eq(tenants.id, tenantId));
+
+      try {
+        await requestJson(`/orders/${orderId}/inquiry/send`, {
+          method: 'POST',
+          token,
+          body: {
+            suppliers: [
+              { supplierId: supplier.id, supplierName: 'Supplier Co', email: 'supplier@example.com' },
+            ],
+            subject: 'Inquiry sub',
+            htmlBody: '<p>body</p>',
+          },
+        });
+
+        await db
+          .update(supplierInquiries)
+          .set({
+            sentAt: new Date(Date.now() - (2 * 3_600_000)),
+            updatedAt: new Date(Date.now() - (2 * 3_600_000)),
+          })
+          .where(eq(supplierInquiries.orderId, orderId));
+
+        const res = await requestJson(`/orders/${orderId}/inquiry/sent`, { token });
+        expect(res.status).toBe(200);
+        expect(res.data?.success).toBe(true);
+        expect(res.data?.data?.[0]?.status).toBe('NO_REPLY');
+
+        const rows = await db
+          .select()
+          .from(supplierInquiries)
+          .where(eq(supplierInquiries.orderId, orderId));
+        expect(rows[0]!.status).toBe('NO_REPLY');
       } finally {
         stub.restore();
         mockGraphToken = null;
@@ -1018,6 +1360,170 @@ describe('email tracking, inquiry send & WhatsApp group notifications', () => {
         token: login.accessToken as string,
       });
       expect(res.data?.success).toBe(false);
+    });
+  });
+
+  describe('GET /orders/:id/inquiry/suppliers', () => {
+    it('returns supplier performance stats for overall and place-specific deliveries', async () => {
+      const { token, orderId, tenantId, userId, supplier, place, client, vessel } = await seedDocumentReadyOrder();
+      const db = await getDb();
+
+      const [otherPlace] = await db
+        .insert(places)
+        .values({
+          name: 'Other Port',
+          country: 'Singapore',
+          countryIso: 'SGP',
+        })
+        .returning();
+
+      await db.insert(companyEmails).values({
+        counterpartyId: supplier.id,
+        emailType: 'inquiry',
+        email: 'supplier@example.com',
+        isPrimary: true,
+        addedById: userId,
+        addedByName: 'Test User',
+      });
+
+      await db.insert(portSuppliers).values({
+        placeId: place.id,
+        companyId: supplier.id,
+        products: ['VLSFO', 'LSMGO'],
+        addedById: userId,
+        addedByName: 'Test User',
+      });
+
+      const historicalOrders = await db.insert(orders).values([
+        {
+          tenantId,
+          clientId: client.id,
+          vesselId: vessel.id,
+          placeId: place.id,
+          supplierId: supplier.id,
+          status: 'DELIVERED',
+          currency: 'USD',
+          deliveredAt: new Date('2026-02-20T10:00:00.000Z'),
+        },
+        {
+          tenantId,
+          clientId: client.id,
+          vesselId: vessel.id,
+          placeId: otherPlace!.id,
+          supplierId: supplier.id,
+          status: 'PAID',
+          currency: 'USD',
+          deliveredAt: new Date('2026-01-15T10:00:00.000Z'),
+        },
+      ]).returning();
+
+      await db.insert(supplierInquiries).values([
+        {
+          orderId: historicalOrders[0]!.id,
+          supplierId: supplier.id,
+          email: 'supplier@example.com',
+          subject: 'Quoted before',
+          status: 'QUOTED',
+          sentByUserId: userId,
+          sentAt: new Date('2026-02-01T10:00:00.000Z'),
+          respondedAt: new Date('2026-02-01T16:00:00.000Z'),
+          quotedAt: new Date('2026-02-01T16:00:00.000Z'),
+          canDeliver: true,
+        },
+        {
+          orderId: historicalOrders[1]!.id,
+          supplierId: supplier.id,
+          email: 'supplier@example.com',
+          subject: 'No reply before',
+          status: 'NO_REPLY',
+          sentByUserId: userId,
+          sentAt: new Date('2026-02-05T10:00:00.000Z'),
+          canDeliver: null,
+        },
+      ]);
+
+      const res = await requestJson(`/orders/${orderId}/inquiry/suppliers`, { token });
+
+      expect(res.status).toBe(200);
+      expect(res.data?.success).toBe(true);
+
+      const rows = res.data?.data as Array<Record<string, any>>;
+      expect(rows.length).toBe(1);
+      expect(rows[0]?.supplierId).toBe(supplier.id);
+      expect(rows[0]?.performance).toEqual({
+        deliveredCountOverall: 2,
+        deliveredCountAtPlace: 1,
+        lastDeliveredAtOverall: '2026-02-20T10:00:00.000Z',
+        lastDeliveredAtPlace: '2026-02-20T10:00:00.000Z',
+        sentCount: 2,
+        quotedCount: 1,
+        declinedCount: 0,
+        noReplyCount: 1,
+        respondedCount: 1,
+        deliverableCount: 1,
+        nonDeliverableCount: 0,
+        averageResponseHours: 6,
+        totalResponseHours: 6,
+      });
+    });
+  });
+
+  describe('PATCH /orders/:id/inquiry/sent/:inquiryId', () => {
+    it('allows traders to record a quoted supplier response with per-line prices', async () => {
+      const { token, orderId, supplier } = await seedDocumentReadyOrder();
+      mockGraphToken = 'graph-token';
+      const stub = stubGraphFetch();
+
+      try {
+        await requestJson(`/orders/${orderId}/inquiry/send`, {
+          method: 'POST',
+          token,
+          body: {
+            suppliers: [
+              { supplierId: supplier.id, supplierName: 'Supplier Co', email: 'supplier@example.com' },
+            ],
+            subject: 'RFQ',
+            htmlBody: '<p>inquiry</p>',
+          },
+        });
+
+        const sentRes = await requestJson(`/orders/${orderId}/inquiry/sent`, { token });
+        const inquiry = (sentRes.data?.data as any[])[0];
+        expect(inquiry).toBeTruthy();
+
+        const patchRes = await requestJson(`/orders/${orderId}/inquiry/sent/${inquiry.id}`, {
+          method: 'PATCH',
+          token,
+          body: {
+            status: 'QUOTED',
+            respondedAt: '2026-03-01T12:00:00.000Z',
+            declineReason: null,
+            items: inquiry.items.map((item: any, index: number) => ({
+              orderItemId: item.orderItemId,
+              price: index === 0 ? '455.00' : '612.50',
+            })),
+          },
+        });
+
+        expect(patchRes.status).toBe(200);
+        expect(patchRes.data?.success).toBe(true);
+
+        const db = await getDb();
+        const rows = await db.select().from(supplierInquiries).where(eq(supplierInquiries.id, inquiry.id));
+        expect(rows[0]!.status).toBe('QUOTED');
+        expect(rows[0]!.respondedAt?.toISOString()).toBe('2026-03-01T12:00:00.000Z');
+        expect(rows[0]!.quotedAt?.toISOString()).toBe('2026-03-01T12:00:00.000Z');
+        expect(rows[0]!.canDeliver).toBe(true);
+
+        const quoteRows = await db
+          .select()
+          .from(supplierInquiryItemQuotes)
+          .where(eq(supplierInquiryItemQuotes.supplierInquiryId, inquiry.id));
+        expect(quoteRows).toHaveLength(2);
+      } finally {
+        stub.restore();
+        mockGraphToken = null;
+      }
     });
   });
 
@@ -1042,6 +1548,7 @@ describe('email tracking, inquiry send & WhatsApp group notifications', () => {
       expect(typeof d?.htmlBody).toBe('string');
       expect(typeof d?.senderName).toBe('string');
       expect(typeof d?.senderEmail).toBe('string');
+      expect(typeof d?.responseDeadlineAt).toBe('string');
 
       // Subject should reference the vessel or port
       const subject = String(d?.subject ?? '');

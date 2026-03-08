@@ -169,6 +169,16 @@ interface LocalPlaceOption {
   id: string;
   name: string;
   country: string | null;
+  source?: 'local' | 'lloyds';
+  lliPlaceId?: string;
+}
+
+interface SupplyPlaceSearchResult {
+  source: 'local' | 'lloyds';
+  localId?: string;
+  lliPlaceId?: string;
+  name: string;
+  country?: string | null;
 }
 
 const SUPPLY_PORT_PRODUCT_OPTIONS = ['VLSFO', 'LSMGO', 'IFO380', 'MGO', 'LUBE'] as const;
@@ -1218,6 +1228,9 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                               @if (selectedSupplyPlace()!.country) {
                                 <span class="ml-1 text-xs text-brand-700/80">{{ selectedSupplyPlace()!.country }}</span>
                               }
+                              @if (selectedSupplyPlace()!.source === 'lloyds') {
+                                <span class="ml-2 inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">Imported from Seasearcher</span>
+                              }
                             </div>
                             <button
                               type="button"
@@ -1233,7 +1246,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                           <input
                             [ngModel]="supplyPlaceSearch()"
                             (ngModelChange)="onSupplyPlaceSearch($event)"
-                            placeholder="Search local place..."
+                            placeholder="Search local place or import from Seasearcher..."
                             class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                           />
                           @if (supplyPlaceResults().length) {
@@ -1242,12 +1255,31 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                                 <button
                                   type="button"
                                   (click)="selectSupplyPlace(place)"
-                                  class="w-full px-3 py-2 text-left text-sm hover:bg-brand-50 transition-colors flex items-center justify-between"
+                                  [disabled]="importingSupplyPlaceId() === place.lliPlaceId"
+                                  class="w-full px-3 py-2 text-left text-sm hover:bg-brand-50 transition-colors flex items-center justify-between disabled:cursor-wait disabled:opacity-60"
                                 >
-                                  <span class="font-medium text-gray-900">{{ place.name }}</span>
-                                  @if (place.country) {
-                                    <span class="text-xs text-gray-400">{{ place.country }}</span>
-                                  }
+                                  <div class="min-w-0">
+                                    <div class="flex items-center gap-2">
+                                      <span class="font-medium text-gray-900">{{ place.name }}</span>
+                                      @if (place.source === 'lloyds') {
+                                        <span class="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">Seasearcher</span>
+                                      }
+                                    </div>
+                                    @if (place.source === 'lloyds') {
+                                      <div class="text-[11px] text-gray-400">Import this place and add it as a supply port</div>
+                                    }
+                                  </div>
+                                  <div class="ml-3 flex shrink-0 items-center gap-2">
+                                    @if (place.country) {
+                                      <span class="text-xs text-gray-400">{{ place.country }}</span>
+                                    }
+                                    @if (importingSupplyPlaceId() === place.lliPlaceId) {
+                                      <svg class="h-3.5 w-3.5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                      </svg>
+                                    }
+                                  </div>
                                 </button>
                               }
                             </div>
@@ -1336,7 +1368,12 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                         <div class="flex items-center justify-between">
                           <a [routerLink]="['/places', sp.placeId]" class="font-medium text-brand-700 hover:text-brand-900 hover:underline">{{ sp.placeName }}</a>
                           @if (sp.placeCountry) {
-                            <span class="text-xs text-gray-400">{{ sp.placeCountry }}</span>
+                            <span class="inline-flex items-center gap-1.5 text-xs text-gray-500">
+                              @if (placeCountryFlag(sp.placeCountry)) {
+                                <span>{{ placeCountryFlag(sp.placeCountry) }}</span>
+                              }
+                              <span>{{ placeCountryLabel(sp.placeCountry) }}</span>
+                            </span>
                           }
                         </div>
                         @if (sp.products && sp.products.length) {
@@ -2227,6 +2264,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     note: '',
   });
   readonly savingSupplyPort = signal(false);
+  readonly importingSupplyPlaceId = signal<string | null>(null);
   readonly supplyPortProductOptions = SUPPLY_PORT_PRODUCT_OPTIONS;
   private supplyPlaceSearchTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -3287,6 +3325,21 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     return flagFromIso3(iso3 ?? null);
   }
 
+  placeCountryFlag(value: string | null | undefined): string {
+    if (!value) return '';
+    const normalized = value.trim().toUpperCase();
+    const country = COUNTRIES.find((entry) => entry.code.toUpperCase() === normalized);
+    return country ? flagFromIso3(country.code) : '';
+  }
+
+  placeCountryLabel(value: string | null | undefined): string {
+    if (!value) return '';
+    const trimmed = value.trim();
+    const normalized = trimmed.toUpperCase();
+    const country = COUNTRIES.find((entry) => entry.code.toUpperCase() === normalized);
+    return country?.name ?? trimmed;
+  }
+
   onCountrySearch(value: string): void {
     this.countrySearchQuery.set(value);
     this.showCountryDropdown.set(true);
@@ -3551,9 +3604,34 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
           ),
         );
         const existingPlaceIds = new Set(this.supplyPorts().map((port) => port.placeId));
+        const localResults = res.success && res.data
+          ? res.data.places
+              .filter((place) => !existingPlaceIds.has(place.id))
+              .map((place) => ({ ...place, source: 'local' as const }))
+          : [];
+
+        if (localResults.length > 0) {
+          this.supplyPlaceResults.set(localResults);
+          return;
+        }
+
+        const lliRes = await firstValueFrom(
+          this.http.get<ApiResponse<SupplyPlaceSearchResult[]>>(
+            `${API}/lloyds/places?name=${encodeURIComponent(term)}`,
+          ),
+        );
+
         this.supplyPlaceResults.set(
-          res.success && res.data
-            ? res.data.places.filter((place) => !existingPlaceIds.has(place.id))
+          lliRes.success && lliRes.data
+            ? lliRes.data
+                .filter((place) => place.source === 'lloyds' && !!place.lliPlaceId)
+                .map((place) => ({
+                  id: `lli:${place.lliPlaceId}`,
+                  name: place.name,
+                  country: place.country ?? null,
+                  source: 'lloyds' as const,
+                  lliPlaceId: place.lliPlaceId,
+                }))
             : [],
         );
       } catch {
@@ -3562,7 +3640,33 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     }, 250);
   }
 
-  selectSupplyPlace(place: LocalPlaceOption): void {
+  async selectSupplyPlace(place: LocalPlaceOption): Promise<void> {
+    if (place.source === 'lloyds' && place.lliPlaceId) {
+      this.importingSupplyPlaceId.set(place.lliPlaceId);
+      try {
+        const res = await firstValueFrom(
+          this.http.post<ApiResponse<{ id: string; name: string }>>(`${API}/lloyds/places/import`, { lliPlaceId: place.lliPlaceId }),
+        );
+        if (!res.success || !res.data) {
+          this.showToast('error', res.message ?? 'Failed to import place from Seasearcher.');
+          return;
+        }
+
+        place = {
+          id: res.data.id,
+          name: res.data.name,
+          country: place.country,
+          source: 'lloyds',
+          lliPlaceId: place.lliPlaceId,
+        };
+      } catch {
+        this.showToast('error', 'Failed to import place from Seasearcher.');
+        return;
+      } finally {
+        this.importingSupplyPlaceId.set(null);
+      }
+    }
+
     this.selectedSupplyPlace.set(place);
     this.supplyPlaceSearch.set('');
     this.supplyPlaceResults.set([]);

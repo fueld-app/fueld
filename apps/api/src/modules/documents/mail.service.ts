@@ -373,6 +373,7 @@ export function buildInquiryEmailHtml(params: {
   companyLogoUrl?: string | null;
   brandColor?: string | null;
   supplierTerms?: string | null;
+  includeSupplierQuoteLink?: boolean;
   items: Array<{ quantity: string; unit: string; productType: string; description?: string | null }>;
 }): string {
   const companyName = params.companyName?.trim() || 'FUELD';
@@ -391,12 +392,26 @@ export function buildInquiryEmailHtml(params: {
   const deliveryLabel = params.etaFormatted && params.etdFormatted
     ? `${params.etaFormatted} to ${params.etdFormatted}`
     : params.etaFormatted || params.etdFormatted || '';
+  const includeSupplierQuoteLink = params.includeSupplierQuoteLink !== false;
+
+  const formatInquiryQuantity = (value: string): string => {
+    const trimmed = value.trim();
+    if (!trimmed) return value;
+    if (!/^\d+(?:\.\d+)?$/.test(trimmed)) return value;
+    return trimmed.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+  };
 
   const itemsHtml = params.items
-    .map((i) => {
-      const desc = i.description ? ` ${i.description}` : '';
-      return `<li>${i.quantity} ${i.unit} ${i.productType}${desc}</li>`;
-    })
+    .map((i) => `
+      <tr>
+        <td style="padding: 14px 16px; border-top: 1px solid #e5e7eb; vertical-align: top;">
+          <div style="font-size: 14px; line-height: 1.6; color: #111827;">
+            <span style="font-weight: 700; color: #111827;">${formatInquiryQuantity(i.quantity)} ${i.unit}</span>
+            <span style="font-weight: 700; color: #111827;"> ${i.productType}</span>${i.description ? `<span style="color: #4b5563;"> - ${i.description}</span>` : ''}
+          </div>
+        </td>
+      </tr>
+    `)
     .join('');
 
   return `
@@ -406,9 +421,9 @@ export function buildInquiryEmailHtml(params: {
         ${logoHtml}
       </div>
       <div style="background: #ffffff; padding: 32px; border-top: 1px solid #e5e7eb;">
-        <p>Good day,</p>
-        <p>Please offer for the following:</p>
-        <table style="margin: 16px 0; border-collapse: collapse;">
+        <p style="margin: 0 0 18px; line-height: 1.65; color: #111827;">Good day \${name},</p>
+        <p style="margin: 0 0 22px; line-height: 1.65; color: #111827;">Please offer for the following:</p>
+        <table style="margin: 0; border-collapse: collapse;">
           <tr>
             <td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Vessel:</td>
             <td style="padding: 4px 0; font-weight: 600;">${vesselLabel}</td>
@@ -426,12 +441,66 @@ export function buildInquiryEmailHtml(params: {
             <td style="padding: 4px 0; font-weight: 600;">${companyName}</td>
           </tr>
         </table>
-        ${itemsHtml ? `<ul style="margin: 8px 0 0 18px; padding: 0; color: #374151;">${itemsHtml}</ul>` : ''}
-        <p>If you have any questions, please don't hesitate to reach out.</p>
-        <p style="margin-top: 24px;">Best regards,<br/><strong>${params.senderName}</strong></p>
+        ${itemsHtml ? `
+          <div style="margin-top: 24px;">
+            <div style="margin: 0 0 10px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #6b7280;">Requested items</div>
+            <table style="width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; background: #f9fafb;">
+              <tbody>
+                ${itemsHtml}
+              </tbody>
+            </table>
+          </div>
+        ` : ''}
+        ${includeSupplierQuoteLink ? `<div style="margin-top: 24px; border: 1px solid #dbeafe; border-radius: 12px; background: #f8fbff; padding: 18px;">
+          <p style="margin: 0 0 12px; line-height: 1.6; color: #1f2937;">To speed things up, you can submit your line-item prices directly here:</p>
+          <a href="\${quoteFormUrl}" style="display: inline-block; border-radius: 999px; background: ${accentColor}; color: #ffffff; font-weight: 700; text-decoration: none; padding: 10px 16px;">Submit quote online</a>
+          <p style="margin: 10px 0 0; font-size: 12px; line-height: 1.5; color: #6b7280;">If the button does not open, copy this URL into your browser: \${quoteFormUrl}</p>
+        </div>` : ''}
+        <p style="margin: 24px 0 0; line-height: 1.65; color: #111827;">If you have any questions, please don't hesitate to reach out.</p>
+        <p style="margin: 28px 0 0; line-height: 1.7; color: #111827;">Best regards,<br/><strong>${params.senderName}</strong></p>
       </div>
       <div style="text-align: center; padding: 16px; color: #9ca3af; font-size: 11px;">
         Sent by ${companyName}
+      </div>
+    </div>
+  `;
+}
+
+export function buildInquiryReminderEmailHtml(params: {
+  senderName: string;
+  vesselName: string;
+  portName: string;
+  orderNumber: string;
+  supplierName?: string | null;
+  contactName?: string | null;
+  responseDeadlineFormatted: string;
+  quoteFormUrl?: string | null;
+}): string {
+  const preferredName = params.contactName?.trim() || params.supplierName?.trim() || 'there';
+  const quoteFormUrl = params.quoteFormUrl?.trim() || '';
+  return `
+    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+      <div style="height: 4px; background: #1e3a5f;"></div>
+      <div style="background: #ffffff; padding: 32px;">
+        <p style="margin: 0 0 18px; line-height: 1.65; color: #111827;">Good day ${preferredName},</p>
+        <p style="margin: 0 0 18px; line-height: 1.65; color: #111827;">This is a reminder for our inquiry regarding <strong>${params.vesselName}</strong> at <strong>${params.portName}</strong>.</p>
+        <p style="margin: 0 0 18px; line-height: 1.65; color: #111827;">We would appreciate your reply by <strong>${params.responseDeadlineFormatted}</strong>.</p>
+        <table style="margin: 0 0 20px; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Order:</td>
+            <td style="padding: 4px 0; font-weight: 600; color: #111827;">${params.orderNumber}</td>
+          </tr>
+          <tr>
+            <td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Place:</td>
+            <td style="padding: 4px 0; font-weight: 600; color: #111827;">${params.portName}</td>
+          </tr>
+        </table>
+        ${quoteFormUrl ? `<div style="margin: 0 0 20px; border: 1px solid #dbeafe; border-radius: 12px; background: #f8fbff; padding: 18px;">
+          <p style="margin: 0 0 12px; line-height: 1.6; color: #1f2937;">You can still submit your quote directly here:</p>
+          <a href="${quoteFormUrl}" style="display: inline-block; border-radius: 999px; background: #1e3a5f; color: #ffffff; font-weight: 700; text-decoration: none; padding: 10px 16px;">Submit quote online</a>
+          <p style="margin: 10px 0 0; font-size: 12px; line-height: 1.5; color: #6b7280;">If the button does not open, copy this URL into your browser: ${quoteFormUrl}</p>
+        </div>` : `<p style="margin: 0 0 20px; line-height: 1.65; color: #111827;">Please reply directly to this email with your availability and prices.</p>`}
+        <p style="margin: 0; line-height: 1.65; color: #111827;">Best regards,<br/><strong>${params.senderName}</strong></p>
       </div>
     </div>
   `;

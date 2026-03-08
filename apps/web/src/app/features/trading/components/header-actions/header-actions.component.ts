@@ -39,6 +39,7 @@ interface ActionItem {
   icon: string;
   color: string;
   disabled?: boolean;
+  dividerBefore?: boolean;
 }
 
 const SEND_ICON = 'M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75';
@@ -152,6 +153,9 @@ const ACTIONS: ActionItem[] = [
         role="menu"
       >
         @for (action of displayActions(); track action.key) {
+          @if (action.dividerBefore) {
+            <div class="my-1 border-t border-gray-100"></div>
+          }
           <button
             (click)="onAction(action.key)"
             class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
@@ -219,31 +223,42 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
     const canMarkPaid = status !== OrderStatus.Paid;
 
     const nextActions = isInquiry
-      ? ACTIONS
-          .filter((action) =>
-            action.key === 'view-offer'
-            || action.key === 'generate-invoice'
-            || action.key === 'convert-to-order'
-            || action.key === 'cancel-inquiry'
-            || action.key === 'send-offer'
-            || action.key === 'send-proforma'
-            || action.key === 'send-inquiry',
-          )
-          .map((action) =>
-            action.key === 'view-offer'
-              ? { ...action, label: 'View Offer PDF', disabled: !hasInvoicingCompany || !hasLineItems }
-              : action.key === 'generate-invoice'
-                ? { ...action, label: 'View Proforma Invoice', disabled: !hasBankAccount || !hasLineItems }
-                : action.key === 'convert-to-order'
-                  ? { ...action, disabled: !hasLineItems }
-                  : action.key === 'send-offer'
-                    ? { ...action, disabled: !hasInvoicingCompany || !hasLineItems }
-                    : action.key === 'send-proforma'
-                      ? { ...action, disabled: !hasBankAccount || !hasLineItems }
-                      : action.key === 'send-inquiry'
-                        ? { ...action, disabled: !hasLineItems }
-                        : action,
-          )
+      ? (() => {
+          const inquiryActions = ACTIONS
+            .filter((action) =>
+              action.key === 'view-offer'
+              || action.key === 'generate-invoice'
+              || action.key === 'convert-to-order'
+              || action.key === 'cancel-inquiry'
+              || action.key === 'send-offer'
+              || action.key === 'send-proforma'
+              || action.key === 'send-inquiry',
+            )
+            .map((action) =>
+              action.key === 'view-offer'
+                ? { ...action, label: 'View Offer PDF', disabled: !hasInvoicingCompany || !hasLineItems }
+                : action.key === 'generate-invoice'
+                  ? { ...action, label: 'View Proforma Invoice', disabled: !hasBankAccount || !hasLineItems }
+                  : action.key === 'convert-to-order'
+                    ? { ...action, disabled: !hasLineItems }
+                    : action.key === 'send-offer'
+                      ? { ...action, disabled: !hasInvoicingCompany || !hasLineItems }
+                      : action.key === 'send-proforma'
+                        ? { ...action, disabled: !hasBankAccount || !hasLineItems }
+                        : action.key === 'send-inquiry'
+                          ? { ...action, disabled: !hasLineItems }
+                          : action,
+            );
+
+          const primaryActions = inquiryActions.filter((action) =>
+            action.key !== 'convert-to-order' && action.key !== 'cancel-inquiry',
+          );
+          const finalActions = inquiryActions
+            .filter((action) => action.key === 'convert-to-order' || action.key === 'cancel-inquiry')
+            .map((action, index) => ({ ...action, dividerBefore: index === 0 }));
+
+          return [...primaryActions, ...finalActions];
+        })()
       : ACTIONS
           .filter((action) =>
             action.key !== 'convert-to-order'

@@ -320,7 +320,29 @@ describe('documents mail service', () => {
     });
 
     expect(html).toContain('Please offer for the following');
-    expect(html).toContain('100.00 MT VLSFO Local specs');
+    expect(html).toContain('Requested items');
+    expect(html).toContain('100 MT');
+    expect(html).not.toContain('100.00 MT');
+    expect(html).toContain('VLSFO');
+    expect(html).toContain('Local specs');
+    expect(html).not.toContain('margin-top: 4px; font-size: 13px; line-height: 1.5; color: #6b7280;');
     expect(html).not.toContain('These terms should stay hidden for now.');
+  });
+
+  test('buildInquiryEmailHtml can omit the supplier quote link block', () => {
+    const html = buildInquiryEmailHtml({
+      senderName: 'Trader',
+      vesselName: 'MV TEST',
+      vesselImo: '1234567',
+      portName: 'Singapore',
+      etaFormatted: '01 Mar 2026',
+      etdFormatted: '02 Mar 2026',
+      companyName: 'Fueld Trading Ltd',
+      includeSupplierQuoteLink: false,
+      items: [{ quantity: '100.00', unit: 'MT', productType: 'VLSFO', description: 'Local specs' }],
+    });
+
+    expect(html).not.toContain('Submit quote online');
+    expect(html).not.toContain('${quoteFormUrl}');
   });
 });

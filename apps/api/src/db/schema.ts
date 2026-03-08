@@ -116,6 +116,10 @@ export interface TenantSettings {
   companyTypes?: string[];
   // Configurable reasons required when cancelling inquiries
   inquiryCancelReasons?: string[];
+  inquirySettings?: {
+    supplierResponseUrlEnabled?: boolean;
+    autoMarkNoReplyAfterHours?: number | null;
+  };
   // Configurable attachment types for order/inquiry attachments
   attachmentTypes?: string[];
   // Microsoft email sending
@@ -1356,18 +1360,50 @@ export const supplierInquiries = pgTable('supplier_inquiries', {
   email: text('email').notNull(),
   subject: text('subject').notNull(),
   status: text('status').notNull().default('SENT'),  // 'SENT' | 'QUOTED' | 'DECLINED' | 'NO_REPLY'
+  quoteTokenHash: text('quote_token_hash'),
+  quoteTokenExpiresAt: timestamp('quote_token_expires_at', { withTimezone: true }),
+  responseDeadlineAt: timestamp('response_deadline_at', { withTimezone: true }),
+  reminderSentAt: timestamp('reminder_sent_at', { withTimezone: true }),
+  reminderCount: integer('reminder_count').notNull().default(0),
+  respondedAt: timestamp('responded_at', { withTimezone: true }),
+  quotedAt: timestamp('quoted_at', { withTimezone: true }),
+  canDeliver: boolean('can_deliver'),
+  declineReason: text('decline_reason'),
+  quoteValidUntil: timestamp('quote_valid_until', { withTimezone: true }),
+  deliveryWindow: text('delivery_window'),
+  supplierPaymentTerms: text('supplier_payment_terms'),
+  supplierComment: text('supplier_comment'),
   sentByUserId: uuid('sent_by_user_id').references(() => users.id),
   sentAt: timestamp('sent_at', { withTimezone: true }).notNull().defaultNow(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const supplierInquiriesRelations = relations(supplierInquiries, ({ one }) => ({
+export const supplierInquiryItemQuotes = pgTable('supplier_inquiry_item_quotes', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  supplierInquiryId: uuid('supplier_inquiry_id').notNull().references(() => supplierInquiries.id, { onDelete: 'cascade' }),
+  orderItemId: uuid('order_item_id').notNull().references(() => orderItems.id, { onDelete: 'cascade' }),
+  price: numeric('price', { precision: 12, scale: 4 }),
+  currency: text('currency').notNull(),
+  note: text('note'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const supplierInquiriesRelations = relations(supplierInquiries, ({ one, many }) => ({
   order: one(orders, { fields: [supplierInquiries.orderId], references: [orders.id] }),
   supplier: one(counterparties, { fields: [supplierInquiries.supplierId], references: [counterparties.id] }),
   contact: one(companyContacts, { fields: [supplierInquiries.contactId], references: [companyContacts.id] }),
   sentByUser: one(users, { fields: [supplierInquiries.sentByUserId], references: [users.id] }),
+  itemQuotes: many(supplierInquiryItemQuotes),
+}));
+
+export const supplierInquiryItemQuotesRelations = relations(supplierInquiryItemQuotes, ({ one }) => ({
+  supplierInquiry: one(supplierInquiries, { fields: [supplierInquiryItemQuotes.supplierInquiryId], references: [supplierInquiries.id] }),
+  orderItem: one(orderItems, { fields: [supplierInquiryItemQuotes.orderItemId], references: [orderItems.id] }),
 }));
 
 export type SupplierInquiry = typeof supplierInquiries.$inferSelect;
 export type NewSupplierInquiry = typeof supplierInquiries.$inferInsert;
+export type SupplierInquiryItemQuote = typeof supplierInquiryItemQuotes.$inferSelect;
+export type NewSupplierInquiryItemQuote = typeof supplierInquiryItemQuotes.$inferInsert;

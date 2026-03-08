@@ -295,6 +295,20 @@
       "when": 1772881800000,
       "tag": "0041_credit_applications",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1772968200000,
+      "tag": "0042_supplier_inquiry_quotes",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1773054600000,
+      "tag": "0043_inquiry_deadlines_partial_quotes",
+      "breakpoints": true
     }
   ]
 }

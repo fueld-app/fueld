@@ -973,6 +973,73 @@ export async function updateInquiryCancelReasonSettings(reasons: string[]): Prom
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+//  INQUIRY SETTINGS
+// ═══════════════════════════════════════════════════════════════════════
+
+export const DEFAULT_SUPPLIER_RESPONSE_URL_ENABLED = true;
+export const DEFAULT_AUTO_MARK_NO_REPLY_AFTER_HOURS = 168;
+
+export interface InquirySettings {
+  supplierResponseUrlEnabled: boolean;
+  autoMarkNoReplyAfterHours: number | null;
+}
+
+export async function getInquirySettings(): Promise<InquirySettings> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  const inquirySettings = settings.inquirySettings ?? {};
+  const autoMarkNoReplyAfterHours = inquirySettings.autoMarkNoReplyAfterHours;
+
+  return {
+    supplierResponseUrlEnabled: inquirySettings.supplierResponseUrlEnabled ?? DEFAULT_SUPPLIER_RESPONSE_URL_ENABLED,
+    autoMarkNoReplyAfterHours:
+      autoMarkNoReplyAfterHours === null
+        ? null
+        : typeof autoMarkNoReplyAfterHours === 'number'
+          ? autoMarkNoReplyAfterHours
+          : DEFAULT_AUTO_MARK_NO_REPLY_AFTER_HOURS,
+  };
+}
+
+export async function updateInquirySettings(data: {
+  supplierResponseUrlEnabled?: boolean;
+  autoMarkNoReplyAfterHours?: number | null;
+}): Promise<InquirySettings> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = { ...(tenant.settings as any) };
+  const inquirySettings = { ...(settings.inquirySettings ?? {}) };
+
+  if (data.supplierResponseUrlEnabled !== undefined) {
+    inquirySettings.supplierResponseUrlEnabled = data.supplierResponseUrlEnabled;
+  }
+
+  if (data.autoMarkNoReplyAfterHours !== undefined) {
+    if (data.autoMarkNoReplyAfterHours === null) {
+      inquirySettings.autoMarkNoReplyAfterHours = null;
+    } else {
+      const normalized = Number(data.autoMarkNoReplyAfterHours);
+      if (!Number.isFinite(normalized) || normalized < 0) {
+        throw new Error('Auto-mark no reply hours must be zero or greater');
+      }
+      inquirySettings.autoMarkNoReplyAfterHours = Math.round(normalized);
+    }
+  }
+
+  settings.inquirySettings = inquirySettings;
+
+  await db
+    .update(tenants)
+    .set({ settings, updatedAt: new Date() })
+    .where(eq(tenants.id, tenant.id));
+
+  return getInquirySettings();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 //  WHATSAPP SETTINGS
 // ═══════════════════════════════════════════════════════════════════════
 

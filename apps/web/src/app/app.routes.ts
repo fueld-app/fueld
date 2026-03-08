@@ -27,6 +27,14 @@ export const routes: Routes = [
       ),
     title: 'Two-Factor Verification',
   },
+  {
+    path: 'supplier-quote/:token',
+    loadComponent: () =>
+      import('./features/trading/pages/public-supplier-quote/public-supplier-quote-page.component').then(
+        (m) => m.PublicSupplierQuotePageComponent,
+      ),
+    title: 'Supplier Quote',
+  },
 
   // ─── Protected routes (inside main layout) ─────────────────────
   {
