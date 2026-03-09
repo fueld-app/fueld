@@ -17,6 +17,7 @@ import { map } from 'rxjs';
 import {
   OrderStatus,
   PaymentTermType,
+  PricingModel,
   type OrderDto,
   type CounterpartyDto,
   type VesselDto,
@@ -999,6 +1000,7 @@ interface InquiryReplyRecommendation {
       [unitOptionsInput]="configuredUnits()"
       [unitConversionsInput]="configuredUnitConversions()"
       [currencyOptionsInput]="configuredCurrencies()"
+      [priceReferencesInput]="configuredPriceReferences()"
       (itemsChange)="onItemsChange($event)"
       (economicsChange)="onItemEconomicsChange($event)"
       (displayCurrencyChange)="itemDisplayCurrency.set($event)"
@@ -1496,6 +1498,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   readonly configuredUnits = signal<DropdownOption[]>([]);
   readonly configuredUnitConversions = signal<{ productType?: string; fromUnit: string; toUnit: string; factor: number }[]>([]);
   readonly configuredCurrencies = signal<DropdownOption[]>([]);
+  readonly configuredPriceReferences = signal<{ id: string; name: string; code: string }[]>([]);
   readonly configuredAttachmentTypes = signal<string[]>(['BDR', 'OTHER']);
 
   /** Whether the user has linked WhatsApp in Settings */
@@ -2022,6 +2025,23 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
             paymentTerms: item.paymentTerms ?? '',
             customerNote: item.customerNote ?? '',
             deliveredQuantity: item.deliveredQuantity ? parseFloat(item.deliveredQuantity) : null,
+            // Formula pricing
+            costPricingModel: item.costPricingModel ?? PricingModel.Fixed,
+            costReferenceId: item.costReferenceId ?? null,
+            costReferenceName: item.costReferenceName ?? null,
+            costPremium: item.costPremium != null ? parseFloat(item.costPremium) : null,
+            costBarging: item.costBarging != null ? parseFloat(item.costBarging) : null,
+            costBargingUnit: item.costBargingUnit ?? null,
+            costCreditDays: item.costCreditDays ?? null,
+            costPriceFinalized: item.costPriceFinalized ?? false,
+            salesPricingModel: item.salesPricingModel ?? PricingModel.Fixed,
+            salesReferenceId: item.salesReferenceId ?? null,
+            salesReferenceName: item.salesReferenceName ?? null,
+            salesPremium: item.salesPremium != null ? parseFloat(item.salesPremium) : null,
+            salesBarging: item.salesBarging != null ? parseFloat(item.salesBarging) : null,
+            salesBargingUnit: item.salesBargingUnit ?? null,
+            salesCreditDays: item.salesCreditDays ?? null,
+            salesPriceFinalized: item.salesPriceFinalized ?? false,
           })),
         );
 
@@ -2248,7 +2268,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
 
   private async loadReferenceData(): Promise<void> {
     try {
-      const [suppliersRes, usersRes, productsRes, unitsRes, unitConversionsRes, currenciesRes, attachmentTypesRes, cancelReasonsRes] = await Promise.all([
+      const [suppliersRes, usersRes, productsRes, unitsRes, unitConversionsRes, currenciesRes, attachmentTypesRes, cancelReasonsRes, priceRefsRes] = await Promise.all([
         firstValueFrom(
           this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
             `${API_URL}/companies/local?type=SUPPLIER&limit=100`,
@@ -2275,6 +2295,9 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
         firstValueFrom(
           this.http.get<ApiResponse<{ reasons: string[] }>>(`${API_URL}/admin/settings/my-inquiry-cancel-reasons`),
         ),
+        firstValueFrom(
+          this.http.get<ApiResponse<{ references: { id: string; name: string; code: string }[] }>>(`${API_URL}/admin/settings/my-price-references`),
+        ),
       ]);
       if (suppliersRes.success) this.suppliers.set(suppliersRes.data.companies);
       if (usersRes.success) this.teamUsers.set(usersRes.data ?? []);
@@ -2296,6 +2319,9 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
       }
       if (cancelReasonsRes.success) {
         this.inquiryCancelReasons.set(cancelReasonsRes.data.reasons ?? []);
+      }
+      if (priceRefsRes.success) {
+        this.configuredPriceReferences.set(priceRefsRes.data.references ?? []);
       }
     } catch {
       // silently ignore
@@ -3098,6 +3124,18 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
         paymentTerms: r.paymentTerms || null,
         customerNote: r.customerNote ?? null,
         deliveredQuantity: r.deliveredQuantity != null ? String(r.deliveredQuantity) : null,
+        costPricingModel: r.costPricingModel ?? 'FIXED',
+        costReferenceId: r.costReferenceId ?? null,
+        costPremium: r.costPremium != null ? String(r.costPremium) : null,
+        costBarging: r.costBarging != null ? String(r.costBarging) : null,
+        costBargingUnit: r.costBargingUnit ?? null,
+        costCreditDays: r.costCreditDays ?? null,
+        salesPricingModel: r.salesPricingModel ?? 'FIXED',
+        salesReferenceId: r.salesReferenceId ?? null,
+        salesPremium: r.salesPremium != null ? String(r.salesPremium) : null,
+        salesBarging: r.salesBarging != null ? String(r.salesBarging) : null,
+        salesBargingUnit: r.salesBargingUnit ?? null,
+        salesCreditDays: r.salesCreditDays ?? null,
       }));
 
       await firstValueFrom(
@@ -3365,6 +3403,18 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
         paymentTerms: r.paymentTerms || null,
         customerNote: r.customerNote ?? null,
         deliveredQuantity: r.deliveredQuantity != null ? String(r.deliveredQuantity) : null,
+        costPricingModel: r.costPricingModel ?? 'FIXED',
+        costReferenceId: r.costReferenceId ?? null,
+        costPremium: r.costPremium != null ? String(r.costPremium) : null,
+        costBarging: r.costBarging != null ? String(r.costBarging) : null,
+        costBargingUnit: r.costBargingUnit ?? null,
+        costCreditDays: r.costCreditDays ?? null,
+        salesPricingModel: r.salesPricingModel ?? 'FIXED',
+        salesReferenceId: r.salesReferenceId ?? null,
+        salesPremium: r.salesPremium != null ? String(r.salesPremium) : null,
+        salesBarging: r.salesBarging != null ? String(r.salesBarging) : null,
+        salesBargingUnit: r.salesBargingUnit ?? null,
+        salesCreditDays: r.salesCreditDays ?? null,
       }));
 
       await firstValueFrom(

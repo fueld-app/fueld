@@ -51,6 +51,10 @@ import {
   updateOwnCompanyTerms,
   getWhatsAppSettings,
   updateWhatsAppSettings,
+  listPriceReferences,
+  createPriceReference,
+  updatePriceReference,
+  deletePriceReference,
 } from './settings.service';
 import { reloadCurrencies } from '../prices/price.service';
 import {
@@ -398,6 +402,18 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     }
   }, {
     detail: { tags: ['Admin Settings'], summary: 'Get unit conversion defaults for current tenant' },
+  })
+
+  .get('/my-price-references', async () => {
+    try {
+      const references = await listPriceReferences();
+      return { success: true, data: { references } } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get price reference sources for current tenant' },
   })
 
   .get('/my-currencies', async () => {
@@ -1433,4 +1449,72 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   }, {
     params: t.Object({ ruleId: t.String() }),
     detail: { tags: ['Admin Settings'], summary: 'Delete an email rule' },
+  })
+
+  // ═════════════════════════════════════════════════════════════════
+  //  PRICE REFERENCES (formula pricing sources)
+  // ═════════════════════════════════════════════════════════════════
+
+  .get('/price-references', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const references = await listPriceReferences();
+      return { success: true, data: { references } } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'List price reference sources' },
+  })
+
+  .post('/price-references', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const ref = await createPriceReference(body);
+      return { success: true, data: ref } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      name: t.String({ minLength: 1 }),
+      code: t.String({ minLength: 1 }),
+      description: t.Optional(t.Nullable(t.String())),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Create a price reference source' },
+  })
+
+  .put('/price-references/:id', async ({ auth, params, body }) => {
+    try {
+      requireAdmin(auth);
+      const ref = await updatePriceReference(params.id, body);
+      return { success: true, data: ref } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    params: t.Object({ id: t.String() }),
+    body: t.Object({
+      name: t.Optional(t.String({ minLength: 1 })),
+      code: t.Optional(t.String({ minLength: 1 })),
+      description: t.Optional(t.Nullable(t.String())),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update a price reference source' },
+  })
+
+  .delete('/price-references/:id', async ({ auth, params }) => {
+    try {
+      requireAdmin(auth);
+      await deletePriceReference(params.id);
+      return { success: true, data: null } satisfies ApiResponse<null>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    params: t.Object({ id: t.String() }),
+    detail: { tags: ['Admin Settings'], summary: 'Delete a price reference source' },
   });

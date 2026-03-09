@@ -12,6 +12,7 @@ import type {
   RiskCheckStatus,
   RiskHitSeverity,
   RiskOverrideStatus,
+  PricingModel,
 } from './enums';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -667,6 +668,21 @@ export interface UnitConversionSettingsDto {
   conversions: { productType?: string; fromUnit: string; toUnit: string; factor: number }[];
 }
 
+/** Price reference source (e.g. Aramco OSP, Platts) */
+export interface PriceReferenceDto {
+  id: string;
+  tenantId: string;
+  name: string;
+  code: string;
+  description: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PriceReferenceSettingsDto {
+  references: PriceReferenceDto[];
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  ORDER ITEM (line items)
 // ═══════════════════════════════════════════════════════════════════════
@@ -690,6 +706,24 @@ export interface OrderItemDto {
   paymentTerms: PaymentTerms | null;
   customerNote?: string | null;
   deliveredQuantity?: string | null;
+  // Formula pricing (cost side)
+  costPricingModel: PricingModel;
+  costReferenceId?: string | null;
+  costReferenceName?: string | null;
+  costPremium?: string | null;
+  costBarging?: string | null;
+  costBargingUnit?: string | null;
+  costCreditDays?: number | null;
+  costPriceFinalized?: boolean;
+  // Formula pricing (sell side)
+  salesPricingModel: PricingModel;
+  salesReferenceId?: string | null;
+  salesReferenceName?: string | null;
+  salesPremium?: string | null;
+  salesBarging?: string | null;
+  salesBargingUnit?: string | null;
+  salesCreditDays?: number | null;
+  salesPriceFinalized?: boolean;
 }
 
 export interface SupplierInquiryItemQuoteDto {

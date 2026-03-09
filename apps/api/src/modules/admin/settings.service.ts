@@ -14,6 +14,7 @@ import {
   companyGroupMembers,
   tenants,
   bankAccounts,
+  priceReferences,
 } from '../../db/schema';
 import type { OwnCompanyDto, TeamDto, CompanyGroupDto, BankAccountDto } from '@fueld/types';
 
@@ -1179,4 +1180,68 @@ export async function getCompanyTerms(companyId: string): Promise<{ customerTerm
     customerTerms: selectedCompany.customerTerms,
     supplierTerms: selectedCompany.supplierTerms,
   };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  PRICE REFERENCE SETTINGS (formula pricing sources)
+// ═══════════════════════════════════════════════════════════════════════
+
+function mapPriceReference(row: typeof priceReferences.$inferSelect) {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    name: row.name,
+    code: row.code,
+    description: row.description ?? null,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+export async function listPriceReferences() {
+  const tenantId = await getTenantId();
+  const rows = await db
+    .select()
+    .from(priceReferences)
+    .where(eq(priceReferences.tenantId, tenantId))
+    .orderBy(priceReferences.name);
+  return rows.map(mapPriceReference);
+}
+
+export async function createPriceReference(input: { name: string; code: string; description?: string | null }) {
+  const tenantId = await getTenantId();
+  const [created] = await db
+    .insert(priceReferences)
+    .values({
+      tenantId,
+      name: input.name.trim(),
+      code: input.code.trim().toUpperCase(),
+      description: input.description?.trim() || null,
+    })
+    .returning();
+  return mapPriceReference(created);
+}
+
+export async function updatePriceReference(id: string, input: { name?: string; code?: string; description?: string | null }) {
+  const setData: Record<string, unknown> = { updatedAt: new Date() };
+  if (input.name !== undefined) setData.name = input.name.trim();
+  if (input.code !== undefined) setData.code = input.code.trim().toUpperCase();
+  if (input.description !== undefined) setData.description = input.description?.trim() || null;
+
+  const [updated] = await db
+    .update(priceReferences)
+    .set(setData)
+    .where(eq(priceReferences.id, id))
+    .returning();
+  if (!updated) throw new Error('Price reference not found');
+  return mapPriceReference(updated);
+}
+
+export async function deletePriceReference(id: string) {
+  const [deleted] = await db
+    .delete(priceReferences)
+    .where(eq(priceReferences.id, id))
+    .returning({ id: priceReferences.id });
+  if (!deleted) throw new Error('Price reference not found');
+  return deleted;
 }

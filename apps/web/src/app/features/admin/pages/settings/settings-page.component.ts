@@ -145,7 +145,7 @@ interface InquirySettingsDto {
               </div>
             </div>
 
-            <div class="app-panel-body space-y-3">
+            <div class="app-panel-body space-y-3 max-h-[28rem] overflow-y-auto">
               @for (p of products(); track $index; let i = $index) {
                 <div class="flex items-center gap-2">
                   <div class="flex flex-col gap-0.5 shrink-0">
@@ -220,7 +220,7 @@ interface InquirySettingsDto {
               </div>
             </div>
 
-            <div class="app-panel-body space-y-3">
+            <div class="app-panel-body space-y-3 max-h-[28rem] overflow-y-auto">
               @for (u of units(); track $index; let i = $index) {
                 <div class="flex items-center gap-2">
                   <div class="flex flex-col gap-0.5 shrink-0">
@@ -295,7 +295,7 @@ interface InquirySettingsDto {
               </div>
             </div>
 
-            <div class="app-panel-body space-y-3">
+            <div class="app-panel-body space-y-3 max-h-[28rem] overflow-y-auto">
               @for (conv of unitConversions(); track $index; let i = $index) {
                 <div class="flex items-center gap-2 min-w-0">
                   <input
@@ -374,6 +374,89 @@ interface InquirySettingsDto {
           </div>
 
           <!-- ════════════════════════════════════════════════════════ -->
+          <!--  Price References (formula pricing sources)             -->
+          <!-- ════════════════════════════════════════════════════════ -->
+          <div class="app-panel min-w-0">
+            <div class="app-panel-header app-panel-header--violet">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--violet">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-violet-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M12.577 4.878a.75.75 0 01.919-.53l4.78 1.281a.75.75 0 01.531.919l-1.281 4.78a.75.75 0 01-1.449-.387l.81-3.022a19.407 19.407 0 00-5.594 5.203.75.75 0 01-1.139.093L7 10.06l-4.72 4.72a.75.75 0 01-1.06-1.06l5.25-5.25a.75.75 0 011.06 0l3.074 3.073a20.923 20.923 0 015.545-4.931l-3.042-.815a.75.75 0 01-.53-.919z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-semibold text-gray-900">Price References</h3>
+                <p class="text-xs text-gray-500">Named pricing sources for formula-based pricing (e.g. Aramco OSP, Platts). Used when suppliers quote "posted price + premium".</p>
+              </div>
+            </div>
+
+            <div class="app-panel-body space-y-3 max-h-[28rem] overflow-y-auto">
+              @for (ref of priceRefs(); track ref.id; let i = $index) {
+                <div class="flex items-center gap-2 min-w-0">
+                  <input
+                    type="text"
+                    [value]="ref.name"
+                    (input)="updatePriceRef(i, 'name', $any($event.target).value)"
+                    placeholder="Name (e.g. Aramco OSP)"
+                    class="min-w-0 flex-1 rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                           focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  />
+                  <input
+                    type="text"
+                    [value]="ref.code"
+                    (input)="updatePriceRef(i, 'code', $any($event.target).value.toUpperCase())"
+                    placeholder="Code"
+                    class="app-input-mono-uppercase min-w-0 w-28 shrink"
+                  />
+                  <input
+                    type="text"
+                    [value]="ref.description ?? ''"
+                    (input)="updatePriceRef(i, 'description', $any($event.target).value)"
+                    placeholder="Description (optional)"
+                    class="min-w-0 flex-1 rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                           focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  />
+                  <button
+                    (click)="removePriceRef(i)"
+                    class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
+                    title="Remove price reference"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              }
+              <button
+                (click)="addPriceRef()"
+                class="app-button-add"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+                </svg>
+                Add Price Reference
+              </button>
+
+              <div class="flex items-center gap-3 pt-2">
+                <button
+                  (click)="savePriceRefs()"
+                  [disabled]="priceRefsSaving()"
+                  class="app-button-primary"
+                >
+                  @if (priceRefsSaving()) { Saving… } @else { Save Price References }
+                </button>
+                @if (priceRefsSaved()) {
+                  <span class="text-sm text-green-600 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                    </svg>
+                    Saved
+                  </span>
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- ════════════════════════════════════════════════════════ -->
           <!--  Currency Options                                       -->
           <!-- ════════════════════════════════════════════════════════ -->
           <div class="app-panel">
@@ -390,7 +473,7 @@ interface InquirySettingsDto {
               </div>
             </div>
 
-            <div class="app-panel-body space-y-3">
+            <div class="app-panel-body space-y-3 max-h-[28rem] overflow-y-auto">
               @for (c of currencies(); track $index; let i = $index) {
                 <div class="flex items-center gap-2">
                   <div class="flex flex-col gap-0.5 shrink-0">
@@ -468,7 +551,7 @@ interface InquirySettingsDto {
               </div>
             </div>
 
-            <div class="app-panel-body space-y-3">
+            <div class="app-panel-body space-y-3 max-h-[28rem] overflow-y-auto">
               @for (ct of companyTypes(); track $index; let i = $index) {
                 <div class="flex items-center gap-2">
                   <div class="flex flex-col gap-0.5 shrink-0">
@@ -544,7 +627,7 @@ interface InquirySettingsDto {
               </div>
             </div>
 
-            <div class="app-panel-body space-y-3">
+            <div class="app-panel-body space-y-3 max-h-[28rem] overflow-y-auto">
               @for (type of attachmentTypes(); track $index; let i = $index) {
                 <div class="flex items-center gap-2">
                   <div class="flex flex-col gap-0.5 shrink-0">
@@ -720,7 +803,7 @@ interface InquirySettingsDto {
               </div>
             </div>
 
-            <div class="app-panel-body space-y-3">
+            <div class="app-panel-body space-y-3 max-h-[28rem] overflow-y-auto">
               @for (reason of inquiryCancelReasons(); track $index; let i = $index) {
                 <div class="flex items-center gap-2">
                   <div class="flex flex-col gap-0.5 shrink-0">
@@ -795,7 +878,7 @@ interface InquirySettingsDto {
               </div>
             </div>
 
-            <div class="app-panel-body space-y-4">
+            <div class="app-panel-body space-y-4 max-h-[28rem] overflow-y-auto">
               @if (rolesLoading()) {
                 <div class="flex items-center justify-center py-6">
                   <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
@@ -962,6 +1045,11 @@ export class SettingsPageComponent implements OnInit {
   readonly unitConversionsSaving = signal(false);
   readonly unitConversionsSaved = signal(false);
 
+  // Price References
+  readonly priceRefs = signal<{ id: string; name: string; code: string; description: string | null; _new?: boolean }[]>([]);
+  readonly priceRefsSaving = signal(false);
+  readonly priceRefsSaved = signal(false);
+
   // Currencies
   readonly currencies = signal<string[]>([]);
   readonly currenciesSaving = signal(false);
@@ -1018,6 +1106,7 @@ export class SettingsPageComponent implements OnInit {
     this.loadProducts();
     this.loadUnits();
     this.loadUnitConversions();
+    this.loadPriceRefs();
     this.loadCurrencies();
     this.loadCompanyTypes();
     this.loadAttachmentTypes();
@@ -1351,6 +1440,76 @@ export class SettingsPageComponent implements OnInit {
       this.showToast('error', 'Failed to save unit conversions.');
     } finally {
       this.unitConversionsSaving.set(false);
+    }
+  }
+
+  // ─── Price References ──────────────────────────────────────────────
+
+  private async loadPriceRefs(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ references: { id: string; name: string; code: string; description: string | null }[] }>>(`${API}/admin/settings/price-references`),
+      );
+      if (res.success) this.priceRefs.set(res.data.references);
+    } catch {
+      this.showToast('error', 'Failed to load price references.');
+    }
+  }
+
+  updatePriceRef(index: number, field: 'name' | 'code' | 'description', value: string): void {
+    const updated = this.priceRefs().map((r, i) =>
+      i === index ? { ...r, [field]: value } : r,
+    );
+    this.priceRefs.set(updated);
+  }
+
+  addPriceRef(): void {
+    this.priceRefs.set([...this.priceRefs(), { id: crypto.randomUUID(), name: '', code: '', description: null, _new: true }]);
+  }
+
+  removePriceRef(index: number): void {
+    const ref = this.priceRefs()[index];
+    this.priceRefs.set(this.priceRefs().filter((_, i) => i !== index));
+    // If it has a real ID (not new), delete from server
+    if (ref && !ref._new) {
+      firstValueFrom(
+        this.http.delete<ApiResponse<null>>(`${API}/admin/settings/price-references/${ref.id}`),
+      ).catch(() => this.showToast('error', 'Failed to delete price reference.'));
+    }
+  }
+
+  async savePriceRefs(): Promise<void> {
+    this.priceRefsSaving.set(true);
+    this.priceRefsSaved.set(false);
+    try {
+      for (const ref of this.priceRefs()) {
+        if (!ref.name.trim() || !ref.code.trim()) continue;
+        if (ref._new) {
+          await firstValueFrom(
+            this.http.post<ApiResponse<unknown>>(`${API}/admin/settings/price-references`, {
+              name: ref.name,
+              code: ref.code,
+              description: ref.description || null,
+            }),
+          );
+        } else {
+          await firstValueFrom(
+            this.http.put<ApiResponse<unknown>>(`${API}/admin/settings/price-references/${ref.id}`, {
+              name: ref.name,
+              code: ref.code,
+              description: ref.description || null,
+            }),
+          );
+        }
+      }
+      // Reload to get server-assigned IDs
+      await this.loadPriceRefs();
+      this.priceRefsSaved.set(true);
+      setTimeout(() => this.priceRefsSaved.set(false), 3000);
+    } catch {
+      this.showToast('error', 'Failed to save price references.');
+    } finally {
+      this.priceRefsSaving.set(false);
     }
   }
 

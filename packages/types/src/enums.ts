@@ -107,3 +107,8 @@ export enum RiskOverrideStatus {
   Expired = 'EXPIRED',
   Revoked = 'REVOKED',
 }
+
+export enum PricingModel {
+  Fixed = 'FIXED',
+  Formula = 'FORMULA',
+}

@@ -27,6 +27,7 @@ import {
   createOrderAttachment,
   listOrderPayments,
   createOrderPayment,
+  finalizeItemPrice,
 } from './orders.service';
 import { logActivity } from '../activity/activity.service';
 import type { ApiResponse } from '@fueld/types';
@@ -376,12 +377,68 @@ export const ordersController = new Elysia({ prefix: '/orders' })
             paymentTerms: t.Optional(t.Nullable(t.String())),
             customerNote: t.Optional(t.Nullable(t.String())),
             deliveredQuantity: t.Optional(t.Nullable(t.String())),
+            // Formula pricing (cost side)
+            costPricingModel: t.Optional(t.Nullable(t.String())),
+            costReferenceId: t.Optional(t.Nullable(t.String())),
+            costPremium: t.Optional(t.Nullable(t.String())),
+            costBarging: t.Optional(t.Nullable(t.String())),
+            costBargingUnit: t.Optional(t.Nullable(t.String())),
+            costCreditDays: t.Optional(t.Nullable(t.Number())),
+            costPriceFinalized: t.Optional(t.Nullable(t.Boolean())),
+            // Formula pricing (sell side)
+            salesPricingModel: t.Optional(t.Nullable(t.String())),
+            salesReferenceId: t.Optional(t.Nullable(t.String())),
+            salesPremium: t.Optional(t.Nullable(t.String())),
+            salesBarging: t.Optional(t.Nullable(t.String())),
+            salesBargingUnit: t.Optional(t.Nullable(t.String())),
+            salesCreditDays: t.Optional(t.Nullable(t.Number())),
+            salesPriceFinalized: t.Optional(t.Nullable(t.Boolean())),
           }),
         ),
       }),
       detail: {
         tags: ['Orders'],
         summary: 'Replace all line items for an order',
+      },
+    },
+  )
+
+  // ─── Finalize Formula Price ──────────────────────────────────────
+  .post(
+    '/:id/items/:itemId/finalize-price',
+    async ({ params, body, auth }) => {
+      try {
+        const orderId = await resolveOrderId(params.id);
+        if (!orderId) return { success: false, data: null, message: 'Order not found' };
+        const updated = await finalizeItemPrice(orderId, params.itemId, {
+          side: body.side as 'cost' | 'sales',
+          finalPrice: body.finalPrice,
+        });
+
+        await logActivity({
+          userId: auth.sub,
+          action: 'UPDATE',
+          entityType: 'order',
+          entityId: orderId,
+          metadata: { action: 'finalize_price', itemId: params.itemId, side: body.side },
+        });
+
+        return { success: true, data: updated } satisfies ApiResponse<typeof updated>;
+      } catch (err) {
+        console.error('[Orders] Finalize price failed:', err);
+        const message = err instanceof Error ? err.message : 'Failed to finalize price';
+        return { success: false, data: null, message };
+      }
+    },
+    {
+      params: t.Object({ id: t.String(), itemId: t.String() }),
+      body: t.Object({
+        side: t.Union([t.Literal('cost'), t.Literal('sales')]),
+        finalPrice: t.String(),
+      }),
+      detail: {
+        tags: ['Orders'],
+        summary: 'Finalize a formula-priced order item with the resolved reference price',
       },
     },
   )

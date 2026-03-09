@@ -13,7 +13,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
-import { ProductType } from '@fueld/types';
+import { ProductType, PricingModel } from '@fueld/types';
 import { Subscription } from 'rxjs';
 import {
   SearchableDropdownComponent,
@@ -46,6 +46,24 @@ export interface OrderItemRow {
   paymentTerms: string;
   customerNote?: string | null;
   deliveredQuantity?: number | null;
+  // Formula pricing — cost side
+  costPricingModel: PricingModel;
+  costReferenceId?: string | null;
+  costReferenceName?: string | null;
+  costPremium?: number | null;
+  costBarging?: number | null;
+  costBargingUnit?: string | null;
+  costCreditDays?: number | null;
+  costPriceFinalized?: boolean;
+  // Formula pricing — sell side
+  salesPricingModel: PricingModel;
+  salesReferenceId?: string | null;
+  salesReferenceName?: string | null;
+  salesPremium?: number | null;
+  salesBarging?: number | null;
+  salesBargingUnit?: string | null;
+  salesCreditDays?: number | null;
+  salesPriceFinalized?: boolean;
 }
 
 export interface OrderItemsEconomics {
@@ -97,7 +115,7 @@ export interface OrderItemsEconomics {
           <tr class="border-b border-gray-200 bg-gray-50/80">
             <th class="px-4 py-3 text-left font-medium text-gray-600 min-w-[140px]">Product</th>
             <th class="px-4 py-3 text-left font-medium text-gray-600 min-w-[180px]">Description</th>
-            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Qty</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-600 min-w-[120px]">Qty</th>
             @if (allowDeliveredEdit()) {
               <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[110px]">Del. Qty</th>
             }
@@ -156,7 +174,7 @@ export interface OrderItemsEconomics {
                     {{ row.unit }}
                   </span>
                 } @else {
-                  <div class="flex items-center gap-1 justify-end">
+                  <div class="flex items-center gap-1">
                     @if (spreadEnabled().has(row.id)) {
                       <input
                         type="number" step="0.001" min="0"
@@ -176,16 +194,7 @@ export interface OrderItemsEconomics {
                       class="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm tabular-nums
                              focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                     />
-                    <select
-                      [ngModel]="row.unit"
-                      (ngModelChange)="updateField(i, 'unit', $event)"
-                      class="w-[4.5rem] rounded-lg border border-gray-300 px-1.5 py-1.5 text-xs text-gray-700
-                             focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
-                    >
-                      @for (u of unitOptions(); track u.value) {
-                        <option [value]="u.value">{{ u.label }}</option>
-                      }
-                    </select>
+                    <span class="text-gray-400 text-xs">{{ row.unit }}</span>
                     <button
                       type="button"
                       (click)="toggleSpread(row.id, i)"
@@ -218,85 +227,248 @@ export interface OrderItemsEconomics {
               }
 
               <!-- Cost (price + currency) -->
-              <td class="px-4 py-2">
+              <td class="px-4 py-2 align-top">
                 @if (readonly()) {
-                  <span class="block text-right tabular-nums">{{ row.costPrice | number:'1.2-4' }} {{ row.costCurrency }}/{{ row.unit }}</span>
-                } @else {
-                  <div class="flex items-center gap-1">
-                    <input
-                      type="number" step="0.01" min="0"
-                      [ngModel]="row.costPrice"
-                      (ngModelChange)="updateField(i, 'costPrice', $event)"
-                      class="w-full min-w-[80px] rounded-lg border border-gray-300 px-3 py-1.5 text-right text-sm tabular-nums
-                             [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
-                             focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                    />
-                    <select
-                      [ngModel]="row.costCurrency"
-                      (ngModelChange)="updateField(i, 'costCurrency', $event)"
-                      class="w-[4.5rem] rounded-lg border border-gray-300 px-1.5 py-1.5 text-xs text-gray-700
-                             focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
-                    >
-                      @for (c of currencyOptions(); track c.value) {
-                        <option [value]="c.value">{{ c.label }}</option>
+                  @if (row.costPricingModel === 'FORMULA') {
+                    <div class="text-right text-xs space-y-0.5">
+                      <span class="inline-flex items-center rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">Dynamic</span>
+                      <div class="text-gray-700">{{ row.costReferenceName || 'Ref' }}</div>
+                      @if (row.costPremium) { <div class="text-gray-500">+ {{ row.costPremium }} pmt</div> }
+                      @if (row.costBarging) { <div class="text-gray-500">barging {{ row.costBarging }} {{ row.costBargingUnit || 'l/s' }}</div> }
+                      @if (row.costCreditDays) { <div class="text-gray-500">{{ row.costCreditDays }} days</div> }
+                      @if (row.costPriceFinalized) {
+                        <div class="font-medium text-gray-900">→ {{ row.costPrice | number:'1.2-4' }} {{ row.costCurrency }}/{{ row.unit }}</div>
+                      } @else {
+                        <div class="italic text-amber-600">price TBD</div>
                       }
-                    </select>
-                    <span class="text-gray-400 text-xs shrink-0">/{{ row.unit }}</span>
-                  </div>
+                    </div>
+                  } @else {
+                    <span class="block text-right tabular-nums">{{ row.costPrice | number:'1.2-4' }} {{ row.costCurrency }}/{{ row.unit }}</span>
+                  }
+                } @else {
+                  @if (row.costPricingModel === 'FORMULA') {
+                    <div class="space-y-1">
+                      <div class="flex items-center gap-1">
+                        <app-searchable-dropdown class="flex-1"
+                          [options]="priceRefOptions()"
+                          [selected]="row.costReferenceId ?? ''"
+                          placeholder="Reference..."
+                          (selectionChange)="updateField(i, 'costReferenceId', $event)"
+                        />
+                        <select [ngModel]="row.costCurrency"
+                          (ngModelChange)="updateField(i, 'costCurrency', $event)"
+                          class="rounded border border-gray-200 px-1 py-1.5 text-xs text-gray-600
+                                 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                        >
+                          @for (c of currencyOptions(); track c.value) {
+                            <option [value]="c.value">{{ c.label }}</option>
+                          }
+                        </select>
+                        <span class="text-gray-400 text-xs shrink-0">/{{ row.unit }}</span>
+                      </div>
+                      <div class="flex items-center gap-1">
+                        <span class="text-[10px] text-gray-500 shrink-0">+</span>
+                        <input type="number" step="0.01"
+                          [ngModel]="row.costPremium ?? 0"
+                          (ngModelChange)="updateField(i, 'costPremium', +$event)"
+                          placeholder="Premium"
+                          class="w-20 rounded border border-gray-200 px-1.5 py-1 text-xs tabular-nums
+                                 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
+                                 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20"
+                        />
+                        <span class="text-[10px] text-gray-400 shrink-0">/{{ row.unit }}</span>
+                        <span class="text-[10px] text-gray-500 shrink-0">barg.</span>
+                        <input type="number" step="0.01"
+                          [ngModel]="row.costBarging ?? 0"
+                          (ngModelChange)="updateField(i, 'costBarging', +$event)"
+                          class="w-16 rounded border border-gray-200 px-1.5 py-1 text-xs tabular-nums
+                                 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
+                                 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20"
+                        />
+                        <span class="text-[10px] text-gray-400 shrink-0">l/s</span>
+                      </div>
+                    </div>
+                  } @else {
+                    <div class="flex items-center gap-1">
+                      <input
+                        type="number" step="0.01" min="0"
+                        [ngModel]="row.costPrice"
+                        (ngModelChange)="updateField(i, 'costPrice', $event)"
+                        class="w-full min-w-[80px] rounded-lg border border-gray-300 px-3 py-1.5 text-right text-sm tabular-nums
+                               [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
+                               focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                      />
+                      <select
+                        [ngModel]="row.costCurrency"
+                        (ngModelChange)="updateField(i, 'costCurrency', $event)"
+                        class="w-[4.5rem] rounded-lg border border-gray-300 px-1.5 py-1.5 text-xs text-gray-700
+                               focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                      >
+                        @for (c of currencyOptions(); track c.value) {
+                          <option [value]="c.value">{{ c.label }}</option>
+                        }
+                      </select>
+                      <span class="text-gray-400 text-xs shrink-0">/</span>
+                      <select
+                        [ngModel]="row.unit"
+                        (ngModelChange)="updateField(i, 'unit', $event)"
+                        class="w-14 rounded-lg border border-gray-300 px-0.5 py-1.5 text-xs text-gray-700
+                               focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                      >
+                        @for (u of unitOptions(); track u.value) {
+                          <option [value]="u.value">{{ u.label }}</option>
+                        }
+                      </select>
+                    </div>
+                  }
+                  <!-- Pricing model toggle -->
+                  @if (formulaPricingEnabled()) {
+                    <div class="mt-1.5 flex gap-1">
+                      <button type="button"
+                        (click)="updateField(i, 'costPricingModel', 'FIXED')"
+                        [class]="row.costPricingModel === 'FORMULA' ? 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-500 hover:bg-gray-200' : 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-brand-100 text-brand-700'"
+                      >Fixed</button>
+                      <button type="button"
+                        (click)="updateField(i, 'costPricingModel', 'FORMULA')"
+                        [class]="row.costPricingModel === 'FORMULA' ? 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-violet-100 text-violet-700' : 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-500 hover:bg-gray-200'"
+                      >Dynamic</button>
+                    </div>
+                  }
                 }
               </td>
 
               <!-- Sell (price + currency + unit) -->
-              <td class="px-4 py-2">
+              <td class="px-4 py-2 align-top">
                 @if (readonly()) {
-                  <span class="block text-right tabular-nums">{{ row.salesPrice | number:'1.2-4' }} {{ row.salesCurrency }}/{{ row.salesUnit }}</span>
-                  @if (row.unit !== row.salesUnit) {
-                    <span class="block text-right text-xs text-gray-400">× {{ row.unitConversionFactor | number:'1.2-4' }} {{ row.unit }}/{{ row.salesUnit }}</span>
+                  @if (row.salesPricingModel === 'FORMULA') {
+                    <div class="text-right text-xs space-y-0.5">
+                      <span class="inline-flex items-center rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">Dynamic</span>
+                      <div class="text-gray-700">{{ row.salesReferenceName || 'Ref' }}</div>
+                      @if (row.salesPremium) { <div class="text-gray-500">+ {{ row.salesPremium }} pmt</div> }
+                      @if (row.salesBarging) { <div class="text-gray-500">barging {{ row.salesBarging }} {{ row.salesBargingUnit || 'l/s' }}</div> }
+                      @if (row.salesCreditDays) { <div class="text-gray-500">{{ row.salesCreditDays }} days</div> }
+                      @if (row.salesPriceFinalized) {
+                        <div class="font-medium text-gray-900">→ {{ row.salesPrice | number:'1.2-4' }} {{ row.salesCurrency }}/{{ row.salesUnit }}</div>
+                      } @else {
+                        <div class="italic text-amber-600">price TBD</div>
+                      }
+                    </div>
+                  } @else {
+                    <span class="block text-right tabular-nums">{{ row.salesPrice | number:'1.2-4' }} {{ row.salesCurrency }}/{{ row.salesUnit }}</span>
+                    @if (row.unit !== row.salesUnit) {
+                      <span class="block text-right text-xs text-gray-400">× {{ row.unitConversionFactor | number:'1.2-4' }} {{ row.unit }}/{{ row.salesUnit }}</span>
+                    }
                   }
                 } @else {
-                  <div class="flex items-center gap-1">
-                    <input
-                      type="number" step="0.01" min="0"
-                      [ngModel]="row.salesPrice"
-                      (ngModelChange)="updateField(i, 'salesPrice', $event)"
-                      class="w-full min-w-[80px] rounded-lg border border-gray-300 px-3 py-1.5 text-right text-sm tabular-nums
-                             [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
-                             focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                    />
-                    <select
-                      [ngModel]="row.salesCurrency"
-                      (ngModelChange)="updateField(i, 'salesCurrency', $event)"
-                      class="w-[4.5rem] rounded-lg border border-gray-300 px-1.5 py-1.5 text-xs text-gray-700
-                             focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
-                    >
-                      @for (c of currencyOptions(); track c.value) {
-                        <option [value]="c.value">{{ c.label }}</option>
-                      }
-                    </select>
-                    <span class="text-gray-400 text-xs">/</span>
-                    <select
-                      [ngModel]="row.salesUnit"
-                      (ngModelChange)="updateField(i, 'salesUnit', $event)"
-                      class="w-[4.5rem] rounded-lg border border-gray-300 px-1.5 py-1.5 text-xs text-gray-700
-                             focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
-                    >
-                      @for (u of unitOptions(); track u.value) {
-                        <option [value]="u.value">{{ u.label }}</option>
-                      }
-                    </select>
-                  </div>
-                  @if (row.unit !== row.salesUnit) {
-                    <div class="mt-1 flex items-center gap-1 text-xs text-gray-500">
-                      <span>density</span>
+                  @if (row.salesPricingModel === 'FORMULA') {
+                    <div class="space-y-1">
+                      <div class="flex items-center gap-1">
+                        <app-searchable-dropdown class="flex-1"
+                          [options]="priceRefOptions()"
+                          [selected]="row.salesReferenceId ?? ''"
+                          placeholder="Reference..."
+                          (selectionChange)="updateField(i, 'salesReferenceId', $event)"
+                        />
+                        <select [ngModel]="row.salesCurrency"
+                          (ngModelChange)="updateField(i, 'salesCurrency', $event)"
+                          class="rounded border border-gray-200 px-1 py-1.5 text-xs text-gray-600
+                                 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                        >
+                          @for (c of currencyOptions(); track c.value) {
+                            <option [value]="c.value">{{ c.label }}</option>
+                          }
+                        </select>
+                        <span class="text-gray-400 text-xs">/</span>
+                        <select [ngModel]="row.salesUnit"
+                          (ngModelChange)="updateField(i, 'salesUnit', $event)"
+                          class="w-14 rounded border border-gray-200 px-0.5 py-1.5 text-xs text-gray-600
+                                 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                        >
+                          @for (u of unitOptions(); track u.value) {
+                            <option [value]="u.value">{{ u.label }}</option>
+                          }
+                        </select>
+                      </div>
+                      <div class="flex items-center gap-1">
+                        <span class="text-[10px] text-gray-500 shrink-0">+</span>
+                        <input type="number" step="0.01"
+                          [ngModel]="row.salesPremium ?? 0"
+                          (ngModelChange)="updateField(i, 'salesPremium', +$event)"
+                          placeholder="Premium"
+                          class="w-20 rounded border border-gray-200 px-1.5 py-1 text-xs tabular-nums
+                                 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
+                                 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20"
+                        />
+                        <span class="text-[10px] text-gray-400 shrink-0">/{{ row.unit }}</span>
+                        <span class="text-[10px] text-gray-500 shrink-0">barg.</span>
+                        <input type="number" step="0.01"
+                          [ngModel]="row.salesBarging ?? 0"
+                          (ngModelChange)="updateField(i, 'salesBarging', +$event)"
+                          class="w-16 rounded border border-gray-200 px-1.5 py-1 text-xs tabular-nums
+                                 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
+                                 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20"
+                        />
+                        <span class="text-[10px] text-gray-400 shrink-0">l/s</span>
+                      </div>
+                    </div>
+                  } @else {
+                    <div class="flex items-center gap-1">
                       <input
-                        type="number" step="0.0001" min="0"
-                        [ngModel]="row.unitConversionFactor"
-                        (ngModelChange)="updateField(i, 'unitConversionFactor', +$event)"
-                        class="w-16 rounded border border-gray-200 px-1.5 py-0.5 text-right text-xs tabular-nums
+                        type="number" step="0.01" min="0"
+                        [ngModel]="row.salesPrice"
+                        (ngModelChange)="updateField(i, 'salesPrice', $event)"
+                        class="w-full min-w-[80px] rounded-lg border border-gray-300 px-3 py-1.5 text-right text-sm tabular-nums
                                [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
-                               focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20"
+                               focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                       />
-                      <span class="text-gray-400">{{ row.unit }}/{{ row.salesUnit }}</span>
+                      <select
+                        [ngModel]="row.salesCurrency"
+                        (ngModelChange)="updateField(i, 'salesCurrency', $event)"
+                        class="w-[4.5rem] rounded-lg border border-gray-300 px-1.5 py-1.5 text-xs text-gray-700
+                               focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                      >
+                        @for (c of currencyOptions(); track c.value) {
+                          <option [value]="c.value">{{ c.label }}</option>
+                        }
+                      </select>
+                      <span class="text-gray-400 text-xs">/</span>
+                      <select
+                        [ngModel]="row.salesUnit"
+                        (ngModelChange)="updateField(i, 'salesUnit', $event)"
+                        class="w-[4.5rem] rounded-lg border border-gray-300 px-1.5 py-1.5 text-xs text-gray-700
+                               focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                      >
+                        @for (u of unitOptions(); track u.value) {
+                          <option [value]="u.value">{{ u.label }}</option>
+                        }
+                      </select>
+                    </div>
+                  }
+                  <!-- Pricing model toggle + density -->
+                  @if (formulaPricingEnabled() || row.unit !== row.salesUnit) {
+                    <div class="mt-1.5 flex items-center gap-1 flex-wrap">
+                      @if (formulaPricingEnabled()) {
+                        <button type="button"
+                          (click)="updateField(i, 'salesPricingModel', 'FIXED')"
+                          [class]="row.salesPricingModel === 'FORMULA' ? 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-500 hover:bg-gray-200' : 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-brand-100 text-brand-700'"
+                        >Fixed</button>
+                        <button type="button"
+                          (click)="updateField(i, 'salesPricingModel', 'FORMULA')"
+                          [class]="row.salesPricingModel === 'FORMULA' ? 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-violet-100 text-violet-700' : 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-500 hover:bg-gray-200'"
+                        >Dynamic</button>
+                      }
+                      @if (row.unit !== row.salesUnit) {
+                        <span class="text-[10px] text-gray-500 ml-auto">density</span>
+                        <input
+                          type="number" step="0.0001" min="0"
+                          [ngModel]="row.unitConversionFactor"
+                          (ngModelChange)="updateField(i, 'unitConversionFactor', +$event)"
+                          class="w-14 rounded border border-gray-200 px-1 py-0.5 text-right text-[10px] tabular-nums
+                                 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
+                                 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20"
+                        />
+                        <span class="text-[10px] text-gray-400">{{ row.unit }}/{{ row.salesUnit }}</span>
+                      }
                     </div>
                   }
                 }
@@ -304,23 +476,35 @@ export interface OrderItemsEconomics {
 
               <!-- Gross Profit (auto-calculated) -->
               <td class="px-4 py-3 pt-4 text-right tabular-nums"
-                [class.text-green-600]="profitForRow(row) > 0"
-                [class.text-red-600]="profitForRow(row) < 0"
-                [class.font-semibold]="profitForRow(row) !== 0"
+                [class.text-green-600]="!isFormulaUnfinalized(row) && profitForRow(row) > 0"
+                [class.text-red-600]="!isFormulaUnfinalized(row) && profitForRow(row) < 0"
+                [class.font-semibold]="!isFormulaUnfinalized(row) && profitForRow(row) !== 0"
               >
-                {{ profitForRow(row) | number:'1.2-2' }}
+                @if (isFormulaUnfinalized(row)) {
+                  <span class="italic text-amber-600 text-xs">TBD</span>
+                } @else {
+                  {{ profitForRow(row) | number:'1.2-2' }}
+                }
               </td>
 
               <td class="px-4 py-3 pt-4 text-right tabular-nums text-amber-700">
-                {{ financingCostForRow(row) | number:'1.2-2' }}
+                @if (isFormulaUnfinalized(row)) {
+                  <span class="italic text-xs">TBD</span>
+                } @else {
+                  {{ financingCostForRow(row) | number:'1.2-2' }}
+                }
               </td>
 
               <td class="px-4 py-3 pt-4 text-right tabular-nums"
-                [class.text-green-600]="netProfitForRow(row) > 0"
-                [class.text-red-600]="netProfitForRow(row) < 0"
-                [class.font-semibold]="netProfitForRow(row) !== 0"
+                [class.text-green-600]="!isFormulaUnfinalized(row) && netProfitForRow(row) > 0"
+                [class.text-red-600]="!isFormulaUnfinalized(row) && netProfitForRow(row) < 0"
+                [class.font-semibold]="!isFormulaUnfinalized(row) && netProfitForRow(row) !== 0"
               >
-                {{ netProfitForRow(row) | number:'1.2-2' }}
+                @if (isFormulaUnfinalized(row)) {
+                  <span class="italic text-amber-600 text-xs">TBD</span>
+                } @else {
+                  {{ netProfitForRow(row) | number:'1.2-2' }}
+                }
               </td>
 
               <!-- Delete -->
@@ -360,7 +544,7 @@ export interface OrderItemsEconomics {
             <tr class="border-t-2 border-gray-200 bg-gray-50/50 font-semibold">
               <td class="px-4 py-3 text-right text-gray-600">Totals</td>
               <td></td>
-              <td class="px-4 py-3 text-right tabular-nums text-gray-900">{{ totalQty() | number:'1.0-3' }}</td>
+              <td></td>
               @if (allowDeliveredEdit()) {
                 <td class="px-4 py-3 text-right tabular-nums text-gray-900">{{ totalDeliveredQty() | number:'1.0-3' }}</td>
               }
@@ -535,27 +719,69 @@ export interface OrderItemsEconomics {
             <div>
               <label class="mb-1 block text-xs font-medium text-gray-500">Cost</label>
               @if (readonly()) {
-                <span class="text-sm tabular-nums">{{ row.costPrice | number:'1.2-4' }} {{ row.costCurrency }}/{{ row.unit }}</span>
-              } @else {
-                <div class="flex items-center gap-2">
-                  <input type="number" step="0.01" min="0"
-                    [ngModel]="row.costPrice"
-                    (ngModelChange)="updateField(i, 'costPrice', $event)"
-                    class="min-w-0 w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
-                           [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
-                           focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                  />
-                  <select
-                    [ngModel]="row.costCurrency"
-                    (ngModelChange)="updateField(i, 'costCurrency', $event)"
-                    class="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-700
-                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
-                  >
-                    @for (c of currencyOptions(); track c.value) {
-                      <option [value]="c.value">{{ c.label }}</option>
+                @if (row.costPricingModel === 'FORMULA') {
+                  <div class="text-xs space-y-0.5">
+                    <span class="inline-flex items-center rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">Dynamic</span>
+                    <div class="text-gray-700">{{ row.costReferenceName || 'Ref' }}</div>
+                    @if (row.costPremium) { <div class="text-gray-500">+ {{ row.costPremium }} pmt</div> }
+                    @if (row.costBarging) { <div class="text-gray-500">barging {{ row.costBarging }} {{ row.costBargingUnit || 'l/s' }}</div> }
+                    @if (row.costPriceFinalized) {
+                      <div class="font-medium text-gray-900">→ {{ row.costPrice | number:'1.2-4' }} {{ row.costCurrency }}/{{ row.unit }}</div>
+                    } @else {
+                      <div class="italic text-amber-600">price TBD</div>
                     }
-                  </select>
-                </div>
+                  </div>
+                } @else {
+                  <span class="text-sm tabular-nums">{{ row.costPrice | number:'1.2-4' }} {{ row.costCurrency }}/{{ row.unit }}</span>
+                }
+              } @else {
+                @if (formulaPricingEnabled()) {
+                  <div class="mb-1.5 flex gap-1">
+                    <button type="button" (click)="updateField(i, 'costPricingModel', 'FIXED')"
+                      [class]="row.costPricingModel === 'FORMULA' ? 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-500' : 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-brand-100 text-brand-700'"
+                    >Fixed</button>
+                    <button type="button" (click)="updateField(i, 'costPricingModel', 'FORMULA')"
+                      [class]="row.costPricingModel === 'FORMULA' ? 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-violet-100 text-violet-700' : 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-500'"
+                    >Dynamic</button>
+                  </div>
+                }
+                @if (row.costPricingModel === 'FORMULA') {
+                  <div class="space-y-1.5">
+                    <app-searchable-dropdown [options]="priceRefOptions()" [selected]="row.costReferenceId ?? ''" placeholder="Reference..." (selectionChange)="updateField(i, 'costReferenceId', $event)" />
+                    <input type="number" step="0.01" [ngModel]="row.costPremium ?? 0" (ngModelChange)="updateField(i, 'costPremium', +$event)" placeholder="Premium pmt"
+                      class="w-full rounded border border-gray-200 px-2 py-1 text-xs tabular-nums focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20" />
+                    <div class="flex gap-1">
+                      <input type="number" step="0.01" [ngModel]="row.costBarging ?? 0" (ngModelChange)="updateField(i, 'costBarging', +$event)" placeholder="Barging"
+                        class="w-full rounded border border-gray-200 px-2 py-1 text-xs tabular-nums focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20" />
+                      <select [ngModel]="row.costBargingUnit ?? 'l/s'" (ngModelChange)="updateField(i, 'costBargingUnit', $event)"
+                        class="w-14 rounded border border-gray-200 px-1 py-1 text-[10px] text-gray-600 focus:border-brand-500 outline-none bg-white">
+                        <option value="l/s">l/s</option><option value="pmt">pmt</option>
+                      </select>
+                    </div>
+                    <input type="number" step="1" min="0" [ngModel]="row.costCreditDays ?? 0" (ngModelChange)="updateField(i, 'costCreditDays', +$event)" placeholder="Credit days"
+                      class="w-full rounded border border-gray-200 px-2 py-1 text-xs tabular-nums focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20" />
+                  </div>
+                } @else {
+                  <div class="flex items-center gap-2">
+                    <input type="number" step="0.01" min="0"
+                      [ngModel]="row.costPrice"
+                      (ngModelChange)="updateField(i, 'costPrice', $event)"
+                      class="min-w-0 w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
+                             [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
+                             focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                    />
+                    <select
+                      [ngModel]="row.costCurrency"
+                      (ngModelChange)="updateField(i, 'costCurrency', $event)"
+                      class="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-700
+                             focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                    >
+                      @for (c of currencyOptions(); track c.value) {
+                        <option [value]="c.value">{{ c.label }}</option>
+                      }
+                    </select>
+                  </div>
+                }
               }
             </div>
 
@@ -563,43 +789,85 @@ export interface OrderItemsEconomics {
             <div>
               <label class="mb-1 block text-xs font-medium text-gray-500">Sell</label>
               @if (readonly()) {
-                <span class="text-sm tabular-nums">{{ row.salesPrice | number:'1.2-4' }} {{ row.salesCurrency }}/{{ row.salesUnit }}</span>
-                @if (row.unit !== row.salesUnit) {
-                  <span class="block text-xs text-gray-400">× {{ row.unitConversionFactor | number:'1.2-4' }} {{ row.unit }}/{{ row.salesUnit }}</span>
+                @if (row.salesPricingModel === 'FORMULA') {
+                  <div class="text-xs space-y-0.5">
+                    <span class="inline-flex items-center rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">Dynamic</span>
+                    <div class="text-gray-700">{{ row.salesReferenceName || 'Ref' }}</div>
+                    @if (row.salesPremium) { <div class="text-gray-500">+ {{ row.salesPremium }} pmt</div> }
+                    @if (row.salesBarging) { <div class="text-gray-500">barging {{ row.salesBarging }} {{ row.salesBargingUnit || 'l/s' }}</div> }
+                    @if (row.salesPriceFinalized) {
+                      <div class="font-medium text-gray-900">→ {{ row.salesPrice | number:'1.2-4' }} {{ row.salesCurrency }}/{{ row.salesUnit }}</div>
+                    } @else {
+                      <div class="italic text-amber-600">price TBD</div>
+                    }
+                  </div>
+                } @else {
+                  <span class="text-sm tabular-nums">{{ row.salesPrice | number:'1.2-4' }} {{ row.salesCurrency }}/{{ row.salesUnit }}</span>
+                  @if (row.unit !== row.salesUnit) {
+                    <span class="block text-xs text-gray-400">× {{ row.unitConversionFactor | number:'1.2-4' }} {{ row.unit }}/{{ row.salesUnit }}</span>
+                  }
                 }
               } @else {
-                <div class="flex items-center gap-2">
-                  <input type="number" step="0.01" min="0"
-                    [ngModel]="row.salesPrice"
-                    (ngModelChange)="updateField(i, 'salesPrice', $event)"
-                    class="min-w-0 w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
-                           [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
-                           focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                  />
-                  <select
-                    [ngModel]="row.salesCurrency"
-                    (ngModelChange)="updateField(i, 'salesCurrency', $event)"
-                    class="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-700
-                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
-                  >
-                    @for (c of currencyOptions(); track c.value) {
-                      <option [value]="c.value">{{ c.label }}</option>
-                    }
-                  </select>
-                </div>
-                @if (row.unit !== row.salesUnit) {
-                  <div class="mt-1 flex items-center gap-1 text-xs text-gray-500">
-                    <span>density</span>
-                    <input
-                      type="number" step="0.0001" min="0"
-                      [ngModel]="row.unitConversionFactor"
-                      (ngModelChange)="updateField(i, 'unitConversionFactor', +$event)"
-                      class="w-16 rounded border border-gray-200 px-1.5 py-0.5 text-right text-xs tabular-nums
-                             [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
-                             focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20"
-                    />
-                    <span class="text-gray-400">{{ row.unit }}/{{ row.salesUnit }}</span>
+                @if (formulaPricingEnabled()) {
+                  <div class="mb-1.5 flex gap-1">
+                    <button type="button" (click)="updateField(i, 'salesPricingModel', 'FIXED')"
+                      [class]="row.salesPricingModel === 'FORMULA' ? 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-500' : 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-brand-100 text-brand-700'"
+                    >Fixed</button>
+                    <button type="button" (click)="updateField(i, 'salesPricingModel', 'FORMULA')"
+                      [class]="row.salesPricingModel === 'FORMULA' ? 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-violet-100 text-violet-700' : 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-500'"
+                    >Dynamic</button>
                   </div>
+                }
+                @if (row.salesPricingModel === 'FORMULA') {
+                  <div class="space-y-1.5">
+                    <app-searchable-dropdown [options]="priceRefOptions()" [selected]="row.salesReferenceId ?? ''" placeholder="Reference..." (selectionChange)="updateField(i, 'salesReferenceId', $event)" />
+                    <input type="number" step="0.01" [ngModel]="row.salesPremium ?? 0" (ngModelChange)="updateField(i, 'salesPremium', +$event)" placeholder="Premium pmt"
+                      class="w-full rounded border border-gray-200 px-2 py-1 text-xs tabular-nums focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20" />
+                    <div class="flex gap-1">
+                      <input type="number" step="0.01" [ngModel]="row.salesBarging ?? 0" (ngModelChange)="updateField(i, 'salesBarging', +$event)" placeholder="Barging"
+                        class="w-full rounded border border-gray-200 px-2 py-1 text-xs tabular-nums focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20" />
+                      <select [ngModel]="row.salesBargingUnit ?? 'l/s'" (ngModelChange)="updateField(i, 'salesBargingUnit', $event)"
+                        class="w-14 rounded border border-gray-200 px-1 py-1 text-[10px] text-gray-600 focus:border-brand-500 outline-none bg-white">
+                        <option value="l/s">l/s</option><option value="pmt">pmt</option>
+                      </select>
+                    </div>
+                    <input type="number" step="1" min="0" [ngModel]="row.salesCreditDays ?? 0" (ngModelChange)="updateField(i, 'salesCreditDays', +$event)" placeholder="Credit days"
+                      class="w-full rounded border border-gray-200 px-2 py-1 text-xs tabular-nums focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20" />
+                  </div>
+                } @else {
+                  <div class="flex items-center gap-2">
+                    <input type="number" step="0.01" min="0"
+                      [ngModel]="row.salesPrice"
+                      (ngModelChange)="updateField(i, 'salesPrice', $event)"
+                      class="min-w-0 w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
+                             [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
+                             focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                    />
+                    <select
+                      [ngModel]="row.salesCurrency"
+                      (ngModelChange)="updateField(i, 'salesCurrency', $event)"
+                      class="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-700
+                             focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                    >
+                      @for (c of currencyOptions(); track c.value) {
+                        <option [value]="c.value">{{ c.label }}</option>
+                      }
+                    </select>
+                  </div>
+                  @if (row.unit !== row.salesUnit) {
+                    <div class="mt-1 flex items-center gap-1 text-xs text-gray-500">
+                      <span>density</span>
+                      <input
+                        type="number" step="0.0001" min="0"
+                        [ngModel]="row.unitConversionFactor"
+                        (ngModelChange)="updateField(i, 'unitConversionFactor', +$event)"
+                        class="w-16 rounded border border-gray-200 px-1.5 py-0.5 text-right text-xs tabular-nums
+                               [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
+                               focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20"
+                      />
+                      <span class="text-gray-400">{{ row.unit }}/{{ row.salesUnit }}</span>
+                    </div>
+                  }
                 }
               }
             </div>
@@ -607,31 +875,43 @@ export interface OrderItemsEconomics {
             <!-- Gross Profit -->
             <div>
               <label class="mb-1 block text-xs font-medium text-gray-500">Gross Profit ({{ baseCurrency() }})</label>
-              <span
-                class="text-sm font-semibold tabular-nums"
-                [class.text-green-600]="profitForRow(row) > 0"
-                [class.text-red-600]="profitForRow(row) < 0"
-              >
-                {{ profitForRow(row) | number:'1.2-2' }}
-              </span>
+              @if (isFormulaUnfinalized(row)) {
+                <span class="text-xs italic text-amber-600">TBD</span>
+              } @else {
+                <span
+                  class="text-sm font-semibold tabular-nums"
+                  [class.text-green-600]="profitForRow(row) > 0"
+                  [class.text-red-600]="profitForRow(row) < 0"
+                >
+                  {{ profitForRow(row) | number:'1.2-2' }}
+                </span>
+              }
             </div>
 
             <div>
               <label class="mb-1 block text-xs font-medium text-gray-500">Financing</label>
-              <span class="text-sm font-semibold tabular-nums text-amber-700">
-                {{ financingCostForRow(row) | number:'1.2-2' }}
-              </span>
+              @if (isFormulaUnfinalized(row)) {
+                <span class="text-xs italic text-amber-700">TBD</span>
+              } @else {
+                <span class="text-sm font-semibold tabular-nums text-amber-700">
+                  {{ financingCostForRow(row) | number:'1.2-2' }}
+                </span>
+              }
             </div>
 
             <div>
               <label class="mb-1 block text-xs font-medium text-gray-500">Net Profit ({{ baseCurrency() }})</label>
-              <span
-                class="text-sm font-semibold tabular-nums"
-                [class.text-green-600]="netProfitForRow(row) > 0"
-                [class.text-red-600]="netProfitForRow(row) < 0"
-              >
-                {{ netProfitForRow(row) | number:'1.2-2' }}
-              </span>
+              @if (isFormulaUnfinalized(row)) {
+                <span class="text-xs italic text-amber-600">TBD</span>
+              } @else {
+                <span
+                  class="text-sm font-semibold tabular-nums"
+                  [class.text-green-600]="netProfitForRow(row) > 0"
+                  [class.text-red-600]="netProfitForRow(row) < 0"
+                >
+                  {{ netProfitForRow(row) | number:'1.2-2' }}
+                </span>
+              }
             </div>
 
             <!-- Delivered Qty (mobile) -->
@@ -719,6 +999,7 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   readonly unitOptionsInput = input<DropdownOption[]>([]);
   readonly unitConversionsInput = input<{ productType?: string; fromUnit: string; toUnit: string; factor: number }[]>([]);
   readonly currencyOptionsInput = input<DropdownOption[]>([]);
+  readonly priceReferencesInput = input<{ id: string; name: string; code: string }[]>([]);
   readonly itemsChange = output<OrderItemRow[]>();
   readonly economicsChange = output<OrderItemsEconomics>();
   readonly displayCurrencyChange = output<string>();
@@ -760,6 +1041,8 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
       costCurrency: item.costCurrency || this.currency(),
       salesCurrency: item.salesCurrency || this.currency(),
       profit: item.profit ?? 0,
+      costPricingModel: item.costPricingModel ?? PricingModel.Fixed,
+      salesPricingModel: item.salesPricingModel ?? PricingModel.Fixed,
     })),
   );
 
@@ -839,6 +1122,13 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
     const fromInput = this.unitOptionsInput();
     return fromInput.length > 0 ? fromInput : OrderItemsComponent.DEFAULT_UNITS;
   });
+
+  readonly priceRefOptions = computed<DropdownOption[]>(() =>
+    this.priceReferencesInput().map((r) => ({ value: r.id, label: r.name })),
+  );
+
+  /** Whether formula pricing is available (at least one price reference configured). */
+  readonly formulaPricingEnabled = computed(() => this.priceReferencesInput().length > 0);
   // ─── Computed totals ─────────────────────────────────────────────
 
   readonly totalQty = computed(() =>
@@ -897,6 +1187,8 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
       profit: 0,
       paymentTerms: '',
       customerNote: '',
+      costPricingModel: PricingModel.Fixed,
+      salesPricingModel: PricingModel.Fixed,
     };
     this.rows.update((prev) => [...prev, newRow]);
     this.emitChange();
@@ -1030,6 +1322,7 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   }
 
   financingCostForRow(row: OrderItemRow): number {
+    if (this.isFormulaUnfinalized(row)) return 0;
     const dayCount = this.financingDayCountConvention() || 365;
     if (dayCount <= 0) return 0;
     return this.toDisplayCurrency(
@@ -1038,10 +1331,27 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   }
 
   profitForRow(row: OrderItemRow): number {
+    if (this.isFormulaUnfinalized(row)) return 0;
     return this.toDisplayCurrency(this.computeRevenueBase(row) - this.computeCostBase(row));
   }
 
   netProfitForRow(row: OrderItemRow): number {
+    if (this.isFormulaUnfinalized(row)) return 0;
     return this.profitForRow(row) - this.financingCostForRow(row);
+  }
+
+  /** True when either side is formula-priced but not yet finalized. */
+  isFormulaUnfinalized(row: OrderItemRow): boolean {
+    return (
+      (row.costPricingModel === PricingModel.Formula && !row.costPriceFinalized) ||
+      (row.salesPricingModel === PricingModel.Formula && !row.salesPriceFinalized)
+    );
+  }
+
+  /** Get the display name for a price reference by ID. */
+  priceRefName(refId: string | null | undefined): string {
+    if (!refId) return '';
+    const ref = this.priceReferencesInput().find((r) => r.id === refId);
+    return ref ? ref.name : '';
   }
 }

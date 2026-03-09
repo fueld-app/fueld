@@ -1,13 +1,13 @@
 import pdfmake from 'pdfmake';
 import vfsFonts from 'pdfmake/build/vfs_fonts.js';
 import type { TDocumentDefinitions, Content, TableCell } from 'pdfmake/interfaces';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, join } from 'node:path';
 import QRCode from 'qrcode';
 import { db } from '../../db';
-import { bankAccounts, orders, orderItems, counterparties, vessels, places, invoices, users, documentRevisions, tenants, type TenantSettings } from '../../db/schema';
+import { bankAccounts, orders, orderItems, counterparties, vessels, places, invoices, users, documentRevisions, tenants, priceReferences, type TenantSettings } from '../../db/schema';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Document Service — Server-side PDF generation (pdfmake v0.3)
@@ -501,6 +501,16 @@ function formatNumber(val: string | null | undefined, decimals = 2): string {
   return isNaN(n) ? '—' : n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
+/** Format a number, stripping trailing zeros (e.g. 100.000 → "100", 100.500 → "100.5"). */
+function formatNumberCompact(val: string | null | undefined, maxDecimals = 3): string {
+  if (!val) return '—';
+  const n = parseFloat(val);
+  if (isNaN(n)) return '—';
+  // Format with up to maxDecimals, then strip trailing zeros
+  const formatted = n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: maxDecimals });
+  return formatted;
+}
+
 /**
  * Format a phone number for display: keep international prefix, format
  * remaining digits in local-style groups.
@@ -847,7 +857,7 @@ function buildInvoiceDocument(data: {
     return [
       { text: String(idx + 1), alignment: 'center' },
       { text: item.productType },
-      { text: formatNumber(item.quantity, 3), alignment: 'right' },
+      { text: formatNumberCompact(item.quantity, 3), alignment: 'right' },
       { text: item.unit },
       { text: formatNumber(item.salesPrice, 4), alignment: 'right' },
       { text: formatNumber(String(lineTotal), 2), alignment: 'right' },
@@ -1419,6 +1429,13 @@ function buildOfferDocument(data: {
     quantityMax: string | null;
     unit: string;
     salesPrice: string | null;
+    salesPricingModel?: string | null;
+    salesReferenceName?: string | null;
+    salesPremium?: string | null;
+    salesBarging?: string | null;
+    salesBargingUnit?: string | null;
+    salesCreditDays?: number | null;
+    salesPriceFinalized?: boolean | null;
   }>;
   createdAt: Date;
   docTitle?: string;
@@ -1475,16 +1492,31 @@ function buildOfferDocument(data: {
 
   const tableRows: TableCell[][] = data.items.map((item) => {
     const qty = item.quantityMin && item.quantityMax
-      ? `${formatNumber(item.quantityMin, 0)} - ${formatNumber(item.quantityMax, 0)}`
-      : formatNumber(item.quantity, 3);
+      ? `${formatNumberCompact(item.quantityMin, 0)} - ${formatNumberCompact(item.quantityMax, 0)}`
+      : formatNumberCompact(item.quantity, 3);
     const productCell: Content = item.description?.trim()
       ? { text: [{ text: item.productType }, { text: `  ${item.description.trim()}`, fontSize: 8, color: '#374151' }] }
       : { text: item.productType };
+
+    let priceCell: Content;
+    if (item.salesPricingModel === 'FORMULA') {
+      const parts: Content[] = [];
+      if (item.salesReferenceName) parts.push({ text: item.salesReferenceName, bold: true, fontSize: 9 });
+      if (item.salesPremium && parseFloat(item.salesPremium)) parts.push({ text: ` + ${formatNumber(item.salesPremium)} /${item.unit}`, fontSize: 8 });
+      if (item.salesBarging && parseFloat(item.salesBarging)) parts.push({ text: `\nbarging ${formatNumber(item.salesBarging)} ${item.salesBargingUnit || 'l/s'}`, fontSize: 8 });
+      if (item.salesPriceFinalized) {
+        parts.push({ text: `\n→ ${formatNumber(item.salesPrice)} ${data.currency}/${item.unit}`, fontSize: 8, bold: true });
+      }
+      priceCell = { text: parts, alignment: 'right' };
+    } else {
+      priceCell = { text: `${data.currency}/${item.unit}  ${formatNumber(item.salesPrice)}`, alignment: 'right' };
+    }
+
     return [
       productCell as TableCell,
       { text: qty, alignment: 'right' },
       { text: item.unit },
-      { text: `${data.currency}/${item.unit}  ${formatNumber(item.salesPrice)}`, alignment: 'right' },
+      priceCell as TableCell,
     ];
   });
 
@@ -1759,6 +1791,20 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
 
   const companyLogoDataUrl = tryLoadLogoDataUrl(order.invoicingCompany?.logoUrl ?? null);
 
+  // Resolve price reference names for formula-priced items
+  const refIds = new Set<string>();
+  for (const item of order.items) {
+    if (item.salesReferenceId) refIds.add(item.salesReferenceId);
+    if (item.costReferenceId) refIds.add(item.costReferenceId);
+  }
+  const refNameMap = new Map<string, string>();
+  if (refIds.size > 0) {
+    const refs = await db.select({ id: priceReferences.id, name: priceReferences.name })
+      .from(priceReferences)
+      .where(inArray(priceReferences.id, [...refIds]));
+    for (const r of refs) refNameMap.set(r.id, r.name);
+  }
+
   const docData = {
     orderNumber: order.orderNumber,
     clientName: order.client.name,
@@ -1808,6 +1854,13 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
       quantityMax: item.quantityMax,
       unit: item.salesUnit ?? item.unit,
       salesPrice: item.salesPrice,
+      salesPricingModel: item.salesPricingModel,
+      salesReferenceName: item.salesReferenceId ? (refNameMap.get(item.salesReferenceId) ?? null) : null,
+      salesPremium: item.salesPremium,
+      salesBarging: item.salesBarging,
+      salesBargingUnit: item.salesBargingUnit,
+      salesCreditDays: item.salesCreditDays,
+      salesPriceFinalized: item.salesPriceFinalized,
     })),
     createdAt: order.createdAt,
     docTitle: documentTitle,
@@ -1882,6 +1935,20 @@ export async function generateNominationPdfBuffer(orderId: string): Promise<{
 
   const companyLogoDataUrl = tryLoadLogoDataUrl(order.invoicingCompany?.logoUrl ?? null);
 
+  // Resolve price reference names for formula-priced items
+  const nomRefIds = new Set<string>();
+  for (const item of order.items) {
+    if (item.salesReferenceId) nomRefIds.add(item.salesReferenceId);
+    if (item.costReferenceId) nomRefIds.add(item.costReferenceId);
+  }
+  const nomRefNameMap = new Map<string, string>();
+  if (nomRefIds.size > 0) {
+    const refs = await db.select({ id: priceReferences.id, name: priceReferences.name })
+      .from(priceReferences)
+      .where(inArray(priceReferences.id, [...nomRefIds]));
+    for (const r of refs) nomRefNameMap.set(r.id, r.name);
+  }
+
   const docData = {
     orderNumber: order.orderNumber,
     clientName: order.supplier?.name ?? 'Supplier',
@@ -1926,6 +1993,13 @@ export async function generateNominationPdfBuffer(orderId: string): Promise<{
       quantityMax: item.quantityMax,
       unit: item.salesUnit ?? item.unit,
       salesPrice: item.salesPrice,
+      salesPricingModel: item.salesPricingModel,
+      salesReferenceName: item.salesReferenceId ? (nomRefNameMap.get(item.salesReferenceId) ?? null) : null,
+      salesPremium: item.salesPremium,
+      salesBarging: item.salesBarging,
+      salesBargingUnit: item.salesBargingUnit,
+      salesCreditDays: item.salesCreditDays,
+      salesPriceFinalized: item.salesPriceFinalized,
     })),
     createdAt: order.createdAt,
     docTitle: 'NOMINATION',
@@ -2003,6 +2077,13 @@ function buildProformaDocument(data: {
     quantity: string;
     unit: string;
     salesPrice: string | null;
+    salesPricingModel?: string | null;
+    salesReferenceName?: string | null;
+    salesPremium?: string | null;
+    salesBarging?: string | null;
+    salesBargingUnit?: string | null;
+    salesCreditDays?: number | null;
+    salesPriceFinalized?: boolean | null;
   }>;
   createdAt: Date;
   verifyUrl?: string | null;
@@ -2057,12 +2138,32 @@ function buildProformaDocument(data: {
     const productCell: Content = item.description?.trim()
       ? { text: [{ text: item.productType }, { text: `  ${item.description.trim()}`, fontSize: 8, color: '#374151' }] }
       : { text: item.productType };
+
+    let priceCell: Content;
+    let totalCell: Content;
+    if (item.salesPricingModel === 'FORMULA') {
+      const parts: Content[] = [];
+      if (item.salesReferenceName) parts.push({ text: item.salesReferenceName, bold: true, fontSize: 9 });
+      if (item.salesPremium && parseFloat(item.salesPremium)) parts.push({ text: ` + ${formatNumber(item.salesPremium)} /${item.unit}`, fontSize: 8 });
+      if (item.salesBarging && parseFloat(item.salesBarging)) parts.push({ text: `\nbarging ${formatNumber(item.salesBarging)} ${item.salesBargingUnit || 'l/s'}`, fontSize: 8 });
+      if (item.salesPriceFinalized) {
+        parts.push({ text: `\n\u2192 ${formatNumber(item.salesPrice)} ${data.currency}/${item.unit}`, fontSize: 8, bold: true });
+        totalCell = { text: `${formatNumber(String(lineTotal), 2)} ${data.currency}`, alignment: 'right' };
+      } else {
+        totalCell = { text: 'TBD', alignment: 'right', italics: true, color: '#d97706' };
+      }
+      priceCell = { text: parts, alignment: 'right' };
+    } else {
+      priceCell = { text: `${data.currency}/${item.unit}  ${formatNumber(item.salesPrice)}`, alignment: 'right' };
+      totalCell = { text: `${formatNumber(String(lineTotal), 2)} ${data.currency}`, alignment: 'right' };
+    }
+
     return [
       productCell as TableCell,
-      { text: formatNumber(item.quantity, 3), alignment: 'right' },
+      { text: formatNumberCompact(item.quantity, 3), alignment: 'right' },
       { text: item.unit },
-      { text: `${data.currency}/${item.unit}  ${formatNumber(item.salesPrice)}`, alignment: 'right' },
-      { text: `${formatNumber(String(lineTotal), 2)} ${data.currency}`, alignment: 'right' },
+      priceCell as TableCell,
+      totalCell as TableCell,
     ];
   });
   const grandTotal = data.items.reduce((sum, item) => {
@@ -2213,7 +2314,7 @@ function buildProformaDocument(data: {
       {
         table: {
           headerRows: 1,
-          widths: ['*', 65, 35, 90, 110],
+          widths: ['*', 65, 35, 130, 90],
           body: [tableHeader, ...tableRows],
         },
         layout: {
@@ -2395,6 +2496,19 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
   const companyLogoDataUrl = tryLoadLogoDataUrl(order.invoicingCompany?.logoUrl ?? null);
   const bank = await loadOrderBankDetails(order.bankAccountId, order.invoicingCompanyId);
 
+  // Resolve price reference names for formula-priced items
+  const proformaRefIds = new Set<string>();
+  for (const item of order.items) {
+    if (item.salesReferenceId) proformaRefIds.add(item.salesReferenceId);
+  }
+  const proformaRefNameMap = new Map<string, string>();
+  if (proformaRefIds.size > 0) {
+    const refs = await db.select({ id: priceReferences.id, name: priceReferences.name })
+      .from(priceReferences)
+      .where(inArray(priceReferences.id, [...proformaRefIds]));
+    for (const r of refs) proformaRefNameMap.set(r.id, r.name);
+  }
+
   const paymentTerms = formatCustomerPaymentTerms(
     order.customerPaymentTermType,
     order.customerCreditDays,
@@ -2442,6 +2556,13 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
       quantity: item.quantity,
       unit: item.salesUnit ?? item.unit,
       salesPrice: item.salesPrice,
+      salesPricingModel: item.salesPricingModel,
+      salesReferenceName: item.salesReferenceId ? (proformaRefNameMap.get(item.salesReferenceId) ?? null) : null,
+      salesPremium: item.salesPremium,
+      salesBarging: item.salesBarging,
+      salesBargingUnit: item.salesBargingUnit,
+      salesCreditDays: item.salesCreditDays,
+      salesPriceFinalized: item.salesPriceFinalized,
     })),
     createdAt: order.createdAt,
     verifyUrl: null as string | null,

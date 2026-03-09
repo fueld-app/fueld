@@ -19,6 +19,7 @@ import {
   customerPayments,
   invoices,
   companyContacts,
+  priceReferences,
 } from '../../db/schema';
 import type { TenantSettings } from '../../db/schema';
 import { logActivity } from '../activity/activity.service';
@@ -106,6 +107,27 @@ interface SaveItemInput {
   paymentTerms?: string | null;
   customerNote?: string | null;
   deliveredQuantity?: string | null;
+  // Formula pricing (cost side)
+  costPricingModel?: string | null;
+  costReferenceId?: string | null;
+  costPremium?: string | null;
+  costBarging?: string | null;
+  costBargingUnit?: string | null;
+  costCreditDays?: number | null;
+  costPriceFinalized?: boolean | null;
+  // Formula pricing (sell side)
+  salesPricingModel?: string | null;
+  salesReferenceId?: string | null;
+  salesPremium?: string | null;
+  salesBarging?: string | null;
+  salesBargingUnit?: string | null;
+  salesCreditDays?: number | null;
+  salesPriceFinalized?: boolean | null;
+}
+
+interface FinalizeItemPriceInput {
+  side: 'cost' | 'sales';
+  finalPrice: string;
 }
 
 async function getTenantFinancingRateByIds(tenantIds: string[]): Promise<Map<string, number>> {
@@ -518,6 +540,21 @@ export async function getOrderById(idOrNumber: string) {
     financingRateAnnual,
   );
 
+  // Resolve price reference names for formula-priced items
+  const refIds = new Set<string>();
+  for (const i of items) {
+    if (i.costReferenceId) refIds.add(i.costReferenceId);
+    if (i.salesReferenceId) refIds.add(i.salesReferenceId);
+  }
+  const refNameMap = new Map<string, string>();
+  if (refIds.size > 0) {
+    const refs = await db
+      .select({ id: priceReferences.id, name: priceReferences.name })
+      .from(priceReferences)
+      .where(inArray(priceReferences.id, Array.from(refIds)));
+    for (const r of refs) refNameMap.set(r.id, r.name);
+  }
+
   return {
     ...row,
     orderNumber: row.orderNumber,
@@ -572,6 +609,24 @@ export async function getOrderById(idOrNumber: string) {
       paymentTerms: i.paymentTerms,
       customerNote: i.customerNote,
       deliveredQuantity: i.deliveredQuantity,
+      // Formula pricing (cost side)
+      costPricingModel: i.costPricingModel ?? 'FIXED',
+      costReferenceId: i.costReferenceId ?? null,
+      costReferenceName: i.costReferenceId ? (refNameMap.get(i.costReferenceId) ?? null) : null,
+      costPremium: i.costPremium ?? null,
+      costBarging: i.costBarging ?? null,
+      costBargingUnit: i.costBargingUnit ?? null,
+      costCreditDays: i.costCreditDays ?? null,
+      costPriceFinalized: i.costPriceFinalized ?? false,
+      // Formula pricing (sell side)
+      salesPricingModel: i.salesPricingModel ?? 'FIXED',
+      salesReferenceId: i.salesReferenceId ?? null,
+      salesReferenceName: i.salesReferenceId ? (refNameMap.get(i.salesReferenceId) ?? null) : null,
+      salesPremium: i.salesPremium ?? null,
+      salesBarging: i.salesBarging ?? null,
+      salesBargingUnit: i.salesBargingUnit ?? null,
+      salesCreditDays: i.salesCreditDays ?? null,
+      salesPriceFinalized: i.salesPriceFinalized ?? false,
     })),
   };
 }
@@ -724,11 +779,81 @@ export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
       paymentTerms: item.paymentTerms as any ?? null,
       customerNote: item.customerNote ?? null,
       deliveredQuantity: item.deliveredQuantity ?? null,
+      // Formula pricing (cost side)
+      costPricingModel: (item.costPricingModel as any) ?? 'FIXED',
+      costReferenceId: item.costReferenceId ?? null,
+      costPremium: item.costPremium ?? null,
+      costBarging: item.costBarging ?? null,
+      costBargingUnit: item.costBargingUnit ?? null,
+      costCreditDays: item.costCreditDays ?? null,
+      costPriceFinalized: item.costPriceFinalized ?? false,
+      // Formula pricing (sell side)
+      salesPricingModel: (item.salesPricingModel as any) ?? 'FIXED',
+      salesReferenceId: item.salesReferenceId ?? null,
+      salesPremium: item.salesPremium ?? null,
+      salesBarging: item.salesBarging ?? null,
+      salesBargingUnit: item.salesBargingUnit ?? null,
+      salesCreditDays: item.salesCreditDays ?? null,
+      salesPriceFinalized: item.salesPriceFinalized ?? false,
     };
   });
 
   const inserted = await db.insert(orderItems).values(values).returning();
   return inserted;
+}
+
+// ─── Finalize Formula Price ────────────────────────────────────────
+// Sets the resolved price on a formula-priced order item once the reference
+// price is known (e.g. Aramco posted price published after delivery).
+
+export async function finalizeItemPrice(
+  orderId: string,
+  itemId: string,
+  input: FinalizeItemPriceInput,
+) {
+  const [item] = await db
+    .select()
+    .from(orderItems)
+    .where(and(eq(orderItems.id, itemId), eq(orderItems.orderId, orderId)))
+    .limit(1);
+
+  if (!item) throw new Error('Order item not found');
+
+  const setData: Record<string, unknown> = { updatedAt: new Date() };
+
+  if (input.side === 'cost') {
+    if (item.costPricingModel !== 'FORMULA') throw new Error('Cost pricing model is not FORMULA');
+    setData.costPrice = input.finalPrice;
+    setData.costPriceFinalized = true;
+  } else {
+    if (item.salesPricingModel !== 'FORMULA') throw new Error('Sales pricing model is not FORMULA');
+    setData.salesPrice = input.finalPrice;
+    setData.salesPriceFinalized = true;
+  }
+
+  // Recalculate profit if both sides have a price now
+  const costPrice = input.side === 'cost' ? input.finalPrice : item.costPrice;
+  const salesPrice = input.side === 'sales' ? input.finalPrice : item.salesPrice;
+
+  if (costPrice && salesPrice) {
+    const profit = calculateGrossProfitBase({
+      quantity: item.quantity,
+      costPrice,
+      costCurrency: item.costCurrency,
+      salesPrice,
+      salesCurrency: item.salesCurrency,
+      unitConversionFactor: item.unitConversionFactor,
+    });
+    setData.profit = profit.toFixed(4);
+  }
+
+  const [updated] = await db
+    .update(orderItems)
+    .set(setData)
+    .where(eq(orderItems.id, itemId))
+    .returning();
+
+  return updated;
 }
 
 // ─── Order Attachments ─────────────────────────────────────────────

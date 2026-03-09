@@ -110,6 +110,11 @@ export const riskOverrideStatusEnum = pgEnum('risk_override_status', [
   'REVOKED',
 ]);
 
+export const pricingModelEnum = pgEnum('pricing_model', [
+  'FIXED',
+  'FORMULA',
+]);
+
 // ═══════════════════════════════════════════════════════════════════════
 //  1. MULTI-TENANCY ROOT
 // ═══════════════════════════════════════════════════════════════════════
@@ -600,6 +605,20 @@ export const orders = pgTable('orders', {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
+//  10b. PRICE REFERENCES (master list of formula base-price sources)
+// ═══════════════════════════════════════════════════════════════════════
+
+export const priceReferences = pgTable('price_references', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  name: text('name').notNull(),
+  code: text('code').notNull(),
+  description: text('description'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ═══════════════════════════════════════════════════════════════════════
 //  11. ORDER ITEMS (line items per order)
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -617,11 +636,30 @@ export const orderItems = pgTable('order_items', {
 
   description: text('description'),
 
+  // ── Fixed pricing ─────────────────────────────────────────────────
   costPrice: numeric('cost_price', { precision: 12, scale: 4 }),
   costCurrency: text('cost_currency').notNull().default('USD'),
   salesPrice: numeric('sales_price', { precision: 12, scale: 4 }),
   salesCurrency: text('sales_currency').notNull().default('USD'),
   profit: numeric('profit', { precision: 12, scale: 4 }),
+
+  // ── Formula pricing (cost side) ───────────────────────────────────
+  costPricingModel: pricingModelEnum('cost_pricing_model').notNull().default('FIXED'),
+  costReferenceId: uuid('cost_reference_id').references(() => priceReferences.id, { onDelete: 'set null' }),
+  costPremium: numeric('cost_premium', { precision: 12, scale: 4 }),
+  costBarging: numeric('cost_barging', { precision: 12, scale: 4 }),
+  costBargingUnit: text('cost_barging_unit'),
+  costCreditDays: integer('cost_credit_days'),
+  costPriceFinalized: boolean('cost_price_finalized').notNull().default(false),
+
+  // ── Formula pricing (sell side) ───────────────────────────────────
+  salesPricingModel: pricingModelEnum('sales_pricing_model').notNull().default('FIXED'),
+  salesReferenceId: uuid('sales_reference_id').references(() => priceReferences.id, { onDelete: 'set null' }),
+  salesPremium: numeric('sales_premium', { precision: 12, scale: 4 }),
+  salesBarging: numeric('sales_barging', { precision: 12, scale: 4 }),
+  salesBargingUnit: text('sales_barging_unit'),
+  salesCreditDays: integer('sales_credit_days'),
+  salesPriceFinalized: boolean('sales_price_finalized').notNull().default(false),
 
   deliveredQuantity: numeric('delivered_quantity', { precision: 12, scale: 3 }),
 
