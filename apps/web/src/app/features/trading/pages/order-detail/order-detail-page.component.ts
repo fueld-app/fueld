@@ -873,7 +873,9 @@ interface InquiryReplyRecommendation {
                               step="0.0001"
                               [ngModel]="inquiryReplyPrices()[item.orderItemId] || ''"
                               (ngModelChange)="setInquiryReplyPrice(item.orderItemId, $event)"
-                              class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-right text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                              class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-right text-sm text-slate-900
+                                     [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
+                                     focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                             />
                             <label class="mt-3 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Line note</label>
                             <textarea
@@ -967,6 +969,7 @@ interface InquiryReplyRecommendation {
 
     <app-order-financing-summary
       class="mt-4 block"
+      [baseCurrency]="itemDisplayCurrency()"
       [financingRateAnnual]="financingRateAnnual()"
       [financingDays]="financingDays()"
       [financingDayCountConvention]="financingDayCountConvention()"
@@ -989,6 +992,7 @@ interface InquiryReplyRecommendation {
       [currencyOptionsInput]="configuredCurrencies()"
       (itemsChange)="onItemsChange($event)"
       (economicsChange)="onItemEconomicsChange($event)"
+      (displayCurrencyChange)="itemDisplayCurrency.set($event)"
     />
 
     <!-- Delivery + Payments + Attachments + Comments -->
@@ -1428,6 +1432,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     totalNetProfit: 0,
     netMarginPct: null,
   });
+  readonly itemDisplayCurrency = signal('USD');
   readonly saving = signal(false);
   readonly toast = signal<{ type: 'success' | 'error'; message: string } | null>(null);
   readonly invoiceNumber = signal('');

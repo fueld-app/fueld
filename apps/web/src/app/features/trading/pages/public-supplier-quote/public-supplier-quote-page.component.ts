@@ -102,7 +102,9 @@ import { API } from '@app/core/config/api';
                           [ngModel]="priceByItem()[item.orderItemId] || ''"
                           (ngModelChange)="setItemPrice(item.orderItemId, $event)"
                           [disabled]="!quotedItemMap()[item.orderItemId]"
-                          class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-right text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                          class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-right text-sm text-slate-900
+                                 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
+                                 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                         />
                         <label class="mt-3 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Line note</label>
                         <textarea

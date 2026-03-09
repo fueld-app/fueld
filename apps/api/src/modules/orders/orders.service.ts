@@ -27,6 +27,7 @@ import {
   calculateOrderEconomics,
   getFinancingRateAnnual,
 } from './order-financing';
+import { getFxRate } from '../prices/price.service';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -331,6 +332,7 @@ export async function listOrders(query?: ListOrdersQuery) {
     totalFinancingCost: number;
     totalNetProfit: number;
     netMarginPct: number | null;
+    displayCurrency: string;
   }> = {};
 
   if (orderIds.length > 0) {
@@ -357,6 +359,7 @@ export async function listOrders(query?: ListOrdersQuery) {
     }
 
     for (const row of rows) {
+      const orderItemList = itemsByOrder.get(row.id) ?? [];
       const economics = calculateOrderEconomics(
         {
           customerPaymentTermType: row.customerPaymentTermType,
@@ -364,16 +367,36 @@ export async function listOrders(query?: ListOrdersQuery) {
           supplierPaymentTermType: row.supplierPaymentTermType,
           supplierCreditDays: row.supplierCreditDays,
         },
-        itemsByOrder.get(row.id) ?? [],
+        orderItemList,
         financingRateByTenant.get(row.tenantId) ?? getFinancingRateAnnual(),
       );
 
+      // Determine display currency: uniform across all items → that currency, else USD
+      let displayCurrency = 'USD';
+      if (orderItemList.length > 0) {
+        const first = (orderItemList[0]!.costCurrency ?? 'USD').toUpperCase();
+        const allSame = orderItemList.every(
+          (item) =>
+            (item.costCurrency ?? 'USD').toUpperCase() === first &&
+            (item.salesCurrency ?? 'USD').toUpperCase() === first,
+        );
+        if (allSame) displayCurrency = first;
+      }
+
+      // When display currency is not USD, convert totals from USD to that currency
+      let fxDiv = 1;
+      if (displayCurrency !== 'USD') {
+        const rate = getFxRate(displayCurrency);
+        if (rate > 0) fxDiv = rate;
+      }
+
       itemAggs[row.id] = {
-        totalValue: economics.totalRevenueBase,
-        totalProfit: economics.totalGrossProfit,
-        totalFinancingCost: economics.totalFinancingCost,
-        totalNetProfit: economics.totalNetProfit,
+        totalValue: economics.totalRevenueBase / fxDiv,
+        totalProfit: economics.totalGrossProfit / fxDiv,
+        totalFinancingCost: economics.totalFinancingCost / fxDiv,
+        totalNetProfit: economics.totalNetProfit / fxDiv,
         netMarginPct: economics.netMarginPct,
+        displayCurrency,
       };
     }
   }
@@ -392,6 +415,7 @@ export async function listOrders(query?: ListOrdersQuery) {
     totalFinancingCost: itemAggs[r.id]?.totalFinancingCost ?? 0,
     totalNetProfit: itemAggs[r.id]?.totalNetProfit ?? 0,
     netMarginPct: itemAggs[r.id]?.netMarginPct ?? null,
+    displayCurrency: itemAggs[r.id]?.displayCurrency ?? 'USD',
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
   }));

@@ -592,6 +592,8 @@ export interface OrderListRowDto {
   totalFinancingCost?: number;
   totalNetProfit?: number;
   netMarginPct?: number | null;
+  /** Display currency for totals — matches item currencies when uniform, otherwise USD. */
+  displayCurrency?: string;
   createdAt: string;
   updatedAt: string;
 }

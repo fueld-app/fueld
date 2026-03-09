@@ -102,7 +102,7 @@ export interface OrderItemsEconomics {
             }
             <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[140px]">Cost</th>
             <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[140px]">Sell</th>
-            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Gross ({{ baseCurrency }})</th>
+            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Gross ({{ baseCurrency() }})</th>
             <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Financing</th>
             <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Net</th>
             @if (!readonly()) {
@@ -233,7 +233,8 @@ export interface OrderItemsEconomics {
                       type="number" step="0.01" min="0"
                       [ngModel]="row.costPrice"
                       (ngModelChange)="updateField(i, 'costPrice', $event)"
-                      class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-right text-sm tabular-nums
+                      class="w-full min-w-[100px] rounded-lg border border-gray-300 px-3 py-1.5 text-right text-sm tabular-nums
+                             [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
                              focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                     />
                     <select
@@ -260,7 +261,8 @@ export interface OrderItemsEconomics {
                       type="number" step="0.01" min="0"
                       [ngModel]="row.salesPrice"
                       (ngModelChange)="updateField(i, 'salesPrice', $event)"
-                      class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-right text-sm tabular-nums
+                      class="w-full min-w-[100px] rounded-lg border border-gray-300 px-3 py-1.5 text-right text-sm tabular-nums
+                             [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
                              focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                     />
                     <select
@@ -340,22 +342,22 @@ export interface OrderItemsEconomics {
               @if (allowDeliveredEdit()) {
                 <td class="px-4 py-3 text-right tabular-nums text-gray-900">{{ totalDeliveredQty() | number:'1.0-3' }}</td>
               }
-              <td class="px-4 py-3 text-right tabular-nums text-gray-600">{{ totalCost() | number:'1.2-2' }} {{ baseCurrency }}</td>
-              <td class="px-4 py-3 text-right tabular-nums text-gray-600">{{ totalRevenue() | number:'1.2-2' }} {{ baseCurrency }}</td>
+              <td class="px-4 py-3 text-right tabular-nums text-gray-600">{{ totalCost() | number:'1.2-2' }} {{ baseCurrency() }}</td>
+              <td class="px-4 py-3 text-right tabular-nums text-gray-600">{{ totalRevenue() | number:'1.2-2' }} {{ baseCurrency() }}</td>
               <td class="px-4 py-3 text-right tabular-nums"
                 [class.text-green-600]="totalProfit() > 0"
                 [class.text-red-600]="totalProfit() < 0"
               >
-                {{ totalProfit() | number:'1.2-2' }} {{ baseCurrency }}
+                {{ totalProfit() | number:'1.2-2' }} {{ baseCurrency() }}
               </td>
               <td class="px-4 py-3 text-right tabular-nums text-amber-700">
-                {{ totalFinancingCost() | number:'1.2-2' }} {{ baseCurrency }}
+                {{ totalFinancingCost() | number:'1.2-2' }} {{ baseCurrency() }}
               </td>
               <td class="px-4 py-3 text-right tabular-nums"
                 [class.text-green-600]="totalNetProfit() > 0"
                 [class.text-red-600]="totalNetProfit() < 0"
               >
-                {{ totalNetProfit() | number:'1.2-2' }} {{ baseCurrency }}
+                {{ totalNetProfit() | number:'1.2-2' }} {{ baseCurrency() }}
               </td>
               @if (!readonly()) { <td class="w-0 p-0"></td> }
             </tr>
@@ -498,7 +500,8 @@ export interface OrderItemsEconomics {
                   <input type="number" step="0.01" min="0"
                     [ngModel]="row.costPrice"
                     (ngModelChange)="updateField(i, 'costPrice', $event)"
-                    class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
+                    class="w-full min-w-[100px] rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
+                           [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
                            focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                   />
                   <select
@@ -525,7 +528,8 @@ export interface OrderItemsEconomics {
                   <input type="number" step="0.01" min="0"
                     [ngModel]="row.salesPrice"
                     (ngModelChange)="updateField(i, 'salesPrice', $event)"
-                    class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
+                    class="w-full min-w-[100px] rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
+                           [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
                            focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                   />
                   <select
@@ -544,7 +548,7 @@ export interface OrderItemsEconomics {
 
             <!-- Gross Profit -->
             <div>
-              <label class="mb-1 block text-xs font-medium text-gray-500">Gross Profit ({{ baseCurrency }})</label>
+              <label class="mb-1 block text-xs font-medium text-gray-500">Gross Profit ({{ baseCurrency() }})</label>
               <span
                 class="text-sm font-semibold tabular-nums"
                 [class.text-green-600]="profitForRow(row) > 0"
@@ -562,7 +566,7 @@ export interface OrderItemsEconomics {
             </div>
 
             <div>
-              <label class="mb-1 block text-xs font-medium text-gray-500">Net Profit ({{ baseCurrency }})</label>
+              <label class="mb-1 block text-xs font-medium text-gray-500">Net Profit ({{ baseCurrency() }})</label>
               <span
                 class="text-sm font-semibold tabular-nums"
                 [class.text-green-600]="netProfitForRow(row) > 0"
@@ -608,12 +612,12 @@ export interface OrderItemsEconomics {
               [class.text-green-600]="totalProfit() > 0"
               [class.text-red-600]="totalProfit() < 0"
             >
-              {{ totalProfit() | number:'1.2-2' }} {{ baseCurrency }}
+              {{ totalProfit() | number:'1.2-2' }} {{ baseCurrency() }}
             </span>
           </div>
           <div class="mt-2 flex items-center justify-between text-sm text-amber-700">
             <span class="font-medium">Financing Cost</span>
-            <span class="font-semibold tabular-nums">{{ totalFinancingCost() | number:'1.2-2' }} {{ baseCurrency }}</span>
+            <span class="font-semibold tabular-nums">{{ totalFinancingCost() | number:'1.2-2' }} {{ baseCurrency() }}</span>
           </div>
           <div class="mt-2 flex items-center justify-between text-sm">
             <span class="font-medium text-gray-600">Net Profit</span>
@@ -622,12 +626,12 @@ export interface OrderItemsEconomics {
               [class.text-green-600]="totalNetProfit() > 0"
               [class.text-red-600]="totalNetProfit() < 0"
             >
-              {{ totalNetProfit() | number:'1.2-2' }} {{ baseCurrency }}
+              {{ totalNetProfit() | number:'1.2-2' }} {{ baseCurrency() }}
             </span>
           </div>
           <div class="mt-2 flex items-center justify-between text-xs text-gray-500">
             <span>Financing / MT</span>
-            <span class="tabular-nums">{{ (financingCostPerMt() ?? 0) | number:'1.2-2' }} {{ baseCurrency }}</span>
+            <span class="tabular-nums">{{ (financingCostPerMt() ?? 0) | number:'1.2-2' }} {{ baseCurrency() }}</span>
           </div>
           <div class="mt-1 flex items-center justify-between text-xs text-gray-500">
             <span>Net Margin</span>
@@ -635,7 +639,7 @@ export interface OrderItemsEconomics {
           </div>
           <div class="mt-1 flex items-center justify-between text-xs text-gray-400">
             <span>{{ rows().length }} item(s) · {{ totalQty() | number:'1.0-0' }} MT</span>
-            <span>Rev {{ totalRevenue() | number:'1.2-2' }} {{ baseCurrency }}</span>
+            <span>Rev {{ totalRevenue() | number:'1.2-2' }} {{ baseCurrency() }}</span>
           </div>
         </div>
       }
@@ -658,11 +662,25 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   readonly currencyOptionsInput = input<DropdownOption[]>([]);
   readonly itemsChange = output<OrderItemRow[]>();
   readonly economicsChange = output<OrderItemsEconomics>();
+  readonly displayCurrencyChange = output<string>();
 
   private readonly wsService = inject(WebSocketService);
   private fxSub: Subscription | null = null;
-  readonly baseCurrency = 'USD';
   private readonly fxRates = signal<Record<string, number>>({ USD: 1 });
+
+  /** When every cost + sell currency on all rows is the same, show totals in
+   *  that currency. Otherwise fall back to USD. */
+  readonly baseCurrency = computed(() => {
+    const r = this.rows();
+    if (r.length === 0) return 'USD';
+    const first = (r[0]!.costCurrency || 'USD').toUpperCase();
+    const allMatch = r.every(
+      (row) =>
+        (row.costCurrency || 'USD').toUpperCase() === first &&
+        (row.salesCurrency || 'USD').toUpperCase() === first,
+    );
+    return allMatch ? first : 'USD';
+  });
 
   private static readonly DEFAULT_CURRENCIES: DropdownOption[] = [
     { value: 'USD', label: 'USD' },
@@ -695,7 +713,7 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
       const data = msg.data as { fxRates?: { base?: string; rates?: Record<string, number> } } | undefined;
       const rates = data?.fxRates?.rates;
       if (!rates) return;
-      const base = (data?.fxRates?.base ?? this.baseCurrency).toUpperCase();
+      const base = (data?.fxRates?.base ?? 'USD').toUpperCase();
       this.fxRates.set({ ...rates, [base]: 1 });
     });
   }
@@ -731,6 +749,10 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
         netMarginPct: this.netMarginPct(),
       });
     });
+
+    effect(() => {
+      this.displayCurrencyChange.emit(this.baseCurrency());
+    });
   }
 
   // ─── Dropdown options ────────────────────────────────────────────
@@ -765,11 +787,11 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   );
 
   readonly totalCost = computed(() =>
-    this.rows().reduce((s, r) => s + this.computeCostBase(r), 0),
+    this.toDisplayCurrency(this.rows().reduce((s, r) => s + this.computeCostBase(r), 0)),
   );
 
   readonly totalRevenue = computed(() =>
-    this.rows().reduce((s, r) => s + this.computeRevenueBase(r), 0),
+    this.toDisplayCurrency(this.rows().reduce((s, r) => s + this.computeRevenueBase(r), 0)),
   );
 
   readonly totalProfit = computed(() =>
@@ -899,10 +921,19 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
     this.itemsChange.emit(this.rows());
   }
 
+  /** FX rate to convert a given currency to USD. */
   private getFxRate(currency: string): number {
-    const code = (currency || this.baseCurrency).toUpperCase();
-    if (code === this.baseCurrency) return 1;
+    const code = (currency || 'USD').toUpperCase();
+    if (code === 'USD') return 1;
     return this.fxRates()[code] ?? 1;
+  }
+
+  /** Converts a USD amount into the current display currency. */
+  private toDisplayCurrency(usdAmount: number): number {
+    const display = this.baseCurrency();
+    if (display === 'USD') return usdAmount;
+    const rate = this.getFxRate(display);
+    return rate > 0 ? usdAmount / rate : usdAmount;
   }
 
   private computeCostBase(row: OrderItemRow): number {
@@ -918,11 +949,13 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   financingCostForRow(row: OrderItemRow): number {
     const dayCount = this.financingDayCountConvention() || 365;
     if (dayCount <= 0) return 0;
-    return this.computeCostBase(row) * this.financingRateAnnual() * this.financingDays() / dayCount;
+    return this.toDisplayCurrency(
+      this.computeCostBase(row) * this.financingRateAnnual() * this.financingDays() / dayCount,
+    );
   }
 
   profitForRow(row: OrderItemRow): number {
-    return this.computeRevenueBase(row) - this.computeCostBase(row);
+    return this.toDisplayCurrency(this.computeRevenueBase(row) - this.computeCostBase(row));
   }
 
   netProfitForRow(row: OrderItemRow): number {

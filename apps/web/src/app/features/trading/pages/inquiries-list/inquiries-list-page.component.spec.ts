@@ -61,9 +61,9 @@ describe('InquiriesListPageComponent', () => {
     fixture.detectChanges();
 
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    expect(text).toContain('Gross (USD)');
-    expect(text).toContain('Financing (USD)');
-    expect(text).toContain('Net (USD)');
+    expect(text).toContain('Gross');
+    expect(text).toContain('Financing');
+    expect(text).toContain('Net');
     expect(text).toContain('32,000.00');
     expect(text).toContain('4,195.07');
     expect(text).toContain('27,804.93');

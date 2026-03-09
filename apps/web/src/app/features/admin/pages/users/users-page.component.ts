@@ -182,7 +182,27 @@ import { API } from '@app/core/config/api';
                       <div class="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">
                         {{ initials(user.name) }}
                       </div>
-                      <span class="font-medium text-gray-900">{{ user.name }}</span>
+                      @if (editingNameId() === user.id) {
+                        <form (ngSubmit)="saveNameEdit(user.id)" class="flex items-center gap-1">
+                          <input
+                            type="text"
+                            [(ngModel)]="editingNameValue"
+                            name="name"
+                            placeholder="Full name"
+                            class="w-40 rounded-md border border-gray-300 px-2 py-1 text-sm font-medium focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                            (blur)="saveNameEdit(user.id)"
+                            (keydown.escape)="editingNameId.set(null)"
+                          />
+                        </form>
+                      } @else {
+                        <button
+                          (click)="startEditName(user)"
+                          class="font-medium text-gray-900 hover:text-brand-600 transition-colors cursor-pointer"
+                          title="Click to edit name"
+                        >
+                          {{ user.name }}
+                        </button>
+                      }
                       @if (user.id === currentUserId()) {
                         <span class="inline-flex items-center rounded-full bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium text-brand-700">You</span>
                       }
@@ -744,6 +764,10 @@ export class UsersPageComponent implements OnInit, OnDestroy {
   readonly editingPhoneId = signal<string | null>(null);
   editingPhoneValue = '';
 
+  // Name editing
+  readonly editingNameId = signal<string | null>(null);
+  editingNameValue = '';
+
   // Per-row actions dropdown
   readonly actionsMenuUserId = signal<string | null>(null);
   readonly actionsMenuPos = signal<{ top: number; left: number } | null>(null);
@@ -929,6 +953,33 @@ export class UsersPageComponent implements OnInit, OnDestroy {
       }
     } catch (err) {
       console.error('Failed to update role:', err);
+    }
+  }
+
+  // ── Name editing ────────────────────────────────────────────────
+
+  startEditName(user: AdminUserDto) {
+    this.editingNameId.set(user.id);
+    this.editingNameValue = user.name;
+  }
+
+  async saveNameEdit(userId: string) {
+    const name = this.editingNameValue.trim();
+    this.editingNameId.set(null);
+    if (!name) return;
+
+    try {
+      const res = await firstValueFrom(
+        this.http.patch<ApiResponse<{ id: string; name: string }>>(`${API}/admin/users/${userId}/name`, { name }),
+      );
+
+      if (res.success && res.data) {
+        this.users.update((list) =>
+          list.map((u) => (u.id === userId ? { ...u, name: res.data!.name } : u)),
+        );
+      }
+    } catch (err) {
+      console.error('Failed to update name:', err);
     }
   }
 

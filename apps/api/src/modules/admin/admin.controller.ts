@@ -10,6 +10,7 @@ import {
   updateUserAllowedIps,
   adminReset2fa,
   updateUserPhone,
+  updateUserName,
 } from './admin.service';
 import { disconnectUserSessions } from '../activity/session-tracker';
 import type { ApiResponse } from '@fueld/types';
@@ -265,6 +266,22 @@ export const adminController = new Elysia({ prefix: '/admin' })
     params: t.Object({ id: t.String() }),
     body: t.Object({ allowedIps: t.Union([t.Array(t.String()), t.Null()]) }),
     detail: { tags: ['Admin'], summary: 'Set allowed IP addresses for a user', security: [{ bearerAuth: [] }] },
+  })
+
+  // ── PATCH /admin/users/:id/name ──────────────────────────────────
+  .patch('/users/:id/name', async ({ auth, params, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateUserName(params.id, body.name);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update name';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    params: t.Object({ id: t.String() }),
+    body: t.Object({ name: t.String({ minLength: 1 }) }),
+    detail: { tags: ['Admin'], summary: 'Update user display name', security: [{ bearerAuth: [] }] },
   })
 
   // ── PATCH /admin/users/:id/phone ─────────────────────────────────

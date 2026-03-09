@@ -98,11 +98,11 @@ interface LliSearchResult {
                 <th app-sort-header field="status" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Status</th>
                 <th app-sort-header field="responsible" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Responsible</th>
                 <th app-sort-header field="eta" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">ETA</th>
-                <th class="px-4 py-3 text-right font-medium text-gray-600">Value (USD)</th>
+                <th class="px-4 py-3 text-right font-medium text-gray-600">Value</th>
                 @if (isOrders()) {
-                  <th class="px-4 py-3 text-right font-medium text-gray-600">Gross (USD)</th>
-                  <th class="px-4 py-3 text-right font-medium text-gray-600">Financing (USD)</th>
-                  <th class="px-4 py-3 text-right font-medium text-gray-600">Net (USD)</th>
+                  <th class="px-4 py-3 text-right font-medium text-gray-600">Gross</th>
+                  <th class="px-4 py-3 text-right font-medium text-gray-600">Financing</th>
+                  <th class="px-4 py-3 text-right font-medium text-gray-600">Net</th>
                 }
                 <th app-sort-header field="createdAt" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Created</th>
                 <th class="px-4 py-3 w-12"></th>
@@ -122,7 +122,7 @@ interface LliSearchResult {
                   <td class="px-4 py-3 text-gray-500">{{ inq.eta ? (inq.eta | date:'mediumDate') : '—' }}</td>
                   <td class="px-4 py-3 text-right tabular-nums text-gray-900">
                     @if (inq.totalValue > 0) {
-                      {{ inq.totalValue | number:'1.2-2' }}
+                      {{ inq.totalValue | number:'1.2-2' }} {{ inq.displayCurrency || 'USD' }}
                     } @else {
                       <span class="text-gray-400">—</span>
                     }
@@ -130,21 +130,21 @@ interface LliSearchResult {
                   @if (isOrders()) {
                     <td class="px-4 py-3 text-right tabular-nums" [class.text-green-600]="inq.totalProfit > 0" [class.text-red-600]="inq.totalProfit < 0">
                       @if (inq.totalValue > 0 || inq.totalProfit !== 0) {
-                        {{ inq.totalProfit | number:'1.2-2' }}
+                        {{ inq.totalProfit | number:'1.2-2' }} {{ inq.displayCurrency || 'USD' }}
                       } @else {
                         <span class="text-gray-400">—</span>
                       }
                     </td>
                     <td class="px-4 py-3 text-right tabular-nums text-amber-700">
                       @if (inq.totalValue > 0 || (inq.totalFinancingCost ?? 0) !== 0) {
-                        {{ (inq.totalFinancingCost ?? 0) | number:'1.2-2' }}
+                        {{ (inq.totalFinancingCost ?? 0) | number:'1.2-2' }} {{ inq.displayCurrency || 'USD' }}
                       } @else {
                         <span class="text-gray-400">—</span>
                       }
                     </td>
                     <td class="px-4 py-3 text-right tabular-nums" [class.text-green-600]="(inq.totalNetProfit ?? 0) > 0" [class.text-red-600]="(inq.totalNetProfit ?? 0) < 0">
                       @if (inq.totalValue > 0 || (inq.totalNetProfit ?? 0) !== 0) {
-                        {{ (inq.totalNetProfit ?? 0) | number:'1.2-2' }}
+                        {{ (inq.totalNetProfit ?? 0) | number:'1.2-2' }} {{ inq.displayCurrency || 'USD' }}
                       } @else {
                         <span class="text-gray-400">—</span>
                       }
@@ -217,19 +217,19 @@ interface LliSearchResult {
                   <div>
                     <p class="text-[11px] uppercase tracking-wide text-gray-500">Gross</p>
                     <p class="mt-1 font-semibold tabular-nums" [class.text-green-600]="inq.totalProfit > 0" [class.text-red-600]="inq.totalProfit < 0">
-                      {{ inq.totalProfit | number:'1.2-2' }}
+                      {{ inq.totalProfit | number:'1.2-2' }} {{ inq.displayCurrency || 'USD' }}
                     </p>
                   </div>
                   <div>
                     <p class="text-[11px] uppercase tracking-wide text-amber-700">Financing</p>
                     <p class="mt-1 font-semibold tabular-nums text-amber-700">
-                      {{ (inq.totalFinancingCost ?? 0) | number:'1.2-2' }}
+                      {{ (inq.totalFinancingCost ?? 0) | number:'1.2-2' }} {{ inq.displayCurrency || 'USD' }}
                     </p>
                   </div>
                   <div>
                     <p class="text-[11px] uppercase tracking-wide text-gray-500">Net</p>
                     <p class="mt-1 font-semibold tabular-nums" [class.text-green-600]="(inq.totalNetProfit ?? 0) > 0" [class.text-red-600]="(inq.totalNetProfit ?? 0) < 0">
-                      {{ (inq.totalNetProfit ?? 0) | number:'1.2-2' }}
+                      {{ (inq.totalNetProfit ?? 0) | number:'1.2-2' }} {{ inq.displayCurrency || 'USD' }}
                     </p>
                   </div>
                   <div>

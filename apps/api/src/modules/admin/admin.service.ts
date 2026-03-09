@@ -352,6 +352,23 @@ export async function updateUserAllowedIps(userId: string, allowedIps: string[] 
   };
 }
 
+// ── Update User Name ─────────────────────────────────────────────────
+
+export async function updateUserName(userId: string, name: string) {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error('Name is required');
+
+  const [updated] = await db
+    .update(users)
+    .set({ name: trimmed, updatedAt: new Date() })
+    .where(eq(users.id, userId))
+    .returning();
+
+  if (!updated) throw new Error('User not found');
+
+  return { id: updated.id, name: updated.name };
+}
+
 // ── Update User Phone ────────────────────────────────────────────────
 
 export async function updateUserPhone(userId: string, phone: string | null) {
