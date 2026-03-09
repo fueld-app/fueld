@@ -282,7 +282,7 @@ interface InquirySettingsDto {
           <!-- ════════════════════════════════════════════════════════ -->
           <!--  Unit Conversions                                       -->
           <!-- ════════════════════════════════════════════════════════ -->
-          <div class="app-panel">
+          <div class="app-panel min-w-0">
             <div class="app-panel-header app-panel-header--amber">
               <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--amber">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
@@ -297,13 +297,13 @@ interface InquirySettingsDto {
 
             <div class="app-panel-body space-y-3">
               @for (conv of unitConversions(); track $index; let i = $index) {
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 min-w-0">
                   <input
                     type="text"
                     [value]="conv.productType ?? ''"
                     (input)="updateUnitConversion(i, 'productType', $any($event.target).value)"
                     placeholder="All products"
-                    class="w-28 rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                    class="min-w-0 flex-1 rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
                            focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                   />
                   <input
@@ -311,7 +311,7 @@ interface InquirySettingsDto {
                     [value]="conv.fromUnit"
                     (input)="updateUnitConversion(i, 'fromUnit', $any($event.target).value.toUpperCase())"
                     placeholder="From"
-                    class="app-input-mono-uppercase w-20"
+                    class="app-input-mono-uppercase min-w-0 w-16 shrink"
                   />
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 11-1.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z" clip-rule="evenodd" />
@@ -321,14 +321,14 @@ interface InquirySettingsDto {
                     [value]="conv.toUnit"
                     (input)="updateUnitConversion(i, 'toUnit', $any($event.target).value.toUpperCase())"
                     placeholder="To"
-                    class="app-input-mono-uppercase w-20"
+                    class="app-input-mono-uppercase min-w-0 w-16 shrink"
                   />
                   <span class="text-xs text-gray-400">=</span>
                   <input
                     type="number" step="0.0001" min="0"
                     [ngModel]="conv.factor"
                     (ngModelChange)="updateUnitConversion(i, 'factor', +$event)"
-                    class="w-24 rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm tabular-nums
+                    class="min-w-0 w-20 shrink rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm tabular-nums
                            [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
                            focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                   />
