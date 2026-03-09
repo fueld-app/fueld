@@ -664,7 +664,7 @@ export interface InquiryCancelReasonSettingsDto {
 
 /** Admin settings for default unit conversion factors */
 export interface UnitConversionSettingsDto {
-  conversions: { fromUnit: string; toUnit: string; factor: number }[];
+  conversions: { productType?: string; fromUnit: string; toUnit: string; factor: number }[];
 }
 
 // ═══════════════════════════════════════════════════════════════════════

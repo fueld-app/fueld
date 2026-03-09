@@ -140,7 +140,7 @@ export interface TenantSettings {
   products?: string[];
   units?: string[];
   // Default conversion factors between units (e.g. MT→CBM = 1.1765)
-  unitConversions?: { fromUnit: string; toUnit: string; factor: number }[];
+  unitConversions?: { productType?: string; fromUnit: string; toUnit: string; factor: number }[];
   // Configurable currency options for order line items
   currencies?: string[];
   // Configurable company types (e.g. CLIENT, SUPPLIER, BARGE)

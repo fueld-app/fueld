@@ -291,13 +291,21 @@ interface InquirySettingsDto {
               </div>
               <div class="flex-1 min-w-0">
                 <h3 class="text-sm font-semibold text-gray-900">Unit Conversions</h3>
-                <p class="text-xs text-gray-500">Default conversion factors applied when buy and sell units differ on order line items.</p>
+                <p class="text-xs text-gray-500">Default density/conversion factors per product. Leave product blank for a generic fallback.</p>
               </div>
             </div>
 
             <div class="app-panel-body space-y-3">
               @for (conv of unitConversions(); track $index; let i = $index) {
                 <div class="flex items-center gap-2">
+                  <input
+                    type="text"
+                    [value]="conv.productType ?? ''"
+                    (input)="updateUnitConversion(i, 'productType', $any($event.target).value)"
+                    placeholder="All products"
+                    class="w-28 rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                           focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  />
                   <input
                     type="text"
                     [value]="conv.fromUnit"
@@ -950,7 +958,7 @@ export class SettingsPageComponent implements OnInit {
   readonly unitsSaved = signal(false);
 
   // Unit Conversions
-  readonly unitConversions = signal<{ fromUnit: string; toUnit: string; factor: number }[]>([]);
+  readonly unitConversions = signal<{ productType?: string; fromUnit: string; toUnit: string; factor: number }[]>([]);
   readonly unitConversionsSaving = signal(false);
   readonly unitConversionsSaved = signal(false);
 
@@ -1309,7 +1317,7 @@ export class SettingsPageComponent implements OnInit {
     }
   }
 
-  updateUnitConversion(index: number, field: 'fromUnit' | 'toUnit' | 'factor', value: string | number): void {
+  updateUnitConversion(index: number, field: 'productType' | 'fromUnit' | 'toUnit' | 'factor', value: string | number): void {
     const updated = this.unitConversions().map((c, i) =>
       i === index ? { ...c, [field]: value } : c,
     );
@@ -1317,7 +1325,7 @@ export class SettingsPageComponent implements OnInit {
   }
 
   addUnitConversion(): void {
-    this.unitConversions.set([...this.unitConversions(), { fromUnit: '', toUnit: '', factor: 1 }]);
+    this.unitConversions.set([...this.unitConversions(), { productType: '', fromUnit: '', toUnit: '', factor: 1 }]);
   }
 
   removeUnitConversion(index: number): void {

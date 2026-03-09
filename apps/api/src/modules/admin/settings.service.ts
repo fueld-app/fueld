@@ -841,12 +841,17 @@ export async function updateUnitSettings(units: string[]): Promise<{ units: stri
 // ═══════════════════════════════════════════════════════════════════════
 
 interface UnitConversion {
+  productType?: string;
   fromUnit: string;
   toUnit: string;
   factor: number;
 }
 
 const DEFAULT_UNIT_CONVERSIONS: UnitConversion[] = [
+  { productType: 'IFO380', fromUnit: 'MT', toUnit: 'CBM', factor: 1.009 },
+  { productType: 'VLSFO', fromUnit: 'MT', toUnit: 'CBM', factor: 1.053 },
+  { productType: 'LSMGO', fromUnit: 'MT', toUnit: 'CBM', factor: 1.183 },
+  { productType: 'HSFO', fromUnit: 'MT', toUnit: 'CBM', factor: 1.02 },
   { fromUnit: 'MT', toUnit: 'CBM', factor: 1.1765 },
   { fromUnit: 'CBM', toUnit: 'MT', factor: 0.85 },
   { fromUnit: 'MT', toUnit: 'BBL', factor: 7.33 },

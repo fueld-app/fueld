@@ -1070,6 +1070,7 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   }, {
     body: t.Object({
       conversions: t.Array(t.Object({
+        productType: t.Optional(t.String()),
         fromUnit: t.String({ minLength: 1 }),
         toUnit: t.String({ minLength: 1 }),
         factor: t.Number({ minimum: 0 }),

@@ -1494,7 +1494,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   );
   readonly configuredProducts = signal<DropdownOption[]>([]);
   readonly configuredUnits = signal<DropdownOption[]>([]);
-  readonly configuredUnitConversions = signal<{ fromUnit: string; toUnit: string; factor: number }[]>([]);
+  readonly configuredUnitConversions = signal<{ productType?: string; fromUnit: string; toUnit: string; factor: number }[]>([]);
   readonly configuredCurrencies = signal<DropdownOption[]>([]);
   readonly configuredAttachmentTypes = signal<string[]>(['BDR', 'OTHER']);
 

@@ -287,7 +287,7 @@ export interface OrderItemsEconomics {
                   </div>
                   @if (row.unit !== row.salesUnit) {
                     <div class="mt-1 flex items-center gap-1 text-xs text-gray-500">
-                      <span>× conv.</span>
+                      <span>density</span>
                       <input
                         type="number" step="0.0001" min="0"
                         [ngModel]="row.unitConversionFactor"
@@ -589,7 +589,7 @@ export interface OrderItemsEconomics {
                 </div>
                 @if (row.unit !== row.salesUnit) {
                   <div class="mt-1 flex items-center gap-1 text-xs text-gray-500">
-                    <span>× conv.</span>
+                    <span>density</span>
                     <input
                       type="number" step="0.0001" min="0"
                       [ngModel]="row.unitConversionFactor"
@@ -717,7 +717,7 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   readonly financingDayCountConvention = input(365);
   readonly productOptionsInput = input<DropdownOption[]>([]);
   readonly unitOptionsInput = input<DropdownOption[]>([]);
-  readonly unitConversionsInput = input<{ fromUnit: string; toUnit: string; factor: number }[]>([]);
+  readonly unitConversionsInput = input<{ productType?: string; fromUnit: string; toUnit: string; factor: number }[]>([]);
   readonly currencyOptionsInput = input<DropdownOption[]>([]);
   readonly itemsChange = output<OrderItemRow[]>();
   readonly economicsChange = output<OrderItemsEconomics>();
@@ -914,9 +914,9 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
 
       (row as Record<string, unknown>)[field] = value;
 
-      // Auto-apply default conversion factor when unit or salesUnit changes
-      if (field === 'unit' || field === 'salesUnit') {
-        row.unitConversionFactor = this.lookupConversionFactor(row.unit, row.salesUnit);
+      // Auto-apply default conversion factor when unit, salesUnit, or product changes
+      if (field === 'unit' || field === 'salesUnit' || field === 'productType') {
+        row.unitConversionFactor = this.lookupConversionFactor(row.productType, row.unit, row.salesUnit);
       }
 
       // Auto-recalculate profit using main quantity
@@ -1013,14 +1013,20 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
     return (row.salesPrice || 0) * qty * factor * this.getFxRate(row.salesCurrency);
   }
 
-  /** Look up a default conversion factor from admin settings. */
-  private lookupConversionFactor(fromUnit: string, toUnit: string): number {
+  /** Look up a default conversion factor from admin settings (product-specific first, then generic fallback). */
+  private lookupConversionFactor(productType: string, fromUnit: string, toUnit: string): number {
     if (fromUnit === toUnit) return 1;
     const conversions = this.unitConversionsInput();
-    const match = conversions.find(
-      (c) => c.fromUnit === fromUnit && c.toUnit === toUnit,
+    // Try product-specific match first
+    const productMatch = productType
+      ? conversions.find((c) => c.productType === productType && c.fromUnit === fromUnit && c.toUnit === toUnit)
+      : undefined;
+    if (productMatch) return productMatch.factor;
+    // Fall back to generic (no product) match
+    const genericMatch = conversions.find(
+      (c) => !c.productType && c.fromUnit === fromUnit && c.toUnit === toUnit,
     );
-    return match?.factor ?? 1;
+    return genericMatch?.factor ?? 1;
   }
 
   financingCostForRow(row: OrderItemRow): number {
