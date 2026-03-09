@@ -158,7 +158,7 @@ export const creditApplicationsController = new Elysia({ prefix: '/credit/applic
           const notificationBody = `${auth.email ?? 'A trader'} submitted a credit application for ${app.counterpartyName} (${app.requestedCurrency} ${Number(app.requestedAmount).toLocaleString()})`;
 
           // Push notification
-          if (settings.notifyPush || settings.notifyCreditManagers) {
+          if (settings.notifyPush) {
             const cmUserIds = await getCreditManagerUserIds();
             if (cmUserIds.length > 0) {
               await sendNotificationToUsers(cmUserIds, {

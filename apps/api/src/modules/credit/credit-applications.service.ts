@@ -64,6 +64,11 @@ export async function updateCreditApplicationSettings(
   const current = { ...DEFAULT_SETTINGS, ...settings.creditApplicationSettings };
   const merged = { ...current, ...updates };
 
+  // Backward compat: propagate legacy notifyCreditManagers to notifyPush
+  if ('notifyCreditManagers' in updates && !('notifyPush' in updates)) {
+    merged.notifyPush = updates.notifyCreditManagers!;
+  }
+
   await db
     .update(tenants)
     .set({
