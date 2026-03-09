@@ -26,6 +26,8 @@ import { ActivityTimelineComponent } from '../../../../shared/components/activit
 import { LastEditedBadgeComponent } from '../../../../shared/components/last-edited-badge/last-edited-badge.component';
 import { CommentsCardComponent } from '../../../../shared/components/comments-card/comments-card.component';
 import { CreditApplicationModalComponent } from '../../../credit/components/credit-application-modal.component';
+import { RiskMonitoringService } from '../../../../core/risk-monitoring/risk-monitoring.service';
+import type { RiskSummaryDto } from '@fueld/types';
 import { API } from '@app/core/config/api';
 
 interface CompanyEnrichment {
@@ -1932,6 +1934,17 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                     >
                       Seizures / Arrests
                     </button>
+                    <button
+                      type="button"
+                      class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
+                      [class]="sanctionsTab() === 'monitoring' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
+                      (click)="sanctionsTab.set('monitoring'); loadRiskSummary()"
+                    >
+                      Monitoring
+                      @if (riskSummary()?.isFrozen) {
+                        <span class="ml-1 inline-block h-2 w-2 rounded-full bg-red-500"></span>
+                      }
+                    </button>
                   </div>
                 </div>
                 <div class="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3 text-sm">
@@ -2006,7 +2019,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                         </span>
                       </div>
                     }
-                  } @else {
+                  } @else if (sanctionsTab() === 'seizures') {
                     @if (seizuresLoading()) {
                       <div class="flex items-center justify-center py-6">
                         <svg class="h-4 w-4 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
@@ -2043,6 +2056,133 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                         <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">
                           No seizures on record
                         </span>
+                      </div>
+                    }
+                  } @else if (sanctionsTab() === 'monitoring') {
+                    @if (riskSummaryLoading()) {
+                      <div class="flex items-center justify-center py-6">
+                        <svg class="h-4 w-4 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                      </div>
+                    } @else if (riskSummary()) {
+                      <div class="space-y-4">
+                        <!-- Frozen banner -->
+                        @if (riskSummary()!.isFrozen) {
+                          <div class="rounded-lg bg-red-50 border border-red-200 px-4 py-3">
+                            <div class="flex items-center gap-2">
+                              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-600 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                              </svg>
+                              <div>
+                                <p class="text-sm font-semibold text-red-800">Credit Frozen</p>
+                                <p class="text-xs text-red-600">{{ riskSummary()!.activeHitCount }} active risk signal(s) detected. Customer credit is unavailable.</p>
+                              </div>
+                            </div>
+                          </div>
+                        }
+
+                        @if (riskSummary()!.hasActiveOverride) {
+                          <div class="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3">
+                            <p class="text-sm font-medium text-amber-800">Override Active</p>
+                            <p class="text-xs text-amber-600">Credit temporarily unfrozen until {{ riskSummary()!.overrideExpiresAt | date:'medium' }}</p>
+                          </div>
+                        }
+
+                        <!-- Provider statuses -->
+                        <div class="space-y-2">
+                          <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Provider Checks</h4>
+                          @for (ps of riskSummary()!.providerStatuses; track ps.providerName) {
+                            <div class="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2">
+                              <div class="flex items-center gap-2">
+                                <span class="inline-flex h-2 w-2 rounded-full"
+                                  [class]="ps.status === 'CLEAR' ? 'bg-green-400' : ps.status === 'HIT' ? 'bg-red-400' : ps.status === 'ERROR' ? 'bg-yellow-400' : 'bg-gray-300'">
+                                </span>
+                                <span class="text-sm font-medium text-gray-700">{{ ps.providerName }}</span>
+                              </div>
+                              <div class="flex items-center gap-2">
+                                @if (ps.hitCount > 0) {
+                                  <span class="text-xs font-medium text-red-600">{{ ps.hitCount }} hit(s)</span>
+                                }
+                                @if (ps.checkedAt) {
+                                  <span class="text-xs text-gray-400">{{ ps.checkedAt | date:'short' }}</span>
+                                }
+                              </div>
+                            </div>
+                          }
+                          @if (!riskSummary()!.providerStatuses.length) {
+                            <p class="text-xs text-gray-400">No checks have run yet.</p>
+                          }
+                        </div>
+
+                        <!-- Active hits -->
+                        @if (riskSummary()!.activeHits.length) {
+                          <div class="space-y-2">
+                            <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Active Signals</h4>
+                            @for (hit of riskSummary()!.activeHits; track hit.id) {
+                              <div class="rounded-lg border px-3 py-2"
+                                [class]="hit.severity === 'CRITICAL' ? 'border-red-200 bg-red-50' : hit.severity === 'HIGH' ? 'border-orange-200 bg-orange-50' : 'border-yellow-200 bg-yellow-50'">
+                                <div class="flex items-center gap-2">
+                                  <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold"
+                                    [class]="hit.severity === 'CRITICAL' ? 'bg-red-100 text-red-700' : hit.severity === 'HIGH' ? 'bg-orange-100 text-orange-700' : 'bg-yellow-100 text-yellow-700'">
+                                    {{ hit.severity }}
+                                  </span>
+                                  <span class="text-xs font-medium text-gray-500">{{ hit.signalType }}</span>
+                                </div>
+                                <p class="mt-1 text-sm font-medium text-gray-900">{{ hit.title }}</p>
+                                @if (hit.detail) {
+                                  <p class="mt-0.5 text-xs text-gray-600">{{ hit.detail }}</p>
+                                }
+                                @if (hit.sourceUrl) {
+                                  <a [href]="hit.sourceUrl" target="_blank" rel="noopener noreferrer" class="mt-1 inline-flex text-xs text-brand-600 hover:underline">View source</a>
+                                }
+                              </div>
+                            }
+                          </div>
+                        }
+
+                        <!-- Actions -->
+                        <div class="flex items-center gap-2 pt-2 border-t border-gray-100">
+                          <button
+                            type="button"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                            [disabled]="riskCheckRunning()"
+                            (click)="runManualCheck()"
+                          >
+                            @if (riskCheckRunning()) {
+                              <svg class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                              </svg>
+                              Checking…
+                            } @else {
+                              Re-check Now
+                            }
+                          </button>
+                          @if (riskSummary()!.isFrozen && canDeleteEntity()) {
+                            <button
+                              type="button"
+                              class="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700 hover:bg-amber-100 transition-colors disabled:opacity-50"
+                              [disabled]="overrideRequesting()"
+                              (click)="requestOverride()"
+                            >
+                              Request Override
+                            </button>
+                          }
+                        </div>
+                      </div>
+                    } @else {
+                      <div class="px-5 py-5 text-center">
+                        <p class="text-sm text-gray-400">Risk monitoring not yet checked for this company.</p>
+                        <button
+                          type="button"
+                          class="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                          [disabled]="riskCheckRunning()"
+                          (click)="runManualCheck()"
+                        >
+                          Run First Check
+                        </button>
                       </div>
                     }
                   }
@@ -2236,7 +2376,13 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly sanctions = signal<any[] | null>(null);
   readonly sanctionsLoading = signal(false);
   readonly registrationTab = signal<'registration' | 'ownership'>('ownership');
-  readonly sanctionsTab = signal<'risk' | 'sanctions' | 'seizures'>('risk');
+  readonly sanctionsTab = signal<'risk' | 'sanctions' | 'seizures' | 'monitoring'>('risk');
+  readonly riskMonitoringService = inject(RiskMonitoringService);
+  readonly riskSummary = signal<RiskSummaryDto | null>(null);
+  readonly riskSummaryLoading = signal(false);
+  readonly riskCheckRunning = signal(false);
+  readonly overrideReason = signal('');
+  readonly overrideRequesting = signal(false);
   readonly companyInfoTab = signal<'info' | 'headOffice' | 'offices' | 'emails' | 'fleet' | 'roles'>('info');
   readonly fleetRolesTab = signal<'fleet' | 'roles'>('fleet');
 
@@ -3888,5 +4034,57 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
 
   onCreditApplicationSubmitted() {
     this.showToast('success', 'Credit application submitted successfully');
+  }
+
+  // ─── Risk Monitoring ──────────────────────────────────────────────
+
+  async loadRiskSummary(): Promise<void> {
+    const c = this.company();
+    if (!c || this.riskSummaryLoading()) return;
+    this.riskSummaryLoading.set(true);
+    try {
+      const summary = await this.riskMonitoringService.getSummary(c.id);
+      this.riskSummary.set(summary);
+    } catch (err) {
+      console.error('Failed to load risk summary:', err);
+    } finally {
+      this.riskSummaryLoading.set(false);
+    }
+  }
+
+  async runManualCheck(): Promise<void> {
+    const c = this.company();
+    if (!c || this.riskCheckRunning()) return;
+    this.riskCheckRunning.set(true);
+    try {
+      const summary = await this.riskMonitoringService.triggerCheck(c.id);
+      if (summary) {
+        this.riskSummary.set(summary);
+        this.showToast('success', summary.isFrozen ? 'Check complete — risk signals found' : 'Check complete — all clear');
+      }
+    } catch (err) {
+      console.error('Failed to run manual check:', err);
+      this.showToast('error', 'Risk check failed');
+    } finally {
+      this.riskCheckRunning.set(false);
+    }
+  }
+
+  async requestOverride(): Promise<void> {
+    const c = this.company();
+    if (!c) return;
+    const reason = prompt('Reason for requesting a credit override:');
+    if (!reason?.trim()) return;
+    this.overrideRequesting.set(true);
+    try {
+      await this.riskMonitoringService.requestOverride(c.id, reason.trim());
+      this.showToast('success', 'Override requested — awaiting approval');
+      await this.loadRiskSummary();
+    } catch (err) {
+      console.error('Failed to request override:', err);
+      this.showToast('error', 'Failed to request override');
+    } finally {
+      this.overrideRequesting.set(false);
+    }
   }
 }

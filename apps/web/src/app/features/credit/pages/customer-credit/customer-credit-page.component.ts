@@ -20,6 +20,7 @@ import type {
 } from '@fueld/types';
 
 import { API } from '@app/core/config/api';
+import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring.service';
 
 interface CompanySearchResult {
   source: 'local' | 'seasearcher';
@@ -101,6 +102,12 @@ interface CompanySearchResultOption {
                           class="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors">
                           {{ name }}
                         </a>
+                        @if (frozenCounterpartyIds().has(line.counterpartyIds[i])) {
+                          <span class="inline-flex items-center gap-0.5 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700 uppercase">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/></svg>
+                            Frozen
+                          </span>
+                        }
                       } @empty {
                         <span class="text-gray-400">-</span>
                       }
@@ -368,6 +375,7 @@ export class CustomerCreditPageComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly riskService = inject(RiskMonitoringService);
   readonly parseFloat = parseFloat;
   readonly pageSize = 25;
 
@@ -407,6 +415,9 @@ export class CustomerCreditPageComponent implements OnInit {
   readonly companyDropdownOpen = signal(false);
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
+  // Frozen state
+  readonly frozenCounterpartyIds = signal<Set<string>>(new Set());
+
   // Delete
   readonly deleteTarget = signal<CreditLineDto | null>(null);
   readonly deleting = signal(false);
@@ -444,6 +455,7 @@ export class CustomerCreditPageComponent implements OnInit {
       if (res.success && res.data) {
         this.creditLines.set(res.data.items);
         this.total.set(res.data.total);
+        this.loadFrozenState(res.data.items);
       }
       if (ownRes.success) this.ownCompanies.set(ownRes.data);
       if (currenciesRes.success && currenciesRes.data.currencies.length) {
@@ -759,5 +771,16 @@ export class CustomerCreditPageComponent implements OnInit {
 
   isExpired(dateStr: string): boolean {
     return new Date(dateStr) < new Date();
+  }
+
+  private async loadFrozenState(lines: CreditLineDto[]): Promise<void> {
+    const ids = [...new Set(lines.flatMap((l) => l.counterpartyIds))];
+    if (!ids.length) return;
+    try {
+      const frozen = await this.riskService.batchFrozen(ids);
+      this.frozenCounterpartyIds.set(new Set(frozen));
+    } catch {
+      // Non-critical — leave empty
+    }
   }
 }

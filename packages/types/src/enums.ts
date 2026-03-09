@@ -77,3 +77,33 @@ export enum CreditApplicationReviewDecision {
   Approved = 'APPROVED',
   Rejected = 'REJECTED',
 }
+
+// ── Risk Monitoring ──
+
+export enum RiskProviderClass {
+  Watchlist = 'WATCHLIST',
+  MaritimeContext = 'MARITIME_CONTEXT',
+  BusinessDistress = 'BUSINESS_DISTRESS',
+}
+
+export enum RiskCheckStatus {
+  Clear = 'CLEAR',
+  Hit = 'HIT',
+  Error = 'ERROR',
+  NoCoverage = 'NO_COVERAGE',
+}
+
+export enum RiskHitSeverity {
+  Critical = 'CRITICAL',
+  High = 'HIGH',
+  Medium = 'MEDIUM',
+  Low = 'LOW',
+  Info = 'INFO',
+}
+
+export enum RiskOverrideStatus {
+  Pending = 'PENDING',
+  Approved = 'APPROVED',
+  Expired = 'EXPIRED',
+  Revoked = 'REVOKED',
+}

@@ -82,6 +82,34 @@ export const documentTypeEnum = pgEnum('document_type', [
   'OTHER',
 ]);
 
+export const riskProviderClassEnum = pgEnum('risk_provider_class', [
+  'WATCHLIST',
+  'MARITIME_CONTEXT',
+  'BUSINESS_DISTRESS',
+]);
+
+export const riskCheckStatusEnum = pgEnum('risk_check_status', [
+  'CLEAR',
+  'HIT',
+  'ERROR',
+  'NO_COVERAGE',
+]);
+
+export const riskHitSeverityEnum = pgEnum('risk_hit_severity', [
+  'CRITICAL',
+  'HIGH',
+  'MEDIUM',
+  'LOW',
+  'INFO',
+]);
+
+export const riskOverrideStatusEnum = pgEnum('risk_override_status', [
+  'PENDING',
+  'APPROVED',
+  'EXPIRED',
+  'REVOKED',
+]);
+
 // ═══════════════════════════════════════════════════════════════════════
 //  1. MULTI-TENANCY ROOT
 // ═══════════════════════════════════════════════════════════════════════
@@ -140,6 +168,21 @@ export interface TenantSettings {
     notifyPush: boolean;                // send push notifications on new applications
     notifyEmail: boolean;               // send email to credit managers/admins
     notifyWhatsApp: boolean;            // send WhatsApp message to default group
+  };
+  // Risk monitoring
+  riskMonitoringSettings?: {
+    enabled: boolean;                   // master toggle
+    checkIntervalHours: number;         // how often to run background checks (default 24)
+    openSanctionsEnabled: boolean;      // enable OpenSanctions watchlist checks
+    openSanctionsBaseUrl: string;       // yente API URL (e.g. http://localhost:8000)
+    companiesHouseEnabled: boolean;     // enable Companies House (UK) distress checks
+    companiesHouseApiKey: string;       // Companies House API key
+    seasearcherEnabled: boolean;        // enable SeaSearcher maritime context checks
+    autoEnforceOnHit: boolean;          // auto-freeze credit on trusted-source hit
+    overrideExpiryDays: number;         // override window in days (default 7)
+    notifyPush: boolean;
+    notifyEmail: boolean;
+    notifyWhatsApp: boolean;
   };
 }
 
@@ -285,6 +328,7 @@ export const counterparties = pgTable('counterparties', {
   headOfficeEmail: text('head_office_email'),
   website: text('website'),
   isSanctioned: boolean('is_sanctioned').default(false),
+  companiesHouseNumber: text('companies_house_number'),
   lastSynced: timestamp('last_synced', { withTimezone: true }),
 
   // Per-field manual override tracking — fields the user manually edited
@@ -1412,3 +1456,92 @@ export type SupplierInquiry = typeof supplierInquiries.$inferSelect;
 export type NewSupplierInquiry = typeof supplierInquiries.$inferInsert;
 export type SupplierInquiryItemQuote = typeof supplierInquiryItemQuotes.$inferSelect;
 export type NewSupplierInquiryItemQuote = typeof supplierInquiryItemQuotes.$inferInsert;
+
+// ═══════════════════════════════════════════════════════════════════════
+//  RISK MONITORING
+// ═══════════════════════════════════════════════════════════════════════
+
+export const riskChecks = pgTable('risk_checks', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  counterpartyId: uuid('counterparty_id').notNull().references(() => counterparties.id, { onDelete: 'cascade' }),
+  providerClass: riskProviderClassEnum('provider_class').notNull(),
+  providerName: text('provider_name').notNull(),             // e.g. 'opensanctions', 'companies_house', 'seasearcher'
+  status: riskCheckStatusEnum('status').notNull(),
+  checkedAt: timestamp('checked_at', { withTimezone: true }).notNull().defaultNow(),
+  rawResponse: jsonb('raw_response'),                        // full provider response for audit
+  errorMessage: text('error_message'),                       // populated when status = ERROR
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const riskHits = pgTable('risk_hits', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  riskCheckId: uuid('risk_check_id').notNull().references(() => riskChecks.id, { onDelete: 'cascade' }),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  counterpartyId: uuid('counterparty_id').notNull().references(() => counterparties.id, { onDelete: 'cascade' }),
+  providerClass: riskProviderClassEnum('provider_class').notNull(),
+  severity: riskHitSeverityEnum('severity').notNull(),
+  signalType: text('signal_type').notNull(),                 // e.g. 'SANCTION', 'PEP', 'SEIZURE', 'INSOLVENCY', 'DISSOLUTION'
+  title: text('title').notNull(),
+  detail: text('detail'),
+  sourceUrl: text('source_url'),
+  matchScore: doublePrecision('match_score'),                // provider-reported confidence 0..1
+  isActive: boolean('is_active').notNull().default(true),    // false when resolved/superseded
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  resolvedByUserId: uuid('resolved_by_user_id').references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const riskOverrides = pgTable('risk_overrides', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  counterpartyId: uuid('counterparty_id').notNull().references(() => counterparties.id, { onDelete: 'cascade' }),
+  status: riskOverrideStatusEnum('status').notNull().default('PENDING'),
+  reason: text('reason').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  requestedByUserId: uuid('requested_by_user_id').notNull().references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const riskOverrideApprovals = pgTable('risk_override_approvals', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  overrideId: uuid('override_id').notNull().references(() => riskOverrides.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  decision: text('decision').notNull(),                      // 'APPROVED' | 'REJECTED'
+  comment: text('comment'),
+  decidedAt: timestamp('decided_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ── Risk Monitoring Relations ──
+
+export const riskChecksRelations = relations(riskChecks, ({ one, many }) => ({
+  counterparty: one(counterparties, { fields: [riskChecks.counterpartyId], references: [counterparties.id] }),
+  hits: many(riskHits),
+}));
+
+export const riskHitsRelations = relations(riskHits, ({ one }) => ({
+  riskCheck: one(riskChecks, { fields: [riskHits.riskCheckId], references: [riskChecks.id] }),
+  counterparty: one(counterparties, { fields: [riskHits.counterpartyId], references: [counterparties.id] }),
+  resolvedByUser: one(users, { fields: [riskHits.resolvedByUserId], references: [users.id] }),
+}));
+
+export const riskOverridesRelations = relations(riskOverrides, ({ one, many }) => ({
+  counterparty: one(counterparties, { fields: [riskOverrides.counterpartyId], references: [counterparties.id] }),
+  requestedByUser: one(users, { fields: [riskOverrides.requestedByUserId], references: [users.id] }),
+  approvals: many(riskOverrideApprovals),
+}));
+
+export const riskOverrideApprovalsRelations = relations(riskOverrideApprovals, ({ one }) => ({
+  override: one(riskOverrides, { fields: [riskOverrideApprovals.overrideId], references: [riskOverrides.id] }),
+  user: one(users, { fields: [riskOverrideApprovals.userId], references: [users.id] }),
+}));
+
+export type RiskCheck = typeof riskChecks.$inferSelect;
+export type NewRiskCheck = typeof riskChecks.$inferInsert;
+export type RiskHit = typeof riskHits.$inferSelect;
+export type NewRiskHit = typeof riskHits.$inferInsert;
+export type RiskOverride = typeof riskOverrides.$inferSelect;
+export type NewRiskOverride = typeof riskOverrides.$inferInsert;
+export type RiskOverrideApproval = typeof riskOverrideApprovals.$inferSelect;
+export type NewRiskOverrideApproval = typeof riskOverrideApprovals.$inferInsert;

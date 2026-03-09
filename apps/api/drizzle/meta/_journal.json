@@ -316,6 +316,13 @@
       "when": 1773268200000,
       "tag": "0044_sales_unit",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1741484400000,
+      "tag": "0045_risk_monitoring",
+      "breakpoints": true
     }
   ]
 }

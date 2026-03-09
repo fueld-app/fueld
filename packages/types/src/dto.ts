@@ -8,6 +8,10 @@ import type {
   Role,
   CreditApplicationStatus,
   CreditApplicationReviewDecision,
+  RiskProviderClass,
+  RiskCheckStatus,
+  RiskHitSeverity,
+  RiskOverrideStatus,
 } from './enums';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1420,4 +1424,104 @@ export interface UpdateCompanyContactDto {
   fax?: string;
   email?: string;
   notes?: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  RISK MONITORING
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface RiskCheckDto {
+  id: string;
+  counterpartyId: string;
+  providerClass: RiskProviderClass;
+  providerName: string;
+  status: RiskCheckStatus;
+  checkedAt: string;
+  errorMessage: string | null;
+  hitCount: number;
+  createdAt: string;
+}
+
+export interface RiskHitDto {
+  id: string;
+  riskCheckId: string;
+  counterpartyId: string;
+  providerClass: RiskProviderClass;
+  severity: RiskHitSeverity;
+  signalType: string;
+  title: string;
+  detail: string | null;
+  sourceUrl: string | null;
+  matchScore: number | null;
+  isActive: boolean;
+  resolvedAt: string | null;
+  resolvedByUserId: string | null;
+  resolvedByUserName: string | null;
+  createdAt: string;
+}
+
+export interface RiskOverrideDto {
+  id: string;
+  counterpartyId: string;
+  counterpartyName: string;
+  status: RiskOverrideStatus;
+  reason: string;
+  expiresAt: string;
+  requestedByUserId: string;
+  requestedByUserName: string;
+  approvals: RiskOverrideApprovalDto[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RiskOverrideApprovalDto {
+  id: string;
+  userId: string;
+  userName: string;
+  decision: 'APPROVED' | 'REJECTED';
+  comment: string | null;
+  decidedAt: string;
+}
+
+export interface RiskSummaryDto {
+  counterpartyId: string;
+  counterpartyName: string;
+  isFrozen: boolean;
+  hasActiveOverride: boolean;
+  overrideExpiresAt: string | null;
+  activeHitCount: number;
+  latestCheckAt: string | null;
+  providerStatuses: {
+    providerClass: RiskProviderClass;
+    providerName: string;
+    status: RiskCheckStatus;
+    checkedAt: string | null;
+    hitCount: number;
+  }[];
+  activeHits: RiskHitDto[];
+}
+
+export interface CreateRiskOverrideDto {
+  counterpartyId: string;
+  reason: string;
+}
+
+export interface RiskOverrideDecisionDto {
+  decision: 'APPROVED' | 'REJECTED';
+  comment?: string;
+}
+
+export interface RiskMonitoringSettingsDto {
+  enabled: boolean;
+  checkIntervalHours: number;
+  openSanctionsEnabled: boolean;
+  openSanctionsBaseUrl: string;
+  companiesHouseEnabled: boolean;
+  companiesHouseApiKey: string;
+  seasearcherEnabled: boolean;
+  autoEnforceOnHit: boolean;
+  overrideExpiryDays: number;
+  notifyPush: boolean;
+  notifyEmail: boolean;
+  notifyWhatsApp: boolean;
 }

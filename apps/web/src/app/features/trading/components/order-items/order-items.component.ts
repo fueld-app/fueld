@@ -152,6 +152,7 @@ export interface OrderItemsEconomics {
                     } @else {
                       {{ row.quantity | number:'1.3-3' }}
                     }
+                    {{ row.unit }}
                   </span>
                 } @else {
                   <div class="flex items-center gap-1 justify-end">
@@ -174,6 +175,16 @@ export interface OrderItemsEconomics {
                       class="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm tabular-nums
                              focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                     />
+                    <select
+                      [ngModel]="row.unit"
+                      (ngModelChange)="updateField(i, 'unit', $event)"
+                      class="w-[4.5rem] rounded-lg border border-gray-300 px-1.5 py-1.5 text-xs text-gray-700
+                             focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                    >
+                      @for (u of unitOptions(); track u.value) {
+                        <option [value]="u.value">{{ u.label }}</option>
+                      }
+                    </select>
                     <button
                       type="button"
                       (click)="toggleSpread(row.id, i)"
@@ -205,7 +216,7 @@ export interface OrderItemsEconomics {
                 </td>
               }
 
-              <!-- Cost (price + currency + unit) -->
+              <!-- Cost (price + currency) -->
               <td class="px-4 py-2">
                 @if (readonly()) {
                   <span class="block text-right tabular-nums">{{ row.costPrice | number:'1.2-4' }} {{ row.costCurrency }}/{{ row.unit }}</span>
@@ -229,17 +240,7 @@ export interface OrderItemsEconomics {
                         <option [value]="c.value">{{ c.label }}</option>
                       }
                     </select>
-                    <span class="text-gray-400 text-xs">/</span>
-                    <select
-                      [ngModel]="row.unit"
-                      (ngModelChange)="updateField(i, 'unit', $event)"
-                      class="w-[4.5rem] rounded-lg border border-gray-300 px-1.5 py-1.5 text-xs text-gray-700
-                             focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
-                    >
-                      @for (u of unitOptions(); track u.value) {
-                        <option [value]="u.value">{{ u.label }}</option>
-                      }
-                    </select>
+                    <span class="text-gray-400 text-xs shrink-0">/{{ row.unit }}</span>
                   </div>
                 }
               </td>

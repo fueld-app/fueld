@@ -50,6 +50,8 @@ import { eq, sql } from 'drizzle-orm';
 import { pushController } from './modules/push/push.controller';
 import { whatsappController } from './modules/whatsapp/whatsapp.controller';
 import { rfqController } from './modules/rfq/rfq.controller';
+import { riskMonitoringController } from './modules/risk-monitoring/risk-monitoring.controller';
+import { runScheduledChecks } from './modules/risk-monitoring/risk-monitoring.service';
 import { reconnectStoredSessions as reconnectWhatsAppSessions } from './modules/whatsapp/whatsapp.service';
 import { getBuildInfo } from './lib/build-info';
 import { assertCredentialsEncryptionConfig } from './lib/crypto';
@@ -215,6 +217,24 @@ export interface CreateAppOptions {
   enableBackgroundJobs?: boolean;
 }
 
+function startRiskMonitoringJob() {
+  // Run every hour; the service internally skips companies checked within checkIntervalHours
+  const INTERVAL_MS = 60 * 60 * 1000;
+
+  const run = async () => {
+    try {
+      await runScheduledChecks();
+    } catch (err) {
+      console.error('[Risk Monitor] Scheduled check failed:', err);
+    }
+  };
+
+  // Initial run after a short delay to let the server warm up
+  setTimeout(run, 30_000);
+  setInterval(run, INTERVAL_MS);
+  console.log('[Risk Monitor] Background job started (interval: 1h)');
+}
+
 export async function createApp(options: CreateAppOptions = {}) {
   assertCredentialsEncryptionConfig();
 
@@ -333,6 +353,7 @@ export async function createApp(options: CreateAppOptions = {}) {
     .use(pushController)
     .use(whatsappController)
     .use(rfqController)
+    .use(riskMonitoringController)
     .get('/uploads/avatars/:filename', async ({ params, set }) => {
       const { join } = await import('path');
       const path = join(process.cwd(), 'uploads/avatars', params.filename);
@@ -607,6 +628,7 @@ export async function createApp(options: CreateAppOptions = {}) {
     startInquiryReminderJob();
     registerAutoSyncHooks();
     reconnectWhatsAppSessions();
+    startRiskMonitoringJob();
   }
 
   return app;

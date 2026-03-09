@@ -32,6 +32,22 @@ services:
       - SETGID
       - SETUID
 
+  yente:
+    image: ghcr.io/opensanctions/yente:latest
+    container_name: fueld-yente
+    ports:
+      - '8000:8000'
+    environment:
+      YENTE_TITLE: 'Fueld Sanctions Screening'
+      YENTE_INDEX_URL: 'https://data.opensanctions.org/datasets/latest/index.json'
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8000/healthz']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
 volumes:
   fueld_pgdata:
   fueld_searxng:

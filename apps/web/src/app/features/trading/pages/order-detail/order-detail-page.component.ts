@@ -59,6 +59,7 @@ import { CreditApplicationModalComponent } from '../../../credit/components/cred
 // ═══════════════════════════════════════════════════════════════════════
 
 import { API_URL } from '@app/core/config/api';
+import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring.service';
 
 interface TeamUserOption {
   id: string;
@@ -323,9 +324,9 @@ interface InquiryReplyRecommendation {
               @for (opt of paymentTermOptions; track opt.value) {
                 <option
                   [value]="opt.value"
-                  [disabled]="opt.value === 'CREDIT' && !canUseCustomerCredit()"
+                  [disabled]="(opt.value === 'CREDIT' && !canUseCustomerCredit())"
                 >
-                  {{ opt.value === 'CREDIT' && !canUseCustomerCredit() ? 'Credit (no line)' : opt.label }}
+                  {{ opt.value === 'CREDIT' && !canUseCustomerCredit() ? (customerCreditFrozen() ? 'Credit (frozen)' : 'Credit (no line)') : opt.label }}
                 </option>
               }
             </select>
@@ -346,10 +347,14 @@ interface InquiryReplyRecommendation {
             @if (customerCreditLoading()) {
               <span>Loading credit line...</span>
             } @else if (customerCreditSummary()) {
-              <span>
-                Available: {{ customerCreditSummary()!.available | number : '1.2-2' }}
-                {{ customerCreditSummary()!.currency }} · Max {{ customerCreditSummary()!.maxDays }} days
-              </span>
+              @if (customerCreditFrozen()) {
+                <span class="text-red-600 font-medium">Credit frozen — risk monitoring hit</span>
+              } @else {
+                <span>
+                  Available: {{ customerCreditSummary()!.available | number : '1.2-2' }}
+                  {{ customerCreditSummary()!.currency }} · Max {{ customerCreditSummary()!.maxDays }} days
+                </span>
+              }
               @if (!isReadonly()) {
                 <button (click)="showCreditApplicationModal.set(true)"
                   class="ml-2 text-xs text-brand-600 hover:text-brand-700 underline">Request Increase</button>
@@ -1392,6 +1397,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   private readonly router = inject(Router);
   private readonly http = inject(HttpClient);
   protected readonly auth = inject(AuthService);
+  private readonly riskService = inject(RiskMonitoringService);
 
   readonly emailModal = viewChild(SendEmailModalComponent);
   readonly pdfModal = viewChild(PdfPreviewModalComponent);
@@ -1457,6 +1463,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   readonly paymentsLoading = signal(false);
   readonly customerCreditLines = signal<CreditLineDto[]>([]);
   readonly customerCreditLoading = signal(false);
+  readonly customerCreditFrozen = signal(false);
   readonly supplierCreditLines = signal<CreditLineDto[]>([]);
   readonly supplierCreditLoading = signal(false);
   readonly paymentModalOpen = signal(false);
@@ -1684,7 +1691,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     return { currency, available, maxDays };
   });
 
-  readonly canUseCustomerCredit = computed(() => !!this.customerCreditSummary());
+  readonly canUseCustomerCredit = computed(() => !!this.customerCreditSummary() && !this.customerCreditFrozen());
 
   readonly supplierCreditSummary = computed(() => {
     const currency = this.order()?.currency ?? 'USD';
@@ -2113,17 +2120,22 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   private async loadCustomerCreditLines(counterpartyId: string | null | undefined): Promise<void> {
     if (!counterpartyId) return;
     this.customerCreditLoading.set(true);
+    this.customerCreditFrozen.set(false);
     try {
-      const res = await firstValueFrom(
-        this.http.get<ApiResponse<{ items: CreditLineDto[]; total: number }>>(
-          `${API_URL}/credit/lines?type=CUSTOMER&counterpartyId=${encodeURIComponent(counterpartyId)}&limit=50`,
+      const [res, frozenRes] = await Promise.all([
+        firstValueFrom(
+          this.http.get<ApiResponse<{ items: CreditLineDto[]; total: number }>>(
+            `${API_URL}/credit/lines?type=CUSTOMER&counterpartyId=${encodeURIComponent(counterpartyId)}&limit=50`,
+          ),
         ),
-      );
+        this.riskService.isFrozen(counterpartyId).catch(() => false),
+      ]);
       if (res.success) {
         this.customerCreditLines.set(res.data.items ?? []);
       } else {
         this.customerCreditLines.set([]);
       }
+      this.customerCreditFrozen.set(frozenRes);
     } catch {
       this.customerCreditLines.set([]);
     } finally {
@@ -2306,6 +2318,10 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   }
 
   onCustomerPaymentTermChange(value: PaymentTermType | ''): void {
+    if (value === 'CREDIT' && this.customerCreditFrozen()) {
+      this.showToast('error', 'Customer credit is frozen due to risk monitoring.');
+      return;
+    }
     if (value === 'CREDIT' && !this.canUseCustomerCredit()) {
       this.showToast('error', 'No customer credit line is available.');
       return;

@@ -8,8 +8,9 @@ import {
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
-import type { ApiResponse, CreditApplicationSettingsDto, FinancingSettingsDto } from '@fueld/types';
+import type { ApiResponse, CreditApplicationSettingsDto, FinancingSettingsDto, RiskMonitoringSettingsDto } from '@fueld/types';
 import { API } from '@app/core/config/api';
+import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring.service';
 
 @Component({
   selector: 'app-credit-settings-page',
@@ -230,6 +231,177 @@ import { API } from '@app/core/config/api';
               </div>
             </div>
           </div>
+
+          <!-- Risk Monitoring Settings -->
+          <div class="app-panel">
+            <div class="app-panel-header app-panel-header--red">
+              <div class="app-panel-icon-shell app-panel-icon-shell--pill app-panel-icon-shell--red">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 1a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 1zM5.05 3.05a.75.75 0 011.06 0l1.062 1.06A.75.75 0 116.11 5.173L5.05 4.11a.75.75 0 010-1.06zm9.9 0a.75.75 0 010 1.06l-1.06 1.062a.75.75 0 01-1.062-1.06l1.06-1.062a.75.75 0 011.06 0zM10 7a3 3 0 100 6 3 3 0 000-6zm-6.25 3a.75.75 0 01.75-.75h1.5a.75.75 0 010 1.5H4.5a.75.75 0 01-.75-.75zm11 0a.75.75 0 01.75-.75h1.5a.75.75 0 010 1.5h-1.5a.75.75 0 01-.75-.75zM6.11 14.828a.75.75 0 010 1.06l-1.06 1.06a.75.75 0 01-1.06-1.06l1.06-1.06a.75.75 0 011.06 0zm7.78 0a.75.75 0 011.06 0l1.06 1.06a.75.75 0 11-1.06 1.06l-1.06-1.06a.75.75 0 010-1.06z" clip-rule="evenodd"/>
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-semibold text-gray-900">Risk Monitoring</h3>
+                <p class="text-xs text-gray-600">Automated sanctions, maritime, and business-distress checks on counterparties.</p>
+              </div>
+            </div>
+
+            <div class="app-panel-body app-panel-stack">
+              <!-- Master toggle -->
+              <div class="flex items-start gap-3">
+                <button (click)="riskEnabled.set(!riskEnabled())"
+                  class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
+                  [class]="riskEnabled() ? 'bg-brand-600' : 'bg-gray-300'">
+                  <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                    [class]="riskEnabled() ? 'translate-x-4' : 'translate-x-0.5'"></span>
+                </button>
+                <div>
+                  <p class="text-sm font-medium text-gray-700">Enable Risk Monitoring</p>
+                  <p class="text-xs text-gray-500">Run automated risk checks on counterparties with active credit lines.</p>
+                </div>
+              </div>
+
+              @if (riskEnabled()) {
+                <!-- Check interval -->
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Check Interval (hours)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="720"
+                    [ngModel]="riskCheckIntervalHours()"
+                    (ngModelChange)="riskCheckIntervalHours.set($event)"
+                    class="app-input w-24"
+                  />
+                  <p class="mt-1 text-xs text-gray-500">How often to re-check each counterparty. Default: 24 hours.</p>
+                </div>
+
+                <!-- Override expiry -->
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Override Expiry (days)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="90"
+                    [ngModel]="riskOverrideExpiryDays()"
+                    (ngModelChange)="riskOverrideExpiryDays.set($event)"
+                    class="app-input w-24"
+                  />
+                  <p class="mt-1 text-xs text-gray-500">How many days an approved override remains valid before it expires.</p>
+                </div>
+
+                <!-- Provider: OpenSanctions -->
+                <div class="rounded-lg border border-gray-200 p-4 space-y-3">
+                  <div class="flex items-start gap-3">
+                    <button (click)="riskOpenSanctionsEnabled.set(!riskOpenSanctionsEnabled())"
+                      class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
+                      [class]="riskOpenSanctionsEnabled() ? 'bg-brand-600' : 'bg-gray-300'">
+                      <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                        [class]="riskOpenSanctionsEnabled() ? 'translate-x-4' : 'translate-x-0.5'"></span>
+                    </button>
+                    <div>
+                      <p class="text-sm font-medium text-gray-700">OpenSanctions (Yente)</p>
+                      <p class="text-xs text-gray-500">Watchlist screening via a self-hosted yente instance.</p>
+                    </div>
+                  </div>
+                  @if (riskOpenSanctionsEnabled()) {
+                    <div>
+                      <label class="block text-xs font-medium text-gray-600">Yente Base URL</label>
+                      <input type="text" [ngModel]="riskOpenSanctionsBaseUrl()" (ngModelChange)="riskOpenSanctionsBaseUrl.set($event)"
+                        class="app-input w-full mt-1" placeholder="http://yente:8000" />
+                    </div>
+                  }
+                </div>
+
+                <!-- Provider: SeaSearcher -->
+                <div class="rounded-lg border border-gray-200 p-4">
+                  <div class="flex items-start gap-3">
+                    <button (click)="riskSeaSearcherEnabled.set(!riskSeaSearcherEnabled())"
+                      class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
+                      [class]="riskSeaSearcherEnabled() ? 'bg-brand-600' : 'bg-gray-300'">
+                      <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                        [class]="riskSeaSearcherEnabled() ? 'translate-x-4' : 'translate-x-0.5'"></span>
+                    </button>
+                    <div>
+                      <p class="text-sm font-medium text-gray-700">SeaSearcher</p>
+                      <p class="text-xs text-gray-500">Maritime sanctions and seizure data. Uses your existing SeaSearcher subscription.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Provider: Companies House -->
+                <div class="rounded-lg border border-gray-200 p-4 space-y-3">
+                  <div class="flex items-start gap-3">
+                    <button (click)="riskCompaniesHouseEnabled.set(!riskCompaniesHouseEnabled())"
+                      class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
+                      [class]="riskCompaniesHouseEnabled() ? 'bg-brand-600' : 'bg-gray-300'">
+                      <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                        [class]="riskCompaniesHouseEnabled() ? 'translate-x-4' : 'translate-x-0.5'"></span>
+                    </button>
+                    <div>
+                      <p class="text-sm font-medium text-gray-700">Companies House (UK)</p>
+                      <p class="text-xs text-gray-500">Insolvency and dissolution checks for UK-registered companies.</p>
+                    </div>
+                  </div>
+                  @if (riskCompaniesHouseEnabled()) {
+                    <div>
+                      <label class="block text-xs font-medium text-gray-600">API Key</label>
+                      <input type="password" [ngModel]="riskCompaniesHouseApiKey()" (ngModelChange)="riskCompaniesHouseApiKey.set($event)"
+                        class="app-input w-full mt-1" placeholder="Companies House API key" />
+                    </div>
+                  }
+                </div>
+
+                <!-- Notifications -->
+                <div class="flex items-start gap-3">
+                  <button (click)="riskNotifyPush.set(!riskNotifyPush())"
+                    class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
+                    [class]="riskNotifyPush() ? 'bg-brand-600' : 'bg-gray-300'">
+                    <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                      [class]="riskNotifyPush() ? 'translate-x-4' : 'translate-x-0.5'"></span>
+                  </button>
+                  <div>
+                    <p class="text-sm font-medium text-gray-700">Push Notifications</p>
+                    <p class="text-xs text-gray-500">Send push notifications to admins, credit managers, and finance when a new risk signal is detected.</p>
+                  </div>
+                </div>
+
+                <!-- Auto enforce -->
+                <div class="flex items-start gap-3">
+                  <button (click)="riskAutoEnforce.set(!riskAutoEnforce())"
+                    class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
+                    [class]="riskAutoEnforce() ? 'bg-brand-600' : 'bg-gray-300'">
+                    <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                      [class]="riskAutoEnforce() ? 'translate-x-4' : 'translate-x-0.5'"></span>
+                  </button>
+                  <div>
+                    <p class="text-sm font-medium text-gray-700">Auto-Freeze on Hit</p>
+                    <p class="text-xs text-gray-500">Automatically freeze credit when risk signals are detected. When disabled, hits are recorded but credit is not blocked.</p>
+                  </div>
+                </div>
+              }
+
+              <!-- Save button -->
+              <div class="pt-2 border-t border-gray-100">
+                <button (click)="saveRiskSettings()" [disabled]="riskSaving()"
+                  class="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700 transition-colors disabled:opacity-50">
+                  @if (riskSaving()) {
+                    <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                  }
+                  Save Risk Settings
+                </button>
+                @if (riskSaveSuccess()) {
+                  <span class="ml-3 text-sm text-green-600">Risk settings saved.</span>
+                }
+                @if (riskSaveError()) {
+                  <span class="ml-3 text-sm text-red-600">{{ riskSaveError() }}</span>
+                }
+              </div>
+            </div>
+          </div>
         </div>
       }
     </div>
@@ -237,6 +409,7 @@ import { API } from '@app/core/config/api';
 })
 export class CreditSettingsPageComponent implements OnInit {
   private readonly http = inject(HttpClient);
+  private readonly riskService = inject(RiskMonitoringService);
 
   readonly loading = signal(true);
   readonly saving = signal(false);
@@ -255,6 +428,23 @@ export class CreditSettingsPageComponent implements OnInit {
   readonly financingAnnualRatePercent = signal(8);
   readonly financingDayCountConvention = signal(365);
 
+  // Risk monitoring
+  readonly riskEnabled = signal(false);
+  readonly riskCheckIntervalHours = signal(24);
+  readonly riskOverrideExpiryDays = signal(7);
+  readonly riskOpenSanctionsEnabled = signal(false);
+  readonly riskOpenSanctionsBaseUrl = signal('http://yente:8000');
+  readonly riskSeaSearcherEnabled = signal(false);
+  readonly riskCompaniesHouseEnabled = signal(false);
+  readonly riskCompaniesHouseApiKey = signal('');
+  readonly riskAutoEnforce = signal(true);
+  readonly riskNotifyPush = signal(true);
+  readonly riskNotifyEmail = signal(true);
+  readonly riskNotifyWhatsApp = signal(false);
+  readonly riskSaving = signal(false);
+  readonly riskSaveSuccess = signal(false);
+  readonly riskSaveError = signal('');
+
   ngOnInit() {
     this.loadSettings();
   }
@@ -262,7 +452,7 @@ export class CreditSettingsPageComponent implements OnInit {
   async loadSettings() {
     this.loading.set(true);
     try {
-      const [creditRes, financingRes] = await Promise.all([
+      const [creditRes, financingRes, riskRes] = await Promise.all([
         firstValueFrom(
           this.http.get<ApiResponse<CreditApplicationSettingsDto>>(
             `${API}/credit/applications/settings`,
@@ -273,6 +463,7 @@ export class CreditSettingsPageComponent implements OnInit {
             `${API}/admin/settings/financing`,
           ),
         ),
+        this.riskService.getSettings().catch(() => null),
       ]);
       if (creditRes.success && creditRes.data) {
         this.requiredApprovals.set(creditRes.data.requiredApprovals);
@@ -285,6 +476,20 @@ export class CreditSettingsPageComponent implements OnInit {
       if (financingRes.success && financingRes.data) {
         this.financingAnnualRatePercent.set(financingRes.data.annualRate * 100);
         this.financingDayCountConvention.set(financingRes.data.dayCountConvention);
+      }
+      if (riskRes) {
+        this.riskEnabled.set(riskRes.enabled);
+        this.riskCheckIntervalHours.set(riskRes.checkIntervalHours);
+        this.riskOverrideExpiryDays.set(riskRes.overrideExpiryDays);
+        this.riskOpenSanctionsEnabled.set(riskRes.openSanctionsEnabled);
+        this.riskOpenSanctionsBaseUrl.set(riskRes.openSanctionsBaseUrl ?? 'http://yente:8000');
+        this.riskSeaSearcherEnabled.set(riskRes.seasearcherEnabled);
+        this.riskCompaniesHouseEnabled.set(riskRes.companiesHouseEnabled);
+        this.riskCompaniesHouseApiKey.set(riskRes.companiesHouseApiKey ?? '');
+        this.riskAutoEnforce.set(riskRes.autoEnforceOnHit);
+        this.riskNotifyPush.set(riskRes.notifyPush);
+        this.riskNotifyEmail.set(riskRes.notifyEmail);
+        this.riskNotifyWhatsApp.set(riskRes.notifyWhatsApp);
       }
     } catch (err) {
       console.error('Failed to load credit and financing settings:', err);
@@ -342,6 +547,35 @@ export class CreditSettingsPageComponent implements OnInit {
       this.financingSaveError.set(err?.error?.message ?? 'Failed to save financing settings');
     } finally {
       this.financingSaving.set(false);
+    }
+  }
+
+  async saveRiskSettings() {
+    this.riskSaving.set(true);
+    this.riskSaveSuccess.set(false);
+    this.riskSaveError.set('');
+
+    try {
+      await this.riskService.updateSettings({
+        enabled: this.riskEnabled(),
+        checkIntervalHours: this.riskCheckIntervalHours(),
+        overrideExpiryDays: this.riskOverrideExpiryDays(),
+        openSanctionsEnabled: this.riskOpenSanctionsEnabled(),
+        openSanctionsBaseUrl: this.riskOpenSanctionsBaseUrl() || 'http://localhost:8000',
+        seasearcherEnabled: this.riskSeaSearcherEnabled(),
+        companiesHouseEnabled: this.riskCompaniesHouseEnabled(),
+        companiesHouseApiKey: this.riskCompaniesHouseApiKey() || '',
+        autoEnforceOnHit: this.riskAutoEnforce(),
+        notifyPush: this.riskNotifyPush(),
+        notifyEmail: this.riskNotifyEmail(),
+        notifyWhatsApp: this.riskNotifyWhatsApp(),
+      });
+      this.riskSaveSuccess.set(true);
+      setTimeout(() => this.riskSaveSuccess.set(false), 3000);
+    } catch (err: any) {
+      this.riskSaveError.set(err?.error?.message ?? 'Failed to save risk settings');
+    } finally {
+      this.riskSaving.set(false);
     }
   }
 }
