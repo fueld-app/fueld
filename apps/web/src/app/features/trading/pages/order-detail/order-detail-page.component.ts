@@ -224,7 +224,7 @@ interface InquiryReplyRecommendation {
         />
         <div class="relative">
           <button
-            (click)="settingsOpen.set(!settingsOpen())"
+            (click)="toggleSettings($event)"
             class="inline-flex items-center rounded-lg border border-gray-300 bg-white p-2 text-sm
                    text-gray-500 shadow-sm hover:bg-gray-50 hover:text-gray-700 transition-colors"
             title="Settings"
@@ -236,7 +236,10 @@ interface InquiryReplyRecommendation {
 
           @if (settingsOpen()) {
             <div class="fixed inset-0 z-40" (click)="settingsOpen.set(false)"></div>
-            <div class="absolute left-0 sm:left-auto sm:right-0 z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
+            <div
+              [style.top.px]="settingsDropdownTop()"
+              [style.left.px]="settingsDropdownLeft()"
+              class="fixed z-50 w-48 rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
               <label class="mb-1 block text-xs font-medium text-gray-500">Currency</label>
               <select
                 [ngModel]="order()?.currency ?? 'USD'"
@@ -1477,6 +1480,8 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   readonly showCustomerPaymentNote = signal(false);
   readonly showSupplierPaymentNote = signal(false);
   readonly settingsOpen = signal(false);
+  readonly settingsDropdownTop = signal(0);
+  readonly settingsDropdownLeft = signal(0);
   readonly showConvertToOrderModal = signal(false);
   readonly showCancelInquiryModal = signal(false);
   readonly convertingToOrder = signal(false);
@@ -3018,6 +3023,16 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   onCurrencyChange(currency: string): void {
     this.order.update((o) => (o ? { ...o, currency } : o));
     this.triggerAutosave();
+  }
+
+  toggleSettings(event: MouseEvent): void {
+    if (!this.settingsOpen()) {
+      const btn = event.currentTarget as HTMLElement;
+      const rect = btn.getBoundingClientRect();
+      this.settingsDropdownTop.set(rect.bottom + 4);
+      this.settingsDropdownLeft.set(Math.max(0, rect.right - 192)); // 192px = w-48
+    }
+    this.settingsOpen.set(!this.settingsOpen());
   }
 
   private triggerAutosave(): void {

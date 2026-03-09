@@ -8,6 +8,7 @@ import {
   ElementRef,
   OnInit,
   OnDestroy,
+  ViewChild,
 } from '@angular/core';
 import { OrderStatus } from '@fueld/types';
 
@@ -134,6 +135,7 @@ const ACTIONS: ActionItem[] = [
   template: `
     <!-- Trigger button -->
     <button
+      #trigger
       (click)="toggleMenu()"
           class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm
             font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors"
@@ -146,10 +148,13 @@ const ACTIONS: ActionItem[] = [
       </svg>
     </button>
 
-    <!-- Dropdown -->
+    <!-- Dropdown (fixed positioning to escape overflow containers) -->
     @if (isOpen()) {
+      <div class="fixed inset-0 z-40" (click)="isOpen.set(false)"></div>
       <div
-        class="absolute left-0 sm:left-auto sm:right-0 z-50 mt-1 w-56 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+        [style.top.px]="dropdownTop()"
+        [style.left.px]="dropdownLeft()"
+        class="fixed z-50 w-56 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
         role="menu"
       >
         @for (action of displayActions(); track action.key) {
@@ -188,6 +193,12 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
   readonly actions = ACTIONS;
   readonly displayActions = signal<ActionItem[]>(ACTIONS);
 
+  // Fixed-position coordinates for the dropdown (escapes overflow containers)
+  readonly dropdownTop = signal(0);
+  readonly dropdownLeft = signal(0);
+
+  @ViewChild('trigger', { static: true }) triggerRef!: ElementRef<HTMLElement>;
+
   private readonly elRef = inject(ElementRef);
   private clickOutside = (e: MouseEvent) => {
     if (!this.elRef.nativeElement.contains(e.target)) this.isOpen.set(false);
@@ -203,8 +214,18 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
   }
 
   toggleMenu(): void {
+    if (!this.isOpen()) {
+      this.updateDropdownPosition();
+    }
     this.isOpen.update((v) => !v);
     this.updateActions();
+  }
+
+  private updateDropdownPosition(): void {
+    const rect = this.triggerRef.nativeElement.getBoundingClientRect();
+    this.dropdownTop.set(rect.bottom + 4);
+    // Align right edge of dropdown with right edge of trigger
+    this.dropdownLeft.set(Math.max(0, rect.right - 224)); // 224px = w-56
   }
 
   private updateActions(): void {

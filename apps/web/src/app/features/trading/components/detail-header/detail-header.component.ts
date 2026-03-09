@@ -29,21 +29,15 @@ import { StatusBadgeComponent } from '../../../../shared/components/status-badge
             <h1 class="text-2xl font-bold text-gray-900">{{ title() }}</h1>
             <app-status-badge [status]="status()" />
           </div>
-          <div class="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
-            <p>
-              @if (entityNumber()) {
-                <span class="font-mono text-gray-600">{{ entityNumber() }}</span>
-                @if (subtitle().trim()) {
-                  <span class="mx-1.5">·</span>
-                }
-              }
-              {{ subtitle() }}
-            </p>
-            <ng-content select="[subtitle-extra]"></ng-content>
-          </div>
+          @if (subtitle().trim()) {
+            <div class="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
+              <p>{{ subtitle() }}</p>
+              <ng-content select="[subtitle-extra]"></ng-content>
+            </div>
+          }
         </div>
 
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3 sm:ml-auto">
           <!-- Save button -->
           @if (showSave()) {
             <button
