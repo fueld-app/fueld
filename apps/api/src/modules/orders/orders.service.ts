@@ -22,7 +22,11 @@ import {
 } from '../../db/schema';
 import type { TenantSettings } from '../../db/schema';
 import { logActivity } from '../activity/activity.service';
-import { getFxRate } from '../prices/price.service';
+import {
+  calculateGrossProfitBase,
+  calculateOrderEconomics,
+  getFinancingRateAnnual,
+} from './order-financing';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -99,6 +103,19 @@ interface SaveItemInput {
   paymentTerms?: string | null;
   customerNote?: string | null;
   deliveredQuantity?: string | null;
+}
+
+async function getTenantFinancingRateByIds(tenantIds: string[]): Promise<Map<string, number>> {
+  if (!tenantIds.length) return new Map();
+
+  const rows = await db
+    .select({ id: tenants.id, settings: tenants.settings })
+    .from(tenants)
+    .where(inArray(tenants.id, tenantIds));
+
+  return new Map(
+    rows.map((row) => [row.id, getFinancingRateAnnual((row.settings ?? {}) as TenantSettings)]),
+  );
 }
 
 function isMissingCompanyRegistrationNumberColumnError(err: unknown): boolean {
@@ -279,12 +296,17 @@ export async function listOrders(query?: ListOrdersQuery) {
     db
       .select({
         id: orders.id,
+        tenantId: orders.tenantId,
         orderNumber: orders.orderNumber,
         status: orders.status,
         clientName: counterparties.name,
         vesselName: vessels.name,
         placeName: places.name,
         salesRepName: users.name,
+        customerPaymentTermType: orders.customerPaymentTermType,
+        customerCreditDays: orders.customerCreditDays,
+        supplierPaymentTermType: orders.supplierPaymentTermType,
+        supplierCreditDays: orders.supplierCreditDays,
         eta: orders.eta,
         createdAt: orders.createdAt,
         updatedAt: orders.updatedAt,
@@ -303,21 +325,56 @@ export async function listOrders(query?: ListOrdersQuery) {
 
   // For each row, compute total value & profit from order items
   const orderIds = rows.map((r) => r.id);
-  let itemAggs: Record<string, { totalValue: number; totalProfit: number }> = {};
+  let itemAggs: Record<string, {
+    totalValue: number;
+    totalProfit: number;
+    totalFinancingCost: number;
+    totalNetProfit: number;
+    netMarginPct: number | null;
+  }> = {};
 
   if (orderIds.length > 0) {
-    const aggs = await db
-      .select({
-        orderId: orderItems.orderId,
-        totalValue: sql<number>`COALESCE(SUM((${orderItems.salesPrice}::numeric) * (${orderItems.quantity}::numeric)), 0)::float`,
-        totalProfit: sql<number>`COALESCE(SUM(${orderItems.profit}::numeric), 0)::float`,
-      })
-      .from(orderItems)
-      .where(inArray(orderItems.orderId, orderIds))
-      .groupBy(orderItems.orderId);
+    const [itemRows, financingRateByTenant] = await Promise.all([
+      db
+        .select({
+          orderId: orderItems.orderId,
+          quantity: orderItems.quantity,
+          costPrice: orderItems.costPrice,
+          costCurrency: orderItems.costCurrency,
+          salesPrice: orderItems.salesPrice,
+          salesCurrency: orderItems.salesCurrency,
+        })
+        .from(orderItems)
+        .where(inArray(orderItems.orderId, orderIds)),
+      getTenantFinancingRateByIds(Array.from(new Set(rows.map((row) => row.tenantId)))),
+    ]);
 
-    for (const a of aggs) {
-      itemAggs[a.orderId] = { totalValue: a.totalValue, totalProfit: a.totalProfit };
+    const itemsByOrder = new Map<string, typeof itemRows>();
+    for (const item of itemRows) {
+      const current = itemsByOrder.get(item.orderId) ?? [];
+      current.push(item);
+      itemsByOrder.set(item.orderId, current);
+    }
+
+    for (const row of rows) {
+      const economics = calculateOrderEconomics(
+        {
+          customerPaymentTermType: row.customerPaymentTermType,
+          customerCreditDays: row.customerCreditDays,
+          supplierPaymentTermType: row.supplierPaymentTermType,
+          supplierCreditDays: row.supplierCreditDays,
+        },
+        itemsByOrder.get(row.id) ?? [],
+        financingRateByTenant.get(row.tenantId) ?? getFinancingRateAnnual(),
+      );
+
+      itemAggs[row.id] = {
+        totalValue: economics.totalRevenueBase,
+        totalProfit: economics.totalGrossProfit,
+        totalFinancingCost: economics.totalFinancingCost,
+        totalNetProfit: economics.totalNetProfit,
+        netMarginPct: economics.netMarginPct,
+      };
     }
   }
 
@@ -332,6 +389,9 @@ export async function listOrders(query?: ListOrdersQuery) {
     eta: r.eta?.toISOString() ?? null,
     totalValue: itemAggs[r.id]?.totalValue ?? 0,
     totalProfit: itemAggs[r.id]?.totalProfit ?? 0,
+    totalFinancingCost: itemAggs[r.id]?.totalFinancingCost ?? 0,
+    totalNetProfit: itemAggs[r.id]?.totalNetProfit ?? 0,
+    netMarginPct: itemAggs[r.id]?.netMarginPct ?? null,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
   }));
@@ -371,7 +431,7 @@ export async function getOrderById(idOrNumber: string) {
   if (!row) return null;
 
   // Fetch relations in parallel
-  const [client, vessel, place, salesRep, invoicingCompany, items, customerContact, supplierContact] =
+  const [client, vessel, place, salesRep, invoicingCompany, items, customerContact, supplierContact, tenant] =
     await Promise.all([
       getCounterpartyById(row.clientId),
       db
@@ -414,7 +474,23 @@ export async function getOrderById(idOrNumber: string) {
             .limit(1)
             .then((r) => r[0] ? { ...r[0], createdAt: r[0].createdAt.toISOString(), updatedAt: r[0].updatedAt.toISOString() } : null)
         : Promise.resolve(null),
+      db.query.tenants.findFirst({
+        where: eq(tenants.id, row.tenantId),
+        columns: { settings: true },
+      }),
     ]);
+
+  const financingRateAnnual = getFinancingRateAnnual((tenant?.settings ?? {}) as TenantSettings);
+  const orderEconomics = calculateOrderEconomics(
+    {
+      customerPaymentTermType: row.customerPaymentTermType,
+      customerCreditDays: row.customerCreditDays,
+      supplierPaymentTermType: row.supplierPaymentTermType,
+      supplierCreditDays: row.supplierCreditDays,
+    },
+    items,
+    financingRateAnnual,
+  );
 
   return {
     ...row,
@@ -435,6 +511,13 @@ export async function getOrderById(idOrNumber: string) {
     supplierNote: row.supplierNote ?? null,
     supplierContactId: row.supplierContactId ?? null,
     termsAndConditions: row.termsAndConditions ?? null,
+    financingRateAnnual,
+    financingDayCountConvention: orderEconomics.dayCountConvention,
+    financingDays: orderEconomics.financingDays,
+    totalFinancingCost: orderEconomics.totalFinancingCost.toFixed(4),
+    financingCostPerMt: orderEconomics.financingCostPerMt != null ? orderEconomics.financingCostPerMt.toFixed(4) : null,
+    totalNetProfit: orderEconomics.totalNetProfit.toFixed(4),
+    netMarginPct: orderEconomics.netMarginPct != null ? orderEconomics.netMarginPct.toFixed(4) : null,
     client,
     vessel,
     place,
@@ -442,7 +525,7 @@ export async function getOrderById(idOrNumber: string) {
     invoicingCompany,
     customerContact,
     supplierContact,
-    items: items.map((i) => ({
+    items: items.map((i, index) => ({
       id: i.id,
       orderId: i.orderId,
       productType: i.productType,
@@ -456,6 +539,8 @@ export async function getOrderById(idOrNumber: string) {
       salesPrice: i.salesPrice,
       salesCurrency: i.salesCurrency,
       profit: i.profit,
+      financingCost: orderEconomics.lineEconomics[index] ? orderEconomics.lineEconomics[index]!.financingCost.toFixed(4) : null,
+      netProfit: orderEconomics.lineEconomics[index] ? orderEconomics.lineEconomics[index]!.netProfit.toFixed(4) : null,
       paymentTerms: i.paymentTerms,
       customerNote: i.customerNote,
       deliveredQuantity: i.deliveredQuantity,
@@ -582,15 +667,15 @@ export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
 
   // Insert new items with profit calculation (base currency)
   const values = items.map((item) => {
-    const cost = parseFloat(item.costPrice ?? '0') || 0;
-    const sale = parseFloat(item.salesPrice ?? '0') || 0;
-    const qty = parseFloat(item.quantity) || 0;
-
     const costCurrency = (item.costCurrency ?? orderCurrency).toUpperCase();
     const salesCurrency = (item.salesCurrency ?? orderCurrency).toUpperCase();
-    const costRate = getFxRate(costCurrency);
-    const salesRate = getFxRate(salesCurrency);
-    const profit = (sale * salesRate - cost * costRate) * qty;
+    const profit = calculateGrossProfitBase({
+      quantity: item.quantity,
+      costPrice: item.costPrice,
+      costCurrency,
+      salesPrice: item.salesPrice,
+      salesCurrency,
+    });
 
     return {
       orderId,

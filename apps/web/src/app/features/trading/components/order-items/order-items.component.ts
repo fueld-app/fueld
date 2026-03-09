@@ -46,6 +46,17 @@ export interface OrderItemRow {
   deliveredQuantity?: number | null;
 }
 
+export interface OrderItemsEconomics {
+  totalQuantity: number;
+  totalCost: number;
+  totalRevenue: number;
+  totalGrossProfit: number;
+  totalFinancingCost: number;
+  financingCostPerMt: number | null;
+  totalNetProfit: number;
+  netMarginPct: number | null;
+}
+
 @Component({
   selector: 'app-order-items',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -91,7 +102,9 @@ export interface OrderItemRow {
             }
             <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[140px]">Cost</th>
             <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[140px]">Sell</th>
-            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Profit ({{ baseCurrency }})</th>
+            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Gross ({{ baseCurrency }})</th>
+            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Financing</th>
+            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Net</th>
             @if (!readonly()) {
               <th class="w-0 p-0"></th>
             }
@@ -264,13 +277,25 @@ export interface OrderItemRow {
                 }
               </td>
 
-              <!-- Profit (auto-calculated) -->
+              <!-- Gross Profit (auto-calculated) -->
               <td class="px-4 py-3 text-right tabular-nums"
                 [class.text-green-600]="profitForRow(row) > 0"
                 [class.text-red-600]="profitForRow(row) < 0"
                 [class.font-semibold]="profitForRow(row) !== 0"
               >
                 {{ profitForRow(row) | number:'1.2-2' }}
+              </td>
+
+              <td class="px-4 py-3 text-right tabular-nums text-amber-700">
+                {{ financingCostForRow(row) | number:'1.2-2' }}
+              </td>
+
+              <td class="px-4 py-3 text-right tabular-nums"
+                [class.text-green-600]="netProfitForRow(row) > 0"
+                [class.text-red-600]="netProfitForRow(row) < 0"
+                [class.font-semibold]="netProfitForRow(row) !== 0"
+              >
+                {{ netProfitForRow(row) | number:'1.2-2' }}
               </td>
 
               <!-- Delete -->
@@ -290,7 +315,7 @@ export interface OrderItemRow {
             </tr>
           } @empty {
             <tr>
-              <td [attr.colspan]="(readonly() ? 7 : 8) + (allowDeliveredEdit() ? 1 : 0)" class="px-4 py-12 text-center">
+              <td [attr.colspan]="(readonly() ? 9 : 10) + (allowDeliveredEdit() ? 1 : 0)" class="px-4 py-12 text-center">
                 <p class="text-sm text-gray-400">No line items yet.</p>
                 @if (!readonly()) {
                   <button
@@ -322,6 +347,15 @@ export interface OrderItemRow {
                 [class.text-red-600]="totalProfit() < 0"
               >
                 {{ totalProfit() | number:'1.2-2' }} {{ baseCurrency }}
+              </td>
+              <td class="px-4 py-3 text-right tabular-nums text-amber-700">
+                {{ totalFinancingCost() | number:'1.2-2' }} {{ baseCurrency }}
+              </td>
+              <td class="px-4 py-3 text-right tabular-nums"
+                [class.text-green-600]="totalNetProfit() > 0"
+                [class.text-red-600]="totalNetProfit() < 0"
+              >
+                {{ totalNetProfit() | number:'1.2-2' }} {{ baseCurrency }}
               </td>
               @if (!readonly()) { <td class="w-0 p-0"></td> }
             </tr>
@@ -508,15 +542,33 @@ export interface OrderItemRow {
               }
             </div>
 
-            <!-- Profit -->
+            <!-- Gross Profit -->
             <div>
-              <label class="mb-1 block text-xs font-medium text-gray-500">Profit ({{ baseCurrency }})</label>
+              <label class="mb-1 block text-xs font-medium text-gray-500">Gross Profit ({{ baseCurrency }})</label>
               <span
                 class="text-sm font-semibold tabular-nums"
                 [class.text-green-600]="profitForRow(row) > 0"
                 [class.text-red-600]="profitForRow(row) < 0"
               >
                 {{ profitForRow(row) | number:'1.2-2' }}
+              </span>
+            </div>
+
+            <div>
+              <label class="mb-1 block text-xs font-medium text-gray-500">Financing</label>
+              <span class="text-sm font-semibold tabular-nums text-amber-700">
+                {{ financingCostForRow(row) | number:'1.2-2' }}
+              </span>
+            </div>
+
+            <div>
+              <label class="mb-1 block text-xs font-medium text-gray-500">Net Profit ({{ baseCurrency }})</label>
+              <span
+                class="text-sm font-semibold tabular-nums"
+                [class.text-green-600]="netProfitForRow(row) > 0"
+                [class.text-red-600]="netProfitForRow(row) < 0"
+              >
+                {{ netProfitForRow(row) | number:'1.2-2' }}
               </span>
             </div>
 
@@ -550,7 +602,7 @@ export interface OrderItemRow {
       @if (rows().length > 0) {
         <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
           <div class="flex items-center justify-between text-sm">
-            <span class="font-medium text-gray-600">Total Profit</span>
+            <span class="font-medium text-gray-600">Gross Profit</span>
             <span
               class="text-lg font-bold tabular-nums"
               [class.text-green-600]="totalProfit() > 0"
@@ -558,6 +610,28 @@ export interface OrderItemRow {
             >
               {{ totalProfit() | number:'1.2-2' }} {{ baseCurrency }}
             </span>
+          </div>
+          <div class="mt-2 flex items-center justify-between text-sm text-amber-700">
+            <span class="font-medium">Financing Cost</span>
+            <span class="font-semibold tabular-nums">{{ totalFinancingCost() | number:'1.2-2' }} {{ baseCurrency }}</span>
+          </div>
+          <div class="mt-2 flex items-center justify-between text-sm">
+            <span class="font-medium text-gray-600">Net Profit</span>
+            <span
+              class="text-lg font-bold tabular-nums"
+              [class.text-green-600]="totalNetProfit() > 0"
+              [class.text-red-600]="totalNetProfit() < 0"
+            >
+              {{ totalNetProfit() | number:'1.2-2' }} {{ baseCurrency }}
+            </span>
+          </div>
+          <div class="mt-2 flex items-center justify-between text-xs text-gray-500">
+            <span>Financing / MT</span>
+            <span class="tabular-nums">{{ (financingCostPerMt() ?? 0) | number:'1.2-2' }} {{ baseCurrency }}</span>
+          </div>
+          <div class="mt-1 flex items-center justify-between text-xs text-gray-500">
+            <span>Net Margin</span>
+            <span class="tabular-nums">{{ (netMarginPct() ?? 0) | number:'1.2-2' }}%</span>
           </div>
           <div class="mt-1 flex items-center justify-between text-xs text-gray-400">
             <span>{{ rows().length }} item(s) · {{ totalQty() | number:'1.0-0' }} MT</span>
@@ -576,10 +650,14 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   readonly readonly = input(false);
   readonly allowDeliveredEdit = input(false);
   readonly currency = input('USD');
+  readonly financingRateAnnual = input(0.08);
+  readonly financingDays = input(0);
+  readonly financingDayCountConvention = input(365);
   readonly productOptionsInput = input<DropdownOption[]>([]);
   readonly unitOptionsInput = input<DropdownOption[]>([]);
   readonly currencyOptionsInput = input<DropdownOption[]>([]);
   readonly itemsChange = output<OrderItemRow[]>();
+  readonly economicsChange = output<OrderItemsEconomics>();
 
   private readonly wsService = inject(WebSocketService);
   private fxSub: Subscription | null = null;
@@ -640,6 +718,19 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
         this.spreadEnabled.set(spreads);
       }
     });
+
+    effect(() => {
+      this.economicsChange.emit({
+        totalQuantity: this.totalQty(),
+        totalCost: this.totalCost(),
+        totalRevenue: this.totalRevenue(),
+        totalGrossProfit: this.totalProfit(),
+        totalFinancingCost: this.totalFinancingCost(),
+        financingCostPerMt: this.financingCostPerMt(),
+        totalNetProfit: this.totalNetProfit(),
+        netMarginPct: this.netMarginPct(),
+      });
+    });
   }
 
   // ─── Dropdown options ────────────────────────────────────────────
@@ -684,6 +775,22 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   readonly totalProfit = computed(() =>
     this.rows().reduce((s, r) => s + this.profitForRow(r), 0),
   );
+
+  readonly totalFinancingCost = computed(() =>
+    this.rows().reduce((sum, row) => sum + this.financingCostForRow(row), 0),
+  );
+
+  readonly financingCostPerMt = computed(() => {
+    const qty = this.totalQty();
+    return qty > 0 ? this.totalFinancingCost() / qty : null;
+  });
+
+  readonly totalNetProfit = computed(() => this.totalProfit() - this.totalFinancingCost());
+
+  readonly netMarginPct = computed(() => {
+    const revenue = this.totalRevenue();
+    return revenue > 0 ? (this.totalNetProfit() / revenue) * 100 : null;
+  });
 
   readonly totalDeliveredQty = computed(() =>
     this.rows().reduce((s, r) => s + (r.deliveredQuantity ?? r.quantity ?? 0), 0),
@@ -808,7 +915,17 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
     return (row.salesPrice || 0) * qty * this.getFxRate(row.salesCurrency);
   }
 
+  financingCostForRow(row: OrderItemRow): number {
+    const dayCount = this.financingDayCountConvention() || 365;
+    if (dayCount <= 0) return 0;
+    return this.computeCostBase(row) * this.financingRateAnnual() * this.financingDays() / dayCount;
+  }
+
   profitForRow(row: OrderItemRow): number {
     return this.computeRevenueBase(row) - this.computeCostBase(row);
+  }
+
+  netProfitForRow(row: OrderItemRow): number {
+    return this.profitForRow(row) - this.financingCostForRow(row);
   }
 }

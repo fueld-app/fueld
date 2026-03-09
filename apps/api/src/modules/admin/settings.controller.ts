@@ -36,6 +36,8 @@ import {
   updateUnitSettings,
   getCurrencySettings,
   updateCurrencySettings,
+  getFinancingSettings,
+  updateFinancingSettings,
   getCompanyTypeSettings,
   updateCompanyTypeSettings,
   getAttachmentTypeSettings,
@@ -1058,6 +1060,39 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       currencies: t.Array(t.String({ minLength: 1 })),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update configurable currency options' },
+  })
+
+  // ═════════════════════════════════════════════════════════════════
+  //  FINANCING SETTINGS
+  // ═════════════════════════════════════════════════════════════════
+
+  .get('/financing', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getFinancingSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get financing settings' },
+  })
+
+  .put('/financing', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateFinancingSettings(body.annualRate);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      annualRate: t.Number({ minimum: 0, maximum: 1 }),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update financing settings' },
   })
 
   // ═════════════════════════════════════════════════════════════════

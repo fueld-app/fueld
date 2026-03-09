@@ -33,7 +33,7 @@ import { API } from '@app/core/config/api';
         </div>
         <button
           (click)="openInviteModal()"
-          class="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 transition-colors"
+          class="app-button-add"
         >
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
             <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
@@ -62,7 +62,7 @@ import { API } from '@app/core/config/api';
               [ngModel]="searchQuery()"
               (ngModelChange)="searchQuery.set($event)"
               placeholder="Search by name or email…"
-              class="w-full rounded-lg border border-gray-300 pl-9 pr-8 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+              class="app-input w-full pl-9 pr-8"
             />
             @if (searchQuery()) {
               <button
@@ -78,7 +78,7 @@ import { API } from '@app/core/config/api';
           <select
             [ngModel]="filterTeam()"
             (ngModelChange)="filterTeam.set($event)"
-            class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+            class="app-input"
           >
             <option value="">All Teams</option>
             <option value="__none__">No Team</option>
@@ -89,7 +89,7 @@ import { API } from '@app/core/config/api';
           <select
             [ngModel]="filterStatus()"
             (ngModelChange)="filterStatus.set($event)"
-            class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
+            class="app-input text-gray-600">
             <option value="active">Active</option>
             <option value="deactivated">Deactivated</option>
             <option value="">All</option>
@@ -145,10 +145,22 @@ import { API } from '@app/core/config/api';
           </div>
         }
 
-        <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="border-b border-gray-200 bg-gray-50/80">
+        <div class="app-panel">
+          <div class="app-panel-header app-panel-header--indigo">
+            <div class="app-panel-icon-shell app-panel-icon-shell--indigo">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M10 2.5a3.25 3.25 0 1 0 0 6.5 3.25 3.25 0 0 0 0-6.5ZM5.25 13A3.25 3.25 0 0 0 2 16.25v.25c0 .414.336.75.75.75h14.5a.75.75 0 0 0 .75-.75v-.25A3.25 3.25 0 0 0 14.75 13h-9.5Z" />
+              </svg>
+            </div>
+            <div>
+              <h2 class="text-base font-semibold text-gray-900">User Directory</h2>
+              <p class="mt-1 text-sm text-gray-600">Monitor authentication status, team assignment, IP locks, and live sessions.</p>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-gray-200 bg-gray-50/80">
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Name</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Email</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Phone</th>
@@ -160,9 +172,9 @@ import { API } from '@app/core/config/api';
                 <th class="px-4 py-3 text-center font-medium text-gray-600">Sessions</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Joined</th>
                 <th class="px-4 py-3 w-28 text-right font-medium text-gray-600">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100">
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
               @for (user of filteredUsers(); track user.id) {
                 <tr class="transition-colors hover:bg-gray-50/50" [class.opacity-50]="!user.isActive">
                   <td class="px-4 py-3">
@@ -370,8 +382,9 @@ import { API } from '@app/core/config/api';
                   <td colspan="11" class="px-4 py-8 text-center text-gray-400">No users found</td>
                 </tr>
               }
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <!-- Actions dropdown overlay (fixed so it isn't clipped by overflow containers) -->
@@ -415,20 +428,31 @@ import { API } from '@app/core/config/api';
         <!-- Pending Invitations -->
         @if (pendingInvitations().length > 0) {
           <div class="mt-8">
-            <h2 class="mb-3 text-lg font-semibold text-gray-900">Pending Invitations</h2>
-            <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-              <table class="w-full text-sm">
-                <thead>
-                  <tr class="border-b border-gray-200 bg-gray-50/80">
+            <div class="app-panel">
+              <div class="app-panel-header app-panel-header--emerald">
+                <div class="app-panel-icon-shell app-panel-icon-shell--emerald">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M3.75 4A1.75 1.75 0 0 0 2 5.75v8.5C2 15.216 2.784 16 3.75 16h12.5c.966 0 1.75-.784 1.75-1.75v-8.5A1.75 1.75 0 0 0 16.25 4H3.75Zm0 1.5h12.5a.25.25 0 0 1 .25.25v.378l-6.09 4.06a.75.75 0 0 1-.832 0L3.5 6.128V5.75a.25.25 0 0 1 .25-.25Zm-.25 2.43 5.246 3.497a2.25 2.25 0 0 0 2.508 0L16.5 7.93v6.32a.25.25 0 0 1-.25.25H3.75a.25.25 0 0 1-.25-.25V7.93Z" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 class="text-base font-semibold text-gray-900">Pending Invitations</h2>
+                  <p class="mt-1 text-sm text-gray-600">Track open invites and expiration windows before access is activated.</p>
+                </div>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead>
+                    <tr class="border-b border-gray-200 bg-gray-50/80">
                     <th class="px-4 py-3 text-left font-medium text-gray-600">Name</th>
                     <th class="px-4 py-3 text-left font-medium text-gray-600">Email</th>
                     <th class="px-4 py-3 text-left font-medium text-gray-600">Role</th>
                     <th class="px-4 py-3 text-left font-medium text-gray-600">Invited By</th>
                     <th class="px-4 py-3 text-left font-medium text-gray-600">Expires</th>
                     <th class="px-4 py-3 text-left font-medium text-gray-600">Status</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100">
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-100">
                   @for (inv of pendingInvitations(); track inv.id) {
                     <tr class="transition-colors hover:bg-gray-50/50">
                       <td class="px-4 py-3 font-medium text-gray-900">{{ inv.name }}</td>
@@ -452,8 +476,9 @@ import { API } from '@app/core/config/api';
                       </td>
                     </tr>
                   }
-                </tbody>
-              </table>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         }
@@ -488,11 +513,11 @@ import { API } from '@app/core/config/api';
                     type="text"
                     [value]="inviteLinkResult()"
                     readonly
-                    class="flex-1 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-xs text-gray-700 font-mono"
+                    class="app-input-mono flex-1 bg-gray-50 text-xs text-gray-700"
                   />
                   <button
                     (click)="copyInviteLink()"
-                    class="shrink-0 rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors"
+                    class="app-button-primary shrink-0 px-3 py-2 text-sm"
                   >
                     {{ copied() ? 'Copied!' : 'Copy' }}
                   </button>
@@ -516,7 +541,7 @@ import { API } from '@app/core/config/api';
                     type="text"
                     [(ngModel)]="inviteForm.name"
                     placeholder="e.g. Jane Smith"
-                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                    class="app-input w-full"
                   />
                 </div>
                 <div>
@@ -525,14 +550,14 @@ import { API } from '@app/core/config/api';
                     type="email"
                     [(ngModel)]="inviteForm.email"
                     placeholder="e.g. jane@company.com"
-                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                    class="app-input w-full"
                   />
                 </div>
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
                   <select
                     [(ngModel)]="inviteForm.role"
-                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                    class="app-input w-full"
                   >
                     @for (r of roles; track r.value) {
                       <option [value]="r.value">{{ r.label }}</option>
@@ -556,7 +581,7 @@ import { API } from '@app/core/config/api';
                   <button
                     (click)="sendInvite()"
                     [disabled]="inviting()"
-                    class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 transition-colors disabled:opacity-50"
+                    class="app-button-primary disabled:opacity-50"
                   >
                     @if (inviting()) {
                       <svg class="h-4 w-4 animate-spin inline mr-1" viewBox="0 0 24 24" fill="none">
@@ -594,7 +619,7 @@ import { API } from '@app/core/config/api';
                     [ngModel]="ip"
                     (ngModelChange)="updateIp($index, $event)"
                     placeholder="e.g. 203.0.113.50 or 10.0.0.0/8"
-                    class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                    class="app-input-mono flex-1"
                   />
                   <button
                     (click)="removeIp($index)"
@@ -611,7 +636,7 @@ import { API } from '@app/core/config/api';
               <!-- Add IP button -->
               <button
                 (click)="addIpRow()"
-                class="inline-flex items-center gap-1 rounded-md border border-dashed border-gray-300 px-3 py-1.5 text-xs text-gray-500 hover:border-brand-400 hover:text-brand-600 transition-colors"
+                class="app-button-add border-dashed px-3 py-1.5 text-xs text-gray-500 hover:text-brand-600"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
@@ -647,7 +672,7 @@ import { API } from '@app/core/config/api';
                 <button
                   (click)="saveIpRestrictions()"
                   [disabled]="savingIps()"
-                  class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 transition-colors disabled:opacity-50"
+                  class="app-button-primary disabled:opacity-50"
                 >
                   @if (savingIps()) {
                     Saving…

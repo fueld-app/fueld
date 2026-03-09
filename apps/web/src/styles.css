@@ -192,3 +192,161 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-gray-400;
 }
+
+/* ─── Shared surfaces ────────────────────────────────────────────── */
+
+@layer components {
+  .app-panel {
+    @apply overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm;
+  }
+
+  .app-panel-header {
+    @apply flex items-center gap-4 border-b px-6 py-4;
+  }
+
+  .app-panel-body {
+    @apply px-5 py-5 sm:px-6 sm:py-6;
+  }
+
+  .app-panel-stack {
+    @apply space-y-5 sm:space-y-6;
+  }
+
+  .app-panel-header--brand {
+    @apply border-brand-100;
+    background-image: linear-gradient(90deg, color-mix(in srgb, var(--color-brand-50) 88%, white), white 58%);
+  }
+
+  .app-panel-header--blue {
+    @apply border-blue-100;
+    background-image: linear-gradient(90deg, color-mix(in srgb, #dbeafe 88%, white), white 58%);
+  }
+
+  .app-panel-header--amber {
+    @apply border-amber-100;
+    background-image: linear-gradient(90deg, color-mix(in srgb, #fef3c7 88%, white), white 58%);
+  }
+
+  .app-panel-header--emerald {
+    @apply border-emerald-100;
+    background-image: linear-gradient(90deg, color-mix(in srgb, #d1fae5 88%, white), white 58%);
+  }
+
+  .app-panel-header--indigo {
+    @apply border-indigo-100;
+    background-image: linear-gradient(90deg, color-mix(in srgb, #e0e7ff 88%, white), white 58%);
+  }
+
+  .app-panel-header--cyan {
+    @apply border-cyan-100;
+    background-image: linear-gradient(90deg, color-mix(in srgb, #cffafe 88%, white), white 58%);
+  }
+
+  .app-panel-header--violet {
+    @apply border-violet-100;
+    background-image: linear-gradient(90deg, color-mix(in srgb, #ede9fe 88%, white), white 58%);
+  }
+
+  .app-panel-header--purple {
+    @apply border-purple-100;
+    background-image: linear-gradient(90deg, color-mix(in srgb, #f3e8ff 88%, white), white 58%);
+  }
+
+  .app-panel-header--sky {
+    @apply border-sky-100;
+    background-image: linear-gradient(90deg, color-mix(in srgb, #e0f2fe 88%, white), white 58%);
+  }
+
+  .app-panel-header--green {
+    @apply border-green-100;
+    background-image: linear-gradient(90deg, color-mix(in srgb, #dcfce7 88%, white), white 58%);
+  }
+
+  .app-panel-header--rose {
+    @apply border-rose-100;
+    background-image: linear-gradient(90deg, color-mix(in srgb, #ffe4e6 88%, white), white 58%);
+  }
+
+  .app-panel-icon-shell {
+    @apply flex h-11 w-11 shrink-0 items-center justify-center border bg-white shadow-sm;
+  }
+
+  .app-panel-icon-shell--rounded {
+    @apply rounded-2xl;
+  }
+
+  .app-panel-icon-shell--pill {
+    @apply rounded-full;
+  }
+
+  .app-panel-icon-shell--brand {
+    @apply border-brand-100;
+  }
+
+  .app-panel-icon-shell--blue {
+    @apply border-blue-100;
+  }
+
+  .app-panel-icon-shell--amber {
+    @apply border-amber-100;
+  }
+
+  .app-panel-icon-shell--emerald {
+    @apply border-emerald-100;
+  }
+
+  .app-panel-icon-shell--indigo {
+    @apply border-indigo-100;
+  }
+
+  .app-panel-icon-shell--cyan {
+    @apply border-cyan-100;
+  }
+
+  .app-panel-icon-shell--violet {
+    @apply border-violet-100;
+  }
+
+  .app-panel-icon-shell--purple {
+    @apply border-purple-100;
+  }
+
+  .app-panel-icon-shell--sky {
+    @apply border-sky-100;
+  }
+
+  .app-panel-icon-shell--green {
+    @apply border-green-100;
+  }
+
+  .app-panel-icon-shell--rose {
+    @apply border-rose-100;
+  }
+
+  .app-kpi-card {
+    @apply rounded-2xl border border-gray-200 p-6 shadow-sm;
+    background-image:
+      radial-gradient(circle at top right, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.7) 34%, transparent 64%),
+      linear-gradient(135deg, #eff6ff 0%, #ffffff 52%, #f8fafc 100%);
+  }
+
+  .app-input {
+    @apply rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-brand-500 focus:ring-1 focus:ring-brand-500;
+  }
+
+  .app-input-mono {
+    @apply rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono outline-none transition-colors focus:border-brand-500 focus:ring-1 focus:ring-brand-500;
+  }
+
+  .app-input-mono-uppercase {
+    @apply rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono uppercase outline-none transition-colors focus:border-brand-500 focus:ring-1 focus:ring-brand-500;
+  }
+
+  .app-button-primary {
+    @apply rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-brand-700 disabled:opacity-50;
+  }
+
+  .app-button-add {
+    @apply inline-flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-xs font-medium text-gray-500 transition-colors hover:border-gray-400 hover:text-gray-700;
+  }
+}

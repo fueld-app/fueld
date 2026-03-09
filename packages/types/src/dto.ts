@@ -505,6 +505,13 @@ export interface OrderDto {
   supplierContactId?: string | null;
   termsAndConditions?: string | null;
   lossReason: string | null;
+  financingRateAnnual?: number;
+  financingDayCountConvention?: number;
+  financingDays?: number;
+  totalFinancingCost?: string;
+  financingCostPerMt?: string | null;
+  totalNetProfit?: string;
+  netMarginPct?: string | null;
   closedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -582,6 +589,9 @@ export interface OrderListRowDto {
   eta: string | null;
   totalValue: number;
   totalProfit: number;
+  totalFinancingCost?: number;
+  totalNetProfit?: number;
+  netMarginPct?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -622,6 +632,15 @@ export interface CurrencySettingsDto {
   currencies: string[];
 }
 
+export interface FinancingSettingsDto {
+  annualRate: number;
+  dayCountConvention: number;
+}
+
+export interface UpdateFinancingSettingsDto {
+  annualRate: number;
+}
+
 /** Admin settings for configurable company types */
 export interface CompanyTypeSettingsDto {
   companyTypes: string[];
@@ -653,6 +672,8 @@ export interface OrderItemDto {
   salesPrice: string | null;
   salesCurrency: string;
   profit: string | null;
+  financingCost?: string | null;
+  netProfit?: string | null;
   paymentTerms: PaymentTerms | null;
   customerNote?: string | null;
   deliveredQuantity?: string | null;
@@ -988,6 +1009,8 @@ export interface TraderStatsDto {
   totalRevenue: string;
   totalCost: string;
   totalProfit: string;
+  totalFinancingCost: string;
+  totalNetProfit: string;
 }
 
 /** A single stage in the order pipeline summary. */
@@ -1008,6 +1031,8 @@ export interface TeamStatsResponseDto {
   totalTraders: number;
   activeOrders: number;
   totalRevenueYTD: string;
+  totalGrossProfitYTD?: string;
+  totalNetProfitYTD?: string;
   avgDealSize: string;
   traderPerformance: { name: string; orders: number; revenue: string; margin: string; }[];
 }

@@ -17,6 +17,9 @@ import {
 } from '../../db/schema';
 import type { OwnCompanyDto, TeamDto, CompanyGroupDto, BankAccountDto } from '@fueld/types';
 
+export const DEFAULT_FINANCING_RATE_ANNUAL = 0.08;
+export const DEFAULT_FINANCING_DAY_COUNT = 365;
+
 const DEFAULT_CUSTOMER_TERMS =
   "This ${documentName} is made subject to ${companyName}’s General Terms and Conditions of Sale effective February 2026 (“ GTCs”), available at www.rivieramarine.mc,\n" +
   "which together with this ${documentName} constitute the entire agreement between the parties. In the event of conflict, this ${documentName} shall prevail, except in respect of Title\n" +
@@ -860,6 +863,44 @@ export async function updateCurrencySettings(currencies: string[]): Promise<{ cu
     .where(eq(tenants.id, tenant.id));
 
   return getCurrencySettings();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  FINANCING SETTINGS
+// ═══════════════════════════════════════════════════════════════════════
+
+export async function getFinancingSettings(): Promise<{ annualRate: number; dayCountConvention: number }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  const annualRate = typeof settings.financingRateAnnual === 'number' && Number.isFinite(settings.financingRateAnnual)
+    ? settings.financingRateAnnual
+    : DEFAULT_FINANCING_RATE_ANNUAL;
+
+  return {
+    annualRate,
+    dayCountConvention: DEFAULT_FINANCING_DAY_COUNT,
+  };
+}
+
+export async function updateFinancingSettings(annualRate: number): Promise<{ annualRate: number; dayCountConvention: number }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  if (!Number.isFinite(annualRate) || annualRate < 0 || annualRate > 1) {
+    throw new Error('Financing annual rate must be between 0 and 1');
+  }
+
+  const settings = { ...(tenant.settings as any) };
+  settings.financingRateAnnual = annualRate;
+
+  await db
+    .update(tenants)
+    .set({ settings, updatedAt: new Date() })
+    .where(eq(tenants.id, tenant.id));
+
+  return getFinancingSettings();
 }
 
 // ═══════════════════════════════════════════════════════════════════════

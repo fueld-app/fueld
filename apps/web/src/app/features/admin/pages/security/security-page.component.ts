@@ -43,9 +43,9 @@ import { API } from '@app/core/config/api';
           <!-- ════════════════════════════════════════════════════════ -->
           <!--  SSO Configuration                                      -->
           <!-- ════════════════════════════════════════════════════════ -->
-          <div class="flex flex-col rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50">
+          <div class="app-panel flex flex-col">
+            <div class="app-panel-header app-panel-header--blue">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--blue">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M18 8a6 6 0 01-7.743 5.743L10 14l-1 1-1 1H6v2H2v-4l4.257-4.257A6 6 0 1118 8zm-6-4a1 1 0 100 2 2 2 0 012 2 1 1 0 102 0 4 4 0 00-4-4z" clip-rule="evenodd" />
                 </svg>
@@ -121,9 +121,9 @@ import { API } from '@app/core/config/api';
           <!-- ════════════════════════════════════════════════════════ -->
           <!--  Two-Factor Authentication                              -->
           <!-- ════════════════════════════════════════════════════════ -->
-          <div class="flex flex-col rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-50">
+          <div class="app-panel flex flex-col">
+            <div class="app-panel-header app-panel-header--amber">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--amber">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                 </svg>
@@ -179,9 +179,9 @@ import { API } from '@app/core/config/api';
           <!-- ════════════════════════════════════════════════════════ -->
           <!--  Passkeys (FIDO2)                                       -->
           <!-- ════════════════════════════════════════════════════════ -->
-          <div class="flex flex-col rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50">
+          <div class="app-panel flex flex-col">
+            <div class="app-panel-header app-panel-header--indigo">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--indigo">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-600" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M10 2a5 5 0 00-5 5v2a2 2 0 00-2 2v5a2 2 0 002 2h10a2 2 0 002-2v-5a2 2 0 00-2-2H7V7a3 3 0 015.905-.75 1 1 0 001.937-.5A5.002 5.002 0 0010 2z" />
                 </svg>
@@ -268,9 +268,9 @@ import { API } from '@app/core/config/api';
           <!-- ════════════════════════════════════════════════════════ -->
           <!--  Session & Token Settings                               -->
           <!-- ════════════════════════════════════════════════════════ -->
-          <div class="flex flex-col rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-purple-50">
+          <div class="app-panel flex flex-col">
+            <div class="app-panel-header app-panel-header--purple">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--purple">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-purple-600" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
                 </svg>
@@ -342,9 +342,9 @@ import { API } from '@app/core/config/api';
           <!-- ════════════════════════════════════════════════════════ -->
           <!--  Microsoft Email Policy                                  -->
           <!-- ════════════════════════════════════════════════════════ -->
-          <div class="flex flex-col rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50">
+          <div class="app-panel flex flex-col">
+            <div class="app-panel-header app-panel-header--blue">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--blue">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" viewBox="0 0 23 23" fill="currentColor">
                   <path d="M1 1h10v10H1z"/>
                   <path d="M12 1h10v10H12z"/>

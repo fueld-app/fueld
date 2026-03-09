@@ -8,7 +8,10 @@ import {
   counterparties,
   vessels,
   places,
+  tenants,
 } from '../../db/schema';
+import type { TenantSettings } from '../../db/schema';
+import { calculateOrderEconomics, getFinancingRateAnnual } from '../orders/order-financing';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Dashboard Service — Smart Aggregations
@@ -98,6 +101,8 @@ export interface TraderStat {
   totalRevenue: string;
   totalCost: string;
   totalProfit: string;
+  totalFinancingCost: string;
+  totalNetProfit: string;
 }
 
 /**
@@ -130,32 +135,110 @@ export async function getTeamStats(
   if (fromDate) baseConditions.push(gte(orders.createdAt, fromDate));
   if (toDate) baseConditions.push(lte(orders.createdAt, toDate));
 
-  const stats = await db
+  const orderRows = await db
     .select({
+      orderId: orders.id,
       traderId: orders.salesRepId,
       traderName: users.name,
       traderEmail: users.email,
-      orderCount: sql<number>`count(distinct ${orders.id})`.as('order_count'),
-      totalVolume: sql<string>`coalesce(sum(${orderItems.quantity}::numeric), 0)`.as('total_volume'),
-      totalRevenue: sql<string>`coalesce(sum(${orderItems.salesPrice}::numeric * ${orderItems.quantity}::numeric), 0)`.as('total_revenue'),
-      totalCost: sql<string>`coalesce(sum(${orderItems.costPrice}::numeric * ${orderItems.quantity}::numeric), 0)`.as('total_cost'),
-      totalProfit: sql<string>`coalesce(sum(${orderItems.profit}::numeric), 0)`.as('total_profit'),
+      customerPaymentTermType: orders.customerPaymentTermType,
+      customerCreditDays: orders.customerCreditDays,
+      supplierPaymentTermType: orders.supplierPaymentTermType,
+      supplierCreditDays: orders.supplierCreditDays,
     })
     .from(orders)
     .innerJoin(users, eq(orders.salesRepId, users.id))
-    .leftJoin(orderItems, eq(orderItems.orderId, orders.id))
-    .where(and(...baseConditions))
-    .groupBy(orders.salesRepId, users.name, users.email);
+    .where(and(...baseConditions));
 
-  return stats.map((s) => ({
-    traderId: s.traderId!,
+  if (orderRows.length === 0) {
+    return [];
+  }
+
+  const [itemRows, tenant] = await Promise.all([
+    db
+      .select({
+        orderId: orderItems.orderId,
+        quantity: orderItems.quantity,
+        costPrice: orderItems.costPrice,
+        costCurrency: orderItems.costCurrency,
+        salesPrice: orderItems.salesPrice,
+        salesCurrency: orderItems.salesCurrency,
+      })
+      .from(orderItems)
+      .where(inArray(orderItems.orderId, orderRows.map((row) => row.orderId))),
+    db.query.tenants.findFirst({
+      where: eq(tenants.id, tenantId),
+      columns: { settings: true },
+    }),
+  ]);
+
+  const financingRateAnnual = getFinancingRateAnnual((tenant?.settings ?? {}) as TenantSettings);
+  const itemsByOrder = new Map<string, typeof itemRows>();
+  for (const item of itemRows) {
+    const current = itemsByOrder.get(item.orderId) ?? [];
+    current.push(item);
+    itemsByOrder.set(item.orderId, current);
+  }
+
+  const stats = new Map<string, {
+    traderId: string;
+    traderName: string;
+    traderEmail: string;
+    orderCount: number;
+    totalVolume: number;
+    totalRevenue: number;
+    totalCost: number;
+    totalProfit: number;
+    totalFinancingCost: number;
+    totalNetProfit: number;
+  }>();
+
+  for (const row of orderRows) {
+    const economics = calculateOrderEconomics(
+      {
+        customerPaymentTermType: row.customerPaymentTermType,
+        customerCreditDays: row.customerCreditDays,
+        supplierPaymentTermType: row.supplierPaymentTermType,
+        supplierCreditDays: row.supplierCreditDays,
+      },
+      itemsByOrder.get(row.orderId) ?? [],
+      financingRateAnnual,
+    );
+
+    const current = stats.get(row.traderId!) ?? {
+      traderId: row.traderId!,
+      traderName: row.traderName,
+      traderEmail: row.traderEmail,
+      orderCount: 0,
+      totalVolume: 0,
+      totalRevenue: 0,
+      totalCost: 0,
+      totalProfit: 0,
+      totalFinancingCost: 0,
+      totalNetProfit: 0,
+    };
+
+    current.orderCount += 1;
+    current.totalVolume += economics.totalQuantity;
+    current.totalRevenue += economics.totalRevenueBase;
+    current.totalCost += economics.totalCostBase;
+    current.totalProfit += economics.totalGrossProfit;
+    current.totalFinancingCost += economics.totalFinancingCost;
+    current.totalNetProfit += economics.totalNetProfit;
+    stats.set(current.traderId, current);
+  }
+
+  return Array.from(stats.values()).map((s) => ({
+    traderId: s.traderId,
     traderName: s.traderName,
     traderEmail: s.traderEmail,
-    orderCount: Number(s.orderCount),
-    totalVolume: String(s.totalVolume),
-    totalRevenue: String(s.totalRevenue),
-    totalCost: String(s.totalCost),
-    totalProfit: String(s.totalProfit),
+    orderCount: s.orderCount,
+    totalVolume: s.totalVolume.toFixed(3),
+    totalRevenue: s.totalRevenue.toFixed(2),
+    totalCost: s.totalCost.toFixed(2),
+    totalProfit: s.totalProfit.toFixed(2),
+    totalFinancingCost: s.totalFinancingCost.toFixed(2),
+    totalNetProfit: s.totalNetProfit.toFixed(2),
   }));
 }
 

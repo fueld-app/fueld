@@ -41,9 +41,9 @@ import { API } from '@app/core/config/api';
           <!-- ════════════════════════════════════════════════════════ -->
           <!--  LLI / Seasearcher Card                                -->
           <!-- ════════════════════════════════════════════════════════ -->
-          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50">
+          <div class="app-panel">
+            <div class="app-panel-header app-panel-header--blue">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--blue">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" />
                 </svg>
@@ -145,9 +145,9 @@ import { API } from '@app/core/config/api';
           <!-- ════════════════════════════════════════════════════════ -->
           <!--  SMTP (Invite Emails)                                 -->
           <!-- ════════════════════════════════════════════════════════ -->
-          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50">
+          <div class="app-panel">
+            <div class="app-panel-header app-panel-header--indigo">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--indigo">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-600" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M2.94 6.34A2 2 0 0 1 4.8 5h10.4a2 2 0 0 1 1.86 1.34L10 10.8 2.94 6.34Z" />
                   <path d="M18 8.08V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.08l7.4 4.44a1 1 0 0 0 1.2 0L18 8.08Z" />
@@ -293,9 +293,9 @@ import { API } from '@app/core/config/api';
           <!-- ════════════════════════════════════════════════════════ -->
           <!--  Microsoft 365 / Entra ID                              -->
           <!-- ════════════════════════════════════════════════════════ -->
-          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-sky-50">
+          <div class="app-panel">
+            <div class="app-panel-header app-panel-header--sky">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--sky">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-sky-600" viewBox="0 0 23 23" fill="currentColor">
                   <path d="M0 0h11v11H0zM12 0h11v11H12zM0 12h11v11H0zM12 12h11v11H12z"/>
                 </svg>
@@ -391,9 +391,9 @@ import { API } from '@app/core/config/api';
           <!-- ════════════════════════════════════════════════════════ -->
           <!--  Web Push (VAPID)                                     -->
           <!-- ════════════════════════════════════════════════════════ -->
-          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-50">
+          <div class="app-panel">
+            <div class="app-panel-header app-panel-header--amber">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--amber">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M10 2a6 6 0 00-6 6v2.5c0 .67-.167 1.33-.486 1.92l-.91 1.67A1 1 0 004.5 16h11a1 1 0 00.896-1.41l-.91-1.67A4 4 0 0115 10.5V8a6 6 0 00-6-6zm0 16a2.5 2.5 0 002.45-2h-4.9A2.5 2.5 0 0010 18z" />
                 </svg>
@@ -503,10 +503,10 @@ import { API } from '@app/core/config/api';
           <!-- ════════════════════════════════════════════════════════ -->
           <!--  QuickBooks Card                                       -->
           <!-- ════════════════════════════════════════════════════════ -->
-          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+          <div class="app-panel">
             <!-- Card Header -->
-            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50">
+            <div class="app-panel-header app-panel-header--emerald">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--emerald">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" />
                 </svg>
@@ -711,8 +711,8 @@ import { API } from '@app/core/config/api';
           <!--  WhatsApp Integration                                  -->
           <!-- ════════════════════════════════════════════════════════ -->
           <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-visible">
-            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-50">
+            <div class="app-panel-header app-panel-header--green">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--green">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-600" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347zM12.05 21.785c-1.875 0-3.713-.504-5.322-1.46l-.382-.227-3.961.99 1.01-3.694-.25-.394A9.848 9.848 0 011.847 12c0-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.82 9.82 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884zm0-21.67C5.495.115.112 5.498.112 12.055c0 2.104.549 4.162 1.595 5.98L.05 24l6.148-1.612a11.87 11.87 0 005.843 1.53h.005c6.554 0 11.89-5.335 11.893-11.893A11.82 11.82 0 0020.526 3.49 11.81 11.81 0 0012.05.115z" />
                 </svg>

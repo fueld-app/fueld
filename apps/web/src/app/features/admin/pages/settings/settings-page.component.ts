@@ -45,9 +45,9 @@ interface InquirySettingsDto {
           <!-- ════════════════════════════════════════════════════════ -->
           <!--  Order Number Template                                   -->
           <!-- ════════════════════════════════════════════════════════ -->
-          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-50">
+          <div class="app-panel">
+            <div class="app-panel-header app-panel-header--brand">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--brand">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-brand-600" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M4.5 2A1.5 1.5 0 003 3.5v13A1.5 1.5 0 004.5 18h11a1.5 1.5 0 001.5-1.5V7.621a1.5 1.5 0 00-.44-1.06l-4.12-4.122A1.5 1.5 0 0011.378 2H4.5zm4.75 6.75a.75.75 0 00-1.5 0v2.546l-.943-1.048a.75.75 0 00-1.114 1.004l2.25 2.5a.75.75 0 001.114 0l2.25-2.5a.75.75 0 10-1.114-1.004l-.943 1.048V8.75z" clip-rule="evenodd" />
                 </svg>
@@ -58,7 +58,7 @@ interface InquirySettingsDto {
               </div>
             </div>
 
-            <div class="p-6 space-y-5">
+            <div class="app-panel-body space-y-5">
 
               <!-- Prefix -->
               <div>
@@ -68,8 +68,7 @@ interface InquirySettingsDto {
                   [ngModel]="prefix()"
                   (ngModelChange)="prefix.set($event)"
                   placeholder="e.g. FU-"
-                  class="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 text-sm
-                         focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                      class="app-input w-full max-w-xs"
                 />
                 <p class="mt-1 text-xs text-gray-500">
                   Added before the template. Leave empty for no prefix.
@@ -83,8 +82,7 @@ interface InquirySettingsDto {
                   type="text"
                   [ngModel]="template()"
                   (ngModelChange)="template.set($event)"
-                  class="w-full max-w-md rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono
-                         focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                      class="app-input-mono w-full max-w-md"
                 />
                 <p class="mt-1 text-xs text-gray-500">
                   Available tokens:
@@ -110,8 +108,7 @@ interface InquirySettingsDto {
                 <button
                   (click)="save()"
                   [disabled]="saving()"
-                  class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm
-                         hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                      class="app-button-primary"
                 >
                   @if (saving()) {
                     Saving…
@@ -135,9 +132,9 @@ interface InquirySettingsDto {
           <!-- ════════════════════════════════════════════════════════ -->
           <!--  Product Options                                        -->
           <!-- ════════════════════════════════════════════════════════ -->
-          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50">
+          <div class="app-panel">
+            <div class="app-panel-header app-panel-header--emerald">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--emerald">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5zm4.707 3.707a1 1 0 00-1.414-1.414l-3 3a1 1 0 000 1.414l3 3a1 1 0 001.414-1.414L8.414 9H10a3 3 0 013 3v1a1 1 0 102 0v-1a5 5 0 00-5-5H8.414l1.293-1.293z" clip-rule="evenodd" />
                 </svg>
@@ -148,7 +145,7 @@ interface InquirySettingsDto {
               </div>
             </div>
 
-            <div class="p-6 space-y-3">
+            <div class="app-panel-body space-y-3">
               @for (p of products(); track $index; let i = $index) {
                 <div class="flex items-center gap-2">
                   <div class="flex flex-col gap-0.5 shrink-0">
@@ -163,8 +160,7 @@ interface InquirySettingsDto {
                     type="text"
                     [value]="p"
                     (input)="updateProduct(i, $any($event.target).value)"
-                    class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono uppercase
-                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                          class="app-input-mono-uppercase flex-1"
                   />
                   <button
                     (click)="removeProduct(i)"
@@ -180,7 +176,7 @@ interface InquirySettingsDto {
               }
               <button
                 (click)="addProduct()"
-                class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-xs font-medium text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors"
+                class="app-button-add"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
@@ -192,8 +188,7 @@ interface InquirySettingsDto {
                 <button
                   (click)="saveProducts()"
                   [disabled]="productsSaving()"
-                  class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm
-                         hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                      class="app-button-primary"
                 >
                   @if (productsSaving()) { Saving… } @else { Save Products }
                 </button>
@@ -212,9 +207,9 @@ interface InquirySettingsDto {
           <!-- ════════════════════════════════════════════════════════ -->
           <!--  Unit Options                                           -->
           <!-- ════════════════════════════════════════════════════════ -->
-          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-50">
+          <div class="app-panel">
+            <div class="app-panel-header app-panel-header--amber">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--amber">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M10 2a.75.75 0 01.75.75v.258a33.186 33.186 0 016.668.83.75.75 0 01-.336 1.461 31.28 31.28 0 00-1.103-.232l1.702 7.545a.75.75 0 01-.387.832A4.981 4.981 0 0115 14c-.825 0-1.606-.2-2.294-.556a.75.75 0 01-.387-.832l1.77-7.849a31.743 31.743 0 00-3.339-.254v11.505a20.01 20.01 0 013.78.501.75.75 0 11-.339 1.462A18.558 18.558 0 0010 17.5c-1.442 0-2.845.165-4.191.477a.75.75 0 01-.338-1.462 20.01 20.01 0 013.779-.501V4.509c-1.129.026-2.243.112-3.34.254l1.771 7.85a.75.75 0 01-.387.83A4.981 4.981 0 015 14c-.825 0-1.606-.2-2.294-.556a.75.75 0 01-.387-.832l1.702-7.545c-.372.06-.742.126-1.103.232a.75.75 0 11-.336-1.462 33.186 33.186 0 016.668-.829V2.75A.75.75 0 0110 2zM5 12.662l-1.395-6.177C4.6 6.327 5.597 6.2 6 6.2c.404 0 1.4.127 2.395.285L5 12.662zm8.395-6.177L15 12.662l1.395-6.177C14.6 6.327 13.597 6.2 13.2 6.2c-.404 0-1.4.127-2.395.285z" clip-rule="evenodd" />
                 </svg>
@@ -225,7 +220,7 @@ interface InquirySettingsDto {
               </div>
             </div>
 
-            <div class="p-6 space-y-3">
+            <div class="app-panel-body space-y-3">
               @for (u of units(); track $index; let i = $index) {
                 <div class="flex items-center gap-2">
                   <div class="flex flex-col gap-0.5 shrink-0">
@@ -240,8 +235,7 @@ interface InquirySettingsDto {
                     type="text"
                     [value]="u"
                     (input)="updateUnit(i, $any($event.target).value)"
-                    class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono uppercase
-                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                          class="app-input-mono-uppercase flex-1"
                   />
                   <button
                     (click)="removeUnit(i)"
@@ -257,7 +251,7 @@ interface InquirySettingsDto {
               }
               <button
                 (click)="addUnit()"
-                class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-xs font-medium text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors"
+                class="app-button-add"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
@@ -269,8 +263,7 @@ interface InquirySettingsDto {
                 <button
                   (click)="saveUnits()"
                   [disabled]="unitsSaving()"
-                  class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm
-                         hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                      class="app-button-primary"
                 >
                   @if (unitsSaving()) { Saving… } @else { Save Units }
                 </button>
@@ -289,9 +282,9 @@ interface InquirySettingsDto {
           <!-- ════════════════════════════════════════════════════════ -->
           <!--  Currency Options                                       -->
           <!-- ════════════════════════════════════════════════════════ -->
-          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-cyan-50">
+          <div class="app-panel">
+            <div class="app-panel-header app-panel-header--cyan">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--cyan">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-cyan-600" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M10.75 10.818v2.614A3.13 3.13 0 0011.888 13c.482-.315.612-.648.612-.875 0-.227-.13-.56-.612-.875a3.13 3.13 0 00-1.138-.432zM8.33 8.62c.053.055.115.11.184.164.208.16.46.284.736.363V6.603a2.45 2.45 0 00-.92.363c-.293.18-.42.403-.42.56 0 .159.127.382.42.56.08.05.164.092.25.128z" />
                   <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-6a.75.75 0 01.75.75v.316a3.78 3.78 0 011.653.713c.426.33.744.74.925 1.2a.75.75 0 01-1.395.55 1.35 1.35 0 00-.447-.563 2.187 2.187 0 00-.736-.363V9.3c.514.082 1.006.234 1.438.467.669.36 1.115.86 1.115 1.608 0 .746-.446 1.245-1.115 1.607a3.78 3.78 0 01-1.438.467v.316a.75.75 0 01-1.5 0v-.316a3.78 3.78 0 01-1.653-.713 2.72 2.72 0 01-.925-1.2.75.75 0 011.395-.55c.12.3.272.492.447.563.243.098.5.163.736.363v-2.697a3.78 3.78 0 01-1.438-.467C5.446 8.87 5 8.37 5 7.625c0-.746.446-1.245 1.115-1.607a3.78 3.78 0 011.438-.467V5.25A.75.75 0 018.25 4.5h.08z" clip-rule="evenodd" />
@@ -303,7 +296,7 @@ interface InquirySettingsDto {
               </div>
             </div>
 
-            <div class="p-6 space-y-3">
+            <div class="app-panel-body space-y-3">
               @for (c of currencies(); track $index; let i = $index) {
                 <div class="flex items-center gap-2">
                   <div class="flex flex-col gap-0.5 shrink-0">
@@ -317,8 +310,7 @@ interface InquirySettingsDto {
                   <select
                     [value]="c"
                     (change)="updateCurrency(i, $any($event.target).value)"
-                    class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono
-                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                          class="app-input-mono flex-1 bg-white"
                   >
                     @for (opt of availableCurrencyOptions(); track opt.code) {
                       <option [value]="opt.code" [selected]="opt.code === c" [disabled]="opt.code !== c && currencies().includes(opt.code)">{{ opt.code }} — {{ opt.name }}</option>
@@ -338,7 +330,7 @@ interface InquirySettingsDto {
               }
               <button
                 (click)="addCurrency()"
-                class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-xs font-medium text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors"
+                class="app-button-add"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
@@ -350,8 +342,7 @@ interface InquirySettingsDto {
                 <button
                   (click)="saveCurrencies()"
                   [disabled]="currenciesSaving()"
-                  class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm
-                         hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                      class="app-button-primary"
                 >
                   @if (currenciesSaving()) { Saving… } @else { Save Currencies }
                 </button>
@@ -370,9 +361,9 @@ interface InquirySettingsDto {
           <!-- ════════════════════════════════════════════════════════ -->
           <!--  Company Types                                          -->
           <!-- ════════════════════════════════════════════════════════ -->
-          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-50">
+          <div class="app-panel">
+            <div class="app-panel-header app-panel-header--violet">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--violet">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-violet-600" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
                 </svg>
@@ -383,7 +374,7 @@ interface InquirySettingsDto {
               </div>
             </div>
 
-            <div class="p-6 space-y-3">
+            <div class="app-panel-body space-y-3">
               @for (ct of companyTypes(); track $index; let i = $index) {
                 <div class="flex items-center gap-2">
                   <div class="flex flex-col gap-0.5 shrink-0">
@@ -398,8 +389,7 @@ interface InquirySettingsDto {
                     type="text"
                     [value]="ct"
                     (input)="updateCompanyType(i, $any($event.target).value)"
-                    class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono uppercase
-                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                          class="app-input-mono-uppercase flex-1"
                   />
                   <button
                     (click)="removeCompanyType(i)"
@@ -415,7 +405,7 @@ interface InquirySettingsDto {
               }
               <button
                 (click)="addCompanyType()"
-                class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-xs font-medium text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors"
+                class="app-button-add"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
@@ -427,8 +417,7 @@ interface InquirySettingsDto {
                 <button
                   (click)="saveCompanyTypes()"
                   [disabled]="companyTypesSaving()"
-                  class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm
-                         hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                      class="app-button-primary"
                 >
                   @if (companyTypesSaving()) { Saving… } @else { Save Types }
                 </button>
@@ -447,9 +436,9 @@ interface InquirySettingsDto {
           <!-- ════════════════════════════════════════════════════════ -->
           <!--  Attachment Types                                       -->
           <!-- ════════════════════════════════════════════════════════ -->
-          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50">
+          <div class="app-panel">
+            <div class="app-panel-header app-panel-header--indigo">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--indigo">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-600" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M10.362 1.093a1 1 0 00-.724 0l-7 2.625A1 1 0 002 4.655v5.69a1 1 0 00.638.937l7 2.625a1 1 0 00.724 0l7-2.625A1 1 0 0018 10.345v-5.69a1 1 0 00-.638-.937l-7-2.625zM10 3.12L4.052 5.35 10 7.58l5.948-2.23L10 3.12z" clip-rule="evenodd" />
                   <path d="M3 11.38l6 2.25v5.25l-6-2.25v-5.25zM11 18.88v-5.25l6-2.25v5.25l-6 2.25z" />
@@ -461,7 +450,7 @@ interface InquirySettingsDto {
               </div>
             </div>
 
-            <div class="p-6 space-y-3">
+            <div class="app-panel-body space-y-3">
               @for (type of attachmentTypes(); track $index; let i = $index) {
                 <div class="flex items-center gap-2">
                   <div class="flex flex-col gap-0.5 shrink-0">
@@ -476,8 +465,7 @@ interface InquirySettingsDto {
                     type="text"
                     [value]="type"
                     (input)="updateAttachmentType(i, $any($event.target).value)"
-                    class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono uppercase
-                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                          class="app-input-mono-uppercase flex-1"
                   />
                   <button
                     (click)="removeAttachmentType(i)"
@@ -493,7 +481,7 @@ interface InquirySettingsDto {
               }
               <button
                 (click)="addAttachmentType()"
-                class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-xs font-medium text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors"
+                class="app-button-add"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
@@ -505,8 +493,7 @@ interface InquirySettingsDto {
                 <button
                   (click)="saveAttachmentTypes()"
                   [disabled]="attachmentTypesSaving()"
-                  class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm
-                         hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                      class="app-button-primary"
                 >
                   @if (attachmentTypesSaving()) { Saving… } @else { Save Types }
                 </button>
@@ -525,9 +512,9 @@ interface InquirySettingsDto {
           <!-- ════════════════════════════════════════════════════════ -->
           <!--  Supplier Inquiry Settings                              -->
           <!-- ════════════════════════════════════════════════════════ -->
-          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-sky-50">
+          <div class="app-panel">
+            <div class="app-panel-header app-panel-header--sky">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--sky">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-sky-600" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M4 4.75A2.75 2.75 0 0 1 6.75 2h10.5A2.75 2.75 0 0 1 20 4.75v10.5A2.75 2.75 0 0 1 17.25 18H9.56l-4.78 3.52A.75.75 0 0 1 3.6 20.9V18.8A2.75 2.75 0 0 1 2 16.25V4.75A2.75 2.75 0 0 1 4.75 2Zm2.75 1.5a1.25 1.25 0 0 0-1.25 1.25v7.95c0 .69.56 1.25 1.25 1.25h10.5c.69 0 1.25-.56 1.25-1.25V7.5c0-.69-.56-1.25-1.25-1.25H6.75Z" />
                 </svg>
@@ -538,7 +525,7 @@ interface InquirySettingsDto {
               </div>
             </div>
 
-            <div class="p-6">
+            <div class="app-panel-body">
               @if (inquirySaveSuccess()) {
                 <div class="mb-4 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
@@ -606,7 +593,7 @@ interface InquirySettingsDto {
                         min="1"
                         [ngModel]="inquiryAutoNoReplyHours()"
                         (ngModelChange)="setInquiryAutoNoReplyHours($event)"
-                        class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                        class="app-input mt-1 w-full"
                       />
                     </div>
                     <button
@@ -626,9 +613,9 @@ interface InquirySettingsDto {
           <!-- ════════════════════════════════════════════════════════ -->
           <!--  Inquiry Cancel Reasons                                 -->
           <!-- ════════════════════════════════════════════════════════ -->
-          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-rose-50">
+          <div class="app-panel">
+            <div class="app-panel-header app-panel-header--rose">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--rose">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-rose-600" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.53-10.53a.75.75 0 0 0-1.06-1.06L10 8.94 7.53 6.47a.75.75 0 0 0-1.06 1.06L8.94 10l-2.47 2.47a.75.75 0 1 0 1.06 1.06L10 11.06l2.47 2.47a.75.75 0 0 0 1.06-1.06L11.06 10l2.47-2.47Z" clip-rule="evenodd" />
                 </svg>
@@ -639,7 +626,7 @@ interface InquirySettingsDto {
               </div>
             </div>
 
-            <div class="p-6 space-y-3">
+            <div class="app-panel-body space-y-3">
               @for (reason of inquiryCancelReasons(); track $index; let i = $index) {
                 <div class="flex items-center gap-2">
                   <div class="flex flex-col gap-0.5 shrink-0">
@@ -654,8 +641,7 @@ interface InquirySettingsDto {
                     type="text"
                     [value]="reason"
                     (input)="updateInquiryCancelReason(i, $any($event.target).value)"
-                    class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm
-                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                          class="app-input flex-1"
                   />
                   <button
                     (click)="removeInquiryCancelReason(i)"
@@ -671,7 +657,7 @@ interface InquirySettingsDto {
               }
               <button
                 (click)="addInquiryCancelReason()"
-                class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-xs font-medium text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors"
+                class="app-button-add"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
@@ -683,8 +669,7 @@ interface InquirySettingsDto {
                 <button
                   (click)="saveInquiryCancelReasons()"
                   [disabled]="inquiryCancelReasonsSaving()"
-                  class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm
-                         hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                      class="app-button-primary"
                 >
                   @if (inquiryCancelReasonsSaving()) { Saving… } @else { Save Reasons }
                 </button>
@@ -703,9 +688,9 @@ interface InquirySettingsDto {
           <!-- ════════════════════════════════════════════════════════ -->
           <!--  Vessel–Company Role Options                            -->
           <!-- ════════════════════════════════════════════════════════ -->
-          <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden min-[900px]:col-span-2">
-            <div class="flex items-center gap-4 border-b border-gray-100 px-6 py-4">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-purple-50">
+          <div class="app-panel min-[900px]:col-span-2">
+            <div class="app-panel-header app-panel-header--purple">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--purple">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-purple-600" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
                 </svg>
@@ -716,7 +701,7 @@ interface InquirySettingsDto {
               </div>
             </div>
 
-            <div class="p-6 space-y-4">
+            <div class="app-panel-body space-y-4">
               @if (rolesLoading()) {
                 <div class="flex items-center justify-center py-6">
                   <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
@@ -764,22 +749,19 @@ interface InquirySettingsDto {
                         [value]="role.key"
                         (input)="updateRoleKey(i, $any($event.target).value)"
                         placeholder="KEY"
-                        class="flex-1 min-w-0 rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono uppercase
-                               focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                           class="app-input-mono-uppercase flex-1 min-w-0"
                       />
                       <input
                         type="text"
                         [value]="role.label"
                         (input)="updateRoleLabel(i, $any($event.target).value)"
                         placeholder="Label"
-                        class="flex-1 min-w-0 rounded-lg border border-gray-300 px-3 py-2 text-sm
-                               focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                           class="app-input flex-1 min-w-0"
                       />
                       <select
                         [value]="role.group"
                         (change)="updateRoleGroup(i, $any($event.target).value)"
-                        class="flex-1 min-w-0 rounded-lg border border-gray-300 px-3 py-2 text-sm
-                               focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                           class="app-input flex-1 min-w-0"
                       >
                         <option value="Legal & Financial">Legal & Financial</option>
                         <option value="Operational & Commercial">Operational & Commercial</option>
@@ -802,7 +784,7 @@ interface InquirySettingsDto {
 
                 <button
                   (click)="addRole()"
-                  class="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-xs font-medium text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors"
+                  class="app-button-add"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                     <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
@@ -814,8 +796,7 @@ interface InquirySettingsDto {
                   <button
                     (click)="saveRoles()"
                     [disabled]="rolesSaving()"
-                    class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm
-                           hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                          class="app-button-primary"
                   >
                     @if (rolesSaving()) {
                       Saving…

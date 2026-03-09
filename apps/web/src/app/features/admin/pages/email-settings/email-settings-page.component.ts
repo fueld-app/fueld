@@ -72,14 +72,21 @@ const DOC_LABELS: Record<DocumentType, string> = {
       } @else {
         <!-- ═══════════════ Email Templates ═══════════════ -->
 
-        <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
-          <div class="border-b border-gray-200 px-6 py-4">
-            <h2 class="text-lg font-semibold text-gray-900">Email Templates</h2>
-            <p class="mt-0.5 text-sm text-gray-500">
-              Define default subject line and body for each document type. Use
-              <code class="rounded bg-gray-100 px-1 py-0.5 text-xs font-mono text-brand-700" [textContent]="lbrace + lbrace + 'variable' + rbrace + rbrace"></code>
-              placeholders.
-            </p>
+        <div class="app-panel">
+          <div class="app-panel-header app-panel-header--violet">
+            <div class="app-panel-icon-shell app-panel-icon-shell--violet">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M3 5.75A2.75 2.75 0 0 1 5.75 3h8.5A2.75 2.75 0 0 1 17 5.75v8.5A2.75 2.75 0 0 1 14.25 17h-8.5A2.75 2.75 0 0 1 3 14.25v-8.5Zm2.75-1.25c-.69 0-1.25.56-1.25 1.25v.378l5.172 3.621a.75.75 0 0 0 .666.09l.167-.09 5.172-3.621V5.75c0-.69-.56-1.25-1.25-1.25h-8.5ZM15.5 7.96l-4.307 3.016a2.25 2.25 0 0 1-2.385 0L4.5 7.96v6.29c0 .69.56 1.25 1.25 1.25h8.5c.69 0 1.25-.56 1.25-1.25V7.96Z" />
+              </svg>
+            </div>
+            <div>
+              <h2 class="text-lg font-semibold text-gray-900">Email Templates</h2>
+              <p class="mt-0.5 text-sm text-gray-600">
+                Define default subject line and body for each document type. Use
+                <code class="rounded bg-gray-100 px-1 py-0.5 text-xs font-mono text-brand-700" [textContent]="lbrace + lbrace + 'variable' + rbrace + rbrace"></code>
+                placeholders.
+              </p>
+            </div>
           </div>
 
           <!-- Template variables reference -->
@@ -125,9 +132,7 @@ const DOC_LABELS: Record<DocumentType, string> = {
                       [ngModel]="getSubject(docType)"
                       (ngModelChange)="setSubject(docType, $event)"
                       [placeholder]="'e.g. ' + '{{' + 'documentLabel' + '}}' + ' — ' + '{{' + 'vesselName' + '}}' + ' — ' + '{{' + 'portName' + '}}'"
-                      class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm
-                             placeholder:text-gray-400 focus:border-brand-500 focus:outline-none
-                             focus:ring-2 focus:ring-brand-500/20"
+                      class="app-input w-full"
                     />
                   </div>
 
@@ -139,9 +144,7 @@ const DOC_LABELS: Record<DocumentType, string> = {
                       (ngModelChange)="setBody(docType, $event)"
                       rows="5"
                       [placeholder]="'<p>Dear Customer,</p><p>Please find attached the ' + '{{' + 'documentLabel' + '}}' + ' for ' + '{{' + 'vesselName' + '}}' + ' at ' + '{{' + 'portName' + '}}' + '.</p>'"
-                      class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm font-mono
-                             placeholder:text-gray-400 focus:border-brand-500 focus:outline-none
-                             focus:ring-2 focus:ring-brand-500/20"
+                      class="app-input w-full font-mono"
                     ></textarea>
                   </div>
 
@@ -151,8 +154,7 @@ const DOC_LABELS: Record<DocumentType, string> = {
                       type="button"
                       (click)="saveTemplate(docType)"
                       [disabled]="savingTemplate() === docType"
-                      class="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm
-                             font-medium text-white shadow-sm hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                      class="app-button-primary px-3 py-1.5 text-sm disabled:opacity-50"
                     >
                       @if (savingTemplate() === docType) {
                         <svg class="h-3.5 w-3.5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -174,13 +176,20 @@ const DOC_LABELS: Record<DocumentType, string> = {
 
         <!-- ═══════════════ CC / BCC Rules ═══════════════ -->
 
-        <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
-          <div class="border-b border-gray-200 px-6 py-4">
-            <h2 class="text-lg font-semibold text-gray-900">Default CC / BCC Rules</h2>
-            <p class="mt-0.5 text-sm text-gray-500">
-              Automatically add CC or BCC recipients when sending emails. Rules can be scoped
-              to a specific own company and/or document type, or apply globally.
-            </p>
+        <div class="app-panel">
+          <div class="app-panel-header app-panel-header--sky">
+            <div class="app-panel-icon-shell app-panel-icon-shell--sky">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M4.75 3A1.75 1.75 0 0 0 3 4.75v10.5C3 16.216 3.784 17 4.75 17h10.5c.966 0 1.75-.784 1.75-1.75V7.311a1.75 1.75 0 0 0-.513-1.237l-2.56-2.56A1.75 1.75 0 0 0 12.69 3H4.75Zm8 .75v2.5c0 .414.336.75.75.75H16.25v8.25a.25.25 0 0 1-.25.25H4.75a.25.25 0 0 1-.25-.25V4.75a.25.25 0 0 1 .25-.25h8Zm-5 3a.75.75 0 0 1 .75.75v1.75h1.75a.75.75 0 0 1 0 1.5H8.5v1.75a.75.75 0 0 1-1.5 0V10.75H5.25a.75.75 0 0 1 0-1.5H7V7.5a.75.75 0 0 1 .75-.75Z" />
+              </svg>
+            </div>
+            <div>
+              <h2 class="text-lg font-semibold text-gray-900">Default CC / BCC Rules</h2>
+              <p class="mt-0.5 text-sm text-gray-600">
+                Automatically add CC or BCC recipients when sending emails. Rules can be scoped
+                to a specific own company and/or document type, or apply globally.
+              </p>
+            </div>
           </div>
 
           <!-- Existing rules table -->
@@ -246,8 +255,7 @@ const DOC_LABELS: Record<DocumentType, string> = {
                 <label class="block text-xs font-medium text-gray-500 mb-1">Type</label>
                 <select
                   [(ngModel)]="newRule.ruleType"
-                  class="rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm
-                         focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  class="app-input"
                 >
                   <option value="CC">CC</option>
                   <option value="BCC">BCC</option>
@@ -261,9 +269,7 @@ const DOC_LABELS: Record<DocumentType, string> = {
                   type="email"
                   [(ngModel)]="newRule.email"
                   placeholder="person@example.com"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm
-                         placeholder:text-gray-400 focus:border-brand-500 focus:outline-none
-                         focus:ring-2 focus:ring-brand-500/20"
+                  class="app-input w-full"
                 />
               </div>
 
@@ -274,9 +280,7 @@ const DOC_LABELS: Record<DocumentType, string> = {
                   type="text"
                   [(ngModel)]="newRule.label"
                   placeholder="e.g. Finance"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm
-                         placeholder:text-gray-400 focus:border-brand-500 focus:outline-none
-                         focus:ring-2 focus:ring-brand-500/20"
+                  class="app-input w-full"
                 />
               </div>
 
@@ -285,8 +289,7 @@ const DOC_LABELS: Record<DocumentType, string> = {
                 <label class="block text-xs font-medium text-gray-500 mb-1">Own Company <span class="text-gray-400">(optional)</span></label>
                 <select
                   [(ngModel)]="newRule.ownCompanyId"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm
-                         focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  class="app-input w-full"
                 >
                   <option value="">All companies</option>
                   @for (c of ownCompanies(); track c.id) {
@@ -300,8 +303,7 @@ const DOC_LABELS: Record<DocumentType, string> = {
                 <label class="block text-xs font-medium text-gray-500 mb-1">Document Type <span class="text-gray-400">(optional)</span></label>
                 <select
                   [(ngModel)]="newRule.documentType"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm
-                         focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  class="app-input w-full"
                 >
                   <option value="">All types</option>
                   @for (dt of docTypes; track dt) {
@@ -315,8 +317,7 @@ const DOC_LABELS: Record<DocumentType, string> = {
                 type="button"
                 (click)="addRule()"
                 [disabled]="addingRule() || !newRule.email"
-                class="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-sm
-                       font-medium text-white shadow-sm hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                class="app-button-primary disabled:opacity-50"
               >
                 @if (addingRule()) {
                   <svg class="h-3.5 w-3.5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

@@ -367,9 +367,9 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
 
             <!-- Map -->
             @if (place()!.lat && place()!.long) {
-                       <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden flex flex-col"
+                        <div class="app-panel overflow-hidden flex flex-col"
                      [class]="mapFullscreen() ? 'fixed inset-0 z-[70] rounded-none border-0 h-screen' : 'lg:order-5 lg:h-[449px]'">
-                <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
+                      <div class="app-panel-header app-panel-header--sky justify-between px-5 py-3">
                   <h2 class="text-sm font-semibold text-gray-700">
                     Location
                     @if (vesselsLoading()) {
@@ -408,8 +408,8 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
             }
 
             <!-- General info -->
-            <div class="rounded-xl border border-gray-200 bg-white shadow-sm lg:order-1 lg:h-[449px] lg:flex lg:flex-col overflow-hidden">
-              <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
+            <div class="app-panel lg:order-1 lg:h-[449px] lg:flex lg:flex-col overflow-hidden">
+              <div class="app-panel-header app-panel-header--brand justify-between px-5 py-3">
                 <div class="flex items-center gap-2">
                   <h2 class="text-sm font-semibold text-gray-700">General Information</h2>
                   @if (isManualPlace()) {
@@ -444,7 +444,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                   </div>
                 }
               </div>
-              <div class="p-5 max-h-[400px] overflow-y-auto">
+              <div class="app-panel-body max-h-[400px] overflow-y-auto">
                 @if (!editingPlace()) {
                   <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
                     <div>
@@ -474,8 +474,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                       <input
                         [ngModel]="placeForm().name"
                         (ngModelChange)="updatePlaceForm('name', $event)"
-                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
-                               focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                           class="app-input w-full text-gray-700"
                       />
                     </label>
                     <label class="space-y-1">
@@ -483,8 +482,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                       <input
                         [ngModel]="placeForm().country"
                         (ngModelChange)="updatePlaceForm('country', $event)"
-                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
-                               focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                           class="app-input w-full text-gray-700"
                       />
                     </label>
                     <label class="space-y-1">
@@ -492,8 +490,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                       <input
                         [ngModel]="placeForm().countryIso"
                         (ngModelChange)="updatePlaceForm('countryIso', $event)"
-                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
-                               focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                           class="app-input w-full text-gray-700"
                       />
                     </label>
                     <label class="space-y-1">
@@ -501,8 +498,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                       <select
                         [ngModel]="placeForm().placeType"
                         (ngModelChange)="updatePlaceForm('placeType', $event)"
-                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
-                               focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                           class="app-input w-full text-gray-700"
                       >
                         <option value="">Select</option>
                         @for (opt of placeTypeOptions; track opt.value) {
@@ -515,8 +511,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                       <input
                         [ngModel]="placeForm().area"
                         (ngModelChange)="updatePlaceForm('area', $event)"
-                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
-                               focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                           class="app-input w-full text-gray-700"
                       />
                     </label>
                     <label class="space-y-1">
@@ -524,8 +519,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                       <input
                         [ngModel]="placeForm().subRegion"
                         (ngModelChange)="updatePlaceForm('subRegion', $event)"
-                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
-                               focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                           class="app-input w-full text-gray-700"
                       />
                     </label>
                     <label class="space-y-1">
@@ -535,8 +529,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                         (ngModelChange)="updatePlaceForm('timezone', $event)"
                         placeholder="e.g. Asia/Dubai, Europe/London"
                         list="iana-timezones"
-                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
-                               focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                           class="app-input w-full text-gray-700"
                       />
                       <datalist id="iana-timezones">
                         @for (tz of commonTimezones; track tz) {
@@ -552,8 +545,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                       <input
                         [ngModel]="placeForm().unlocode"
                         (ngModelChange)="updatePlaceForm('unlocode', $event)"
-                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 font-mono
-                               focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                           class="app-input-mono w-full text-gray-700"
                       />
                     </label>
                     <label class="space-y-1">
@@ -561,8 +553,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                       <input
                         [ngModel]="placeForm().admiraltyChart"
                         (ngModelChange)="updatePlaceForm('admiraltyChart', $event)"
-                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
-                               focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                           class="app-input w-full text-gray-700"
                       />
                     </label>
                     <label class="space-y-1">
@@ -572,8 +563,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                         step="0.000001"
                         [ngModel]="placeForm().lat"
                         (ngModelChange)="onLatChange($event)"
-                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
-                               focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                           class="app-input w-full text-gray-700"
                       />
                     </label>
                     <label class="space-y-1">
@@ -583,8 +573,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                         step="0.000001"
                         [ngModel]="placeForm().long"
                         (ngModelChange)="onLongChange($event)"
-                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
-                               focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                           class="app-input w-full text-gray-700"
                       />
                     </label>
                   </div>
@@ -597,8 +586,8 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
           <div class="contents">
             <!-- Terminals + Anchorages -->
             @if (terminals().length || anchorages().length) {
-              <div class="rounded-xl border border-gray-200 bg-white shadow-sm lg:order-7 lg:h-[449px] lg:flex lg:flex-col overflow-hidden">
-                <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
+              <div class="app-panel lg:order-7 lg:h-[449px] lg:flex lg:flex-col overflow-hidden">
+                <div class="app-panel-header app-panel-header--amber justify-between px-5 py-3">
                   <h2 class="text-sm font-semibold text-gray-700">
                     🏭 Terminals & ⚓ Anchorages
                   </h2>
@@ -684,8 +673,8 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
 
             <!-- Facilities (from Seasearcher) -->
             @if (place()!.lliPlaceId) {
-              <div class="rounded-xl border border-gray-200 bg-white shadow-sm lg:order-8 lg:h-[449px] lg:flex lg:flex-col overflow-hidden">
-                <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
+              <div class="app-panel lg:order-8 lg:h-[449px] lg:flex lg:flex-col overflow-hidden">
+                <div class="app-panel-header app-panel-header--violet justify-between px-5 py-3">
                   <h2 class="text-sm font-semibold text-gray-700">
                     Port Facilities
                     @if (facilitiesLoading()) {
@@ -786,8 +775,8 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
           <div class="contents">
 
             <!-- Orders at this place -->
-            <div class="rounded-xl border border-gray-200 bg-white shadow-sm lg:order-3 lg:h-[449px] lg:flex lg:flex-col overflow-hidden">
-              <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
+            <div class="app-panel lg:order-3 lg:h-[449px] lg:flex lg:flex-col overflow-hidden">
+              <div class="app-panel-header app-panel-header--green justify-between px-5 py-3">
                 <h2 class="text-sm font-semibold text-gray-700">Orders</h2>
                 @if (placeOrders().length) {
                   <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
@@ -835,8 +824,8 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
             </div>
 
             <!-- Port Suppliers -->
-            <div class="rounded-xl border border-gray-200 bg-white shadow-sm lg:order-2 lg:h-[449px] lg:flex lg:flex-col overflow-hidden">
-              <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
+            <div class="app-panel lg:order-2 lg:h-[449px] lg:flex lg:flex-col overflow-hidden">
+              <div class="app-panel-header app-panel-header--cyan justify-between px-5 py-3">
                 <h2 class="text-sm font-semibold text-gray-700">
                   Port Suppliers
                   @if (portSuppliers().length) {
@@ -846,7 +835,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                   }
                 </h2>
                 <button (click)="openAddSupplier()"
-                  class="rounded-md bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 hover:bg-brand-100 transition-colors">
+                  class="app-button-add px-2 py-1 text-[11px] text-brand-700 hover:text-brand-800">
                   + Add
                 </button>
               </div>
@@ -873,7 +862,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                             [ngModel]="supplierCompanySearch()"
                             (ngModelChange)="onSupplierCompanySearch($event)"
                             placeholder="Search company..."
-                            class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                            class="app-input w-full px-3 py-1.5"
                           />
                           @if (supplierCompanyResults().length) {
                             <div class="absolute z-10 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
@@ -903,7 +892,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                           <select
                             [ngModel]="supplierForm().contactId"
                             (ngModelChange)="supplierForm.set({ ...supplierForm(), contactId: $event || null })"
-                            class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
+                            class="app-input w-full px-3 py-1.5">
                             <option [ngValue]="null">— None —</option>
                             @for (ct of supplierContacts(); track ct.id) {
                               <option [ngValue]="ct.id">{{ ct.name }}@if (ct.role) { ({{ ct.role }}) }</option>
@@ -935,7 +924,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                       (ngModelChange)="supplierForm.set({ ...supplierForm(), note: $event })"
                       placeholder="Notes"
                       rows="2"
-                      class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                      class="app-input w-full px-3 py-1.5"
                     ></textarea>
                     <div class="flex justify-end gap-2">
                       <button (click)="cancelSupplierForm()"
@@ -944,7 +933,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                       </button>
                       <button (click)="saveSupplier()"
                         [disabled]="savingSupplier() || (!editingSupplierId() && !selectedSupplierCompany())"
-                        class="rounded-md bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors">
+                        class="app-button-primary px-3 py-1 text-xs disabled:opacity-50">
                         {{ editingSupplierId() ? 'Update' : 'Add' }}
                       </button>
                     </div>
@@ -1006,8 +995,8 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
             </div>
 
             <!-- Expected Arrivals + Nearby Vessels -->
-            <div class="rounded-xl border border-gray-200 bg-white shadow-sm lg:order-6 lg:h-[449px] lg:flex lg:flex-col overflow-hidden">
-              <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
+            <div class="app-panel lg:order-6 lg:h-[449px] lg:flex lg:flex-col overflow-hidden">
+              <div class="app-panel-header app-panel-header--blue justify-between px-5 py-3">
                 <h2 class="text-sm font-semibold text-gray-700">
                   @if (trafficTab() === 'arrivals') {
                     Expected Arrivals
@@ -1156,18 +1145,18 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
 
             <!-- Default Order Remark -->
             @if (place()) {
-              <div class="rounded-xl border border-gray-200 bg-white shadow-sm lg:order-4 lg:h-[449px] lg:flex lg:flex-col overflow-hidden">
-                <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
+              <div class="app-panel lg:order-4 lg:h-[449px] lg:flex lg:flex-col overflow-hidden">
+                <div class="app-panel-header app-panel-header--rose justify-between px-5 py-3">
                   <h2 class="text-sm font-semibold text-gray-700">Default Order Remark</h2>
                   <button
                     (click)="saveOrderRemark()"
                     [disabled]="savingOrderRemark()"
-                    class="rounded-md bg-brand-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
+                    class="app-button-primary px-2.5 py-1 text-xs disabled:opacity-60"
                   >
                     {{ savingOrderRemark() ? 'Saving…' : 'Save' }}
                   </button>
                 </div>
-                <div class="p-5 flex-1 overflow-y-auto">
+                <div class="app-panel-body flex-1 overflow-y-auto">
                   <p class="text-xs text-gray-500">
                     This remark is used on all orders for this place. It is visible (read-only) on the order and included in the confirmation PDF.
                   </p>
@@ -1183,8 +1172,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                     [ngModel]="orderRemarkDraft()"
                     (ngModelChange)="orderRemarkDraft.set($event)"
                     placeholder="Remark to show on all orders for this place"
-                    class="mt-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
-                           focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                          class="app-input mt-3 w-full text-gray-700"
                   ></textarea>
 
                   @if (orderRemarkSaved()) {

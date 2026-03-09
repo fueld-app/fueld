@@ -28,7 +28,7 @@ import { API } from '@app/core/config/api';
         </div>
         <button
           (click)="openCreateModal()"
-          class="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 transition-colors"
+          class="app-button-add"
         >
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
             <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
@@ -45,17 +45,29 @@ import { API } from '@app/core/config/api';
           </svg>
         </div>
       } @else {
-        <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="border-b border-gray-200 bg-gray-50/80">
+        <div class="app-panel">
+          <div class="app-panel-header app-panel-header--blue">
+            <div class="app-panel-icon-shell app-panel-icon-shell--blue">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M3 6.75A2.75 2.75 0 0 1 5.75 4h8.5A2.75 2.75 0 0 1 17 6.75v6.5A2.75 2.75 0 0 1 14.25 16h-8.5A2.75 2.75 0 0 1 3 13.25v-6.5Zm2.75-1.25c-.69 0-1.25.56-1.25 1.25v.19l5.09 3.18a.75.75 0 0 0 .8 0l5.09-3.18v-.19c0-.69-.56-1.25-1.25-1.25h-8.5Zm9.75 3.2-4.3 2.687a2.25 2.25 0 0 1-2.38 0L4.5 8.7v4.55c0 .69.56 1.25 1.25 1.25h8.5c.69 0 1.25-.56 1.25-1.25V8.7Z" />
+              </svg>
+            </div>
+            <div>
+              <h2 class="text-base font-semibold text-gray-900">Team Directory</h2>
+              <p class="mt-1 text-sm text-gray-600">Review team ownership, company access, and assigned members from one place.</p>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-gray-200 bg-gray-50/80">
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Team Name</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Companies</th>
                 <th class="px-4 py-3 text-center font-medium text-gray-600">Members</th>
                 <th class="px-4 py-3 w-24"></th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100">
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
               @for (team of teams(); track team.id) {
                 <tr class="transition-colors hover:bg-gray-50/50">
                   <td class="px-4 py-3 font-medium text-gray-900">{{ team.name }}</td>
@@ -108,8 +120,9 @@ import { API } from '@app/core/config/api';
                   </td>
                 </tr>
               }
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         </div>
       }
 
@@ -127,7 +140,7 @@ import { API } from '@app/core/config/api';
               <div>
                 <label class="block text-sm font-medium text-gray-700">Team Name *</label>
                 <input type="text" [ngModel]="formName()" (ngModelChange)="formName.set($event)"
-                  class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                  class="app-input mt-1 w-full"
                   placeholder="e.g. Europe Desk" />
               </div>
 
@@ -182,7 +195,7 @@ import { API } from '@app/core/config/api';
               <button (click)="showModal.set(false)"
                 class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
               <button (click)="saveForm()" [disabled]="saving()"
-                class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+                class="app-button-primary disabled:opacity-50">
                 @if (saving()) { Saving… } @else { {{ editingId() ? 'Update' : 'Create' }} }
               </button>
             </div>

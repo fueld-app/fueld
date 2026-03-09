@@ -127,6 +127,9 @@ describe('dashboard.service', () => {
       vesselId: vessel.id,
       placeId: place.id,
       salesRepId: user.id,
+      customerPaymentTermType: 'CREDIT',
+      customerCreditDays: 15,
+      supplierPaymentTermType: 'COD',
     });
     await db.update(orders).set({ createdAt: new Date('2026-03-01T10:00:00.000Z') }).where(eq(orders.id, oldOrder.id));
     await saveOrderItems(oldOrder.id, [
@@ -166,7 +169,11 @@ describe('dashboard.service', () => {
     expect(Number(adminStat?.totalRevenue)).toBe(1000);
     expect(Number(adminStat?.totalCost)).toBe(800);
     expect(Number(adminStat?.totalProfit)).toBe(200);
+    expect(Number(adminStat?.totalFinancingCost)).toBeCloseTo(2.63, 2);
+    expect(Number(adminStat?.totalNetProfit)).toBeCloseTo(197.37, 2);
     expect(traderTwoStat?.orderCount).toBe(1);
+    expect(Number(traderTwoStat?.totalFinancingCost)).toBe(0);
+    expect(Number(traderTwoStat?.totalNetProfit)).toBe(400);
 
     const filteredStats = await getTeamStats(tenant.id, user.id, '2026-03-04', '2026-03-06');
     expect(filteredStats.length).toBe(1);

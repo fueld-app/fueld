@@ -79,8 +79,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
             (ngModelChange)="onSearchInput($event)"
             (focus)="onSearchFocus()"
             placeholder="Search places to import or create (min. 2 characters)…"
-            class="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm
-                   focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+            class="app-input w-full py-2 pl-9 pr-3"
           />
           @if (lliSearching()) {
             <div class="absolute inset-y-0 right-0 flex items-center pr-3">
@@ -133,8 +132,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
                   <p class="text-sm text-gray-500">No places found matching "{{ lliSearchTerm() }}"</p>
                   <button
                     (click)="openCreateModal(); $event.stopPropagation()"
-                    class="mt-2 inline-flex items-center gap-1.5 rounded-md bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white
-                           hover:bg-brand-700 transition-colors"
+                    class="app-button-primary mt-2 px-3 py-1.5 text-xs font-semibold"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
                       <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
@@ -149,8 +147,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
         <select
           [(ngModel)]="localTypeFilter"
           (ngModelChange)="currentPage.set(1); loadPlaces(); updateUrlParams()"
-          class="w-full sm:w-40 rounded-lg border border-gray-300 px-3 py-2 text-sm
-                 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+          class="app-input w-full bg-white sm:w-40"
         >
           <option value="">All types</option>
           <option value="POR">Port</option>
@@ -162,8 +159,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
         <select
           [ngModel]="filterResponsible()"
           (ngModelChange)="filterResponsible.set($event); currentPage.set(1); loadPlaces(); updateUrlParams()"
-          class="w-full sm:w-48 rounded-lg border border-gray-300 px-3 py-2 text-sm
-                 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+          class="app-input w-full bg-white sm:w-48"
         >
           <option value="">All Responsible</option>
           @for (u of users(); track u.id) {
@@ -185,8 +181,20 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
       }
 
       <!-- Desktop table -->
-      <div class="hidden md:block overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-        <table class="w-full text-sm">
+      <div class="app-panel hidden md:block">
+        <div class="app-panel-header app-panel-header--cyan">
+          <div class="app-panel-icon-shell app-panel-icon-shell--cyan">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M10 1.75a.75.75 0 0 1 .75.75v.55a6.752 6.752 0 0 1 5.7 5.7h.55a.75.75 0 0 1 0 1.5h-.55a6.752 6.752 0 0 1-5.7 5.7v.55a.75.75 0 0 1-1.5 0v-.55a6.752 6.752 0 0 1-5.7-5.7H3a.75.75 0 0 1 0-1.5h.55a6.752 6.752 0 0 1 5.7-5.7V2.5A.75.75 0 0 1 10 1.75Zm0 2.75A5.25 5.25 0 1 0 10 15a5.25 5.25 0 0 0 0-10.5Zm0 2a3.25 3.25 0 1 1 0 6.5 3.25 3.25 0 0 1 0-6.5Z" />
+            </svg>
+          </div>
+          <div>
+            <h2 class="text-base font-semibold text-gray-900">Place Registry</h2>
+            <p class="mt-1 text-sm text-gray-600">Browse local and imported places, then inspect operational usage at a glance.</p>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-gray-200 bg-gray-50/80">
               <th app-sort-header field="name" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Name</th>
@@ -262,7 +270,8 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
               </tr>
             }
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
 
       <!-- Mobile cards -->
@@ -359,12 +368,12 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
                 <div class="col-span-2 sm:col-span-1">
                   <label class="block text-sm font-medium text-gray-700">Name *</label>
                   <input type="text" [(ngModel)]="createForm.name" name="name" required
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
+                    class="app-input mt-1 w-full" />
                 </div>
                 <div class="col-span-2 sm:col-span-1">
                   <label class="block text-sm font-medium text-gray-700">Country *</label>
                   <select [ngModel]="createForm.countryIso" (ngModelChange)="onCountryChange($event)" name="country" required
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white">
+                    class="app-input mt-1 w-full bg-white">
                     <option value="">Select country…</option>
                     @for (c of countries; track c.code) {
                       <option [value]="c.code">{{ c.name }}</option>
@@ -374,7 +383,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
                 <div>
                   <label class="block text-sm font-medium text-gray-700">Type</label>
                   <select [(ngModel)]="createForm.placeType" name="placeType"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white">
+                    class="app-input mt-1 w-full bg-white">
                     <option [ngValue]="undefined">—</option>
                     <option value="POR">Port</option>
                     <option value="PSP">Sub Port</option>
@@ -386,22 +395,22 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
                 <div>
                   <label class="block text-sm font-medium text-gray-700">UNLOCODE</label>
                   <input type="text" [(ngModel)]="createForm.unlocode" name="unlocode"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
+                    class="app-input-mono-uppercase mt-1 w-full" />
                 </div>
                 <div>
                   <label class="block text-sm font-medium text-gray-700">Latitude</label>
                   <input type="number" step="any" [(ngModel)]="createForm.lat" name="lat"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
+                    class="app-input mt-1 w-full" />
                 </div>
                 <div>
                   <label class="block text-sm font-medium text-gray-700">Longitude</label>
                   <input type="number" step="any" [(ngModel)]="createForm.long" name="long"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
+                    class="app-input mt-1 w-full" />
                 </div>
                 <div class="col-span-2">
                   <label class="block text-sm font-medium text-gray-700">Area</label>
                   <select [(ngModel)]="createForm.area" name="area"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white">
+                    class="app-input mt-1 w-full bg-white">
                     <option [ngValue]="undefined">—</option>
                     @for (a of areas; track a) {
                       <option [value]="a">{{ a }}</option>
@@ -416,7 +425,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
                   Cancel
                 </button>
                 <button type="submit" [disabled]="creating()"
-                  class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50 transition-colors">
+                  class="app-button-primary disabled:opacity-50">
                   {{ creating() ? 'Creating…' : 'Create Place' }}
                 </button>
               </div>

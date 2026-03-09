@@ -99,6 +99,11 @@ interface LliSearchResult {
                 <th app-sort-header field="responsible" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Responsible</th>
                 <th app-sort-header field="eta" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">ETA</th>
                 <th class="px-4 py-3 text-right font-medium text-gray-600">Value (USD)</th>
+                @if (isOrders()) {
+                  <th class="px-4 py-3 text-right font-medium text-gray-600">Gross (USD)</th>
+                  <th class="px-4 py-3 text-right font-medium text-gray-600">Financing (USD)</th>
+                  <th class="px-4 py-3 text-right font-medium text-gray-600">Net (USD)</th>
+                }
                 <th app-sort-header field="createdAt" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Created</th>
                 <th class="px-4 py-3 w-12"></th>
               </tr>
@@ -122,6 +127,29 @@ interface LliSearchResult {
                       <span class="text-gray-400">—</span>
                     }
                   </td>
+                  @if (isOrders()) {
+                    <td class="px-4 py-3 text-right tabular-nums" [class.text-green-600]="inq.totalProfit > 0" [class.text-red-600]="inq.totalProfit < 0">
+                      @if (inq.totalValue > 0 || inq.totalProfit !== 0) {
+                        {{ inq.totalProfit | number:'1.2-2' }}
+                      } @else {
+                        <span class="text-gray-400">—</span>
+                      }
+                    </td>
+                    <td class="px-4 py-3 text-right tabular-nums text-amber-700">
+                      @if (inq.totalValue > 0 || (inq.totalFinancingCost ?? 0) !== 0) {
+                        {{ (inq.totalFinancingCost ?? 0) | number:'1.2-2' }}
+                      } @else {
+                        <span class="text-gray-400">—</span>
+                      }
+                    </td>
+                    <td class="px-4 py-3 text-right tabular-nums" [class.text-green-600]="(inq.totalNetProfit ?? 0) > 0" [class.text-red-600]="(inq.totalNetProfit ?? 0) < 0">
+                      @if (inq.totalValue > 0 || (inq.totalNetProfit ?? 0) !== 0) {
+                        {{ (inq.totalNetProfit ?? 0) | number:'1.2-2' }}
+                      } @else {
+                        <span class="text-gray-400">—</span>
+                      }
+                    </td>
+                  }
                   <td class="px-4 py-3 text-gray-500">{{ inq.createdAt | date:'mediumDate' }}</td>
                   <td class="px-4 py-3">
                     <a
@@ -138,7 +166,7 @@ interface LliSearchResult {
                 </tr>
               } @empty {
                 <tr>
-                  <td colspan="10" class="px-4 py-12 text-center">
+                  <td [attr.colspan]="isOrders() ? 13 : 10" class="px-4 py-12 text-center">
                     <p class="text-sm text-gray-400">{{ isOrders() ? 'No orders found.' : 'No inquiries found.' }}</p>
                     @if (!isOrders()) {
                       <button
@@ -184,6 +212,34 @@ interface LliSearchResult {
                 <span>Resp {{ inq.salesRepName || '—' }}</span>
                 <span>{{ inq.createdAt | date:'mediumDate' }}</span>
               </div>
+              @if (isOrders()) {
+                <div class="mt-3 grid grid-cols-2 gap-2 rounded-lg border border-gray-100 bg-gray-50 p-3 text-xs">
+                  <div>
+                    <p class="text-[11px] uppercase tracking-wide text-gray-500">Gross</p>
+                    <p class="mt-1 font-semibold tabular-nums" [class.text-green-600]="inq.totalProfit > 0" [class.text-red-600]="inq.totalProfit < 0">
+                      {{ inq.totalProfit | number:'1.2-2' }}
+                    </p>
+                  </div>
+                  <div>
+                    <p class="text-[11px] uppercase tracking-wide text-amber-700">Financing</p>
+                    <p class="mt-1 font-semibold tabular-nums text-amber-700">
+                      {{ (inq.totalFinancingCost ?? 0) | number:'1.2-2' }}
+                    </p>
+                  </div>
+                  <div>
+                    <p class="text-[11px] uppercase tracking-wide text-gray-500">Net</p>
+                    <p class="mt-1 font-semibold tabular-nums" [class.text-green-600]="(inq.totalNetProfit ?? 0) > 0" [class.text-red-600]="(inq.totalNetProfit ?? 0) < 0">
+                      {{ (inq.totalNetProfit ?? 0) | number:'1.2-2' }}
+                    </p>
+                  </div>
+                  <div>
+                    <p class="text-[11px] uppercase tracking-wide text-gray-500">Net Margin</p>
+                    <p class="mt-1 font-semibold tabular-nums text-gray-700">
+                      Net Margin {{ (inq.netMarginPct ?? 0) | number:'1.2-2' }}%
+                    </p>
+                  </div>
+                </div>
+              }
             </a>
           } @empty {
             <div class="rounded-xl border-2 border-dashed border-gray-300 bg-white p-8 text-center">

@@ -28,7 +28,7 @@ import { API } from '@app/core/config/api';
         </div>
         <button
           (click)="openCreateModal()"
-          class="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 transition-colors"
+          class="app-button-add"
         >
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
             <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
@@ -45,16 +45,28 @@ import { API } from '@app/core/config/api';
           </svg>
         </div>
       } @else {
-        <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="border-b border-gray-200 bg-gray-50/80">
+        <div class="app-panel">
+          <div class="app-panel-header app-panel-header--amber">
+            <div class="app-panel-icon-shell app-panel-icon-shell--amber">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M2.75 5A2.25 2.25 0 0 1 5 2.75h3.19c.597 0 1.169.237 1.591.659l.81.81c.14.141.332.22.53.22H15A2.25 2.25 0 0 1 17.25 6.5v6.75A2.75 2.75 0 0 1 14.5 16h-9A2.75 2.75 0 0 1 2.75 13.25V5Zm2.25-.75a.75.75 0 0 0-.75.75v8.25c0 .69.56 1.25 1.25 1.25h9c.69 0 1.25-.56 1.25-1.25V6.5a.75.75 0 0 0-.75-.75h-3.87a2.25 2.25 0 0 1-1.59-.659l-.81-.81a.75.75 0 0 0-.53-.22H5Z" />
+              </svg>
+            </div>
+            <div>
+              <h2 class="text-base font-semibold text-gray-900">Group Allocation</h2>
+              <p class="mt-1 text-sm text-gray-600">Define customer groups that share credit capacity and commercial exposure.</p>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-gray-200 bg-gray-50/80">
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Group Name</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600">Companies</th>
                 <th class="px-4 py-3 w-24"></th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100">
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
               @for (group of groups(); track group.id) {
                 <tr class="transition-colors hover:bg-gray-50/50">
                   <td class="px-4 py-3 font-medium text-gray-900">{{ group.name }}</td>
@@ -94,8 +106,9 @@ import { API } from '@app/core/config/api';
                   </td>
                 </tr>
               }
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         </div>
       }
 
@@ -113,14 +126,14 @@ import { API } from '@app/core/config/api';
               <div>
                 <label class="block text-sm font-medium text-gray-700">Group Name *</label>
                 <input type="text" [ngModel]="formName()" (ngModelChange)="formName.set($event)"
-                  class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                  class="app-input mt-1 w-full"
                   placeholder="e.g. Acme Corp Group" />
               </div>
 
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Company Search</label>
                 <input type="text" [ngModel]="searchQuery()" (ngModelChange)="onSearchChange($event)"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                  class="app-input w-full"
                   placeholder="Search companies to add…" />
 
                 @if (searchResults().length) {
@@ -165,7 +178,7 @@ import { API } from '@app/core/config/api';
               <button (click)="showModal.set(false)"
                 class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
               <button (click)="saveForm()" [disabled]="saving()"
-                class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+                class="app-button-primary disabled:opacity-50">
                 @if (saving()) { Saving… } @else { {{ editingId() ? 'Update' : 'Create' }} }
               </button>
             </div>

@@ -46,7 +46,7 @@ interface CompanySearchResultOption {
         </div>
         <button
           (click)="openAddModal()"
-          class="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 transition-colors"
+          class="app-button-add"
         >
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
             <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
@@ -65,9 +65,9 @@ interface CompanySearchResultOption {
       } @else {
         <div class="space-y-4">
           @for (co of companies(); track co.id) {
-            <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div class="app-panel">
               <!-- Company Header Row -->
-              <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div class="app-panel-header app-panel-header--brand justify-between px-5 py-4">
                 <div class="flex items-center gap-4 min-w-0">
                   <!-- Logo -->
                   <div class="relative group flex-shrink-0">
@@ -148,7 +148,7 @@ interface CompanySearchResultOption {
                     <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Bank Accounts</h3>
                     <button
                       (click)="openBankAccountModal(co.id)"
-                      class="inline-flex items-center gap-1 rounded-md bg-brand-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-brand-700 transition-colors"
+                      class="app-button-add px-2.5 py-1 text-xs"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                         <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
@@ -236,7 +236,7 @@ interface CompanySearchResultOption {
                       <button
                         (click)="saveTerms(co.id)"
                         [disabled]="savingTerms()"
-                        class="rounded-md bg-brand-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
+                        class="app-button-primary px-2.5 py-1 text-xs disabled:opacity-60"
                       >
                         {{ savingTerms() ? 'Saving…' : 'Save terms' }}
                       </button>
@@ -258,8 +258,7 @@ interface CompanySearchResultOption {
                           rows="10"
                           [ngModel]="customerTermsDraft()"
                           (ngModelChange)="customerTermsDraft.set($event)"
-                          class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-700 whitespace-pre-line
-                                 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                          class="app-input w-full bg-white text-xs text-gray-700 whitespace-pre-line"
                         ></textarea>
                       </div>
                       <div>
@@ -268,8 +267,7 @@ interface CompanySearchResultOption {
                           rows="10"
                           [ngModel]="supplierTermsDraft()"
                           (ngModelChange)="supplierTermsDraft.set($event)"
-                          class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-700 whitespace-pre-line
-                                 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                          class="app-input w-full bg-white text-xs text-gray-700 whitespace-pre-line"
                         ></textarea>
                       </div>
                     </div>
@@ -283,8 +281,7 @@ interface CompanySearchResultOption {
                           [ngModel]="vatDraft()"
                           (ngModelChange)="vatDraft.set($event)"
                           placeholder="e.g. FR31000060599"
-                          class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700
-                                 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                          class="app-input w-full bg-white text-gray-700"
                         />
                       </div>
                       <div>
@@ -294,8 +291,7 @@ interface CompanySearchResultOption {
                           [ngModel]="companyRegistrationNumberDraft()"
                           (ngModelChange)="companyRegistrationNumberDraft.set($event)"
                           placeholder="e.g. 12345678"
-                          class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700
-                                 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                          class="app-input w-full bg-white text-gray-700"
                         />
                       </div>
                       <div>
@@ -305,8 +301,7 @@ interface CompanySearchResultOption {
                           [ngModel]="latePaymentInterestDraft()"
                           (ngModelChange)="latePaymentInterestDraft.set($event)"
                           placeholder="e.g. 2%"
-                          class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700
-                                 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                          class="app-input w-full bg-white text-gray-700"
                         />
                       </div>
                       <div>
@@ -323,8 +318,7 @@ interface CompanySearchResultOption {
                             [ngModel]="brandColorDraft()"
                             (ngModelChange)="brandColorDraft.set($event)"
                             placeholder="#ffffff"
-                            class="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700
-                                   focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                            class="app-input flex-1 bg-white text-gray-700"
                           />
                         </div>
                       </div>
@@ -334,8 +328,7 @@ interface CompanySearchResultOption {
                           rows="4"
                           [ngModel]="fraudDraft()"
                           (ngModelChange)="fraudDraft.set($event)"
-                          class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-700 whitespace-pre-line
-                                 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                          class="app-input w-full bg-white text-xs text-gray-700 whitespace-pre-line"
                         ></textarea>
                       </div>
                     </div>
@@ -348,7 +341,7 @@ interface CompanySearchResultOption {
               }
             </div>
           } @empty {
-            <div class="rounded-xl border border-gray-200 bg-white shadow-sm px-4 py-8 text-center text-gray-400">
+            <div class="app-panel px-4 py-8 text-center text-gray-400">
               No companies marked as own yet. Click "Add Company" to add one.
             </div>
           }
@@ -368,7 +361,7 @@ interface CompanySearchResultOption {
                 <input type="text" [ngModel]="searchTerm()" (ngModelChange)="onSearch($event)"
                   (focus)="dropdownOpen.set(searchResults().length > 0)"
                   placeholder="Search companies\u2026"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
+                  class="app-input w-full" />
                 @if (dropdownOpen() && searchResults().length) {
                   <div class="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
                     @for (c of searchResults(); track c.key) {
@@ -408,17 +401,17 @@ interface CompanySearchResultOption {
                 <div class="col-span-2">
                   <label class="block text-xs font-medium text-gray-600">Label *</label>
                   <input type="text" [(ngModel)]="baForm.label" name="label" required placeholder="e.g. USD Main Account"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
+                    class="app-input mt-1 w-full" />
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-600">Bank Name *</label>
                   <input type="text" [(ngModel)]="baForm.bankName" name="bankName" required placeholder="e.g. HSBC"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
+                    class="app-input mt-1 w-full" />
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-600">Currency *</label>
                   <select [(ngModel)]="baForm.currency" name="currency" required
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono uppercase focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white">
+                    class="app-input-mono-uppercase mt-1 w-full bg-white">
                     @for (c of configuredCurrencies(); track c) {
                       <option [value]="c">{{ c }}</option>
                     }
@@ -427,47 +420,47 @@ interface CompanySearchResultOption {
                 <div class="col-span-2">
                   <label class="block text-xs font-medium text-gray-600">Beneficiary Name</label>
                   <input type="text" [(ngModel)]="baForm.accountName" name="accountName" placeholder="Account holder name"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
+                    class="app-input mt-1 w-full" />
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-600">IBAN</label>
                   <input type="text" [(ngModel)]="baForm.iban" name="iban" placeholder="e.g. AE07033\u2026"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
+                    class="app-input-mono mt-1 w-full" />
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-600">Account Number</label>
                   <input type="text" [(ngModel)]="baForm.accountNumber" name="accountNumber"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
+                    class="app-input-mono mt-1 w-full" />
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-600">SWIFT / BIC</label>
                   <input type="text" [(ngModel)]="baForm.swiftBic" name="swiftBic" placeholder="e.g. BBMEAEAD"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
+                    class="app-input-mono mt-1 w-full" />
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-600">Sort Code</label>
                   <input type="text" [(ngModel)]="baForm.sortCode" name="sortCode"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
+                    class="app-input-mono mt-1 w-full" />
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-600">Routing Number</label>
                   <input type="text" [(ngModel)]="baForm.routingNumber" name="routingNumber"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
+                    class="app-input-mono mt-1 w-full" />
                 </div>
                 <div class="col-span-2">
                   <label class="block text-xs font-medium text-gray-600">Intermediary Bank</label>
                   <input type="text" [(ngModel)]="baForm.intermediaryBank" name="intermediaryBank" placeholder="e.g. SWIFT BSUIFRPP / CACIB"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
+                    class="app-input-mono mt-1 w-full" />
                 </div>
                 <div class="col-span-2">
                   <label class="block text-xs font-medium text-gray-600">Branch Address</label>
                   <input type="text" [(ngModel)]="baForm.branchAddress" name="branchAddress"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
+                    class="app-input mt-1 w-full" />
                 </div>
                 <div class="col-span-2">
                   <label class="block text-xs font-medium text-gray-600">Notes</label>
                   <textarea [(ngModel)]="baForm.notes" name="notes" rows="2"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none resize-none"></textarea>
+                    class="app-input mt-1 w-full resize-none"></textarea>
                 </div>
                 <div class="col-span-2 flex items-center gap-2">
                   <input type="checkbox" id="isDefault" [(ngModel)]="baForm.isDefault" name="isDefault"
@@ -484,7 +477,7 @@ interface CompanySearchResultOption {
                 <button type="button" (click)="bankAccountModalOpen.set(false)"
                   class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
                 <button type="submit" [disabled]="savingBankAccount()"
-                  class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors">
+                  class="app-button-primary disabled:opacity-50">
                   @if (savingBankAccount()) {
                     Saving\u2026
                   } @else {

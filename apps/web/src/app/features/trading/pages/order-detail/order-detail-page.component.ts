@@ -33,7 +33,9 @@ import {
 import {
   OrderItemsComponent,
   type OrderItemRow,
+  type OrderItemsEconomics,
 } from '../../components/order-items/order-items.component';
+import { OrderFinancingSummaryComponent } from '../../components/order-financing-summary/order-financing-summary.component';
 import {
   HeaderActionsComponent,
   type HeaderAction,
@@ -167,6 +169,7 @@ interface InquiryReplyRecommendation {
     DatePipe,
     DecimalPipe,
     OrderItemsComponent,
+    OrderFinancingSummaryComponent,
     HeaderActionsComponent,
     SendEmailModalComponent,
     SendInquiryModalComponent,
@@ -962,6 +965,14 @@ interface InquiryReplyRecommendation {
       </div>
     }
 
+    <app-order-financing-summary
+      class="mt-4 block"
+      [financingRateAnnual]="financingRateAnnual()"
+      [financingDays]="financingDays()"
+      [financingDayCountConvention]="financingDayCountConvention()"
+      [economics]="itemEconomics()"
+    />
+
     <!-- ═════════════════════════════════════════════════════════════ -->
     <!--  Editable Items Grid                                         -->
     <!-- ═════════════════════════════════════════════════════════════ -->
@@ -970,10 +981,14 @@ interface InquiryReplyRecommendation {
       [items]="itemRows()"
       [readonly]="isReadonly()"
       [allowDeliveredEdit]="allowDeliveredEdit()"
+      [financingRateAnnual]="financingRateAnnual()"
+      [financingDays]="financingDays()"
+      [financingDayCountConvention]="financingDayCountConvention()"
       [productOptionsInput]="configuredProducts()"
       [unitOptionsInput]="configuredUnits()"
       [currencyOptionsInput]="configuredCurrencies()"
       (itemsChange)="onItemsChange($event)"
+      (economicsChange)="onItemEconomicsChange($event)"
     />
 
     <!-- Delivery + Payments + Attachments + Comments -->
@@ -1403,6 +1418,16 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   readonly vessels = signal<VesselDto[]>([]);
   readonly places = signal<PlaceDto[]>([]);
   readonly itemRows = signal<OrderItemRow[]>([]);
+  readonly itemEconomics = signal<OrderItemsEconomics>({
+    totalQuantity: 0,
+    totalCost: 0,
+    totalRevenue: 0,
+    totalGrossProfit: 0,
+    totalFinancingCost: 0,
+    financingCostPerMt: null,
+    totalNetProfit: 0,
+    netMarginPct: null,
+  });
   readonly saving = signal(false);
   readonly toast = signal<{ type: 'success' | 'error'; message: string } | null>(null);
   readonly invoiceNumber = signal('');
@@ -1667,6 +1692,18 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
 
   readonly canUseSupplierCredit = computed(() => !!this.supplierCreditSummary());
 
+  readonly financingRateAnnual = computed(() => this.order()?.financingRateAnnual ?? 0.08);
+  readonly financingDayCountConvention = computed(() => this.order()?.financingDayCountConvention ?? 365);
+  readonly financingDays = computed(() => {
+    const customerDays = this.order()?.customerPaymentTermType === 'CREDIT'
+      ? Math.max(0, this.order()?.customerCreditDays ?? 0)
+      : 0;
+    const supplierDays = this.order()?.supplierPaymentTermType === 'CREDIT'
+      ? Math.max(0, this.order()?.supplierCreditDays ?? 0)
+      : 0;
+    return Math.max(customerDays - supplierDays, 0);
+  });
+
   readonly rankedInquirySuppliers = computed(() =>
     [...this.inquirySupplierContext()].sort((left, right) => this.compareInquirySupplierPerformance(left, right)).slice(0, 6),
   );
@@ -1915,6 +1952,13 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
           supplierContactId: d.supplierContactId ?? null,
           termsAndConditions: d.termsAndConditions ?? null,
           lossReason: d.lossReason,
+          financingRateAnnual: d.financingRateAnnual ?? 0.08,
+          financingDayCountConvention: d.financingDayCountConvention ?? 365,
+          financingDays: d.financingDays ?? 0,
+          totalFinancingCost: d.totalFinancingCost ?? '0.0000',
+          financingCostPerMt: d.financingCostPerMt ?? null,
+          totalNetProfit: d.totalNetProfit ?? '0.0000',
+          netMarginPct: d.netMarginPct ?? null,
           closedAt: d.closedAt,
           deliveredAt: d.deliveredAt ?? null,
           createdAt: d.createdAt,
@@ -2943,6 +2987,10 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     const iso = value ? this.toUtcIsoFromZonedInput(value, this.placeTimezone()) : null;
     this.order.update((o) => (o ? { ...o, deliveredAt: iso } : o));
     this.triggerAutosave();
+  }
+
+  onItemEconomicsChange(economics: OrderItemsEconomics): void {
+    this.itemEconomics.set(economics);
   }
 
   onCurrencyChange(currency: string): void {

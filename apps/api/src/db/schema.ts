@@ -88,6 +88,7 @@ export const documentTypeEnum = pgEnum('document_type', [
 
 export interface TenantSettings {
   activityRetentionDays?: number;
+  financingRateAnnual?: number;
   // Security / Auth
   ssoProvider?: 'microsoft' | 'google' | 'none';
   ssoClientId?: string;

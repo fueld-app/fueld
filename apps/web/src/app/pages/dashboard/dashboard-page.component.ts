@@ -128,7 +128,7 @@ import { API } from '@app/core/config/api';
       <!-- KPI Cards -->
       <div class="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         @for (card of kpiCards(); track card.label) {
-          <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div class="app-kpi-card">
             <p class="text-sm font-medium text-gray-500">{{ card.label }}</p>
             <p class="mt-2 text-3xl font-bold text-gray-900">{{ card.value }}</p>
           </div>
@@ -260,6 +260,8 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     totalTraders: 0,
     activeOrders: 0,
     totalRevenueYTD: '—',
+    totalGrossProfitYTD: '—',
+    totalNetProfitYTD: '—',
     avgDealSize: '—',
     traderPerformance: [],
   });
@@ -282,6 +284,8 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   readonly kpiCards = computed(() => [
     { label: 'Total Orders', value: this.teamStats().activeOrders.toString() },
     { label: 'Total Revenue YTD', value: this.teamStats().totalRevenueYTD },
+    { label: 'Gross Profit YTD', value: this.teamStats().totalGrossProfitYTD ?? '—' },
+    { label: 'Net Profit YTD', value: this.teamStats().totalNetProfitYTD ?? '—' },
     { label: 'Avg. Deal Size', value: this.teamStats().avgDealSize },
     { label: 'Overdue Invoices', value: this.collections().items.length.toString() },
   ]);
@@ -355,6 +359,8 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
         totalTraders: 0,
         activeOrders: 0,
         totalRevenueYTD: '—',
+        totalGrossProfitYTD: '—',
+        totalNetProfitYTD: '—',
         avgDealSize: '—',
         traderPerformance: [],
       });
@@ -377,18 +383,24 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
       (sum, trader) => sum + this.parseNumber(trader.totalProfit),
       0,
     );
+    const totalNetProfit = filtered.reduce(
+      (sum, trader) => sum + this.parseNumber(trader.totalNetProfit),
+      0,
+    );
     const avgDealSize = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
     this.teamStats.set({
       totalTraders: filtered.length,
       activeOrders: totalOrders,
       totalRevenueYTD: totalRevenue > 0 ? this.formatUsd(totalRevenue) : '—',
+      totalGrossProfitYTD: totalProfit !== 0 ? this.formatUsd(totalProfit) : '—',
+      totalNetProfitYTD: totalNetProfit !== 0 ? this.formatUsd(totalNetProfit) : '—',
       avgDealSize: avgDealSize > 0 ? this.formatUsd(avgDealSize) : '—',
       traderPerformance: filtered.map((trader) => ({
         name: trader.traderName,
         orders: trader.orderCount,
         revenue: this.formatUsd(this.parseNumber(trader.totalRevenue)),
-        margin: this.formatUsd(this.parseNumber(trader.totalProfit)),
+        margin: this.formatUsd(this.parseNumber(trader.totalNetProfit)),
       })),
     });
   }

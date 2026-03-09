@@ -166,6 +166,8 @@ describe('admin settings.service', () => {
       updateUnitSettings,
       getCurrencySettings,
       updateCurrencySettings,
+      getFinancingSettings,
+      updateFinancingSettings,
       getCompanyTypeSettings,
       updateCompanyTypeSettings,
     } = await loadSettingsService();
@@ -194,6 +196,14 @@ describe('admin settings.service', () => {
     const updatedCurrencies = (await updateCurrencySettings(['USD', 'EUR'])).currencies;
     expect(updatedCurrencies).toContain('USD');
     expect(updatedCurrencies).toContain('EUR');
+
+    const financingDefaults = await getFinancingSettings();
+    expect(financingDefaults.annualRate).toBe(0.08);
+    expect(financingDefaults.dayCountConvention).toBe(365);
+
+    const updatedFinancing = await updateFinancingSettings(0.1);
+    expect(updatedFinancing.annualRate).toBe(0.1);
+    expect(updatedFinancing.dayCountConvention).toBe(365);
 
     expect((await getCompanyTypeSettings()).companyTypes.length).toBeGreaterThan(0);
     expect((await updateCompanyTypeSettings(['CLIENT', 'SUPPLIER'])).companyTypes).toEqual(['CLIENT', 'SUPPLIER']);

@@ -44,7 +44,7 @@ import { API } from '@app/core/config/api';
               (blur)="saveRetention()"
               min="1"
               max="3650"
-              class="w-20 rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+              class="app-input w-20 px-2 py-1.5"
             />
             <span>days</span>
           </div>
@@ -104,23 +104,35 @@ import { API } from '@app/core/config/api';
         } @else {
           <!-- Session summary cards -->
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-            <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <div class="app-kpi-card p-4">
               <p class="text-sm text-gray-500">Active Sessions</p>
               <p class="text-2xl font-bold text-gray-900 mt-1">{{ sessions().length }}</p>
             </div>
-            <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <div class="app-kpi-card p-4">
               <p class="text-sm text-gray-500">Unique Users</p>
               <p class="text-2xl font-bold text-gray-900 mt-1">{{ uniqueUserCount() }}</p>
             </div>
-            <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <div class="app-kpi-card p-4">
               <p class="text-sm text-gray-500">Avg. Sessions / User</p>
               <p class="text-2xl font-bold text-gray-900 mt-1">{{ avgSessionsPerUser() }}</p>
             </div>
           </div>
 
           <!-- Sessions table -->
-          <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-            <table class="w-full text-sm">
+          <div class="app-panel">
+            <div class="app-panel-header app-panel-header--emerald">
+              <div class="app-panel-icon-shell app-panel-icon-shell--emerald">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10 2.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5ZM5.5 9A2.5 2.5 0 1 0 5.5 14a2.5 2.5 0 0 0 0-5Zm9 0a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5ZM2.75 16A1.75 1.75 0 0 1 4.5 14.25h2A1.75 1.75 0 0 1 8.25 16v.25a.75.75 0 0 1-.75.75H3.5a.75.75 0 0 1-.75-.75V16Zm8.5 0A1.75 1.75 0 0 1 13 14.25h2A1.75 1.75 0 0 1 16.75 16v.25a.75.75 0 0 1-.75.75h-4a.75.75 0 0 1-.75-.75V16Zm-4.25 0A2.75 2.75 0 0 1 9.75 13.25h.5A2.75 2.75 0 0 1 13 16v.25a.75.75 0 0 1-.75.75h-4.5a.75.75 0 0 1-.75-.75V16Z" />
+                </svg>
+              </div>
+              <div>
+                <h2 class="text-base font-semibold text-gray-900">Live Session Feed</h2>
+                <p class="mt-1 text-sm text-gray-600">Current presence, device, and geography for active users.</p>
+              </div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
               <thead>
                 <tr class="border-b border-gray-200 bg-gray-50/80">
                   <th class="px-4 py-3 text-left font-medium text-gray-600">User</th>
@@ -174,7 +186,8 @@ import { API } from '@app/core/config/api';
                   </tr>
                 }
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
         }
       }
@@ -186,7 +199,7 @@ import { API } from '@app/core/config/api';
           <select
             [ngModel]="filterAction()"
             (ngModelChange)="filterAction.set($event); loadLogs()"
-            class="rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+            class="app-input px-3 py-1.5"
           >
             <option value="">All Actions</option>
             <option value="PAGE_VIEW">Page View</option>
@@ -200,7 +213,7 @@ import { API } from '@app/core/config/api';
           <select
             [ngModel]="filterEntity()"
             (ngModelChange)="filterEntity.set($event); loadLogs()"
-            class="rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+            class="app-input px-3 py-1.5"
           >
             <option value="">All Entities</option>
             <option value="page">Page</option>
@@ -218,21 +231,21 @@ import { API } from '@app/core/config/api';
             [ngModel]="filterEmail()"
             (ngModelChange)="filterEmail.set($event)"
             (keyup.enter)="loadLogs()"
-            class="rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 w-60"
+            class="app-input w-60 px-3 py-1.5"
           />
           <div class="flex items-center gap-1.5">
             <input
               type="date"
               [ngModel]="filterDateFrom()"
               (ngModelChange)="filterDateFrom.set($event); loadLogs()"
-              class="rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+              class="app-input px-2 py-1.5"
             />
             <span class="text-gray-400 text-xs">–</span>
             <input
               type="date"
               [ngModel]="filterDateTo()"
               (ngModelChange)="filterDateTo.set($event); loadLogs()"
-              class="rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+              class="app-input px-2 py-1.5"
             />
           </div>
           <button
@@ -259,8 +272,20 @@ import { API } from '@app/core/config/api';
             <p class="text-sm mt-1">Activity will be recorded as users interact with the system.</p>
           </div>
         } @else {
-          <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-            <table class="w-full text-sm">
+          <div class="app-panel">
+            <div class="app-panel-header app-panel-header--indigo">
+              <div class="app-panel-icon-shell app-panel-icon-shell--indigo">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M5.75 2.75A2.75 2.75 0 0 0 3 5.5v9A2.75 2.75 0 0 0 5.75 17.25h8.5A2.75 2.75 0 0 0 17 14.5v-6.69a2.75 2.75 0 0 0-.805-1.945l-2.06-2.06A2.75 2.75 0 0 0 12.19 3H5.75Zm6 .75v2.75c0 .69.56 1.25 1.25 1.25h2.5v7a1.25 1.25 0 0 1-1.25 1.25h-8.5A1.25 1.25 0 0 1 4.5 14.5v-9c0-.69.56-1.25 1.25-1.25h6Zm1.5.31 1.94 1.94h-1.94V3.81Z" />
+                </svg>
+              </div>
+              <div>
+                <h2 class="text-base font-semibold text-gray-900">Audit Timeline</h2>
+                <p class="mt-1 text-sm text-gray-600">Filter by actor, action, entity, and date to inspect operational history.</p>
+              </div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
               <thead>
                 <tr class="border-b border-gray-200 bg-gray-50/80">
                   <th app-sort-header field="createdAt" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Time</th>
@@ -326,7 +351,8 @@ import { API } from '@app/core/config/api';
                       <code class="text-[11px] text-gray-500">{{ log.clientIp || '\u2014' }}</code>
                     </td>
                     <td class="px-4 py-3 text-[11px] text-gray-500">{{ log.platform || '\u2014' }}</td>
-                  </tr>                  @if (expandedLogId() === log.id) {
+                  </tr>
+                  @if (expandedLogId() === log.id) {
                     <tr class="bg-gray-50/80">
                       <td colspan="7" class="px-6 py-4">
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
@@ -395,9 +421,11 @@ import { API } from '@app/core/config/api';
                         </div>
                       </td>
                     </tr>
-                  }                }
+                  }
+                }
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
 
           <!-- Pagination -->
