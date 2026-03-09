@@ -149,7 +149,7 @@ const ACTIONS: ActionItem[] = [
     <!-- Dropdown -->
     @if (isOpen()) {
       <div
-        class="absolute right-0 z-50 mt-1 w-56 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+        class="absolute left-0 sm:left-auto sm:right-0 z-50 mt-1 w-56 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
         role="menu"
       >
         @for (action of displayActions(); track action.key) {

@@ -29,7 +29,7 @@ import { StatusBadgeComponent } from '../../../../shared/components/status-badge
             <h1 class="text-2xl font-bold text-gray-900">{{ title() }}</h1>
             <app-status-badge [status]="status()" />
           </div>
-          <div class="mt-1 flex items-center gap-2 text-sm text-gray-500">
+          <div class="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
             <p>
               @if (entityNumber()) {
                 <span class="font-mono text-gray-600">{{ entityNumber() }}</span>

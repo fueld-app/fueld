@@ -21,13 +21,6 @@ import type { ApiResponse } from '@fueld/types';
 
 export const creditController = new Elysia({ prefix: '/credit' })
   .use(authGuard)
-  // Only ADMIN and CREDITMANAGER may access credit endpoints
-  .onBeforeHandle(({ auth, set }) => {
-    if (auth.role !== 'ADMIN' && auth.role !== 'CREDITMANAGER') {
-      set.status = 403;
-      return { success: false, error: 'Forbidden: insufficient role' };
-    }
-  })
 
   // ─── List Credit Lines ──────────────────────────────────────────
   .get(
@@ -81,7 +74,11 @@ export const creditController = new Elysia({ prefix: '/credit' })
   // ─── Create Credit Line ─────────────────────────────────────────
   .post(
     '/lines',
-    async ({ body }) => {
+    async ({ auth, body, set }) => {
+      if (auth.role !== 'ADMIN' && auth.role !== 'CREDITMANAGER') {
+        set.status = 403;
+        return { success: false, data: null, message: 'Forbidden: insufficient role' };
+      }
       try {
         const line = await createCreditLine(body);
         return { success: true, data: line } satisfies ApiResponse<typeof line>;
@@ -113,7 +110,11 @@ export const creditController = new Elysia({ prefix: '/credit' })
   // ─── Update Credit Line ─────────────────────────────────────────
   .patch(
     '/lines/:id',
-    async ({ params, body }) => {
+    async ({ auth, params, body, set }) => {
+      if (auth.role !== 'ADMIN' && auth.role !== 'CREDITMANAGER') {
+        set.status = 403;
+        return { success: false, data: null, message: 'Forbidden: insufficient role' };
+      }
       const updated = await updateCreditLine(params.id, body);
       if (!updated) {
         return { success: false, data: null, message: 'Credit line not found' };
@@ -143,7 +144,11 @@ export const creditController = new Elysia({ prefix: '/credit' })
   // ─── Delete Credit Line ─────────────────────────────────────────
   .delete(
     '/lines/:id',
-    async ({ params }) => {
+    async ({ auth, params, set }) => {
+      if (auth.role !== 'ADMIN' && auth.role !== 'CREDITMANAGER') {
+        set.status = 403;
+        return { success: false, data: null, message: 'Forbidden: insufficient role' };
+      }
       const deleted = await deleteCreditLine(params.id);
       if (!deleted) {
         return { success: false, data: null, message: 'Credit line not found' };

@@ -236,7 +236,7 @@ interface InquiryReplyRecommendation {
 
           @if (settingsOpen()) {
             <div class="fixed inset-0 z-40" (click)="settingsOpen.set(false)"></div>
-            <div class="absolute right-0 z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
+            <div class="absolute left-0 sm:left-auto sm:right-0 z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
               <label class="mb-1 block text-xs font-medium text-gray-500">Currency</label>
               <select
                 [ngModel]="order()?.currency ?? 'USD'"

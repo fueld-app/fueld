@@ -523,7 +523,7 @@ export interface OrderItemsEconomics {
                   <input type="number" step="0.01" min="0"
                     [ngModel]="row.costPrice"
                     (ngModelChange)="updateField(i, 'costPrice', $event)"
-                    class="w-full min-w-[100px] rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
+                    class="min-w-0 w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
                            [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
                            focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                   />
@@ -551,7 +551,7 @@ export interface OrderItemsEconomics {
                   <input type="number" step="0.01" min="0"
                     [ngModel]="row.salesPrice"
                     (ngModelChange)="updateField(i, 'salesPrice', $event)"
-                    class="w-full min-w-[100px] rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
+                    class="min-w-0 w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
                            [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
                            focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                   />
