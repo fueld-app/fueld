@@ -1628,7 +1628,10 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   );
 
   readonly placeDropdownOptions = computed<DropdownOption[]>(() =>
-    this.places().map((p) => ({ value: p.id, label: p.name })),
+    this.places().map((p) => ({
+      value: p.id,
+      label: p.unlocode ? `${p.name} (${p.unlocode.replace(/\s+/g, '')})` : p.name,
+    })),
   );
 
   readonly responsibleUserOptions = computed<DropdownOption[]>(() =>

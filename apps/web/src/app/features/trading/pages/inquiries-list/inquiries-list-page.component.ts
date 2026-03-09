@@ -480,7 +480,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   );
   readonly placeOptions = computed<DropdownOption[]>(() =>
     [
-      ...this.placesList().map((p) => ({ value: p.id, label: p.name })),
+      ...this.placesList().map((p) => ({ value: p.id, label: p.unlocode ? `${p.name} (${p.unlocode.replace(/\s+/g, '')})` : p.name })),
       ...this.placeImportOptions(),
     ],
   );

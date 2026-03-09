@@ -840,7 +840,7 @@ export async function updateUnitSettings(units: string[]): Promise<{ units: stri
 //  UNIT CONVERSION SETTINGS
 // ═══════════════════════════════════════════════════════════════════════
 
-interface UnitConversion {
+export interface UnitConversion {
   productType?: string;
   fromUnit: string;
   toUnit: string;

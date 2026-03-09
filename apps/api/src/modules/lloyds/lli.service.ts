@@ -310,7 +310,17 @@ export async function searchPlaces(query: {
 
   // ── 1. Local DB search ─────────────────────────────────────────────
   const conditions = [];
-  if (query.name) conditions.push(ilike(places.name, `%${query.name}%`));
+  if (query.name) {
+    const term = query.name.trim();
+    // Match against name OR unlocode (spaced form like "IN MUN" and compact form like "INMUN")
+    conditions.push(
+      or(
+        ilike(places.name, `%${term}%`),
+        ilike(places.unlocode, `%${term}%`),
+        sql`lower(replace(${places.unlocode}, ' ', '')) LIKE lower(${'%' + term.replace(/\s+/g, '') + '%'})`,
+      )!,
+    );
+  }
   if (query.country) conditions.push(ilike(places.country, `%${query.country}%`));
 
   if (conditions.length > 0) {
@@ -461,7 +471,17 @@ export async function listPlaces(query?: {
   page?: number;
 }) {
   const conditions = [];
-  if (query?.search) conditions.push(ilike(places.name, `%${query.search}%`));
+  if (query?.search) {
+    const term = query.search.trim();
+    // Match against name OR unlocode (spaced form like "IN MUN" and compact form like "INMUN")
+    conditions.push(
+      or(
+        ilike(places.name, `%${term}%`),
+        ilike(places.unlocode, `%${term}%`),
+        sql`lower(replace(${places.unlocode}, ' ', '')) LIKE lower(${'%' + term.replace(/\s+/g, '') + '%'})`,
+      )!,
+    );
+  }
   if (query?.country) conditions.push(ilike(places.country, `%${query.country}%`));
   if (query?.placeType) conditions.push(eq(places.placeType, query.placeType as any));
   if (query?.responsibleUserId) conditions.push(eq(places.responsibleUserId, query.responsibleUserId));
