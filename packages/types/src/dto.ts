@@ -1164,6 +1164,9 @@ export interface CreditApplicationSettingsDto {
   autoApplyOnApproval: boolean;
   immediateRejection: boolean;
   notifyCreditManagers: boolean;
+  notifyPush: boolean;
+  notifyEmail: boolean;
+  notifyWhatsApp: boolean;
 }
 
 export interface UpdateCreditApplicationSettingsDto {
@@ -1171,6 +1174,9 @@ export interface UpdateCreditApplicationSettingsDto {
   autoApplyOnApproval?: boolean;
   immediateRejection?: boolean;
   notifyCreditManagers?: boolean;
+  notifyPush?: boolean;
+  notifyEmail?: boolean;
+  notifyWhatsApp?: boolean;
 }
 
 // ═══════════════════════════════════════════════════════════════════════

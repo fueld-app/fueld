@@ -497,7 +497,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         const filename = `${orderId}-${crypto.randomUUID()}.${ext}`;
         const { join } = await import('path');
         const { mkdir } = await import('fs/promises');
-        const dir = join(import.meta.dir, '../../../uploads/attachments');
+        const dir = join(process.cwd(), 'uploads/attachments');
         await mkdir(dir, { recursive: true });
         await Bun.write(join(dir, filename), file);
 

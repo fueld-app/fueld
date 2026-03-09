@@ -208,3 +208,35 @@ export async function sendTestEmail(to: string): Promise<boolean> {
 
   return true;
 }
+
+/**
+ * Send a simple notification email (no attachments, plain subject + body).
+ * Returns true when successfully queued, false if SMTP is not configured.
+ */
+export async function sendNotificationEmail(
+  to: string | string[],
+  subject: string,
+  htmlContent: string,
+): Promise<boolean> {
+  const cfg = await getSmtpConfig();
+  if (!cfg) {
+    console.warn('[Email] SMTP not configured, notification email skipped');
+    return false;
+  }
+
+  const transporter = await getTransporter();
+  if (!transporter) return false;
+
+  const recipients = Array.isArray(to) ? to.join(', ') : to;
+  const plainText = htmlContent.replace(/<[^>]*>/g, '');
+
+  await transporter.sendMail({
+    from: cfg.from,
+    to: recipients,
+    subject,
+    text: plainText,
+    html: htmlContent,
+  });
+
+  return true;
+}

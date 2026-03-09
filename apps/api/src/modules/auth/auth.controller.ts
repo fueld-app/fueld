@@ -1314,7 +1314,7 @@ export const authController = new Elysia({ prefix: '/auth' })
 
         const ext = file.type.split('/')[1] === 'jpeg' ? 'jpg' : file.type.split('/')[1];
         const filename = `${decoded.sub}.${ext}`;
-        const uploadDir = join(import.meta.dir, '../../../uploads/avatars');
+        const uploadDir = join(process.cwd(), 'uploads/avatars');
         const filepath = join(uploadDir, filename);
 
         // Delete old avatar files for this user
@@ -1369,7 +1369,7 @@ export const authController = new Elysia({ prefix: '/auth' })
         }
 
         // Delete avatar files
-        const uploadDir = join(import.meta.dir, '../../../uploads/avatars');
+        const uploadDir = join(process.cwd(), 'uploads/avatars');
         const { readdirSync, unlinkSync } = await import('fs');
         try {
           for (const f of readdirSync(uploadDir)) {

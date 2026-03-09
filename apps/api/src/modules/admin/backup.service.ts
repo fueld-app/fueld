@@ -67,7 +67,6 @@ function resolveUploadsRoot(): string {
   const candidates = [
     join(cwd, 'uploads'),
     join(cwd, 'apps', 'api', 'uploads'),
-    join(import.meta.dir, '../../../uploads'),
   ];
 
   for (const candidate of candidates) {

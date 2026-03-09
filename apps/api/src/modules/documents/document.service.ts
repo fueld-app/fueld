@@ -782,7 +782,7 @@ export function tryLoadLogoDataUrl(logoUrl: string | null | undefined): string |
   if (!mime) return null;
 
   // Resolve to local uploads folder (works in dev and in the deployed /opt/fueld layout).
-  const localPath = join(import.meta.dir, '../../../uploads/logos', filename);
+  const localPath = join(process.cwd(), 'uploads/logos', filename);
   if (!existsSync(localPath)) return null;
 
   try {

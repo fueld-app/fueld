@@ -751,7 +751,7 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       const ext = file.name.split('.').pop() ?? 'png';
       const filename = `${params.companyId}.${ext}`;
       const { join } = await import('path');
-      const dir = join(import.meta.dir, '../../../uploads/logos');
+      const dir = join(process.cwd(), 'uploads/logos');
       await Bun.write(join(dir, filename), file);
 
       // Remove old logos with different extensions
@@ -785,7 +785,7 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       // Remove file
       const { join } = await import('path');
       const { readdirSync, unlinkSync } = await import('fs');
-      const dir = join(import.meta.dir, '../../../uploads/logos');
+      const dir = join(process.cwd(), 'uploads/logos');
       try {
         for (const f of readdirSync(dir)) {
           if (f.startsWith(params.companyId + '.')) {
@@ -837,7 +837,7 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       const ext = file.name.split('.').pop() ?? 'png';
       const filename = `default-logo.${ext}`;
       const { join } = await import('path');
-      const dir = join(import.meta.dir, '../../../uploads/logos');
+      const dir = join(process.cwd(), 'uploads/logos');
       await Bun.write(join(dir, filename), file);
 
       // Clean up old default logo files with different extension
@@ -869,7 +869,7 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
 
       const { join } = await import('path');
       const { readdirSync, unlinkSync } = await import('fs');
-      const dir = join(import.meta.dir, '../../../uploads/logos');
+      const dir = join(process.cwd(), 'uploads/logos');
       try {
         for (const f of readdirSync(dir)) {
           if (f.startsWith('default-logo.')) unlinkSync(join(dir, f));

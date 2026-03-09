@@ -335,7 +335,7 @@ export async function createApp(options: CreateAppOptions = {}) {
     .use(rfqController)
     .get('/uploads/avatars/:filename', async ({ params, set }) => {
       const { join } = await import('path');
-      const path = join(import.meta.dir, '../uploads/avatars', params.filename);
+      const path = join(process.cwd(), 'uploads/avatars', params.filename);
       const file = Bun.file(path);
       if (!(await file.exists())) {
         set.status = 404;
@@ -347,7 +347,7 @@ export async function createApp(options: CreateAppOptions = {}) {
     })
     .get('/uploads/logos/:filename', async ({ params, set }) => {
       const { join } = await import('path');
-      const path = join(import.meta.dir, '../uploads/logos', params.filename);
+      const path = join(process.cwd(), 'uploads/logos', params.filename);
       const file = Bun.file(path);
       if (!(await file.exists())) {
         set.status = 404;
@@ -359,7 +359,7 @@ export async function createApp(options: CreateAppOptions = {}) {
     })
     .get('/uploads/attachments/:filename', async ({ params, set }) => {
       const { join } = await import('path');
-      const path = join(import.meta.dir, '../uploads/attachments', params.filename);
+      const path = join(process.cwd(), 'uploads/attachments', params.filename);
       const file = Bun.file(path);
       if (!(await file.exists())) {
         set.status = 404;

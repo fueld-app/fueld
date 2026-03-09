@@ -136,7 +136,10 @@ export interface TenantSettings {
     requiredApprovals: number;          // how many credit managers must approve (default 1)
     autoApplyOnApproval: boolean;       // auto-create/update credit line when approved
     immediateRejection: boolean;        // reject immediately on first rejection (vs wait for all)
-    notifyCreditManagers: boolean;      // send push notifications on new applications
+    notifyCreditManagers: boolean;      // legacy — maps to notifyPush for backward compat
+    notifyPush: boolean;                // send push notifications on new applications
+    notifyEmail: boolean;               // send email to credit managers/admins
+    notifyWhatsApp: boolean;            // send WhatsApp message to default group
   };
 }
 

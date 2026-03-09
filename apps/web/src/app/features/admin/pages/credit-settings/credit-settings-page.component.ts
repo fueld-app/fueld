@@ -116,6 +116,39 @@ import { API } from '@app/core/config/api';
                 </div>
               </div>
 
+              <!-- Email Notifications -->
+              <div class="flex items-start gap-3">
+                <button (click)="notifyEmail.set(!notifyEmail())"
+                  class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
+                  [class]="notifyEmail() ? 'bg-brand-600' : 'bg-gray-300'">
+                  <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                    [class]="notifyEmail() ? 'translate-x-4' : 'translate-x-0.5'"></span>
+                </button>
+                <div>
+                  <p class="text-sm font-medium text-gray-700">Email Notifications</p>
+                  <p class="text-xs text-gray-500">
+                    Send an email to all credit managers and admins when a new application is submitted.
+                  </p>
+                </div>
+              </div>
+
+              <!-- WhatsApp Notifications -->
+              <div class="flex items-start gap-3">
+                <button (click)="notifyWhatsApp.set(!notifyWhatsApp())"
+                  class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
+                  [class]="notifyWhatsApp() ? 'bg-brand-600' : 'bg-gray-300'">
+                  <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                    [class]="notifyWhatsApp() ? 'translate-x-4' : 'translate-x-0.5'"></span>
+                </button>
+                <div>
+                  <p class="text-sm font-medium text-gray-700">WhatsApp Notifications</p>
+                  <p class="text-xs text-gray-500">
+                    Send a WhatsApp message to the default group when a new application is submitted.
+                    Requires WhatsApp to be connected and a default group configured in Integrations.
+                  </p>
+                </div>
+              </div>
+
               <!-- Save button -->
               <div class="pt-2 border-t border-gray-100">
                 <button (click)="save()" [disabled]="saving()"
@@ -217,6 +250,8 @@ export class CreditSettingsPageComponent implements OnInit {
   readonly autoApplyOnApproval = signal(true);
   readonly immediateRejection = signal(true);
   readonly notifyCreditManagers = signal(true);
+  readonly notifyEmail = signal(false);
+  readonly notifyWhatsApp = signal(false);
   readonly financingAnnualRatePercent = signal(8);
   readonly financingDayCountConvention = signal(365);
 
@@ -244,6 +279,8 @@ export class CreditSettingsPageComponent implements OnInit {
         this.autoApplyOnApproval.set(creditRes.data.autoApplyOnApproval);
         this.immediateRejection.set(creditRes.data.immediateRejection);
         this.notifyCreditManagers.set(creditRes.data.notifyCreditManagers);
+        this.notifyEmail.set(creditRes.data.notifyEmail ?? false);
+        this.notifyWhatsApp.set(creditRes.data.notifyWhatsApp ?? false);
       }
       if (financingRes.success && financingRes.data) {
         this.financingAnnualRatePercent.set(financingRes.data.annualRate * 100);
@@ -270,6 +307,9 @@ export class CreditSettingsPageComponent implements OnInit {
             autoApplyOnApproval: this.autoApplyOnApproval(),
             immediateRejection: this.immediateRejection(),
             notifyCreditManagers: this.notifyCreditManagers(),
+            notifyPush: this.notifyCreditManagers(),
+            notifyEmail: this.notifyEmail(),
+            notifyWhatsApp: this.notifyWhatsApp(),
           },
         ),
       );

@@ -23,8 +23,11 @@ import {
   getCreditApplicationSettings,
   updateCreditApplicationSettings,
   getCreditManagerUserIds,
+  getCreditManagerEmails,
 } from './credit-applications.service';
 import { sendNotificationToUsers } from '../push/push.service';
+import { sendNotificationEmail } from '../../lib/email';
+import { notifyCreditApplicationWhatsApp } from './credit-notifications';
 import type { ApiResponse } from '@fueld/types';
 
 export const creditApplicationsController = new Elysia({ prefix: '/credit/applications' })
@@ -112,6 +115,9 @@ export const creditApplicationsController = new Elysia({ prefix: '/credit/applic
         autoApplyOnApproval: t.Optional(t.Boolean()),
         immediateRejection: t.Optional(t.Boolean()),
         notifyCreditManagers: t.Optional(t.Boolean()),
+        notifyPush: t.Optional(t.Boolean()),
+        notifyEmail: t.Optional(t.Boolean()),
+        notifyWhatsApp: t.Optional(t.Boolean()),
       }),
       detail: {
         tags: ['Credit Applications'],
@@ -146,21 +152,45 @@ export const creditApplicationsController = new Elysia({ prefix: '/credit/applic
       try {
         const app = await createCreditApplication(body, auth.sub);
 
-        // Notify credit managers via push notification
+        // Notify credit managers via configured channels
         try {
           const settings = await getCreditApplicationSettings();
-          if (settings.notifyCreditManagers) {
+          const notificationBody = `${auth.email ?? 'A trader'} submitted a credit application for ${app.counterpartyName} (${app.requestedCurrency} ${Number(app.requestedAmount).toLocaleString()})`;
+
+          // Push notification
+          if (settings.notifyPush || settings.notifyCreditManagers) {
             const cmUserIds = await getCreditManagerUserIds();
             if (cmUserIds.length > 0) {
               await sendNotificationToUsers(cmUserIds, {
                 title: 'New Credit Application',
-                body: `${auth.email ?? 'A trader'} submitted a credit application for ${app.counterpartyName} (${app.requestedCurrency} ${Number(app.requestedAmount).toLocaleString()})`,
+                body: notificationBody,
                 url: `/credit/applications`,
               }, auth.tenantId);
             }
           }
+
+          // Email notification
+          if (settings.notifyEmail) {
+            const emails = await getCreditManagerEmails();
+            if (emails.length > 0) {
+              await sendNotificationEmail(
+                emails,
+                'New Credit Application',
+                `<div style="font-family: Arial, sans-serif; line-height: 1.5; color: #1f2937;">
+                  <h2 style="margin: 0 0 12px;">New Credit Application</h2>
+                  <p style="margin: 0 0 8px;">${notificationBody}</p>
+                  <p style="margin: 0;"><a href="${process.env['APP_URL'] ?? ''}/credit/applications" style="color: #2563eb;">View in Fueld</a></p>
+                </div>`,
+              );
+            }
+          }
+
+          // WhatsApp notification
+          if (settings.notifyWhatsApp) {
+            await notifyCreditApplicationWhatsApp(notificationBody);
+          }
         } catch (e) {
-          console.error('[CreditApplications] Push notification failed:', e);
+          console.error('[CreditApplications] Notification failed:', e);
         }
 
         return { success: true, data: app } satisfies ApiResponse<typeof app>;

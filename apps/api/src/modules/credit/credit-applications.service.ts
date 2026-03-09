@@ -32,6 +32,9 @@ const DEFAULT_SETTINGS = {
   autoApplyOnApproval: true,
   immediateRejection: true,
   notifyCreditManagers: true,
+  notifyPush: true,
+  notifyEmail: false,
+  notifyWhatsApp: false,
 };
 
 async function getTenantId(): Promise<string> {
@@ -44,7 +47,12 @@ export async function getCreditApplicationSettings() {
   const tenant = await db.query.tenants.findFirst();
   if (!tenant) throw new Error('No tenant found');
   const settings = (tenant.settings as TenantSettings) ?? {};
-  return { ...DEFAULT_SETTINGS, ...settings.creditApplicationSettings };
+  const raw = { ...DEFAULT_SETTINGS, ...settings.creditApplicationSettings };
+  // Migrate legacy: if notifyPush was never explicitly set, inherit from notifyCreditManagers
+  if (settings.creditApplicationSettings && raw.notifyPush === undefined) {
+    raw.notifyPush = raw.notifyCreditManagers;
+  }
+  return raw;
 }
 
 export async function updateCreditApplicationSettings(
@@ -434,4 +442,17 @@ export async function getCreditManagerUserIds(): Promise<string[]> {
       ),
     );
   return rows.map((r) => r.id);
+}
+
+export async function getCreditManagerEmails(): Promise<string[]> {
+  const rows = await db
+    .select({ email: users.email })
+    .from(users)
+    .where(
+      and(
+        eq(users.isActive, true),
+        inArray(users.role, ['CREDITMANAGER', 'ADMIN']),
+      ),
+    );
+  return rows.map((r) => r.email);
 }
