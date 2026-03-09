@@ -96,6 +96,7 @@ interface SaveItemInput {
   quantityMin?: string | null;
   quantityMax?: string | null;
   unit?: string;
+  salesUnit?: string;
   description?: string | null;
   costPrice?: string | null;
   costCurrency?: string | null;
@@ -557,6 +558,7 @@ export async function getOrderById(idOrNumber: string) {
       quantityMin: i.quantityMin,
       quantityMax: i.quantityMax,
       unit: i.unit,
+      salesUnit: i.salesUnit ?? i.unit,
       description: i.description ?? null,
       costPrice: i.costPrice,
       costCurrency: i.costCurrency,
@@ -708,6 +710,7 @@ export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
       quantityMin: item.quantityMin ?? null,
       quantityMax: item.quantityMax ?? null,
       unit: item.unit ?? 'MT',
+      salesUnit: item.salesUnit ?? item.unit ?? 'MT',
       description: item.description ?? null,
       costPrice: item.costPrice ?? null,
       costCurrency,

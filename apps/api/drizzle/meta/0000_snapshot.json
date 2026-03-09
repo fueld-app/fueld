@@ -1585,6 +1585,13 @@
           "notNull": true,
           "default": "'MT'"
         },
+        "sales_unit": {
+          "name": "sales_unit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'MT'"
+        },
         "cost_price": {
           "name": "cost_price",
           "type": "numeric(12, 4)",

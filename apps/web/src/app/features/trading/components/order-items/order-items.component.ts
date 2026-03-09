@@ -36,6 +36,7 @@ export interface OrderItemRow {
   quantityMin: number | null;
   quantityMax: number | null;
   unit: string;
+  salesUnit: string;
   costPrice: number;
   costCurrency: string;
   salesPrice: number;
@@ -96,12 +97,11 @@ export interface OrderItemsEconomics {
             <th class="px-4 py-3 text-left font-medium text-gray-600 min-w-[140px]">Product</th>
             <th class="px-4 py-3 text-left font-medium text-gray-600 min-w-[180px]">Description</th>
             <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Qty</th>
-            <th class="px-4 py-3 text-left font-medium text-gray-600 w-16">Unit</th>
             @if (allowDeliveredEdit()) {
               <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[110px]">Del. Qty</th>
             }
-            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[140px]">Cost</th>
-            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[140px]">Sell</th>
+            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[180px]">Cost</th>
+            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[180px]">Sell</th>
             <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Gross ({{ baseCurrency() }})</th>
             <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Financing</th>
             <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Net</th>
@@ -192,24 +192,6 @@ export interface OrderItemsEconomics {
                 }
               </td>
 
-              <!-- Unit -->
-              <td class="px-4 py-2">
-                @if (readonly()) {
-                  <span class="text-gray-500">{{ row.unit }}</span>
-                } @else {
-                  <select
-                    [ngModel]="row.unit"
-                    (ngModelChange)="updateField(i, 'unit', $event)"
-                    class="rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
-                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
-                  >
-                    @for (u of unitOptions(); track u.value) {
-                      <option [value]="u.value">{{ u.label }}</option>
-                    }
-                  </select>
-                }
-              </td>
-
               <!-- Delivered Qty -->
               @if (allowDeliveredEdit()) {
                 <td class="px-4 py-2">
@@ -223,56 +205,78 @@ export interface OrderItemsEconomics {
                 </td>
               }
 
-              <!-- Cost -->
+              <!-- Cost (price + currency + unit) -->
               <td class="px-4 py-2">
                 @if (readonly()) {
-                  <span class="block text-right tabular-nums">{{ row.costCurrency }} {{ row.costPrice | number:'1.2-4' }}</span>
+                  <span class="block text-right tabular-nums">{{ row.costPrice | number:'1.2-4' }} {{ row.costCurrency }}/{{ row.unit }}</span>
                 } @else {
-                  <div class="flex items-center gap-2">
+                  <div class="flex items-center gap-1">
                     <input
                       type="number" step="0.01" min="0"
                       [ngModel]="row.costPrice"
                       (ngModelChange)="updateField(i, 'costPrice', $event)"
-                      class="w-full min-w-[100px] rounded-lg border border-gray-300 px-3 py-1.5 text-right text-sm tabular-nums
+                      class="w-full min-w-[80px] rounded-lg border border-gray-300 px-3 py-1.5 text-right text-sm tabular-nums
                              [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
                              focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                     />
                     <select
                       [ngModel]="row.costCurrency"
                       (ngModelChange)="updateField(i, 'costCurrency', $event)"
-                      class="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-700
+                      class="w-[4.5rem] rounded-lg border border-gray-300 px-1.5 py-1.5 text-xs text-gray-700
                              focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
                     >
                       @for (c of currencyOptions(); track c.value) {
                         <option [value]="c.value">{{ c.label }}</option>
                       }
                     </select>
+                    <span class="text-gray-400 text-xs">/</span>
+                    <select
+                      [ngModel]="row.unit"
+                      (ngModelChange)="updateField(i, 'unit', $event)"
+                      class="w-[4.5rem] rounded-lg border border-gray-300 px-1.5 py-1.5 text-xs text-gray-700
+                             focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                    >
+                      @for (u of unitOptions(); track u.value) {
+                        <option [value]="u.value">{{ u.label }}</option>
+                      }
+                    </select>
                   </div>
                 }
               </td>
 
-              <!-- Sell -->
+              <!-- Sell (price + currency + unit) -->
               <td class="px-4 py-2">
                 @if (readonly()) {
-                  <span class="block text-right tabular-nums">{{ row.salesCurrency }} {{ row.salesPrice | number:'1.2-4' }}</span>
+                  <span class="block text-right tabular-nums">{{ row.salesPrice | number:'1.2-4' }} {{ row.salesCurrency }}/{{ row.salesUnit }}</span>
                 } @else {
-                  <div class="flex items-center gap-2">
+                  <div class="flex items-center gap-1">
                     <input
                       type="number" step="0.01" min="0"
                       [ngModel]="row.salesPrice"
                       (ngModelChange)="updateField(i, 'salesPrice', $event)"
-                      class="w-full min-w-[100px] rounded-lg border border-gray-300 px-3 py-1.5 text-right text-sm tabular-nums
+                      class="w-full min-w-[80px] rounded-lg border border-gray-300 px-3 py-1.5 text-right text-sm tabular-nums
                              [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
                              focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                     />
                     <select
                       [ngModel]="row.salesCurrency"
                       (ngModelChange)="updateField(i, 'salesCurrency', $event)"
-                      class="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-700
+                      class="w-[4.5rem] rounded-lg border border-gray-300 px-1.5 py-1.5 text-xs text-gray-700
                              focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
                     >
                       @for (c of currencyOptions(); track c.value) {
                         <option [value]="c.value">{{ c.label }}</option>
+                      }
+                    </select>
+                    <span class="text-gray-400 text-xs">/</span>
+                    <select
+                      [ngModel]="row.salesUnit"
+                      (ngModelChange)="updateField(i, 'salesUnit', $event)"
+                      class="w-[4.5rem] rounded-lg border border-gray-300 px-1.5 py-1.5 text-xs text-gray-700
+                             focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                    >
+                      @for (u of unitOptions(); track u.value) {
+                        <option [value]="u.value">{{ u.label }}</option>
                       }
                     </select>
                   </div>
@@ -338,7 +342,6 @@ export interface OrderItemsEconomics {
               <td class="px-4 py-3 text-right text-gray-600">Totals</td>
               <td></td>
               <td class="px-4 py-3 text-right tabular-nums text-gray-900">{{ totalQty() | number:'1.0-3' }}</td>
-              <td></td>
               @if (allowDeliveredEdit()) {
                 <td class="px-4 py-3 text-right tabular-nums text-gray-900">{{ totalDeliveredQty() | number:'1.0-3' }}</td>
               }
@@ -473,7 +476,7 @@ export interface OrderItemsEconomics {
 
             <!-- Unit -->
             <div>
-              <label class="mb-1 block text-xs font-medium text-gray-500">Unit</label>
+              <label class="mb-1 block text-xs font-medium text-gray-500">Cost Unit</label>
               @if (readonly()) {
                 <span class="text-sm text-gray-500">{{ row.unit }}</span>
               } @else {
@@ -490,11 +493,30 @@ export interface OrderItemsEconomics {
               }
             </div>
 
+            <!-- Sales Unit -->
+            <div>
+              <label class="mb-1 block text-xs font-medium text-gray-500">Sales Unit</label>
+              @if (readonly()) {
+                <span class="text-sm text-gray-500">{{ row.salesUnit }}</span>
+              } @else {
+                <select
+                  [ngModel]="row.salesUnit"
+                  (ngModelChange)="updateField(i, 'salesUnit', $event)"
+                  class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                         focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                >
+                  @for (u of unitOptions(); track u.value) {
+                    <option [value]="u.value">{{ u.label }}</option>
+                  }
+                </select>
+              }
+            </div>
+
             <!-- Cost -->
             <div>
               <label class="mb-1 block text-xs font-medium text-gray-500">Cost</label>
               @if (readonly()) {
-                <span class="text-sm tabular-nums">{{ row.costCurrency }} {{ row.costPrice | number:'1.2-4' }}</span>
+                <span class="text-sm tabular-nums">{{ row.costPrice | number:'1.2-4' }} {{ row.costCurrency }}/{{ row.unit }}</span>
               } @else {
                 <div class="flex items-center gap-2">
                   <input type="number" step="0.01" min="0"
@@ -522,7 +544,7 @@ export interface OrderItemsEconomics {
             <div>
               <label class="mb-1 block text-xs font-medium text-gray-500">Sell</label>
               @if (readonly()) {
-                <span class="text-sm tabular-nums">{{ row.salesCurrency }} {{ row.salesPrice | number:'1.2-4' }}</span>
+                <span class="text-sm tabular-nums">{{ row.salesPrice | number:'1.2-4' }} {{ row.salesCurrency }}/{{ row.salesUnit }}</span>
               } @else {
                 <div class="flex items-center gap-2">
                   <input type="number" step="0.01" min="0"
@@ -700,7 +722,7 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
       ...item,
       costCurrency: item.costCurrency || this.currency(),
       salesCurrency: item.salesCurrency || this.currency(),
-      profit: this.profitForRow(item),
+      profit: item.profit ?? 0,
     })),
   );
 
@@ -829,6 +851,7 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
       quantityMin: null,
       quantityMax: null,
       unit: 'MT',
+      salesUnit: 'MT',
       costPrice: 0,
       costCurrency: this.currency(),
       salesPrice: 0,

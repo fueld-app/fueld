@@ -309,6 +309,13 @@
       "when": 1773054600000,
       "tag": "0043_inquiry_deadlines_partial_quotes",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1773268200000,
+      "tag": "0044_sales_unit",
+      "breakpoints": true
     }
   ]
 }

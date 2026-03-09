@@ -668,6 +668,7 @@ export interface OrderItemDto {
   productType: ProductType;
   quantity: string;
   unit: string;
+  salesUnit: string;
   description: string | null;
   costPrice: string | null;
   costCurrency: string;
