@@ -837,6 +837,46 @@ export async function updateUnitSettings(units: string[]): Promise<{ units: stri
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+//  UNIT CONVERSION SETTINGS
+// ═══════════════════════════════════════════════════════════════════════
+
+interface UnitConversion {
+  fromUnit: string;
+  toUnit: string;
+  factor: number;
+}
+
+const DEFAULT_UNIT_CONVERSIONS: UnitConversion[] = [
+  { fromUnit: 'MT', toUnit: 'CBM', factor: 1.1765 },
+  { fromUnit: 'CBM', toUnit: 'MT', factor: 0.85 },
+  { fromUnit: 'MT', toUnit: 'BBL', factor: 7.33 },
+  { fromUnit: 'BBL', toUnit: 'MT', factor: 0.1364 },
+];
+
+export async function getUnitConversionSettings(): Promise<{ conversions: UnitConversion[] }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  return { conversions: settings.unitConversions ?? DEFAULT_UNIT_CONVERSIONS };
+}
+
+export async function updateUnitConversionSettings(conversions: UnitConversion[]): Promise<{ conversions: UnitConversion[] }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = { ...(tenant.settings as any) };
+  settings.unitConversions = conversions;
+
+  await db
+    .update(tenants)
+    .set({ settings, updatedAt: new Date() })
+    .where(eq(tenants.id, tenant.id));
+
+  return getUnitConversionSettings();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 //  CURRENCY SETTINGS
 // ═══════════════════════════════════════════════════════════════════════
 

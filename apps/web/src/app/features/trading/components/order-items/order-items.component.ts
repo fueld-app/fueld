@@ -37,6 +37,7 @@ export interface OrderItemRow {
   quantityMax: number | null;
   unit: string;
   salesUnit: string;
+  unitConversionFactor: number;
   costPrice: number;
   costCurrency: string;
   salesPrice: number;
@@ -112,7 +113,7 @@ export interface OrderItemsEconomics {
         </thead>
         <tbody class="divide-y divide-gray-100">
           @for (row of rows(); track row.id; let i = $index) {
-            <tr class="group relative transition-colors hover:bg-gray-50/50">
+            <tr class="group relative transition-colors hover:bg-gray-50/50 align-top">
               <!-- Product -->
               <td class="px-4 py-2">
                 @if (readonly()) {
@@ -249,6 +250,9 @@ export interface OrderItemsEconomics {
               <td class="px-4 py-2">
                 @if (readonly()) {
                   <span class="block text-right tabular-nums">{{ row.salesPrice | number:'1.2-4' }} {{ row.salesCurrency }}/{{ row.salesUnit }}</span>
+                  @if (row.unit !== row.salesUnit) {
+                    <span class="block text-right text-xs text-gray-400">× {{ row.unitConversionFactor | number:'1.2-4' }} {{ row.unit }}/{{ row.salesUnit }}</span>
+                  }
                 } @else {
                   <div class="flex items-center gap-1">
                     <input
@@ -281,11 +285,25 @@ export interface OrderItemsEconomics {
                       }
                     </select>
                   </div>
+                  @if (row.unit !== row.salesUnit) {
+                    <div class="mt-1 flex items-center gap-1 text-xs text-gray-500">
+                      <span>× conv.</span>
+                      <input
+                        type="number" step="0.0001" min="0"
+                        [ngModel]="row.unitConversionFactor"
+                        (ngModelChange)="updateField(i, 'unitConversionFactor', +$event)"
+                        class="w-16 rounded border border-gray-200 px-1.5 py-0.5 text-right text-xs tabular-nums
+                               [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
+                               focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20"
+                      />
+                      <span class="text-gray-400">{{ row.unit }}/{{ row.salesUnit }}</span>
+                    </div>
+                  }
                 }
               </td>
 
               <!-- Gross Profit (auto-calculated) -->
-              <td class="px-4 py-3 text-right tabular-nums"
+              <td class="px-4 py-3 pt-4 text-right tabular-nums"
                 [class.text-green-600]="profitForRow(row) > 0"
                 [class.text-red-600]="profitForRow(row) < 0"
                 [class.font-semibold]="profitForRow(row) !== 0"
@@ -293,11 +311,11 @@ export interface OrderItemsEconomics {
                 {{ profitForRow(row) | number:'1.2-2' }}
               </td>
 
-              <td class="px-4 py-3 text-right tabular-nums text-amber-700">
+              <td class="px-4 py-3 pt-4 text-right tabular-nums text-amber-700">
                 {{ financingCostForRow(row) | number:'1.2-2' }}
               </td>
 
-              <td class="px-4 py-3 text-right tabular-nums"
+              <td class="px-4 py-3 pt-4 text-right tabular-nums"
                 [class.text-green-600]="netProfitForRow(row) > 0"
                 [class.text-red-600]="netProfitForRow(row) < 0"
                 [class.font-semibold]="netProfitForRow(row) !== 0"
@@ -546,6 +564,9 @@ export interface OrderItemsEconomics {
               <label class="mb-1 block text-xs font-medium text-gray-500">Sell</label>
               @if (readonly()) {
                 <span class="text-sm tabular-nums">{{ row.salesPrice | number:'1.2-4' }} {{ row.salesCurrency }}/{{ row.salesUnit }}</span>
+                @if (row.unit !== row.salesUnit) {
+                  <span class="block text-xs text-gray-400">× {{ row.unitConversionFactor | number:'1.2-4' }} {{ row.unit }}/{{ row.salesUnit }}</span>
+                }
               } @else {
                 <div class="flex items-center gap-2">
                   <input type="number" step="0.01" min="0"
@@ -566,6 +587,20 @@ export interface OrderItemsEconomics {
                     }
                   </select>
                 </div>
+                @if (row.unit !== row.salesUnit) {
+                  <div class="mt-1 flex items-center gap-1 text-xs text-gray-500">
+                    <span>× conv.</span>
+                    <input
+                      type="number" step="0.0001" min="0"
+                      [ngModel]="row.unitConversionFactor"
+                      (ngModelChange)="updateField(i, 'unitConversionFactor', +$event)"
+                      class="w-16 rounded border border-gray-200 px-1.5 py-0.5 text-right text-xs tabular-nums
+                             [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
+                             focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20"
+                    />
+                    <span class="text-gray-400">{{ row.unit }}/{{ row.salesUnit }}</span>
+                  </div>
+                }
               }
             </div>
 
@@ -682,6 +717,7 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   readonly financingDayCountConvention = input(365);
   readonly productOptionsInput = input<DropdownOption[]>([]);
   readonly unitOptionsInput = input<DropdownOption[]>([]);
+  readonly unitConversionsInput = input<{ fromUnit: string; toUnit: string; factor: number }[]>([]);
   readonly currencyOptionsInput = input<DropdownOption[]>([]);
   readonly itemsChange = output<OrderItemRow[]>();
   readonly economicsChange = output<OrderItemsEconomics>();
@@ -853,6 +889,7 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
       quantityMax: null,
       unit: 'MT',
       salesUnit: 'MT',
+      unitConversionFactor: 1,
       costPrice: 0,
       costCurrency: this.currency(),
       salesPrice: 0,
@@ -876,6 +913,11 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
       const row = { ...updated[index]! };
 
       (row as Record<string, unknown>)[field] = value;
+
+      // Auto-apply default conversion factor when unit or salesUnit changes
+      if (field === 'unit' || field === 'salesUnit') {
+        row.unitConversionFactor = this.lookupConversionFactor(row.unit, row.salesUnit);
+      }
 
       // Auto-recalculate profit using main quantity
       row.profit = this.profitForRow(row);
@@ -967,7 +1009,18 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
 
   private computeRevenueBase(row: OrderItemRow): number {
     const qty = row.quantity || 0;
-    return (row.salesPrice || 0) * qty * this.getFxRate(row.salesCurrency);
+    const factor = row.unitConversionFactor || 1;
+    return (row.salesPrice || 0) * qty * factor * this.getFxRate(row.salesCurrency);
+  }
+
+  /** Look up a default conversion factor from admin settings. */
+  private lookupConversionFactor(fromUnit: string, toUnit: string): number {
+    if (fromUnit === toUnit) return 1;
+    const conversions = this.unitConversionsInput();
+    const match = conversions.find(
+      (c) => c.fromUnit === fromUnit && c.toUnit === toUnit,
+    );
+    return match?.factor ?? 1;
   }
 
   financingCostForRow(row: OrderItemRow): number {

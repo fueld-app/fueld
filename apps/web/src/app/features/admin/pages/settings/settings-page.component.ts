@@ -9,7 +9,7 @@ import {
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
-import type { ApiResponse, OrderNumberSettingsDto, VesselCompanyRoleSettingsDto, VesselCompanyRoleOption, ProductSettingsDto, UnitSettingsDto, CurrencySettingsDto, CompanyTypeSettingsDto, AttachmentTypeSettingsDto, InquiryCancelReasonSettingsDto } from '@fueld/types';
+import type { ApiResponse, OrderNumberSettingsDto, VesselCompanyRoleSettingsDto, VesselCompanyRoleOption, ProductSettingsDto, UnitSettingsDto, CurrencySettingsDto, CompanyTypeSettingsDto, AttachmentTypeSettingsDto, InquiryCancelReasonSettingsDto, UnitConversionSettingsDto } from '@fueld/types';
 
 import { API } from '@app/core/config/api';
 
@@ -268,6 +268,92 @@ interface InquirySettingsDto {
                   @if (unitsSaving()) { Saving… } @else { Save Units }
                 </button>
                 @if (unitsSaved()) {
+                  <span class="text-sm text-green-600 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                    </svg>
+                    Saved
+                  </span>
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- ════════════════════════════════════════════════════════ -->
+          <!--  Unit Conversions                                       -->
+          <!-- ════════════════════════════════════════════════════════ -->
+          <div class="app-panel">
+            <div class="app-panel-header app-panel-header--amber">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--amber">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H4.28a.75.75 0 00-.75.75v3.955a.75.75 0 001.5 0v-2.134l.312.312a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm.002-2.853a.75.75 0 00.743-.648 7 7 0 00-11.712 3.138.75.75 0 001.449.39 5.5 5.5 0 019.201-2.466l.312.311H13.01a.75.75 0 000 1.5h3.955a.75.75 0 00.75-.75V6.091a.75.75 0 00-1.5 0v2.134l-.312-.312a5.474 5.474 0 00-.59-.342z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-semibold text-gray-900">Unit Conversions</h3>
+                <p class="text-xs text-gray-500">Default conversion factors applied when buy and sell units differ on order line items.</p>
+              </div>
+            </div>
+
+            <div class="app-panel-body space-y-3">
+              @for (conv of unitConversions(); track $index; let i = $index) {
+                <div class="flex items-center gap-2">
+                  <input
+                    type="text"
+                    [value]="conv.fromUnit"
+                    (input)="updateUnitConversion(i, 'fromUnit', $any($event.target).value.toUpperCase())"
+                    placeholder="From"
+                    class="app-input-mono-uppercase w-20"
+                  />
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 11-1.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z" clip-rule="evenodd" />
+                  </svg>
+                  <input
+                    type="text"
+                    [value]="conv.toUnit"
+                    (input)="updateUnitConversion(i, 'toUnit', $any($event.target).value.toUpperCase())"
+                    placeholder="To"
+                    class="app-input-mono-uppercase w-20"
+                  />
+                  <span class="text-xs text-gray-400">=</span>
+                  <input
+                    type="number" step="0.0001" min="0"
+                    [ngModel]="conv.factor"
+                    (ngModelChange)="updateUnitConversion(i, 'factor', +$event)"
+                    class="w-24 rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm tabular-nums
+                           [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
+                           focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  />
+                  <button
+                    (click)="removeUnitConversion(i)"
+                    class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
+                    title="Remove conversion"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              }
+              <button
+                (click)="addUnitConversion()"
+                class="app-button-add"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+                </svg>
+                Add Conversion
+              </button>
+
+              <div class="flex items-center gap-3 pt-2">
+                <button
+                  (click)="saveUnitConversions()"
+                  [disabled]="unitConversionsSaving()"
+                  class="app-button-primary"
+                >
+                  @if (unitConversionsSaving()) { Saving… } @else { Save Conversions }
+                </button>
+                @if (unitConversionsSaved()) {
                   <span class="text-sm text-green-600 flex items-center gap-1">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                       <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
@@ -863,6 +949,11 @@ export class SettingsPageComponent implements OnInit {
   readonly unitsSaving = signal(false);
   readonly unitsSaved = signal(false);
 
+  // Unit Conversions
+  readonly unitConversions = signal<{ fromUnit: string; toUnit: string; factor: number }[]>([]);
+  readonly unitConversionsSaving = signal(false);
+  readonly unitConversionsSaved = signal(false);
+
   // Currencies
   readonly currencies = signal<string[]>([]);
   readonly currenciesSaving = signal(false);
@@ -918,6 +1009,7 @@ export class SettingsPageComponent implements OnInit {
     this.loadRoles();
     this.loadProducts();
     this.loadUnits();
+    this.loadUnitConversions();
     this.loadCurrencies();
     this.loadCompanyTypes();
     this.loadAttachmentTypes();
@@ -1201,6 +1293,56 @@ export class SettingsPageComponent implements OnInit {
       this.showToast('error', 'Failed to save units.');
     } finally {
       this.unitsSaving.set(false);
+    }
+  }
+
+  // ─── Unit Conversions ──────────────────────────────────────────────
+
+  private async loadUnitConversions(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<UnitConversionSettingsDto>>(`${API}/admin/settings/unit-conversions`),
+      );
+      if (res.success) this.unitConversions.set(res.data.conversions);
+    } catch {
+      this.showToast('error', 'Failed to load unit conversions.');
+    }
+  }
+
+  updateUnitConversion(index: number, field: 'fromUnit' | 'toUnit' | 'factor', value: string | number): void {
+    const updated = this.unitConversions().map((c, i) =>
+      i === index ? { ...c, [field]: value } : c,
+    );
+    this.unitConversions.set(updated);
+  }
+
+  addUnitConversion(): void {
+    this.unitConversions.set([...this.unitConversions(), { fromUnit: '', toUnit: '', factor: 1 }]);
+  }
+
+  removeUnitConversion(index: number): void {
+    this.unitConversions.set(this.unitConversions().filter((_, i) => i !== index));
+  }
+
+  async saveUnitConversions(): Promise<void> {
+    const valid = this.unitConversions().filter(c => c.fromUnit.trim() && c.toUnit.trim() && c.factor > 0);
+    this.unitConversionsSaving.set(true);
+    this.unitConversionsSaved.set(false);
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<UnitConversionSettingsDto>>(`${API}/admin/settings/unit-conversions`, { conversions: valid }),
+      );
+      if (res.success) {
+        this.unitConversions.set(res.data.conversions);
+        this.unitConversionsSaved.set(true);
+        setTimeout(() => this.unitConversionsSaved.set(false), 3000);
+      } else {
+        this.showToast('error', (res as any).message ?? 'Failed to save.');
+      }
+    } catch {
+      this.showToast('error', 'Failed to save unit conversions.');
+    } finally {
+      this.unitConversionsSaving.set(false);
     }
   }
 

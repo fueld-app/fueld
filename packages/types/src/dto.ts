@@ -662,6 +662,11 @@ export interface InquiryCancelReasonSettingsDto {
   reasons: string[];
 }
 
+/** Admin settings for default unit conversion factors */
+export interface UnitConversionSettingsDto {
+  conversions: { fromUnit: string; toUnit: string; factor: number }[];
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  ORDER ITEM (line items)
 // ═══════════════════════════════════════════════════════════════════════
@@ -673,6 +678,7 @@ export interface OrderItemDto {
   quantity: string;
   unit: string;
   salesUnit: string;
+  unitConversionFactor: string;
   description: string | null;
   costPrice: string | null;
   costCurrency: string;

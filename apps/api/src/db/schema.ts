@@ -139,6 +139,8 @@ export interface TenantSettings {
   // Configurable product and unit options for order line items
   products?: string[];
   units?: string[];
+  // Default conversion factors between units (e.g. MT→CBM = 1.1765)
+  unitConversions?: { fromUnit: string; toUnit: string; factor: number }[];
   // Configurable currency options for order line items
   currencies?: string[];
   // Configurable company types (e.g. CLIENT, SUPPLIER, BARGE)
@@ -611,6 +613,7 @@ export const orderItems = pgTable('order_items', {
   quantityMax: numeric('quantity_max', { precision: 12, scale: 3 }),
   unit: text('unit').notNull().default('MT'),
   salesUnit: text('sales_unit').notNull().default('MT'),
+  unitConversionFactor: numeric('unit_conversion_factor', { precision: 12, scale: 6 }).notNull().default('1'),
 
   description: text('description'),
 

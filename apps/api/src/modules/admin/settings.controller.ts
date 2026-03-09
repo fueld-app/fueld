@@ -34,6 +34,8 @@ import {
   updateProductSettings,
   getUnitSettings,
   updateUnitSettings,
+  getUnitConversionSettings,
+  updateUnitConversionSettings,
   getCurrencySettings,
   updateCurrencySettings,
   getFinancingSettings,
@@ -384,6 +386,18 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     }
   }, {
     detail: { tags: ['Admin Settings'], summary: 'Get unit options for current tenant' },
+  })
+
+  .get('/my-unit-conversions', async () => {
+    try {
+      const data = await getUnitConversionSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get unit conversion defaults for current tenant' },
   })
 
   .get('/my-currencies', async () => {
@@ -1025,6 +1039,43 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       units: t.Array(t.String({ minLength: 1 })),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update configurable unit options' },
+  })
+
+  // ═════════════════════════════════════════════════════════════════
+  //  UNIT CONVERSION SETTINGS
+  // ═════════════════════════════════════════════════════════════════
+
+  .get('/unit-conversions', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getUnitConversionSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get unit conversion defaults' },
+  })
+
+  .put('/unit-conversions', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateUnitConversionSettings(body.conversions);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      conversions: t.Array(t.Object({
+        fromUnit: t.String({ minLength: 1 }),
+        toUnit: t.String({ minLength: 1 }),
+        factor: t.Number({ minimum: 0 }),
+      })),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update unit conversion defaults' },
   })
 
   // ═════════════════════════════════════════════════════════════════

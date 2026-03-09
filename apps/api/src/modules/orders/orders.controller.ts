@@ -367,6 +367,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
             quantityMax: t.Optional(t.Nullable(t.String())),
             unit: t.Optional(t.String()),
             salesUnit: t.Optional(t.String()),
+            unitConversionFactor: t.Optional(t.Nullable(t.String())),
             description: t.Optional(t.Nullable(t.String())),
             costPrice: t.Optional(t.Nullable(t.String())),
             costCurrency: t.Optional(t.Nullable(t.String())),

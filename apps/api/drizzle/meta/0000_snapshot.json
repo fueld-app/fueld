@@ -1592,6 +1592,13 @@
           "notNull": true,
           "default": "'MT'"
         },
+        "unit_conversion_factor": {
+          "name": "unit_conversion_factor",
+          "type": "numeric(12, 6)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'1'"
+        },
         "cost_price": {
           "name": "cost_price",
           "type": "numeric(12, 4)",

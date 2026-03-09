@@ -17,6 +17,7 @@ export interface FinancingItemInput {
   costCurrency?: string | null;
   salesPrice?: string | number | null;
   salesCurrency?: string | null;
+  unitConversionFactor?: string | number | null;
 }
 
 export interface LineEconomics {
@@ -86,8 +87,9 @@ export function calculateCostBase(item: FinancingItemInput): number {
 export function calculateRevenueBase(item: FinancingItemInput): number {
   const quantity = parseNumber(item.quantity);
   const salesPrice = parseNumber(item.salesPrice);
+  const conversionFactor = parseNumber(item.unitConversionFactor) || 1;
   const salesRate = getFxRate(normalizedCurrency(item.salesCurrency));
-  return quantity * salesPrice * salesRate;
+  return quantity * salesPrice * conversionFactor * salesRate;
 }
 
 export function calculateGrossProfitBase(item: FinancingItemInput): number {

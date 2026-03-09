@@ -997,6 +997,7 @@ interface InquiryReplyRecommendation {
       [financingDayCountConvention]="financingDayCountConvention()"
       [productOptionsInput]="configuredProducts()"
       [unitOptionsInput]="configuredUnits()"
+      [unitConversionsInput]="configuredUnitConversions()"
       [currencyOptionsInput]="configuredCurrencies()"
       (itemsChange)="onItemsChange($event)"
       (economicsChange)="onItemEconomicsChange($event)"
@@ -1493,6 +1494,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   );
   readonly configuredProducts = signal<DropdownOption[]>([]);
   readonly configuredUnits = signal<DropdownOption[]>([]);
+  readonly configuredUnitConversions = signal<{ fromUnit: string; toUnit: string; factor: number }[]>([]);
   readonly configuredCurrencies = signal<DropdownOption[]>([]);
   readonly configuredAttachmentTypes = signal<string[]>(['BDR', 'OTHER']);
 
@@ -2008,6 +2010,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
             quantityMax: item.quantityMax ? parseFloat(item.quantityMax) : null,
             unit: item.unit ?? 'MT',
             salesUnit: item.salesUnit ?? item.unit ?? 'MT',
+            unitConversionFactor: parseFloat(item.unitConversionFactor) || 1,
             costPrice: parseFloat(item.costPrice) || 0,
             costCurrency: item.costCurrency ?? d.currency ?? 'USD',
             salesPrice: parseFloat(item.salesPrice) || 0,
@@ -2242,7 +2245,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
 
   private async loadReferenceData(): Promise<void> {
     try {
-      const [suppliersRes, usersRes, productsRes, unitsRes, currenciesRes, attachmentTypesRes, cancelReasonsRes] = await Promise.all([
+      const [suppliersRes, usersRes, productsRes, unitsRes, unitConversionsRes, currenciesRes, attachmentTypesRes, cancelReasonsRes] = await Promise.all([
         firstValueFrom(
           this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
             `${API_URL}/companies/local?type=SUPPLIER&limit=100`,
@@ -2256,6 +2259,9 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
         ),
         firstValueFrom(
           this.http.get<ApiResponse<{ units: string[] }>>(`${API_URL}/admin/settings/my-units`),
+        ),
+        firstValueFrom(
+          this.http.get<ApiResponse<{ conversions: { fromUnit: string; toUnit: string; factor: number }[] }>>(`${API_URL}/admin/settings/my-unit-conversions`),
         ),
         firstValueFrom(
           this.http.get<ApiResponse<{ currencies: string[] }>>(`${API_URL}/admin/settings/my-currencies`),
@@ -2275,6 +2281,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
       if (unitsRes.success) this.configuredUnits.set(
         unitsRes.data.units.map((u) => ({ value: u, label: u })),
       );
+      if (unitConversionsRes.success) this.configuredUnitConversions.set(unitConversionsRes.data.conversions);
       if (currenciesRes.success) this.configuredCurrencies.set(
         currenciesRes.data.currencies.map((c) => ({ value: c, label: c })),
       );
@@ -3079,6 +3086,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
         quantityMax: String(r.quantityMax ?? r.quantity),
         unit: r.unit,
         salesUnit: r.salesUnit,
+        unitConversionFactor: r.unitConversionFactor != null ? String(r.unitConversionFactor) : '1',
         description: r.description || null,
         costPrice: r.costPrice ? String(r.costPrice) : null,
         costCurrency: r.costCurrency ?? o.currency,
@@ -3345,6 +3353,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
         quantityMax: String(r.quantityMax ?? r.quantity),
         unit: r.unit,
         salesUnit: r.salesUnit,
+        unitConversionFactor: r.unitConversionFactor != null ? String(r.unitConversionFactor) : '1',
         description: r.description || null,
         costPrice: r.costPrice ? String(r.costPrice) : null,
         costCurrency: r.costCurrency ?? o.currency,
