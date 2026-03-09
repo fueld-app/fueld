@@ -34,7 +34,7 @@ test('admin inquiry settings persist through reloads', async ({ page }) => {
   await page.goto('/admin/settings');
   await expect(page.getByRole('heading', { name: 'General Settings' })).toBeVisible();
 
-  const inquiryCard = page.locator('div.rounded-xl').filter({
+  const inquiryCard = page.locator('div.app-panel').filter({
     has: page.getByRole('heading', { name: 'Supplier Inquiry Settings' }),
   }).first();
   await expect(inquiryCard).toBeVisible();

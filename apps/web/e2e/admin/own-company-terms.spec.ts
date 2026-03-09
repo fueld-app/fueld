@@ -12,10 +12,9 @@ test('admin can edit own-company customer/supplier terms', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Our Companies' })).toBeVisible();
 
   // Expand the company panel (expands "Bank Accounts" section which contains Terms editor).
-  const companyCard = page
-    .getByRole('link', { name: ownCompanyName })
-    .locator('xpath=ancestor::div[contains(@class, "rounded-xl")]')
-    .first();
+  const companyCard = page.locator('div.app-panel').filter({
+    has: page.getByRole('link', { name: ownCompanyName }),
+  }).first();
   await expect(companyCard).toBeVisible();
   await companyCard.getByRole('button', { name: /Show Details|Hide Details/i }).first().click();
 

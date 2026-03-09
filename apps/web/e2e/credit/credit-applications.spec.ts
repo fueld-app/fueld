@@ -257,7 +257,8 @@ test('admin can update and persist credit application settings via UI', async ({
 
   await loginViaUi(page, adminUser);
   await page.goto('/admin/credit');
-  await expect(page.getByRole('heading', { name: 'Credit Application Settings' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Credit & Financing Settings' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Approval Workflow' })).toBeVisible();
 
   const approvalsInput = page.locator('input[type="number"]').first();
   const originalValue = await approvalsInput.inputValue();
