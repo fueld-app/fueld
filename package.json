@@ -12,6 +12,8 @@
     "build:web": "bun run --filter @fueld/web build",
     "build:meta": "bun run scripts/release/generate-build-meta.ts",
     "dev": "bun run dev:api & bun run dev:web",
+    "typecheck": "cd apps/api && bun run typecheck && cd ../web && bunx tsc --noEmit -p tsconfig.json",
+    "ship": "bun run typecheck && git add -A && git commit && git push",
     "test": "bun run --filter @fueld/api test && bun test packages/types/tests",
     "test:raw": "bun test apps/api/tests packages/types/tests",
     "test:coverage": "bun run --filter @fueld/api test:coverage && bun test --coverage packages/types/tests",

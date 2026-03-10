@@ -217,6 +217,9 @@ interface CompanySearchResultOption {
                             @if (ba.routingNumber) {
                               <div><span class="text-gray-400">Routing #:</span> <span class="text-gray-700 font-mono">{{ ba.routingNumber }}</span></div>
                             }
+                            @if (ba.intermediaryBank) {
+                              <div class="col-span-2"><span class="text-gray-400">Intermediary Bank:</span> <span class="text-gray-700">{{ ba.intermediaryBank }}</span></div>
+                            }
                             @if (ba.branchAddress) {
                               <div class="col-span-2"><span class="text-gray-400">Branch:</span> <span class="text-gray-700">{{ ba.branchAddress }}</span></div>
                             }
