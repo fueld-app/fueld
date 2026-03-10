@@ -19,24 +19,24 @@ CREATE TABLE IF NOT EXISTS "price_references" (
 );
 
 -- 3. Formula pricing columns on order_items (cost side)
-ALTER TABLE "order_items" ADD COLUMN "cost_pricing_model" pricing_model NOT NULL DEFAULT 'FIXED';
-ALTER TABLE "order_items" ADD COLUMN "cost_reference_id" uuid REFERENCES "price_references"("id") ON DELETE SET NULL;
-ALTER TABLE "order_items" ADD COLUMN "cost_premium" numeric(12, 4);
-ALTER TABLE "order_items" ADD COLUMN "cost_barging" numeric(12, 4);
-ALTER TABLE "order_items" ADD COLUMN "cost_barging_unit" text;
-ALTER TABLE "order_items" ADD COLUMN "cost_credit_days" integer;
-ALTER TABLE "order_items" ADD COLUMN "cost_price_finalized" boolean NOT NULL DEFAULT false;
+ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "cost_pricing_model" pricing_model NOT NULL DEFAULT 'FIXED';
+ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "cost_reference_id" uuid REFERENCES "price_references"("id") ON DELETE SET NULL;
+ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "cost_premium" numeric(12, 4);
+ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "cost_barging" numeric(12, 4);
+ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "cost_barging_unit" text;
+ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "cost_credit_days" integer;
+ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "cost_price_finalized" boolean NOT NULL DEFAULT false;
 
 -- 4. Formula pricing columns on order_items (sell side)
-ALTER TABLE "order_items" ADD COLUMN "sales_pricing_model" pricing_model NOT NULL DEFAULT 'FIXED';
-ALTER TABLE "order_items" ADD COLUMN "sales_reference_id" uuid REFERENCES "price_references"("id") ON DELETE SET NULL;
-ALTER TABLE "order_items" ADD COLUMN "sales_premium" numeric(12, 4);
-ALTER TABLE "order_items" ADD COLUMN "sales_barging" numeric(12, 4);
-ALTER TABLE "order_items" ADD COLUMN "sales_barging_unit" text;
-ALTER TABLE "order_items" ADD COLUMN "sales_credit_days" integer;
-ALTER TABLE "order_items" ADD COLUMN "sales_price_finalized" boolean NOT NULL DEFAULT false;
+ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "sales_pricing_model" pricing_model NOT NULL DEFAULT 'FIXED';
+ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "sales_reference_id" uuid REFERENCES "price_references"("id") ON DELETE SET NULL;
+ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "sales_premium" numeric(12, 4);
+ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "sales_barging" numeric(12, 4);
+ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "sales_barging_unit" text;
+ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "sales_credit_days" integer;
+ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "sales_price_finalized" boolean NOT NULL DEFAULT false;
 
--- 5. Seed default price references for every existing tenant
+-- 5. Seed default price references for every existing tenant (skip if already seeded)
 INSERT INTO "price_references" ("tenant_id", "name", "code", "description")
 SELECT t."id", r."name", r."code", r."description"
 FROM "tenants" t
@@ -55,4 +55,8 @@ CROSS JOIN (VALUES
   ('Platts LSFO',         'PLATTS-LSFO',  'Platts Low Sulphur Fuel Oil assessment'),
   ('Platts HSFO',         'PLATTS-HSFO',  'Platts High Sulphur Fuel Oil 380 CST assessment'),
   ('Platts Gasoil',       'PLATTS-GO',    'Platts Gasoil 0.5% assessment')
-) AS r("name", "code", "description");
+) AS r("name", "code", "description")
+WHERE NOT EXISTS (
+  SELECT 1 FROM "price_references" pr
+  WHERE pr."tenant_id" = t."id" AND pr."code" = r."code"
+);
