@@ -40,6 +40,8 @@ interface BankDetails {
   swift: string | null;
   currency: string;
   branchAddress: string | null;
+  sortCode: string | null;
+  routingNumber: string | null;
   intermediaryBank: string | null;
 }
 
@@ -339,6 +341,8 @@ const DEFAULT_BANK_DETAILS: BankDetails = {
   swift: 'DNBANOKKXXX',
   currency: 'USD',
   branchAddress: null,
+  sortCode: null,
+  routingNumber: null,
   intermediaryBank: null,
 };
 
@@ -466,6 +470,8 @@ async function loadOrderBankDetails(
         swift: ba.swiftBic,
         currency: ba.currency,
         branchAddress: ba.branchAddress,
+        sortCode: ba.sortCode,
+        routingNumber: ba.routingNumber,
         intermediaryBank: ba.intermediaryBank,
       };
     }
@@ -486,6 +492,8 @@ async function loadOrderBankDetails(
         swift: ba.swiftBic,
         currency: ba.currency,
         branchAddress: ba.branchAddress,
+        sortCode: ba.sortCode,
+        routingNumber: ba.routingNumber,
         intermediaryBank: ba.intermediaryBank,
       };
     }
@@ -1016,6 +1024,20 @@ function buildInvoiceDocument(data: {
         columns: [
           { width: '25%', text: 'SWIFT:', bold: true },
           { width: '75%', text: data.bank.swift },
+        ],
+        margin: [0, 2, 0, 0],
+      } as Content] : []),
+      ...(data.bank.sortCode ? [{
+        columns: [
+          { width: '25%', text: 'Sort Code:', bold: true },
+          { width: '75%', text: data.bank.sortCode },
+        ],
+        margin: [0, 2, 0, 0],
+      } as Content] : []),
+      ...(data.bank.routingNumber ? [{
+        columns: [
+          { width: '25%', text: 'Routing No:', bold: true },
+          { width: '75%', text: data.bank.routingNumber },
         ],
         margin: [0, 2, 0, 0],
       } as Content] : []),
@@ -2393,6 +2415,20 @@ function buildProformaDocument(data: {
           columns: [
             { width: '25%', text: 'SWIFT:', bold: true },
             { width: '75%', text: data.bank.swift },
+          ],
+          margin: [0, 2, 0, 0],
+        } as Content] : []),
+        ...(data.bank.sortCode ? [{
+          columns: [
+            { width: '25%', text: 'Sort Code:', bold: true },
+            { width: '75%', text: data.bank.sortCode },
+          ],
+          margin: [0, 2, 0, 0],
+        } as Content] : []),
+        ...(data.bank.routingNumber ? [{
+          columns: [
+            { width: '25%', text: 'Routing No:', bold: true },
+            { width: '75%', text: data.bank.routingNumber },
           ],
           margin: [0, 2, 0, 0],
         } as Content] : []),
