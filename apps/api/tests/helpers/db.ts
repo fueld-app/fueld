@@ -108,6 +108,7 @@ function getTruncateTables() {
     'supplier_inquiry_item_quotes',
     'supplier_inquiries',
     'email_rules',
+    'price_references',
     'order_items',
     'orders',
     'order_number_sequences',
@@ -223,7 +224,22 @@ async function ensureTestSchemaCompat(): Promise<void> {
     ADD COLUMN IF NOT EXISTS description text,
     ADD COLUMN IF NOT EXISTS cost_currency text DEFAULT 'USD',
     ADD COLUMN IF NOT EXISTS sales_currency text DEFAULT 'USD',
-    ADD COLUMN IF NOT EXISTS delivered_quantity numeric(12, 3)
+    ADD COLUMN IF NOT EXISTS delivered_quantity numeric(12, 3),
+    ADD COLUMN IF NOT EXISTS cost_pricing_model text NOT NULL DEFAULT 'FIXED',
+    ADD COLUMN IF NOT EXISTS cost_reference_id uuid,
+    ADD COLUMN IF NOT EXISTS cost_premium numeric(12, 4),
+    ADD COLUMN IF NOT EXISTS cost_barging numeric(12, 4),
+    ADD COLUMN IF NOT EXISTS cost_barging_unit text,
+    ADD COLUMN IF NOT EXISTS cost_credit_days integer,
+    ADD COLUMN IF NOT EXISTS cost_price_finalized boolean NOT NULL DEFAULT false,
+    ADD COLUMN IF NOT EXISTS sales_pricing_model text NOT NULL DEFAULT 'FIXED',
+    ADD COLUMN IF NOT EXISTS sales_reference_id uuid,
+    ADD COLUMN IF NOT EXISTS sales_premium numeric(12, 4),
+    ADD COLUMN IF NOT EXISTS sales_barging numeric(12, 4),
+    ADD COLUMN IF NOT EXISTS sales_barging_unit text,
+    ADD COLUMN IF NOT EXISTS sales_credit_days integer,
+    ADD COLUMN IF NOT EXISTS sales_price_finalized boolean NOT NULL DEFAULT false,
+    ADD COLUMN IF NOT EXISTS unit_conversion_factor numeric(12, 6) NOT NULL DEFAULT '1'
   `;
 
   await sql`
@@ -235,7 +251,20 @@ async function ensureTestSchemaCompat(): Promise<void> {
     ADD COLUMN IF NOT EXISTS logo_url text,
     ADD COLUMN IF NOT EXISTS brand_color text,
     ADD COLUMN IF NOT EXISTS vat_number text,
-    ADD COLUMN IF NOT EXISTS fraud_prevention_text text
+    ADD COLUMN IF NOT EXISTS fraud_prevention_text text,
+    ADD COLUMN IF NOT EXISTS companies_house_number text
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS price_references (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      tenant_id uuid NOT NULL REFERENCES tenants(id),
+      name text NOT NULL,
+      code text NOT NULL,
+      description text,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
   `;
 
   await sql`

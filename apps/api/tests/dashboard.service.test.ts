@@ -237,8 +237,8 @@ describe('dashboard.service', () => {
       salesRepId: user.id,
     });
     await db.insert(orderItems).values([
-      { orderId: inquiryOrder.id, productType: 'VLSFO', quantity: '10', unit: 'MT', salesPrice: '100', costPrice: '80', profit: '200.0000' },
-      { orderId: inquiryOrder.id, productType: 'LSMGO', quantity: '5', unit: 'MT', salesPrice: '120', costPrice: '100', profit: '100.0000' },
+      { orderId: inquiryOrder.id, productType: 'VLSFO', quantity: '10', unit: 'MT', salesPrice: '100', costPrice: '80', profit: '200.0000', costPricingModel: 'FIXED', salesPricingModel: 'FIXED', costPriceFinalized: false, salesPriceFinalized: false },
+      { orderId: inquiryOrder.id, productType: 'LSMGO', quantity: '5', unit: 'MT', salesPrice: '120', costPrice: '100', profit: '100.0000', costPricingModel: 'FIXED', salesPricingModel: 'FIXED', costPriceFinalized: false, salesPriceFinalized: false },
     ]);
 
     const confirmedOrder = await createOrder({
@@ -250,7 +250,7 @@ describe('dashboard.service', () => {
     });
     await db.update(orders).set({ status: 'CONFIRMED', updatedAt: new Date() }).where(eq(orders.id, confirmedOrder.id));
     await db.insert(orderItems).values([
-      { orderId: confirmedOrder.id, productType: 'VLSFO', quantity: '2', unit: 'MT', salesPrice: '500', costPrice: '450', profit: '100.0000' },
+      { orderId: confirmedOrder.id, productType: 'VLSFO', quantity: '2', unit: 'MT', salesPrice: '500', costPrice: '450', profit: '100.0000', costPricingModel: 'FIXED', salesPricingModel: 'FIXED', costPriceFinalized: false, salesPriceFinalized: false },
     ]);
 
     const pipeline = await getPipelineSummary(tenant.id);
