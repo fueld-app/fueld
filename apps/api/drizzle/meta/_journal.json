@@ -330,6 +330,13 @@
       "when": 1773354600000,
       "tag": "0046_unit_conversion_factor",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1773441000000,
+      "tag": "0047_formula_pricing",
+      "breakpoints": true
     }
   ]
 }

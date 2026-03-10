@@ -5,9 +5,7 @@
 DO $$ BEGIN
   CREATE TYPE pricing_model AS ENUM ('FIXED', 'FORMULA');
 EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-
--- 2. Price references table (master list of base-price sources)
+END $$;--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "price_references" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   "tenant_id" uuid NOT NULL REFERENCES "tenants"("id"),
@@ -16,27 +14,21 @@ CREATE TABLE IF NOT EXISTS "price_references" (
   "description" text,
   "created_at" timestamptz NOT NULL DEFAULT now(),
   "updated_at" timestamptz NOT NULL DEFAULT now()
-);
-
--- 3. Formula pricing columns on order_items (cost side)
-ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "cost_pricing_model" pricing_model NOT NULL DEFAULT 'FIXED';
-ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "cost_reference_id" uuid REFERENCES "price_references"("id") ON DELETE SET NULL;
-ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "cost_premium" numeric(12, 4);
-ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "cost_barging" numeric(12, 4);
-ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "cost_barging_unit" text;
-ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "cost_credit_days" integer;
-ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "cost_price_finalized" boolean NOT NULL DEFAULT false;
-
--- 4. Formula pricing columns on order_items (sell side)
-ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "sales_pricing_model" pricing_model NOT NULL DEFAULT 'FIXED';
-ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "sales_reference_id" uuid REFERENCES "price_references"("id") ON DELETE SET NULL;
-ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "sales_premium" numeric(12, 4);
-ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "sales_barging" numeric(12, 4);
-ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "sales_barging_unit" text;
-ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "sales_credit_days" integer;
-ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "sales_price_finalized" boolean NOT NULL DEFAULT false;
-
--- 5. Seed default price references for every existing tenant (skip if already seeded)
+);--> statement-breakpoint
+ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "cost_pricing_model" pricing_model NOT NULL DEFAULT 'FIXED';--> statement-breakpoint
+ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "cost_reference_id" uuid REFERENCES "price_references"("id") ON DELETE SET NULL;--> statement-breakpoint
+ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "cost_premium" numeric(12, 4);--> statement-breakpoint
+ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "cost_barging" numeric(12, 4);--> statement-breakpoint
+ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "cost_barging_unit" text;--> statement-breakpoint
+ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "cost_credit_days" integer;--> statement-breakpoint
+ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "cost_price_finalized" boolean NOT NULL DEFAULT false;--> statement-breakpoint
+ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "sales_pricing_model" pricing_model NOT NULL DEFAULT 'FIXED';--> statement-breakpoint
+ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "sales_reference_id" uuid REFERENCES "price_references"("id") ON DELETE SET NULL;--> statement-breakpoint
+ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "sales_premium" numeric(12, 4);--> statement-breakpoint
+ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "sales_barging" numeric(12, 4);--> statement-breakpoint
+ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "sales_barging_unit" text;--> statement-breakpoint
+ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "sales_credit_days" integer;--> statement-breakpoint
+ALTER TABLE "order_items" ADD COLUMN IF NOT EXISTS "sales_price_finalized" boolean NOT NULL DEFAULT false;--> statement-breakpoint
 INSERT INTO "price_references" ("tenant_id", "name", "code", "description")
 SELECT t."id", r."name", r."code", r."description"
 FROM "tenants" t
