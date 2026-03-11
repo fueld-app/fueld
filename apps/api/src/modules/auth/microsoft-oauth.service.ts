@@ -115,8 +115,10 @@ export async function exchangeCodeForTokens(
   config: MicrosoftSsoConfig,
   code: string,
   redirectUri: string,
+  /** Use 'common' for the connect flow so any org's user can link. */
+  tenantOverride?: string,
 ): Promise<MicrosoftTokenResponse> {
-  const tenantId = config.ssoTenantId || 'common';
+  const tenantId = tenantOverride ?? config.ssoTenantId ?? 'common';
   const url = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
 
   const body = new URLSearchParams({
@@ -151,8 +153,9 @@ export async function refreshMicrosoftToken(
   config: MicrosoftSsoConfig,
   refreshToken: string,
 ): Promise<MicrosoftTokenResponse> {
-  const tenantId = config.ssoTenantId || 'common';
-  const url = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+  // Always use 'common' for token refresh — tokens may belong to users
+  // from any Azure AD tenant (linked via the connect flow).
+  const url = `https://login.microsoftonline.com/common/oauth2/v2.0/token`;
 
   const body = new URLSearchParams({
     client_id: config.ssoClientId,
@@ -291,8 +294,9 @@ export function buildConnectAuthorizationUrl(
   userEmail: string,
   forceUserEmail: boolean,
 ): string {
-  const tenantId = config.ssoTenantId || 'common';
-  const base = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize`;
+  // Always use 'common' for the connect flow so users from ANY Azure AD
+  // tenant can link their Outlook account (not just the SSO tenant).
+  const base = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize`;
 
   const state = signState({
     returnUrl,

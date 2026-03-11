@@ -698,7 +698,9 @@ export const authController = new Elysia({ prefix: '/auth' })
 
         // 3. Exchange authorization code for tokens
         const redirectUri = getMicrosoftRedirectUri(request.url);
-        const msTokens = await exchangeCodeForTokens(config, query.code, redirectUri);
+        // For the connect flow, use 'common' tenant so tokens from any org work
+        const tenantOverride = state.purpose === 'connect' ? 'common' : undefined;
+        const msTokens = await exchangeCodeForTokens(config, query.code, redirectUri, tenantOverride);
 
         // ── CONNECT flow: just store the refresh token on the existing user ──
         if (state.purpose === 'connect' && state.userId) {
