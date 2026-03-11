@@ -28,6 +28,9 @@ import {
 import { sendNotificationToUsers } from '../push/push.service';
 import { sendNotificationEmail } from '../../lib/email';
 import { notifyCreditApplicationWhatsApp } from './credit-notifications';
+import { db } from '../../db';
+import { users } from '../../db/schema';
+import { eq } from 'drizzle-orm';
 import type { ApiResponse } from '@fueld/types';
 
 export const creditApplicationsController = new Elysia({ prefix: '/credit/applications' })
@@ -118,6 +121,8 @@ export const creditApplicationsController = new Elysia({ prefix: '/credit/applic
         notifyPush: t.Optional(t.Boolean()),
         notifyEmail: t.Optional(t.Boolean()),
         notifyWhatsApp: t.Optional(t.Boolean()),
+        notifyTraderPush: t.Optional(t.Boolean()),
+        notifyTraderEmail: t.Optional(t.Boolean()),
       }),
       detail: {
         tags: ['Credit Applications'],
@@ -230,6 +235,42 @@ export const creditApplicationsController = new Elysia({ prefix: '/credit/applic
         if (!app) {
           return { success: false, data: null, message: 'Application not found or already resolved' };
         }
+
+        // Notify the submitting trader when the application is resolved
+        if (app.status === 'APPROVED' || app.status === 'REJECTED') {
+          try {
+            const settings = await getCreditApplicationSettings();
+            const statusLabel = app.status === 'APPROVED' ? 'approved' : 'rejected';
+            const notificationBody = `Your credit application for ${app.counterpartyName} (${app.requestedCurrency} ${Number(app.requestedAmount).toLocaleString()}) has been ${statusLabel}.`;
+
+            if (settings.notifyTraderPush) {
+              await sendNotificationToUsers([app.requestedByUserId], {
+                title: `Credit Application ${app.status === 'APPROVED' ? 'Approved' : 'Rejected'}`,
+                body: notificationBody,
+                url: `/credit/applications`,
+              }, auth.tenantId);
+            }
+
+            if (settings.notifyTraderEmail) {
+              // Look up trader email
+              const [traderRow] = await db.select({ email: users.email }).from(users).where(eq(users.id, app.requestedByUserId)).limit(1);
+              if (traderRow?.email) {
+                await sendNotificationEmail(
+                  traderRow.email,
+                  `Credit Application ${app.status === 'APPROVED' ? 'Approved' : 'Rejected'}`,
+                  `<div style="font-family: Arial, sans-serif; line-height: 1.5; color: #1f2937;">
+                    <h2 style="margin: 0 0 12px;">Credit Application ${app.status === 'APPROVED' ? 'Approved' : 'Rejected'}</h2>
+                    <p style="margin: 0 0 8px;">${notificationBody}</p>
+                    <p style="margin: 0;"><a href="${process.env['APP_URL'] ?? ''}/credit/applications" style="color: #2563eb;">View in Fueld</a></p>
+                  </div>`,
+                );
+              }
+            }
+          } catch (e) {
+            console.error('[CreditApplications] Trader notification failed:', e);
+          }
+        }
+
         return { success: true, data: app } satisfies ApiResponse<typeof app>;
       } catch (err: any) {
         console.error('[CreditApplications] Review failed:', err);

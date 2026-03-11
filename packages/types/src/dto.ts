@@ -1212,6 +1212,8 @@ export interface CreditApplicationSettingsDto {
   notifyPush: boolean;
   notifyEmail: boolean;
   notifyWhatsApp: boolean;
+  notifyTraderPush: boolean;
+  notifyTraderEmail: boolean;
 }
 
 export interface UpdateCreditApplicationSettingsDto {
@@ -1222,6 +1224,8 @@ export interface UpdateCreditApplicationSettingsDto {
   notifyPush?: boolean;
   notifyEmail?: boolean;
   notifyWhatsApp?: boolean;
+  notifyTraderPush?: boolean;
+  notifyTraderEmail?: boolean;
 }
 
 // ═══════════════════════════════════════════════════════════════════════

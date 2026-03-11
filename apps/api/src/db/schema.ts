@@ -175,6 +175,8 @@ export interface TenantSettings {
     notifyPush: boolean;                // send push notifications on new applications
     notifyEmail: boolean;               // send email to credit managers/admins
     notifyWhatsApp: boolean;            // send WhatsApp message to default group
+    notifyTraderPush: boolean;          // send push notification to trader on approval/rejection
+    notifyTraderEmail: boolean;         // send email to trader on approval/rejection
   };
   // Risk monitoring
   riskMonitoringSettings?: {

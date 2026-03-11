@@ -150,6 +150,42 @@ import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring
                 </div>
               </div>
 
+              <div class="pt-3 mt-1 border-t border-gray-200">
+                <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">Notify Trader on Decision</p>
+
+                <!-- Notify Trader Push -->
+                <div class="flex items-start gap-3 mb-3">
+                  <button (click)="notifyTraderPush.set(!notifyTraderPush())"
+                    class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
+                    [class]="notifyTraderPush() ? 'bg-brand-600' : 'bg-gray-300'">
+                    <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                      [class]="notifyTraderPush() ? 'translate-x-4' : 'translate-x-0.5'"></span>
+                  </button>
+                  <div>
+                    <p class="text-sm font-medium text-gray-700">Push Notification to Trader</p>
+                    <p class="text-xs text-gray-500">
+                      Send a push notification to the submitting trader when their credit application is approved or rejected.
+                    </p>
+                  </div>
+                </div>
+
+                <!-- Notify Trader Email -->
+                <div class="flex items-start gap-3">
+                  <button (click)="notifyTraderEmail.set(!notifyTraderEmail())"
+                    class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
+                    [class]="notifyTraderEmail() ? 'bg-brand-600' : 'bg-gray-300'">
+                    <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                      [class]="notifyTraderEmail() ? 'translate-x-4' : 'translate-x-0.5'"></span>
+                  </button>
+                  <div>
+                    <p class="text-sm font-medium text-gray-700">Email Notification to Trader</p>
+                    <p class="text-xs text-gray-500">
+                      Send an email to the submitting trader when their credit application is approved or rejected.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <!-- Save button -->
               <div class="pt-2 border-t border-gray-100">
                 <button (click)="save()" [disabled]="saving()"
@@ -425,6 +461,8 @@ export class CreditSettingsPageComponent implements OnInit {
   readonly notifyCreditManagers = signal(true);
   readonly notifyEmail = signal(false);
   readonly notifyWhatsApp = signal(false);
+  readonly notifyTraderPush = signal(true);
+  readonly notifyTraderEmail = signal(false);
   readonly financingAnnualRatePercent = signal(8);
   readonly financingDayCountConvention = signal(365);
 
@@ -472,6 +510,8 @@ export class CreditSettingsPageComponent implements OnInit {
         this.notifyCreditManagers.set(creditRes.data.notifyCreditManagers);
         this.notifyEmail.set(creditRes.data.notifyEmail ?? false);
         this.notifyWhatsApp.set(creditRes.data.notifyWhatsApp ?? false);
+        this.notifyTraderPush.set(creditRes.data.notifyTraderPush ?? true);
+        this.notifyTraderEmail.set(creditRes.data.notifyTraderEmail ?? false);
       }
       if (financingRes.success && financingRes.data) {
         this.financingAnnualRatePercent.set(financingRes.data.annualRate * 100);
@@ -515,6 +555,8 @@ export class CreditSettingsPageComponent implements OnInit {
             notifyPush: this.notifyCreditManagers(),
             notifyEmail: this.notifyEmail(),
             notifyWhatsApp: this.notifyWhatsApp(),
+            notifyTraderPush: this.notifyTraderPush(),
+            notifyTraderEmail: this.notifyTraderEmail(),
           },
         ),
       );
