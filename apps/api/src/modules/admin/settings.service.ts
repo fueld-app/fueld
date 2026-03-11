@@ -1026,6 +1026,7 @@ const DEFAULT_INQUIRY_CANCEL_REASONS = [
   'No supplier availability',
   'Credit not approved',
   'Duplicate inquiry',
+  'Other',
 ];
 
 export async function getInquiryCancelReasonSettings(): Promise<{ reasons: string[] }> {

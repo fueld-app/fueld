@@ -1328,6 +1328,19 @@ interface InquiryReplyRecommendation {
               }
             </select>
           </div>
+          @if (selectedInquiryCancelReason() === 'Other') {
+            <div class="mt-3">
+              <label class="text-xs font-medium text-gray-500">Please specify</label>
+              <textarea
+                [ngModel]="cancelReasonOtherDetail()"
+                (ngModelChange)="cancelReasonOtherDetail.set($event)"
+                placeholder="e.g. Adani is exclusive at Mundra - direct with client"
+                rows="3"
+                class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
+                       focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+              ></textarea>
+            </div>
+          }
           <div class="mt-5 flex items-center justify-end gap-3">
             <button
               type="button"
@@ -1491,6 +1504,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   readonly cancellingInquiry = signal(false);
   readonly inquiryCancelReasons = signal<string[]>([]);
   readonly selectedInquiryCancelReason = signal('');
+  readonly cancelReasonOtherDetail = signal('');
   readonly availableInquiryCancelReasons = computed(() =>
     this.inquiryCancelReasons().map((reason) => reason.trim()).filter(Boolean),
   );
@@ -3254,6 +3268,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     }
 
     this.selectedInquiryCancelReason.set(reasons[0]!);
+    this.cancelReasonOtherDetail.set('');
     this.showCancelInquiryModal.set(true);
   }
 
@@ -3307,12 +3322,22 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
       return;
     }
 
+    let lossReason = reason;
+    if (reason === 'Other') {
+      const detail = this.cancelReasonOtherDetail().trim();
+      if (!detail) {
+        this.showToast('error', 'Please specify a reason.');
+        return;
+      }
+      lossReason = `Other: ${detail}`;
+    }
+
     this.cancellingInquiry.set(true);
     try {
       const res = await firstValueFrom(
         this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}/status`, {
           status: 'CANCELLED',
-          lossReason: reason,
+          lossReason,
         }),
       );
       if (res.success) {

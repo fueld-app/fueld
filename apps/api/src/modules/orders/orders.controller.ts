@@ -300,7 +300,8 @@ export const ordersController = new Elysia({ prefix: '/orders' })
           }
 
           const reasonSettings = await getInquiryCancelReasonSettings();
-          if (!reasonSettings.reasons.includes(reason)) {
+          const isOtherReason = reasonSettings.reasons.includes('Other') && reason.startsWith('Other:');
+          if (!isOtherReason && !reasonSettings.reasons.includes(reason)) {
             return { success: false, data: null, message: 'Invalid cancellation reason' };
           }
         }
