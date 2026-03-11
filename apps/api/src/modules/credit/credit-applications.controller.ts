@@ -123,6 +123,7 @@ export const creditApplicationsController = new Elysia({ prefix: '/credit/applic
         notifyWhatsApp: t.Optional(t.Boolean()),
         notifyTraderPush: t.Optional(t.Boolean()),
         notifyTraderEmail: t.Optional(t.Boolean()),
+        notifyTraderWhatsApp: t.Optional(t.Boolean()),
       }),
       detail: {
         tags: ['Credit Applications'],
@@ -265,6 +266,10 @@ export const creditApplicationsController = new Elysia({ prefix: '/credit/applic
                   </div>`,
                 );
               }
+            }
+            if (settings.notifyTraderWhatsApp) {
+              const waBody = `Credit application for ${app.counterpartyName} (${app.requestedCurrency} ${Number(app.requestedAmount).toLocaleString()}) has been ${statusLabel}.`;
+              await notifyCreditApplicationWhatsApp(waBody);
             }
           } catch (e) {
             console.error('[CreditApplications] Trader notification failed:', e);

@@ -177,6 +177,7 @@ export interface TenantSettings {
     notifyWhatsApp: boolean;            // send WhatsApp message to default group
     notifyTraderPush: boolean;          // send push notification to trader on approval/rejection
     notifyTraderEmail: boolean;         // send email to trader on approval/rejection
+    notifyTraderWhatsApp: boolean;      // send WhatsApp msg to default group on approval/rejection
   };
   // Risk monitoring
   riskMonitoringSettings?: {

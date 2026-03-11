@@ -170,7 +170,7 @@ import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring
                 </div>
 
                 <!-- Notify Trader Email -->
-                <div class="flex items-start gap-3">
+                <div class="flex items-start gap-3 mb-3">
                   <button (click)="notifyTraderEmail.set(!notifyTraderEmail())"
                     class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
                     [class]="notifyTraderEmail() ? 'bg-brand-600' : 'bg-gray-300'">
@@ -181,6 +181,22 @@ import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring
                     <p class="text-sm font-medium text-gray-700">Email Notification to Trader</p>
                     <p class="text-xs text-gray-500">
                       Send an email to the submitting trader when their credit application is approved or rejected.
+                    </p>
+                  </div>
+                </div>
+
+                <!-- Notify Trader WhatsApp -->
+                <div class="flex items-start gap-3">
+                  <button (click)="notifyTraderWhatsApp.set(!notifyTraderWhatsApp())"
+                    class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
+                    [class]="notifyTraderWhatsApp() ? 'bg-brand-600' : 'bg-gray-300'">
+                    <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                      [class]="notifyTraderWhatsApp() ? 'translate-x-4' : 'translate-x-0.5'"></span>
+                  </button>
+                  <div>
+                    <p class="text-sm font-medium text-gray-700">WhatsApp Group on Decision</p>
+                    <p class="text-xs text-gray-500">
+                      Send a message to the default WhatsApp group when a credit application is approved or rejected.
                     </p>
                   </div>
                 </div>
@@ -463,6 +479,7 @@ export class CreditSettingsPageComponent implements OnInit {
   readonly notifyWhatsApp = signal(false);
   readonly notifyTraderPush = signal(true);
   readonly notifyTraderEmail = signal(false);
+  readonly notifyTraderWhatsApp = signal(false);
   readonly financingAnnualRatePercent = signal(8);
   readonly financingDayCountConvention = signal(365);
 
@@ -512,6 +529,7 @@ export class CreditSettingsPageComponent implements OnInit {
         this.notifyWhatsApp.set(creditRes.data.notifyWhatsApp ?? false);
         this.notifyTraderPush.set(creditRes.data.notifyTraderPush ?? true);
         this.notifyTraderEmail.set(creditRes.data.notifyTraderEmail ?? false);
+        this.notifyTraderWhatsApp.set(creditRes.data.notifyTraderWhatsApp ?? false);
       }
       if (financingRes.success && financingRes.data) {
         this.financingAnnualRatePercent.set(financingRes.data.annualRate * 100);
@@ -557,6 +575,7 @@ export class CreditSettingsPageComponent implements OnInit {
             notifyWhatsApp: this.notifyWhatsApp(),
             notifyTraderPush: this.notifyTraderPush(),
             notifyTraderEmail: this.notifyTraderEmail(),
+            notifyTraderWhatsApp: this.notifyTraderWhatsApp(),
           },
         ),
       );

@@ -37,6 +37,7 @@ const DEFAULT_SETTINGS = {
   notifyWhatsApp: false,
   notifyTraderPush: true,
   notifyTraderEmail: false,
+  notifyTraderWhatsApp: false,
 };
 
 async function getTenantId(): Promise<string> {
