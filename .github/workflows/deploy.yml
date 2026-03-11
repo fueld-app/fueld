@@ -8,6 +8,7 @@ on:
   workflow_dispatch:
 
 env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   VPS_HOST: 139.162.157.31
   VPS_USER: deploy
   DOMAIN: riviera-marine.fueld.app
