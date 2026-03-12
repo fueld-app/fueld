@@ -783,7 +783,12 @@ export async function updateVesselCompanyRoleSettings(
 //  PRODUCT SETTINGS
 // ═══════════════════════════════════════════════════════════════════════
 
-const DEFAULT_PRODUCTS = ['VLSFO', 'LSMGO', 'IFO380CST', 'MGO', 'LUBE'];
+const DEFAULT_PRODUCTS = [
+  'VLSFO', 'LSMGO', 'IFO380CST', 'IFO180CST', 'IFO120CST', 'IFO30CST',
+  'IFO', 'MGO', 'MDO', 'LSIFO', 'LUBE',
+  'ITEM', 'COMMISSION', 'HIRE', 'PAYMENT', 'CREDIT_NOTE',
+  'CUTTERSTOCK', 'PYGAS', 'BARGING_FEE',
+];
 
 export async function getProductSettings(): Promise<{ products: string[] }> {
   const tenant = await db.query.tenants.findFirst();
