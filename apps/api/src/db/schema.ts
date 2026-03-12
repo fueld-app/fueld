@@ -41,6 +41,21 @@ export const productTypeEnum = pgEnum('product_type', [
   'IFO380',
   'MGO',
   'LUBE',
+  'IFO380CST',
+  'IFO180CST',
+  'IFO120CST',
+  'IFO30CST',
+  'IFO',
+  'MDO',
+  'LSIFO',
+  'ITEM',
+  'COMMISSION',
+  'HIRE',
+  'PAYMENT',
+  'CREDIT_NOTE',
+  'CUTTERSTOCK',
+  'PYGAS',
+  'BARGING_FEE',
 ]);
 
 export const paymentTermsEnum = pgEnum('payment_terms', [

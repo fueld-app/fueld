@@ -337,6 +337,13 @@
       "when": 1773441000000,
       "tag": "0047_formula_pricing",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1741820400000,
+      "tag": "0048_product_types_expand",
+      "breakpoints": true
     }
   ]
 }
