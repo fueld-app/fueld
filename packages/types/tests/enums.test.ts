@@ -43,9 +43,23 @@ describe('enums', () => {
     verifyStringEnum(ProductType, {
       VLSFO: 'VLSFO',
       LSMGO: 'LSMGO',
-      IFO380: 'IFO380',
       MGO: 'MGO',
       LUBE: 'LUBE',
+      IFO380CST: 'IFO380CST',
+      IFO180CST: 'IFO180CST',
+      IFO120CST: 'IFO120CST',
+      IFO30CST: 'IFO30CST',
+      IFO: 'IFO',
+      MDO: 'MDO',
+      LSIFO: 'LSIFO',
+      ITEM: 'ITEM',
+      COMMISSION: 'COMMISSION',
+      HIRE: 'HIRE',
+      PAYMENT: 'PAYMENT',
+      CREDIT_NOTE: 'CREDIT_NOTE',
+      CUTTERSTOCK: 'CUTTERSTOCK',
+      PYGAS: 'PYGAS',
+      BARGING_FEE: 'BARGING_FEE',
     });
   });
 

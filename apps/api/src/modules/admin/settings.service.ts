@@ -783,7 +783,7 @@ export async function updateVesselCompanyRoleSettings(
 //  PRODUCT SETTINGS
 // ═══════════════════════════════════════════════════════════════════════
 
-const DEFAULT_PRODUCTS = ['VLSFO', 'LSMGO', 'IFO380', 'MGO', 'LUBE'];
+const DEFAULT_PRODUCTS = ['VLSFO', 'LSMGO', 'IFO380CST', 'MGO', 'LUBE'];
 
 export async function getProductSettings(): Promise<{ products: string[] }> {
   const tenant = await db.query.tenants.findFirst();
@@ -849,7 +849,7 @@ export interface UnitConversion {
 }
 
 const DEFAULT_UNIT_CONVERSIONS: UnitConversion[] = [
-  { productType: 'IFO380', fromUnit: 'MT', toUnit: 'CBM', factor: 1.009 },
+  { productType: 'IFO380CST', fromUnit: 'MT', toUnit: 'CBM', factor: 1.009 },
   { productType: 'VLSFO', fromUnit: 'MT', toUnit: 'CBM', factor: 1.053 },
   { productType: 'LSMGO', fromUnit: 'MT', toUnit: 'CBM', factor: 1.183 },
   { productType: 'HSFO', fromUnit: 'MT', toUnit: 'CBM', factor: 1.02 },

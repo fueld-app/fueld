@@ -15,7 +15,6 @@ export enum OrderStatus {
 export enum ProductType {
   VLSFO = 'VLSFO',
   LSMGO = 'LSMGO',
-  IFO380 = 'IFO380',
   MGO = 'MGO',
   LUBE = 'LUBE',
   IFO380CST = 'IFO380CST',

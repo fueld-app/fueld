@@ -48,7 +48,7 @@ interface CompanySearchResultOption {
   country?: string | null;
 }
 
-const PRODUCT_OPTIONS = ['VLSFO', 'LSMGO', 'IFO380', 'MGO', 'LUBE'] as const;
+const PRODUCT_OPTIONS = ['VLSFO', 'LSMGO', 'IFO380CST', 'MGO', 'LUBE'] as const;
 
 const PLACE_TYPE_LABELS: Record<string, string> = {
   POR: 'Port',

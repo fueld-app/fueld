@@ -38,7 +38,6 @@ export const orderStatusEnum = pgEnum('order_status', [
 export const productTypeEnum = pgEnum('product_type', [
   'VLSFO',
   'LSMGO',
-  'IFO380',
   'MGO',
   'LUBE',
   'IFO380CST',

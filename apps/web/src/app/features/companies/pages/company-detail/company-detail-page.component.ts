@@ -183,7 +183,7 @@ interface SupplyPlaceSearchResult {
   country?: string | null;
 }
 
-const SUPPLY_PORT_PRODUCT_OPTIONS = ['VLSFO', 'LSMGO', 'IFO380', 'MGO', 'LUBE'] as const;
+const SUPPLY_PORT_PRODUCT_OPTIONS = ['VLSFO', 'LSMGO', 'IFO380CST', 'MGO', 'LUBE'] as const;
 
 interface FleetVessel {
   id: string;

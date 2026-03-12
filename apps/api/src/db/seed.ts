@@ -270,7 +270,7 @@ async function seed() {
     // Order 1 — Offer
     { orderId: orders[1].id, productType: 'LSMGO' as const, quantity: '200.000', costPrice: '820.0000', salesPrice: '860.0000', profit: '8000.0000', paymentTerms: 'CREDIT_30' as const },
     // Order 2 — Confirmed
-    { orderId: orders[2].id, productType: 'IFO380' as const, quantity: '1200.000', costPrice: '450.0000', salesPrice: '485.0000', profit: '42000.0000', paymentTerms: 'ON_RECEIPT' as const },
+    { orderId: orders[2].id, productType: 'IFO380CST' as const, quantity: '1200.000', costPrice: '450.0000', salesPrice: '485.0000', profit: '42000.0000', paymentTerms: 'ON_RECEIPT' as const },
     { orderId: orders[2].id, productType: 'LSMGO' as const, quantity: '100.000', costPrice: '810.0000', salesPrice: '850.0000', profit: '4000.0000', paymentTerms: 'ON_RECEIPT' as const },
     // Order 3 — Delivered
     { orderId: orders[3].id, productType: 'VLSFO' as const, quantity: '800.000', costPrice: '575.0000', salesPrice: '605.0000', profit: '24000.0000', paymentTerms: 'CREDIT_30' as const },

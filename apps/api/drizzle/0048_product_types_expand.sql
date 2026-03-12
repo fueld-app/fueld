@@ -13,4 +13,6 @@ ALTER TYPE "public"."product_type" ADD VALUE IF NOT EXISTS 'PAYMENT';--> stateme
 ALTER TYPE "public"."product_type" ADD VALUE IF NOT EXISTS 'CREDIT_NOTE';--> statement-breakpoint
 ALTER TYPE "public"."product_type" ADD VALUE IF NOT EXISTS 'CUTTERSTOCK';--> statement-breakpoint
 ALTER TYPE "public"."product_type" ADD VALUE IF NOT EXISTS 'PYGAS';--> statement-breakpoint
-ALTER TYPE "public"."product_type" ADD VALUE IF NOT EXISTS 'BARGING_FEE';
+ALTER TYPE "public"."product_type" ADD VALUE IF NOT EXISTS 'BARGING_FEE';--> statement-breakpoint
+-- Migrate existing IFO380 data to IFO380CST
+UPDATE "order_items" SET "product_type" = 'IFO380CST' WHERE "product_type" = 'IFO380';

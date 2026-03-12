@@ -13,8 +13,9 @@ Return ONLY valid JSON matching this exact schema — no markdown, no explanatio
 ## Rules
 
 - "products[].name" must be uppercase fuel abbreviations:
-  VLSFO, LSMGO, HSFO, IFO380, IFO180, MGO, MDO, ULSD, GASOIL, LUBE
-  Also accept: HFO → HSFO, MFO → IFO380, ULSFO → VLSFO, DMA → MGO, RMG → IFO380
+  VLSFO, LSMGO, HSFO, IFO380CST, IFO180CST, IFO120CST, IFO30CST, IFO, MGO, MDO, ULSD, GASOIL, LUBE,
+  LSIFO, ITEM, COMMISSION, HIRE, PAYMENT, CREDIT_NOTE, CUTTERSTOCK, PYGAS, BARGING_FEE
+  Also accept: HFO → HSFO, MFO → IFO380CST, ULSFO → VLSFO, DMA → MGO, RMG → IFO380CST, IFO380 → IFO380CST
 - "products[].unit" must be MT, CBM, KL, or LT (default MT if omitted)
 - "products[].quantity" must be a number or null if not stated
 - "imo" must be a 7-digit IMO number as string, or null
