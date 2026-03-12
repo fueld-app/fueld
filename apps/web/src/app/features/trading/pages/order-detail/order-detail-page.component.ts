@@ -3193,11 +3193,15 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
         break;
       case 'view-proforma':
         if (!this.hasLineItems()) {
-          this.showToast('error', 'Add at least one line item before generating Proforma Invoice.');
+          this.showToast('error', 'Add at least one line item before generating Nomination PDF.');
           break;
         }
-        if (!this.hasBankAccount()) {
-          this.showToast('error', 'Select a bank account before generating Proforma Invoice.');
+        if (!this.hasSupplier()) {
+          this.showToast('error', 'Select a supplier before generating Nomination PDF.');
+          break;
+        }
+        if (!this.hasInvoicingCompany()) {
+          this.showToast('error', 'Select an invoicing company before generating Nomination PDF.');
           break;
         }
         this.viewProformaPdf();
