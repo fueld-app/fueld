@@ -63,6 +63,7 @@ interface CreateOrderInput {
   supplierNote?: string | null;
   supplierContactId?: string | null;
   termsAndConditions?: string | null;
+  placeRemark?: string | null;
 }
 
 interface UpdateOrderInput {
@@ -87,6 +88,7 @@ interface UpdateOrderInput {
   supplierNote?: string | null;
   supplierContactId?: string | null;
   termsAndConditions?: string | null;
+  placeRemark?: string | null;
   lossReason?: string | null;
 }
 
@@ -637,6 +639,17 @@ export async function createOrder(input: CreateOrderInput) {
   // Generate the external order number
   const orderNumber = await generateOrderNumber(input.tenantId);
 
+  // Seed placeRemark from the place's default if not explicitly provided
+  let placeRemark = input.placeRemark ?? null;
+  if (placeRemark === null) {
+    const [placeRow] = await db
+      .select({ orderRemark: places.orderRemark })
+      .from(places)
+      .where(eq(places.id, input.placeId))
+      .limit(1);
+    placeRemark = placeRow?.orderRemark ?? null;
+  }
+
   const values: typeof orders.$inferInsert = {
     tenantId: input.tenantId,
     orderNumber,
@@ -659,6 +672,7 @@ export async function createOrder(input: CreateOrderInput) {
     supplierNote: input.supplierNote ?? null,
     supplierContactId: input.supplierContactId ?? null,
     termsAndConditions: input.termsAndConditions ?? null,
+    placeRemark,
   };
 
   const [created] = await db
@@ -703,6 +717,7 @@ export async function updateOrder(id: string, input: UpdateOrderInput) {
   if (input.supplierNote !== undefined) setData.supplierNote = input.supplierNote;
   if (input.supplierContactId !== undefined) setData.supplierContactId = input.supplierContactId;
   if (input.termsAndConditions !== undefined) setData.termsAndConditions = input.termsAndConditions;
+  if (input.placeRemark !== undefined) setData.placeRemark = input.placeRemark;
   if (input.lossReason !== undefined) setData.lossReason = input.lossReason;
 
   // Auto-set closedAt when status moves to CANCELLED or PAID

@@ -509,6 +509,7 @@ export interface OrderDto {
   supplierNote?: string | null;
   supplierContactId?: string | null;
   termsAndConditions?: string | null;
+  placeRemark?: string | null;
   lossReason: string | null;
   financingRateAnnual?: number;
   financingDayCountConvention?: number;
@@ -566,6 +567,7 @@ export interface UpdateOrderDto {
   supplierNote?: string | null;
   supplierContactId?: string | null;
   termsAndConditions?: string | null;
+  placeRemark?: string | null;
   lossReason?: string | null;
 }
 

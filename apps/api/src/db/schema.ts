@@ -610,6 +610,9 @@ export const orders = pgTable('orders', {
   // Terms & conditions
   termsAndConditions: text('terms_and_conditions'),
 
+  // Place remark (seeded from place.orderRemark on creation, editable per-order)
+  placeRemark: text('place_remark'),
+
   // Analytics
   lossReason: text('loss_reason'),
   closedAt: timestamp('closed_at', { withTimezone: true }),

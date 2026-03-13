@@ -480,11 +480,19 @@ interface InquiryReplyRecommendation {
       <!-- Notes + T&C (projected into invoicing card) -->
       <div notesAndTerms>
         <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Place remark</p>
-        @if (port()?.orderRemark) {
+        @if (!isPaidOrCancelled()) {
+          <textarea
+            rows="3"
+            class="mt-1 block w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:bg-white"
+            placeholder="Remark to include on order documents"
+            [ngModel]="order()?.placeRemark ?? ''"
+            (ngModelChange)="onPlaceRemarkChange($event)"
+          ></textarea>
+        } @else if (order()?.placeRemark) {
           <p
             class="mt-1 text-sm text-gray-700 whitespace-pre-line"
             [class.fueld-clamp-1]="!showPlaceRemarkFull()"
-          >{{ port()?.orderRemark }}</p>
+          >{{ order()?.placeRemark }}</p>
           <button
             type="button"
             (click)="showPlaceRemarkFull.set(!showPlaceRemarkFull())"
@@ -493,7 +501,6 @@ interface InquiryReplyRecommendation {
         } @else {
           <p class="mt-1 text-sm text-gray-700">-</p>
         }
-        <p class="mt-2 text-[11px] text-gray-400">Edit in Places → Details</p>
 
         <div class="mt-4"></div>
         <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Customer terms</p>
@@ -1362,6 +1369,50 @@ interface InquiryReplyRecommendation {
       </div>
     }
 
+    <!-- Place Remark Change Prompt -->
+    @if (showPlaceRemarkPrompt()) {
+      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-gray-900">Update place remark?</h3>
+            <button
+              type="button"
+              (click)="dismissPlaceRemarkPrompt()"
+              class="text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
+          </div>
+          <p class="mt-3 text-sm text-gray-600">
+            The new place has a different default remark. Would you like to update the order's place remark to match?
+          </p>
+          @if (pendingPlaceRemark()) {
+            <div class="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700 whitespace-pre-line max-h-32 overflow-y-auto">
+              {{ pendingPlaceRemark() }}
+            </div>
+          } @else {
+            <p class="mt-3 text-sm text-gray-400 italic">The new place has no default remark.</p>
+          }
+          <div class="mt-5 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              (click)="dismissPlaceRemarkPrompt()"
+              class="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600"
+            >
+              Keep current
+            </button>
+            <button
+              type="button"
+              (click)="applyNewPlaceRemark()"
+              class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-700"
+            >
+              {{ pendingPlaceRemark() ? 'Use new remark' : 'Clear remark' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
     <!-- Send Email Modal -->
     <app-send-email-modal
       [documentType]="emailDocumentType()"
@@ -1537,6 +1588,8 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   // ─── Terms UI (collapsed by default) ─────────────────────────────
 
   readonly showPlaceRemarkFull = signal(false);
+  readonly showPlaceRemarkPrompt = signal(false);
+  readonly pendingPlaceRemark = signal<string | null>(null);
   readonly showCustomerTermsFull = signal(false);
   readonly showSupplierTermsFull = signal(false);
 
@@ -3040,10 +3093,36 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
 
   onPortChange(placeId: string): void {
     if (!placeId) return;
+    const previousRemark = this.order()?.placeRemark ?? null;
     this.order.update((o) => (o ? { ...o, placeId } : o));
     const placeData = this.places().find((p) => p.id === placeId);
     this.port.set(placeData ?? null);
     this.triggerAutosave();
+
+    // Prompt user if the new place has a different default remark
+    const newDefault = placeData?.orderRemark ?? null;
+    if ((newDefault ?? '') !== (previousRemark ?? '')) {
+      this.pendingPlaceRemark.set(newDefault);
+      this.showPlaceRemarkPrompt.set(true);
+    }
+  }
+
+  onPlaceRemarkChange(value: string): void {
+    this.order.update((o) => (o ? { ...o, placeRemark: value || null } : o));
+    this.triggerAutosave();
+  }
+
+  applyNewPlaceRemark(): void {
+    const remark = this.pendingPlaceRemark();
+    this.order.update((o) => (o ? { ...o, placeRemark: remark } : o));
+    this.showPlaceRemarkPrompt.set(false);
+    this.pendingPlaceRemark.set(null);
+    this.triggerAutosave();
+  }
+
+  dismissPlaceRemarkPrompt(): void {
+    this.showPlaceRemarkPrompt.set(false);
+    this.pendingPlaceRemark.set(null);
   }
 
   onEtaChange(eta: string): void {

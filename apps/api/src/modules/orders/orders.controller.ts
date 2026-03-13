@@ -262,6 +262,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         supplierNote: t.Optional(t.Nullable(t.String())),
         supplierContactId: t.Optional(t.Nullable(t.String())),
         termsAndConditions: t.Optional(t.Nullable(t.String())),
+        placeRemark: t.Optional(t.Nullable(t.String())),
         status: t.Optional(t.String()),
         eta: t.Optional(t.Nullable(t.String())),
         etd: t.Optional(t.Nullable(t.String())),
