@@ -1431,6 +1431,10 @@ interface InquiryReplyRecommendation {
       [orderId]="orderId()"
       [portName]="port()?.name ?? ''"
       [waLinked]="waLinked()"
+      [vesselName]="vesselName()"
+      [vesselImo]="vessel()?.imo ?? null"
+      [eta]="order()?.eta ?? null"
+      [items]="itemRows()"
       (sendInquiry)="onSendInquiry($event)"
       (sendWhatsAppInquiry)="onSendInquiryWhatsApp($event)"
     />

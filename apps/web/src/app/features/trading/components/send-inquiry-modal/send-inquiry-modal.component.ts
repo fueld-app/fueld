@@ -648,6 +648,10 @@ export class SendInquiryModalComponent {
   readonly orderId = input.required<string>();
   readonly portName = input<string>('');
   readonly waLinked = input(false);
+  readonly vesselName = input<string>('');
+  readonly vesselImo = input<string | null>(null);
+  readonly eta = input<string | null>(null);
+  readonly items = input<{ productType: string; quantity: number; unit: string }[]>([]);
 
   readonly sendInquiry = output<SendInquiryPayload>();
   readonly sendWhatsAppInquiry = output<SendInquiryWhatsAppPayload>();
@@ -914,10 +918,23 @@ export class SendInquiryModalComponent {
   }
 
   copyBodyText(): void {
-    const editor = this.bodyEditor()?.nativeElement;
-    if (!editor) return;
-    const plainText = editor.innerText.replace(/\n{3,}/g, '\n\n').trim();
-    navigator.clipboard.writeText(plainText).then(() => {
+    const lines: string[] = [];
+    const vessel = this.vesselName();
+    if (vessel) lines.push(vessel);
+    const imo = this.vesselImo();
+    if (imo) lines.push(`IMO ${imo}`);
+    const port = this.portName();
+    if (port) lines.push(port);
+    for (const item of this.items()) {
+      lines.push(`${item.productType} ${item.quantity} ${item.unit}`);
+    }
+    const eta = this.eta();
+    if (eta) {
+      const d = new Date(eta);
+      lines.push(`ETA ${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`);
+    }
+    const text = lines.join('\n');
+    navigator.clipboard.writeText(text).then(() => {
       this.copySuccess.set(true);
       setTimeout(() => this.copySuccess.set(false), 2000);
     });
