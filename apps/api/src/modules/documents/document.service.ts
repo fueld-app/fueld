@@ -770,7 +770,7 @@ function buildNotesSection(params: {
 
   if (termsAndConditions) {
     notes.push({ text: 'Terms:', bold: true, margin: [0, 2, 0, 4] } as Content);
-    notes.push({ text: termsAndConditions, margin: [0, 0, 0, 6] } as Content);
+    notes.push({ text: termsAndConditions, alignment: 'justify', margin: [0, 0, 0, 6] } as Content);
   }
 
   if (itemNotes.length) {
