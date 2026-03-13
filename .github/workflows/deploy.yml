@@ -8,7 +8,6 @@ on:
   workflow_dispatch:
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   VPS_HOST: 139.162.157.31
   VPS_USER: deploy
   DOMAIN: riviera-marine.fueld.app
@@ -42,9 +41,9 @@ jobs:
           rm repo.tar.gz
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
+        run: |
+          curl -fsSL https://bun.sh/install | bash -s "bun-v${{ env.BUN_VERSION }}"
+          echo "$HOME/.bun/bin" >> $GITHUB_PATH
 
       - name: Setup Node.js (for Angular CLI)
         uses: actions/setup-node@v6

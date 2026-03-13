@@ -546,7 +546,7 @@ export interface OrderItemsEconomics {
               <td></td>
               <td></td>
               @if (allowDeliveredEdit()) {
-                <td class="px-4 py-3 text-right tabular-nums text-gray-900">{{ totalDeliveredQty() | number:'1.0-3' }}</td>
+                <td></td>
               }
               <td class="px-4 py-3 text-right tabular-nums text-gray-600">{{ totalCost() | number:'1.2-2' }} {{ baseCurrency() }}</td>
               <td class="px-4 py-3 text-right tabular-nums text-gray-600">{{ totalRevenue() | number:'1.2-2' }} {{ baseCurrency() }}</td>
