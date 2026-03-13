@@ -41,7 +41,7 @@ import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
             <div class="flex items-center gap-3">
               <!-- Download button -->
               <a
-                [href]="rawBlobUrl()"
+                [href]="downloadUrl()"
                 [download]="fileName()"
                 class="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold
                        text-white shadow-sm transition-colors hover:bg-brand-700
@@ -199,6 +199,7 @@ export class PdfPreviewModalComponent {
     const url = this.rawBlobUrl();
     return url ? this.sanitizer.bypassSecurityTrustResourceUrl(url) : '';
   });
+  readonly downloadUrl = signal<string>('');
   readonly title = signal('');
   readonly fileName = signal('');
   readonly verifyUrl = signal('');
@@ -222,20 +223,35 @@ export class PdfPreviewModalComponent {
     this.verifyUrl.set('');
     this.verifyCopied.set(false);
     this.rawBlobUrl.set('');
+    this.downloadUrl.set('');
     this.loading.set(true);
     this.visible.set(true);
   }
 
   /** Set the loaded PDF blob and display it */
   setBlob(blob: Blob, fileName: string, verifyUrl?: string | null): void {
-    const url = URL.createObjectURL(blob);
-    this.currentBlobUrl = url;
     this.currentBlob = blob;
-    this.rawBlobUrl.set(url);
     this.fileName.set(fileName);
     this.verifyUrl.set((verifyUrl ?? '').trim());
     this.verifyCopied.set(false);
-    this.loading.set(false);
+
+    const blobUrl = URL.createObjectURL(blob);
+    this.currentBlobUrl = blobUrl;
+    this.downloadUrl.set(blobUrl);
+
+    // Android PWA / mobile browsers can't render blob: URLs in iframes for PDFs.
+    // Convert to a data URL which works universally.
+    if (/android|iphone|ipad/i.test(navigator.userAgent)) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        this.rawBlobUrl.set(reader.result as string);
+        this.loading.set(false);
+      };
+      reader.readAsDataURL(blob);
+    } else {
+      this.rawBlobUrl.set(blobUrl);
+      this.loading.set(false);
+    }
   }
 
   async copyVerifyUrl(): Promise<void> {
