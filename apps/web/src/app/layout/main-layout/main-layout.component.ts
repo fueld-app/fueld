@@ -365,6 +365,9 @@ const NAVIGATION: NavItem[] = [
         <div class="ml-auto flex items-center gap-3">
           <!-- Commodity Prices (shrinks / hides when search expands) -->
           <div class="hidden shrink items-center gap-3 overflow-hidden md:flex">
+            @if (eurRate() !== null || commodityPrices().length > 0) {
+              <span class="text-[10px] text-gray-400 shrink-0" [title]="pricesUpdatedAt() ?? ''">{{ pricesUpdatedAgo() }}</span>
+            }
             @if (eurRate() !== null) {
               <div class="flex shrink-0 flex-col leading-tight">
                 <div class="flex items-center gap-1 text-xs">
@@ -637,6 +640,9 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   readonly eurRate = signal<number | null>(null);
   readonly eurChange = signal<number>(0);
   readonly eurChangePercent = signal<number>(0);
+  readonly pricesUpdatedAt = signal<string | null>(null);
+  private readonly pricesTick = signal(0);
+  private pricesTickTimer: ReturnType<typeof setInterval> | null = null;
   readonly updateDismissed = signal(false);
   readonly appHealth = this.appHealthService.health;
   readonly showUpdateToast = computed(() =>
@@ -666,11 +672,25 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     void this.appHealthService.refresh();
 
+    // Tick every 30s so the relative "X min ago" label refreshes
+    this.pricesTickTimer = setInterval(() => this.pricesTick.update((n) => n + 1), 30_000);
+
     // Subscribe to commodity price updates from WebSocket
     this.priceSub = this.wsService
       .on<{ prices: CommodityPrice[]; fxRates?: FxRatesPayload }>('prices')
       .subscribe((data) => {
         this.commodityPrices.set(data.prices);
+
+        // Track the most recent updatedAt across all sources
+        const timestamps = [
+          ...data.prices.map((p) => p.updatedAt),
+          data.fxRates?.updatedAt,
+        ].filter(Boolean) as string[];
+        if (timestamps.length) {
+          timestamps.sort();
+          this.pricesUpdatedAt.set(timestamps[timestamps.length - 1]);
+        }
+
         const eur = data.fxRates?.rates?.['EUR'];
         if (typeof eur === 'number' && eur !== 0) {
           const nextRate = 1 / eur;
@@ -747,6 +767,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     this.routerSub?.unsubscribe();
     this.priceSub?.unsubscribe();
     this.rfqSub?.unsubscribe();
+    if (this.pricesTickTimer) clearInterval(this.pricesTickTimer);
     if (this.copyHandler) {
       document.removeEventListener('copy', this.copyHandler as EventListener);
     }
@@ -1098,6 +1119,21 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     if (phone) return `+${phone}`;
     const source = typeof rfq?.source === 'string' ? rfq.source.trim() : '';
     return source || '—';
+  }
+
+  pricesUpdatedAgo(): string {
+    this.pricesTick(); // subscribe to tick for reactivity
+    const iso = this.pricesUpdatedAt();
+    if (!iso) return '';
+    const diff = Date.now() - new Date(iso).getTime();
+    if (diff < 0) return 'just now';
+    const seconds = Math.floor(diff / 1000);
+    if (seconds < 60) return 'just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours / 24)}d ago`;
   }
 
   senderInitial(rfq: any): string {

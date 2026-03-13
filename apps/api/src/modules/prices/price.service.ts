@@ -375,10 +375,12 @@ function broadcast(): void {
   const payload = getLatestPricePayload();
   if (payload.prices.length === 0 && !payload.fxRates) return;
 
-  // Build a fingerprint from the actual data values (not updatedAt timestamps)
+  // Build a fingerprint from the actual data values (including updatedAt for freshness)
   const fingerprint = payload.prices
-    .map((p) => `${p.ticker}:${p.price}:${p.change}`)
+    .map((p) => `${p.ticker}:${p.price}:${p.change}:${p.updatedAt}`)
     .join('|')
+    + '||'
+    + (payload.fxRates?.updatedAt ?? '')
     + '||'
     + Object.entries(payload.fxRates?.rates ?? {})
       .sort(([a], [b]) => a.localeCompare(b))
