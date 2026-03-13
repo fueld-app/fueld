@@ -17,6 +17,11 @@ const webCommand = isCI
   ? `bun run start -- --port ${PORT} --host localhost --watch=false`
   : `bun run start -- --port ${PORT} --host localhost`;
 
+// PWA tests need production build with service worker
+const PWA_PORT = Number(process.env['PWA_PORT'] ?? '4250');
+const pwaBaseURL = `http://localhost:${PWA_PORT}`;
+const pwaServeCommand = `bunx serve dist/web/browser/browser -l ${PWA_PORT} -s --no-clipboard`;
+
 export default defineConfig({
   testDir: './e2e',
   timeout: 30_000,
@@ -44,6 +49,12 @@ export default defineConfig({
       port: PORT,
       reuseExistingServer: reuseExistingServers,
     },
+    {
+      command: pwaServeCommand,
+      cwd: '.',
+      port: PWA_PORT,
+      reuseExistingServer: reuseExistingServers,
+    },
   ],
   use: {
     baseURL,
@@ -52,9 +63,43 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
   projects: [
+    // ── Desktop browsers ──────────────────────────────────────
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'firefox',
+      use: { ...devices['Desktop Firefox'] },
+    },
+    {
+      name: 'webkit',
+      use: { ...devices['Desktop Safari'] },
+    },
+
+    // ── Mobile viewports ──────────────────────────────────────
+    {
+      name: 'mobile-chrome',
+      use: { ...devices['Pixel 7'] },
+    },
+    {
+      name: 'mobile-safari',
+      use: { ...devices['iPhone 14'] },
+    },
+    {
+      name: 'tablet',
+      use: { ...devices['iPad (gen 7)'] },
+    },
+
+    // ── PWA / Service-worker ──────────────────────────────────
+    // Uses a production build so the service worker is registered.
+    {
+      name: 'pwa',
+      testMatch: /pwa\/.*\.spec\.ts/,
+      use: {
+        ...devices['Pixel 7'],
+        baseURL: pwaBaseURL,
+      },
     },
   ],
 });
