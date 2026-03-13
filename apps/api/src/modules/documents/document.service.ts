@@ -46,7 +46,7 @@ interface BankDetails {
 }
 
 type DocumentType = 'OFFER' | 'PROFORMA_INVOICE' | 'INVOICE' | 'OTHER';
-const DOCUMENT_TEMPLATE_VERSION = '2026-03-13e';
+const DOCUMENT_TEMPLATE_VERSION = '2026-03-13f';
 
 export interface DocumentRevisionInfo {
   id: string;
@@ -519,6 +519,23 @@ function formatNumberCompact(val: string | null | undefined, maxDecimals = 3): s
   return formatted;
 }
 
+/** Strip common country prefixes so "Republic of Singapore" normalises to "singapore". */
+function normalizeCountryName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/^(the\s+)?(republic|kingdom|state|emirate|sultanate|federation|commonwealth|principality)\s+of\s+/i, '')
+    .trim();
+}
+
+/** Returns true when the country is already mentioned in one of the address lines. */
+function countryAlreadyInAddress(lines: string[], country: string): boolean {
+  const norm = normalizeCountryName(country);
+  return lines.some(l => {
+    const nl = normalizeCountryName(l);
+    return nl.includes(norm) || norm.includes(nl);
+  });
+}
+
 /**
  * Format a phone number for display: keep international prefix, format
  * remaining digits in local-style groups.
@@ -949,7 +966,7 @@ function buildInvoiceDocument(data: {
               if (invAddr) {
                 const addrLines = splitAddressLines(invAddr);
                 for (const line of addrLines) billTo.push({ text: line, color: '#666666' } as Content);
-                if (data.clientCountry?.trim() && !addrLines.some(l => l.toLowerCase().includes(data.clientCountry!.trim().toLowerCase()))) {
+                if (data.clientCountry?.trim() && !countryAlreadyInAddress(addrLines, data.clientCountry)) {
                   billTo.push({ text: data.clientCountry.trim(), color: '#666666' } as Content);
                 }
               } else if (data.clientCountry) {
@@ -1527,7 +1544,7 @@ function buildOfferDocument(data: {
       customerBlock.push({ text: line, fontSize: 10 } as Content);
     }
     // Append country if not already included in address lines
-    if (data.clientCountry?.trim() && !lines.some(l => l.toLowerCase().includes(data.clientCountry!.trim().toLowerCase()))) {
+    if (data.clientCountry?.trim() && !countryAlreadyInAddress(lines, data.clientCountry)) {
       customerBlock.push({ text: data.clientCountry.trim(), fontSize: 10 } as Content);
     }
   } else if (data.clientCountry?.trim()) {
@@ -2180,7 +2197,7 @@ function buildProformaDocument(data: {
       customerBlock.push({ text: line, fontSize: 10 } as Content);
     }
     // Append country if not already included in address lines
-    if (data.clientCountry?.trim() && !lines.some(l => l.toLowerCase().includes(data.clientCountry!.trim().toLowerCase()))) {
+    if (data.clientCountry?.trim() && !countryAlreadyInAddress(lines, data.clientCountry)) {
       customerBlock.push({ text: data.clientCountry.trim(), fontSize: 10 } as Content);
     }
   } else if (data.clientCountry?.trim()) {
@@ -2733,6 +2750,8 @@ export const __documentTestUtils = {
   replaceCompanyNamePlaceholder,
   buildOfferForAccountOfText,
   buildNotesSection,
+  normalizeCountryName,
+  countryAlreadyInAddress,
   tryLoadLogoDataUrl,
   createPdfBuffer,
   buildInvoiceDocument,
