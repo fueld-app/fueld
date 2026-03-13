@@ -121,6 +121,7 @@ function getTruncateTables() {
 }
 
 let migrationsPromise: Promise<void> | null = null;
+let schemaCompatPromise: Promise<void> | null = null;
 
 function resolveMigrationsDir(): string {
   const env = process.env['MIGRATIONS_DIR'];
@@ -160,7 +161,19 @@ async function ensureMigrationsApplied(): Promise<void> {
 }
 
 async function ensureTestSchemaCompat(): Promise<void> {
+  if (!schemaCompatPromise) {
+    schemaCompatPromise = _doEnsureTestSchemaCompat();
+  }
+  await schemaCompatPromise;
+}
+
+async function _doEnsureTestSchemaCompat(): Promise<void> {
   const sql = getSql();
+
+  // Serialize across parallel test-file connections to prevent DDL deadlocks.
+  // Lock id 737833 is arbitrary but unique within the test database.
+  await sql`SELECT pg_advisory_lock(737833)`;
+  try {
 
   await sql`
     CREATE TABLE IF NOT EXISTS password_reset_tokens (
@@ -439,6 +452,10 @@ async function ensureTestSchemaCompat(): Promise<void> {
       decided_at timestamptz NOT NULL DEFAULT now()
     )
   `;
+
+  } finally {
+    await sql`SELECT pg_advisory_unlock(737833)`;
+  }
 }
 
 export async function truncateAll(): Promise<void> {
