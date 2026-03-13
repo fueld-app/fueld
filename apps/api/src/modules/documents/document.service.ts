@@ -667,7 +667,7 @@ function computeDueDate(
   return new Date(baseDate.getTime() + 30 * 86_400_000).toISOString().split('T')[0]!;
 }
 
-function formatDateTimeForDisplay(value: string | null, tz: string | null | undefined): string | null {
+function formatDateTimeForDisplay(value: string | null, tz: string | null | undefined, omitTz = false): string | null {
   if (!value) return null;
   const date = new Date(value);
   if (isNaN(date.getTime())) return null;
@@ -697,7 +697,8 @@ function formatDateTimeForDisplay(value: string | null, tz: string | null | unde
     }).formatToParts(date);
     const abbr = abbrParts.find((p) => p.type === 'timeZoneName')?.value ?? tz;
 
-    return `${day}-${month}-${year} ${hour}:${minute} ${abbr}`;
+    const dateTime = `${day}-${month}-${year} ${hour}:${minute}`;
+    return omitTz ? dateTime : `${dateTime} ${abbr}`;
   }
 
   // ── Legacy fixed-offset path (fallback for old "GMT +04H" style) ─
@@ -709,6 +710,7 @@ function formatDateTimeForDisplay(value: string | null, tz: string | null | unde
   const hour = String(local.getUTCHours()).padStart(2, '0');
   const minute = String(local.getUTCMinutes()).padStart(2, '0');
   const formatted = `${day}-${month}-${year} ${hour}:${minute}`;
+  if (omitTz) return formatted;
   return tz ? `${formatted} ${tz}` : formatted;
 }
 
@@ -1515,8 +1517,7 @@ function buildOfferDocument(data: {
     { text: data.clientName, fontSize: 10 } as Content,
   ];
   if (data.customerContactName?.trim()) {
-    const role = data.customerContactRole?.trim();
-    customerBlock.push({ text: `Att:${data.customerContactName.trim()}${role ? ` (${role})` : ''}`, fontSize: 10 } as Content);
+    customerBlock.push({ text: `Att.: ${data.customerContactName.trim()}`, fontSize: 10 } as Content);
   }
   // Client address lines
   const clientAddr = data.clientAddress?.trim();
@@ -1580,7 +1581,8 @@ function buildOfferDocument(data: {
   // Delivery date string
   let deliveryDateStr = '';
   if (data.eta) {
-    const fmtEta = formatDateTimeForDisplay(data.eta, data.timezone);
+    const hasRange = !!data.etd;
+    const fmtEta = formatDateTimeForDisplay(data.eta, data.timezone, hasRange);
     deliveryDateStr = fmtEta ?? data.eta;
     if (data.etd) {
       const fmtEtd = formatDateTimeForDisplay(data.etd, data.timezone);
@@ -1630,7 +1632,7 @@ function buildOfferDocument(data: {
     } as Content);
 
     return {
-      margin: [40, 30, 40, 0],
+      margin: [40, 30, 50, 0],
       columns: [
         { width: 200, stack: currentPage === 1 ? customerBlock : [{ text: '' }], margin: [0, customerTopOffset, 0, 0] },
         { width: '*', text: title, style: 'docTitle', alignment: 'center', margin: [10, 0, 10, 0] },
@@ -2168,8 +2170,7 @@ function buildProformaDocument(data: {
     { text: data.clientName, fontSize: 10 } as Content,
   ];
   if (data.customerContactName?.trim()) {
-    const role = data.customerContactRole?.trim();
-    customerBlock.push({ text: `Att:${data.customerContactName.trim()}${role ? ` (${role})` : ''}`, fontSize: 10 } as Content);
+    customerBlock.push({ text: `Att.: ${data.customerContactName.trim()}`, fontSize: 10 } as Content);
   }
   // Client address lines
   const clientAddr = data.clientAddress?.trim();
@@ -2240,7 +2241,8 @@ function buildProformaDocument(data: {
   // Delivery date string
   let deliveryDateStr = '';
   if (data.eta) {
-    const fmtEta = formatDateTimeForDisplay(data.eta, data.timezone);
+    const hasRange = !!data.etd;
+    const fmtEta = formatDateTimeForDisplay(data.eta, data.timezone, hasRange);
     deliveryDateStr = fmtEta ?? data.eta;
     if (data.etd) {
       const fmtEtd = formatDateTimeForDisplay(data.etd, data.timezone);
@@ -2286,7 +2288,7 @@ function buildProformaDocument(data: {
     } as Content);
 
     return {
-      margin: [40, 30, 40, 0],
+      margin: [40, 30, 50, 0],
       columns: [
         { width: 150, stack: currentPage === 1 ? customerBlock : [{ text: '' }], margin: [0, customerTopOffset, 0, 0] },
         { width: '*', text: 'PROFORMA INVOICE', style: 'docTitle', alignment: 'center', margin: [10, 0, 10, 0], noWrap: true },
