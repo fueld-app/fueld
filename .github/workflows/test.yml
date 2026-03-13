@@ -126,15 +126,17 @@ jobs:
       TEST_DB_BASE_URL: postgres://fueld:fueld@localhost:5432
     steps:
       - name: Start Postgres
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 3
-          max_attempts: 3
-          command: |
-            docker pull postgres:17-alpine
+        run: |
+          for attempt in 1 2 3; do
+            echo "Attempt $attempt: starting Postgres..."
+            docker rm -f postgres 2>/dev/null || true
+            docker pull postgres:17-alpine && \
             docker run -d --name postgres -p 5432:5432 \
               -e POSTGRES_USER=fueld -e POSTGRES_PASSWORD=fueld -e POSTGRES_DB=postgres \
-              postgres:17-alpine
+              postgres:17-alpine && break
+            echo "Attempt $attempt failed, retrying in 5s..."
+            sleep 5
+          done
       - name: Checkout repository
         id: checkout
         uses: actions/checkout@v4
@@ -176,15 +178,17 @@ jobs:
       TEST_DB_BASE_URL: postgres://fueld:fueld@localhost:5432
     steps:
       - name: Start Postgres
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 3
-          max_attempts: 3
-          command: |
-            docker pull postgres:17-alpine
+        run: |
+          for attempt in 1 2 3; do
+            echo "Attempt $attempt: starting Postgres..."
+            docker rm -f postgres 2>/dev/null || true
+            docker pull postgres:17-alpine && \
             docker run -d --name postgres -p 5432:5432 \
               -e POSTGRES_USER=fueld -e POSTGRES_PASSWORD=fueld -e POSTGRES_DB=postgres \
-              postgres:17-alpine
+              postgres:17-alpine && break
+            echo "Attempt $attempt failed, retrying in 5s..."
+            sleep 5
+          done
       - name: Checkout repository
         id: checkout
         uses: actions/checkout@v4
@@ -226,15 +230,17 @@ jobs:
       TEST_DB_BASE_URL: postgres://fueld:fueld@localhost:5432
     steps:
       - name: Start Postgres
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 3
-          max_attempts: 3
-          command: |
-            docker pull postgres:17-alpine
+        run: |
+          for attempt in 1 2 3; do
+            echo "Attempt $attempt: starting Postgres..."
+            docker rm -f postgres 2>/dev/null || true
+            docker pull postgres:17-alpine && \
             docker run -d --name postgres -p 5432:5432 \
               -e POSTGRES_USER=fueld -e POSTGRES_PASSWORD=fueld -e POSTGRES_DB=postgres \
-              postgres:17-alpine
+              postgres:17-alpine && break
+            echo "Attempt $attempt failed, retrying in 5s..."
+            sleep 5
+          done
       - name: Checkout repository
         id: checkout
         uses: actions/checkout@v4
