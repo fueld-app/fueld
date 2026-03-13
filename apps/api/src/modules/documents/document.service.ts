@@ -1632,11 +1632,11 @@ function buildOfferDocument(data: {
     } as Content);
 
     return {
-      margin: [40, 30, 50, 0],
+      margin: [40, 30, 0, 0],
       columns: [
         { width: 200, stack: currentPage === 1 ? customerBlock : [{ text: '' }], margin: [0, customerTopOffset, 0, 0] },
         { width: '*', text: title, style: 'docTitle', alignment: 'center', margin: [10, 0, 10, 0] },
-        { width: 200, stack: rightStack },
+        { width: 200, stack: rightStack, margin: [0, 0, 40, 0] },
       ],
     } as Content;
   };
@@ -2288,11 +2288,11 @@ function buildProformaDocument(data: {
     } as Content);
 
     return {
-      margin: [40, 30, 50, 0],
+      margin: [40, 30, 0, 0],
       columns: [
         { width: 150, stack: currentPage === 1 ? customerBlock : [{ text: '' }], margin: [0, customerTopOffset, 0, 0] },
         { width: '*', text: 'PROFORMA INVOICE', style: 'docTitle', alignment: 'center', margin: [10, 0, 10, 0], noWrap: true },
-        { width: 150, stack: rightStack },
+        { width: 150, stack: rightStack, margin: [0, 0, 40, 0] },
       ],
     } as Content;
   };
