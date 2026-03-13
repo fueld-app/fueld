@@ -46,7 +46,7 @@ interface BankDetails {
 }
 
 type DocumentType = 'OFFER' | 'PROFORMA_INVOICE' | 'INVOICE' | 'OTHER';
-const DOCUMENT_TEMPLATE_VERSION = '2026-02-27b';
+const DOCUMENT_TEMPLATE_VERSION = '2026-03-13a';
 
 export interface DocumentRevisionInfo {
   id: string;
