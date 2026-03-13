@@ -351,6 +351,13 @@
       "when": 1741906800000,
       "tag": "0049_normalize_country_names",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1741993200000,
+      "tag": "0050_order_place_remark",
+      "breakpoints": true
     }
   ]
 }
