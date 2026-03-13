@@ -46,7 +46,7 @@ interface BankDetails {
 }
 
 type DocumentType = 'OFFER' | 'PROFORMA_INVOICE' | 'INVOICE' | 'OTHER';
-const DOCUMENT_TEMPLATE_VERSION = '2026-03-13c';
+const DOCUMENT_TEMPLATE_VERSION = '2026-03-13d';
 
 export interface DocumentRevisionInfo {
   id: string;
@@ -947,7 +947,7 @@ function buildInvoiceDocument(data: {
               if (invAddr) {
                 const addrLines = splitAddressLines(invAddr);
                 for (const line of addrLines) billTo.push({ text: line, color: '#666666' } as Content);
-                if (data.clientCountry?.trim() && !addrLines.some(l => l.toLowerCase() === data.clientCountry!.trim().toLowerCase())) {
+                if (data.clientCountry?.trim() && !addrLines.some(l => l.toLowerCase().includes(data.clientCountry!.trim().toLowerCase()))) {
                   billTo.push({ text: data.clientCountry.trim(), color: '#666666' } as Content);
                 }
               } else if (data.clientCountry) {
@@ -1526,7 +1526,7 @@ function buildOfferDocument(data: {
       customerBlock.push({ text: line, fontSize: 10 } as Content);
     }
     // Append country if not already included in address lines
-    if (data.clientCountry?.trim() && !lines.some(l => l.toLowerCase() === data.clientCountry!.trim().toLowerCase())) {
+    if (data.clientCountry?.trim() && !lines.some(l => l.toLowerCase().includes(data.clientCountry!.trim().toLowerCase()))) {
       customerBlock.push({ text: data.clientCountry.trim(), fontSize: 10 } as Content);
     }
   } else if (data.clientCountry?.trim()) {
@@ -2179,7 +2179,7 @@ function buildProformaDocument(data: {
       customerBlock.push({ text: line, fontSize: 10 } as Content);
     }
     // Append country if not already included in address lines
-    if (data.clientCountry?.trim() && !lines.some(l => l.toLowerCase() === data.clientCountry!.trim().toLowerCase())) {
+    if (data.clientCountry?.trim() && !lines.some(l => l.toLowerCase().includes(data.clientCountry!.trim().toLowerCase()))) {
       customerBlock.push({ text: data.clientCountry.trim(), fontSize: 10 } as Content);
     }
   } else if (data.clientCountry?.trim()) {
