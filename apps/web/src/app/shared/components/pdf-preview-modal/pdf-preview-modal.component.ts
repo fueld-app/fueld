@@ -6,6 +6,8 @@ import {
   computed,
   output,
   input,
+  ElementRef,
+  viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
@@ -172,14 +174,18 @@ import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
                 </div>
               </div>
             } @else if (isMobile) {
-              <div class="flex h-full items-center justify-center">
-                <div class="flex flex-col items-center gap-4 text-center px-6">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-brand-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
-                  </svg>
-                  <p class="text-sm text-gray-600">Your PDF has been downloaded.</p>
-                  <p class="text-sm text-gray-500">Check your notifications or tap <strong>Download</strong> above to save again.</p>
-                </div>
+              <div #pdfContainer class="flex h-full flex-col items-center gap-2 overflow-y-auto bg-gray-200 p-2">
+                @if (renderingPages()) {
+                  <div class="flex h-full items-center justify-center">
+                    <div class="flex flex-col items-center gap-3">
+                      <svg class="h-8 w-8 animate-spin text-brand-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                      </svg>
+                      <span class="text-sm text-gray-500">Rendering PDF…</span>
+                    </div>
+                  </div>
+                }
               </div>
             } @else {
               <iframe
@@ -215,6 +221,8 @@ export class PdfPreviewModalComponent {
   readonly fileName = signal('');
   readonly verifyUrl = signal('');
   readonly verifyCopied = signal(false);
+  readonly renderingPages = signal(false);
+  readonly pdfContainer = viewChild<ElementRef<HTMLDivElement>>('pdfContainer');
 
   // WhatsApp send
   readonly sendWhatsApp = output<{ phone: string; blob: Blob; fileName: string }>();
@@ -252,12 +260,9 @@ export class PdfPreviewModalComponent {
     this.rawBlobUrl.set(blobUrl);
     this.loading.set(false);
 
-    // On mobile, auto-trigger download so the native PDF viewer opens immediately
+    // On mobile, render PDF pages as canvas images since WebView lacks a PDF renderer
     if (this.isMobile) {
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = fileName;
-      a.click();
+      this.renderPdfPages(blob);
     }
   }
 
@@ -300,6 +305,7 @@ export class PdfPreviewModalComponent {
   close(): void {
     this.visible.set(false);
     this.loading.set(false);
+    this.renderingPages.set(false);
     this.waFormOpen.set(false);
     this.waSending.set(false);
     this.waNotLinkedMsg.set(false);
@@ -325,6 +331,52 @@ export class PdfPreviewModalComponent {
     this.waSending.set(false);
     this.waFormOpen.set(false);
     this.waPhone = '';
+  }
+
+  private async renderPdfPages(blob: Blob): Promise<void> {
+    this.renderingPages.set(true);
+    try {
+      const { getDocument, GlobalWorkerOptions } = await import('pdfjs-dist');
+      GlobalWorkerOptions.workerSrc = 'pdf.worker.min.mjs';
+
+      const data = new Uint8Array(await blob.arrayBuffer());
+      const pdf = await getDocument({ data }).promise;
+
+      // Wait a tick for Angular to render the container after loading state change
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      const container = this.pdfContainer()?.nativeElement;
+      if (!container) return;
+
+      this.renderingPages.set(false);
+
+      const containerWidth = container.clientWidth - 16; // account for padding
+
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const unscaledViewport = page.getViewport({ scale: 1 });
+        const scale = containerWidth / unscaledViewport.width;
+        const viewport = page.getViewport({ scale: scale * (window.devicePixelRatio || 1) });
+
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        canvas.style.width = `${containerWidth}px`;
+        canvas.style.height = `${(containerWidth * viewport.height) / viewport.width}px`;
+        canvas.classList.add('rounded-lg', 'shadow-sm');
+
+        container.appendChild(canvas);
+
+        await page.render({ canvas, viewport }).promise;
+      }
+    } catch {
+      // Fallback: trigger download if rendering fails
+      this.renderingPages.set(false);
+      const a = document.createElement('a');
+      a.href = this.downloadUrl();
+      a.download = this.fileName();
+      a.click();
+    }
   }
 
   private revokePreviousUrl(): void {

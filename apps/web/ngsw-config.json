@@ -23,7 +23,8 @@
           "/favicon.svg",
           "/manifest.webmanifest",
           "/assets/**",
-          "/*.(png|jpg|jpeg|svg|webp|gif)"
+          "/*.(png|jpg|jpeg|svg|webp|gif)",
+          "/pdf.worker.min.mjs"
         ]
       }
     }
