@@ -1,7 +1,7 @@
 import { Elysia, t } from 'elysia';
 import { eq, and, desc, inArray } from 'drizzle-orm';
 import { authGuard } from '../auth/auth.guard';
-import { generateNominationPdfBuffer, generateOrderInvoicePdfBuffer, generateOfferPdfBuffer, generateProformaInvoicePdfBuffer, tryLoadLogoDataUrl } from './document.service';
+import { generateNominationPdfBuffer, generateOrderInvoicePdfBuffer, generateOfferPdfBuffer, generateProformaInvoicePdfBuffer, tryLoadLogoDataUrl, formatCustomerPaymentTerms } from './document.service';
 import { sendDocumentEmail, buildDocumentEmailHtml, buildDocumentEmailSubject, buildInquiryEmailHtml, type DocumentEmailType } from './mail.service';
 import { resolveOrderId, getOrderById } from '../orders/orders.service';
 import { getPortSuppliers } from '../lloyds/lli.service';
@@ -360,6 +360,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       const companyName = order.invoicingCompany?.name ?? null;
       const companyLogoUrl = tryLoadLogoDataUrl(order.invoicingCompany?.logoUrl ?? null);
       const brandColor = order.invoicingCompany?.brandColor ?? null;
+      const companyAddress = order.invoicingCompany?.headOfficeAddress ?? null;
 
       const docLabels: Record<DocumentEmailType, string> = {
         OFFER: 'Offer',
@@ -411,16 +412,10 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         console.error('[Documents] Failed to load email rules:', err);
       }
 
-      // Payment terms
-      const paymentTerms = order.customerPaymentTermType
-        ? order.customerPaymentTermType === 'CREDIT'
-          ? `Credit ${order.customerCreditDays ?? 0} days`
-          : order.customerPaymentTermType === 'COD'
-            ? 'Cash on Delivery'
-            : order.customerPaymentTermType === 'PREPAY'
-              ? 'Cash in advance'
-              : order.customerPaymentTermType
-        : null;
+      // Payment terms — use supplier terms for nominations, customer terms otherwise
+      const paymentTerms = docType === 'NOMINATION'
+        ? formatCustomerPaymentTerms(order.supplierPaymentTermType, order.supplierCreditDays)
+        : formatCustomerPaymentTerms(order.customerPaymentTermType, order.customerCreditDays);
 
       // Invoice number (for invoice type) — fetch from invoices table
       let invoiceNumber: string | undefined;
@@ -470,6 +465,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             customerNote: docType === 'NOMINATION' ? order.supplierNote ?? null : order.customerNote ?? null,
             companyName,
             companyLogoUrl,
+            companyAddress,
             brandColor,
             itemNotes: order.items
               ?.filter((item: any) => item.customerNote)
@@ -491,6 +487,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           customerNote: docType === 'NOMINATION' ? order.supplierNote ?? null : order.customerNote ?? null,
           companyName,
           companyLogoUrl,
+          companyAddress,
           brandColor,
           itemNotes: order.items
             ?.filter((item: any) => item.customerNote)

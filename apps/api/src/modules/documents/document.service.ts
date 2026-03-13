@@ -594,7 +594,7 @@ function emailTextNode(label: string, email: string, opts: { fontSize?: number; 
   } as Content;
 }
 
-function formatCustomerPaymentTerms(
+export function formatCustomerPaymentTerms(
   type: string | null | undefined,
   creditDays: number | null | undefined,
 ): string | null {
