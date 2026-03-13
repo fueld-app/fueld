@@ -823,6 +823,7 @@ function buildInvoiceDocument(data: {
   dueDate: string;
   clientName: string;
   clientCountry: string | null;
+  clientAddress?: string | null;
   vesselName: string;
   vesselImo: string | null;
   portName: string;
@@ -925,11 +926,23 @@ function buildInvoiceDocument(data: {
         columns: [
           {
             width: '50%',
-            stack: [
-              { text: 'Bill To:', style: 'sectionLabel' },
-              { text: data.clientName, style: 'clientName' },
-              { text: data.clientCountry ?? '', color: '#666666' },
-            ],
+            stack: (() => {
+              const billTo: Content[] = [
+                { text: 'Bill To:', style: 'sectionLabel' } as Content,
+                { text: data.clientName, style: 'clientName' } as Content,
+              ];
+              const invAddr = data.clientAddress?.trim();
+              if (invAddr) {
+                const addrLines = invAddr.split(/\n|,\s*/).map((l: string) => l.trim()).filter(Boolean);
+                for (const line of addrLines) billTo.push({ text: line, color: '#666666' } as Content);
+                if (data.clientCountry?.trim() && !addrLines.some(l => l.toLowerCase() === data.clientCountry!.trim().toLowerCase())) {
+                  billTo.push({ text: data.clientCountry.trim(), color: '#666666' } as Content);
+                }
+              } else if (data.clientCountry) {
+                billTo.push({ text: data.clientCountry, color: '#666666' } as Content);
+              }
+              return billTo;
+            })(),
           },
           {
             width: '50%',
@@ -1209,6 +1222,7 @@ export async function generateInvoicePdfBuffer(invoiceId: string): Promise<Buffe
     dueDate: invoice.dueDate,
     clientName: order.client.name,
     clientCountry: order.client.country,
+    clientAddress: order.client.headOfficeAddress ?? null,
     vesselName: order.vessel.name,
     vesselImo: order.vessel.imo,
     portName: order.place.name,
@@ -1329,6 +1343,7 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
     dueDate,
     clientName: order.client.name,
     clientCountry: order.client.country,
+    clientAddress: order.client.headOfficeAddress ?? null,
     vesselName: order.vessel.name,
     vesselImo: order.vessel.imo,
     portName: order.place.name,
@@ -1498,6 +1513,10 @@ function buildOfferDocument(data: {
     const lines = clientAddr.split(/\n|,\s*/).map(l => l.trim()).filter(Boolean);
     for (const line of lines) {
       customerBlock.push({ text: line, fontSize: 10 } as Content);
+    }
+    // Append country if not already included in address lines
+    if (data.clientCountry?.trim() && !lines.some(l => l.toLowerCase() === data.clientCountry!.trim().toLowerCase())) {
+      customerBlock.push({ text: data.clientCountry.trim(), fontSize: 10 } as Content);
     }
   } else if (data.clientCountry?.trim()) {
     customerBlock.push({ text: data.clientCountry.trim(), fontSize: 10 } as Content);
@@ -2144,6 +2163,10 @@ function buildProformaDocument(data: {
     const lines = clientAddr.split(/\n|,\s*/).map(l => l.trim()).filter(Boolean);
     for (const line of lines) {
       customerBlock.push({ text: line, fontSize: 10 } as Content);
+    }
+    // Append country if not already included in address lines
+    if (data.clientCountry?.trim() && !lines.some(l => l.toLowerCase() === data.clientCountry!.trim().toLowerCase())) {
+      customerBlock.push({ text: data.clientCountry.trim(), fontSize: 10 } as Content);
     }
   } else if (data.clientCountry?.trim()) {
     customerBlock.push({ text: data.clientCountry.trim(), fontSize: 10 } as Content);
