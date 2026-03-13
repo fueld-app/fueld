@@ -453,7 +453,7 @@ export interface SendInquiryWhatsAppPayload {
                 type="datetime-local"
                 class="mt-1 block w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                 [ngModel]="responseDeadlineAt()"
-                (ngModelChange)="responseDeadlineAt.set($event)"
+                (ngModelChange)="onDeadlineChange($event)"
               />
               <p class="mt-2 text-xs leading-5 text-gray-500">A reminder will be sent automatically before this deadline if the supplier has not replied.</p>
             </div>
@@ -493,21 +493,6 @@ export interface SendInquiryWhatsAppPayload {
                       <path fill-rule="evenodd" d="M6 4.75A.75.75 0 016.75 4h10.5a.75.75 0 010 1.5H6.75A.75.75 0 016 4.75zM6 10a.75.75 0 01.75-.75h10.5a.75.75 0 010 1.5H6.75A.75.75 0 016 10zm0 5.25a.75.75 0 01.75-.75h10.5a.75.75 0 010 1.5H6.75a.75.75 0 01-.75-.75zM1.99 4.75a1 1 0 011-1h.01a1 1 0 010 2h-.01a1 1 0 01-1-1zm0 5.25a1 1 0 011-1h.01a1 1 0 010 2h-.01a1 1 0 01-1-1zm0 5.25a1 1 0 011-1h.01a1 1 0 010 2h-.01a1 1 0 01-1-1z" clip-rule="evenodd" />
                     </svg>
                   </button>
-                  <div class="flex-1"></div>
-                  <button type="button" (click)="copyBodyText()" class="toolbar-btn flex items-center gap-1" title="Copy body text">
-                    @if (copySuccess()) {
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-600" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                      </svg>
-                      <span class="text-xs text-green-600">Copied</span>
-                    } @else {
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M8 2a1 1 0 000 2h2a1 1 0 100-2H8z" />
-                        <path d="M3 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v6h-4.586l1.293-1.293a1 1 0 00-1.414-1.414l-3 3a1 1 0 000 1.414l3 3a1 1 0 001.414-1.414L10.414 13H15v3a2 2 0 01-2 2H5a2 2 0 01-2-2V5zM15 11h2a1 1 0 110 2h-2v-2z" />
-                      </svg>
-                      <span class="text-xs">Copy</span>
-                    }
-                  </button>
                 </div>
                 <!-- Content editable area -->
                 <div
@@ -545,6 +530,25 @@ export interface SendInquiryWhatsAppPayload {
               }
             </span>
             <div class="flex items-center gap-3">
+              <button
+                type="button"
+                (click)="copyBodyText()"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                title="Copy body text"
+              >
+                @if (copySuccess()) {
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-600" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                  </svg>
+                  <span class="text-green-600">Copied</span>
+                } @else {
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M8 2a1 1 0 000 2h2a1 1 0 100-2H8z" />
+                    <path d="M3 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v6h-4.586l1.293-1.293a1 1 0 00-1.414-1.414l-3 3a1 1 0 000 1.414l3 3a1 1 0 001.414-1.414L10.414 13H15v3a2 2 0 01-2 2H5a2 2 0 01-2-2V5zM15 11h2a1 1 0 110 2h-2v-2z" />
+                  </svg>
+                  Copy
+                }
+              </button>
               <button
                 type="button"
                 (click)="close()"
@@ -872,6 +876,35 @@ export class SendInquiryModalComponent {
     const editor = this.bodyEditor()?.nativeElement;
     if (editor) {
       this.htmlBody.set(editor.innerHTML);
+    }
+  }
+
+  onDeadlineChange(value: string): void {
+    this.responseDeadlineAt.set(value);
+    if (!value) return;
+    const deadline = new Date(value);
+    if (Number.isNaN(deadline.getTime())) return;
+    const hours = Math.round((deadline.getTime() - Date.now()) / 3_600_000);
+    let label: string;
+    if (hours < 1) label = '1 hour';
+    else if (hours < 24) label = `${hours} hour${hours === 1 ? '' : 's'}`;
+    else {
+      const days = Math.round(hours / 24);
+      label = days === 1 ? '1 day' : `${days} days`;
+    }
+    // Update the "Reply within" value in the body editor
+    const editor = this.bodyEditor()?.nativeElement;
+    if (!editor) return;
+    const cells = editor.querySelectorAll('td');
+    for (let i = 0; i < cells.length; i++) {
+      if (cells[i].textContent?.trim().startsWith('Reply within')) {
+        const valueCell = cells[i + 1];
+        if (valueCell) {
+          valueCell.textContent = label;
+          this.htmlBody.set(editor.innerHTML);
+        }
+        break;
+      }
     }
   }
 

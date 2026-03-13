@@ -394,7 +394,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
               }
               @if (canDeleteEntity()) {
                 <button
-                  (click)="confirmDeleteOpen.set(true)"
+                  (click)="deleteError.set(''); confirmDeleteOpen.set(true)"
                   class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
                 >
                   Delete
@@ -3287,8 +3287,9 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
       } else {
         this.deleteError.set(res.message ?? 'Failed to delete');
       }
-    } catch {
-      this.deleteError.set('Failed to delete company');
+    } catch (err: any) {
+      const msg = err?.error?.message ?? err?.message ?? 'Failed to delete company';
+      this.deleteError.set(msg);
     } finally {
       this.deleting.set(false);
     }

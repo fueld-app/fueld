@@ -608,8 +608,9 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
       } else {
         this.deleteError.set(res.message ?? 'Failed to delete');
       }
-    } catch (err) {
-      this.deleteError.set('Failed to delete company');
+    } catch (err: any) {
+      const msg = err?.error?.message ?? err?.message ?? 'Failed to delete company';
+      this.deleteError.set(msg);
     } finally {
       this.deleting.set(false);
     }
