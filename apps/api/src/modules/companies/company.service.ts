@@ -4,7 +4,7 @@
 
 import { eq, ilike, or, and, sql, asc, desc } from 'drizzle-orm';
 import { db } from '../../db';
-import { counterparties, companyContacts, companyEmails, orders, vessels, places, users, vesselCompanies } from '../../db/schema';
+import { counterparties, companyContacts, companyEmails, orders, vessels, places, users, vesselCompanies, customerPayments, creditApplications } from '../../db/schema';
 import type { CompanyEmailType } from '@fueld/types';
 import {
   seasearcherCompanyDetail,
@@ -679,6 +679,10 @@ export async function deleteCompany(id: string) {
       { code: 'HAS_ORDERS', count: linked.count },
     );
   }
+
+  // Clean up records that reference this company but aren't orders
+  await db.delete(customerPayments).where(eq(customerPayments.customerId, id));
+  await db.delete(creditApplications).where(eq(creditApplications.counterpartyId, id));
 
   const [deleted] = await db
     .delete(counterparties)

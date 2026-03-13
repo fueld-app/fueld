@@ -380,7 +380,7 @@ const NAVIGATION: NavItem[] = [
                     {{ eurChange() >= 0 ? '+' : '' }}{{ eurChange() | number:'1.2-2' }}
                     ({{ eurChangePercent() >= 0 ? '+' : '' }}{{ eurChangePercent() | number:'1.2-2' }}%)
                   </span>
-                  <span class="text-[10px] text-gray-400" [title]="fxUpdatedAt() ?? ''">{{ relativeTime(fxUpdatedAt()) }}</span>
+                  <span class="text-[10px] text-gray-400" [title]="formatLocalDateTime(fxUpdatedAt())">{{ relativeTime(fxUpdatedAt()) }}</span>
                 </div>
               </div>
             }
@@ -398,7 +398,7 @@ const NAVIGATION: NavItem[] = [
                     {{ p.change >= 0 ? '+' : '' }}{{ p.change | number:'1.2-2' }}
                     ({{ p.change >= 0 ? '+' : '' }}{{ p.changePercent | number:'1.2-2' }}%)
                   </span>
-                  <span class="text-[10px] text-gray-400" [title]="p.updatedAt">{{ relativeTime(p.updatedAt) }}</span>
+                  <span class="text-[10px] text-gray-400" [title]="formatLocalDateTime(p.updatedAt)">{{ relativeTime(p.updatedAt) }}</span>
                 </div>
               </div>
             }
@@ -1128,6 +1128,16 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     const hours = Math.floor(minutes / 60);
     if (hours < 24) return `${hours}h ago`;
     return `${Math.floor(hours / 24)}d ago`;
+  }
+
+  formatLocalDateTime(iso: string | null | undefined): string {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleString(undefined, {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+    });
   }
 
   senderInitial(rfq: any): string {
