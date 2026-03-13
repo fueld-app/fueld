@@ -1683,11 +1683,11 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     }
   });
   readonly minDateTime = computed(() =>
-    this.formatDateTimeForInput(new Date(), this.placeTimezone()),
+    this.formatDateForInput(new Date(), this.placeTimezone()),
   );
   readonly etaMinDateTime = computed(() => {
     const eta = this.order()?.eta;
-    if (eta) return this.formatDateTimeForInput(new Date(eta), this.placeTimezone());
+    if (eta) return this.formatDateForInput(new Date(eta), this.placeTimezone());
     return this.minDateTime();
   });
 
@@ -3047,15 +3047,13 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   }
 
   onEtaChange(eta: string): void {
-    const timeZone = this.placeTimezone();
-    const iso = eta ? this.toUtcIsoFromZonedInput(eta, timeZone) : null;
+    const iso = eta ? `${eta}T12:00:00.000Z` : null;
     this.order.update((o) => (o ? { ...o, eta: iso } : o));
     this.triggerAutosave();
   }
 
   onEtdChange(etd: string): void {
-    const timeZone = this.placeTimezone();
-    const iso = etd ? this.toUtcIsoFromZonedInput(etd, timeZone) : null;
+    const iso = etd ? `${etd}T12:00:00.000Z` : null;
     this.order.update((o) => (o ? { ...o, etd: iso } : o));
     this.triggerAutosave();
   }

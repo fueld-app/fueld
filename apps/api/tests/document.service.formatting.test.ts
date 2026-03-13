@@ -152,8 +152,8 @@ describe('document.service formatting helpers', () => {
     expect(__documentTestUtils.parseTimezoneOffset('GMT-05:30')).toBe(-330);
     expect(__documentTestUtils.parseTimezoneOffset('Europe/Copenhagen')).toBeNull();
 
-    expect(__documentTestUtils.formatDateTimeForDisplay('2026-03-01T10:00:00.000Z', 'UTC+2')).toBe('01-03-2026 12:00 UTC+2');
-    expect(__documentTestUtils.formatDateTimeForDisplay('2026-03-01T10:00:00.000Z', null)).toBe('01-03-2026 10:00');
+    expect(__documentTestUtils.formatDateTimeForDisplay('2026-03-01T10:00:00.000Z', 'UTC+2')).toBe('01-03-2026');
+    expect(__documentTestUtils.formatDateTimeForDisplay('2026-03-01T10:00:00.000Z', null)).toBe('01-03-2026');
     expect(__documentTestUtils.formatDateTimeForDisplay(null, 'UTC+2')).toBeNull();
   });
 

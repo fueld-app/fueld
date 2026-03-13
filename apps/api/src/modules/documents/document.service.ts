@@ -696,26 +696,13 @@ function formatDateTimeForDisplay(value: string | null, tz: string | null | unde
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
     }).formatToParts(date);
     const map = new Map(parts.map((p) => [p.type, p.value]));
     const day = map.get('day') ?? '01';
     const month = map.get('month') ?? '01';
     const year = map.get('year') ?? '0000';
-    const hour = map.get('hour') ?? '00';
-    const minute = map.get('minute') ?? '00';
 
-    // Get timezone abbreviation (e.g. "HKT", "GST", "CET")
-    const abbrParts = new Intl.DateTimeFormat('en-US', {
-      timeZone: tz,
-      timeZoneName: 'short',
-    }).formatToParts(date);
-    const abbr = abbrParts.find((p) => p.type === 'timeZoneName')?.value ?? tz;
-
-    const dateTime = `${day}-${month}-${year} ${hour}:${minute}`;
-    return omitTz ? dateTime : `${dateTime} ${abbr}`;
+    return `${day}-${month}-${year}`;
   }
 
   // ── Legacy fixed-offset path (fallback for old "GMT +04H" style) ─
@@ -724,11 +711,7 @@ function formatDateTimeForDisplay(value: string | null, tz: string | null | unde
   const year = String(local.getUTCFullYear()).padStart(4, '0');
   const month = String(local.getUTCMonth() + 1).padStart(2, '0');
   const day = String(local.getUTCDate()).padStart(2, '0');
-  const hour = String(local.getUTCHours()).padStart(2, '0');
-  const minute = String(local.getUTCMinutes()).padStart(2, '0');
-  const formatted = `${day}-${month}-${year} ${hour}:${minute}`;
-  if (omitTz) return formatted;
-  return tz ? `${formatted} ${tz}` : formatted;
+  return `${day}-${month}-${year}`;
 }
 
 function replaceCompanyNamePlaceholder(

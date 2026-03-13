@@ -183,16 +183,15 @@ import {
           }
         </div>
         <div class="mt-3 border-t border-gray-100 pt-3">
-          <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">ETA @if (timezoneAbbr()) { <span class="normal-case text-gray-400">({{ timezoneAbbr() }})</span> }</p>
+          <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">ETA</p>
           @if (isReadonly()) {
             <p class="mt-1 text-sm font-semibold text-gray-900">
-              {{ formatDateTimeLabel(eta()) }}
+              {{ formatDateLabel(eta()) }}
             </p>
           } @else {
             <input
-              type="datetime-local"
-              step="60"
-              [ngModel]="formatDateTimeForInput(eta())"
+              type="date"
+              [ngModel]="formatDateForInput(eta())"
               (ngModelChange)="etaChange.emit($event)"
               [min]="minDateTime()"
               class="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-900
@@ -202,16 +201,15 @@ import {
         </div>
         @if (showEtd()) {
           <div class="mt-3 border-t border-gray-100 pt-3">
-            <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">ETD @if (timezoneAbbr()) { <span class="normal-case text-gray-400">({{ timezoneAbbr() }})</span> }</p>
+            <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">ETD</p>
             @if (isReadonly()) {
               <p class="mt-1 text-sm font-semibold text-gray-900">
-                {{ formatDateTimeLabel(etd()) }}
+                {{ formatDateLabel(etd()) }}
               </p>
             } @else {
               <input
-                type="datetime-local"
-                step="60"
-                [ngModel]="formatDateTimeForInput(etd())"
+                type="date"
+                [ngModel]="formatDateForInput(etd())"
                 (ngModelChange)="etdChange.emit($event)"
                 [min]="etaMinDateTime() || minDateTime()"
                 class="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-900
@@ -370,40 +368,36 @@ export class TradingDetailMetaCardsComponent {
     void this.router.navigate(['/places', id]);
   }
 
-  formatDateTimeForInput(dateStr: string | null | undefined): string {
+  formatDateForInput(dateStr: string | null | undefined): string {
     if (!dateStr) return '';
     const date = new Date(dateStr);
-    return this.formatDateTimeParts(date);
+    const tz = this.timezone();
+    const safeTimezone = this.normalizeTimeZone(tz);
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: safeTimezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(date);
+    const map = new Map(parts.map((p) => [p.type, p.value]));
+    return `${map.get('year') ?? '0000'}-${map.get('month') ?? '01'}-${map.get('day') ?? '01'}`;
   }
 
-  formatDateTimeLabel(dateStr: string | null | undefined): string {
+  formatDateLabel(dateStr: string | null | undefined): string {
     if (!dateStr) return '-';
     const date = new Date(dateStr);
     const tz = this.timezone();
 
-    // IANA timezone path (preferred)
     const safeTimezone = this.normalizeTimeZone(tz);
     if (safeTimezone !== 'UTC' || tz === 'UTC') {
-      // Check it's a valid IANA timezone (not a legacy "GMT +04H" that fell through to UTC)
       try {
         Intl.DateTimeFormat(undefined, { timeZone: tz });
-        const formatted = new Intl.DateTimeFormat('en-GB', {
+        return new Intl.DateTimeFormat('en-GB', {
           timeZone: tz,
           day: '2-digit',
           month: 'short',
           year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false,
         }).format(date);
-
-        // Get timezone abbreviation
-        const abbrParts = new Intl.DateTimeFormat('en-US', {
-          timeZone: tz,
-          timeZoneName: 'short',
-        }).formatToParts(date);
-        const abbr = abbrParts.find((p) => p.type === 'timeZoneName')?.value ?? '';
-        return abbr ? `${formatted} ${abbr}` : formatted;
       } catch { /* fall through to legacy path */ }
     }
 
@@ -414,9 +408,7 @@ export class TradingDetailMetaCardsComponent {
       const day = String(shifted.getUTCDate()).padStart(2, '0');
       const month = shifted.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' });
       const year = shifted.getUTCFullYear();
-      const hour = String(shifted.getUTCHours()).padStart(2, '0');
-      const minute = String(shifted.getUTCMinutes()).padStart(2, '0');
-      return `${day} ${month} ${year}, ${hour}:${minute} ${tz}`;
+      return `${day} ${month} ${year}`;
     }
 
     // Fallback: UTC
@@ -425,40 +417,7 @@ export class TradingDetailMetaCardsComponent {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
     }).format(date);
-  }
-
-  private formatDateTimeParts(date: Date): string {
-    const fixedOffset = this.parseFixedOffsetMinutes(this.timezone());
-    if (fixedOffset !== null) {
-      const shifted = new Date(date.getTime() + fixedOffset * 60_000);
-      const year = String(shifted.getUTCFullYear()).padStart(4, '0');
-      const month = String(shifted.getUTCMonth() + 1).padStart(2, '0');
-      const day = String(shifted.getUTCDate()).padStart(2, '0');
-      const hour = String(shifted.getUTCHours()).padStart(2, '0');
-      const minute = String(shifted.getUTCMinutes()).padStart(2, '0');
-      return `${year}-${month}-${day}T${hour}:${minute}`;
-    }
-
-    const parts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: this.normalizeTimeZone(this.timezone()),
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    }).formatToParts(date);
-    const map = new Map(parts.map((p) => [p.type, p.value]));
-    const year = map.get('year') ?? '0000';
-    const month = map.get('month') ?? '01';
-    const day = map.get('day') ?? '01';
-    const hour = map.get('hour') ?? '00';
-    const minute = map.get('minute') ?? '00';
-    return `${year}-${month}-${day}T${hour}:${minute}`;
   }
 
   private normalizeTimeZone(timeZone: string): string {
