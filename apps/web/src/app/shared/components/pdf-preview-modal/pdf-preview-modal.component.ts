@@ -177,8 +177,8 @@ import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-brand-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
                   </svg>
-                  <p class="text-sm text-gray-600">PDF preview is not supported on mobile devices.</p>
-                  <p class="text-sm text-gray-500">Use the <strong>Download</strong> button above to save and view the file.</p>
+                  <p class="text-sm text-gray-600">Your PDF has been downloaded.</p>
+                  <p class="text-sm text-gray-500">Check your notifications or tap <strong>Download</strong> above to save again.</p>
                 </div>
               </div>
             } @else {
@@ -251,6 +251,14 @@ export class PdfPreviewModalComponent {
     this.downloadUrl.set(blobUrl);
     this.rawBlobUrl.set(blobUrl);
     this.loading.set(false);
+
+    // On mobile, auto-trigger download so the native PDF viewer opens immediately
+    if (this.isMobile) {
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = fileName;
+      a.click();
+    }
   }
 
   async copyVerifyUrl(): Promise<void> {
