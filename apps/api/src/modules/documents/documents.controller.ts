@@ -54,8 +54,18 @@ function calculateInquiryResponseHours(sentAt: Date | null, respondedAt: Date | 
   return Number((diffMs / 3_600_000).toFixed(2));
 }
 
+const DEFAULT_INQUIRY_DEADLINE_HOURS = 48;
+
 function getDefaultInquiryResponseDeadline(): string {
-  return new Date(Date.now() + (48 * 3_600_000)).toISOString();
+  return new Date(Date.now() + (DEFAULT_INQUIRY_DEADLINE_HOURS * 3_600_000)).toISOString();
+}
+
+function formatDeadlineHumanDuration(deadlineIso: string): string {
+  const hours = Math.round((new Date(deadlineIso).getTime() - Date.now()) / 3_600_000);
+  if (hours < 1) return '1 hour';
+  if (hours < 24) return `${hours} hours`;
+  const days = Math.round(hours / 24);
+  return days === 1 ? '1 day' : `${days} days`;
 }
 
 export const documentsController = new Elysia({ prefix: '/orders' })
@@ -995,7 +1005,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             brandColor,
             supplierTerms,
             includeSupplierQuoteLink: inquirySettings.supplierResponseUrlEnabled,
-            responseDeadlineFormatted: formatDate(getDefaultInquiryResponseDeadline()),
+            responseDeadlineFormatted: formatDeadlineHumanDuration(getDefaultInquiryResponseDeadline()),
             items: order.items.map((i: any) => ({
               quantity: i.quantity,
               unit: i.unit,
@@ -1018,7 +1028,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           brandColor,
           supplierTerms,
           includeSupplierQuoteLink: inquirySettings.supplierResponseUrlEnabled,
-          responseDeadlineFormatted: formatDate(getDefaultInquiryResponseDeadline()),
+          responseDeadlineFormatted: formatDeadlineHumanDuration(getDefaultInquiryResponseDeadline()),
           items: order.items.map((i: any) => ({
             quantity: i.quantity,
             unit: i.unit,

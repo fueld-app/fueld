@@ -445,7 +445,7 @@ export function buildInquiryEmailHtml(params: {
             <td style="padding: 4px 0; font-weight: 600;">${deliveryLabel}</td>
           </tr>` : ''}
           ${params.responseDeadlineFormatted ? `<tr>
-            <td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Reply by:</td>
+            <td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Reply within:</td>
             <td style="padding: 4px 0; font-weight: 600;">${params.responseDeadlineFormatted}</td>
           </tr>` : ''}
           <tr>
