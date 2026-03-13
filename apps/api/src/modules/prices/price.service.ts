@@ -39,6 +39,7 @@ export interface FxRates {
 
 const GASOIL_POLL_INTERVAL_MS = 60_000; // 60 seconds
 const FX_POLL_INTERVAL_MS = 5 * 60_000; // 5 minutes
+const BRENT_STALE_MS = 2 * 60_000;     // 2 minutes — if WS is silent this long, poll REST
 const FX_BASE = 'USD';
 
 // Dynamic FX ticker maps — rebuilt from tenant currency settings
@@ -89,6 +90,7 @@ let fxRates: FxRates = {
 let yahooWs: WebSocket | null = null;
 let PricingData: protobuf.Type | null = null;
 let yahooReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let brentStaleTimer: ReturnType<typeof setInterval> | null = null;
 
 // ─── Yahoo Finance WebSocket (Brent Oil) ─────────────────────────────
 
@@ -144,6 +146,17 @@ async function initYahooWs(): Promise<void> {
 
     // Then connect to WebSocket for real-time updates
     connectYahooWs();
+
+    // Periodically check if WS went silent and fetch via REST as fallback
+    if (brentStaleTimer) clearInterval(brentStaleTimer);
+    brentStaleTimer = setInterval(async () => {
+      if (!brentPrice?.updatedAt) return;
+      const age = Date.now() - new Date(brentPrice.updatedAt).getTime();
+      if (age > BRENT_STALE_MS) {
+        console.log(`[Prices] Brent data stale (${Math.round(age / 1000)}s), fetching via REST`);
+        await fetchBrentRest();
+      }
+    }, GASOIL_POLL_INTERVAL_MS);
   } catch (err: any) {
     console.error('[Prices] Failed to load protobuf schema:', err.message);
     // Fall back to REST polling
