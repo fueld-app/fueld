@@ -14,6 +14,7 @@ import { db } from '../../db';
 import { emailLog } from '../../db/schema';
 import { getSmtpConfig, getTransporter } from '../../lib/email';
 import { acquireGraphTokenForUser } from '../auth/microsoft-oauth.service';
+import { splitAddressLines } from './document.service';
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -307,7 +308,7 @@ export function buildDocumentEmailHtml(params: {
     : `<h1 style="color: ${headerTextColor}; margin: 0; font-size: 24px;">${companyName}</h1>`;
 
   const addressHtml = params.companyAddress?.trim()
-    ? `<div style="color: ${headerTextColor}; font-size: 12px; margin-top: 6px; line-height: 1.5; opacity: 0.85;">${params.companyAddress.trim().split(/\n|,\s*/).map((line: string) => line.trim()).filter(Boolean).join('<br/>')}</div>`
+    ? `<div style="color: ${headerTextColor}; font-size: 12px; margin-top: 6px; line-height: 1.5; opacity: 0.85;">${splitAddressLines(params.companyAddress).join('<br/>')}</div>`
     : '';
 
   return `

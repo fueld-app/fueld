@@ -46,7 +46,7 @@ interface BankDetails {
 }
 
 type DocumentType = 'OFFER' | 'PROFORMA_INVOICE' | 'INVOICE' | 'OTHER';
-const DOCUMENT_TEMPLATE_VERSION = '2026-03-13b';
+const DOCUMENT_TEMPLATE_VERSION = '2026-03-13c';
 
 export interface DocumentRevisionInfo {
   id: string;
@@ -608,6 +608,18 @@ export function formatCustomerPaymentTerms(
   return type;
 }
 
+/** Split an address into display lines.
+ *  If the address contains newlines, split on newlines only (preserving commas).
+ *  Otherwise, split on commas. */
+export function splitAddressLines(address: string): string[] {
+  const trimmed = address.trim();
+  if (!trimmed) return [];
+  if (trimmed.includes('\n')) {
+    return trimmed.split('\n').map(l => l.trim()).filter(Boolean);
+  }
+  return trimmed.split(/,\s*/).map(l => l.trim()).filter(Boolean);
+}
+
 function parseTimezoneOffset(tz: string | null | undefined): number | null {
   if (!tz) return null;
   const match = tz.match(/([+-])\s*(\d{1,2})(?::(\d{2}))?/);
@@ -933,7 +945,7 @@ function buildInvoiceDocument(data: {
               ];
               const invAddr = data.clientAddress?.trim();
               if (invAddr) {
-                const addrLines = invAddr.split(/\n|,\s*/).map((l: string) => l.trim()).filter(Boolean);
+                const addrLines = splitAddressLines(invAddr);
                 for (const line of addrLines) billTo.push({ text: line, color: '#666666' } as Content);
                 if (data.clientCountry?.trim() && !addrLines.some(l => l.toLowerCase() === data.clientCountry!.trim().toLowerCase())) {
                   billTo.push({ text: data.clientCountry.trim(), color: '#666666' } as Content);
@@ -1120,9 +1132,8 @@ function buildInvoiceDocument(data: {
         { text: senderName, fontSize: 8, bold: true, color: '#374151' } as Content,
       ];
       if (data.companyAddress?.trim()) {
-        for (const line of data.companyAddress.trim().split(/\n|,\s*/)) {
-          const l = line.trim();
-          if (l) leftTexts.push({ text: l, fontSize: 8, color: '#374151' } as Content);
+        for (const line of splitAddressLines(data.companyAddress)) {
+          leftTexts.push({ text: line, fontSize: 8, color: '#374151' } as Content);
         }
       }
       const middleTexts: Content[] = [];
@@ -1507,10 +1518,10 @@ function buildOfferDocument(data: {
     const role = data.customerContactRole?.trim();
     customerBlock.push({ text: `Att:${data.customerContactName.trim()}${role ? ` (${role})` : ''}`, fontSize: 10 } as Content);
   }
-  // Client address — split commas and newlines into separate lines
+  // Client address lines
   const clientAddr = data.clientAddress?.trim();
   if (clientAddr) {
-    const lines = clientAddr.split(/\n|,\s*/).map(l => l.trim()).filter(Boolean);
+    const lines = splitAddressLines(clientAddr);
     for (const line of lines) {
       customerBlock.push({ text: line, fontSize: 10 } as Content);
     }
@@ -1634,9 +1645,8 @@ function buildOfferDocument(data: {
       { text: senderName, fontSize: 8, bold: true, color: '#374151' } as Content,
     ];
     if (data.companyAddress?.trim()) {
-      for (const line of data.companyAddress.trim().split(/\n|,\s*/)) {
-        const l = line.trim();
-        if (l) leftTexts.push({ text: l, fontSize: 8, color: '#374151' } as Content);
+      for (const line of splitAddressLines(data.companyAddress)) {
+        leftTexts.push({ text: line, fontSize: 8, color: '#374151' } as Content);
       }
     }
     const middleTexts: Content[] = [];
@@ -2161,10 +2171,10 @@ function buildProformaDocument(data: {
     const role = data.customerContactRole?.trim();
     customerBlock.push({ text: `Att:${data.customerContactName.trim()}${role ? ` (${role})` : ''}`, fontSize: 10 } as Content);
   }
-  // Client address — split commas and newlines into separate lines
+  // Client address lines
   const clientAddr = data.clientAddress?.trim();
   if (clientAddr) {
-    const lines = clientAddr.split(/\n|,\s*/).map(l => l.trim()).filter(Boolean);
+    const lines = splitAddressLines(clientAddr);
     for (const line of lines) {
       customerBlock.push({ text: line, fontSize: 10 } as Content);
     }
@@ -2291,9 +2301,8 @@ function buildProformaDocument(data: {
       { text: senderName, fontSize: 8, bold: true, color: '#374151' } as Content,
     ];
     if (data.companyAddress?.trim()) {
-      for (const line of data.companyAddress.trim().split(/\n|,\s*/)) {
-        const l = line.trim();
-        if (l) leftTexts.push({ text: l, fontSize: 8, color: '#374151' } as Content);
+      for (const line of splitAddressLines(data.companyAddress)) {
+        leftTexts.push({ text: line, fontSize: 8, color: '#374151' } as Content);
       }
     }
     const middleTexts: Content[] = [];
