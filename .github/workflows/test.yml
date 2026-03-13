@@ -10,6 +10,43 @@ env:
   BUN_VERSION: '1.3.10'
 
 jobs:
+  migration-journal:
+    name: Migration journal check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        id: checkout
+        uses: actions/checkout@v6
+        continue-on-error: true
+      - name: Fallback checkout via archive download
+        if: steps.checkout.outcome == 'failure'
+        run: |
+          curl -fL --retry 5 --retry-all-errors --retry-delay 3 \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}" \
+            -o repo.tar.gz
+          tar -xzf repo.tar.gz --strip-components=1
+          rm repo.tar.gz
+      - name: Verify every migration SQL file is registered in the journal
+        run: |
+          journal="apps/api/drizzle/meta/_journal.json"
+          missing=()
+          for f in apps/api/drizzle/[0-9]*.sql; do
+            tag=$(basename "$f" .sql)
+            if ! grep -q "\"$tag\"" "$journal"; then
+              missing+=("$tag")
+            fi
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "ERROR: The following migrations are NOT registered in $journal:"
+            printf '  - %s\n' "${missing[@]}"
+            echo ""
+            echo "Add an entry to $journal for each migration before merging."
+            exit 1
+          fi
+          echo "All migration files are registered in the journal."
+
   types:
     name: Types
     runs-on: ubuntu-latest
