@@ -770,7 +770,12 @@ function buildNotesSection(params: {
 
   if (termsAndConditions) {
     notes.push({ text: 'Terms:', bold: true, margin: [0, 2, 0, 4] } as Content);
-    notes.push({ text: termsAndConditions, alignment: 'justify', margin: [0, 0, 0, 6] } as Content);
+    // Split on newlines so each paragraph is justified independently.
+    // pdfmake only justifies text that wraps; short/last lines stay left-aligned.
+    const paragraphs = termsAndConditions.split(/\n/).filter((p) => p.trim());
+    for (const para of paragraphs) {
+      notes.push({ text: para.trim(), alignment: 'justify', margin: [0, 0, 0, 2] } as Content);
+    }
   }
 
   if (itemNotes.length) {
