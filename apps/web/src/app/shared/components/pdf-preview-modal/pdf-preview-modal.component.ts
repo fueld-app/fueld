@@ -171,6 +171,16 @@ import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
                   <span class="text-sm text-gray-500">Generating PDF…</span>
                 </div>
               </div>
+            } @else if (isMobile) {
+              <div class="flex h-full items-center justify-center">
+                <div class="flex flex-col items-center gap-4 text-center px-6">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-brand-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                  </svg>
+                  <p class="text-sm text-gray-600">PDF preview is not supported on mobile devices.</p>
+                  <p class="text-sm text-gray-500">Use the <strong>Download</strong> button above to save and view the file.</p>
+                </div>
+              </div>
             } @else {
               <iframe
                 [src]="safeBlobUrl()"
@@ -200,6 +210,7 @@ export class PdfPreviewModalComponent {
     return url ? this.sanitizer.bypassSecurityTrustResourceUrl(url) : '';
   });
   readonly downloadUrl = signal<string>('');
+  readonly isMobile = /android|iphone|ipad/i.test(navigator.userAgent);
   readonly title = signal('');
   readonly fileName = signal('');
   readonly verifyUrl = signal('');
@@ -238,20 +249,8 @@ export class PdfPreviewModalComponent {
     const blobUrl = URL.createObjectURL(blob);
     this.currentBlobUrl = blobUrl;
     this.downloadUrl.set(blobUrl);
-
-    // Android PWA / mobile browsers can't render blob: URLs in iframes for PDFs.
-    // Convert to a data URL which works universally.
-    if (/android|iphone|ipad/i.test(navigator.userAgent)) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        this.rawBlobUrl.set(reader.result as string);
-        this.loading.set(false);
-      };
-      reader.readAsDataURL(blob);
-    } else {
-      this.rawBlobUrl.set(blobUrl);
-      this.loading.set(false);
-    }
+    this.rawBlobUrl.set(blobUrl);
+    this.loading.set(false);
   }
 
   async copyVerifyUrl(): Promise<void> {
