@@ -493,6 +493,21 @@ export interface SendInquiryWhatsAppPayload {
                       <path fill-rule="evenodd" d="M6 4.75A.75.75 0 016.75 4h10.5a.75.75 0 010 1.5H6.75A.75.75 0 016 4.75zM6 10a.75.75 0 01.75-.75h10.5a.75.75 0 010 1.5H6.75A.75.75 0 016 10zm0 5.25a.75.75 0 01.75-.75h10.5a.75.75 0 010 1.5H6.75a.75.75 0 01-.75-.75zM1.99 4.75a1 1 0 011-1h.01a1 1 0 010 2h-.01a1 1 0 01-1-1zm0 5.25a1 1 0 011-1h.01a1 1 0 010 2h-.01a1 1 0 01-1-1zm0 5.25a1 1 0 011-1h.01a1 1 0 010 2h-.01a1 1 0 01-1-1z" clip-rule="evenodd" />
                     </svg>
                   </button>
+                  <div class="flex-1"></div>
+                  <button type="button" (click)="copyBodyText()" class="toolbar-btn flex items-center gap-1" title="Copy body text">
+                    @if (copySuccess()) {
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-600" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                      </svg>
+                      <span class="text-xs text-green-600">Copied</span>
+                    } @else {
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M8 2a1 1 0 000 2h2a1 1 0 100-2H8z" />
+                        <path d="M3 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v6h-4.586l1.293-1.293a1 1 0 00-1.414-1.414l-3 3a1 1 0 000 1.414l3 3a1 1 0 001.414-1.414L10.414 13H15v3a2 2 0 01-2 2H5a2 2 0 01-2-2V5zM15 11h2a1 1 0 110 2h-2v-2z" />
+                      </svg>
+                      <span class="text-xs">Copy</span>
+                    }
+                  </button>
                 </div>
                 <!-- Content editable area -->
                 <div
@@ -638,6 +653,7 @@ export class SendInquiryModalComponent {
   readonly loadingSuppliers = signal(false);
   readonly sending = signal(false);
   readonly waSending = signal(false);
+  readonly copySuccess = signal(false);
   readonly suppliers = signal<SupplierRow[]>([]);
   readonly supplierFilter = signal('');
   readonly subject = signal('');
@@ -862,6 +878,16 @@ export class SendInquiryModalComponent {
   execCommand(command: string): void {
     document.execCommand(command, false);
     this.onBodyInput();
+  }
+
+  copyBodyText(): void {
+    const editor = this.bodyEditor()?.nativeElement;
+    if (!editor) return;
+    const plainText = editor.innerText.replace(/\n{3,}/g, '\n\n').trim();
+    navigator.clipboard.writeText(plainText).then(() => {
+      this.copySuccess.set(true);
+      setTimeout(() => this.copySuccess.set(false), 2000);
+    });
   }
 
   send(): void {

@@ -381,6 +381,7 @@ export function buildInquiryEmailHtml(params: {
   brandColor?: string | null;
   supplierTerms?: string | null;
   includeSupplierQuoteLink?: boolean;
+  responseDeadlineFormatted?: string | null;
   items: Array<{ quantity: string; unit: string; productType: string; description?: string | null }>;
 }): string {
   const companyName = params.companyName?.trim() || 'FUELD';
@@ -442,6 +443,10 @@ export function buildInquiryEmailHtml(params: {
           ${deliveryLabel ? `<tr>
             <td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Delivery:</td>
             <td style="padding: 4px 0; font-weight: 600;">${deliveryLabel}</td>
+          </tr>` : ''}
+          ${params.responseDeadlineFormatted ? `<tr>
+            <td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Reply by:</td>
+            <td style="padding: 4px 0; font-weight: 600;">${params.responseDeadlineFormatted}</td>
           </tr>` : ''}
           <tr>
             <td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Account:</td>

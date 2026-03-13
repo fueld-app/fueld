@@ -365,9 +365,6 @@ const NAVIGATION: NavItem[] = [
         <div class="ml-auto flex items-center gap-3">
           <!-- Commodity Prices (shrinks / hides when search expands) -->
           <div class="hidden shrink items-center gap-3 overflow-hidden md:flex">
-            @if (eurRate() !== null || commodityPrices().length > 0) {
-              <span class="text-[10px] text-gray-400 shrink-0" [title]="pricesUpdatedAt() ?? ''">{{ pricesUpdatedAgo() }}</span>
-            }
             @if (eurRate() !== null) {
               <div class="flex shrink-0 flex-col leading-tight">
                 <div class="flex items-center gap-1 text-xs">
@@ -375,13 +372,16 @@ const NAVIGATION: NavItem[] = [
                   <span class="font-semibold text-gray-900">{{ eurRate() | number:'1.2-2' }}</span>
                   <span class="font-medium text-gray-500">EUR</span>
                 </div>
-                <span
-                  class="text-[11px] font-medium"
-                  [class]="eurChange() >= 0 ? 'text-emerald-600' : 'text-red-600'"
-                >
-                  {{ eurChange() >= 0 ? '+' : '' }}{{ eurChange() | number:'1.2-2' }}
-                  ({{ eurChangePercent() >= 0 ? '+' : '' }}{{ eurChangePercent() | number:'1.2-2' }}%)
-                </span>
+                <div class="flex items-center gap-1">
+                  <span
+                    class="text-[11px] font-medium"
+                    [class]="eurChange() >= 0 ? 'text-emerald-600' : 'text-red-600'"
+                  >
+                    {{ eurChange() >= 0 ? '+' : '' }}{{ eurChange() | number:'1.2-2' }}
+                    ({{ eurChangePercent() >= 0 ? '+' : '' }}{{ eurChangePercent() | number:'1.2-2' }}%)
+                  </span>
+                  <span class="text-[10px] text-gray-400" [title]="fxUpdatedAt() ?? ''">{{ relativeTime(fxUpdatedAt()) }}</span>
+                </div>
               </div>
             }
             @for (p of commodityPrices(); track p.ticker) {
@@ -390,13 +390,16 @@ const NAVIGATION: NavItem[] = [
                   <span class="font-medium text-gray-500">{{ p.name }}</span>
                   <span class="font-semibold text-gray-900">{{ p.price | number:'1.2-2' }}</span>
                 </div>
-                <span
-                  class="text-[11px] font-medium"
-                  [class]="p.change >= 0 ? 'text-emerald-600' : 'text-red-600'"
-                >
-                  {{ p.change >= 0 ? '+' : '' }}{{ p.change | number:'1.2-2' }}
-                  ({{ p.change >= 0 ? '+' : '' }}{{ p.changePercent | number:'1.2-2' }}%)
-                </span>
+                <div class="flex items-center gap-1">
+                  <span
+                    class="text-[11px] font-medium"
+                    [class]="p.change >= 0 ? 'text-emerald-600' : 'text-red-600'"
+                  >
+                    {{ p.change >= 0 ? '+' : '' }}{{ p.change | number:'1.2-2' }}
+                    ({{ p.change >= 0 ? '+' : '' }}{{ p.changePercent | number:'1.2-2' }}%)
+                  </span>
+                  <span class="text-[10px] text-gray-400" [title]="p.updatedAt">{{ relativeTime(p.updatedAt) }}</span>
+                </div>
               </div>
             }
           </div>
@@ -640,7 +643,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   readonly eurRate = signal<number | null>(null);
   readonly eurChange = signal<number>(0);
   readonly eurChangePercent = signal<number>(0);
-  readonly pricesUpdatedAt = signal<string | null>(null);
+  readonly fxUpdatedAt = signal<string | null>(null);
   private readonly pricesTick = signal(0);
   private pricesTickTimer: ReturnType<typeof setInterval> | null = null;
   readonly updateDismissed = signal(false);
@@ -681,16 +684,6 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
       .subscribe((data) => {
         this.commodityPrices.set(data.prices);
 
-        // Track the most recent updatedAt across all sources
-        const timestamps = [
-          ...data.prices.map((p) => p.updatedAt),
-          data.fxRates?.updatedAt,
-        ].filter(Boolean) as string[];
-        if (timestamps.length) {
-          timestamps.sort();
-          this.pricesUpdatedAt.set(timestamps[timestamps.length - 1]);
-        }
-
         const eur = data.fxRates?.rates?.['EUR'];
         if (typeof eur === 'number' && eur !== 0) {
           const nextRate = 1 / eur;
@@ -700,10 +693,12 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
           this.eurRate.set(nextRate);
           this.eurChange.set(change);
           this.eurChangePercent.set(percent);
+          this.fxUpdatedAt.set(data.fxRates?.updatedAt ?? null);
         } else {
           this.eurRate.set(null);
           this.eurChange.set(0);
           this.eurChangePercent.set(0);
+          this.fxUpdatedAt.set(null);
         }
       });
 
@@ -1121,9 +1116,8 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     return source || '—';
   }
 
-  pricesUpdatedAgo(): string {
-    this.pricesTick(); // subscribe to tick for reactivity
-    const iso = this.pricesUpdatedAt();
+  relativeTime(iso: string | null | undefined): string {
+    this.pricesTick();
     if (!iso) return '';
     const diff = Date.now() - new Date(iso).getTime();
     if (diff < 0) return 'just now';

@@ -995,6 +995,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             brandColor,
             supplierTerms,
             includeSupplierQuoteLink: inquirySettings.supplierResponseUrlEnabled,
+            responseDeadlineFormatted: formatDate(getDefaultInquiryResponseDeadline()),
             items: order.items.map((i: any) => ({
               quantity: i.quantity,
               unit: i.unit,
@@ -1017,6 +1018,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           brandColor,
           supplierTerms,
           includeSupplierQuoteLink: inquirySettings.supplierResponseUrlEnabled,
+          responseDeadlineFormatted: formatDate(getDefaultInquiryResponseDeadline()),
           items: order.items.map((i: any) => ({
             quantity: i.quantity,
             unit: i.unit,
