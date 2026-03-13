@@ -46,7 +46,7 @@ interface BankDetails {
 }
 
 type DocumentType = 'OFFER' | 'PROFORMA_INVOICE' | 'INVOICE' | 'OTHER';
-const DOCUMENT_TEMPLATE_VERSION = '2026-03-13a';
+const DOCUMENT_TEMPLATE_VERSION = '2026-03-13b';
 
 export interface DocumentRevisionInfo {
   id: string;
@@ -1587,9 +1587,13 @@ function buildOfferDocument(data: {
   });
 
   // ── Header (3 columns: client | title | logo+date/ref) ───────────
+  const customerTopOffset = data.companyLogoDataUrl ? 60 : 0;
+  // Dynamically compute top page margin so the header is never clipped
+  const headerContentHeight = 30 + customerTopOffset + customerBlock.length * 14 + 4;
+  const topMargin = Math.max(140, headerContentHeight);
+
   const header = (currentPage: number, pageCount: number): Content => {
     const rightStack: Content[] = [];
-    const customerTopOffset = data.companyLogoDataUrl ? 60 : 0;
     // Logo
     if (data.companyLogoDataUrl) {
       rightStack.push({ image: data.companyLogoDataUrl, fit: [150, 50], alignment: 'right', margin: [0, 0, 0, 10] } as Content);
@@ -1676,7 +1680,7 @@ function buildOfferDocument(data: {
   // ── Document definition ───────────────────────────────────────────
   return {
     pageSize: 'A4',
-    pageMargins: [40, 140, 40, 80],
+    pageMargins: [40, topMargin, 40, 80],
     header,
     content: [
       // Vessel / Delivery info (single-column stack)
@@ -2242,9 +2246,12 @@ function buildProformaDocument(data: {
   const hasNotesSection = !!data.customerNote?.trim() || data.itemNotes.length > 0;
 
   // ── Header (3 columns: client | title | logo+date/ref) ────────────
+  const customerTopOffset = data.companyLogoDataUrl ? 60 : 0;
+  const headerContentHeight = 30 + customerTopOffset + customerBlock.length * 14 + 4;
+  const topMargin = Math.max(140, headerContentHeight);
+
   const header = (currentPage: number, _pageCount: number): Content => {
     const rightStack: Content[] = [];
-    const customerTopOffset = data.companyLogoDataUrl ? 60 : 0;
     if (data.companyLogoDataUrl) {
       rightStack.push({ image: data.companyLogoDataUrl, fit: [150, 50], alignment: 'right', margin: [0, 0, 0, 10] } as Content);
     }
@@ -2330,7 +2337,7 @@ function buildProformaDocument(data: {
   // ── Document definition ───────────────────────────────────────────
   return {
     pageSize: 'A4',
-    pageMargins: [40, 140, 40, 80],
+    pageMargins: [40, topMargin, 40, 80],
     header,
     content: [
       // Vessel / Delivery info (single-column stack)
