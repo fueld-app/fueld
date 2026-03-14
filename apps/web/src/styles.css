@@ -90,14 +90,24 @@ body {
   height: var(--app-height);
 }
 
+/* Position update toast just below the topbar, respecting safe-area. */
+.app-update-toast {
+  top: calc(4rem + var(--safe-top) + 0.5rem);
+  right: calc(1rem + var(--safe-right));
+}
+
 /* Ensure bottom content isn't hidden behind iOS home indicator / browser UI. */
 .app-main {
   padding-bottom: calc(1rem + var(--safe-bottom));
 }
 
 /* In landscape on notched iPhones, the notch/Dynamic Island sits on the left/right.
-   Add safe-area padding to body content (not the header). */
+   Add safe-area padding so content isn't hidden behind the notch. */
 @media (orientation: landscape) {
+  .app-sidebar {
+    padding-left: var(--safe-left);
+  }
+
   .app-main {
     padding-left: calc(1rem + var(--safe-left));
     padding-right: calc(1rem + var(--safe-right));

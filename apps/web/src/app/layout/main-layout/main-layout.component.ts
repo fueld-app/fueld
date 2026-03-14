@@ -256,7 +256,7 @@ const NAVIGATION: NavItem[] = [
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <div class="app-shell flex min-h-screen min-h-[100dvh] flex-col lg:pl-64">
       @if (showUpdateToast()) {
-        <div class="fixed right-4 top-4 z-50 w-80 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-lg">
+        <div class="app-update-toast fixed z-50 w-80 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-lg">
           <p class="text-sm font-semibold text-amber-900">Update available</p>
           <p class="mt-1 text-xs text-amber-800">Reload to get the latest fixes and features.</p>
           <div class="mt-3 flex items-center gap-2">
