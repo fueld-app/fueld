@@ -43,6 +43,7 @@ interface CommodityPrice {
 interface FxRatesPayload {
   base: string;
   rates: Record<string, number>;
+  changes?: Record<string, { change: number; changePercent: number }>;
   updatedAt: string | null;
 }
 
@@ -686,13 +687,14 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
         const eur = data.fxRates?.rates?.['EUR'];
         if (typeof eur === 'number' && eur !== 0) {
-          const nextRate = 1 / eur;
-          const previous = this.eurRate();
-          const change = typeof previous === 'number' ? nextRate - previous : 0;
-          const percent = previous ? (change / previous) * 100 : 0;
-          this.eurRate.set(nextRate);
-          this.eurChange.set(change);
-          this.eurChangePercent.set(percent);
+          this.eurRate.set(1 / eur);
+          const eurChanges = data.fxRates?.changes?.['EUR'];
+          // EUR rate change is inverted since we display USD/EUR (= 1/EUR)
+          const eurPrevClose = eur - (eurChanges?.change ?? 0);
+          const usdEurNow = 1 / eur;
+          const usdEurPrev = eurPrevClose !== 0 ? 1 / eurPrevClose : usdEurNow;
+          this.eurChange.set(Math.round((usdEurNow - usdEurPrev) * 100) / 100);
+          this.eurChangePercent.set(usdEurPrev !== 0 ? Math.round(((usdEurNow - usdEurPrev) / usdEurPrev) * 10000) / 100 : 0);
           this.fxUpdatedAt.set(data.fxRates?.updatedAt ?? null);
         } else {
           this.eurRate.set(null);

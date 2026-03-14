@@ -32,6 +32,7 @@ export interface PricesPayload {
 export interface FxRates {
   base: string;
   rates: Record<string, number>;
+  changes: Record<string, { change: number; changePercent: number }>;
   updatedAt: string | null;
 }
 
@@ -83,6 +84,7 @@ let fxTimer: ReturnType<typeof setInterval> | null = null;
 let fxRates: FxRates = {
   base: FX_BASE,
   rates: { [FX_BASE]: 1 },
+  changes: {},
   updatedAt: null,
 };
 
@@ -214,11 +216,19 @@ function connectYahooWs(): void {
         broadcast();
       } else if (obj.id && obj.price && FX_TICKER_TO_CURRENCY[obj.id]) {
         const currency = FX_TICKER_TO_CURRENCY[obj.id];
+        const fxPrice = obj.price;
+        const fxPrevClose = obj.previousClose;
+        const fxChange = obj.change ?? (fxPrevClose ? fxPrice - fxPrevClose : 0);
+        const fxChangePct = obj.changePercent ?? (fxPrevClose ? ((fxPrice - fxPrevClose) / fxPrevClose) * 100 : 0);
         fxRates = {
           base: FX_BASE,
           rates: {
             ...fxRates.rates,
-            [currency]: round2(obj.price),
+            [currency]: round2(fxPrice),
+          },
+          changes: {
+            ...fxRates.changes,
+            [currency]: { change: round2(fxChange), changePercent: round2(fxChangePct) },
           },
           updatedAt: new Date().toISOString(),
         };
@@ -323,13 +333,15 @@ async function fetchGasOilYahoo(): Promise<void> {
 
 async function fetchFxRates(): Promise<void> {
   const nextRates: Record<string, number> = { [FX_BASE]: 1 };
+  const nextChanges: Record<string, { change: number; changePercent: number }> = {};
   let updated = false;
 
   await Promise.all(
     Object.entries(FX_TICKERS).map(async ([currency, ticker]) => {
-      const price = await fetchYahooChart(ticker, `${currency}/${FX_BASE}`);
-      if (price?.price) {
-        nextRates[currency] = price.price;
+      const data = await fetchYahooChart(ticker, `${currency}/${FX_BASE}`);
+      if (data?.price) {
+        nextRates[currency] = data.price;
+        nextChanges[currency] = { change: round2(data.change), changePercent: round2(data.changePercent) };
         updated = true;
       }
     }),
@@ -339,6 +351,7 @@ async function fetchFxRates(): Promise<void> {
     fxRates = {
       base: FX_BASE,
       rates: nextRates,
+      changes: { ...fxRates.changes, ...nextChanges },
       updatedAt: new Date().toISOString(),
     };
     broadcast();
