@@ -19,6 +19,19 @@ import { Title } from '@angular/platform-browser';
 import * as L from 'leaflet/dist/leaflet-src.esm.js';
 import type { ApiResponse, CompanyContactDto, CompanyEmailDto, CompanyEmailType, CounterpartyDto, SupplyPortDto, VesselCompanyDto, VesselCompanyRole, VesselCompanyRoleOption, VesselDto } from '@fueld/types';
 import { flagFromIso3 } from '../../../../shared/utils/flags';
+
+interface CompanyOfficeDto {
+  id: string;
+  counterpartyId: string;
+  city: string;
+  country: string | null;
+  countryCode: string | null;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  source: string;
+  seasearcherOfficeId: number | null;
+}
 import { COUNTRIES, type Country } from '../../../../shared/data/countries';
 import { WebSocketService } from '../../../../core/websocket/websocket.service';
 import { AuthService } from '../../../../core/auth/auth.service';
@@ -491,16 +504,14 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                   >
                     Head Office
                   </button>
-                  @if (enrichment()?.offices?.length) {
-                    <button
-                      type="button"
-                      class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
-                      [class]="companyInfoTab() === 'offices' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
-                      (click)="companyInfoTab.set('offices')"
-                    >
-                      Offices
-                    </button>
-                  }
+                  <button
+                    type="button"
+                    class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
+                    [class]="companyInfoTab() === 'offices' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
+                    (click)="companyInfoTab.set('offices')"
+                  >
+                    Offices
+                  </button>
                   <button
                     type="button"
                     class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
@@ -862,20 +873,123 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                     }
                   </div>
                 } @else if (companyInfoTab() === 'offices') {
-                  @if (enrichment()?.offices?.length) {
-                    <div class="divide-y divide-gray-50 -mx-5 -mt-4">
-                      @for (office of enrichment()!.offices; track office.officeId) {
-                        <div class="px-5 py-3 text-sm">
-                          <span class="font-medium text-gray-900">{{ office.town }}</span>
-                          <span class="text-gray-400 ml-1">{{ office.country }}</span>
-                          @if (office.addressLine1) {
-                            <p class="text-xs text-gray-500 mt-0.5">{{ office.addressLine1 }}</p>
-                          }
+                  @if (showAddOffice()) {
+                    <div class="-mx-5 -mt-4 border-b border-gray-100 px-5 py-4 bg-gray-50/50">
+                      <div class="space-y-2">
+                        <div class="grid grid-cols-2 gap-2">
+                          <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">City *</label>
+                            <input
+                              [ngModel]="officeForm().city"
+                              (ngModelChange)="officeForm.set({ ...officeForm(), city: $event })"
+                              class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                              placeholder="e.g. Monaco"
+                            />
+                          </div>
+                          <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Country</label>
+                            <input
+                              [ngModel]="officeForm().country"
+                              (ngModelChange)="officeForm.set({ ...officeForm(), country: $event })"
+                              class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                              placeholder="e.g. Monaco"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label class="block text-xs font-medium text-gray-500 mb-1">Address</label>
+                          <input
+                            [ngModel]="officeForm().address"
+                            (ngModelChange)="officeForm.set({ ...officeForm(), address: $event })"
+                            class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                            placeholder="Street address"
+                          />
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                          <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Phone</label>
+                            <input
+                              [ngModel]="officeForm().phone"
+                              (ngModelChange)="officeForm.set({ ...officeForm(), phone: $event })"
+                              class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                              placeholder="+377 ..."
+                            />
+                          </div>
+                          <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Email</label>
+                            <input
+                              [ngModel]="officeForm().email"
+                              (ngModelChange)="officeForm.set({ ...officeForm(), email: $event })"
+                              class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                              placeholder="office&#64;example.com"
+                            />
+                          </div>
+                        </div>
+                        <div class="flex items-center justify-end gap-2 pt-1">
+                          <button (click)="cancelOfficeForm()"
+                            class="rounded-md px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100">
+                            Cancel
+                          </button>
+                          <button
+                            [disabled]="savingOffice() || !officeForm().city.trim()"
+                            (click)="saveCompanyOffice()"
+                            class="rounded-md bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+                            {{ editingOfficeId() ? 'Update' : 'Add' }}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  } @else if (!companyOffices().length && !showAddOffice()) {
+                    <div class="flex flex-col items-center justify-center py-8">
+                      <p class="text-xs text-gray-500 mb-2">No offices on file</p>
+                      <button (click)="openAddOffice()" class="text-xs font-medium text-brand-600 hover:text-brand-700">+ Add office</button>
+                    </div>
+                  }
+                  @if (companyOffices().length) {
+                    <div class="divide-y divide-gray-50 -mx-5" [class.-mt-4]="!showAddOffice()">
+                      @for (office of companyOffices(); track office.id) {
+                        <div class="group px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors">
+                          <div class="flex items-start justify-between">
+                            <div>
+                              <span class="font-medium text-gray-900">{{ office.city }}</span>
+                              @if (office.country) {
+                                <span class="text-gray-400 ml-1">{{ office.country }}</span>
+                              }
+                              @if (office.address) {
+                                <p class="text-xs text-gray-500 mt-0.5">{{ office.address }}</p>
+                              }
+                              @if (office.phone || office.email) {
+                                <div class="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                                  @if (office.phone) { <span>{{ office.phone }}</span> }
+                                  @if (office.email) { <span>{{ office.email }}</span> }
+                                </div>
+                              }
+                            </div>
+                            <div class="hidden group-hover:flex items-center gap-1 shrink-0 ml-2">
+                              <button (click)="openEditOffice(office)"
+                                class="rounded p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                                title="Edit office">
+                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                  <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
+                                </svg>
+                              </button>
+                              <button (click)="deleteCompanyOffice(office.id)"
+                                class="rounded p-1 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                                title="Delete office">
+                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                  <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       }
                     </div>
-                  } @else {
-                    <div class="text-xs text-gray-500 text-center">No offices on file</div>
+                    @if (!showAddOffice()) {
+                      <div class="px-5 py-2 border-t border-gray-100 -mx-5">
+                        <button (click)="openAddOffice()" class="text-xs font-medium text-brand-600 hover:text-brand-700">+ Add office</button>
+                      </div>
+                    }
                   }
                 } @else if (companyInfoTab() === 'emails') {
                   @if (showAddEmail()) {
@@ -2423,6 +2537,13 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly savingEmail = signal(false);
   readonly emailTypeOptions: CompanyEmailType[] = ['sales', 'invoice', 'inquiry', 'general'];
 
+  // Company Offices
+  readonly companyOffices = signal<CompanyOfficeDto[]>([]);
+  readonly showAddOffice = signal(false);
+  readonly officeForm = signal<{ city: string; country: string; address: string; phone: string; email: string }>({ city: '', country: '', address: '', phone: '', email: '' });
+  readonly editingOfficeId = signal<string | null>(null);
+  readonly savingOffice = signal(false);
+
   // Fleet map
   readonly fleetMapEl = viewChild<ElementRef<HTMLDivElement>>('fleetMapEl');
   private fleetMap: L.Map | null = null;
@@ -2568,6 +2689,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
         this.loadContacts(id);
         this.loadSupplyPorts(id);
         this.loadCompanyEmails(id);
+        this.loadCompanyOffices(id);
         if (res.data.seasearcherId) {
           // Show syncing indicator — backend auto-syncs via WS presence
           this.syncing.set(true);
@@ -3970,6 +4092,91 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
       this.loadCompanyEmails(c.id);
     } catch (err) {
       console.error('Failed to delete company email:', err);
+    }
+  }
+
+  // ─── Offices CRUD ────────────────────────────────────────────────────
+
+  private async loadCompanyOffices(companyId: string): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<CompanyOfficeDto[]>>(`${API}/companies/local/${companyId}/offices`),
+      );
+      if (res.success && res.data) {
+        this.companyOffices.set(res.data);
+      }
+    } catch (err) {
+      console.error('Failed to load company offices:', err);
+    }
+  }
+
+  openAddOffice(): void {
+    this.officeForm.set({ city: '', country: '', address: '', phone: '', email: '' });
+    this.editingOfficeId.set(null);
+    this.showAddOffice.set(true);
+  }
+
+  openEditOffice(o: CompanyOfficeDto): void {
+    this.officeForm.set({ city: o.city, country: o.country ?? '', address: o.address ?? '', phone: o.phone ?? '', email: o.email ?? '' });
+    this.editingOfficeId.set(o.id);
+    this.showAddOffice.set(true);
+  }
+
+  cancelOfficeForm(): void {
+    this.showAddOffice.set(false);
+    this.editingOfficeId.set(null);
+  }
+
+  async saveCompanyOffice(): Promise<void> {
+    const c = this.company();
+    if (!c) return;
+    const form = this.officeForm();
+    if (!form.city.trim()) return;
+
+    this.savingOffice.set(true);
+    try {
+      const editId = this.editingOfficeId();
+      if (editId) {
+        await firstValueFrom(
+          this.http.patch(`${API}/companies/offices/${editId}`, {
+            city: form.city.trim(),
+            country: form.country.trim() || undefined,
+            address: form.address.trim() || undefined,
+            phone: form.phone.trim() || undefined,
+            email: form.email.trim() || undefined,
+          }),
+        );
+      } else {
+        await firstValueFrom(
+          this.http.post(`${API}/companies/local/${c.id}/offices`, {
+            city: form.city.trim(),
+            country: form.country.trim() || undefined,
+            address: form.address.trim() || undefined,
+            phone: form.phone.trim() || undefined,
+            email: form.email.trim() || undefined,
+          }),
+        );
+      }
+      this.showAddOffice.set(false);
+      this.editingOfficeId.set(null);
+      this.loadCompanyOffices(c.id);
+    } catch (err) {
+      console.error('Failed to save company office:', err);
+    } finally {
+      this.savingOffice.set(false);
+    }
+  }
+
+  async deleteCompanyOffice(officeId: string): Promise<void> {
+    const c = this.company();
+    if (!c) return;
+    try {
+      await firstValueFrom(
+        this.http.delete(`${API}/companies/offices/${officeId}`),
+      );
+      this.loadCompanyOffices(c.id);
+    } catch (err) {
+      console.error('Failed to delete company office:', err);
     }
   }
 

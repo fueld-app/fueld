@@ -358,6 +358,13 @@
       "when": 1741993200000,
       "tag": "0050_order_place_remark",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1742079600000,
+      "tag": "0051_company_offices",
+      "breakpoints": true
     }
   ]
 }

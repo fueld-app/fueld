@@ -1015,6 +1015,25 @@ export const companyEmails = pgTable('company_emails', {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
+//  COMPANY OFFICES (branch offices / addresses per company)
+// ═══════════════════════════════════════════════════════════════════════
+
+export const companyOffices = pgTable('company_offices', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  counterpartyId: uuid('counterparty_id').notNull().references(() => counterparties.id, { onDelete: 'cascade' }),
+  city: text('city').notNull(),
+  country: text('country'),
+  countryCode: text('country_code'),
+  address: text('address'),
+  phone: text('phone'),
+  email: text('email'),
+  source: text('source').notNull().default('manual'),   // 'manual' | 'seasearcher'
+  seasearcherOfficeId: integer('seasearcher_office_id'),  // for dedup on re-sync
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ═══════════════════════════════════════════════════════════════════════
 //  ENTITY COMMENTS (polymorphic — place, company, order, vessel)
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -1106,6 +1125,7 @@ export const counterpartiesRelations = relations(counterparties, ({ one, many })
   creditLineCounterparties: many(creditLineCounterparties),
   contacts: many(companyContacts),
   emails: many(companyEmails),
+  offices: many(companyOffices),
   vesselAssociations: many(vesselCompanies),
 }));
 
@@ -1116,6 +1136,10 @@ export const companyContactsRelations = relations(companyContacts, ({ one }) => 
 export const companyEmailsRelations = relations(companyEmails, ({ one }) => ({
   counterparty: one(counterparties, { fields: [companyEmails.counterpartyId], references: [counterparties.id] }),
   addedBy: one(users, { fields: [companyEmails.addedById], references: [users.id] }),
+}));
+
+export const companyOfficesRelations = relations(companyOffices, ({ one }) => ({
+  counterparty: one(counterparties, { fields: [companyOffices.counterpartyId], references: [counterparties.id] }),
 }));
 
 export const companyGroupsRelations = relations(companyGroups, ({ one, many }) => ({

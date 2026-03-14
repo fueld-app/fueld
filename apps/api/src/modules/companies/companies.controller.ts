@@ -46,6 +46,10 @@ import {
   addCompanyEmail,
   updateCompanyEmail,
   deleteCompanyEmail,
+  getCompanyOffices,
+  addCompanyOffice,
+  updateCompanyOffice,
+  deleteCompanyOffice,
 } from './company.service';
 import { getSupplyPortsForCompany } from '../lloyds/lli.service';
 import { getUserCompanyAccess } from '../admin/settings.service';
@@ -778,5 +782,95 @@ export const companiesController = new Elysia({ prefix: '/companies' })
         tags: ['Companies'],
         summary: 'Delete a company email',
       },
+    },
+  )
+
+  // ═══════════════════════════════════════════════════════════════════════
+  //  COMPANY OFFICES
+  // ═══════════════════════════════════════════════════════════════════════
+
+  .get(
+    '/local/:id/offices',
+    async ({ params }) => {
+      try {
+        const offices = await getCompanyOffices(params.id);
+        return { success: true, data: offices } satisfies ApiResponse<typeof offices>;
+      } catch (err: any) {
+        console.error('[Companies] Failed to load offices:', err);
+        return { success: false, data: [], message: 'Failed to load offices' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: { tags: ['Companies'], summary: 'List offices for a company' },
+    },
+  )
+
+  .post(
+    '/local/:id/offices',
+    async ({ params, body }) => {
+      try {
+        const office = await addCompanyOffice(params.id, body);
+        return { success: true, data: office } satisfies ApiResponse<typeof office>;
+      } catch (err: any) {
+        console.error('[Companies] Failed to add office:', err);
+        return { success: false, data: null, message: err.message ?? 'Failed to add office' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({
+        city: t.String(),
+        country: t.Optional(t.String()),
+        countryCode: t.Optional(t.String()),
+        address: t.Optional(t.String()),
+        phone: t.Optional(t.String()),
+        email: t.Optional(t.String()),
+      }),
+      detail: { tags: ['Companies'], summary: 'Add an office to a company' },
+    },
+  )
+
+  .patch(
+    '/offices/:officeId',
+    async ({ params, body }) => {
+      try {
+        const updated = await updateCompanyOffice(params.officeId, body);
+        if (!updated) return { success: false, data: null, message: 'Office not found' };
+        return { success: true, data: updated } satisfies ApiResponse<typeof updated>;
+      } catch (err: any) {
+        console.error('[Companies] Failed to update office:', err);
+        return { success: false, data: null, message: err.message ?? 'Failed to update' };
+      }
+    },
+    {
+      params: t.Object({ officeId: t.String() }),
+      body: t.Object({
+        city: t.Optional(t.String()),
+        country: t.Optional(t.String()),
+        countryCode: t.Optional(t.String()),
+        address: t.Optional(t.String()),
+        phone: t.Optional(t.String()),
+        email: t.Optional(t.String()),
+      }),
+      detail: { tags: ['Companies'], summary: 'Update a company office' },
+    },
+  )
+
+  .delete(
+    '/offices/:officeId',
+    async ({ params }) => {
+      try {
+        const deleted = await deleteCompanyOffice(params.officeId);
+        if (!deleted) return { success: false, data: null, message: 'Office not found' };
+        return { success: true, data: deleted } satisfies ApiResponse<typeof deleted>;
+      } catch (err: any) {
+        console.error('[Companies] Failed to delete office:', err);
+        return { success: false, data: null, message: err.message ?? 'Failed to delete' };
+      }
+    },
+    {
+      params: t.Object({ officeId: t.String() }),
+      detail: { tags: ['Companies'], summary: 'Delete a company office' },
     },
   );

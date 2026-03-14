@@ -4,7 +4,7 @@
 
 import { eq, ilike, or, and, sql, asc, desc } from 'drizzle-orm';
 import { db } from '../../db';
-import { counterparties, companyContacts, companyEmails, orders, vessels, places, users, vesselCompanies, customerPayments, creditApplications } from '../../db/schema';
+import { counterparties, companyContacts, companyEmails, companyOffices, orders, vessels, places, users, vesselCompanies, customerPayments, creditApplications } from '../../db/schema';
 import type { CompanyEmailType } from '@fueld/types';
 import {
   seasearcherCompanyDetail,
@@ -377,6 +377,11 @@ export async function importCompanyFromSeasearcher(seasearcherId: string) {
   // Sync contacts from Seasearcher
   await syncContactsFromSeasearcher(created.id, detail.headOffice);
 
+  // Sync branch offices from Seasearcher
+  if (detail.offices?.length) {
+    await syncOfficesFromSeasearcher(created.id, detail.offices);
+  }
+
   return created;
 }
 
@@ -496,6 +501,11 @@ export async function syncCompanyFromSeasearcher(companyId: string): Promise<Syn
 
   // Sync contacts from Seasearcher (only source='seasearcher' contacts get replaced)
   await syncContactsFromSeasearcher(companyId, detail.headOffice);
+
+  // Sync branch offices from Seasearcher
+  if (detail.offices?.length) {
+    await syncOfficesFromSeasearcher(companyId, detail.offices);
+  }
 
   return updated ? { company: updated, conflicts } : null;
 }
@@ -1078,4 +1088,109 @@ export async function deleteCompanyEmail(id: string) {
     .where(eq(companyEmails.id, id))
     .returning({ id: companyEmails.id, email: companyEmails.email, emailType: companyEmails.emailType });
   return deleted ?? null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Company Offices
+// ═══════════════════════════════════════════════════════════════════════
+
+export async function getCompanyOffices(counterpartyId: string) {
+  return db
+    .select()
+    .from(companyOffices)
+    .where(eq(companyOffices.counterpartyId, counterpartyId))
+    .orderBy(companyOffices.city);
+}
+
+export async function addCompanyOffice(
+  counterpartyId: string,
+  data: { city: string; country?: string; countryCode?: string; address?: string; phone?: string; email?: string; source?: string; seasearcherOfficeId?: number },
+) {
+  const [created] = await db
+    .insert(companyOffices)
+    .values({
+      counterpartyId,
+      city: data.city,
+      country: data.country ?? null,
+      countryCode: data.countryCode ?? null,
+      address: data.address ?? null,
+      phone: data.phone ?? null,
+      email: data.email ?? null,
+      source: data.source ?? 'manual',
+      seasearcherOfficeId: data.seasearcherOfficeId ?? null,
+    })
+    .returning();
+  return created;
+}
+
+export async function updateCompanyOffice(
+  id: string,
+  data: { city?: string; country?: string; countryCode?: string; address?: string; phone?: string; email?: string },
+) {
+  const [updated] = await db
+    .update(companyOffices)
+    .set({
+      ...(data.city !== undefined && { city: data.city }),
+      ...(data.country !== undefined && { country: data.country }),
+      ...(data.countryCode !== undefined && { countryCode: data.countryCode }),
+      ...(data.address !== undefined && { address: data.address }),
+      ...(data.phone !== undefined && { phone: data.phone }),
+      ...(data.email !== undefined && { email: data.email }),
+      updatedAt: new Date(),
+    })
+    .where(eq(companyOffices.id, id))
+    .returning();
+  return updated ?? null;
+}
+
+export async function deleteCompanyOffice(id: string) {
+  const [deleted] = await db
+    .delete(companyOffices)
+    .where(eq(companyOffices.id, id))
+    .returning({ id: companyOffices.id, city: companyOffices.city });
+  return deleted ?? null;
+}
+
+export async function syncOfficesFromSeasearcher(
+  counterpartyId: string,
+  offices: SeasearcherCompanyOffice[],
+) {
+  for (const office of offices) {
+    const addressParts = [office.addressLine1, office.addressLine2, office.addressLine3, office.addressLine4].filter(Boolean);
+    if (office.postCode1) addressParts.push(office.postCode1);
+    const phoneStr = office.telephoneNumbers?.[0]
+      ? `+${office.telephoneNumbers[0].countryDialingCode} ${office.telephoneNumbers[0].areaDialingCode} ${office.telephoneNumbers[0].number}`.trim()
+      : null;
+
+    // Upsert by seasearcherOfficeId if present
+    const [existing] = await db
+      .select({ id: companyOffices.id })
+      .from(companyOffices)
+      .where(and(eq(companyOffices.counterpartyId, counterpartyId), eq(companyOffices.seasearcherOfficeId, office.officeId)))
+      .limit(1);
+
+    if (existing) {
+      await db.update(companyOffices).set({
+        city: office.town || 'Unknown',
+        country: office.country ?? null,
+        countryCode: office.countryCode ?? null,
+        address: addressParts.join(', ') || null,
+        phone: phoneStr,
+        email: office.emailAddress ?? null,
+        updatedAt: new Date(),
+      }).where(eq(companyOffices.id, existing.id));
+    } else {
+      await db.insert(companyOffices).values({
+        counterpartyId,
+        city: office.town || 'Unknown',
+        country: office.country ?? null,
+        countryCode: office.countryCode ?? null,
+        address: addressParts.join(', ') || null,
+        phone: phoneStr,
+        email: office.emailAddress ?? null,
+        source: 'seasearcher',
+        seasearcherOfficeId: office.officeId,
+      });
+    }
+  }
 }
