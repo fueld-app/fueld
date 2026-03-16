@@ -20,6 +20,7 @@ import type {
   ConversionMetricsDto,
 } from '@fueld/types';
 import { firstValueFrom } from 'rxjs';
+import { Router } from '@angular/router';
 
 import { CollectionsWidgetComponent } from '../../features/dashboard/components/collections-widget/collections-widget.component';
 import { AuthService } from '../../core/auth/auth.service';
@@ -144,6 +145,52 @@ import { API } from '@app/core/config/api';
         <app-collections-widget [overdueInvoices]="collections().items" />
       </div>
 
+      <!-- Top Customer Groups by Credit Exposure -->
+      @if (topCreditGroups().length) {
+        <div class="mt-8 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">Top Customer Groups by Credit Exposure</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-gray-200 bg-gray-50/80">
+                  <th class="px-4 py-2 text-left font-medium text-gray-600">Parent Company</th>
+                  <th class="px-4 py-2 text-center font-medium text-gray-600">Companies</th>
+                  <th class="px-4 py-2 text-right font-medium text-gray-600">Credit Limit</th>
+                  <th class="px-4 py-2 text-right font-medium text-gray-600">Credit Used</th>
+                  <th class="px-4 py-2 text-right font-medium text-gray-600">Utilization</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                @for (g of topCreditGroups(); track g.id) {
+                  <tr class="hover:bg-gray-50/50 cursor-pointer transition-colors" (click)="goToCompanyGroup(g.id)">
+                    <td class="px-4 py-2.5">
+                      <span class="font-medium text-gray-900">{{ g.name }}</span>
+                      @if (g.country) {
+                        <span class="ml-1 text-xs text-gray-400">{{ g.country }}</span>
+                      }
+                    </td>
+                    <td class="px-4 py-2.5 text-center text-gray-600">{{ g.childCount }}</td>
+                    <td class="px-4 py-2.5 text-right font-medium tabular-nums text-gray-700">{{ formatUsd(+g.totalCreditLimit) }}</td>
+                    <td class="px-4 py-2.5 text-right font-medium tabular-nums text-gray-700">{{ formatUsd(+g.totalCreditUsed) }}</td>
+                    <td class="px-4 py-2.5 text-right">
+                      @if (+g.totalCreditLimit > 0) {
+                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+                          [class]="(+g.totalCreditUsed / +g.totalCreditLimit) >= 0.8 ? 'bg-red-100 text-red-700' :
+                                   (+g.totalCreditUsed / +g.totalCreditLimit) >= 0.5 ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'">
+                          {{ ((+g.totalCreditUsed / +g.totalCreditLimit) * 100).toFixed(0) }}%
+                        </span>
+                      } @else {
+                        <span class="text-xs text-gray-400">—</span>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+
       <!-- Pipeline & Loss Analysis -->
       <div class="mt-8 grid gap-6 lg:grid-cols-2">
         <!-- Sales Funnel / Pipeline -->
@@ -232,6 +279,7 @@ import { API } from '@app/core/config/api';
 export class DashboardPageComponent implements OnInit, OnDestroy {
   readonly auth = inject(AuthService);
   private readonly http = inject(HttpClient);
+  private readonly router = inject(Router);
 
   @ViewChild('dateDropdown') dateDropdownRef!: ElementRef;
 
@@ -340,6 +388,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   readonly pipelineStages = signal<PipelineStageDto[]>([]);
   readonly lossAnalysis = signal<{ reasons: LossReasonDto[]; totalCancelled: number }>({ reasons: [], totalCancelled: 0 });
   readonly conversionMetrics = signal<ConversionMetricsDto>({ totalInquiries: 0, totalWon: 0, totalLost: 0, winRate: 0, avgDaysToClose: null });
+  readonly topCreditGroups = signal<{ id: string; name: string; country: string | null; totalCreditLimit: string; totalCreditUsed: string; childCount: number }[]>([]);
 
   constructor() {}
 
@@ -348,6 +397,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     document.addEventListener('click', this.clickOutsideHandler);
     void this.loadDashboardData();
+    void this.loadTopCreditGroups();
   }
 
   ngOnDestroy(): void {
@@ -535,4 +585,20 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     return colors[status] ?? 'bg-gray-400';
   }
 
+  private async loadTopCreditGroups(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<{ success: boolean; data: any[] }>(`${API}/companies/top-credit-groups`),
+      );
+      if (res.success) {
+        this.topCreditGroups.set(res.data);
+      }
+    } catch {
+      // Non-critical widget — silently fail
+    }
+  }
+
+  goToCompanyGroup(id: string): void {
+    void this.router.navigate(['/companies', id]);
+  }
 }

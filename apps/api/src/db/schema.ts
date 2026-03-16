@@ -385,6 +385,10 @@ export const counterparties = pgTable('counterparties', {
   // Late payment interest rate (e.g. "2%") — shown on invoices
   latePaymentInterest: text('late_payment_interest'),
 
+  // ── Parent / Child hierarchy ────────────────────────────────────────
+  // Single-level only: a parent cannot be a child, a child cannot be a parent.
+  parentId: uuid('parent_id'),
+
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -1117,6 +1121,8 @@ export const passkeysRelations = relations(passkeys, ({ one }) => ({
 export const counterpartiesRelations = relations(counterparties, ({ one, many }) => ({
   tenant: one(tenants, { fields: [counterparties.tenantId], references: [tenants.id] }),
   responsibleUser: one(users, { fields: [counterparties.responsibleUserId], references: [users.id] }),
+  parent: one(counterparties, { fields: [counterparties.parentId], references: [counterparties.id], relationName: 'parentChild' }),
+  children: many(counterparties, { relationName: 'parentChild' }),
   clientOrders: many(orders),
   suppliedItems: many(orderItems),
   teamCompanies: many(teamCompanies),

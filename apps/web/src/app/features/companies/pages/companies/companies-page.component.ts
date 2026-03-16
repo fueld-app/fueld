@@ -204,6 +204,11 @@ interface CompanySearchResult {
                 <tr class="transition-colors hover:bg-gray-50/50 cursor-pointer" (click)="goToCompany(company.id)">
                   <td class="px-4 py-3">
                     <span class="font-medium text-gray-900">{{ company.name }}</span>
+                    @if (company.parentName) {
+                      <span class="ml-1.5 inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-600">
+                        Child of {{ company.parentName }}
+                      </span>
+                    }
                   </td>
                   <td class="px-4 py-3">
                     <div class="flex flex-wrap gap-1">

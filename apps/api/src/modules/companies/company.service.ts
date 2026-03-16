@@ -181,6 +181,8 @@ export async function listCompanies(query?: {
         responsibleUserId: counterparties.responsibleUserId,
         responsibleUserName: users.name,
         contactsCount: sql<number>`(SELECT count(*)::int FROM company_contacts cc WHERE cc.counterparty_id = ${counterparties.id})`,
+        parentId: counterparties.parentId,
+        parentName: sql<string | null>`(SELECT c2.name FROM counterparties c2 WHERE c2.id = ${counterparties.parentId})`.as('parent_name'),
         createdAt: counterparties.createdAt,
         updatedAt: counterparties.updatedAt,
       })
@@ -1193,4 +1195,214 @@ export async function syncOfficesFromSeasearcher(
       });
     }
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  PARENT / CHILD HIERARCHY
+//  Single-level only: a parent cannot be a child; a child cannot be a parent.
+// ═══════════════════════════════════════════════════════════════════════
+
+/** Get child companies for a parent. */
+export async function getChildCompanies(parentId: string) {
+  return db
+    .select({
+      id: counterparties.id,
+      name: counterparties.name,
+      country: counterparties.country,
+      creditLimit: counterparties.creditLimit,
+      creditUsed: counterparties.creditUsed,
+      fleetSize: counterparties.fleetSize,
+      isSanctioned: counterparties.isSanctioned,
+    })
+    .from(counterparties)
+    .where(eq(counterparties.parentId, parentId))
+    .orderBy(counterparties.name);
+}
+
+/** Get parent summary for a child company. */
+export async function getParentCompany(childId: string) {
+  const [child] = await db
+    .select({ parentId: counterparties.parentId })
+    .from(counterparties)
+    .where(eq(counterparties.id, childId))
+    .limit(1);
+  if (!child?.parentId) return null;
+
+  const [parent] = await db
+    .select({
+      id: counterparties.id,
+      name: counterparties.name,
+      country: counterparties.country,
+    })
+    .from(counterparties)
+    .where(eq(counterparties.id, child.parentId))
+    .limit(1);
+  return parent ?? null;
+}
+
+/** Set the parent for a child company (link). Enforces single-level constraint. */
+export async function setParentCompany(childId: string, parentId: string) {
+  if (childId === parentId) {
+    throw Object.assign(new Error('A company cannot be its own parent.'), { code: 'SELF_REFERENCE' });
+  }
+
+  // The target parent must not itself be a child
+  const [parentRow] = await db
+    .select({ parentId: counterparties.parentId })
+    .from(counterparties)
+    .where(eq(counterparties.id, parentId))
+    .limit(1);
+  if (!parentRow) throw Object.assign(new Error('Parent company not found.'), { code: 'NOT_FOUND' });
+  if (parentRow.parentId) {
+    throw Object.assign(new Error('Cannot link to a company that is already a child of another company.'), { code: 'ALREADY_CHILD' });
+  }
+
+  // The child must not already have children (would create depth > 1)
+  const [hasChildren] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(counterparties)
+    .where(eq(counterparties.parentId, childId));
+  if (hasChildren && hasChildren.count > 0) {
+    throw Object.assign(
+      new Error('Cannot make a parent company into a child. Remove its children first.'),
+      { code: 'HAS_CHILDREN' },
+    );
+  }
+
+  const [updated] = await db
+    .update(counterparties)
+    .set({ parentId, updatedAt: new Date() })
+    .where(eq(counterparties.id, childId))
+    .returning();
+  return updated ?? null;
+}
+
+/** Remove the parent link from a child company (unlink). */
+export async function removeParentCompany(childId: string) {
+  const [updated] = await db
+    .update(counterparties)
+    .set({ parentId: null, updatedAt: new Date() })
+    .where(eq(counterparties.id, childId))
+    .returning();
+  return updated ?? null;
+}
+
+/** Aggregated credit, fleet, and order totals for a parent + all its children. */
+export async function getCompanyGroupAggregate(parentId: string) {
+  const [row] = await db.execute<{
+    total_credit_limit: string;
+    total_credit_used: string;
+    total_fleet_size: string;
+    total_orders: string;
+    child_count: string;
+  }>(sql`
+    WITH family AS (
+      SELECT id, credit_limit, credit_used, fleet_size
+      FROM counterparties
+      WHERE id = ${parentId} OR parent_id = ${parentId}
+    )
+    SELECT
+      COALESCE(SUM(f.credit_limit), 0)::text AS total_credit_limit,
+      COALESCE(SUM(f.credit_used), 0)::text AS total_credit_used,
+      COALESCE(SUM(f.fleet_size), 0)::int AS total_fleet_size,
+      (SELECT count(*)::int FROM orders WHERE client_id IN (SELECT id FROM family)) AS total_orders,
+      (SELECT count(*)::int FROM family WHERE id != ${parentId}) AS child_count
+    FROM family f
+  `);
+
+  return {
+    totalCreditLimit: row?.total_credit_limit ?? '0',
+    totalCreditUsed: row?.total_credit_used ?? '0',
+    totalFleetSize: Number(row?.total_fleet_size ?? 0),
+    totalOrders: Number(row?.total_orders ?? 0),
+    childCount: Number(row?.child_count ?? 0),
+  };
+}
+
+/** Get orders for a parent + all its children. */
+export async function getGroupOrdersForCompany(parentId: string) {
+  return db
+    .select({
+      id: orders.id,
+      status: orders.status,
+      eta: orders.eta,
+      etd: orders.etd,
+      createdAt: orders.createdAt,
+      updatedAt: orders.updatedAt,
+      vesselName: vessels.name,
+      vesselImo: vessels.imo,
+      placeName: places.name,
+      placeCountry: places.country,
+      salesRepId: orders.salesRepId,
+      clientId: orders.clientId,
+      clientName: counterparties.name,
+    })
+    .from(orders)
+    .innerJoin(vessels, eq(orders.vesselId, vessels.id))
+    .innerJoin(places, eq(orders.placeId, places.id))
+    .innerJoin(counterparties, eq(orders.clientId, counterparties.id))
+    .where(
+      or(
+        eq(orders.clientId, parentId),
+        sql`${orders.clientId} IN (SELECT id FROM counterparties WHERE parent_id = ${parentId})`,
+      )!,
+    )
+    .orderBy(sql`${orders.createdAt} desc`);
+}
+
+/** Get vessels for a parent + all its children. */
+export async function getGroupVesselsForCompany(parentId: string) {
+  return db
+    .select({
+      id: vesselCompanies.id,
+      vesselId: vesselCompanies.vesselId,
+      vesselName: vessels.name,
+      vesselImo: vessels.imo,
+      companyId: vesselCompanies.companyId,
+      companyName: counterparties.name,
+      role: vesselCompanies.role,
+      source: vesselCompanies.source,
+      contactId: vesselCompanies.contactId,
+      note: vesselCompanies.note,
+      addedById: vesselCompanies.addedById,
+      addedByName: vesselCompanies.addedByName,
+      createdAt: vesselCompanies.createdAt,
+      updatedAt: vesselCompanies.updatedAt,
+    })
+    .from(vesselCompanies)
+    .innerJoin(vessels, eq(vesselCompanies.vesselId, vessels.id))
+    .innerJoin(counterparties, eq(vesselCompanies.companyId, counterparties.id))
+    .where(
+      or(
+        eq(vesselCompanies.companyId, parentId),
+        sql`${vesselCompanies.companyId} IN (SELECT id FROM counterparties WHERE parent_id = ${parentId})`,
+      )!,
+    )
+    .orderBy(vesselCompanies.role, vessels.name);
+}
+
+/** Top parent companies by aggregated credit exposure (parent + children). */
+export async function getTopCreditGroups(limit = 10) {
+  const rows = await db.execute(sql`
+    SELECT
+      p.id,
+      p.name,
+      p.country,
+      COALESCE(p.credit_limit, 0) + COALESCE(SUM(c.credit_limit), 0) AS "totalCreditLimit",
+      COALESCE(p.credit_used, 0) + COALESCE(SUM(c.credit_used), 0) AS "totalCreditUsed",
+      1 + COUNT(c.id)::int AS "childCount"
+    FROM counterparties p
+    INNER JOIN counterparties c ON c.parent_id = p.id
+    GROUP BY p.id, p.name, p.country, p.credit_limit, p.credit_used
+    ORDER BY COALESCE(p.credit_used, 0) + COALESCE(SUM(c.credit_used), 0) DESC
+    LIMIT ${limit}
+  `);
+  return rows as unknown as {
+    id: string;
+    name: string;
+    country: string | null;
+    totalCreditLimit: string;
+    totalCreditUsed: string;
+    childCount: number;
+  }[];
 }

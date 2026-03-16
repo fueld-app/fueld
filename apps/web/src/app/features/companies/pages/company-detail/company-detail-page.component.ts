@@ -12,12 +12,12 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
-import { DatePipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subscription, skip } from 'rxjs';
 import { Title } from '@angular/platform-browser';
 import * as L from 'leaflet/dist/leaflet-src.esm.js';
-import type { ApiResponse, CompanyContactDto, CompanyEmailDto, CompanyEmailType, CounterpartyDto, SupplyPortDto, VesselCompanyDto, VesselCompanyRole, VesselCompanyRoleOption, VesselDto } from '@fueld/types';
+import type { ApiResponse, CompanyContactDto, CompanyEmailDto, CompanyEmailType, CompanyChildSummaryDto, CompanyParentSummaryDto, CompanyGroupAggregateDto, CounterpartyDto, SupplyPortDto, VesselCompanyDto, VesselCompanyRole, VesselCompanyRoleOption, VesselDto } from '@fueld/types';
 import { flagFromIso3 } from '../../../../shared/utils/flags';
 
 interface CompanyOfficeDto {
@@ -319,7 +319,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
 @Component({
   selector: 'app-company-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, FormsModule, RouterLink, ActivityTimelineComponent, LastEditedBadgeComponent, CommentsCardComponent, CreditApplicationModalComponent],
+  imports: [DatePipe, DecimalPipe, FormsModule, RouterLink, ActivityTimelineComponent, LastEditedBadgeComponent, CommentsCardComponent, CreditApplicationModalComponent],
   styles: [`
     :host ::ng-deep .leaflet-container { font-family: inherit; }
     .fleet-map-fullscreen {
@@ -445,6 +445,52 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
             <app-last-edited-badge entityType="company" [entityId]="company()!.id" />
           </div>
         </div>
+
+        <!-- Parent breadcrumb (shown when this is a child company) -->
+        @if (parentCompany()) {
+          <div class="mb-3 flex items-center gap-2 text-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M4.083 9h1.946c.089-1.546.383-2.97.837-4.118A6.004 6.004 0 004.083 9zM10 2a8 8 0 100 16 8 8 0 000-16zm0 2c-.076 0-.232.032-.465.262-.238.234-.497.623-.737 1.182-.389.907-.673 2.142-.766 3.556h3.936c-.093-1.414-.377-2.649-.766-3.556-.24-.56-.5-.948-.737-1.182C10.232 4.032 10.076 4 10 4zm3.971 5c-.089-1.546-.383-2.97-.837-4.118A6.004 6.004 0 0115.917 9h-1.946zm-2.003 2H8.032c.093 1.414.377 2.649.766 3.556.24.56.5.948.737 1.182.233.23.389.262.465.262.076 0 .232-.032.465-.262.238-.234.497-.623.737-1.182.389-.907.673-2.142.766-3.556zm1.166 4.118c.454-1.147.748-2.572.837-4.118h1.946a6.004 6.004 0 01-2.783 4.118zm-6.268 0C6.412 13.97 6.118 12.546 6.029 11H4.083a6.004 6.004 0 002.783 4.118z" clip-rule="evenodd" />
+            </svg>
+            <span class="text-gray-400">Child of</span>
+            <a [routerLink]="['/companies', parentCompany()!.id]"
+               class="font-medium text-brand-600 hover:text-brand-700 hover:underline transition-colors">
+              {{ parentCompany()!.name }}
+            </a>
+            @if (parentCompany()!.country) {
+              <span class="text-xs text-gray-400">{{ parentCompany()!.country }}</span>
+            }
+            <button
+              (click)="removeOwnParent()"
+              [disabled]="unlinkingChildId() === company()!.id"
+              class="ml-1 rounded-md px-2 py-0.5 text-[11px] font-medium text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+            >
+              @if (unlinkingChildId() === company()!.id) { Unlinking… } @else { Unlink }
+            </button>
+          </div>
+        }
+
+        <!-- Aggregated stats bar (shown when this is a parent with children) -->
+        @if (groupAggregate(); as agg) {
+          <div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
+              <div class="text-xs font-medium text-gray-500 mb-0.5">Group Credit Limit</div>
+              <div class="text-lg font-bold text-gray-900">{{ agg.totalCreditLimit | number:'1.0-0' }}</div>
+            </div>
+            <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
+              <div class="text-xs font-medium text-gray-500 mb-0.5">Group Credit Used</div>
+              <div class="text-lg font-bold text-gray-900">{{ agg.totalCreditUsed | number:'1.0-0' }}</div>
+            </div>
+            <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
+              <div class="text-xs font-medium text-gray-500 mb-0.5">Group Fleet</div>
+              <div class="text-lg font-bold text-gray-900">{{ agg.totalFleetSize }} vessels</div>
+            </div>
+            <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
+              <div class="text-xs font-medium text-gray-500 mb-0.5">Group Orders</div>
+              <div class="text-lg font-bold text-gray-900">{{ agg.totalOrders }}</div>
+            </div>
+          </div>
+        }
 
         <div class="company-card-grid grid grid-cols-1 gap-6 min-[900px]:grid-cols-2 min-[1600px]:grid-cols-3 min-[2000px]:grid-cols-4">
           <!-- Left column -->
@@ -1508,63 +1554,275 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 }
               </div>
 
+            <!-- Group Structure (parent/child hierarchy) -->
+            @if (!isChild()) {
+            <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-[12]">
+              <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
+                <h2 class="text-sm font-semibold text-gray-700">Group Structure</h2>
+                <div class="flex items-center gap-2">
+                  @if (isParent()) {
+                    <span class="inline-flex items-center rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-medium text-brand-700">
+                      Parent · {{ childCompanies().length }} {{ childCompanies().length === 1 ? 'child' : 'children' }}
+                    </span>
+                  }
+                  <button (click)="showLinkChildModal.set(true)"
+                    class="rounded-md bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 hover:bg-brand-100 transition-colors">
+                    + Add child
+                  </button>
+                </div>
+              </div>
+              <div class="px-5 py-4">
+                @if (isParent()) {
+                <!-- Visual tree diagram -->
+                <div class="space-y-1">
+                  <!-- Self as parent -->
+                  <div class="flex items-center gap-2 rounded-lg border border-brand-200 bg-brand-50/50 px-3 py-2">
+                    <div class="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-brand-700 text-[10px] font-bold">P</div>
+                    <span class="text-sm font-medium text-gray-900">{{ company()!.name }}</span>
+                    @if (company()!.country) {
+                      <span class="text-xs text-gray-400">{{ company()!.country }}</span>
+                    }
+                    <span class="ml-auto text-xs text-gray-500">Credit: {{ company()!.creditLimit | number:'1.0-0' }}</span>
+                    @if (company()!.fleetSize) {
+                      <span class="text-xs text-gray-500">Fleet: {{ company()!.fleetSize }}</span>
+                    }
+                  </div>
+                  <!-- Children -->
+                  @for (child of childCompanies(); track child.id) {
+                    <div class="ml-6 flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 group hover:bg-gray-100 transition-colors">
+                      <div class="h-4 border-l-2 border-gray-300 mr-1"></div>
+                      <div class="flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 text-gray-600 text-[10px] font-bold">C</div>
+                      <a [routerLink]="['/companies', child.id]"
+                         class="text-sm font-medium text-brand-600 hover:underline">{{ child.name }}</a>
+                      @if (child.country) {
+                        <span class="text-xs text-gray-400">{{ child.country }}</span>
+                      }
+                      <span class="ml-auto text-xs text-gray-500">Credit: {{ child.creditLimit | number:'1.0-0' }}</span>
+                      @if (child.fleetSize) {
+                        <span class="text-xs text-gray-500">Fleet: {{ child.fleetSize }}</span>
+                      }
+                      @if (child.isSanctioned) {
+                        <span class="text-[10px] text-red-600">⚠️</span>
+                      }
+                      <button
+                        (click)="unlinkChild(child.id); $event.stopPropagation()"
+                        [disabled]="unlinkingChildId() === child.id"
+                        class="invisible group-hover:visible rounded px-1.5 py-0.5 text-[10px] text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+                      >
+                        @if (unlinkingChildId() === child.id) { … } @else { Unlink }
+                      </button>
+                    </div>
+                  }
+                </div>
+                } @else {
+                  <p class="text-sm text-gray-400">No child companies linked yet. Click "+ Add child" to create a group.</p>
+                }
+              </div>
+            </div>
+            }
+
+            @if (isChild()) {
+            <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-[12]">
+              <div class="border-b border-gray-100 px-5 py-3">
+                <h2 class="text-sm font-semibold text-gray-700">Group Structure</h2>
+              </div>
+              <div class="px-5 py-4">
+                <div class="space-y-1">
+                  <div class="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2">
+                    <div class="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-brand-700 text-[10px] font-bold">P</div>
+                    <a [routerLink]="['/companies', parentCompany()!.id]"
+                       class="text-sm font-medium text-brand-600 hover:underline">{{ parentCompany()!.name }}</a>
+                    @if (parentCompany()!.country) {
+                      <span class="text-xs text-gray-400">{{ parentCompany()!.country }}</span>
+                    }
+                  </div>
+                  <div class="ml-6 flex items-center gap-2 rounded-lg border border-brand-200 bg-brand-50/50 px-3 py-2">
+                    <div class="h-4 border-l-2 border-gray-300 mr-1"></div>
+                    <div class="flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 text-gray-600 text-[10px] font-bold">C</div>
+                    <span class="text-sm font-medium text-gray-900">{{ company()!.name }}</span>
+                    <span class="text-[10px] text-gray-400">(this company)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            }
+
+            <!-- Link Child Modal -->
+            @if (showLinkChildModal()) {
+              <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" (click)="showLinkChildModal.set(false)">
+                <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl" (click)="$event.stopPropagation()">
+                  <h3 class="text-base font-semibold text-gray-900 mb-4">Add Child Company</h3>
+                  <p class="text-xs text-gray-500 mb-3">Search for an existing company to link as a child of <strong>{{ company()!.name }}</strong>.</p>
+                  <input
+                    type="text"
+                    [value]="linkChildSearch()"
+                    (input)="onLinkChildSearch($any($event.target).value)"
+                    placeholder="Search companies..."
+                    class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                    autofocus
+                  />
+                  @if (linkChildResults().length) {
+                    <div class="mt-2 max-h-48 overflow-y-auto divide-y divide-gray-50 rounded-lg border border-gray-100">
+                      @for (r of linkChildResults(); track r.id) {
+                        <button
+                          (click)="linkChild(r.id)"
+                          [disabled]="linkingChildId() === r.id"
+                          class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors disabled:opacity-50 flex items-center gap-2"
+                        >
+                          <span class="font-medium text-gray-900">{{ r.name }}</span>
+                          @if (r.country) { <span class="text-xs text-gray-400">{{ r.country }}</span> }
+                          @if (linkingChildId() === r.id) {
+                            <svg class="ml-auto h-4 w-4 animate-spin text-brand-500" viewBox="0 0 24 24" fill="none">
+                              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                            </svg>
+                          }
+                        </button>
+                      }
+                    </div>
+                  } @else if (linkChildSearch().length >= 2) {
+                    <div class="mt-2 text-center text-xs text-gray-400 py-3">No matching companies found</div>
+                  }
+                  <div class="mt-4 flex justify-end">
+                    <button (click)="showLinkChildModal.set(false)" class="rounded-md px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-50 transition-colors">Cancel</button>
+                  </div>
+                </div>
+              </div>
+            }
+
             <!-- Orders -->
             <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-[13]">
               <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
-                <h2 class="text-sm font-semibold text-gray-700">Orders</h2>
-                @if (companyOrders().length) {
+                <div class="flex items-center gap-2">
+                  <h2 class="text-sm font-semibold text-gray-700">Orders</h2>
+                  @if (isParent()) {
+                    <div class="flex gap-1">
+                      <button
+                        (click)="toggleOrdersMode()"
+                        class="rounded-md px-2 py-0.5 text-[10px] font-medium transition-colors"
+                        [class]="groupOrdersMode() === 'own' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
+                      >Own</button>
+                      <button
+                        (click)="toggleOrdersMode()"
+                        class="rounded-md px-2 py-0.5 text-[10px] font-medium transition-colors"
+                        [class]="groupOrdersMode() === 'group' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
+                      >Group</button>
+                    </div>
+                  }
+                </div>
+                @if (groupOrdersMode() === 'group' ? groupOrders().length : companyOrders().length) {
                   <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
-                    {{ companyOrders().length }}
+                    {{ groupOrdersMode() === 'group' ? groupOrders().length : companyOrders().length }}
                   </span>
                 }
               </div>
-              @if (ordersLoading()) {
-                <div class="flex items-center justify-center py-8">
-                  <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                  </svg>
-                </div>
-              } @else if (companyOrders().length) {
-                <div class="overflow-x-auto">
-                  <table class="w-full text-sm">
-                    <thead>
-                      <tr class="border-b border-gray-100 bg-gray-50/60">
-                        <th class="px-5 py-2 text-left font-medium text-gray-500">Vessel</th>
-                        <th class="px-5 py-2 text-left font-medium text-gray-500">Place</th>
-                        <th class="px-5 py-2 text-left font-medium text-gray-500">Status</th>
-                        <th class="px-5 py-2 text-left font-medium text-gray-500">Created</th>
-                      </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-50">
-                      @for (order of companyOrders(); track order.id) {
-                        <tr class="hover:bg-gray-50/50 cursor-pointer transition-colors" (click)="goToOrder(order.id, order.status)">
-                          <td class="px-5 py-2.5">
-                            <span class="font-medium text-gray-900">{{ order.vesselName }}</span>
-                            @if (order.vesselImo) {
-                              <span class="ml-1 text-xs text-gray-400">{{ order.vesselImo }}</span>
-                            }
-                          </td>
-                          <td class="px-5 py-2.5 text-gray-600">
-                            {{ order.placeName }}
-                            @if (order.placeCountry) {
-                              <span class="text-xs text-gray-400 ml-1">{{ order.placeCountry }}</span>
-                            }
-                          </td>
-                          <td class="px-5 py-2.5">
-                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                              [class]="statusBadge(order.status)">
-                              {{ order.status }}
-                            </span>
-                          </td>
-                          <td class="px-5 py-2.5 text-gray-500">{{ order.createdAt | date:'mediumDate' }}</td>
+
+              <!-- Own orders mode -->
+              @if (groupOrdersMode() === 'own') {
+                @if (ordersLoading()) {
+                  <div class="flex items-center justify-center py-8">
+                    <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                  </div>
+                } @else if (companyOrders().length) {
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                      <thead>
+                        <tr class="border-b border-gray-100 bg-gray-50/60">
+                          <th class="px-5 py-2 text-left font-medium text-gray-500">Vessel</th>
+                          <th class="px-5 py-2 text-left font-medium text-gray-500">Place</th>
+                          <th class="px-5 py-2 text-left font-medium text-gray-500">Status</th>
+                          <th class="px-5 py-2 text-left font-medium text-gray-500">Created</th>
                         </tr>
-                      }
-                    </tbody>
-                  </table>
-                </div>
-              } @else {
-                <div class="px-5 py-6 text-center text-sm text-gray-400">No orders found for this company</div>
+                      </thead>
+                      <tbody class="divide-y divide-gray-50">
+                        @for (order of companyOrders(); track order.id) {
+                          <tr class="hover:bg-gray-50/50 cursor-pointer transition-colors" (click)="goToOrder(order.id, order.status)">
+                            <td class="px-5 py-2.5">
+                              <span class="font-medium text-gray-900">{{ order.vesselName }}</span>
+                              @if (order.vesselImo) {
+                                <span class="ml-1 text-xs text-gray-400">{{ order.vesselImo }}</span>
+                              }
+                            </td>
+                            <td class="px-5 py-2.5 text-gray-600">
+                              {{ order.placeName }}
+                              @if (order.placeCountry) {
+                                <span class="text-xs text-gray-400 ml-1">{{ order.placeCountry }}</span>
+                              }
+                            </td>
+                            <td class="px-5 py-2.5">
+                              <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+                                [class]="statusBadge(order.status)">
+                                {{ order.status }}
+                              </span>
+                            </td>
+                            <td class="px-5 py-2.5 text-gray-500">{{ order.createdAt | date:'mediumDate' }}</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                } @else {
+                  <div class="px-5 py-6 text-center text-sm text-gray-400">No orders found for this company</div>
+                }
+              }
+
+              <!-- Group orders mode -->
+              @if (groupOrdersMode() === 'group') {
+                @if (groupOrdersLoading()) {
+                  <div class="flex items-center justify-center py-8">
+                    <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                  </div>
+                } @else if (groupOrders().length) {
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                      <thead>
+                        <tr class="border-b border-gray-100 bg-gray-50/60">
+                          <th class="px-5 py-2 text-left font-medium text-gray-500">Client</th>
+                          <th class="px-5 py-2 text-left font-medium text-gray-500">Vessel</th>
+                          <th class="px-5 py-2 text-left font-medium text-gray-500">Place</th>
+                          <th class="px-5 py-2 text-left font-medium text-gray-500">Status</th>
+                          <th class="px-5 py-2 text-left font-medium text-gray-500">Created</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-gray-50">
+                        @for (order of groupOrders(); track order.id) {
+                          <tr class="hover:bg-gray-50/50 cursor-pointer transition-colors" (click)="goToOrder(order.id, order.status)">
+                            <td class="px-5 py-2.5">
+                              <span class="text-gray-700">{{ order.clientName || '—' }}</span>
+                            </td>
+                            <td class="px-5 py-2.5">
+                              <span class="font-medium text-gray-900">{{ order.vesselName }}</span>
+                              @if (order.vesselImo) {
+                                <span class="ml-1 text-xs text-gray-400">{{ order.vesselImo }}</span>
+                              }
+                            </td>
+                            <td class="px-5 py-2.5 text-gray-600">
+                              {{ order.placeName }}
+                              @if (order.placeCountry) {
+                                <span class="text-xs text-gray-400 ml-1">{{ order.placeCountry }}</span>
+                              }
+                            </td>
+                            <td class="px-5 py-2.5">
+                              <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+                                [class]="statusBadge(order.status)">
+                                {{ order.status }}
+                              </span>
+                            </td>
+                            <td class="px-5 py-2.5 text-gray-500">{{ order.createdAt | date:'mediumDate' }}</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                } @else {
+                  <div class="px-5 py-6 text-center text-sm text-gray-400">No group orders found</div>
+                }
               }
             </div>
 
@@ -1606,7 +1864,23 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
             <!-- Fleet (Seasearcher + Manual) -->
             <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-[17] min-[900px]:col-span-2">
               <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
-                <h2 class="text-sm font-semibold text-gray-700">Fleet</h2>
+                <div class="flex items-center gap-2">
+                  <h2 class="text-sm font-semibold text-gray-700">Fleet</h2>
+                  @if (isParent()) {
+                    <div class="flex gap-1">
+                      <button
+                        (click)="toggleFleetMode()"
+                        class="rounded-md px-2 py-0.5 text-[10px] font-medium transition-colors"
+                        [class]="groupFleetMode() === 'own' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
+                      >Own</button>
+                      <button
+                        (click)="toggleFleetMode()"
+                        class="rounded-md px-2 py-0.5 text-[10px] font-medium transition-colors"
+                        [class]="groupFleetMode() === 'group' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
+                      >Group</button>
+                    </div>
+                  }
+                </div>
                 <div class="flex items-center gap-2">
                   @if (fleet()) {
                     <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
@@ -1620,6 +1894,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 </div>
               </div>
 
+              @if (groupFleetMode() === 'own') {
               @if (showAddVessel()) {
                 <div class="border-b border-gray-100 px-5 py-4 bg-gray-50/50">
                   <div class="space-y-2">
@@ -1870,6 +2145,53 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 </div>
               } @else {
                 <div class="px-5 py-6 text-center text-sm text-gray-400">No vessels added yet</div>
+              }
+              }
+
+              @if (groupFleetMode() === 'group') {
+                @if (groupVesselsLoading()) {
+                  <div class="flex items-center justify-center py-8">
+                    <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                  </div>
+                } @else if (groupVessels().length) {
+                  <div class="overflow-auto max-h-[500px]">
+                    <table class="w-full text-sm">
+                      <thead class="sticky top-0 z-10">
+                        <tr class="border-b border-gray-100 bg-gray-50">
+                          <th class="px-5 py-2 text-left font-medium text-gray-500">Client</th>
+                          <th class="px-5 py-2 text-left font-medium text-gray-500">Vessel</th>
+                          <th class="px-5 py-2 text-left font-medium text-gray-500">Role</th>
+                          <th class="px-5 py-2 text-left font-medium text-gray-500">Source</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-gray-50">
+                        @for (v of groupVessels(); track v.id) {
+                          <tr class="hover:bg-gray-50/50 transition-colors cursor-pointer" [routerLink]="['/vessels', v.vesselId]">
+                            <td class="px-5 py-2.5 text-gray-700">{{ v.companyName }}</td>
+                            <td class="px-5 py-2.5">
+                              <span class="font-medium text-gray-900">{{ v.vesselName }}</span>
+                              @if (v.vesselImo) {
+                                <span class="ml-1 text-xs text-gray-400">{{ v.vesselImo }}</span>
+                              }
+                            </td>
+                            <td class="px-5 py-2.5 text-gray-600 capitalize">{{ v.role }}</td>
+                            <td class="px-5 py-2.5">
+                              <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
+                                [class]="v.source === 'manual' ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600'">
+                                {{ v.source || 'linked' }}
+                              </span>
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                } @else {
+                  <div class="px-5 py-6 text-center text-sm text-gray-400">No vessels in group</div>
+                }
               }
             </div>
           </div>
@@ -2544,6 +2866,26 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly editingOfficeId = signal<string | null>(null);
   readonly savingOffice = signal(false);
 
+  // Parent / Child hierarchy
+  readonly parentCompany = signal<CompanyParentSummaryDto | null>(null);
+  readonly childCompanies = signal<CompanyChildSummaryDto[]>([]);
+  readonly groupAggregate = signal<CompanyGroupAggregateDto | null>(null);
+  readonly childrenLoading = signal(false);
+  readonly groupOrdersMode = signal<'own' | 'group'>('own');
+  readonly groupOrders = signal<(CompanyOrder & { clientName?: string })[]>([]);
+  readonly groupOrdersLoading = signal(false);
+  readonly linkChildSearch = signal('');
+  readonly linkChildResults = signal<{ id: string; name: string; country: string | null }[]>([]);
+  readonly linkingChildId = signal<string | null>(null);
+  readonly showLinkChildModal = signal(false);
+  readonly groupFleetMode = signal<'own' | 'group'>('own');
+  readonly groupVessels = signal<{ id: string; vesselId: string; vesselName: string; vesselImo: string | null; companyName: string; role: string; source: string | null }[]>([]);
+  readonly groupVesselsLoading = signal(false);
+  readonly unlinkingChildId = signal<string | null>(null);
+  private linkChildSearchTimeout: ReturnType<typeof setTimeout> | null = null;
+  readonly isParent = computed(() => this.childCompanies().length > 0);
+  readonly isChild = computed(() => !!this.parentCompany());
+
   // Fleet map
   readonly fleetMapEl = viewChild<ElementRef<HTMLDivElement>>('fleetMapEl');
   private fleetMap: L.Map | null = null;
@@ -2690,6 +3032,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
         this.loadSupplyPorts(id);
         this.loadCompanyEmails(id);
         this.loadCompanyOffices(id);
+        this.loadParentChildData(id);
         if (res.data.seasearcherId) {
           // Show syncing indicator — backend auto-syncs via WS presence
           this.syncing.set(true);
@@ -4293,6 +4636,179 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
       this.showToast('error', 'Failed to request override');
     } finally {
       this.overrideRequesting.set(false);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  PARENT / CHILD HIERARCHY
+  // ═══════════════════════════════════════════════════════════════════
+
+  private async loadParentChildData(companyId: string): Promise<void> {
+    this.childrenLoading.set(true);
+    try {
+      const [childRes, parentRes] = await Promise.all([
+        firstValueFrom(this.http.get<ApiResponse<CompanyChildSummaryDto[]>>(`${API}/companies/local/${companyId}/children`)),
+        firstValueFrom(this.http.get<ApiResponse<CompanyParentSummaryDto>>(`${API}/companies/local/${companyId}/parent`)),
+      ]);
+      this.childCompanies.set(childRes.success && childRes.data ? childRes.data : []);
+      this.parentCompany.set(parentRes.success && parentRes.data ? parentRes.data : null);
+      // If this is a parent with children, load aggregate
+      if (this.childCompanies().length > 0) {
+        this.loadGroupAggregate(companyId);
+      }
+    } catch {
+      // ignore
+    } finally {
+      this.childrenLoading.set(false);
+    }
+  }
+
+  private async loadGroupAggregate(companyId: string): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<CompanyGroupAggregateDto>>(`${API}/companies/local/${companyId}/group-aggregate`),
+      );
+      if (res.success && res.data) {
+        this.groupAggregate.set(res.data);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  async loadGroupOrders(): Promise<void> {
+    const c = this.company();
+    if (!c) return;
+    this.groupOrdersLoading.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<(CompanyOrder & { clientName?: string })[]>>(`${API}/companies/local/${c.id}/group-orders`),
+      );
+      if (res.success && res.data) {
+        this.groupOrders.set(res.data);
+      }
+    } catch {
+      // ignore
+    } finally {
+      this.groupOrdersLoading.set(false);
+    }
+  }
+
+  toggleOrdersMode(): void {
+    const next = this.groupOrdersMode() === 'own' ? 'group' : 'own';
+    this.groupOrdersMode.set(next);
+    if (next === 'group' && this.groupOrders().length === 0) {
+      this.loadGroupOrders();
+    }
+  }
+
+  async onLinkChildSearch(term: string): Promise<void> {
+    this.linkChildSearch.set(term);
+    if (this.linkChildSearchTimeout) clearTimeout(this.linkChildSearchTimeout);
+    if (term.length < 2) { this.linkChildResults.set([]); return; }
+    this.linkChildSearchTimeout = setTimeout(async () => {
+      try {
+        const res = await firstValueFrom(
+          this.http.get<ApiResponse<{ companies: { id: string; name: string; country: string | null; parentId: string | null }[] }>>(`${API}/companies/local`, { params: { search: term, limit: '10' } }),
+        );
+        if (res.success && res.data?.companies) {
+          const c = this.company();
+          // Filter out self, existing children, and companies that already have a parent or have children of their own
+          this.linkChildResults.set(
+            res.data.companies.filter(
+              (r) => r.id !== c?.id && !r.parentId && !this.childCompanies().some((ch) => ch.id === r.id),
+            ),
+          );
+        }
+      } catch { /* ignore */ }
+    }, 300);
+  }
+
+  async linkChild(childId: string): Promise<void> {
+    this.linkingChildId.set(childId);
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<any>>(`${API}/companies/local/${childId}/set-parent`, { parentId: this.company()!.id }),
+      );
+      if (res.success) {
+        this.showToast('success', 'Company linked as child');
+        this.showLinkChildModal.set(false);
+        this.linkChildSearch.set('');
+        this.linkChildResults.set([]);
+        await this.loadParentChildData(this.company()!.id);
+      } else {
+        this.showToast('error', res.message ?? 'Failed to link');
+      }
+    } catch (err: any) {
+      this.showToast('error', err?.error?.message ?? 'Failed to link');
+    } finally {
+      this.linkingChildId.set(null);
+    }
+  }
+
+  async unlinkChild(childId: string): Promise<void> {
+    this.unlinkingChildId.set(childId);
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<any>>(`${API}/companies/local/${childId}/remove-parent`, {}),
+      );
+      if (res.success) {
+        this.showToast('success', 'Company unlinked');
+        await this.loadParentChildData(this.company()!.id);
+      } else {
+        this.showToast('error', res.message ?? 'Failed to unlink');
+      }
+    } catch {
+      this.showToast('error', 'Failed to unlink');
+    } finally {
+      this.unlinkingChildId.set(null);
+    }
+  }
+
+  async removeOwnParent(): Promise<void> {
+    const c = this.company();
+    if (!c) return;
+    this.unlinkingChildId.set(c.id);
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<any>>(`${API}/companies/local/${c.id}/remove-parent`, {}),
+      );
+      if (res.success) {
+        this.showToast('success', 'Unlinked from parent');
+        this.parentCompany.set(null);
+      } else {
+        this.showToast('error', res.message ?? 'Failed to unlink');
+      }
+    } catch {
+      this.showToast('error', 'Failed to unlink');
+    } finally {
+      this.unlinkingChildId.set(null);
+    }
+  }
+
+  async loadGroupVessels(): Promise<void> {
+    const c = this.company();
+    if (!c) return;
+    this.groupVesselsLoading.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<any[]>>(`${API}/companies/local/${c.id}/group-vessels`),
+      );
+      if (res.success) {
+        this.groupVessels.set(res.data);
+      }
+    } catch {
+      this.showToast('error', 'Failed to load group vessels');
+    } finally {
+      this.groupVesselsLoading.set(false);
+    }
+  }
+
+  toggleFleetMode(): void {
+    const next = this.groupFleetMode() === 'own' ? 'group' : 'own';
+    this.groupFleetMode.set(next);
+    if (next === 'group' && this.groupVessels().length === 0) {
+      this.loadGroupVessels();
     }
   }
 }

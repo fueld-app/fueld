@@ -50,6 +50,14 @@ import {
   addCompanyOffice,
   updateCompanyOffice,
   deleteCompanyOffice,
+  getChildCompanies,
+  getParentCompany,
+  setParentCompany,
+  removeParentCompany,
+  getCompanyGroupAggregate,
+  getGroupOrdersForCompany,
+  getGroupVesselsForCompany,
+  getTopCreditGroups,
 } from './company.service';
 import { getSupplyPortsForCompany } from '../lloyds/lli.service';
 import { getUserCompanyAccess } from '../admin/settings.service';
@@ -872,5 +880,149 @@ export const companiesController = new Elysia({ prefix: '/companies' })
     {
       params: t.Object({ officeId: t.String() }),
       detail: { tags: ['Companies'], summary: 'Delete a company office' },
+    },
+  )
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  PARENT / CHILD HIERARCHY
+  // ═══════════════════════════════════════════════════════════════════
+
+  // ─── Get Children ──────────────────────────────────────────────────
+  .get(
+    '/local/:id/children',
+    async ({ params }) => {
+      try {
+        const children = await getChildCompanies(params.id);
+        return { success: true, data: children } satisfies ApiResponse<typeof children>;
+      } catch (err: any) {
+        return { success: false, data: [], message: err.message ?? 'Failed to load children' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: { tags: ['Companies'], summary: 'Get child companies for a parent' },
+    },
+  )
+
+  // ─── Get Parent ────────────────────────────────────────────────────
+  .get(
+    '/local/:id/parent',
+    async ({ params }) => {
+      try {
+        const parent = await getParentCompany(params.id);
+        return { success: true, data: parent } satisfies ApiResponse<typeof parent>;
+      } catch (err: any) {
+        return { success: false, data: null, message: err.message ?? 'Failed to load parent' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: { tags: ['Companies'], summary: 'Get parent company for a child' },
+    },
+  )
+
+  // ─── Aggregated group figures (credit, fleet, orders) ─────────────
+  .get(
+    '/local/:id/group-aggregate',
+    async ({ params }) => {
+      try {
+        const data = await getCompanyGroupAggregate(params.id);
+        return { success: true, data } satisfies ApiResponse<typeof data>;
+      } catch (err: any) {
+        return { success: false, data: null, message: err.message ?? 'Failed to aggregate' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: { tags: ['Companies'], summary: 'Get aggregated credit/fleet/order totals for a parent + children' },
+    },
+  )
+
+  // ─── Group orders (parent + children) ──────────────────────────────
+  .get(
+    '/local/:id/group-orders',
+    async ({ params }) => {
+      try {
+        const orders = await getGroupOrdersForCompany(params.id);
+        return { success: true, data: orders } satisfies ApiResponse<typeof orders>;
+      } catch (err: any) {
+        return { success: false, data: [], message: err.message ?? 'Failed to load group orders' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: { tags: ['Companies'], summary: 'Get orders for a parent + all its children' },
+    },
+  )
+
+  // ─── Group vessels (parent + children) ─────────────────────────────
+  .get(
+    '/local/:id/group-vessels',
+    async ({ params }) => {
+      try {
+        const vessels = await getGroupVesselsForCompany(params.id);
+        return { success: true, data: vessels } satisfies ApiResponse<typeof vessels>;
+      } catch (err: any) {
+        return { success: false, data: [], message: err.message ?? 'Failed to load group vessels' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: { tags: ['Companies'], summary: 'Get vessels for a parent + all its children' },
+    },
+  )
+
+  // ─── Link child to parent ─────────────────────────────────────────
+  .post(
+    '/local/:id/set-parent',
+    async ({ params, body }) => {
+      try {
+        const updated = await setParentCompany(params.id, body.parentId);
+        if (!updated) return { success: false, data: null, message: 'Company not found' };
+        return { success: true, data: updated } satisfies ApiResponse<typeof updated>;
+      } catch (err: any) {
+        return { success: false, data: null, message: err.message ?? 'Failed to set parent' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({ parentId: t.String() }),
+      detail: { tags: ['Companies'], summary: 'Set the parent company for a child (link)' },
+    },
+  )
+
+  // ─── Unlink child from parent ─────────────────────────────────────
+  .post(
+    '/local/:id/remove-parent',
+    async ({ params }) => {
+      try {
+        const updated = await removeParentCompany(params.id);
+        if (!updated) return { success: false, data: null, message: 'Company not found' };
+        return { success: true, data: updated } satisfies ApiResponse<typeof updated>;
+      } catch (err: any) {
+        return { success: false, data: null, message: err.message ?? 'Failed to remove parent' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: { tags: ['Companies'], summary: 'Remove the parent link from a child company (unlink)' },
+    },
+  )
+
+  // ─── Top credit groups (dashboard widget) ─────────────────────────
+  .get(
+    '/top-credit-groups',
+    async ({ query }) => {
+      try {
+        const limit = query?.limit ? Number(query.limit) : 10;
+        const groups = await getTopCreditGroups(limit);
+        return { success: true, data: groups } satisfies ApiResponse<typeof groups>;
+      } catch (err: any) {
+        return { success: false, data: [], message: err.message ?? 'Failed to load credit groups' };
+      }
+    },
+    {
+      query: t.Optional(t.Object({ limit: t.Optional(t.String()) })),
+      detail: { tags: ['Companies'], summary: 'Top parent company groups by credit exposure' },
     },
   );

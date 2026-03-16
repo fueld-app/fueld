@@ -231,6 +231,36 @@ export interface CounterpartyDto {
   companyRegistrationNumber?: string | null;
   fraudPreventionText?: string | null;
   contactsCount?: number | null;
+  /** Parent/child hierarchy — single-level only */
+  parentId?: string | null;
+  parentName?: string | null;
+}
+
+/** Lightweight child summary returned alongside a parent company detail. */
+export interface CompanyChildSummaryDto {
+  id: string;
+  name: string;
+  country: string | null;
+  creditLimit: string;
+  creditUsed: string;
+  fleetSize: number | null;
+  isSanctioned: boolean;
+}
+
+/** Lightweight parent reference returned alongside a child company detail. */
+export interface CompanyParentSummaryDto {
+  id: string;
+  name: string;
+  country: string | null;
+}
+
+/** Aggregated figures across the parent and all its children. */
+export interface CompanyGroupAggregateDto {
+  totalCreditLimit: string;
+  totalCreditUsed: string;
+  totalFleetSize: number;
+  totalOrders: number;
+  childCount: number;
 }
 
 export interface CreateCounterpartyDto {
