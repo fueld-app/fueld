@@ -150,6 +150,7 @@ interface InquiryQuoteMatrixRow {
   orderItemId: string;
   productType: string;
   quantity: string;
+  quantityMin: string | null;
   unit: string;
   description: string | null;
   cells: InquiryQuoteMatrixCell[];
@@ -712,7 +713,7 @@ interface InquiryReplyRecommendation {
                   <tr>
                     <td class="sticky left-0 z-10 border-b border-slate-100 bg-white px-4 py-3 align-top">
                       <div class="font-semibold text-slate-900">{{ matrixRow.productType }}</div>
-                      <div class="mt-1 text-xs text-slate-500">{{ matrixRow.quantity }} {{ matrixRow.unit }}@if (matrixRow.description) { · {{ matrixRow.description }} }</div>
+                      <div class="mt-1 text-xs text-slate-500">{{ formatQty(matrixRow.quantity, matrixRow.quantityMin) }} {{ matrixRow.unit }}@if (matrixRow.description) { · {{ matrixRow.description }} }</div>
                     </td>
                     @for (cell of matrixRow.cells; track cell.supplierInquiryId) {
                       <td class="border-b border-slate-100 px-4 py-3 align-top"
@@ -833,7 +834,7 @@ interface InquiryReplyRecommendation {
                     @for (item of reply.items; track item.orderItemId) {
                         <div class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm">
                         <div class="font-medium text-slate-900">{{ item.productType }}</div>
-                        <div class="mt-1 text-xs text-slate-500">{{ item.quantity }} {{ item.unit }}@if (item.description) { · {{ item.description }} }</div>
+                        <div class="mt-1 text-xs text-slate-500">{{ formatQty(item.quantity) }} {{ item.unit }}@if (item.description) { · {{ item.description }} }</div>
                         <div class="mt-2 text-sm font-semibold text-slate-900">{{ item.price || '—' }}@if (item.price) { {{ item.currency }} }</div>
                         @if (item.note) {
                           <div class="mt-1 text-xs text-slate-500">{{ item.note }}</div>
@@ -881,7 +882,7 @@ interface InquiryReplyRecommendation {
                         @for (item of reply.items; track item.orderItemId) {
                           <div class="rounded-xl border border-slate-200 bg-white p-3">
                             <div class="text-sm font-semibold text-slate-900">{{ item.productType }}</div>
-                            <div class="mt-1 text-xs text-slate-500">{{ item.quantity }} {{ item.unit }}@if (item.description) { · {{ item.description }} }</div>
+                            <div class="mt-1 text-xs text-slate-500">{{ formatQty(item.quantity) }} {{ item.unit }}@if (item.description) { · {{ item.description }} }</div>
                             <label class="mt-3 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Price ({{ item.currency }})</label>
                             <input
                               type="number"
@@ -1849,6 +1850,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
         orderItemId,
         productType: fallbackItem?.productType ?? localItem?.productType ?? '',
         quantity: fallbackItem?.quantity ?? String(localItem?.quantity ?? ''),
+        quantityMin: localItem?.quantityMin != null ? String(localItem.quantityMin) : null,
         unit: fallbackItem?.unit ?? localItem?.unit ?? '',
         description: fallbackItem?.description ?? localItem?.description ?? null,
         cells: replies.map((reply) => {
@@ -3021,6 +3023,18 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
       return `${Number((hours / 24).toFixed(1))} days`;
     }
     return `${Number(hours.toFixed(1))} hours`;
+  }
+
+  /** Strip trailing zeros from a numeric string, show min-max spread if applicable. */
+  formatQty(qty: string | null, qtyMin?: string | null): string {
+    const fmt = (v: string) => {
+      const n = parseFloat(v);
+      return isNaN(n) ? v : n.toString();
+    };
+    if (!qty) return '';
+    const max = fmt(qty);
+    const min = qtyMin ? fmt(qtyMin) : '';
+    return min && min !== max ? `${min}-${max}` : max;
   }
 
   supplierPerformanceSummary(performance: InquirySupplierPerformance): string {

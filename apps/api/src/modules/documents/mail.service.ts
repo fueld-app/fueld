@@ -382,7 +382,7 @@ export function buildInquiryEmailHtml(params: {
   supplierTerms?: string | null;
   includeSupplierQuoteLink?: boolean;
   responseDeadlineFormatted?: string | null;
-  items: Array<{ quantity: string; unit: string; productType: string; description?: string | null }>;
+  items: Array<{ quantity: string; quantityMin?: string | null; unit: string; productType: string; description?: string | null }>;
 }): string {
   const companyName = params.companyName?.trim() || 'FUELD';
   const headerBg = params.brandColor?.trim() || '#ffffff';
@@ -410,16 +410,21 @@ export function buildInquiryEmailHtml(params: {
   };
 
   const itemsHtml = params.items
-    .map((i) => `
+    .map((i) => {
+      const max = formatInquiryQuantity(i.quantity);
+      const min = i.quantityMin ? formatInquiryQuantity(i.quantityMin) : '';
+      const qtyLabel = min && min !== max ? `${min}-${max}` : max;
+      return `
       <tr>
         <td style="padding: 14px 16px; border-top: 1px solid #e5e7eb; vertical-align: top;">
           <div style="font-size: 14px; line-height: 1.6; color: #111827;">
-            <span style="font-weight: 700; color: #111827;">${formatInquiryQuantity(i.quantity)} ${i.unit}</span>
+            <span style="font-weight: 700; color: #111827;">${qtyLabel} ${i.unit}</span>
             <span style="font-weight: 700; color: #111827;"> ${i.productType}</span>${i.description ? `<span style="color: #4b5563;"> - ${i.description}</span>` : ''}
           </div>
         </td>
       </tr>
-    `)
+    `;
+    })
     .join('');
 
   return `

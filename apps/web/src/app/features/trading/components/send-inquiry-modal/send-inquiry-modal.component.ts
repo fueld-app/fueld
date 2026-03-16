@@ -644,7 +644,7 @@ export class SendInquiryModalComponent {
   readonly vesselName = input<string>('');
   readonly vesselImo = input<string | null>(null);
   readonly eta = input<string | null>(null);
-  readonly items = input<{ productType: string; quantity: number; unit: string }[]>([]);
+  readonly items = input<{ productType: string; quantity: number; quantityMin?: number | null; unit: string }[]>([]);
 
   readonly sendInquiry = output<SendInquiryPayload>();
   readonly sendWhatsAppInquiry = output<SendInquiryWhatsAppPayload>();
@@ -919,7 +919,11 @@ export class SendInquiryModalComponent {
     const port = this.portName();
     if (port) lines.push(port);
     for (const item of this.items()) {
-      lines.push(`${item.productType} ${item.quantity} ${item.unit}`);
+      const fmtQty = (v: number) => Number.isInteger(v) ? v.toString() : v.toString();
+      const min = item.quantityMin != null ? fmtQty(item.quantityMin) : '';
+      const max = fmtQty(item.quantity);
+      const qty = min && min !== max ? `${min} - ${max}` : max;
+      lines.push(`${item.productType} ${qty} ${item.unit}`);
     }
     const eta = this.eta();
     if (eta) {

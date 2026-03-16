@@ -1008,6 +1008,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             responseDeadlineFormatted: formatDeadlineHumanDuration(getDefaultInquiryResponseDeadline()),
             items: order.items.map((i: any) => ({
               quantity: i.quantity,
+              quantityMin: i.quantityMin,
               unit: i.unit,
               productType: i.productType,
               description: i.description,
@@ -1031,6 +1032,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           responseDeadlineFormatted: formatDeadlineHumanDuration(getDefaultInquiryResponseDeadline()),
           items: order.items.map((i: any) => ({
             quantity: i.quantity,
+            quantityMin: i.quantityMin,
             unit: i.unit,
             productType: i.productType,
             description: i.description,
@@ -1270,7 +1272,13 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             const vesselImo = order.vessel?.imo ? ` (IMO: ${order.vessel.imo})` : '';
             const portName = order.place?.name ?? 'Unknown Port';
             const supplierList = successfulSuppliers.map(s => s.supplierName).join(', ');
-            const productLines = order.items.map((i: any) => `  • ${i.quantity} ${i.unit} ${i.productType}${i.description ? ' – ' + i.description : ''}`).join('\n');
+            const fmtQty = (v: string | null | undefined) => v ? parseFloat(v).toString() : '';
+            const productLines = order.items.map((i: any) => {
+              const min = i.quantityMin ? fmtQty(i.quantityMin) : '';
+              const max = fmtQty(i.quantity);
+              const qty = min && min !== max ? `${min} - ${max}` : max;
+              return `  • ${qty} ${i.unit} ${i.productType}${i.description ? ' – ' + i.description : ''}`;
+            }).join('\n');
 
             const waText = [
               `📋 *Inquiry Sent*`,

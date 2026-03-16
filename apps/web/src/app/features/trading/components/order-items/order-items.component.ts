@@ -167,9 +167,9 @@ export interface OrderItemsEconomics {
                 @if (readonly()) {
                   <span class="block text-right tabular-nums">
                     @if (row.quantityMin != null && row.quantityMin !== row.quantity) {
-                      {{ row.quantityMin | number:'1.0-0' }}–{{ row.quantity | number:'1.0-0' }}
+                      {{ row.quantityMin | number:'1.0-3' }}–{{ row.quantity | number:'1.0-3' }}
                     } @else {
-                      {{ row.quantity | number:'1.3-3' }}
+                      {{ row.quantity | number:'1.0-3' }}
                     }
                     {{ row.unit }}
                   </span>
@@ -636,9 +636,9 @@ export interface OrderItemsEconomics {
               @if (readonly()) {
                 <span class="text-sm tabular-nums">
                   @if (row.quantityMin != null && row.quantityMin !== row.quantity) {
-                    {{ row.quantityMin | number:'1.0-0' }}–{{ row.quantity | number:'1.0-0' }}
+                    {{ row.quantityMin | number:'1.0-3' }}–{{ row.quantity | number:'1.0-3' }}
                   } @else {
-                    {{ row.quantity | number:'1.3-3' }}
+                    {{ row.quantity | number:'1.0-3' }}
                   }
                   {{ row.unit }}
                 </span>
