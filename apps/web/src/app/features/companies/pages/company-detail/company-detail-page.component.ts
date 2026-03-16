@@ -570,19 +570,19 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 </div>
               </div>
               <div class="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-4 text-sm">
-                @if (syncConflicts().length > 0) {
+                @if (activeConflicts().length > 0) {
                   <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 mb-2">
                     <div class="flex items-center justify-between mb-2">
                       <div class="flex items-center gap-2">
                         <svg class="h-4 w-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                           <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
                         </svg>
-                        <span class="text-xs font-semibold text-amber-800">SeaSearcher has different values for {{ syncConflicts().length }} field{{ syncConflicts().length > 1 ? 's' : '' }}</span>
+                        <span class="text-xs font-semibold text-amber-800">SeaSearcher has different values for {{ activeConflicts().length }} field{{ activeConflicts().length > 1 ? 's' : '' }}</span>
                       </div>
                       <button (click)="dismissConflicts()" class="text-xs text-amber-600 hover:text-amber-800 font-medium">Dismiss all</button>
                     </div>
                     <div class="space-y-2">
-                      @for (conflict of syncConflicts(); track conflict.field) {
+                      @for (conflict of activeConflicts(); track conflict.field) {
                         <div class="flex items-start justify-between gap-2 rounded-md bg-white/70 px-2.5 py-2 text-xs">
                           <div class="min-w-0 flex-1">
                             <span class="font-semibold text-gray-700">{{ FIELD_LABELS[conflict.field] || conflict.field }}</span>
@@ -599,13 +599,39 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                               class="rounded bg-amber-100 px-2 py-1 text-[11px] font-medium text-amber-800 hover:bg-amber-200 transition-colors"
                             >Accept</button>
                             <button
-                              (click)="dismissConflict(conflict.field)"
+                              (click)="dismissConflict(conflict.field, conflict.seasearcherValue)"
                               class="rounded bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-600 hover:bg-gray-200 transition-colors"
                             >Keep mine</button>
                           </div>
                         </div>
                       }
                     </div>
+                  </div>
+                }
+                @if (dismissedConflictsCount() > 0) {
+                  <div class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 mb-2">
+                    <button (click)="showDismissedConflicts.set(!showDismissedConflicts())" class="flex items-center justify-between w-full text-xs text-gray-500 hover:text-gray-700">
+                      <span>{{ dismissedConflictsCount() }} dismissed SeaSearcher difference{{ dismissedConflictsCount() > 1 ? 's' : '' }}</span>
+                      <svg class="h-3.5 w-3.5 transition-transform" [class.rotate-180]="showDismissedConflicts()" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                      </svg>
+                    </button>
+                    @if (showDismissedConflicts()) {
+                      <div class="space-y-1.5 mt-2">
+                        @for (conflict of dismissedConflictsList(); track conflict.field) {
+                          <div class="flex items-center justify-between gap-2 rounded-md bg-white/70 px-2.5 py-1.5 text-xs text-gray-500">
+                            <div class="min-w-0 flex-1">
+                              <span class="font-medium text-gray-600">{{ FIELD_LABELS[conflict.field] || conflict.field }}</span>
+                              — SS: <span class="text-gray-500">{{ conflict.seasearcherValue || '(empty)' }}</span>
+                            </div>
+                            <button
+                              (click)="acceptSeasearcherValue(conflict.field)"
+                              class="rounded bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-500 hover:bg-gray-200 transition-colors"
+                            >Accept</button>
+                          </div>
+                        }
+                      </div>
+                    }
                   </div>
                 }
                 @if (companyInfoTab() === 'info') {
@@ -2788,7 +2814,11 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly editWebsite = signal('');
 
   // Sync conflict state
-  readonly syncConflicts = signal<{ field: string; localValue: any; seasearcherValue: any }[]>([]);
+  readonly syncConflicts = signal<{ field: string; localValue: any; seasearcherValue: any; dismissed: boolean }[]>([]);
+  readonly showDismissedConflicts = signal(false);
+  readonly activeConflicts = computed(() => this.syncConflicts().filter(c => !c.dismissed));
+  readonly dismissedConflictsCount = computed(() => this.syncConflicts().filter(c => c.dismissed).length);
+  readonly dismissedConflictsList = computed(() => this.syncConflicts().filter(c => c.dismissed));
   // Country typeahead
   readonly countrySearchQuery = signal('');
   readonly showCountryDropdown = signal(false);
@@ -2959,7 +2989,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     });
 
     // Listen for sync conflicts (fields user manually overrode that differ on SeaSearcher)
-    this.conflictsSub = this.wsService.on<{ field: string; localValue: any; seasearcherValue: any }[]>('company-sync-conflicts').subscribe((conflicts) => {
+    this.conflictsSub = this.wsService.on<{ field: string; localValue: any; seasearcherValue: any; dismissed: boolean }[]>('company-sync-conflicts').subscribe((conflicts) => {
       if (conflicts?.length) {
         this.syncConflicts.set(conflicts);
       }
@@ -3883,7 +3913,10 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   };
 
   dismissConflicts(): void {
-    this.syncConflicts.set([]);
+    const active = this.activeConflicts();
+    for (const conflict of active) {
+      this.dismissConflict(conflict.field, conflict.seasearcherValue);
+    }
   }
 
   async acceptSeasearcherValue(field: string): Promise<void> {
@@ -3903,8 +3936,20 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  dismissConflict(field: string): void {
-    this.syncConflicts.update((conflicts) => conflicts.filter((cf) => cf.field !== field));
+  async dismissConflict(field: string, seasearcherValue: any): Promise<void> {
+    const c = this.company();
+    if (!c) return;
+    // Optimistically mark as dismissed in the UI
+    this.syncConflicts.update((conflicts) =>
+      conflicts.map((cf) => cf.field === field ? { ...cf, dismissed: true } : cf),
+    );
+    try {
+      await firstValueFrom(
+        this.http.post<ApiResponse<any>>(`${API}/companies/local/${c.id}/keep-mine`, { field, seasearcherValue }),
+      );
+    } catch (err) {
+      console.error('Failed to persist keep-mine:', err);
+    }
   }
 
   // ─── Helpers ───────────────────────────────────────────────────────

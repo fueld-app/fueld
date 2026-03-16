@@ -360,6 +360,10 @@ export const counterparties = pgTable('counterparties', {
   // that should NOT be overwritten by SeaSearcher sync
   manualOverrides: jsonb('manual_overrides').$type<string[]>().default([]),
 
+  // Dismissed SeaSearcher conflicts — maps field name → the SS value that was dismissed
+  // so we can show them as minimised rather than prominent on next sync
+  dismissedConflicts: jsonb('dismissed_conflicts').$type<Record<string, string | number | null>>().default({}),
+
   // ── Responsible user ───────────────────────────────────────────────
   responsibleUserId: uuid('responsible_user_id').references(() => users.id),
 

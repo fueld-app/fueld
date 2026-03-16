@@ -416,6 +416,7 @@ export interface SyncConflict {
   field: string;
   localValue: string | number | null;
   seasearcherValue: string | number | null;
+  dismissed: boolean;
 }
 
 export interface SyncResult {
@@ -466,6 +467,7 @@ export async function syncCompanyFromSeasearcher(companyId: string): Promise<Syn
   };
 
   const overrides = new Set<string>(local.manualOverrides ?? []);
+  const dismissed: Record<string, any> = (local.dismissedConflicts as Record<string, any>) ?? {};
   const conflicts: SyncConflict[] = [];
   const setFields: Record<string, any> = {
     isSanctioned: detail.isSanctioned ?? false,
@@ -482,10 +484,14 @@ export async function syncCompanyFromSeasearcher(companyId: string): Promise<Syn
       const ssStr = JSON.stringify(ssValue);
       const localStr = JSON.stringify(localVal);
       if (ssStr !== localStr && ssValue != null) {
+        // Check if this SS value was previously dismissed
+        const dismissedStr = JSON.stringify(dismissed[field] ?? null);
+        const isDismissed = dismissedStr === ssStr;
         conflicts.push({
           field,
           localValue: localVal,
           seasearcherValue: ssValue,
+          dismissed: isDismissed,
         });
       }
       // Don't overwrite — keep user's manual value
@@ -557,8 +563,13 @@ export async function acceptSeasearcherValue(companyId: string, field: string) {
     case 'website': value = detail.headOffice?.webAddress ?? null; break;
   }
 
+  // Also clear any dismissed conflict for this field
+  const dismissed: Record<string, any> = { ...((local.dismissedConflicts as Record<string, any>) ?? {}) };
+  delete dismissed[field];
+
   const setFields: Record<string, any> = {
     manualOverrides: overrides,
+    dismissedConflicts: dismissed,
     updatedAt: new Date(),
   };
   setFields[field] = value;
@@ -566,6 +577,25 @@ export async function acceptSeasearcherValue(companyId: string, field: string) {
   const [updated] = await db
     .update(counterparties)
     .set(setFields)
+    .where(eq(counterparties.id, companyId))
+    .returning();
+  return updated ?? null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  KEEP MINE (dismiss a conflict by storing the SS value we're ignoring)
+// ═══════════════════════════════════════════════════════════════════════
+
+export async function keepMineValue(companyId: string, field: string, seasearcherValue: string | number | null) {
+  const local = await getCompanyById(companyId);
+  if (!local) return null;
+
+  const dismissed: Record<string, any> = { ...((local.dismissedConflicts as Record<string, any>) ?? {}) };
+  dismissed[field] = seasearcherValue;
+
+  const [updated] = await db
+    .update(counterparties)
+    .set({ dismissedConflicts: dismissed, updatedAt: new Date() })
     .where(eq(counterparties.id, companyId))
     .returning();
   return updated ?? null;

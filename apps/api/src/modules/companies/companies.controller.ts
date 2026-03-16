@@ -29,6 +29,7 @@ import {
   importCompanyByName,
   syncCompanyFromSeasearcher,
   acceptSeasearcherValue,
+  keepMineValue,
   deleteCompany,
   searchCompaniesTypeahead,
   getCompanyEnrichment,
@@ -504,6 +505,33 @@ export const companiesController = new Elysia({ prefix: '/companies' })
       detail: {
         tags: ['Companies'],
         summary: 'Accept SeaSearcher value for a conflicting field, removing the manual override',
+      },
+    },
+  )
+
+  // ─── Keep Mine (dismiss a SeaSearcher conflict) ───────────────────
+  .post(
+    '/local/:id/keep-mine',
+    async ({ params, body }) => {
+      try {
+        const updated = await keepMineValue(params.id, body.field, body.seasearcherValue);
+        if (!updated) {
+          return { success: false, data: null, message: 'Company not found' };
+        }
+        return { success: true, data: updated } satisfies ApiResponse<typeof updated>;
+      } catch (err: any) {
+        return { success: false, data: null, message: err?.message ?? 'Failed to keep mine' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({
+        field: t.String(),
+        seasearcherValue: t.Union([t.String(), t.Number(), t.Null()]),
+      }),
+      detail: {
+        tags: ['Companies'],
+        summary: 'Dismiss a SeaSearcher conflict by persisting the SS value we chose to ignore',
       },
     },
   )
