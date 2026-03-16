@@ -52,8 +52,8 @@ export const dashboardController = new Elysia({ prefix: '/dashboard' })
   .get(
     '/pipeline',
     async ({ auth, query }) => {
-      const params = query as { from?: string; to?: string };
-      const pipeline = await getPipelineSummary(auth.tenantId, params.from, params.to);
+      const params = query as { from?: string; to?: string; userId?: string };
+      const pipeline = await getPipelineSummary(auth.tenantId, params.from, params.to, params.userId);
       return { stages: pipeline };
     },
     {
@@ -70,8 +70,8 @@ export const dashboardController = new Elysia({ prefix: '/dashboard' })
   .get(
     '/loss-analysis',
     async ({ auth, query }) => {
-      const params = query as { from?: string; to?: string };
-      return getLossAnalysis(auth.tenantId, params.from, params.to);
+      const params = query as { from?: string; to?: string; userId?: string };
+      return getLossAnalysis(auth.tenantId, params.from, params.to, params.userId);
     },
     {
       detail: {
@@ -87,8 +87,8 @@ export const dashboardController = new Elysia({ prefix: '/dashboard' })
   .get(
     '/conversion',
     async ({ auth, query }) => {
-      const params = query as { from?: string; to?: string };
-      return getConversionMetrics(auth.tenantId, params.from, params.to);
+      const params = query as { from?: string; to?: string; userId?: string };
+      return getConversionMetrics(auth.tenantId, params.from, params.to, params.userId);
     },
     {
       detail: {

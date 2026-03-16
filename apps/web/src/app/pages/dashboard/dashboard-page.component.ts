@@ -41,8 +41,30 @@ import { API } from '@app/core/config/api';
           <p class="mt-1 text-sm text-gray-500">Overview of your bunker trading operations.</p>
         </div>
 
-        <!-- Date Range Selector -->
+        <!-- Date Range + Team Toggle -->
         <div class="flex items-center gap-3 flex-shrink-0">
+          @if (auth.isAdmin()) {
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-medium text-gray-600">My Orders</span>
+              <button
+                (click)="toggleTeamView()"
+                [class.bg-brand-600]="teamView()"
+                [class.bg-gray-200]="!teamView()"
+                class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
+                role="switch"
+                [attr.aria-checked]="teamView()"
+              >
+                <span class="sr-only">Toggle team view</span>
+                <span
+                  aria-hidden="true"
+                  [class.translate-x-5]="teamView()"
+                  [class.translate-x-0]="!teamView()"
+                  class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                ></span>
+              </button>
+              <span class="text-sm font-medium text-gray-600">Team View</span>
+            </div>
+          }
           <div class="relative" #dateDropdown>
             <button
               (click)="dateDropdownOpen.set(!dateDropdownOpen())"
@@ -106,30 +128,6 @@ import { API } from '@app/core/config/api';
           </div>
         </div>
       </div>
-
-      <!-- Team View Toggle -->
-      @if (auth.isAdmin()) {
-        <div class="mt-4 flex items-center justify-end gap-3">
-          <span class="text-sm font-medium text-gray-600">My Orders</span>
-          <button
-            (click)="toggleTeamView()"
-            [class.bg-brand-600]="teamView()"
-            [class.bg-gray-200]="!teamView()"
-            class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
-            role="switch"
-            [attr.aria-checked]="teamView()"
-          >
-            <span class="sr-only">Enable notifications</span>
-            <span
-              aria-hidden="true"
-              [class.translate-x-5]="teamView()"
-              [class.translate-x-0]="!teamView()"
-              class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
-            ></span>
-          </button>
-          <span class="text-sm font-medium text-gray-600">Team View</span>
-        </div>
-      }
 
       <!-- KPI Cards -->
       <div class="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -371,7 +369,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
 
   toggleTeamView(): void {
     this.teamView.update((current) => !current);
-    this.applyTeamStats();
+    void this.loadDashboardData();
   }
 
   selectDatePreset(key: string): void {
@@ -410,6 +408,12 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
       const range = this.dateRange();
       params.set('from', this.formatDateForQuery(range.from));
       params.set('to', this.formatDateForQuery(range.to));
+    }
+    // "My Orders" mode: filter server-side by current user
+    const isMyOrders = this.auth.isAdmin() ? !this.teamView() : true;
+    if (isMyOrders) {
+      const uid = this.auth.user()?.id;
+      if (uid) params.set('userId', uid);
     }
     return params.toString();
   }

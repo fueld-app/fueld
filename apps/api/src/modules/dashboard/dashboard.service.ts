@@ -257,10 +257,12 @@ export async function getPipelineSummary(
   tenantId: string,
   from?: string,
   to?: string,
+  userId?: string,
 ): Promise<PipelineSummary[]> {
   const conditions = [eq(orders.tenantId, tenantId)];
   if (from) conditions.push(gte(orders.createdAt, new Date(`${from}T00:00:00`)));
   if (to) conditions.push(lte(orders.createdAt, new Date(`${to}T23:59:59`)));
+  if (userId) conditions.push(eq(orders.salesRepId, userId));
 
   const results = await db
     .select({
@@ -295,6 +297,7 @@ export async function getLossAnalysis(
   tenantId: string,
   from?: string,
   to?: string,
+  userId?: string,
 ): Promise<{ reasons: LossReason[]; totalCancelled: number }> {
   const conditions = [
     eq(orders.tenantId, tenantId),
@@ -303,6 +306,7 @@ export async function getLossAnalysis(
   ];
   if (from) conditions.push(gte(orders.createdAt, new Date(`${from}T00:00:00`)));
   if (to) conditions.push(lte(orders.createdAt, new Date(`${to}T23:59:59`)));
+  if (userId) conditions.push(eq(orders.salesRepId, userId));
 
   const results = await db
     .select({
@@ -346,10 +350,12 @@ export async function getConversionMetrics(
   tenantId: string,
   from?: string,
   to?: string,
+  userId?: string,
 ): Promise<ConversionMetrics> {
   const conditions = [eq(orders.tenantId, tenantId)];
   if (from) conditions.push(gte(orders.createdAt, new Date(`${from}T00:00:00`)));
   if (to) conditions.push(lte(orders.createdAt, new Date(`${to}T23:59:59`)));
+  if (userId) conditions.push(eq(orders.salesRepId, userId));
 
   const wonStatuses = ['CONFIRMED', 'DELIVERED', 'INVOICED', 'PAID'];
 
