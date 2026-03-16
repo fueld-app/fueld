@@ -413,7 +413,7 @@ export function buildInquiryEmailHtml(params: {
     .map((i) => {
       const max = formatInquiryQuantity(i.quantity);
       const min = i.quantityMin ? formatInquiryQuantity(i.quantityMin) : '';
-      const qtyLabel = min && min !== max ? `${min}-${max}` : max;
+      const qtyLabel = min && min !== max ? `${min} - ${max}` : max;
       return `
       <tr>
         <td style="padding: 14px 16px; border-top: 1px solid #e5e7eb; vertical-align: top;">

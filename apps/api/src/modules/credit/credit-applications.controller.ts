@@ -203,10 +203,14 @@ export const creditApplicationsController = new Elysia({ prefix: '/credit/applic
       } catch (err: any) {
         console.error('[CreditApplications] Create failed:', err);
         const pgCode = err?.cause?.code ?? err?.code;
+        const detail = err?.cause?.message ?? err?.message ?? '';
         if (pgCode === '23503') {
-          return { success: false, data: null, message: 'Company no longer exists. It may have been deleted — please refresh the page.' };
+          return { success: false, data: null, message: 'Company not found — it may have been deleted. Please refresh the page.' };
         }
-        return { success: false, data: null, message: 'Failed to create credit application' };
+        if (pgCode === '42P01') {
+          return { success: false, data: null, message: 'Credit applications table does not exist. A database migration may be pending — please contact your administrator.' };
+        }
+        return { success: false, data: null, message: `Failed to create credit application: ${detail || 'unknown error'}` };
       }
     },
     {

@@ -1450,7 +1450,7 @@ interface InquiryReplyRecommendation {
         [open]="showCreditApplicationModal()"
         [counterpartyId]="order()!.clientId"
         [counterpartyName]="clientName()"
-        [orderId]="orderId()"
+        [orderId]="order()!.id"
         defaultType="CUSTOMER"
         (closed)="showCreditApplicationModal.set(false)"
         (submitted)="onCreditApplicationSubmitted()"
@@ -3035,7 +3035,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     if (!qty) return '';
     const max = fmt(qty);
     const min = qtyMin ? fmt(qtyMin) : '';
-    return min && min !== max ? `${min}-${max}` : max;
+    return min && min !== max ? `${min} - ${max}` : max;
   }
 
   supplierPerformanceSummary(performance: InquirySupplierPerformance): string {
