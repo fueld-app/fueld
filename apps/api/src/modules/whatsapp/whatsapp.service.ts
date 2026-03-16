@@ -436,43 +436,18 @@ async function findAdminConnection(): Promise<UserConnection | null> {
 
 /**
  * Send a WhatsApp message to a group by its JID.
- * Uses the specified user's connected session.
- * If the user doesn't have a session, falls back to an Admin's session, then any connected session.
+ * Always uses the Admin's connected WhatsApp session.
  */
 export async function sendWhatsAppGroupMessage(
-  userId: string,
+  _userId: string,
   groupJid: string,
   text: string,
 ): Promise<{ success: boolean; message: string }> {
-  // Find a connected session — prefer the specified user, then fall back to any
-  let conn = connections.get(userId);
-  if (!conn || conn.status !== 'connected') {
-    // Try to reconnect the specified user first
-    try {
-      const result = await startWhatsAppSession(userId);
-      if (result.status === 'connected') {
-        conn = connections.get(userId);
-      }
-    } catch {}
-
-    // Fall back: prefer an Admin's connected session, then any connected session
-    if (!conn || conn.status !== 'connected') {
-      const adminConn = await findAdminConnection();
-      if (adminConn) {
-        conn = adminConn;
-      } else {
-        for (const [, c] of connections) {
-          if (c.status === 'connected' && c.socket) {
-            conn = c;
-            break;
-          }
-        }
-      }
-    }
-  }
+  // Always send group messages from the Admin's WhatsApp session
+  const conn = await findAdminConnection();
 
   if (!conn?.socket) {
-    return { success: false, message: 'No WhatsApp session connected. Cannot send group message.' };
+    return { success: false, message: 'Admin WhatsApp session is not connected. An admin must link their WhatsApp to send group messages.' };
   }
 
   // Ensure the JID ends with @g.us (bail if it's invalid)
@@ -496,17 +471,16 @@ export async function sendWhatsAppMessage(
   pdfBuffer?: Buffer,
   pdfFileName?: string,
 ): Promise<{ success: boolean; message: string }> {
-  // Ensure connection is active
+  // Only send from the user's own session — no fallback to other users
   let conn = connections.get(userId);
   if (!conn || conn.status !== 'connected') {
     // Try to reconnect from stored credentials
     const result = await startWhatsAppSession(userId);
     if (result.status !== 'connected') {
-      // Wait a bit more for reconnection
       await new Promise((r) => setTimeout(r, 3000));
       conn = connections.get(userId);
       if (!conn || conn.status !== 'connected') {
-        return { success: false, message: 'WhatsApp not connected. Please link your device first.' };
+        return { success: false, message: 'Your WhatsApp is not linked. Please go to Settings → WhatsApp to link your device.' };
       }
     } else {
       conn = connections.get(userId);
