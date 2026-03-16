@@ -28,7 +28,7 @@ const baileysLogger = {
 } as any;
 import { eq, and } from 'drizzle-orm';
 import { db } from '../../db';
-import { whatsappSessions, whatsappKeys } from '../../db/schema';
+import { whatsappSessions, whatsappKeys, users } from '../../db/schema';
 import { sendToUserSockets } from '../activity/session-tracker';
 import { parseRFQ } from './rfq-parser';
 import { saveIncomingRfq, getUserTenantId } from '../rfq/rfq.service';
@@ -421,10 +421,23 @@ export async function listWhatsAppGroups(userId: string): Promise<WhatsAppGroup[
 
 // ─── Send Message ────────────────────────────────────────────────────
 
+/** Find a connected WhatsApp session belonging to an ADMIN user. */
+async function findAdminConnection(): Promise<UserConnection | null> {
+  const adminRows = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.role, 'ADMIN'));
+  for (const row of adminRows) {
+    const c = connections.get(row.id);
+    if (c?.status === 'connected' && c.socket) return c;
+  }
+  return null;
+}
+
 /**
  * Send a WhatsApp message to a group by its JID.
  * Uses the specified user's connected session.
- * If the user doesn't have a session, tries any connected session.
+ * If the user doesn't have a session, falls back to an Admin's session, then any connected session.
  */
 export async function sendWhatsAppGroupMessage(
   userId: string,
@@ -442,12 +455,17 @@ export async function sendWhatsAppGroupMessage(
       }
     } catch {}
 
-    // Fall back to any connected session
+    // Fall back: prefer an Admin's connected session, then any connected session
     if (!conn || conn.status !== 'connected') {
-      for (const [, c] of connections) {
-        if (c.status === 'connected' && c.socket) {
-          conn = c;
-          break;
+      const adminConn = await findAdminConnection();
+      if (adminConn) {
+        conn = adminConn;
+      } else {
+        for (const [, c] of connections) {
+          if (c.status === 'connected' && c.socket) {
+            conn = c;
+            break;
+          }
         }
       }
     }
