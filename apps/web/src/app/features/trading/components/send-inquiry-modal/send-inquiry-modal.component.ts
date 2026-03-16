@@ -644,6 +644,7 @@ export class SendInquiryModalComponent {
   readonly vesselName = input<string>('');
   readonly vesselImo = input<string | null>(null);
   readonly eta = input<string | null>(null);
+  readonly etd = input<string | null>(null);
   readonly items = input<{ productType: string; quantity: number; quantityMin?: number | null; unit: string }[]>([]);
 
   readonly sendInquiry = output<SendInquiryPayload>();
@@ -929,6 +930,11 @@ export class SendInquiryModalComponent {
     if (eta) {
       const d = new Date(eta);
       lines.push(`ETA ${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`);
+    }
+    const etd = this.etd();
+    if (etd) {
+      const d = new Date(etd);
+      lines.push(`ETD ${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`);
     }
     const text = lines.join('\n');
     navigator.clipboard.writeText(text).then(() => {

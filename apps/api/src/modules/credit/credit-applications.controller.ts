@@ -200,8 +200,12 @@ export const creditApplicationsController = new Elysia({ prefix: '/credit/applic
         }
 
         return { success: true, data: app } satisfies ApiResponse<typeof app>;
-      } catch (err) {
+      } catch (err: any) {
         console.error('[CreditApplications] Create failed:', err);
+        const pgCode = err?.cause?.code ?? err?.code;
+        if (pgCode === '23503') {
+          return { success: false, data: null, message: 'Company no longer exists. It may have been deleted — please refresh the page.' };
+        }
         return { success: false, data: null, message: 'Failed to create credit application' };
       }
     },

@@ -1435,6 +1435,7 @@ interface InquiryReplyRecommendation {
       [vesselName]="vesselName()"
       [vesselImo]="vessel()?.imo ?? null"
       [eta]="order()?.eta ?? null"
+      [etd]="order()?.etd ?? null"
       [items]="itemRows()"
       (sendInquiry)="onSendInquiry($event)"
       (sendWhatsAppInquiry)="onSendInquiryWhatsApp($event)"
