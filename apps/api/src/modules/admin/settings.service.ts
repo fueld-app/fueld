@@ -1071,10 +1071,12 @@ export async function updateInquiryCancelReasonSettings(reasons: string[]): Prom
 
 export const DEFAULT_SUPPLIER_RESPONSE_URL_ENABLED = true;
 export const DEFAULT_AUTO_MARK_NO_REPLY_AFTER_HOURS = 168;
+export const DEFAULT_RESPONSE_DEADLINE_HOURS = 48;
 
 export interface InquirySettings {
   supplierResponseUrlEnabled: boolean;
   autoMarkNoReplyAfterHours: number | null;
+  defaultResponseDeadlineHours: number;
 }
 
 export async function getInquirySettings(): Promise<InquirySettings> {
@@ -1093,12 +1095,17 @@ export async function getInquirySettings(): Promise<InquirySettings> {
         : typeof autoMarkNoReplyAfterHours === 'number'
           ? autoMarkNoReplyAfterHours
           : DEFAULT_AUTO_MARK_NO_REPLY_AFTER_HOURS,
+    defaultResponseDeadlineHours:
+      typeof inquirySettings.defaultResponseDeadlineHours === 'number' && inquirySettings.defaultResponseDeadlineHours > 0
+        ? inquirySettings.defaultResponseDeadlineHours
+        : DEFAULT_RESPONSE_DEADLINE_HOURS,
   };
 }
 
 export async function updateInquirySettings(data: {
   supplierResponseUrlEnabled?: boolean;
   autoMarkNoReplyAfterHours?: number | null;
+  defaultResponseDeadlineHours?: number;
 }): Promise<InquirySettings> {
   const tenant = await db.query.tenants.findFirst();
   if (!tenant) throw new Error('No tenant found');
@@ -1120,6 +1127,14 @@ export async function updateInquirySettings(data: {
       }
       inquirySettings.autoMarkNoReplyAfterHours = Math.round(normalized);
     }
+  }
+
+  if (data.defaultResponseDeadlineHours !== undefined) {
+    const normalized = Number(data.defaultResponseDeadlineHours);
+    if (!Number.isFinite(normalized) || normalized < 1) {
+      throw new Error('Response deadline must be at least 1 hour');
+    }
+    inquirySettings.defaultResponseDeadlineHours = Math.round(normalized);
   }
 
   settings.inquirySettings = inquirySettings;

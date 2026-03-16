@@ -16,6 +16,7 @@ import { API } from '@app/core/config/api';
 interface InquirySettingsDto {
   supplierResponseUrlEnabled: boolean;
   autoMarkNoReplyAfterHours: number | null;
+  defaultResponseDeadlineHours: number;
 }
 
 @Component({
@@ -784,6 +785,33 @@ interface InquirySettingsDto {
                   </div>
                 }
               </div>
+
+              <div class="mt-5 border-t border-gray-100 pt-5">
+                <div>
+                  <p class="text-sm font-medium text-gray-900">Default response deadline</p>
+                  <p class="text-xs text-gray-500">Number of hours from when an inquiry is sent until the response deadline shown to suppliers.</p>
+                </div>
+                <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+                  <div class="w-full sm:w-40">
+                    <label class="block text-sm font-medium text-gray-700">Hours</label>
+                    <input
+                      type="number"
+                      min="1"
+                      [ngModel]="inquiryDeadlineHours()"
+                      (ngModelChange)="setInquiryDeadlineHours($event)"
+                      class="app-input mt-1 w-full"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    (click)="saveInquiryDeadlineHours()"
+                    [disabled]="inquirySaving()"
+                    class="inline-flex items-center justify-center rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-sky-700 disabled:opacity-50"
+                  >
+                    Save deadline
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1072,6 +1100,7 @@ export class SettingsPageComponent implements OnInit {
   readonly inquiryResponseUrlEnabled = signal(true);
   readonly inquiryAutoNoReplyEnabled = signal(true);
   readonly inquiryAutoNoReplyHours = signal('168');
+  readonly inquiryDeadlineHours = signal('48');
   readonly inquirySaving = signal(false);
   readonly inquirySaveSuccess = signal('');
   readonly inquirySaveError = signal('');
@@ -1787,6 +1816,7 @@ export class SettingsPageComponent implements OnInit {
     const autoMarkNoReplyAfterHours = settings.autoMarkNoReplyAfterHours;
     this.inquiryAutoNoReplyEnabled.set(autoMarkNoReplyAfterHours !== null && autoMarkNoReplyAfterHours > 0);
     this.inquiryAutoNoReplyHours.set(String(autoMarkNoReplyAfterHours ?? 168));
+    this.inquiryDeadlineHours.set(String(settings.defaultResponseDeadlineHours ?? 48));
   }
 
   private async updateInquirySettings(payload: Partial<InquirySettingsDto>, successMessage: string): Promise<void> {
@@ -1843,6 +1873,24 @@ export class SettingsPageComponent implements OnInit {
 
   setInquiryAutoNoReplyHours(value: unknown): void {
     this.inquiryAutoNoReplyHours.set(String(value ?? ''));
+  }
+
+  async saveInquiryDeadlineHours(): Promise<void> {
+    const parsedHours = Number(String(this.inquiryDeadlineHours()).trim());
+    if (!Number.isFinite(parsedHours) || parsedHours < 1) {
+      this.inquirySaveSuccess.set('');
+      this.inquirySaveError.set('Response deadline must be at least 1 hour.');
+      return;
+    }
+
+    await this.updateInquirySettings(
+      { defaultResponseDeadlineHours: Math.round(parsedHours) },
+      'Response deadline updated.',
+    );
+  }
+
+  setInquiryDeadlineHours(value: unknown): void {
+    this.inquiryDeadlineHours.set(String(value ?? ''));
   }
 
   // ─── Inquiry cancellation reasons ────────────────────────────────

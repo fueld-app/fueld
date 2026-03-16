@@ -67,6 +67,8 @@ export interface SupplierRow {
   emailOverride: string;
   phoneOverride: string;
   expanded: boolean;
+  ccCompanyEmail: boolean;
+  personalNote: string;
 }
 
 export interface SendInquiryPayload {
@@ -76,6 +78,8 @@ export interface SendInquiryPayload {
     email: string;
     contactId?: string;
     contactName?: string;
+    ccEmail?: string;
+    personalNote?: string;
   }>;
   recipientEmails: string[];
   subject: string;
@@ -142,17 +146,74 @@ export interface SendInquiryWhatsAppPayload {
                 <label class="block text-sm font-medium text-gray-700">
                   Suppliers ({{ selectedCount() }}/{{ suppliers().length }} selected)
                 </label>
-                <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
-                    [checked]="allSelected()"
-                    [indeterminate]="someSelected() && !allSelected()"
-                    (change)="toggleAll()"
-                  />
-                  Select All
-                </label>
+                <div class="flex items-center gap-3">
+                  <button
+                    type="button"
+                    class="text-sm font-medium text-brand-600 hover:text-brand-700"
+                    (click)="showAddSupplier.set(!showAddSupplier())"
+                  >
+                    {{ showAddSupplier() ? 'Cancel' : '+ Add supplier' }}
+                  </button>
+                  <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                      [checked]="allSelected()"
+                      [indeterminate]="someSelected() && !allSelected()"
+                      (change)="toggleAll()"
+                    />
+                    Select All
+                  </label>
+                </div>
               </div>
+
+              <!-- Add supplier inline search -->
+              @if (showAddSupplier()) {
+                <div class="mb-3 rounded-lg border border-brand-200 bg-brand-50/50 p-3 space-y-2">
+                  <div class="relative">
+                    <input
+                      type="text"
+                      class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                      [ngModel]="addSupplierQuery()"
+                      (ngModelChange)="onAddSupplierSearch($event)"
+                      placeholder="Search existing companies by name..."
+                    />
+                    @if (addSupplierLoading()) {
+                      <svg class="absolute right-3 top-2.5 h-4 w-4 animate-spin text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    }
+                  </div>
+                  @if (addSupplierResults().length > 0) {
+                    <div class="max-h-40 overflow-y-auto rounded border border-gray-200 bg-white divide-y divide-gray-100">
+                      @for (company of addSupplierResults(); track company.localId) {
+                        <button
+                          type="button"
+                          class="flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-gray-50 transition-colors"
+                          [disabled]="isAlreadyPortSupplier(company.localId)"
+                          [class.opacity-50]="isAlreadyPortSupplier(company.localId)"
+                          (click)="addCompanyAsSupplier(company.localId, company.name)"
+                        >
+                          <div>
+                            <span class="font-medium text-gray-900">{{ company.name }}</span>
+                            @if (company.country) {
+                              <span class="ml-1 text-xs text-gray-500">{{ company.country }}</span>
+                            }
+                          </div>
+                          @if (isAlreadyPortSupplier(company.localId)) {
+                            <span class="text-xs text-gray-400">Already added</span>
+                          } @else {
+                            <span class="text-xs font-medium text-brand-600">Add</span>
+                          }
+                        </button>
+                      }
+                    </div>
+                  } @else if (addSupplierQuery().length >= 2 && !addSupplierLoading()) {
+                    <p class="text-xs text-gray-500 px-1">No matching companies found. Create the company first in the Companies section.</p>
+                  }
+                </div>
+              }
 
               @if (suppliers().length > 0) {
                 <div class="mb-3">
@@ -300,6 +361,40 @@ export interface SendInquiryWhatsAppPayload {
                             }
                           </div>
                         }
+                        <!-- CC company email checkbox -->
+                        @if (s.selected && s.contactId && ccCompanyEmailAddress(s)) {
+                          <label class="mt-1.5 flex items-center gap-2 text-[11px] text-gray-600 cursor-pointer" (click)="$event.stopPropagation()">
+                            <input
+                              type="checkbox"
+                              class="h-3.5 w-3.5 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                              [checked]="s.ccCompanyEmail"
+                              (change)="toggleCcCompanyEmail(s)"
+                            />
+                            Also send to {{ ccCompanyEmailAddress(s) }}
+                          </label>
+                        }
+                        <!-- Personal note -->
+                        @if (s.selected) {
+                          <div class="mt-1.5" (click)="$event.stopPropagation()">
+                            @if (s.personalNote) {
+                              <textarea
+                                class="w-full text-xs rounded border-gray-200 bg-gray-50 px-2 py-1.5 text-gray-600 focus:bg-white focus:border-brand-400 focus:ring-1 focus:ring-brand-300 resize-none"
+                                rows="2"
+                                [value]="s.personalNote"
+                                (input)="onPersonalNoteEdit(s, $event)"
+                                placeholder="e.g. Hope the weekend football match went well!"
+                              ></textarea>
+                            } @else {
+                              <button
+                                type="button"
+                                class="text-[11px] font-medium text-brand-600 hover:text-brand-700"
+                                (click)="enablePersonalNote(s)"
+                              >
+                                + Add personal note
+                              </button>
+                            }
+                          </div>
+                        }
                         <div class="mt-2">
                           <input
                             type="tel"
@@ -364,58 +459,48 @@ export interface SendInquiryWhatsAppPayload {
                                 <div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Contacts</div>
                                 <div class="space-y-1.5 border-l border-gray-200 pl-3">
                                   @for (contact of s.contacts; track contact.id) {
-                                    <div
-                                      class="rounded-md border px-2.5 py-2"
+                                    <button
+                                      type="button"
+                                      class="flex w-full items-start gap-2.5 rounded-md border px-2.5 py-2 text-left transition-colors"
                                       [class.border-brand-300]="contact.email && isSelectedRecipientOption(s, contact.email, contact.id)"
                                       [class.bg-brand-50]="contact.email && isSelectedRecipientOption(s, contact.email, contact.id)"
                                       [class.border-gray-200]="!contact.email || !isSelectedRecipientOption(s, contact.email, contact.id)"
+                                      [class.hover:border-brand-300]="contact.email && !isSelectedRecipientOption(s, contact.email, contact.id)"
+                                      [class.hover:bg-brand-50]="contact.email && !isSelectedRecipientOption(s, contact.email, contact.id)"
+                                      [disabled]="!contact.email"
+                                      (click)="applySupplierEmail(s, contact.email!, contact.id, contact.name, contact.phone, $event)"
                                     >
-                                      <div class="flex items-start justify-between gap-3">
-                                        <div class="flex min-w-0 flex-1 items-start gap-2.5">
-                                          <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border"
-                                            [class.border-brand-500]="contact.email && isSelectedRecipientOption(s, contact.email, contact.id)"
-                                            [class.border-gray-300]="!contact.email || !isSelectedRecipientOption(s, contact.email, contact.id)">
-                                            @if (contact.email && isSelectedRecipientOption(s, contact.email, contact.id)) {
-                                              <span class="h-2 w-2 rounded-full bg-brand-600"></span>
-                                            }
-                                          </span>
-                                          <div class="min-w-0 flex-1">
-                                            <div class="truncate text-xs font-medium text-gray-800">{{ contact.name }}</div>
-                                            <div class="text-[11px] text-gray-500">{{ contact.role || 'Contact person' }}</div>
-                                            @if (contact.email) {
-                                              <div class="truncate text-[11px] text-gray-600">{{ contact.email }}</div>
-                                            }
-                                            @if (contact.phone) {
-                                              <div class="truncate text-[11px] text-gray-600">{{ contact.phone }}</div>
-                                            }
-                                            @if (!contact.email && !contact.phone) {
-                                              <div class="text-[11px] text-red-400">No email on file</div>
-                                            }
-                                          </div>
-                                        </div>
-                                        <div class="flex items-center gap-2">
-                                          @if (contact.phone) {
-                                            <button
-                                              type="button"
-                                              class="text-[11px] font-medium text-green-600 hover:text-green-700 disabled:cursor-not-allowed disabled:text-gray-300"
-                                              (click)="applySupplierPhone(s, contact.phone, contact.id, contact.name, $event)"
-                                              [disabled]="!waLinked()"
-                                            >
-                                              WA
-                                            </button>
-                                          }
-                                          @if (contact.email) {
-                                            <button
-                                              type="button"
-                                              class="text-[11px] font-medium text-brand-600 hover:text-brand-700"
-                                              (click)="applySupplierEmail(s, contact.email, contact.id, contact.name, contact.phone, $event)"
-                                            >
-                                              Select
-                                            </button>
-                                          }
-                                        </div>
+                                      <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border"
+                                        [class.border-brand-500]="contact.email && isSelectedRecipientOption(s, contact.email, contact.id)"
+                                        [class.border-gray-300]="!contact.email || !isSelectedRecipientOption(s, contact.email, contact.id)">
+                                        @if (contact.email && isSelectedRecipientOption(s, contact.email, contact.id)) {
+                                          <span class="h-2 w-2 rounded-full bg-brand-600"></span>
+                                        }
+                                      </span>
+                                      <div class="min-w-0 flex-1">
+                                        <div class="truncate text-xs font-medium text-gray-800">{{ contact.name }}</div>
+                                        <div class="text-[11px] text-gray-500">{{ contact.role || 'Contact person' }}</div>
+                                        @if (contact.email) {
+                                          <div class="truncate text-[11px] text-gray-600">{{ contact.email }}</div>
+                                        }
+                                        @if (contact.phone) {
+                                          <div class="truncate text-[11px] text-gray-600">{{ contact.phone }}</div>
+                                        }
+                                        @if (!contact.email && !contact.phone) {
+                                          <div class="text-[11px] text-red-400">No email on file</div>
+                                        }
                                       </div>
-                                    </div>
+                                      @if (contact.phone) {
+                                        <button
+                                          type="button"
+                                          class="self-center text-[11px] font-medium text-green-600 hover:text-green-700 disabled:cursor-not-allowed disabled:text-gray-300"
+                                          (click)="applySupplierPhone(s, contact.phone, contact.id, contact.name, $event)"
+                                          [disabled]="!waLinked()"
+                                        >
+                                          WA
+                                        </button>
+                                      }
+                                    </button>
                                   }
                                 </div>
                               </div>
@@ -639,6 +724,7 @@ export class SendInquiryModalComponent {
   private readonly sanitizer = inject(DomSanitizer);
 
   readonly orderId = input.required<string>();
+  readonly placeId = input<string>('');
   readonly portName = input<string>('');
   readonly waLinked = input(false);
   readonly vesselName = input<string>('');
@@ -663,6 +749,12 @@ export class SendInquiryModalComponent {
   readonly recipientTags = signal<EmailTag[]>([]);
   readonly previewHtml = computed<SafeHtml>(() => this.sanitizer.bypassSecurityTrustHtml(this.htmlBody()));
   readonly responseDeadlineAt = signal('');
+
+  // Add-supplier search state
+  readonly showAddSupplier = signal(false);
+  readonly addSupplierQuery = signal('');
+  readonly addSupplierResults = signal<Array<{ localId: string; name: string; country?: string }>>([]);
+  readonly addSupplierLoading = signal(false);
 
   readonly bodyEditor = viewChild<ElementRef<HTMLDivElement>>('bodyEditor');
 
@@ -701,6 +793,9 @@ export class SendInquiryModalComponent {
     this.open.set(true);
     this.recipientTags.set([]);
     this.responseDeadlineAt.set('');
+    this.showAddSupplier.set(false);
+    this.addSupplierQuery.set('');
+    this.addSupplierResults.set([]);
     this.loadSuppliers();
     this.loadDefaults();
   }
@@ -734,6 +829,8 @@ export class SendInquiryModalComponent {
               emailOverride: '',
               phoneOverride: '',
               expanded: (s.companyEmails?.length ?? 0) + (s.contacts?.length ?? 0) > 0,
+              ccCompanyEmail: false,
+              personalNote: '',
             })));
           }
           this.loadingSuppliers.set(false);
@@ -955,6 +1052,8 @@ export class SendInquiryModalComponent {
         email: s.emailOverride || s.email!,
         contactId: s.contactId ?? undefined,
         contactName: s.contactName ?? undefined,
+        ccEmail: s.ccCompanyEmail ? this.ccCompanyEmailAddress(s) : undefined,
+        personalNote: s.personalNote.trim() || undefined,
       })),
       recipientEmails: this.recipientTags().map((tag) => tag.email),
       subject: this.subject(),
@@ -1152,6 +1251,102 @@ export class SendInquiryModalComponent {
     }
 
     return supplier.waContactName ? `${supplier.waContactName} / Custom` : 'Custom number';
+  }
+
+  // ─── CC Company Email ───────────────────────────────────────────
+
+  /** Return the primary company email for a supplier that differs from the resolved email. */
+  ccCompanyEmailAddress(supplier: SupplierRow): string {
+    const resolvedEmail = this.resolvedRecipientEmail(supplier).toLowerCase();
+    const primary = supplier.companyEmails.find((e) => e.isPrimary);
+    const candidate = primary ?? supplier.companyEmails[0];
+    if (!candidate) return '';
+    return candidate.email.toLowerCase() !== resolvedEmail ? candidate.email : '';
+  }
+
+  toggleCcCompanyEmail(supplier: SupplierRow): void {
+    this.suppliers.update((list) =>
+      list.map((row) =>
+        row.portSupplierId === supplier.portSupplierId
+          ? { ...row, ccCompanyEmail: !row.ccCompanyEmail }
+          : row,
+      ),
+    );
+  }
+
+  // ─── Personal Note ────────────────────────────────────────────
+
+  enablePersonalNote(supplier: SupplierRow): void {
+    this.suppliers.update((list) =>
+      list.map((row) =>
+        row.portSupplierId === supplier.portSupplierId
+          ? { ...row, personalNote: ' ' }
+          : row,
+      ),
+    );
+  }
+
+  onPersonalNoteEdit(supplier: SupplierRow, event: Event): void {
+    const value = (event.target as HTMLTextAreaElement).value;
+    this.suppliers.update((list) =>
+      list.map((row) =>
+        row.portSupplierId === supplier.portSupplierId
+          ? { ...row, personalNote: value }
+          : row,
+      ),
+    );
+  }
+
+  // ─── Add Supplier ─────────────────────────────────────────────
+
+  private addSupplierDebounce: any;
+
+  onAddSupplierSearch(query: string): void {
+    this.addSupplierQuery.set(query);
+    clearTimeout(this.addSupplierDebounce);
+    if (query.trim().length < 2) {
+      this.addSupplierResults.set([]);
+      return;
+    }
+    this.addSupplierLoading.set(true);
+    this.addSupplierDebounce = setTimeout(() => {
+      this.http.get<any[]>(`${API_URL}/lloyds/companies`, { params: { name: query.trim() } })
+        .subscribe({
+          next: (results) => {
+            this.addSupplierResults.set(
+              results
+                .filter((r: any) => r.source === 'local' && r.localId)
+                .map((r: any) => ({ localId: r.localId, name: r.name, country: r.country })),
+            );
+            this.addSupplierLoading.set(false);
+          },
+          error: () => {
+            this.addSupplierResults.set([]);
+            this.addSupplierLoading.set(false);
+          },
+        });
+    }, 300);
+  }
+
+  isAlreadyPortSupplier(companyId: string): boolean {
+    return this.suppliers().some((s) => s.supplierId === companyId);
+  }
+
+  addCompanyAsSupplier(companyId: string, companyName: string): void {
+    const pId = this.placeId();
+    if (!pId) return;
+    this.http.post<any>(`${API_URL}/lloyds/places/local/${pId}/suppliers`, { companyId })
+      .subscribe({
+        next: () => {
+          this.showAddSupplier.set(false);
+          this.addSupplierQuery.set('');
+          this.addSupplierResults.set([]);
+          this.loadSuppliers();
+        },
+        error: (err) => {
+          console.error('Failed to add supplier:', err);
+        },
+      });
   }
 
   private compareSupplierPriority(left: SupplierRow, right: SupplierRow): number {

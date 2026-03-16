@@ -54,10 +54,8 @@ function calculateInquiryResponseHours(sentAt: Date | null, respondedAt: Date | 
   return Number((diffMs / 3_600_000).toFixed(2));
 }
 
-const DEFAULT_INQUIRY_DEADLINE_HOURS = 48;
-
-function getDefaultInquiryResponseDeadline(): string {
-  return new Date(Date.now() + (DEFAULT_INQUIRY_DEADLINE_HOURS * 3_600_000)).toISOString();
+function getDefaultInquiryResponseDeadline(hours = 48): string {
+  return new Date(Date.now() + (hours * 3_600_000)).toISOString();
 }
 
 function formatDeadlineHumanDuration(deadlineIso: string): string {
@@ -1005,7 +1003,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             brandColor,
             supplierTerms,
             includeSupplierQuoteLink: inquirySettings.supplierResponseUrlEnabled,
-            responseDeadlineFormatted: formatDeadlineHumanDuration(getDefaultInquiryResponseDeadline()),
+            responseDeadlineFormatted: formatDeadlineHumanDuration(getDefaultInquiryResponseDeadline(inquirySettings.defaultResponseDeadlineHours)),
             items: order.items.map((i: any) => ({
               quantity: i.quantity,
               quantityMin: i.quantityMin,
@@ -1029,7 +1027,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           brandColor,
           supplierTerms,
           includeSupplierQuoteLink: inquirySettings.supplierResponseUrlEnabled,
-          responseDeadlineFormatted: formatDeadlineHumanDuration(getDefaultInquiryResponseDeadline()),
+          responseDeadlineFormatted: formatDeadlineHumanDuration(getDefaultInquiryResponseDeadline(inquirySettings.defaultResponseDeadlineHours)),
           items: order.items.map((i: any) => ({
             quantity: i.quantity,
             quantityMin: i.quantityMin,
@@ -1048,7 +1046,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           senderName,
           senderEmail: auth.email,
           supplierTerms,
-          responseDeadlineAt: getDefaultInquiryResponseDeadline(),
+          responseDeadlineAt: getDefaultInquiryResponseDeadline(inquirySettings.defaultResponseDeadlineHours),
         },
       };
     },
@@ -1118,6 +1116,8 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         email: supplier.email,
         contactId: supplier.contactId,
         contactName: supplier.contactName,
+        ccEmail: supplier.ccEmail,
+        personalNote: supplier.personalNote?.trim() || undefined,
         resultId: supplier.supplierId,
         label: supplier.supplierName,
       }));
@@ -1155,7 +1155,24 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             quoteFormUrl: quoteToken ? getSupplierQuoteFormUrl(quoteToken.rawToken) : '',
           });
           const renderedSubject = renderTemplate(body.subject, templateVars);
-          const renderedHtmlBody = renderTemplate(body.htmlBody, templateVars);
+          let renderedHtmlBody = renderTemplate(body.htmlBody, templateVars);
+
+          // Prepend personal note if provided
+          if (target.type === 'supplier' && target.personalNote) {
+            const escapedNote = target.personalNote
+              .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+              .replace(/\n/g, '<br/>');
+            renderedHtmlBody = `<p style="color:#374151;font-style:italic;margin-bottom:16px;">${escapedNote}</p>${renderedHtmlBody}`;
+          }
+
+          // Merge CC company email with global CC list for this target
+          const targetCcEmails = [...ccEmails];
+          if (target.type === 'supplier' && target.ccEmail) {
+            const ccLower = target.ccEmail.toLowerCase();
+            if (!targetCcEmails.some((e) => e.toLowerCase() === ccLower) && ccLower !== target.email.toLowerCase()) {
+              targetCcEmails.push(target.ccEmail);
+            }
+          }
 
           await sendDocumentEmail({
             documentType: 'INQUIRY',
@@ -1165,7 +1182,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             senderEmail,
             senderName,
             recipientEmail: target.email,
-            ccEmails,
+            ccEmails: targetCcEmails,
             bccEmails,
             subject: renderedSubject,
             htmlBody: renderedHtmlBody,
@@ -1319,6 +1336,8 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           email: t.String({ format: 'email' }),
           contactId: t.Optional(t.String()),
           contactName: t.Optional(t.String()),
+          ccEmail: t.Optional(t.String({ format: 'email' })),
+          personalNote: t.Optional(t.String()),
         })),
         recipientEmails: t.Optional(t.Array(t.String({ format: 'email' }))),
         subject: t.String(),

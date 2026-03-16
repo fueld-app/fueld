@@ -1430,6 +1430,7 @@ interface InquiryReplyRecommendation {
     <!-- Send Inquiry Modal -->
     <app-send-inquiry-modal
       [orderId]="orderId()"
+      [placeId]="order()?.placeId ?? ''"
       [portName]="port()?.name ?? ''"
       [waLinked]="waLinked()"
       [vesselName]="vesselName()"
