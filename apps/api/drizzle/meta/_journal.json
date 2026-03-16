@@ -365,6 +365,13 @@
       "when": 1742079600000,
       "tag": "0051_company_offices",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1742166000000,
+      "tag": "0052_company_parent_child",
+      "breakpoints": true
     }
   ]
 }
