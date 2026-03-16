@@ -356,6 +356,14 @@ export const routes: Routes = [
               ),
             title: 'Admin > Credit Settings',
           },
+          {
+            path: 'vessel-sanctions',
+            loadComponent: () =>
+              import('./features/admin/pages/vessel-sanctions/vessel-sanctions-page.component').then(
+                (m) => m.VesselSanctionsPageComponent,
+              ),
+            title: 'Admin > Vessel Sanctions',
+          },
         ],
       },
       // ── Account ──

@@ -52,6 +52,8 @@ import { whatsappController } from './modules/whatsapp/whatsapp.controller';
 import { rfqController } from './modules/rfq/rfq.controller';
 import { riskMonitoringController } from './modules/risk-monitoring/risk-monitoring.controller';
 import { runScheduledChecks } from './modules/risk-monitoring/risk-monitoring.service';
+import { vesselSanctionsController } from './modules/vessel-sanctions/vessel-sanctions.controller';
+import { runScheduledVesselSanctionChecks } from './modules/vessel-sanctions/vessel-sanctions.service';
 import { reconnectStoredSessions as reconnectWhatsAppSessions } from './modules/whatsapp/whatsapp.service';
 import { getBuildInfo } from './lib/build-info';
 import { assertCredentialsEncryptionConfig } from './lib/crypto';
@@ -235,6 +237,23 @@ function startRiskMonitoringJob() {
   console.log('[Risk Monitor] Background job started (interval: 1h)');
 }
 
+function startVesselSanctionJob() {
+  // Run every hour; the service internally skips tenants checked within checkIntervalHours
+  const INTERVAL_MS = 60 * 60 * 1000;
+
+  const run = async () => {
+    try {
+      await runScheduledVesselSanctionChecks();
+    } catch (err) {
+      console.error('[Vessel Sanctions] Scheduled check failed:', err);
+    }
+  };
+
+  setTimeout(run, 45_000);
+  setInterval(run, INTERVAL_MS);
+  console.log('[Vessel Sanctions] Background job started (interval: 1h)');
+}
+
 export async function createApp(options: CreateAppOptions = {}) {
   assertCredentialsEncryptionConfig();
 
@@ -354,6 +373,7 @@ export async function createApp(options: CreateAppOptions = {}) {
     .use(whatsappController)
     .use(rfqController)
     .use(riskMonitoringController)
+    .use(vesselSanctionsController)
     .get('/uploads/avatars/:filename', async ({ params, set }) => {
       const { join } = await import('path');
       const path = join(process.cwd(), 'uploads/avatars', params.filename);
@@ -629,6 +649,7 @@ export async function createApp(options: CreateAppOptions = {}) {
     registerAutoSyncHooks();
     reconnectWhatsAppSessions();
     startRiskMonitoringJob();
+    startVesselSanctionJob();
   }
 
   return app;

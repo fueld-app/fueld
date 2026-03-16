@@ -209,6 +209,14 @@ export interface TenantSettings {
     notifyEmail: boolean;
     notifyWhatsApp: boolean;
   };
+  // Vessel sanction checks (TankerTrackers)
+  vesselSanctionSettings?: {
+    enabled: boolean;                   // master toggle
+    checkIntervalHours: number;         // how often to run checks (default 24)
+    notifyPush: boolean;
+    notifyEmail: boolean;
+    notifyWhatsApp: boolean;
+  };
 }
 
 export const tenants = pgTable('tenants', {
@@ -559,6 +567,8 @@ export const vessels = pgTable('vessels', {
   buildYear: integer('build_year'),
   builder: text('builder'),
   classificationSociety: text('classification_society'),
+  sanctionStatus: text('sanction_status').default('UNCHECKED'),
+  lastSanctionCheck: timestamp('last_sanction_check', { withTimezone: true }),
   lastSynced: timestamp('last_synced', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -1641,3 +1651,26 @@ export type RiskOverride = typeof riskOverrides.$inferSelect;
 export type NewRiskOverride = typeof riskOverrides.$inferInsert;
 export type RiskOverrideApproval = typeof riskOverrideApprovals.$inferSelect;
 export type NewRiskOverrideApproval = typeof riskOverrideApprovals.$inferInsert;
+
+// ═══════════════════════════════════════════════════════════════════════
+//  VESSEL SANCTION CHECKS
+// ═══════════════════════════════════════════════════════════════════════
+
+export const vesselSanctionChecks = pgTable('vessel_sanction_checks', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  vesselId: uuid('vessel_id').notNull().references(() => vessels.id, { onDelete: 'cascade' }),
+  status: text('status').notNull(),                  // 'CLEAR' | 'SANCTIONED' | 'ERROR'
+  source: text('source').notNull().default('TANKERTRACKERS'),
+  matchedOn: text('matched_on'),                     // 'IMO' | 'NAME' | null
+  rawData: jsonb('raw_data'),
+  checkedAt: timestamp('checked_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const vesselSanctionChecksRelations = relations(vesselSanctionChecks, ({ one }) => ({
+  vessel: one(vessels, { fields: [vesselSanctionChecks.vesselId], references: [vessels.id] }),
+}));
+
+export type VesselSanctionCheck = typeof vesselSanctionChecks.$inferSelect;
+export type NewVesselSanctionCheck = typeof vesselSanctionChecks.$inferInsert;

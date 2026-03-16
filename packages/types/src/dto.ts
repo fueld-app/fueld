@@ -490,6 +490,8 @@ export interface VesselDto {
   builder: string | null;
   classificationSociety: string | null;
   lastSynced: string | null;
+  sanctionStatus: string | null;
+  lastSanctionCheck: string | null;
 }
 
 export interface CreateVesselDto {
@@ -1629,4 +1631,23 @@ export interface RiskMonitoringSettingsDto {
   notifyPush: boolean;
   notifyEmail: boolean;
   notifyWhatsApp: boolean;
+}
+
+export interface VesselSanctionSettingsDto {
+  enabled: boolean;
+  checkIntervalHours: number;
+  notifyPush: boolean;
+  notifyEmail: boolean;
+  notifyWhatsApp: boolean;
+}
+
+export interface VesselSanctionCheckDto {
+  id: string;
+  vesselId: string;
+  vesselName: string;
+  vesselImo: string | null;
+  status: 'CLEAR' | 'SANCTIONED' | 'ERROR';
+  source: string;
+  matchedOn: string | null;
+  checkedAt: string;
 }

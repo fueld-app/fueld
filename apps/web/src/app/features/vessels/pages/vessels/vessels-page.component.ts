@@ -182,7 +182,12 @@ interface VesselSearchResult {
               @for (v of vessels(); track v.id) {
                 <tr class="hover:bg-gray-50/50 transition-colors cursor-pointer" (click)="goToVessel(v.id)">
                   <td class="px-5 py-3">
-                    <div class="font-medium text-gray-900">{{ v.name }}</div>
+                    <div class="flex items-center gap-2">
+                      <span class="font-medium text-gray-900">{{ v.name }}</span>
+                      @if (v.sanctionStatus === 'SANCTIONED') {
+                        <span class="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Sanctioned</span>
+                      }
+                    </div>
                     <div class="text-xs text-gray-400">
                       @if (v.imo) { IMO {{ v.imo }} }
                       @if (v.mmsi) { · MMSI {{ v.mmsi }} }

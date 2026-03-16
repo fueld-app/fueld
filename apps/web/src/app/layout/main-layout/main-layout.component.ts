@@ -129,6 +129,7 @@ const NAVIGATION: NavItem[] = [
       { label: 'Backup / Restore', route: '/admin/backup' },
       { label: 'Email', route: '/admin/email' },
       { label: 'Credit Settings', route: '/admin/credit' },
+      { label: 'Vessel Sanctions', route: '/admin/vessel-sanctions' },
     ],
   },
 ];
