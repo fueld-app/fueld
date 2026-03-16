@@ -42,7 +42,7 @@ import { API } from '@app/core/config/api';
         </div>
 
         <!-- Date Range + Team Toggle -->
-        <div class="flex items-center gap-3 flex-shrink-0">
+        <div class="flex items-center justify-between gap-3 flex-shrink-0 sm:justify-end">
           @if (auth.isAdmin()) {
             <div class="flex items-center gap-2">
               <span class="text-sm font-medium text-gray-600">My Orders</span>
