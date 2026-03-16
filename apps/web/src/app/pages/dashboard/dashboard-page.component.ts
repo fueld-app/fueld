@@ -102,19 +102,19 @@ import { API } from '@app/core/config/api';
                 </div>
                 <div class="border-t border-gray-100 px-4 py-3">
                   <p class="mb-2 text-xs font-medium text-gray-500 uppercase tracking-wider">Custom Range</p>
-                  <div class="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+                  <div class="flex items-center gap-2">
                     <input
                       type="date"
                       [ngModel]="customDateFrom()"
                       (ngModelChange)="customDateFrom.set($event)"
-                      class="min-w-0 w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                      class="min-w-0 flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                     />
-                    <span class="text-gray-400 text-xs flex-shrink-0">to</span>
+                    <span class="text-gray-400 text-xs shrink-0 px-1">to</span>
                     <input
                       type="date"
                       [ngModel]="customDateTo()"
                       (ngModelChange)="customDateTo.set($event)"
-                      class="min-w-0 w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                      class="min-w-0 flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                     />
                   </div>
                   <button
