@@ -225,14 +225,16 @@ import { API } from '@app/core/config/api';
             <option value="team">Team</option>
             <option value="user">User</option>
           </select>
-          <input
-            type="text"
-            placeholder="Filter by user email..."
-            [ngModel]="filterEmail()"
-            (ngModelChange)="filterEmail.set($event)"
-            (keyup.enter)="loadLogs()"
-            class="app-input w-60 px-3 py-1.5"
-          />
+          <select
+            [ngModel]="filterUserId()"
+            (ngModelChange)="filterUserId.set($event); loadLogs()"
+            class="app-input px-3 py-1.5"
+          >
+            <option value="">All users</option>
+            @for (u of allUsers(); track u.id) {
+              <option [value]="u.id">{{ u.name || u.email }}</option>
+            }
+          </select>
           <div class="flex items-center gap-1.5">
             <input
               type="date"
@@ -480,9 +482,12 @@ export class ActivityLogPageComponent implements OnInit, OnDestroy {
   // ── Filters ──
   readonly filterAction = signal('');
   readonly filterEntity = signal('');
-  readonly filterEmail = signal('');
+  readonly filterUserId = signal('');
   readonly filterDateFrom = signal('');
   readonly filterDateTo = signal('');
+
+  // ── Users for filter dropdown ──
+  readonly allUsers = signal<{ id: string; name: string; email: string }[]>([]);
 
   // ── Expanded detail ──
   readonly expandedLogId = signal<string | null>(null);
@@ -499,6 +504,9 @@ export class ActivityLogPageComponent implements OnInit, OnDestroy {
 
     // Load retention setting
     this.loadRetention();
+
+    // Load users for filter dropdown
+    this.loadUsers();
 
     // Load initial logs
     this.loadLogs();
@@ -576,6 +584,17 @@ export class ActivityLogPageComponent implements OnInit, OnDestroy {
     return null;
   }
 
+  async loadUsers(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ id: string; name: string; email: string }[]>>(`${API}/admin/users`),
+      );
+      if (res.success && res.data) {
+        this.allUsers.set(res.data.sort((a, b) => (a.name || a.email).localeCompare(b.name || b.email)));
+      }
+    } catch { /* silent */ }
+  }
+
   // ── Audit log methods ──
 
   async loadLogs(): Promise<void> {
@@ -587,6 +606,7 @@ export class ActivityLogPageComponent implements OnInit, OnDestroy {
       };
       if (this.filterAction()) params['action'] = this.filterAction();
       if (this.filterEntity()) params['entityType'] = this.filterEntity();
+      if (this.filterUserId()) params['userId'] = this.filterUserId();
       if (this.filterDateFrom()) params['dateFrom'] = this.filterDateFrom();
       if (this.filterDateTo()) params['dateTo'] = this.filterDateTo();
       if (this.sortBy()) { params['sortBy'] = this.sortBy(); params['sortDir'] = this.sortDir(); }
