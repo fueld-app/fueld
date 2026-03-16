@@ -1091,6 +1091,33 @@ export interface PipelineResponseDto {
   stages: PipelineStageDto[];
 }
 
+/** A single loss / cancel reason with its count and percentage. */
+export interface LossReasonDto {
+  reason: string;
+  count: number;
+  percentage: number;
+}
+
+/** Loss analysis response (cancel reason breakdown). */
+export interface LossAnalysisResponseDto {
+  reasons: LossReasonDto[];
+  totalCancelled: number;
+}
+
+/** Conversion metrics for the selected period. */
+export interface ConversionMetricsDto {
+  /** Total inquiries created in the period. */
+  totalInquiries: number;
+  /** Inquiries that progressed to at least CONFIRMED. */
+  totalWon: number;
+  /** Inquiries that were CANCELLED. */
+  totalLost: number;
+  /** Win rate (totalWon / (totalWon + totalLost)), 0–1. */
+  winRate: number;
+  /** Average days from INQUIRY creation to closedAt for won orders. */
+  avgDaysToClose: number | null;
+}
+
 /** Request to send an invoice email. */
 export interface SendInvoiceRequestDto {
   accessToken: string;

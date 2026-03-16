@@ -105,6 +105,7 @@ function getTruncateTables() {
     'credit_line_companies',
     'credit_line_counterparties',
     'credit_lines',
+    'company_offices',
     'supplier_inquiry_item_quotes',
     'supplier_inquiries',
     'email_rules',
@@ -450,6 +451,29 @@ async function _doEnsureTestSchemaCompat(): Promise<void> {
       decision credit_application_review_decision NOT NULL,
       comment text,
       decided_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+
+  // Migration 0050 – place_remark on orders
+  await sql`
+    ALTER TABLE orders
+    ADD COLUMN IF NOT EXISTS place_remark text
+  `;
+
+  // Migration 0051 – company_offices
+  await sql`
+    CREATE TABLE IF NOT EXISTS company_offices (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      counterparty_id uuid NOT NULL REFERENCES counterparties(id) ON DELETE CASCADE,
+      label text NOT NULL,
+      address text,
+      city text,
+      country text,
+      phone text,
+      email text,
+      is_hq boolean NOT NULL DEFAULT false,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
     )
   `;
 

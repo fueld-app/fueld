@@ -253,7 +253,15 @@ export interface PipelineSummary {
 /**
  * Returns count + total value grouped by order status.
  */
-export async function getPipelineSummary(tenantId: string): Promise<PipelineSummary[]> {
+export async function getPipelineSummary(
+  tenantId: string,
+  from?: string,
+  to?: string,
+): Promise<PipelineSummary[]> {
+  const conditions = [eq(orders.tenantId, tenantId)];
+  if (from) conditions.push(gte(orders.createdAt, new Date(`${from}T00:00:00`)));
+  if (to) conditions.push(lte(orders.createdAt, new Date(`${to}T23:59:59`)));
+
   const results = await db
     .select({
       status: orders.status,
@@ -262,7 +270,7 @@ export async function getPipelineSummary(tenantId: string): Promise<PipelineSumm
     })
     .from(orders)
     .leftJoin(orderItems, eq(orderItems.orderId, orders.id))
-    .where(eq(orders.tenantId, tenantId))
+    .where(and(...conditions))
     .groupBy(orders.status);
 
   return results.map((r) => ({
@@ -270,6 +278,117 @@ export async function getPipelineSummary(tenantId: string): Promise<PipelineSumm
     count: Number(r.count),
     totalValue: String(r.totalValue),
   }));
+}
+
+// ─── Loss Analysis (cancel‑reason breakdown) ─────────────────────────
+
+export interface LossReason {
+  reason: string;
+  count: number;
+  percentage: number;
+}
+
+/**
+ * Aggregates cancelled orders by their loss reason.
+ */
+export async function getLossAnalysis(
+  tenantId: string,
+  from?: string,
+  to?: string,
+): Promise<{ reasons: LossReason[]; totalCancelled: number }> {
+  const conditions = [
+    eq(orders.tenantId, tenantId),
+    eq(orders.status, 'CANCELLED'),
+    isNotNull(orders.lossReason),
+  ];
+  if (from) conditions.push(gte(orders.createdAt, new Date(`${from}T00:00:00`)));
+  if (to) conditions.push(lte(orders.createdAt, new Date(`${to}T23:59:59`)));
+
+  const results = await db
+    .select({
+      reason: orders.lossReason,
+      count: sql<number>`count(*)`.as('count'),
+    })
+    .from(orders)
+    .where(and(...conditions))
+    .groupBy(orders.lossReason)
+    .orderBy(sql`count(*) desc`);
+
+  const totalCancelled = results.reduce((sum, r) => sum + Number(r.count), 0);
+
+  return {
+    reasons: results.map((r) => ({
+      reason: r.reason!,
+      count: Number(r.count),
+      percentage: totalCancelled > 0 ? Number(r.count) / totalCancelled : 0,
+    })),
+    totalCancelled,
+  };
+}
+
+// ─── Conversion Metrics ──────────────────────────────────────────────
+
+export interface ConversionMetrics {
+  totalInquiries: number;
+  totalWon: number;
+  totalLost: number;
+  winRate: number;
+  avgDaysToClose: number | null;
+}
+
+/**
+ * Calculates win rate and average time-to-close for Orders created in the period.
+ *
+ * "Won" = reached CONFIRMED, DELIVERED, INVOICED, or PAID.
+ * "Lost" = CANCELLED.
+ */
+export async function getConversionMetrics(
+  tenantId: string,
+  from?: string,
+  to?: string,
+): Promise<ConversionMetrics> {
+  const conditions = [eq(orders.tenantId, tenantId)];
+  if (from) conditions.push(gte(orders.createdAt, new Date(`${from}T00:00:00`)));
+  if (to) conditions.push(lte(orders.createdAt, new Date(`${to}T23:59:59`)));
+
+  const wonStatuses = ['CONFIRMED', 'DELIVERED', 'INVOICED', 'PAID'];
+
+  const rows = await db
+    .select({
+      status: orders.status,
+      createdAt: orders.createdAt,
+      closedAt: orders.closedAt,
+    })
+    .from(orders)
+    .where(and(...conditions));
+
+  let totalInquiries = rows.length;
+  let totalWon = 0;
+  let totalLost = 0;
+  let closeDaysSum = 0;
+  let closeDaysCount = 0;
+
+  for (const row of rows) {
+    if (wonStatuses.includes(row.status)) {
+      totalWon++;
+      if (row.closedAt && row.createdAt) {
+        const days = (new Date(row.closedAt).getTime() - new Date(row.createdAt).getTime()) / 86_400_000;
+        closeDaysSum += days;
+        closeDaysCount++;
+      }
+    } else if (row.status === 'CANCELLED') {
+      totalLost++;
+    }
+  }
+
+  const decided = totalWon + totalLost;
+  return {
+    totalInquiries,
+    totalWon,
+    totalLost,
+    winRate: decided > 0 ? totalWon / decided : 0,
+    avgDaysToClose: closeDaysCount > 0 ? Math.round((closeDaysSum / closeDaysCount) * 10) / 10 : null,
+  };
 }
 
 // ─── Vacation / Delegation Helper ────────────────────────────────────

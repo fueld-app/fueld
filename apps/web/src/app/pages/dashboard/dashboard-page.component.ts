@@ -9,10 +9,16 @@ import {
   ViewChild,
   OnDestroy,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
-import type { CollectionsResponseDto, TeamStatsResponseDto, TraderStatsDto } from '@fueld/types';
+import type {
+  CollectionsResponseDto,
+  TeamStatsResponseDto,
+  TraderStatsDto,
+  PipelineStageDto,
+  LossReasonDto,
+  ConversionMetricsDto,
+} from '@fueld/types';
 import { firstValueFrom } from 'rxjs';
 
 import { CollectionsWidgetComponent } from '../../features/dashboard/components/collections-widget/collections-widget.component';
@@ -26,7 +32,7 @@ import { API } from '@app/core/config/api';
 @Component({
   selector: 'app-dashboard-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, FormsModule, CollectionsWidgetComponent],
+  imports: [FormsModule, CollectionsWidgetComponent],
   template: `
     <div>
       <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -142,16 +148,84 @@ import { API } from '@app/core/config/api';
 
       <!-- Pipeline & Loss Analysis -->
       <div class="mt-8 grid gap-6 lg:grid-cols-2">
+        <!-- Sales Funnel / Pipeline -->
+        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">Sales Pipeline</h3>
+          @if (pipelineStages().length === 0) {
+            <p class="text-sm text-gray-500">No data for this period.</p>
+          } @else {
+            <div class="space-y-3">
+              @for (stage of pipelineStages(); track stage.status) {
+                <div>
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="text-sm font-medium text-gray-700">{{ stage.status }}</span>
+                    <span class="text-sm font-semibold text-gray-900">{{ stage.count }} <span class="text-xs font-normal text-gray-500">({{ formatUsd(parseNumber(stage.totalValue)) }})</span></span>
+                  </div>
+                  <div class="h-3 w-full rounded-full bg-gray-100 overflow-hidden">
+                    <div
+                      class="h-3 rounded-full transition-all duration-300"
+                      [class]="pipelineBarColor(stage.status)"
+                      [style.width.%]="pipelineBarWidth(stage.count)"
+                    ></div>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+
+        <!-- Loss Analysis (cancel reasons) -->
         <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
           <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-semibold text-gray-900">Sales Funnel</h3>
-            <a routerLink="/analytics" class="text-xs font-medium text-brand-600 hover:text-brand-700 transition-colors">View Analytics &rarr;</a>
+            <h3 class="text-lg font-semibold text-gray-900">Loss Analysis</h3>
+            @if (lossAnalysis().totalCancelled > 0) {
+              <span class="text-xs font-medium text-gray-500">{{ lossAnalysis().totalCancelled }} cancelled</span>
+            }
           </div>
-          <p class="text-sm text-gray-500">No data available yet.</p>
+          @if (lossAnalysis().reasons.length === 0) {
+            <p class="text-sm text-gray-500">No cancellations in this period.</p>
+          } @else {
+            <div class="space-y-3">
+              @for (reason of lossAnalysis().reasons; track reason.reason) {
+                <div>
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="text-sm text-gray-700 truncate max-w-[70%]">{{ reason.reason }}</span>
+                    <span class="text-sm font-semibold text-gray-900">{{ reason.count }} <span class="text-xs font-normal text-gray-500">({{ (reason.percentage * 100).toFixed(0) }}%)</span></span>
+                  </div>
+                  <div class="h-2.5 w-full rounded-full bg-gray-100 overflow-hidden">
+                    <div
+                      class="h-2.5 rounded-full bg-red-400 transition-all duration-300"
+                      [style.width.%]="reason.percentage * 100"
+                    ></div>
+                  </div>
+                </div>
+              }
+            </div>
+          }
         </div>
-        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <h3 class="text-lg font-semibold text-gray-900 mb-4">Loss Analysis</h3>
-          <p class="text-sm text-gray-500">No data available yet.</p>
+      </div>
+
+      <!-- Conversion Metrics -->
+      <div class="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="app-kpi-card">
+          <p class="text-sm font-medium text-gray-500">Win Rate</p>
+          <p class="mt-2 text-3xl font-bold" [class]="conversionMetrics().winRate >= 0.5 ? 'text-emerald-600' : 'text-amber-600'">
+            {{ (conversionMetrics().winRate * 100).toFixed(1) }}%
+          </p>
+          <p class="mt-1 text-xs text-gray-400">{{ conversionMetrics().totalWon }}W / {{ conversionMetrics().totalLost }}L of {{ conversionMetrics().totalInquiries }} total</p>
+        </div>
+        <div class="app-kpi-card">
+          <p class="text-sm font-medium text-gray-500">Avg. Days to Close</p>
+          <p class="mt-2 text-3xl font-bold text-gray-900">{{ conversionMetrics().avgDaysToClose !== null ? conversionMetrics().avgDaysToClose : '—' }}</p>
+          <p class="mt-1 text-xs text-gray-400">From inquiry to confirmed</p>
+        </div>
+        <div class="app-kpi-card">
+          <p class="text-sm font-medium text-gray-500">Won Orders</p>
+          <p class="mt-2 text-3xl font-bold text-emerald-600">{{ conversionMetrics().totalWon }}</p>
+        </div>
+        <div class="app-kpi-card">
+          <p class="text-sm font-medium text-gray-500">Lost Orders</p>
+          <p class="mt-2 text-3xl font-bold text-red-500">{{ conversionMetrics().totalLost }}</p>
         </div>
       </div>
     </div>
@@ -265,6 +339,9 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     avgDealSize: '—',
     traderPerformance: [],
   });
+  readonly pipelineStages = signal<PipelineStageDto[]>([]);
+  readonly lossAnalysis = signal<{ reasons: LossReasonDto[]; totalCancelled: number }>({ reasons: [], totalCancelled: 0 });
+  readonly conversionMetrics = signal<ConversionMetricsDto>({ totalInquiries: 0, totalWon: 0, totalLost: 0, winRate: 0, avgDaysToClose: null });
 
   constructor() {}
 
@@ -341,9 +418,12 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     try {
       const query = this.buildDateQuery();
       const suffix = query ? `?${query}` : '';
-      const [collectionsRes, teamRes] = await Promise.all([
+      const [collectionsRes, teamRes, pipelineRes, lossRes, convRes] = await Promise.all([
         firstValueFrom(this.http.get<CollectionsResponseDto>(`${API}/dashboard/collections${suffix}`)),
         firstValueFrom(this.http.get<{ traders: TraderStatsDto[] }>(`${API}/dashboard/team-stats${suffix}`)),
+        firstValueFrom(this.http.get<{ stages: PipelineStageDto[] }>(`${API}/dashboard/pipeline${suffix}`)),
+        firstValueFrom(this.http.get<{ reasons: LossReasonDto[]; totalCancelled: number }>(`${API}/dashboard/loss-analysis${suffix}`)),
+        firstValueFrom(this.http.get<ConversionMetricsDto>(`${API}/dashboard/conversion${suffix}`)),
       ]);
 
       const itemsWithComments = (collectionsRes.items ?? []).map((item) => ({
@@ -353,6 +433,15 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
       this.collections.set({ items: itemsWithComments, count: collectionsRes.count ?? itemsWithComments.length });
       this.rawTraderStats.set(teamRes.traders ?? []);
       this.applyTeamStats();
+
+      // Pipeline — order stages logically
+      const statusOrder = ['INQUIRY', 'OFFER', 'CONFIRMED', 'DELIVERED', 'INVOICED', 'PAID', 'CANCELLED'];
+      const sorted = [...(pipelineRes.stages ?? [])].sort(
+        (a, b) => statusOrder.indexOf(a.status) - statusOrder.indexOf(b.status),
+      );
+      this.pipelineStages.set(sorted);
+      this.lossAnalysis.set({ reasons: lossRes.reasons ?? [], totalCancelled: lossRes.totalCancelled ?? 0 });
+      this.conversionMetrics.set(convRes);
     } catch {
       this.collections.set({ items: [], count: 0 });
       this.teamStats.set({
@@ -364,6 +453,9 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
         avgDealSize: '—',
         traderPerformance: [],
       });
+      this.pipelineStages.set([]);
+      this.lossAnalysis.set({ reasons: [], totalCancelled: 0 });
+      this.conversionMetrics.set({ totalInquiries: 0, totalWon: 0, totalLost: 0, winRate: 0, avgDaysToClose: null });
     }
   }
 
@@ -405,18 +497,38 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     });
   }
 
-  private parseNumber(value: string | null | undefined): number {
+  parseNumber(value: string | null | undefined): number {
     if (value === null || value === undefined) return 0;
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : 0;
   }
 
-  private formatUsd(value: number): string {
+  formatUsd(value: number): string {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
       maximumFractionDigits: 2,
     }).format(value);
+  }
+
+  // ─── Pipeline Helpers ────────────────────────────────────────────
+
+  pipelineBarWidth(count: number): number {
+    const max = Math.max(...this.pipelineStages().map((s) => s.count), 1);
+    return (count / max) * 100;
+  }
+
+  pipelineBarColor(status: string): string {
+    const colors: Record<string, string> = {
+      INQUIRY: 'bg-blue-400',
+      OFFER: 'bg-indigo-400',
+      CONFIRMED: 'bg-emerald-500',
+      DELIVERED: 'bg-teal-500',
+      INVOICED: 'bg-amber-500',
+      PAID: 'bg-green-600',
+      CANCELLED: 'bg-red-400',
+    };
+    return colors[status] ?? 'bg-gray-400';
   }
 
 }

@@ -22,6 +22,8 @@ beforeEach(async () => {
 });
 
 describe('dashboard.service', () => {
+  // ─── Collections ─────────────────────────────────────────────────
+
   it('returns overdue collections ordered by due date and respects date filters', async () => {
     const { tenant, client, vessel, place, user } = await seedBasics();
     const db = await getDb();
@@ -97,6 +99,8 @@ describe('dashboard.service', () => {
     expect(filtered.length).toBe(1);
     expect(filtered[0]?.invoiceNumber).toBe('INV-OLD-2');
   });
+
+  // ─── Team Stats ──────────────────────────────────────────────────
 
   it('returns empty team stats when user cannot see any trader ids', async () => {
     const { tenant } = await seedBasics();
@@ -223,6 +227,8 @@ describe('dashboard.service', () => {
     expect(visibleIds).toEqual([delegator.id, user.id].sort());
   });
 
+  // ─── Pipeline Summary ────────────────────────────────────────────
+
   it('summarizes pipeline by order status and total value', async () => {
     const { tenant, client, vessel, place, user } = await seedBasics();
     const { createOrder } = await loadOrdersService();
@@ -261,5 +267,285 @@ describe('dashboard.service', () => {
     expect(Number(inquiry?.totalValue)).toBe(1600);
     expect(confirmed?.count).toBe(1);
     expect(Number(confirmed?.totalValue)).toBe(1000);
+  });
+
+  it('filters pipeline by date range', async () => {
+    const { tenant, client, vessel, place, user } = await seedBasics();
+    const { createOrder } = await loadOrdersService();
+    const { getPipelineSummary } = await loadDashboardService();
+    const db = await getDb();
+
+    const oldOrder = await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+    });
+    await db.update(orders).set({ createdAt: new Date('2026-01-15T10:00:00.000Z') }).where(eq(orders.id, oldOrder.id));
+    await db.insert(orderItems).values([
+      { orderId: oldOrder.id, productType: 'VLSFO', quantity: '10', unit: 'MT', salesPrice: '100', costPrice: '80', profit: '200.0000', costPricingModel: 'FIXED', salesPricingModel: 'FIXED', costPriceFinalized: false, salesPriceFinalized: false },
+    ]);
+
+    const newOrder = await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+    });
+    await db.update(orders).set({ createdAt: new Date('2026-03-10T10:00:00.000Z') }).where(eq(orders.id, newOrder.id));
+    await db.insert(orderItems).values([
+      { orderId: newOrder.id, productType: 'LSMGO', quantity: '5', unit: 'MT', salesPrice: '200', costPrice: '150', profit: '250.0000', costPricingModel: 'FIXED', salesPricingModel: 'FIXED', costPriceFinalized: false, salesPriceFinalized: false },
+    ]);
+
+    // Without filter — both orders
+    const allPipeline = await getPipelineSummary(tenant.id);
+    const allInquiry = allPipeline.find((s) => s.status === 'INQUIRY');
+    expect(allInquiry?.count).toBe(2);
+
+    // With date filter — only March order
+    const filtered = await getPipelineSummary(tenant.id, '2026-03-01', '2026-03-31');
+    const marchInquiry = filtered.find((s) => s.status === 'INQUIRY');
+    expect(marchInquiry?.count).toBe(1);
+    expect(Number(marchInquiry?.totalValue)).toBe(1000);
+  });
+
+  // ─── Loss Analysis ───────────────────────────────────────────────
+
+  it('aggregates cancel reasons with counts and percentages', async () => {
+    const { tenant, client, vessel, place, user } = await seedBasics();
+    const { createOrder } = await loadOrdersService();
+    const { getLossAnalysis } = await loadDashboardService();
+    const db = await getDb();
+
+    // Create 3 cancelled orders with different reasons
+    for (const reason of ['Price not competitive', 'Price not competitive', 'Customer cancelled request']) {
+      const order = await createOrder({
+        tenantId: tenant.id,
+        clientId: client.id,
+        vesselId: vessel.id,
+        placeId: place.id,
+        salesRepId: user.id,
+      });
+      await db.update(orders).set({
+        status: 'CANCELLED',
+        lossReason: reason,
+        closedAt: new Date(),
+        updatedAt: new Date(),
+      }).where(eq(orders.id, order.id));
+    }
+
+    // Create a non-cancelled order — should not appear
+    await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+    });
+
+    const result = await getLossAnalysis(tenant.id);
+    expect(result.totalCancelled).toBe(3);
+    expect(result.reasons.length).toBe(2);
+
+    const priceReason = result.reasons.find((r) => r.reason === 'Price not competitive');
+    expect(priceReason?.count).toBe(2);
+    expect(priceReason?.percentage).toBeCloseTo(2 / 3, 4);
+
+    const cancelReason = result.reasons.find((r) => r.reason === 'Customer cancelled request');
+    expect(cancelReason?.count).toBe(1);
+    expect(cancelReason?.percentage).toBeCloseTo(1 / 3, 4);
+  });
+
+  it('filters loss analysis by date range', async () => {
+    const { tenant, client, vessel, place, user } = await seedBasics();
+    const { createOrder } = await loadOrdersService();
+    const { getLossAnalysis } = await loadDashboardService();
+    const db = await getDb();
+
+    const oldOrder = await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+    });
+    await db.update(orders).set({
+      status: 'CANCELLED',
+      lossReason: 'Old reason',
+      closedAt: new Date('2026-01-10T12:00:00Z'),
+      createdAt: new Date('2026-01-10T12:00:00Z'),
+      updatedAt: new Date(),
+    }).where(eq(orders.id, oldOrder.id));
+
+    const recentOrder = await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+    });
+    await db.update(orders).set({
+      status: 'CANCELLED',
+      lossReason: 'Recent reason',
+      closedAt: new Date('2026-03-10T12:00:00Z'),
+      createdAt: new Date('2026-03-10T12:00:00Z'),
+      updatedAt: new Date(),
+    }).where(eq(orders.id, recentOrder.id));
+
+    const all = await getLossAnalysis(tenant.id);
+    expect(all.totalCancelled).toBe(2);
+
+    const filtered = await getLossAnalysis(tenant.id, '2026-03-01', '2026-03-31');
+    expect(filtered.totalCancelled).toBe(1);
+    expect(filtered.reasons[0]?.reason).toBe('Recent reason');
+  });
+
+  it('returns empty loss analysis when no cancellations exist', async () => {
+    const { tenant } = await seedBasics();
+    const { getLossAnalysis } = await loadDashboardService();
+
+    const result = await getLossAnalysis(tenant.id);
+    expect(result.totalCancelled).toBe(0);
+    expect(result.reasons).toEqual([]);
+  });
+
+  // ─── Conversion Metrics ──────────────────────────────────────────
+
+  it('calculates win rate and average days to close', async () => {
+    const { tenant, client, vessel, place, user } = await seedBasics();
+    const { createOrder } = await loadOrdersService();
+    const { getConversionMetrics } = await loadDashboardService();
+    const db = await getDb();
+
+    // Won order (CONFIRMED) with closedAt
+    const wonOrder = await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+    });
+    await db.update(orders).set({
+      status: 'CONFIRMED',
+      createdAt: new Date('2026-03-01T10:00:00Z'),
+      closedAt: new Date('2026-03-04T10:00:00Z'),
+      updatedAt: new Date(),
+    }).where(eq(orders.id, wonOrder.id));
+
+    // Another won order (PAID)
+    const paidOrder = await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+    });
+    await db.update(orders).set({
+      status: 'PAID',
+      createdAt: new Date('2026-03-02T10:00:00Z'),
+      closedAt: new Date('2026-03-06T10:00:00Z'),
+      updatedAt: new Date(),
+    }).where(eq(orders.id, paidOrder.id));
+
+    // Lost order
+    const lostOrder = await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+    });
+    await db.update(orders).set({
+      status: 'CANCELLED',
+      lossReason: 'Price not competitive',
+      createdAt: new Date('2026-03-03T10:00:00Z'),
+      closedAt: new Date('2026-03-03T14:00:00Z'),
+      updatedAt: new Date(),
+    }).where(eq(orders.id, lostOrder.id));
+
+    // Open inquiry (neither won nor lost)
+    await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+    });
+
+    const metrics = await getConversionMetrics(tenant.id, '2026-03-01', '2026-03-31');
+    expect(metrics.totalInquiries).toBe(4);
+    expect(metrics.totalWon).toBe(2);
+    expect(metrics.totalLost).toBe(1);
+    expect(metrics.winRate).toBeCloseTo(2 / 3, 4);
+    // Won orders: 3 days + 4 days = 7, avg = 3.5
+    expect(metrics.avgDaysToClose).toBe(3.5);
+  });
+
+  it('returns zero win rate when no decided orders exist', async () => {
+    const { tenant, client, vessel, place, user } = await seedBasics();
+    const { createOrder } = await loadOrdersService();
+    const { getConversionMetrics } = await loadDashboardService();
+
+    // Only open inquiries
+    await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+    });
+
+    const metrics = await getConversionMetrics(tenant.id);
+    expect(metrics.totalInquiries).toBe(1);
+    expect(metrics.totalWon).toBe(0);
+    expect(metrics.totalLost).toBe(0);
+    expect(metrics.winRate).toBe(0);
+    expect(metrics.avgDaysToClose).toBeNull();
+  });
+
+  it('filters conversion metrics by date range', async () => {
+    const { tenant, client, vessel, place, user } = await seedBasics();
+    const { createOrder } = await loadOrdersService();
+    const { getConversionMetrics } = await loadDashboardService();
+    const db = await getDb();
+
+    // Old won order outside the filter range
+    const oldWon = await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+    });
+    await db.update(orders).set({
+      status: 'CONFIRMED',
+      createdAt: new Date('2026-01-05T10:00:00Z'),
+      closedAt: new Date('2026-01-08T10:00:00Z'),
+      updatedAt: new Date(),
+    }).where(eq(orders.id, oldWon.id));
+
+    // Recent lost order inside the filter range
+    const recentLost = await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+    });
+    await db.update(orders).set({
+      status: 'CANCELLED',
+      lossReason: 'No supplier availability',
+      createdAt: new Date('2026-03-10T10:00:00Z'),
+      closedAt: new Date('2026-03-10T12:00:00Z'),
+      updatedAt: new Date(),
+    }).where(eq(orders.id, recentLost.id));
+
+    const metrics = await getConversionMetrics(tenant.id, '2026-03-01', '2026-03-31');
+    expect(metrics.totalInquiries).toBe(1);
+    expect(metrics.totalWon).toBe(0);
+    expect(metrics.totalLost).toBe(1);
+    expect(metrics.winRate).toBe(0);
   });
 });
