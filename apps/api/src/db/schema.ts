@@ -217,6 +217,13 @@ export interface TenantSettings {
     notifyEmail: boolean;
     notifyWhatsApp: boolean;
   };
+  // Company segmentation — admin-configurable categories & options
+  segmentCategories?: {
+    key: string;           // stable identifier (e.g. 'business', 'purchasing')
+    label: string;         // display name
+    mode: 'multi' | 'single';
+    options: { key: string; label: string; description?: string }[];
+  }[];
 }
 
 export const tenants = pgTable('tenants', {
@@ -396,6 +403,10 @@ export const counterparties = pgTable('counterparties', {
 
   // Late payment interest rate (e.g. "2%") — shown on invoices
   latePaymentInterest: text('late_payment_interest'),
+
+  // ── Company segmentation ───────────────────────────────────────────
+  // Keys match segmentCategories[].key; values are option key(s)
+  segments: jsonb('segments').$type<Record<string, string | string[]>>().default({}),
 
   // ── Parent / Child hierarchy ────────────────────────────────────────
   // Single-level only: a parent cannot be a child, a child cannot be a parent.

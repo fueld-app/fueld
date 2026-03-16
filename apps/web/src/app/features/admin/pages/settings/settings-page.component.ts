@@ -1023,6 +1023,135 @@ interface InquirySettingsDto {
             </div>
           </div>
 
+          <!-- ════════════════════════════════════════════════════════ -->
+          <!--  Company Segmentation                                    -->
+          <!-- ════════════════════════════════════════════════════════ -->
+          <div class="app-panel min-[900px]:col-span-2 min-[2000px]:col-span-2">
+            <div class="app-panel-header app-panel-header--violet">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--violet">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-violet-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M2 4.5A2.5 2.5 0 014.5 2h11A2.5 2.5 0 0118 4.5v3.757c0 .663-.263 1.299-.732 1.768l-7.2 7.2a2.5 2.5 0 01-3.536 0l-3.768-3.768A2.5 2.5 0 012 11.69V4.5zm5-1a1 1 0 100 2 1 1 0 000-2z" />
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-semibold text-gray-900">Company Segmentation</h3>
+                <p class="text-xs text-gray-500">Define segment categories and options that can be assigned to companies.</p>
+              </div>
+            </div>
+
+            <div class="app-panel-body space-y-5">
+              @for (cat of segmentCategories(); track cat.key; let ci = $index) {
+                <div class="rounded-lg border border-gray-200 bg-gray-50/50 p-4 space-y-3">
+                  <div class="flex items-center gap-3">
+                    <div class="flex flex-col gap-0.5 shrink-0">
+                      <button (click)="moveSegmentCategoryUp(ci)" [disabled]="ci === 0" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move up">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
+                      </button>
+                      <button (click)="moveSegmentCategoryDown(ci)" [disabled]="ci === segmentCategories().length - 1" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move down">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      [value]="cat.label"
+                      (input)="updateSegmentCategoryLabel(ci, $any($event.target).value)"
+                      placeholder="Category name"
+                      class="app-input flex-1"
+                    />
+                    <select
+                      [value]="cat.mode"
+                      (change)="updateSegmentCategoryMode(ci, $any($event.target).value)"
+                      class="app-input w-32"
+                    >
+                      <option value="multi">Multi-select</option>
+                      <option value="single">Single-select</option>
+                    </select>
+                    <button
+                      (click)="removeSegmentCategory(ci)"
+                      [disabled]="segmentCategories().length <= 1"
+                      class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 transition-colors shrink-0"
+                      title="Remove category"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <!-- Options for this category -->
+                  <div class="ml-8 space-y-2">
+                    @for (opt of cat.options; track opt.key; let oi = $index) {
+                      <div class="flex items-center gap-2">
+                        <div class="flex flex-col gap-0.5 shrink-0">
+                          <button (click)="moveSegmentOptionUp(ci, oi)" [disabled]="oi === 0" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move up">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
+                          </button>
+                          <button (click)="moveSegmentOptionDown(ci, oi)" [disabled]="oi === cat.options.length - 1" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move down">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          [value]="opt.label"
+                          (input)="updateSegmentOptionLabel(ci, oi, $any($event.target).value)"
+                          placeholder="Option name"
+                          class="app-input flex-1"
+                        />
+                        <button
+                          (click)="removeSegmentOption(ci, oi)"
+                          [disabled]="cat.options.length <= 1"
+                          class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 transition-colors shrink-0"
+                          title="Remove option"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                          </svg>
+                        </button>
+                      </div>
+                    }
+                    <button
+                      (click)="addSegmentOption(ci)"
+                      class="text-xs text-violet-600 hover:text-violet-700 font-medium flex items-center gap-1"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+                      </svg>
+                      Add Option
+                    </button>
+                  </div>
+                </div>
+              }
+
+              <button
+                (click)="addSegmentCategory()"
+                class="app-button-add"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+                </svg>
+                Add Category
+              </button>
+
+              <div class="flex items-center gap-3 pt-2">
+                <button
+                  (click)="saveSegments()"
+                  [disabled]="segmentsSaving()"
+                  class="app-button-primary"
+                >
+                  @if (segmentsSaving()) { Saving… } @else { Save Segments }
+                </button>
+                @if (segmentsSaved()) {
+                  <span class="text-sm text-green-600 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                    </svg>
+                    Saved
+                  </span>
+                }
+              </div>
+            </div>
+          </div>
+
         </div>
       }
 
@@ -1105,6 +1234,11 @@ export class SettingsPageComponent implements OnInit {
   readonly inquirySaveSuccess = signal('');
   readonly inquirySaveError = signal('');
 
+  // Company segmentation
+  readonly segmentCategories = signal<{ key: string; label: string; mode: 'multi' | 'single'; options: { key: string; label: string; description?: string }[] }[]>([]);
+  readonly segmentsSaving = signal(false);
+  readonly segmentsSaved = signal(false);
+
   readonly livePreview = computed(() => {
     const tmpl = this.template();
     const pfx = this.prefix();
@@ -1141,6 +1275,7 @@ export class SettingsPageComponent implements OnInit {
     this.loadAttachmentTypes();
     this.loadInquirySettings();
     this.loadInquiryCancelReasons();
+    this.loadSegments();
   }
 
   private async loadSettings(): Promise<void> {
@@ -1958,6 +2093,147 @@ export class SettingsPageComponent implements OnInit {
       this.showToast('error', 'Failed to save inquiry cancellation reasons.');
     } finally {
       this.inquiryCancelReasonsSaving.set(false);
+    }
+  }
+
+  // ─── Company segmentation ─────────────────────────────────────────
+
+  private async loadSegments(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ segmentCategories: { key: string; label: string; mode: 'multi' | 'single'; options: { key: string; label: string; description?: string }[] }[] }>>(`${API}/admin/settings/segment-settings`),
+      );
+      if (res.success) this.segmentCategories.set(res.data.segmentCategories);
+    } catch {
+      this.showToast('error', 'Failed to load segment settings.');
+    }
+  }
+
+  private generateKey(label: string): string {
+    return label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || `item_${Date.now()}`;
+  }
+
+  addSegmentCategory(): void {
+    const key = `category_${Date.now()}`;
+    this.segmentCategories.set([
+      ...this.segmentCategories(),
+      { key, label: '', mode: 'multi', options: [{ key: `option_${Date.now()}`, label: '' }] },
+    ]);
+  }
+
+  removeSegmentCategory(index: number): void {
+    this.segmentCategories.set(this.segmentCategories().filter((_, i) => i !== index));
+  }
+
+  moveSegmentCategoryUp(index: number): void {
+    if (index <= 0) return;
+    const cats = [...this.segmentCategories()];
+    [cats[index - 1], cats[index]] = [cats[index], cats[index - 1]];
+    this.segmentCategories.set(cats);
+  }
+
+  moveSegmentCategoryDown(index: number): void {
+    const cats = [...this.segmentCategories()];
+    if (index >= cats.length - 1) return;
+    [cats[index], cats[index + 1]] = [cats[index + 1], cats[index]];
+    this.segmentCategories.set(cats);
+  }
+
+  updateSegmentCategoryLabel(catIndex: number, label: string): void {
+    const cats = this.segmentCategories().map((c, i) =>
+      i === catIndex ? { ...c, label, key: c.key.startsWith('category_') ? this.generateKey(label) : c.key } : c,
+    );
+    this.segmentCategories.set(cats);
+  }
+
+  updateSegmentCategoryMode(catIndex: number, mode: string): void {
+    const cats = this.segmentCategories().map((c, i) =>
+      i === catIndex ? { ...c, mode: mode as 'multi' | 'single' } : c,
+    );
+    this.segmentCategories.set(cats);
+  }
+
+  addSegmentOption(catIndex: number): void {
+    const cats = this.segmentCategories().map((c, i) =>
+      i === catIndex
+        ? { ...c, options: [...c.options, { key: `option_${Date.now()}`, label: '' }] }
+        : c,
+    );
+    this.segmentCategories.set(cats);
+  }
+
+  removeSegmentOption(catIndex: number, optIndex: number): void {
+    const cats = this.segmentCategories().map((c, i) =>
+      i === catIndex
+        ? { ...c, options: c.options.filter((_, oi) => oi !== optIndex) }
+        : c,
+    );
+    this.segmentCategories.set(cats);
+  }
+
+  moveSegmentOptionUp(catIndex: number, optIndex: number): void {
+    if (optIndex <= 0) return;
+    const cats = this.segmentCategories().map((c, i) => {
+      if (i !== catIndex) return c;
+      const opts = [...c.options];
+      [opts[optIndex - 1], opts[optIndex]] = [opts[optIndex], opts[optIndex - 1]];
+      return { ...c, options: opts };
+    });
+    this.segmentCategories.set(cats);
+  }
+
+  moveSegmentOptionDown(catIndex: number, optIndex: number): void {
+    const cats = this.segmentCategories().map((c, i) => {
+      if (i !== catIndex) return c;
+      if (optIndex >= c.options.length - 1) return c;
+      const opts = [...c.options];
+      [opts[optIndex], opts[optIndex + 1]] = [opts[optIndex + 1], opts[optIndex]];
+      return { ...c, options: opts };
+    });
+    this.segmentCategories.set(cats);
+  }
+
+  updateSegmentOptionLabel(catIndex: number, optIndex: number, label: string): void {
+    const cats = this.segmentCategories().map((c, ci) => {
+      if (ci !== catIndex) return c;
+      const options = c.options.map((o, oi) =>
+        oi === optIndex ? { ...o, label, key: o.key.startsWith('option_') ? this.generateKey(label) : o.key } : o,
+      );
+      return { ...c, options };
+    });
+    this.segmentCategories.set(cats);
+  }
+
+  async saveSegments(): Promise<void> {
+    const cats = this.segmentCategories().filter(c => c.label.trim() && c.options.some(o => o.label.trim()));
+    if (cats.length === 0) {
+      this.showToast('error', 'At least one category with one option is required.');
+      return;
+    }
+    // Clean empty options
+    const cleaned = cats.map(c => ({
+      ...c,
+      label: c.label.trim(),
+      options: c.options.filter(o => o.label.trim()).map(o => ({ ...o, label: o.label.trim() })),
+    }));
+
+    this.segmentsSaving.set(true);
+    this.segmentsSaved.set(false);
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<{ segmentCategories: typeof cleaned }>>(`${API}/admin/settings/segment-settings`, { segmentCategories: cleaned }),
+      );
+      if (res.success) {
+        this.segmentCategories.set(res.data.segmentCategories);
+        this.segmentsSaved.set(true);
+        setTimeout(() => this.segmentsSaved.set(false), 3000);
+      } else {
+        this.showToast('error', (res as any).message ?? 'Failed to save.');
+      }
+    } catch {
+      this.showToast('error', 'Failed to save segment settings.');
+    } finally {
+      this.segmentsSaving.set(false);
     }
   }
 }

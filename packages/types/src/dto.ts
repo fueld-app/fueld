@@ -231,6 +231,8 @@ export interface CounterpartyDto {
   companyRegistrationNumber?: string | null;
   fraudPreventionText?: string | null;
   contactsCount?: number | null;
+  /** Company segmentation (key→selected option keys) */
+  segments?: Record<string, string | string[]> | null;
   /** Parent/child hierarchy — single-level only */
   parentId?: string | null;
   parentName?: string | null;

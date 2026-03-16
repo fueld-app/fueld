@@ -168,6 +168,22 @@ interface CompanySearchResult {
             <option [value]="u.id">{{ u.name }}</option>
           }
         </select>
+
+        <!-- Filter by segment -->
+        @if (segmentCategories().length > 0) {
+          <select
+            [ngModel]="filterSegment()"
+            (ngModelChange)="filterSegment.set($event); currentPage.set(1); loadCompanies(); updateUrlParams()"
+            class="rounded-lg border border-gray-300 py-2 pl-3 pr-8 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+          >
+            <option value="">All Segments</option>
+            @for (cat of segmentCategories(); track cat.key) {
+              @for (opt of cat.options; track opt.key) {
+                <option [value]="cat.key + ':' + opt.key">{{ cat.label }}: {{ opt.label }}</option>
+              }
+            }
+          </select>
+        }
       </div>
 
       <!-- Click-away backdrop for dropdown -->
@@ -208,6 +224,13 @@ interface CompanySearchResult {
                       <span class="ml-1.5 inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-600">
                         Child of {{ company.parentName }}
                       </span>
+                    }
+                    @if (getSegmentBadges(company).length > 0) {
+                      <div class="flex flex-wrap gap-1 mt-0.5">
+                        @for (badge of getSegmentBadges(company); track badge) {
+                          <span class="inline-flex items-center rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-700">{{ badge }}</span>
+                        }
+                      </div>
                     }
                   </td>
                   <td class="px-4 py-3">
@@ -399,9 +422,11 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
   readonly loading = signal(true);
   readonly filterType = signal('');
   readonly filterResponsible = signal('');
+  readonly filterSegment = signal(''); // format: "categoryKey:optionKey"
   readonly sortBy = signal('');
   readonly sortDir = signal<'asc' | 'desc'>('asc');
   readonly users = signal<{ id: string; name: string; email: string }[]>([]);
+  readonly segmentCategories = signal<{ key: string; label: string; mode: 'multi' | 'single'; options: { key: string; label: string }[] }[]>([]);
 
   // Search / typeahead
   readonly searchTerm = signal('');
@@ -446,9 +471,12 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
     if (sortBy) this.sortBy.set(sortBy);
     const sortDir = params.get('sortDir') as 'asc' | 'desc';
     if (sortDir) this.sortDir.set(sortDir);
+    const segment = params.get('segment');
+    if (segment) this.filterSegment.set(segment);
 
     this.loadCompanies();
     this.loadUsers();
+    this.loadSegmentCategories();
 
     // Debounced search
     this.searchSubject
@@ -486,6 +514,7 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
     params.set('limit', String(this.pageSize));
     if (this.filterType()) params.set('type', this.filterType());
     if (this.filterResponsible()) params.set('responsibleUserId', this.filterResponsible());
+    if (this.filterSegment()) params.set('segment', this.filterSegment());
     if (this.sortBy()) params.set('sortBy', this.sortBy());
     if (this.sortBy()) params.set('sortDir', this.sortDir());
 
@@ -567,6 +596,7 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
       page: this.currentPage() > 1 ? String(this.currentPage()) : null,
       type: this.filterType() || null,
       responsible: this.filterResponsible() || null,
+      segment: this.filterSegment() || null,
       sortBy: this.sortBy() || null,
       sortDir: this.sortBy() ? this.sortDir() : null,
     };
@@ -711,5 +741,38 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
     if (amount >= 1_000_000) return `$${(amount / 1_000_000).toFixed(1)}M`;
     if (amount >= 1_000) return `$${(amount / 1_000).toFixed(0)}K`;
     return `$${amount.toFixed(0)}`;
+  }
+
+  // ─── Segments ──────────────────────────────────────────────────────
+
+  private async loadSegmentCategories(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ segmentCategories: { key: string; label: string; mode: 'multi' | 'single'; options: { key: string; label: string }[] }[] }>>(`${API}/admin/settings/segment-settings/options`),
+      );
+      if (res.success && res.data?.segmentCategories) {
+        this.segmentCategories.set(res.data.segmentCategories);
+      }
+    } catch {
+      // Segment categories not available
+    }
+  }
+
+  getSegmentBadges(company: any): string[] {
+    const segs = company.segments as Record<string, string | string[]> | null | undefined;
+    if (!segs) return [];
+    const cats = this.segmentCategories();
+    const badges: string[] = [];
+    for (const cat of cats) {
+      const val = segs[cat.key];
+      if (!val) continue;
+      const keys = Array.isArray(val) ? val : [val];
+      for (const k of keys) {
+        if (!k) continue;
+        const opt = cat.options.find(o => o.key === k);
+        badges.push(opt ? opt.label : k);
+      }
+    }
+    return badges;
   }
 }

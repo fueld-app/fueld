@@ -59,6 +59,7 @@ import {
   getGroupOrdersForCompany,
   getGroupVesselsForCompany,
   getTopCreditGroups,
+  updateCompanySegments,
 } from './company.service';
 import { getSupplyPortsForCompany } from '../lloyds/lli.service';
 import { getUserCompanyAccess } from '../admin/settings.service';
@@ -95,6 +96,7 @@ export const companiesController = new Elysia({ prefix: '/companies' })
         type: query.type,
         country: query.country,
         responsibleUserId: query.responsibleUserId,
+        segment: query.segment,
         sortBy: query.sortBy,
         sortDir: query.sortDir as 'asc' | 'desc' | undefined,
         page: query.page ? parseInt(query.page) : undefined,
@@ -108,6 +110,7 @@ export const companiesController = new Elysia({ prefix: '/companies' })
         type: t.Optional(t.String()),
         country: t.Optional(t.String()),
         responsibleUserId: t.Optional(t.String()),
+        segment: t.Optional(t.String()),
         sortBy: t.Optional(t.String()),
         sortDir: t.Optional(t.String()),
         page: t.Optional(t.String()),
@@ -387,6 +390,28 @@ export const companiesController = new Elysia({ prefix: '/companies' })
       detail: {
         tags: ['Companies'],
         summary: 'Update company types',
+      },
+    },
+  )
+
+  // ─── Update Company Segments ──────────────────────────────────────
+  .patch(
+    '/local/:id/segments',
+    async ({ params, body }) => {
+      const updated = await updateCompanySegments(params.id, body.segments);
+      if (!updated) {
+        return { success: false, data: null, message: 'Company not found' };
+      }
+      return { success: true, data: updated } satisfies ApiResponse<typeof updated>;
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({
+        segments: t.Record(t.String(), t.Union([t.String(), t.Array(t.String())])),
+      }),
+      detail: {
+        tags: ['Companies'],
+        summary: 'Update company segmentation values',
       },
     },
   )

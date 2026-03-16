@@ -128,6 +128,7 @@ export async function listCompanies(query?: {
   type?: string;
   country?: string;
   responsibleUserId?: string;
+  segment?: string; // format: "categoryKey:optionKey"
   sortBy?: string;
   sortDir?: 'asc' | 'desc';
   limit?: number;
@@ -138,6 +139,16 @@ export async function listCompanies(query?: {
   if (query?.type) conditions.push(sql`${counterparties.types} @> ${JSON.stringify([query.type])}::jsonb`);
   if (query?.country) conditions.push(ilike(counterparties.country, `%${query.country}%`));
   if (query?.responsibleUserId) conditions.push(eq(counterparties.responsibleUserId, query.responsibleUserId));
+  if (query?.segment) {
+    const [catKey, optKey] = query.segment.split(':');
+    if (catKey && optKey) {
+      // Match both single-select (string) and multi-select (array contains)
+      conditions.push(sql`(
+        ${counterparties.segments}->>${sql.raw(`'${catKey.replace(/'/g, "''")}'`)} = ${optKey}
+        OR ${counterparties.segments}->${sql.raw(`'${catKey.replace(/'/g, "''")}'`)} @> ${JSON.stringify([optKey])}::jsonb
+      )`);
+    }
+  }
 
   const where = conditions.length
     ? conditions.length === 1
@@ -183,6 +194,7 @@ export async function listCompanies(query?: {
         contactsCount: sql<number>`(SELECT count(*)::int FROM company_contacts cc WHERE cc.counterparty_id = ${counterparties.id})`,
         parentId: counterparties.parentId,
         parentName: sql<string | null>`(SELECT c2.name FROM counterparties c2 WHERE c2.id = ${counterparties.parentId})`.as('parent_name'),
+        segments: counterparties.segments,
         createdAt: counterparties.createdAt,
         updatedAt: counterparties.updatedAt,
       })
@@ -676,6 +688,19 @@ export async function updateCompanyTypes(companyId: string, types: string[]) {
       types,
       updatedAt: new Date(),
     })
+    .where(eq(counterparties.id, companyId))
+    .returning();
+  return updated ?? null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  UPDATE COMPANY SEGMENTS
+// ═══════════════════════════════════════════════════════════════════════
+
+export async function updateCompanySegments(companyId: string, segments: Record<string, string | string[]>) {
+  const [updated] = await db
+    .update(counterparties)
+    .set({ segments, updatedAt: new Date() })
     .where(eq(counterparties.id, companyId))
     .returning();
   return updated ?? null;

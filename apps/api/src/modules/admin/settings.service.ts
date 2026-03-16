@@ -1266,3 +1266,62 @@ export async function deletePriceReference(id: string) {
   if (!deleted) throw new Error('Price reference not found');
   return deleted;
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+//  SEGMENT SETTINGS
+// ═══════════════════════════════════════════════════════════════════════
+
+export type SegmentCategory = {
+  key: string;
+  label: string;
+  mode: 'multi' | 'single';
+  options: { key: string; label: string; description?: string }[];
+};
+
+const DEFAULT_SEGMENT_CATEGORIES: SegmentCategory[] = [
+  {
+    key: 'business',
+    label: 'Business',
+    mode: 'multi',
+    options: [
+      { key: 'tramp', label: 'Tramp' },
+      { key: 'liner', label: 'Liner' },
+      { key: 'project', label: 'Project' },
+      { key: 'others', label: 'Others' },
+    ],
+  },
+  {
+    key: 'purchasing',
+    label: 'Purchasing',
+    mode: 'single',
+    options: [
+      { key: 'department', label: 'Department' },
+      { key: 'dedicated_buyer', label: 'Dedicated Buyer' },
+      { key: 'operators', label: 'Operators' },
+      { key: 'others', label: 'Others' },
+    ],
+  },
+];
+
+export async function getSegmentSettings(): Promise<{ segmentCategories: SegmentCategory[] }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  return { segmentCategories: settings.segmentCategories ?? DEFAULT_SEGMENT_CATEGORIES };
+}
+
+export async function updateSegmentSettings(segmentCategories: SegmentCategory[]): Promise<{ segmentCategories: SegmentCategory[] }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = { ...(tenant.settings as any) };
+  settings.segmentCategories = segmentCategories;
+
+  await db
+    .update(tenants)
+    .set({ settings, updatedAt: new Date() })
+    .where(eq(tenants.id, tenant.id));
+
+  return getSegmentSettings();
+}

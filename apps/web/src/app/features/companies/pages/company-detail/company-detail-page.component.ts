@@ -1580,6 +1580,48 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 }
               </div>
 
+            <!-- Company Segments -->
+            @if (segmentCategories().length > 0) {
+            <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-[11]">
+              <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
+                <h2 class="text-sm font-semibold text-gray-700">Segments</h2>
+                @if (segmentsSaving()) {
+                  <span class="text-xs text-gray-400">Saving…</span>
+                }
+              </div>
+              <div class="px-5 py-4 space-y-4">
+                @for (cat of segmentCategories(); track cat.key) {
+                  <div>
+                    <label class="text-xs font-medium text-gray-500 uppercase tracking-wide">{{ cat.label }}</label>
+                    @if (cat.mode === 'multi') {
+                      <div class="mt-1.5 flex flex-wrap gap-2">
+                        @for (opt of cat.options; track opt.key) {
+                          <button
+                            (click)="toggleSegment(cat.key, opt.key)"
+                            [class]="isSegmentSelected(cat.key, opt.key)
+                              ? 'rounded-full px-3 py-1 text-xs font-medium bg-violet-100 text-violet-800 ring-1 ring-violet-300'
+                              : 'rounded-full px-3 py-1 text-xs font-medium bg-gray-100 text-gray-600 ring-1 ring-gray-200 hover:bg-gray-200'"
+                          >{{ opt.label }}</button>
+                        }
+                      </div>
+                    } @else {
+                      <div class="mt-1.5 flex flex-wrap gap-2">
+                        @for (opt of cat.options; track opt.key) {
+                          <button
+                            (click)="selectSingleSegment(cat.key, opt.key)"
+                            [class]="getSegmentValue(cat.key) === opt.key
+                              ? 'rounded-full px-3 py-1 text-xs font-medium bg-violet-100 text-violet-800 ring-1 ring-violet-300'
+                              : 'rounded-full px-3 py-1 text-xs font-medium bg-gray-100 text-gray-600 ring-1 ring-gray-200 hover:bg-gray-200'"
+                          >{{ opt.label }}</button>
+                        }
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+            </div>
+            }
+
             <!-- Group Structure (parent/child hierarchy) -->
             @if (!isChild()) {
             <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-[12]">
@@ -2916,6 +2958,11 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly isParent = computed(() => this.childCompanies().length > 0);
   readonly isChild = computed(() => !!this.parentCompany());
 
+  // Company segmentation
+  readonly segmentCategories = signal<{ key: string; label: string; mode: 'multi' | 'single'; options: { key: string; label: string }[] }[]>([]);
+  readonly companySegments = signal<Record<string, string | string[]>>({});
+  readonly segmentsSaving = signal(false);
+
   // Fleet map
   readonly fleetMapEl = viewChild<ElementRef<HTMLDivElement>>('fleetMapEl');
   private fleetMap: L.Map | null = null;
@@ -2962,6 +3009,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     this.loadUsers();
     this.loadRoleOptions();
     this.loadCompanyTypes();
+    this.loadSegmentCategories();
     if (id) this.loadCompany(id);
 
     // React to same-route navigation (e.g. clicking related company links)
@@ -3052,6 +3100,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
       );
       if (res.success && res.data) {
         this.company.set(res.data);
+        this.companySegments.set((res.data as any).segments ?? {});
         this.responsibleUserId.set(res.data.responsibleUserId ?? null);
         this.pageTitle.setTitle(`Fueld | Companies > ${res.data.name}`);
         this.wsService.sendPresence(this.router.url, this.pageTitle.getTitle());
@@ -4854,6 +4903,70 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     this.groupFleetMode.set(next);
     if (next === 'group' && this.groupVessels().length === 0) {
       this.loadGroupVessels();
+    }
+  }
+
+  // ─── Company Segmentation ─────────────────────────────────────────
+
+  private async loadSegmentCategories(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ segmentCategories: { key: string; label: string; mode: 'multi' | 'single'; options: { key: string; label: string }[] }[] }>>(`${API}/admin/settings/segment-settings/options`),
+      );
+      if (res.success && res.data?.segmentCategories) {
+        this.segmentCategories.set(res.data.segmentCategories);
+      }
+    } catch {
+      // Segment categories not available — hide the card
+    }
+  }
+
+  getSegmentValue(categoryKey: string): string | string[] | undefined {
+    return this.companySegments()[categoryKey];
+  }
+
+  isSegmentSelected(categoryKey: string, optionKey: string): boolean {
+    const val = this.companySegments()[categoryKey];
+    if (Array.isArray(val)) return val.includes(optionKey);
+    return val === optionKey;
+  }
+
+  toggleSegment(categoryKey: string, optionKey: string): void {
+    const segments = { ...this.companySegments() };
+    const current = segments[categoryKey];
+    let arr = Array.isArray(current) ? [...current] : current ? [current] : [];
+    if (arr.includes(optionKey)) {
+      arr = arr.filter(k => k !== optionKey);
+    } else {
+      arr.push(optionKey);
+    }
+    segments[categoryKey] = arr;
+    this.companySegments.set(segments);
+    this.persistSegments(segments);
+  }
+
+  selectSingleSegment(categoryKey: string, optionKey: string): void {
+    const segments = { ...this.companySegments() };
+    segments[categoryKey] = segments[categoryKey] === optionKey ? '' : optionKey;
+    this.companySegments.set(segments);
+    this.persistSegments(segments);
+  }
+
+  private async persistSegments(segments: Record<string, string | string[]>): Promise<void> {
+    const id = this.company()?.id;
+    if (!id) return;
+    this.segmentsSaving.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.patch<ApiResponse<any>>(`${API}/companies/local/${id}/segments`, { segments }),
+      );
+      if (!res.success) {
+        this.showToast('error', 'Failed to save segments');
+      }
+    } catch {
+      this.showToast('error', 'Failed to save segments');
+    } finally {
+      this.segmentsSaving.set(false);
     }
   }
 }

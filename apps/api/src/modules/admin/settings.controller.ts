@@ -55,6 +55,8 @@ import {
   createPriceReference,
   updatePriceReference,
   deletePriceReference,
+  getSegmentSettings,
+  updateSegmentSettings,
 } from './settings.service';
 import { reloadCurrencies } from '../prices/price.service';
 import {
@@ -104,6 +106,20 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     }
   }, {
     detail: { tags: ['Admin Settings'], summary: 'Get vessel-company role options (any user)' },
+  })
+
+  // ─── Public: any authenticated user can fetch segment categories ───
+  .get('/segment-settings/options', async ({ auth }) => {
+    try {
+      if (!auth) throw new Error('Authentication required');
+      const data = await getSegmentSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get segment categories (any user)' },
   })
 
   // ═══════════════════════════════════════════════════════════════════
@@ -1520,4 +1536,46 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   }, {
     params: t.Object({ id: t.String() }),
     detail: { tags: ['Admin Settings'], summary: 'Delete a price reference source' },
+  })
+
+  // ═════════════════════════════════════════════════════════════════
+  //  SEGMENT SETTINGS (Admin)
+  // ═════════════════════════════════════════════════════════════════
+
+  .get('/segment-settings', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getSegmentSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get segment categories (admin)' },
+  })
+
+  .put('/segment-settings', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateSegmentSettings(body.segmentCategories);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      segmentCategories: t.Array(t.Object({
+        key: t.String({ minLength: 1 }),
+        label: t.String({ minLength: 1 }),
+        mode: t.Union([t.Literal('multi'), t.Literal('single')]),
+        options: t.Array(t.Object({
+          key: t.String({ minLength: 1 }),
+          label: t.String({ minLength: 1 }),
+          description: t.Optional(t.String()),
+        })),
+      })),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update segment categories (admin)' },
   });
