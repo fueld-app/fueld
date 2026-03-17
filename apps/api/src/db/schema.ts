@@ -219,6 +219,10 @@ export interface TenantSettings {
   };
   // Broker settings
   brokerCcCustomer?: boolean;  // When brokerGetsAll, also CC the original customer contact (default false)
+  // Follow-up settings
+  followUpSettings?: {
+    defaultFollowUpDays: number;  // Default days ahead for follow-up date (default 90)
+  };
   // Company segmentation — admin-configurable categories & options
   segmentCategories?: {
     key: string;           // stable identifier (e.g. 'business', 'purchasing')
@@ -1083,6 +1087,8 @@ export const entityComments = pgTable('entity_comments', {
   userId: uuid('user_id').notNull().references(() => users.id),
   userName: text('user_name').notNull(),        // cached for display
   content: text('content').notNull(),
+  followUpDate: date('follow_up_date'),
+  followUpCompleted: boolean('follow_up_completed').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

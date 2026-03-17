@@ -10,6 +10,7 @@ import {
   updateComment,
   deleteComment,
   getComment,
+  completeFollowUp,
 } from './comments.service';
 import { resolveOrderId } from '../orders/orders.service';
 import { db } from '../../db';
@@ -65,6 +66,7 @@ export const commentsController = new Elysia({ prefix: '/comments' })
         userId: auth.sub,
         userName: u?.name ?? auth.email,
         content: body.content,
+        followUpDate: body.followUpDate,
       });
 
       return { success: true, data: comment };
@@ -76,6 +78,7 @@ export const commentsController = new Elysia({ prefix: '/comments' })
       }),
       body: t.Object({
         content: t.String({ minLength: 1 }),
+        followUpDate: t.Optional(t.Nullable(t.String())),
       }),
     },
   )
@@ -95,13 +98,14 @@ export const commentsController = new Elysia({ prefix: '/comments' })
         return { success: false, data: null, message: 'You can only edit your own comments' };
       }
 
-      const updated = await updateComment(params.commentId, body.content);
+      const updated = await updateComment(params.commentId, body.content, body.followUpDate);
       return { success: true, data: updated };
     },
     {
       params: t.Object({ commentId: t.String() }),
       body: t.Object({
         content: t.String({ minLength: 1 }),
+        followUpDate: t.Optional(t.Nullable(t.String())),
       }),
     },
   )
@@ -122,6 +126,22 @@ export const commentsController = new Elysia({ prefix: '/comments' })
 
       await deleteComment(params.commentId);
       return { success: true, data: { id: params.commentId } };
+    },
+    {
+      params: t.Object({ commentId: t.String() }),
+    },
+  )
+
+  /** PATCH /comments/:commentId/complete — mark a follow-up as done */
+  .patch(
+    '/:commentId/complete',
+    async ({ params, set }): Promise<ApiResponse<any>> => {
+      const updated = await completeFollowUp(params.commentId);
+      if (!updated) {
+        set.status = 404;
+        return { success: false, data: null, message: 'Comment not found' };
+      }
+      return { success: true, data: updated };
     },
     {
       params: t.Object({ commentId: t.String() }),

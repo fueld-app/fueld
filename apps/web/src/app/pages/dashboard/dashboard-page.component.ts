@@ -18,9 +18,11 @@ import type {
   PipelineStageDto,
   LossReasonDto,
   ConversionMetricsDto,
+  ApiResponse,
 } from '@fueld/types';
 import { firstValueFrom } from 'rxjs';
 import { Router } from '@angular/router';
+import { DatePipe } from '@angular/common';
 
 import { CollectionsWidgetComponent } from '../../features/dashboard/components/collections-widget/collections-widget.component';
 import { AuthService } from '../../core/auth/auth.service';
@@ -33,7 +35,7 @@ import { API } from '@app/core/config/api';
 @Component({
   selector: 'app-dashboard-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, CollectionsWidgetComponent],
+  imports: [FormsModule, CollectionsWidgetComponent, DatePipe],
   template: `
     <div>
       <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -144,6 +146,48 @@ import { API } from '@app/core/config/api';
       <div class="mt-8">
         <app-collections-widget [overdueInvoices]="collections().items" />
       </div>
+
+      <!-- Follow-Ups Widget -->
+      @if (followUps().length) {
+        <div class="mt-8 rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+          <div class="border-b border-gray-100 px-5 py-3 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-500" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z" clip-rule="evenodd" />
+            </svg>
+            <h3 class="text-sm font-semibold text-gray-900">Follow-Ups Due</h3>
+            <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+              {{ followUps().length }}
+            </span>
+          </div>
+          <div class="divide-y divide-gray-50">
+            @for (f of followUps(); track f.id) {
+              <div class="px-5 py-3 flex items-center gap-4 hover:bg-gray-50/50 transition-colors">
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-2">
+                    <span
+                      class="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium"
+                      [class]="followUpDateClass(f.followUpDate)"
+                    >{{ f.followUpDate | date:'mediumDate' }}</span>
+                    <span class="text-xs text-gray-400">{{ f.entityType }}</span>
+                    <span class="text-sm font-medium text-gray-900 truncate">{{ f.entityName || f.entityId }}</span>
+                  </div>
+                  <p class="mt-0.5 text-xs text-gray-500 line-clamp-1">{{ f.content }}</p>
+                  <span class="text-[10px] text-gray-400">{{ f.userName }}</span>
+                </div>
+                <button
+                  (click)="completeFollowUp(f.id)"
+                  class="shrink-0 rounded-full p-1.5 text-gray-400 hover:bg-green-50 hover:text-green-600 transition-colors"
+                  title="Mark done"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            }
+          </div>
+        </div>
+      }
 
       <!-- Top Customer Groups by Credit Exposure -->
       @if (topCreditGroups().length) {
@@ -389,6 +433,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   readonly lossAnalysis = signal<{ reasons: LossReasonDto[]; totalCancelled: number }>({ reasons: [], totalCancelled: 0 });
   readonly conversionMetrics = signal<ConversionMetricsDto>({ totalInquiries: 0, totalWon: 0, totalLost: 0, winRate: 0, avgDaysToClose: null });
   readonly topCreditGroups = signal<{ id: string; name: string; country: string | null; totalCreditLimit: string; totalCreditUsed: string; childCount: number }[]>([]);
+  readonly followUps = signal<{ id: string; entityType: string; entityId: string; entityName: string; content: string; followUpDate: string; userName: string }[]>([]);
 
   constructor() {}
 
@@ -398,6 +443,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     document.addEventListener('click', this.clickOutsideHandler);
     void this.loadDashboardData();
     void this.loadTopCreditGroups();
+    void this.loadFollowUps();
   }
 
   ngOnDestroy(): void {
@@ -600,5 +646,40 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
 
   goToCompanyGroup(id: string): void {
     void this.router.navigate(['/companies', id]);
+  }
+
+  // ─── Follow-ups ───────────────────────────────────────────────
+
+  private async loadFollowUps(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ items: { id: string; entityType: string; entityId: string; entityName: string; content: string; followUpDate: string; userName: string }[] }>>(`${API}/dashboard/follow-ups`),
+      );
+      if (res.success && res.data) {
+        this.followUps.set(res.data.items);
+      }
+    } catch {
+      // non-critical
+    }
+  }
+
+  followUpDateClass(dateStr: string): string {
+    const today = new Date().toISOString().slice(0, 10);
+    if (dateStr < today) return 'bg-red-100 border-red-200 text-red-700';
+    if (dateStr === today) return 'bg-amber-100 border-amber-200 text-amber-700';
+    return 'bg-gray-100 border-gray-200 text-gray-600';
+  }
+
+  async completeFollowUp(commentId: string): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.patch<ApiResponse<unknown>>(`${API}/comments/${encodeURIComponent(commentId)}/complete`, {}),
+      );
+      if (res.success) {
+        this.followUps.update((list) => list.filter((f) => f.id !== commentId));
+      }
+    } catch {
+      // silent
+    }
   }
 }

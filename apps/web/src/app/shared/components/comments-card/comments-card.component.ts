@@ -24,6 +24,8 @@ interface Comment {
   userId: string;
   userName: string;
   content: string;
+  followUpDate: string | null;
+  followUpCompleted: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -57,20 +59,40 @@ interface Comment {
               rows="2"
               class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none resize-none"
             ></textarea>
-            <div class="mt-1.5 flex justify-end">
-              <button
-                (click)="addComment()"
-                [disabled]="!newContent.trim() || saving()"
-                class="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                @if (saving()) {
-                  <svg class="inline h-3.5 w-3.5 animate-spin mr-1" viewBox="0 0 24 24" fill="none">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                  </svg>
-                }
-                Post
-              </button>
+
+            <!-- Follow-up date row -->
+            <div class="mt-1.5 flex items-center gap-3 flex-wrap">
+              <label class="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  [checked]="showFollowUpInput()"
+                  (change)="toggleFollowUpInput()"
+                  class="h-3.5 w-3.5 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                />
+                Follow-up
+              </label>
+              @if (showFollowUpInput()) {
+                <input
+                  type="date"
+                  [(ngModel)]="newFollowUpDate"
+                  class="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
+                />
+              }
+              <div class="ml-auto">
+                <button
+                  (click)="addComment()"
+                  [disabled]="!newContent.trim() || saving()"
+                  class="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  @if (saving()) {
+                    <svg class="inline h-3.5 w-3.5 animate-spin mr-1" viewBox="0 0 24 24" fill="none">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                  }
+                  Post
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -129,6 +151,40 @@ interface Comment {
                   } @else {
                     <!-- Display mode -->
                     <p class="mt-0.5 text-sm text-gray-600 whitespace-pre-line">{{ c.content }}</p>
+
+                    <!-- Follow-up badge -->
+                    @if (c.followUpDate) {
+                      <div class="mt-1.5 flex items-center gap-1.5">
+                        @if (c.followUpCompleted) {
+                          <span class="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200 px-2 py-0.5 text-[11px] font-medium text-green-700 line-through">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                              <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                            </svg>
+                            {{ c.followUpDate | date:'mediumDate' }}
+                          </span>
+                        } @else {
+                          <span
+                            class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium"
+                            [class]="followUpBadgeClass(c.followUpDate)"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z" clip-rule="evenodd" />
+                            </svg>
+                            {{ c.followUpDate | date:'mediumDate' }}
+                          </span>
+                          <button
+                            (click)="markFollowUpDone(c.id)"
+                            [disabled]="saving()"
+                            class="rounded-full p-0.5 text-gray-400 hover:bg-green-50 hover:text-green-600 transition-colors"
+                            title="Mark follow-up done"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                              <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                            </svg>
+                          </button>
+                        }
+                      </div>
+                    }
                   }
                 </div>
 
@@ -178,9 +234,13 @@ export class CommentsCardComponent implements OnDestroy {
   readonly loading = signal(true);
   readonly saving = signal(false);
   readonly editingId = signal<string | null>(null);
+  readonly showFollowUpInput = signal(false);
 
   newContent = '';
   editContent = '';
+  newFollowUpDate = '';
+
+  private defaultFollowUpDays = 90;
 
   readonly currentUserId = computed(() => this.auth.user()?.id ?? '');
   readonly currentUserInitials = computed(() => {
@@ -195,6 +255,8 @@ export class CommentsCardComponent implements OnDestroy {
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
+    this.loadDefaultFollowUpDays();
+
     effect(() => {
       const id = this.entityId();
       const type = this.entityType();
@@ -208,6 +270,57 @@ export class CommentsCardComponent implements OnDestroy {
     if (this.refreshTimer) {
       clearInterval(this.refreshTimer);
       this.refreshTimer = null;
+    }
+  }
+
+  private async loadDefaultFollowUpDays(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ defaultFollowUpDays: number }>>(`${API}/admin/settings/my-follow-up-settings`),
+      );
+      if (res.success && res.data) {
+        this.defaultFollowUpDays = res.data.defaultFollowUpDays;
+      }
+    } catch {
+      // use default
+    }
+  }
+
+  toggleFollowUpInput(): void {
+    const show = !this.showFollowUpInput();
+    this.showFollowUpInput.set(show);
+    if (show && !this.newFollowUpDate) {
+      const d = new Date();
+      d.setDate(d.getDate() + this.defaultFollowUpDays);
+      this.newFollowUpDate = d.toISOString().slice(0, 10);
+    }
+  }
+
+  followUpBadgeClass(dateStr: string): string {
+    const today = new Date().toISOString().slice(0, 10);
+    if (dateStr < today) return 'bg-red-50 border-red-200 text-red-700';
+    if (dateStr === today) return 'bg-amber-50 border-amber-200 text-amber-700';
+    return 'bg-gray-50 border-gray-200 text-gray-600';
+  }
+
+  async markFollowUpDone(commentId: string): Promise<void> {
+    this.saving.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.patch<ApiResponse<Comment>>(
+          `${API}/comments/${encodeURIComponent(commentId)}/complete`,
+          {},
+        ),
+      );
+      if (res.success && res.data) {
+        this.comments.update((list) =>
+          list.map((c) => (c.id === commentId ? res.data! : c)),
+        );
+      }
+    } catch {
+      // silent
+    } finally {
+      this.saving.set(false);
     }
   }
 
@@ -250,17 +363,21 @@ export class CommentsCardComponent implements OnDestroy {
     const id = this.entityId();
     if (!type || !id) return;
 
+    const followUpDate = this.showFollowUpInput() && this.newFollowUpDate ? this.newFollowUpDate : null;
+
     this.saving.set(true);
     try {
       const res = await firstValueFrom(
         this.http.post<ApiResponse<Comment>>(
           `${API}/comments/${encodeURIComponent(type)}/${encodeURIComponent(id)}`,
-          { content },
+          { content, followUpDate },
         ),
       );
       if (res.success && res.data) {
         this.comments.update((list) => [res.data!, ...list]);
         this.newContent = '';
+        this.newFollowUpDate = '';
+        this.showFollowUpInput.set(false);
       }
     } catch {
       // silent

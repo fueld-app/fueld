@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia';
 import { authGuard } from '../auth/auth.guard';
-import { getCollections, getTeamStats, getPipelineSummary, getLossAnalysis, getConversionMetrics } from './dashboard.service';
+import { getCollections, getTeamStats, getPipelineSummary, getLossAnalysis, getConversionMetrics, getFollowUps } from './dashboard.service';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Dashboard Controller
@@ -95,6 +95,24 @@ export const dashboardController = new Elysia({ prefix: '/dashboard' })
         tags: ['Dashboard'],
         summary: 'Get conversion metrics',
         description: 'Returns win rate, total won/lost, and average days to close for orders in the period.',
+        security: [{ bearerAuth: [] }],
+      },
+    },
+  )
+
+  // ── GET /dashboard/follow-ups ──────────────────────────────────────
+  .get(
+    '/follow-ups',
+    async ({ auth, query }) => {
+      const params = query as { userId?: string };
+      const items = await getFollowUps(auth.tenantId, params.userId);
+      return { items };
+    },
+    {
+      detail: {
+        tags: ['Dashboard'],
+        summary: 'Get due/overdue follow-ups',
+        description: 'Returns all comment follow-ups that are due today or overdue and not yet completed.',
         security: [{ bearerAuth: [] }],
       },
     },

@@ -1,4 +1,4 @@
-import { eq, and, lt, sql, inArray, ne, notInArray, isNotNull, gte, lte } from 'drizzle-orm';
+import { eq, and, lt, sql, inArray, ne, notInArray, isNotNull, gte, lte, or, asc } from 'drizzle-orm';
 import { db } from '../../db';
 import {
   invoices,
@@ -9,6 +9,7 @@ import {
   vessels,
   places,
   tenants,
+  entityComments,
 } from '../../db/schema';
 import type { TenantSettings } from '../../db/schema';
 import { calculateOrderEconomics, calculateRevenueBase, getFinancingRateAnnual } from '../orders/order-financing';
@@ -424,6 +425,108 @@ export async function getConversionMetrics(
     winRate: decided > 0 ? totalWon / decided : 0,
     avgDaysToClose: closeDaysCount > 0 ? Math.round((closeDaysSum / closeDaysCount) * 10) / 10 : null,
   };
+}
+
+// ─── Follow-Ups (due/overdue comment follow-ups) ─────────────────────
+
+export interface FollowUpItem {
+  id: string;
+  entityType: string;
+  entityId: string;
+  entityName: string | null;
+  content: string;
+  followUpDate: string;
+  userName: string;
+  userId: string;
+  createdAt: string;
+}
+
+/**
+ * Returns all incomplete follow-ups that are due today or overdue,
+ * optionally filtered by user. Resolves entity names for display.
+ */
+export async function getFollowUps(
+  tenantId: string,
+  userId?: string,
+): Promise<FollowUpItem[]> {
+  const today = new Date().toISOString().split('T')[0]!;
+
+  const conditions = [
+    isNotNull(entityComments.followUpDate),
+    lte(entityComments.followUpDate, today),
+    eq(entityComments.followUpCompleted, false),
+  ];
+  if (userId) conditions.push(eq(entityComments.userId, userId));
+
+  const rows = await db
+    .select()
+    .from(entityComments)
+    .where(and(...conditions))
+    .orderBy(asc(entityComments.followUpDate));
+
+  if (rows.length === 0) return [];
+
+  // Resolve entity names in batch
+  const entityIds = new Map<string, Set<string>>();
+  for (const r of rows) {
+    const set = entityIds.get(r.entityType) ?? new Set();
+    set.add(r.entityId);
+    entityIds.set(r.entityType, set);
+  }
+
+  const nameMap = new Map<string, string>();
+
+  // Resolve company names
+  const companyIds = entityIds.get('company');
+  if (companyIds?.size) {
+    const companies = await db
+      .select({ id: counterparties.id, name: counterparties.name })
+      .from(counterparties)
+      .where(and(eq(counterparties.tenantId, tenantId), inArray(counterparties.id, [...companyIds])));
+    for (const c of companies) nameMap.set(`company:${c.id}`, c.name);
+  }
+
+  // Resolve order names
+  const orderIds = entityIds.get('order');
+  if (orderIds?.size) {
+    const orderRows = await db
+      .select({ id: orders.id, orderNumber: orders.orderNumber })
+      .from(orders)
+      .where(and(eq(orders.tenantId, tenantId), inArray(orders.id, [...orderIds])));
+    for (const o of orderRows) nameMap.set(`order:${o.id}`, o.orderNumber ?? o.id);
+  }
+
+  // Resolve vessel names
+  const vesselIds = entityIds.get('vessel');
+  if (vesselIds?.size) {
+    const vesselRows = await db
+      .select({ id: vessels.id, name: vessels.name })
+      .from(vessels)
+      .where(inArray(vessels.id, [...vesselIds]));
+    for (const v of vesselRows) nameMap.set(`vessel:${v.id}`, v.name);
+  }
+
+  // Resolve place names
+  const placeIds = entityIds.get('place');
+  if (placeIds?.size) {
+    const placeRows = await db
+      .select({ id: places.id, name: places.name })
+      .from(places)
+      .where(inArray(places.id, [...placeIds]));
+    for (const p of placeRows) nameMap.set(`place:${p.id}`, p.name);
+  }
+
+  return rows.map((r) => ({
+    id: r.id,
+    entityType: r.entityType,
+    entityId: r.entityId,
+    entityName: nameMap.get(`${r.entityType}:${r.entityId}`) ?? null,
+    content: r.content,
+    followUpDate: r.followUpDate!,
+    userName: r.userName,
+    userId: r.userId,
+    createdAt: r.createdAt.toISOString(),
+  }));
 }
 
 // ─── Vacation / Delegation Helper ────────────────────────────────────

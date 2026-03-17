@@ -13,8 +13,21 @@ export interface CommentRow {
   userId: string;
   userName: string;
   content: string;
+  followUpDate: string | null;
+  followUpCompleted: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Map a DB row to a CommentRow. */
+function mapRow(r: typeof entityComments.$inferSelect): CommentRow {
+  return {
+    ...r,
+    followUpDate: r.followUpDate ?? null,
+    followUpCompleted: r.followUpCompleted,
+    createdAt: r.createdAt.toISOString(),
+    updatedAt: r.updatedAt.toISOString(),
+  };
 }
 
 /** List comments for an entity, newest first. */
@@ -33,11 +46,7 @@ export async function listComments(
     )
     .orderBy(desc(entityComments.createdAt));
 
-  return rows.map((r) => ({
-    ...r,
-    createdAt: r.createdAt.toISOString(),
-    updatedAt: r.updatedAt.toISOString(),
-  }));
+  return rows.map(mapRow);
 }
 
 /** Create a new comment. */
@@ -47,6 +56,7 @@ export async function createComment(params: {
   userId: string;
   userName: string;
   content: string;
+  followUpDate?: string | null;
 }): Promise<CommentRow> {
   const [row] = await db
     .insert(entityComments)
@@ -56,33 +66,33 @@ export async function createComment(params: {
       userId: params.userId,
       userName: params.userName,
       content: params.content,
+      followUpDate: params.followUpDate ?? null,
     })
     .returning();
 
-  return {
-    ...row,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-  };
+  return mapRow(row);
 }
 
-/** Update a comment (only content). Returns null if not found. */
+/** Update a comment (content and/or followUpDate). Returns null if not found. */
 export async function updateComment(
   commentId: string,
   content: string,
+  followUpDate?: string | null,
 ): Promise<CommentRow | null> {
+  const updates: Record<string, unknown> = { content, updatedAt: new Date() };
+  if (followUpDate !== undefined) {
+    updates.followUpDate = followUpDate;
+    // Reset completion when date changes
+    if (followUpDate) updates.followUpCompleted = false;
+  }
+
   const [row] = await db
     .update(entityComments)
-    .set({ content, updatedAt: new Date() })
+    .set(updates)
     .where(eq(entityComments.id, commentId))
     .returning();
 
-  if (!row) return null;
-  return {
-    ...row,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-  };
+  return row ? mapRow(row) : null;
 }
 
 /** Delete a comment. Returns the deleted row or null. */
@@ -92,12 +102,7 @@ export async function deleteComment(commentId: string): Promise<CommentRow | nul
     .where(eq(entityComments.id, commentId))
     .returning();
 
-  if (!row) return null;
-  return {
-    ...row,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-  };
+  return row ? mapRow(row) : null;
 }
 
 /** Get a single comment by ID. */
@@ -108,10 +113,16 @@ export async function getComment(commentId: string): Promise<CommentRow | null> 
     .where(eq(entityComments.id, commentId))
     .limit(1);
 
-  if (!row) return null;
-  return {
-    ...row,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-  };
+  return row ? mapRow(row) : null;
+}
+
+/** Mark a follow-up as completed. */
+export async function completeFollowUp(commentId: string): Promise<CommentRow | null> {
+  const [row] = await db
+    .update(entityComments)
+    .set({ followUpCompleted: true, updatedAt: new Date() })
+    .where(eq(entityComments.id, commentId))
+    .returning();
+
+  return row ? mapRow(row) : null;
 }

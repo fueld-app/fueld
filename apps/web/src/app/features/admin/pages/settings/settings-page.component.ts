@@ -1024,6 +1024,59 @@ interface InquirySettingsDto {
           </div>
 
           <!-- ════════════════════════════════════════════════════════ -->
+          <!--  Follow-Up Settings                                       -->
+          <!-- ════════════════════════════════════════════════════════ -->
+          <div class="app-panel">
+            <div class="app-panel-header app-panel-header--amber">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--amber">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-semibold text-gray-900">Follow-Up Settings</h3>
+                <p class="text-xs text-gray-500">Configure default follow-up reminder timing for comments.</p>
+              </div>
+            </div>
+
+            <div class="app-panel-body">
+              <div>
+                <p class="text-sm font-medium text-gray-900">Default follow-up days</p>
+                <p class="text-xs text-gray-500">When a user adds a follow-up to a comment, the date will default to this many days from today.</p>
+              </div>
+              <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+                <div class="w-full sm:w-40">
+                  <label class="block text-sm font-medium text-gray-700">Days</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="365"
+                    [ngModel]="followUpDefaultDays()"
+                    (ngModelChange)="setFollowUpDefaultDays($event)"
+                    class="app-input mt-1 w-full"
+                  />
+                </div>
+                <button
+                  type="button"
+                  (click)="saveFollowUpSettings()"
+                  [disabled]="followUpSaving()"
+                  class="inline-flex items-center justify-center rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-amber-700 disabled:opacity-50"
+                >
+                  @if (followUpSaving()) { Saving… } @else { Save }
+                </button>
+                @if (followUpSaved()) {
+                  <span class="text-sm text-green-600 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                    </svg>
+                    Saved
+                  </span>
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- ════════════════════════════════════════════════════════ -->
           <!--  Company Segmentation                                    -->
           <!-- ════════════════════════════════════════════════════════ -->
           <div class="app-panel min-[900px]:col-span-2 min-[2000px]:col-span-2">
@@ -1239,6 +1292,11 @@ export class SettingsPageComponent implements OnInit {
   readonly segmentsSaving = signal(false);
   readonly segmentsSaved = signal(false);
 
+  // Follow-up settings
+  readonly followUpDefaultDays = signal('90');
+  readonly followUpSaving = signal(false);
+  readonly followUpSaved = signal(false);
+
   readonly livePreview = computed(() => {
     const tmpl = this.template();
     const pfx = this.prefix();
@@ -1276,6 +1334,7 @@ export class SettingsPageComponent implements OnInit {
     this.loadInquirySettings();
     this.loadInquiryCancelReasons();
     this.loadSegments();
+    this.loadFollowUpSettings();
   }
 
   private async loadSettings(): Promise<void> {
@@ -2234,6 +2293,51 @@ export class SettingsPageComponent implements OnInit {
       this.showToast('error', 'Failed to save segment settings.');
     } finally {
       this.segmentsSaving.set(false);
+    }
+  }
+
+  // ─── Follow-up settings ────────────────────────────────────────
+
+  private async loadFollowUpSettings(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ defaultFollowUpDays: number }>>(`${API}/admin/settings/follow-up`),
+      );
+      if (res.success) {
+        this.followUpDefaultDays.set(String(res.data.defaultFollowUpDays));
+      }
+    } catch {
+      // ignore – defaults work fine
+    }
+  }
+
+  setFollowUpDefaultDays(value: string): void {
+    this.followUpDefaultDays.set(value);
+  }
+
+  async saveFollowUpSettings(): Promise<void> {
+    const days = parseInt(this.followUpDefaultDays(), 10);
+    if (!days || days < 1 || days > 365) {
+      this.showToast('error', 'Days must be between 1 and 365.');
+      return;
+    }
+    this.followUpSaving.set(true);
+    this.followUpSaved.set(false);
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<{ defaultFollowUpDays: number }>>(`${API}/admin/settings/follow-up`, { defaultFollowUpDays: days }),
+      );
+      if (res.success) {
+        this.followUpDefaultDays.set(String(res.data.defaultFollowUpDays));
+        this.followUpSaved.set(true);
+        setTimeout(() => this.followUpSaved.set(false), 3000);
+      } else {
+        this.showToast('error', (res as any).message ?? 'Failed to save.');
+      }
+    } catch {
+      this.showToast('error', 'Failed to save follow-up settings.');
+    } finally {
+      this.followUpSaving.set(false);
     }
   }
 }

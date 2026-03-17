@@ -1350,3 +1350,42 @@ export async function updateBrokerSettings(data: { brokerCcCustomer?: boolean })
 
   return getBrokerSettings();
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+//  FOLLOW-UP SETTINGS
+// ═══════════════════════════════════════════════════════════════════════
+
+const DEFAULT_FOLLOW_UP_DAYS = 90;
+
+export async function getFollowUpSettings(): Promise<{ defaultFollowUpDays: number }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  const days = settings.followUpSettings?.defaultFollowUpDays;
+  return { defaultFollowUpDays: typeof days === 'number' && days > 0 ? days : DEFAULT_FOLLOW_UP_DAYS };
+}
+
+export async function updateFollowUpSettings(data: { defaultFollowUpDays?: number }): Promise<{ defaultFollowUpDays: number }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = { ...(tenant.settings as any) };
+  const followUpSettings = { ...(settings.followUpSettings ?? {}) };
+
+  if (data.defaultFollowUpDays !== undefined) {
+    if (!Number.isFinite(data.defaultFollowUpDays) || data.defaultFollowUpDays < 1 || data.defaultFollowUpDays > 365) {
+      throw new Error('Default follow-up days must be between 1 and 365');
+    }
+    followUpSettings.defaultFollowUpDays = Math.round(data.defaultFollowUpDays);
+  }
+
+  settings.followUpSettings = followUpSettings;
+
+  await db
+    .update(tenants)
+    .set({ settings, updatedAt: new Date() })
+    .where(eq(tenants.id, tenant.id));
+
+  return getFollowUpSettings();
+}
