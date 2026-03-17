@@ -11,7 +11,7 @@ import {
   tenants,
 } from '../../db/schema';
 import type { TenantSettings } from '../../db/schema';
-import { calculateOrderEconomics, getFinancingRateAnnual } from '../orders/order-financing';
+import { calculateOrderEconomics, calculateRevenueBase, getFinancingRateAnnual } from '../orders/order-financing';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Dashboard Service — Smart Aggregations
@@ -253,7 +253,10 @@ export interface PipelineSummary {
 }
 
 /**
- * Returns count + total value grouped by order status.
+ * Returns count + total revenue (USD-normalized) grouped by order status.
+ *
+ * Uses the same `calculateRevenueBase()` logic as the KPI cards so that
+ * pipeline values include FX conversion and unit conversion factors.
  */
 export async function getPipelineSummary(
   tenantId: string,
@@ -266,21 +269,45 @@ export async function getPipelineSummary(
   if (to) conditions.push(lte(orders.createdAt, new Date(`${to}T23:59:59`)));
   if (userId) conditions.push(eq(orders.salesRepId, userId));
 
-  const results = await db
-    .select({
-      status: orders.status,
-      count: sql<number>`count(distinct ${orders.id})`.as('count'),
-      totalValue: sql<string>`coalesce(sum(${orderItems.salesPrice}::numeric * ${orderItems.quantity}::numeric), 0)`.as('total_value'),
-    })
+  const orderRows = await db
+    .select({ id: orders.id, status: orders.status })
     .from(orders)
-    .leftJoin(orderItems, eq(orderItems.orderId, orders.id))
-    .where(and(...conditions))
-    .groupBy(orders.status);
+    .where(and(...conditions));
 
-  return results.map((r) => ({
-    status: r.status,
-    count: Number(r.count),
-    totalValue: String(r.totalValue),
+  if (orderRows.length === 0) return [];
+
+  const itemRows = await db
+    .select({
+      orderId: orderItems.orderId,
+      quantity: orderItems.quantity,
+      salesPrice: orderItems.salesPrice,
+      salesCurrency: orderItems.salesCurrency,
+      unitConversionFactor: orderItems.unitConversionFactor,
+    })
+    .from(orderItems)
+    .where(inArray(orderItems.orderId, orderRows.map((r) => r.id)));
+
+  const itemsByOrder = new Map<string, typeof itemRows>();
+  for (const item of itemRows) {
+    const arr = itemsByOrder.get(item.orderId) ?? [];
+    arr.push(item);
+    itemsByOrder.set(item.orderId, arr);
+  }
+
+  const stats = new Map<string, { count: number; totalValue: number }>();
+  for (const row of orderRows) {
+    const entry = stats.get(row.status) ?? { count: 0, totalValue: 0 };
+    entry.count += 1;
+    for (const item of itemsByOrder.get(row.id) ?? []) {
+      entry.totalValue += calculateRevenueBase(item);
+    }
+    stats.set(row.status, entry);
+  }
+
+  return Array.from(stats.entries()).map(([status, s]) => ({
+    status,
+    count: s.count,
+    totalValue: s.totalValue.toFixed(2),
   }));
 }
 
