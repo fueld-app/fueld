@@ -196,12 +196,11 @@ export interface OrderItemsEconomics {
                       class="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm tabular-nums
                              focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                     />
-                    <span class="text-gray-400 text-xs">{{ row.unit }}</span>
                     <select
                       [ngModel]="row.unit"
                       (ngModelChange)="updateField(i, 'unit', $event)"
-                      class="w-14 rounded border border-gray-200 px-0.5 py-1 text-[10px] text-gray-600
-                             focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                      class="cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
+                             hover:text-brand-600 focus:outline-none"
                     >
                       @for (u of unitOptions(); track u.value) {
                         <option [value]="u.value">{{ u.label }}</option>
@@ -272,8 +271,8 @@ export interface OrderItemsEconomics {
                         />
                         <select [ngModel]="row.costCurrency"
                           (ngModelChange)="updateField(i, 'costCurrency', $event)"
-                          class="rounded border border-gray-200 px-1 py-1.5 text-xs text-gray-600
-                                 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                          class="cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
+                                 hover:text-brand-600 focus:outline-none"
                         >
                           @for (c of currencyOptions(); track c.value) {
                             <option [value]="c.value">{{ c.label }}</option>
@@ -316,8 +315,8 @@ export interface OrderItemsEconomics {
                       <select
                         [ngModel]="row.costCurrency"
                         (ngModelChange)="updateField(i, 'costCurrency', $event)"
-                        class="w-[4.5rem] rounded-lg border border-gray-300 px-1.5 py-1.5 text-xs text-gray-700
-                               focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                        class="cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
+                               hover:text-brand-600 focus:outline-none"
                       >
                         @for (c of currencyOptions(); track c.value) {
                           <option [value]="c.value">{{ c.label }}</option>
@@ -327,8 +326,8 @@ export interface OrderItemsEconomics {
                       <select
                         [ngModel]="row.costUnit"
                         (ngModelChange)="updateField(i, 'costUnit', $event)"
-                        class="w-14 rounded-lg border border-gray-300 px-0.5 py-1.5 text-xs text-gray-700
-                               focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                        class="cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
+                               hover:text-brand-600 focus:outline-none"
                       >
                         @for (u of unitOptions(); track u.value) {
                           <option [value]="u.value">{{ u.label }}</option>
@@ -400,8 +399,8 @@ export interface OrderItemsEconomics {
                         />
                         <select [ngModel]="row.salesCurrency"
                           (ngModelChange)="updateField(i, 'salesCurrency', $event)"
-                          class="rounded border border-gray-200 px-1 py-1.5 text-xs text-gray-600
-                                 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                          class="cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
+                                 hover:text-brand-600 focus:outline-none"
                         >
                           @for (c of currencyOptions(); track c.value) {
                             <option [value]="c.value">{{ c.label }}</option>
@@ -410,8 +409,8 @@ export interface OrderItemsEconomics {
                         <span class="text-gray-400 text-xs">/</span>
                         <select [ngModel]="row.salesUnit"
                           (ngModelChange)="updateField(i, 'salesUnit', $event)"
-                          class="w-14 rounded border border-gray-200 px-0.5 py-1.5 text-xs text-gray-600
-                                 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                          class="cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
+                                 hover:text-brand-600 focus:outline-none"
                         >
                           @for (u of unitOptions(); track u.value) {
                             <option [value]="u.value">{{ u.label }}</option>
@@ -453,8 +452,8 @@ export interface OrderItemsEconomics {
                       <select
                         [ngModel]="row.salesCurrency"
                         (ngModelChange)="updateField(i, 'salesCurrency', $event)"
-                        class="w-[4.5rem] rounded-lg border border-gray-300 px-1.5 py-1.5 text-xs text-gray-700
-                               focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                        class="cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
+                               hover:text-brand-600 focus:outline-none"
                       >
                         @for (c of currencyOptions(); track c.value) {
                           <option [value]="c.value">{{ c.label }}</option>
@@ -464,8 +463,8 @@ export interface OrderItemsEconomics {
                       <select
                         [ngModel]="row.salesUnit"
                         (ngModelChange)="updateField(i, 'salesUnit', $event)"
-                        class="w-[4.5rem] rounded-lg border border-gray-300 px-1.5 py-1.5 text-xs text-gray-700
-                               focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                        class="cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
+                               hover:text-brand-600 focus:outline-none"
                       >
                         @for (u of unitOptions(); track u.value) {
                           <option [value]="u.value">{{ u.label }}</option>
