@@ -124,6 +124,76 @@ import {
           <ng-content select="[supplierPayment]"></ng-content>
         </div>
       </div>
+
+      <!-- Broker -->
+      <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <button
+          type="button"
+          (click)="navigateToBroker()"
+          [disabled]="!brokerId()"
+          class="text-xs font-medium uppercase tracking-wider mb-1.5"
+          [class.text-gray-500]="!brokerId()"
+          [class.text-brand-600]="!!brokerId()"
+          [class.hover:underline]="!!brokerId()"
+          [class.cursor-pointer]="!!brokerId()"
+          [class.cursor-not-allowed]="!brokerId()"
+          [class.opacity-50]="!brokerId()"
+        >
+          Broker
+        </button>
+        @if (isReadonly()) {
+          <p class="mt-1 text-sm font-semibold text-gray-900">{{ brokerName() }}</p>
+        } @else {
+          <app-searchable-dropdown
+            [options]="brokerOptions()"
+            [selected]="brokerId()"
+            [asyncSearch]="true"
+            [loading]="brokerLoading()"
+            placeholder="Search brokers..."
+            (searchChange)="brokerSearch.emit($event)"
+            (selectionChange)="brokerChange.emit($event)"
+          />
+        }
+        @if (brokerId()) {
+          <div class="mt-3 border-t border-gray-100 pt-3">
+            <label class="text-xs font-medium text-gray-400">Contact Person</label>
+            @if (isReadonly()) {
+              <p class="mt-1 text-sm text-gray-900">{{ brokerContactName() || '—' }}</p>
+            } @else {
+              <select
+                [ngModel]="brokerContactId()"
+                (ngModelChange)="brokerContactChange.emit($event)"
+                class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                       focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+              >
+                <option value="">— None —</option>
+                @for (c of brokerContactOptions(); track c.value) {
+                  <option [value]="c.value">{{ c.label }}</option>
+                }
+              </select>
+            }
+          </div>
+          <div class="mt-3 border-t border-gray-100 pt-3">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <button
+                type="button"
+                (click)="brokerGetsAllChange.emit(!brokerGetsAll())"
+                [disabled]="isReadonly()"
+                class="relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
+                [class]="brokerGetsAll() ? 'bg-brand-600' : 'bg-gray-300'"
+              >
+                <span
+                  class="pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                  [class.translate-x-4]="brokerGetsAll()"
+                  [class.translate-x-0]="!brokerGetsAll()"
+                ></span>
+              </button>
+              <span class="text-xs text-gray-600">Broker gets all comms</span>
+            </label>
+          </div>
+        }
+      </div>
+
       <!-- Voyage: Vessel + Place + ETA/ETD -->
       <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <button
@@ -327,6 +397,16 @@ export class TradingDetailMetaCardsComponent {
   readonly customerContactOptions = input<{ value: string; label: string }[]>([]);
   readonly supplierContactOptions = input<{ value: string; label: string }[]>([]);
 
+  // Broker
+  readonly brokerId = input<string>('');
+  readonly brokerName = input<string>('—');
+  readonly brokerOptions = input<DropdownOption[]>([]);
+  readonly brokerLoading = input<boolean>(false);
+  readonly brokerContactId = input<string>('');
+  readonly brokerContactName = input<string>('');
+  readonly brokerContactOptions = input<{ value: string; label: string }[]>([]);
+  readonly brokerGetsAll = input<boolean>(false);
+
   readonly clientSearch = output<string>();
   readonly supplierSearch = output<string>();
   readonly vesselSearch = output<string>();
@@ -343,6 +423,10 @@ export class TradingDetailMetaCardsComponent {
   readonly responsibleChange = output<string>();
   readonly customerContactChange = output<string>();
   readonly supplierContactChange = output<string>();
+  readonly brokerSearch = output<string>();
+  readonly brokerChange = output<string>();
+  readonly brokerContactChange = output<string>();
+  readonly brokerGetsAllChange = output<boolean>();
 
   navigateToClient(): void {
     const id = this.clientId();
@@ -352,6 +436,12 @@ export class TradingDetailMetaCardsComponent {
 
   navigateToSupplier(): void {
     const id = this.supplierId();
+    if (!id) return;
+    void this.router.navigate(['/companies', id]);
+  }
+
+  navigateToBroker(): void {
+    const id = this.brokerId();
     if (!id) return;
     void this.router.navigate(['/companies', id]);
   }

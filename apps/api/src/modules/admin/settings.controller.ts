@@ -57,6 +57,8 @@ import {
   deletePriceReference,
   getSegmentSettings,
   updateSegmentSettings,
+  getBrokerSettings,
+  updateBrokerSettings,
 } from './settings.service';
 import { reloadCurrencies } from '../prices/price.service';
 import {
@@ -1349,6 +1351,39 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       firstInquiryGroupNotificationEnabled: t.Optional(t.Boolean()),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update WhatsApp integration settings' },
+  })
+
+  // ═════════════════════════════════════════════════════════════
+  //  BROKER SETTINGS
+  // ═════════════════════════════════════════════════════════════
+
+  .get('/broker', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getBrokerSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get broker settings' },
+  })
+
+  .put('/broker', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateBrokerSettings(body);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      brokerCcCustomer: t.Optional(t.Boolean()),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update broker settings' },
   })
 
   // ═════════════════════════════════════════════════════════════

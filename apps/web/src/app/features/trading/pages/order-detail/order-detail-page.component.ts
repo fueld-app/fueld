@@ -311,6 +311,18 @@ interface InquiryReplyRecommendation {
       [supplierContactOptions]="supplierContactDropdownOptions()"
       (customerContactChange)="onCustomerContactChange($event)"
       (supplierContactChange)="onSupplierContactChange($event)"
+      [brokerId]="order()?.brokerId ?? ''"
+      [brokerName]="brokerName()"
+      [brokerOptions]="brokerDropdownOptions()"
+      [brokerLoading]="brokerSearchLoading()"
+      [brokerContactId]="order()?.brokerContactId ?? ''"
+      [brokerContactName]="brokerContact()?.name ?? ''"
+      [brokerContactOptions]="brokerContactDropdownOptions()"
+      [brokerGetsAll]="order()?.brokerGetsAll ?? false"
+      (brokerSearch)="searchBrokers($event)"
+      (brokerChange)="onBrokerChange($event)"
+      (brokerContactChange)="onBrokerContactChange($event)"
+      (brokerGetsAllChange)="onBrokerGetsAllChange($event)"
     >
       <!-- Customer Payment (projected into client card) -->
       <div customerPayment>
@@ -1422,7 +1434,7 @@ interface InquiryReplyRecommendation {
       [pdfFileName]="emailPdfFileName()"
       [orderId]="orderId()"
       [waLinked]="waLinked()"
-      [defaultPhone]="customerContact()?.phone ?? null"
+      [defaultPhone]="order()?.brokerGetsAll && brokerContact()?.phone ? brokerContact()?.phone ?? null : customerContact()?.phone ?? null"
       (sendEmail)="onSendEmail($event)"
       (sendWhatsApp)="onSendInvoiceWhatsApp($event)"
     />
@@ -1612,8 +1624,15 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
 
   readonly customerContact = signal<CompanyContactDto | null>(null);
   readonly supplierContact = signal<CompanyContactDto | null>(null);
+  readonly brokerContact = signal<CompanyContactDto | null>(null);
   readonly customerContacts = signal<CompanyContactDto[]>([]);
   readonly supplierContacts = signal<CompanyContactDto[]>([]);
+  readonly brokerContacts = signal<CompanyContactDto[]>([]);
+
+  // ─── Broker search ──────────────────────────────────────────────
+
+  readonly brokers = signal<CounterpartyDto[]>([]);
+  readonly brokerSearchLoading = signal(false);
 
   // ─── Autosave ────────────────────────────────────────────────────
 
@@ -1629,6 +1648,11 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     const id = this.order()?.supplierId;
     if (!id) return '—';
     return this.suppliers().find((s) => s.id === id)?.name ?? '—';
+  });
+  readonly brokerName = computed(() => {
+    const id = this.order()?.brokerId;
+    if (!id) return '—';
+    return this.brokers().find((b) => b.id === id)?.name ?? '—';
   });
   readonly vesselName = computed(() => this.vessel()?.name ?? '—');
   readonly portName = computed(() => this.port()?.name ?? '—');
@@ -1724,6 +1748,17 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
 
   readonly supplierContactDropdownOptions = computed(() =>
     this.supplierContacts().map((c) => ({
+      value: c.id,
+      label: c.name + (c.role ? ` (${c.role})` : ''),
+    })),
+  );
+
+  readonly brokerDropdownOptions = computed<DropdownOption[]>(() =>
+    this.brokers().map((b) => ({ value: b.id, label: b.name })),
+  );
+
+  readonly brokerContactDropdownOptions = computed(() =>
+    this.brokerContacts().map((c) => ({
       value: c.id,
       label: c.name + (c.role ? ` (${c.role})` : ''),
     })),
@@ -2050,6 +2085,9 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
           supplierCreditDays: d.supplierCreditDays ?? null,
           supplierNote: d.supplierNote ?? null,
           supplierContactId: d.supplierContactId ?? null,
+          brokerId: d.brokerId ?? null,
+          brokerContactId: d.brokerContactId ?? null,
+          brokerGetsAll: d.brokerGetsAll ?? false,
           termsAndConditions: d.termsAndConditions ?? null,
           lossReason: d.lossReason,
           financingRateAnnual: d.financingRateAnnual ?? 0.08,
@@ -2069,6 +2107,8 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
 
         if (d.customerContact) this.customerContact.set(d.customerContact);
         if (d.supplierContact) this.supplierContact.set(d.supplierContact);
+        if (d.brokerContact) this.brokerContact.set(d.brokerContact);
+        if (d.broker) this.brokers.set([d.broker]);
 
         if (d.client) this.client.set(d.client);
         if (d.client) this.clients.set([d.client]);
@@ -2125,6 +2165,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
         await this.loadReferenceData();
         await this.loadCompanyContacts('customer', d.clientId);
         if (d.supplierId) await this.loadCompanyContacts('supplier', d.supplierId);
+        if (d.brokerId) await this.loadCompanyContacts('broker', d.brokerId);
         await Promise.all([
           this.loadInquirySupplierContext(),
           this.loadInquiryReplies(),
@@ -2541,14 +2582,15 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
 
   // ─── Contact person handlers ─────────────────────────────────────
 
-  async loadCompanyContacts(side: 'customer' | 'supplier', companyId: string): Promise<void> {
+  async loadCompanyContacts(side: 'customer' | 'supplier' | 'broker', companyId: string): Promise<void> {
     try {
       const res = await firstValueFrom(
         this.http.get<ApiResponse<CompanyContactDto[]>>(`${API_URL}/companies/local/${companyId}/contacts`),
       );
       if (res.success) {
         if (side === 'customer') this.customerContacts.set(res.data ?? []);
-        else this.supplierContacts.set(res.data ?? []);
+        else if (side === 'supplier') this.supplierContacts.set(res.data ?? []);
+        else this.brokerContacts.set(res.data ?? []);
       }
     } catch {
       // silently ignore
@@ -2566,6 +2608,64 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     this.order.update((o) => (o ? { ...o, supplierContactId: contactId || null } : o));
     const contact = this.supplierContacts().find((c) => c.id === contactId) ?? null;
     this.supplierContact.set(contact);
+    this.triggerAutosave();
+  }
+
+  // ─── Broker handlers ─────────────────────────────────────────────
+
+  async searchBrokers(term: string): Promise<void> {
+    this.brokerSearchLoading.set(true);
+    try {
+      let res = await firstValueFrom(
+        this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
+          `${API_URL}/companies/local?type=BROKER&search=${encodeURIComponent(term)}&limit=20`,
+        ),
+      );
+      let localResults = res.success ? res.data.companies : [];
+      if (localResults.length === 0 && term.trim()) {
+        res = await firstValueFrom(
+          this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
+            `${API_URL}/companies/local?search=${encodeURIComponent(term)}&limit=20`,
+          ),
+        );
+        localResults = res.success ? res.data.companies : [];
+      }
+      const currentId = this.order()?.brokerId ?? '';
+      const mergedLocal = currentId && !localResults.find((c) => c.id === currentId)
+        ? [this.brokers().find((b) => b.id === currentId) ?? null, ...localResults].filter(Boolean)
+        : localResults;
+      this.brokers.set(mergedLocal as CounterpartyDto[]);
+    } catch {
+      // silently ignore
+    } finally {
+      this.brokerSearchLoading.set(false);
+    }
+  }
+
+  onBrokerChange(brokerId: string): void {
+    if (!brokerId) {
+      // Clearing broker — also clear contact and toggle
+      this.order.update((o) => (o ? { ...o, brokerId: null, brokerContactId: null, brokerGetsAll: false } : o));
+      this.brokerContact.set(null);
+      this.brokerContacts.set([]);
+      this.triggerAutosave();
+      return;
+    }
+    this.order.update((o) => (o ? { ...o, brokerId, brokerContactId: null } : o));
+    this.brokerContact.set(null);
+    void this.loadCompanyContacts('broker', brokerId);
+    this.triggerAutosave();
+  }
+
+  onBrokerContactChange(contactId: string): void {
+    this.order.update((o) => (o ? { ...o, brokerContactId: contactId || null } : o));
+    const contact = this.brokerContacts().find((c) => c.id === contactId) ?? null;
+    this.brokerContact.set(contact);
+    this.triggerAutosave();
+  }
+
+  onBrokerGetsAllChange(value: boolean): void {
+    this.order.update((o) => (o ? { ...o, brokerGetsAll: value } : o));
     this.triggerAutosave();
   }
 

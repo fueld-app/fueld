@@ -1325,3 +1325,28 @@ export async function updateSegmentSettings(segmentCategories: SegmentCategory[]
 
   return getSegmentSettings();
 }
+
+// ─── Broker Settings ──────────────────────────────────────────────────
+
+export async function getBrokerSettings(): Promise<{ brokerCcCustomer: boolean }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  return { brokerCcCustomer: settings.brokerCcCustomer ?? false };
+}
+
+export async function updateBrokerSettings(data: { brokerCcCustomer?: boolean }): Promise<{ brokerCcCustomer: boolean }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = { ...(tenant.settings as any) };
+  if (data.brokerCcCustomer !== undefined) settings.brokerCcCustomer = data.brokerCcCustomer;
+
+  await db
+    .update(tenants)
+    .set({ settings, updatedAt: new Date() })
+    .where(eq(tenants.id, tenant.id));
+
+  return getBrokerSettings();
+}

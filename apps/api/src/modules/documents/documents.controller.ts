@@ -390,6 +390,10 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           const [supplier] = await db.select({ name: counterparties.name }).from(counterparties).where(eq(counterparties.id, order.supplierId)).limit(1);
           recipientName = supplier?.name ?? '';
         }
+      } else if (order.brokerGetsAll && order.brokerContact) {
+        // Broker gets all customer-facing comms
+        recipientEmail = order.brokerContact.email ?? '';
+        recipientName = order.brokerContact.name ?? order.broker?.name ?? '';
       } else {
         recipientEmail = order.customerContact?.email ?? '';
         recipientName = order.customerContact?.name ?? order.client?.name ?? '';
@@ -398,6 +402,20 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       // Build default CC list: sender's own email (so they get a copy)
       const ccEmails = [auth.email];
       const bccEmails: string[] = [];
+
+      // If broker gets all, optionally CC the original customer contact (admin setting)
+      if (docType !== 'NOMINATION' && order.brokerGetsAll && order.brokerContact) {
+        const tenantRow = await db.query.tenants.findFirst({
+          where: eq(tenants.id, auth.tenantId),
+          columns: { settings: true },
+        });
+        const tenantSettings = (tenantRow?.settings ?? {}) as import('../../db/schema').TenantSettings;
+        if (tenantSettings.brokerCcCustomer && order.customerContact?.email) {
+          if (!ccEmails.includes(order.customerContact.email)) {
+            ccEmails.push(order.customerContact.email);
+          }
+        }
+      }
 
       // ── Apply email rules (default CC/BCC from admin config) ──
       const defaultCcEmails: Array<{ email: string; label: string | null }> = [];

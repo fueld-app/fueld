@@ -65,7 +65,7 @@ interface LliSearchResult {
       </div>
 
       <!-- Search bar -->
-      <div class="mb-4">
+      <div class="mb-4 flex flex-wrap items-end gap-3">
         <input
           type="text"
           [ngModel]="searchTerm()"
@@ -75,6 +75,19 @@ interface LliSearchResult {
                  placeholder:text-gray-400 focus:border-brand-500 focus:outline-none
                  focus:ring-2 focus:ring-brand-500/20"
         />
+        <div class="w-56">
+          <label class="mb-1 block text-xs font-medium text-gray-500">Broker</label>
+          <app-searchable-dropdown
+            placeholder="Filter by broker…"
+            [options]="brokerFilterOptions()"
+            [selected]="filterBrokerId()"
+            [loading]="brokerFilterLoading()"
+            [asyncSearch]="true"
+            [clearable]="true"
+            (searchChange)="searchBrokerFilter($event)"
+            (selectionChange)="onBrokerFilterChange($event)"
+          />
+        </div>
       </div>
 
       <!-- Loading state -->
@@ -449,6 +462,11 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   readonly sortDir = signal<'asc' | 'desc'>('asc');
   readonly toast = signal<{ type: 'success' | 'error'; message: string } | null>(null);
 
+  // ─── Broker filter ────────────────────────────────────────────────
+  readonly filterBrokerId = signal('');
+  readonly brokerFilterOptions = signal<DropdownOption[]>([]);
+  readonly brokerFilterLoading = signal(false);
+
   // ─── New inquiry modal ────────────────────────────────────────────
 
   readonly showNewInquiryModal = signal(false);
@@ -551,6 +569,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
       params.set('page', String(this.currentPage()));
       params.set('limit', String(this.pageSize()));
       if (this.searchTerm()) params.set('search', this.searchTerm());
+      if (this.filterBrokerId()) params.set('brokerId', this.filterBrokerId());
       if (this.sortBy()) params.set('sortBy', this.sortBy());
       if (this.sortBy()) params.set('sortDir', this.sortDir());
 
@@ -859,6 +878,30 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
       this.currentPage.set(1);
       this.loadInquiries();
     }, 300);
+  }
+
+  async searchBrokerFilter(term: string): Promise<void> {
+    this.brokerFilterLoading.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
+          `${API}/companies/local?type=BROKER&search=${encodeURIComponent(term)}&limit=20`,
+        ),
+      );
+      if (res.success) {
+        this.brokerFilterOptions.set(
+          res.data.companies.map((c) => ({ value: c.id, label: c.name })),
+        );
+      }
+    } catch { /* ignore */ } finally {
+      this.brokerFilterLoading.set(false);
+    }
+  }
+
+  onBrokerFilterChange(value: string): void {
+    this.filterBrokerId.set(value ?? '');
+    this.currentPage.set(1);
+    this.loadInquiries();
   }
 
   goToPage(page: number): void {

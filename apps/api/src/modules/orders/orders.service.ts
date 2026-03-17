@@ -36,6 +36,7 @@ interface ListOrdersQuery {
   search?: string;
   statuses?: string[];     // filter by status(es), e.g. ['INQUIRY','OFFER'] for inquiries
   salesRepId?: string;
+  brokerId?: string;       // filter by broker company
   sortBy?: string;
   sortDir?: 'asc' | 'desc';
   page?: number;
@@ -64,6 +65,9 @@ interface CreateOrderInput {
   supplierContactId?: string | null;
   termsAndConditions?: string | null;
   placeRemark?: string | null;
+  brokerId?: string | null;
+  brokerContactId?: string | null;
+  brokerGetsAll?: boolean;
 }
 
 interface UpdateOrderInput {
@@ -90,6 +94,9 @@ interface UpdateOrderInput {
   termsAndConditions?: string | null;
   placeRemark?: string | null;
   lossReason?: string | null;
+  brokerId?: string | null;
+  brokerContactId?: string | null;
+  brokerGetsAll?: boolean;
 }
 
 interface SaveItemInput {
@@ -279,6 +286,10 @@ export async function listOrders(query?: ListOrdersQuery) {
 
   if (query?.salesRepId) {
     conditions.push(eq(orders.salesRepId, query.salesRepId));
+  }
+
+  if (query?.brokerId) {
+    conditions.push(eq(orders.brokerId, query.brokerId));
   }
 
   if (query?.search) {
@@ -481,7 +492,7 @@ export async function getOrderById(idOrNumber: string) {
   if (!row) return null;
 
   // Fetch relations in parallel
-  const [client, vessel, place, salesRep, invoicingCompany, items, customerContact, supplierContact, tenant] =
+  const [client, vessel, place, salesRep, invoicingCompany, items, customerContact, supplierContact, broker, brokerContact, tenant] =
     await Promise.all([
       getCounterpartyById(row.clientId),
       db
@@ -521,6 +532,17 @@ export async function getOrderById(idOrNumber: string) {
             .select()
             .from(companyContacts)
             .where(eq(companyContacts.id, row.supplierContactId))
+            .limit(1)
+            .then((r) => r[0] ? { ...r[0], createdAt: r[0].createdAt.toISOString(), updatedAt: r[0].updatedAt.toISOString() } : null)
+        : Promise.resolve(null),
+      row.brokerId
+        ? getCounterpartyById(row.brokerId)
+        : Promise.resolve(null),
+      row.brokerContactId
+        ? db
+            .select()
+            .from(companyContacts)
+            .where(eq(companyContacts.id, row.brokerContactId))
             .limit(1)
             .then((r) => r[0] ? { ...r[0], createdAt: r[0].createdAt.toISOString(), updatedAt: r[0].updatedAt.toISOString() } : null)
         : Promise.resolve(null),
@@ -575,6 +597,9 @@ export async function getOrderById(idOrNumber: string) {
     supplierCreditDays: row.supplierCreditDays ?? null,
     supplierNote: row.supplierNote ?? null,
     supplierContactId: row.supplierContactId ?? null,
+    brokerId: row.brokerId ?? null,
+    brokerContactId: row.brokerContactId ?? null,
+    brokerGetsAll: row.brokerGetsAll ?? false,
     termsAndConditions: row.termsAndConditions ?? null,
     financingRateAnnual,
     financingDayCountConvention: orderEconomics.dayCountConvention,
@@ -590,6 +615,8 @@ export async function getOrderById(idOrNumber: string) {
     invoicingCompany,
     customerContact,
     supplierContact,
+    broker,
+    brokerContact,
     items: items.map((i, index) => ({
       id: i.id,
       orderId: i.orderId,
@@ -672,6 +699,9 @@ export async function createOrder(input: CreateOrderInput) {
     supplierNote: input.supplierNote ?? null,
     supplierContactId: input.supplierContactId ?? null,
     termsAndConditions: input.termsAndConditions ?? null,
+    brokerId: input.brokerId ?? null,
+    brokerContactId: input.brokerContactId ?? null,
+    brokerGetsAll: input.brokerGetsAll ?? false,
     placeRemark,
   };
 
@@ -719,6 +749,9 @@ export async function updateOrder(id: string, input: UpdateOrderInput) {
   if (input.termsAndConditions !== undefined) setData.termsAndConditions = input.termsAndConditions;
   if (input.placeRemark !== undefined) setData.placeRemark = input.placeRemark;
   if (input.lossReason !== undefined) setData.lossReason = input.lossReason;
+  if (input.brokerId !== undefined) setData.brokerId = input.brokerId;
+  if (input.brokerContactId !== undefined) setData.brokerContactId = input.brokerContactId;
+  if (input.brokerGetsAll !== undefined) setData.brokerGetsAll = input.brokerGetsAll;
 
   // Auto-set closedAt when status moves to CANCELLED or PAID
   if (input.status === 'CANCELLED' || input.status === 'PAID') {
