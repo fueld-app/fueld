@@ -135,7 +135,7 @@ describe('dashboard.service', () => {
       customerCreditDays: 15,
       supplierPaymentTermType: 'COD',
     });
-    await db.update(orders).set({ createdAt: new Date('2026-03-01T10:00:00.000Z') }).where(eq(orders.id, oldOrder.id));
+    await db.update(orders).set({ status: 'CONFIRMED', createdAt: new Date('2026-03-01T10:00:00.000Z'), updatedAt: new Date() }).where(eq(orders.id, oldOrder.id));
     await saveOrderItems(oldOrder.id, [
       {
         productType: 'VLSFO',
@@ -153,7 +153,7 @@ describe('dashboard.service', () => {
       placeId: place.id,
       salesRepId: traderTwo.id,
     });
-    await db.update(orders).set({ createdAt: new Date('2026-03-05T10:00:00.000Z') }).where(eq(orders.id, newOrder.id));
+    await db.update(orders).set({ status: 'CONFIRMED', createdAt: new Date('2026-03-05T10:00:00.000Z'), updatedAt: new Date() }).where(eq(orders.id, newOrder.id));
     await saveOrderItems(newOrder.id, [
       {
         productType: 'LSMGO',
@@ -206,6 +206,7 @@ describe('dashboard.service', () => {
       placeId: place.id,
       salesRepId: user.id,
     });
+    await db.update(orders).set({ status: 'CONFIRMED', updatedAt: new Date() }).where(eq(orders.id, ownOrder.id));
     await saveOrderItems(ownOrder.id, [
       { productType: 'VLSFO', quantity: '5', unit: 'MT', salesPrice: '200', costPrice: '190' },
     ]);
@@ -217,6 +218,7 @@ describe('dashboard.service', () => {
       placeId: place.id,
       salesRepId: delegator.id,
     });
+    await db.update(orders).set({ status: 'CONFIRMED', updatedAt: new Date() }).where(eq(orders.id, delegatedOrder.id));
     await saveOrderItems(delegatedOrder.id, [
       { productType: 'LSMGO', quantity: '7', unit: 'MT', salesPrice: '300', costPrice: '250' },
     ]);
@@ -547,5 +549,337 @@ describe('dashboard.service', () => {
     expect(metrics.totalWon).toBe(0);
     expect(metrics.totalLost).toBe(1);
     expect(metrics.winRate).toBe(0);
+  });
+
+  // ─── Dashboard KPI Consistency ───────────────────────────────────
+  // These tests verify that the numbers shown on the dashboard (as in
+  // the screenshot) are internally consistent and computed correctly.
+
+  describe('KPI card consistency', () => {
+    it('Total Revenue YTD equals sum of all trader revenues', async () => {
+      const { tenant, client, vessel, place, user } = await seedBasics();
+      const db = await getDb();
+      const { createOrder, saveOrderItems } = await loadOrdersService();
+      const { getTeamStats } = await loadDashboardService();
+
+      await db.update(users).set({ role: 'ADMIN', updatedAt: new Date() }).where(eq(users.id, user.id));
+
+      const [trader2] = await db.insert(users).values({
+        tenantId: tenant.id,
+        email: 'trader-b@test.local',
+        name: 'Trader B',
+        role: 'TRADER',
+      }).returning();
+
+      // Trader 1 (admin) - two confirmed orders
+      const o1 = await createOrder({ tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: user.id });
+      await db.update(orders).set({ status: 'CONFIRMED', updatedAt: new Date() }).where(eq(orders.id, o1.id));
+      await saveOrderItems(o1.id, [
+        { productType: 'VLSFO', quantity: '500', unit: 'MT', salesPrice: '650', costPrice: '620' },
+      ]);
+      const o2 = await createOrder({ tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: user.id });
+      await db.update(orders).set({ status: 'DELIVERED', updatedAt: new Date() }).where(eq(orders.id, o2.id));
+      await saveOrderItems(o2.id, [
+        { productType: 'LSMGO', quantity: '200', unit: 'MT', salesPrice: '700', costPrice: '670' },
+      ]);
+
+      // Trader 2 - one confirmed order
+      const o3 = await createOrder({ tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: trader2.id });
+      await db.update(orders).set({ status: 'INVOICED', updatedAt: new Date() }).where(eq(orders.id, o3.id));
+      await saveOrderItems(o3.id, [
+        { productType: 'VLSFO', quantity: '300', unit: 'MT', salesPrice: '640', costPrice: '610' },
+      ]);
+
+      const stats = await getTeamStats(tenant.id, user.id);
+      const totalRevenue = stats.reduce((sum, s) => sum + Number(s.totalRevenue), 0);
+      const totalOrders = stats.reduce((sum, s) => sum + s.orderCount, 0);
+      const avgDealSize = totalRevenue / totalOrders;
+
+      // Expected: 500*650 + 200*700 + 300*640 = 325000 + 140000 + 192000 = 657000
+      expect(totalRevenue).toBe(657_000);
+      expect(totalOrders).toBe(3);
+      expect(avgDealSize).toBeCloseTo(219_000, 0);
+    });
+
+    it('Gross Profit YTD equals revenue minus cost', async () => {
+      const { tenant, client, vessel, place, user } = await seedBasics();
+      const db = await getDb();
+      const { createOrder, saveOrderItems } = await loadOrdersService();
+      const { getTeamStats } = await loadDashboardService();
+
+      const order = await createOrder({
+        tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: user.id,
+      });
+      await db.update(orders).set({ status: 'CONFIRMED', updatedAt: new Date() }).where(eq(orders.id, order.id));
+      await saveOrderItems(order.id, [
+        { productType: 'VLSFO', quantity: '100', unit: 'MT', salesPrice: '500', costPrice: '450' },
+        { productType: 'LSMGO', quantity: '50', unit: 'MT', salesPrice: '600', costPrice: '550' },
+      ]);
+
+      const stats = await getTeamStats(tenant.id, user.id);
+      expect(stats.length).toBe(1);
+
+      const rev = Number(stats[0]!.totalRevenue);
+      const cost = Number(stats[0]!.totalCost);
+      const gross = Number(stats[0]!.totalProfit);
+
+      // revenue = 100*500 + 50*600 = 50000 + 30000 = 80000
+      // cost    = 100*450 + 50*550 = 45000 + 27500 = 72500
+      // gross   = 80000 - 72500 = 7500
+      expect(rev).toBe(80_000);
+      expect(cost).toBe(72_500);
+      expect(gross).toBe(7_500);
+      expect(gross).toBe(rev - cost);
+    });
+
+    it('Net Profit YTD equals Gross Profit minus financing cost', async () => {
+      const { tenant, client, vessel, place, user } = await seedBasics();
+      const db = await getDb();
+      const { createOrder, saveOrderItems } = await loadOrdersService();
+      const { getTeamStats } = await loadDashboardService();
+
+      const order = await createOrder({
+        tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: user.id,
+        customerPaymentTermType: 'CREDIT',
+        customerCreditDays: 30,
+        supplierPaymentTermType: 'CREDIT',
+        supplierCreditDays: 10,
+      });
+      await db.update(orders).set({ status: 'CONFIRMED', updatedAt: new Date() }).where(eq(orders.id, order.id));
+      await saveOrderItems(order.id, [
+        { productType: 'VLSFO', quantity: '100', unit: 'MT', salesPrice: '500', costPrice: '450' },
+      ]);
+
+      const stats = await getTeamStats(tenant.id, user.id);
+      const s = stats[0]!;
+      const gross = Number(s.totalProfit);
+      const financing = Number(s.totalFinancingCost);
+      const net = Number(s.totalNetProfit);
+
+      // financing = costBase * rate * days / 365 = 45000 * 0.08 * 20 / 365 ≈ 197.26
+      expect(financing).toBeCloseTo(45_000 * 0.08 * 20 / 365, 2);
+      expect(net).toBeCloseTo(gross - financing, 2);
+    });
+
+    it('revenue excludes INQUIRY and CANCELLED orders', async () => {
+      const { tenant, client, vessel, place, user } = await seedBasics();
+      const db = await getDb();
+      const { createOrder, saveOrderItems } = await loadOrdersService();
+      const { getTeamStats } = await loadDashboardService();
+
+      const inquiry = await createOrder({
+        tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: user.id,
+      });
+      await saveOrderItems(inquiry.id, [
+        { productType: 'VLSFO', quantity: '100', unit: 'MT', salesPrice: '500', costPrice: '450' },
+      ]);
+      // Default status is INQUIRY — should NOT count
+
+      const confirmed = await createOrder({
+        tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: user.id,
+      });
+      await db.update(orders).set({ status: 'CONFIRMED', updatedAt: new Date() }).where(eq(orders.id, confirmed.id));
+      await saveOrderItems(confirmed.id, [
+        { productType: 'LSMGO', quantity: '200', unit: 'MT', salesPrice: '600', costPrice: '550' },
+      ]);
+
+      const cancelled = await createOrder({
+        tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: user.id,
+      });
+      await db.update(orders).set({ status: 'CANCELLED', lossReason: 'Price not competitive', updatedAt: new Date() }).where(eq(orders.id, cancelled.id));
+      await saveOrderItems(cancelled.id, [
+        { productType: 'VLSFO', quantity: '300', unit: 'MT', salesPrice: '650', costPrice: '620' },
+      ]);
+
+      const stats = await getTeamStats(tenant.id, user.id);
+      const totalRevenue = Number(stats[0]!.totalRevenue);
+      const orderCount = stats[0]!.orderCount;
+
+      // Only the CONFIRMED order contributes to revenue:
+      // 200*600 = 120000
+      expect(orderCount).toBe(1);
+      expect(totalRevenue).toBe(120_000);
+    });
+
+    it('pipeline total value uses raw salesPrice*quantity without FX', async () => {
+      // This test documents the pipeline calculation approach: raw SQL
+      // multiplication of salesPrice × quantity, without FX conversion.
+      const { tenant, client, vessel, place, user } = await seedBasics();
+      const db = await getDb();
+      const { createOrder } = await loadOrdersService();
+      const { getPipelineSummary } = await loadDashboardService();
+
+      const order = await createOrder({
+        tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: user.id,
+      });
+      await db.insert(orderItems).values([
+        { orderId: order.id, productType: 'VLSFO', quantity: '100', unit: 'MT', salesPrice: '500', costPrice: '450', profit: '5000.0000', costPricingModel: 'FIXED', salesPricingModel: 'FIXED', costPriceFinalized: false, salesPriceFinalized: false },
+        { orderId: order.id, productType: 'LSMGO', quantity: '50', unit: 'MT', salesPrice: '600', costPrice: '550', profit: '2500.0000', costPricingModel: 'FIXED', salesPricingModel: 'FIXED', costPriceFinalized: false, salesPriceFinalized: false },
+      ]);
+
+      const pipeline = await getPipelineSummary(tenant.id);
+      const inquiry = pipeline.find((s) => s.status === 'INQUIRY');
+
+      // Pipeline: raw SQL sum(salesPrice * quantity) = 100*500 + 50*600 = 80000
+      expect(Number(inquiry?.totalValue)).toBe(80_000);
+    });
+
+    it('pipeline total across statuses equals Sum(salesPrice*qty) for all orders', async () => {
+      const { tenant, client, vessel, place, user } = await seedBasics();
+      const db = await getDb();
+      const { createOrder } = await loadOrdersService();
+      const { getPipelineSummary } = await loadDashboardService();
+
+      // Inquiry order
+      const o1 = await createOrder({ tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: user.id });
+      await db.insert(orderItems).values([
+        { orderId: o1.id, productType: 'VLSFO', quantity: '100', unit: 'MT', salesPrice: '500', costPrice: '450', profit: '5000.0000', costPricingModel: 'FIXED', salesPricingModel: 'FIXED', costPriceFinalized: false, salesPriceFinalized: false },
+      ]);
+
+      // Confirmed order
+      const o2 = await createOrder({ tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: user.id });
+      await db.update(orders).set({ status: 'CONFIRMED', updatedAt: new Date() }).where(eq(orders.id, o2.id));
+      await db.insert(orderItems).values([
+        { orderId: o2.id, productType: 'LSMGO', quantity: '50', unit: 'MT', salesPrice: '600', costPrice: '550', profit: '2500.0000', costPricingModel: 'FIXED', salesPricingModel: 'FIXED', costPriceFinalized: false, salesPriceFinalized: false },
+      ]);
+
+      // Cancelled order
+      const o3 = await createOrder({ tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: user.id });
+      await db.update(orders).set({ status: 'CANCELLED', lossReason: 'Test', updatedAt: new Date() }).where(eq(orders.id, o3.id));
+      await db.insert(orderItems).values([
+        { orderId: o3.id, productType: 'VLSFO', quantity: '200', unit: 'MT', salesPrice: '650', costPrice: '620', profit: '6000.0000', costPricingModel: 'FIXED', salesPricingModel: 'FIXED', costPriceFinalized: false, salesPriceFinalized: false },
+      ]);
+
+      const pipeline = await getPipelineSummary(tenant.id);
+      const totalPipelineValue = pipeline.reduce((sum, s) => sum + Number(s.totalValue), 0);
+
+      // 100*500 + 50*600 + 200*650 = 50000 + 30000 + 130000 = 210000
+      expect(totalPipelineValue).toBe(210_000);
+    });
+
+    it('orders without items contribute 0 to revenue but 1 to count', async () => {
+      const { tenant, client, vessel, place, user } = await seedBasics();
+      const db = await getDb();
+      const { createOrder, saveOrderItems } = await loadOrdersService();
+      const { getTeamStats } = await loadDashboardService();
+
+      // Order WITH items (CONFIRMED)
+      const o1 = await createOrder({
+        tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: user.id,
+      });
+      await db.update(orders).set({ status: 'CONFIRMED', updatedAt: new Date() }).where(eq(orders.id, o1.id));
+      await saveOrderItems(o1.id, [
+        { productType: 'VLSFO', quantity: '100', unit: 'MT', salesPrice: '500', costPrice: '450' },
+      ]);
+
+      // Order WITHOUT items (CONFIRMED)
+      const o2 = await createOrder({
+        tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: user.id,
+      });
+      await db.update(orders).set({ status: 'CONFIRMED', updatedAt: new Date() }).where(eq(orders.id, o2.id));
+
+      const stats = await getTeamStats(tenant.id, user.id);
+      expect(stats.length).toBe(1);
+      expect(stats[0]!.orderCount).toBe(2);
+      expect(Number(stats[0]!.totalRevenue)).toBe(50_000);
+    });
+
+    it('win rate uses only decided orders (won + lost), not total', async () => {
+      const { tenant, client, vessel, place, user } = await seedBasics();
+      const db = await getDb();
+      const { createOrder } = await loadOrdersService();
+      const { getConversionMetrics } = await loadDashboardService();
+
+      // 1 won, 3 cancelled, 6 inquiries = 10 total
+      const won = await createOrder({ tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: user.id });
+      await db.update(orders).set({ status: 'CONFIRMED', closedAt: new Date(), updatedAt: new Date() }).where(eq(orders.id, won.id));
+
+      for (let i = 0; i < 3; i++) {
+        const lost = await createOrder({ tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: user.id });
+        await db.update(orders).set({ status: 'CANCELLED', lossReason: 'Test', closedAt: new Date(), updatedAt: new Date() }).where(eq(orders.id, lost.id));
+      }
+
+      for (let i = 0; i < 6; i++) {
+        await createOrder({ tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: user.id });
+      }
+
+      const metrics = await getConversionMetrics(tenant.id);
+      expect(metrics.totalInquiries).toBe(10);
+      expect(metrics.totalWon).toBe(1);
+      expect(metrics.totalLost).toBe(3);
+      // Win Rate = won / (won + lost) = 1/4 = 25%
+      expect(metrics.winRate).toBeCloseTo(0.25, 4);
+    });
+
+    it('all KPI numbers are consistent in a complete dashboard scenario', async () => {
+      // Simulates the full dashboard: multiple traders, mixed statuses,
+      // overdue invoices, and conversion metrics — verifies everything ties out.
+      const { tenant, client, vessel, place, user } = await seedBasics();
+      const db = await getDb();
+      const { createOrder, saveOrderItems } = await loadOrdersService();
+      const { getTeamStats, getCollections, getPipelineSummary, getLossAnalysis, getConversionMetrics } = await loadDashboardService();
+
+      await db.update(users).set({ role: 'ADMIN', updatedAt: new Date() }).where(eq(users.id, user.id));
+
+      const [trader2] = await db.insert(users).values({
+        tenantId: tenant.id,
+        email: 'trader-c@test.local',
+        name: 'Trader C',
+        role: 'TRADER',
+      }).returning();
+
+      // --- Create orders across various statuses ---
+
+      // 2 inquiry orders (user)
+      for (let i = 0; i < 2; i++) {
+        const o = await createOrder({ tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: user.id });
+        await saveOrderItems(o.id, [
+          { productType: 'VLSFO', quantity: '100', unit: 'MT', salesPrice: '500', costPrice: '450' },
+        ]);
+      }
+
+      // 1 confirmed order (trader2)
+      const confirmed = await createOrder({ tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: trader2.id });
+      await db.update(orders).set({ status: 'CONFIRMED', closedAt: new Date('2026-03-05'), createdAt: new Date('2026-03-01'), updatedAt: new Date() }).where(eq(orders.id, confirmed.id));
+      await saveOrderItems(confirmed.id, [
+        { productType: 'LSMGO', quantity: '200', unit: 'MT', salesPrice: '600', costPrice: '550' },
+      ]);
+
+      // 1 cancelled order (user)
+      const cancelled = await createOrder({ tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: user.id });
+      await db.update(orders).set({ status: 'CANCELLED', lossReason: 'Price not competitive', closedAt: new Date(), updatedAt: new Date() }).where(eq(orders.id, cancelled.id));
+      await saveOrderItems(cancelled.id, [
+        { productType: 'VLSFO', quantity: '150', unit: 'MT', salesPrice: '650', costPrice: '620' },
+      ]);
+
+      // --- Team Stats (revenue, profit) ---
+      const stats = await getTeamStats(tenant.id, user.id);
+      const totalOrders = stats.reduce((s, t) => s + t.orderCount, 0);
+      const totalRevenue = stats.reduce((s, t) => s + Number(t.totalRevenue), 0);
+      const totalGross = stats.reduce((s, t) => s + Number(t.totalProfit), 0);
+
+      expect(totalOrders).toBe(1); // only the 1 confirmed order counts
+      // revenue: 200*600 = 120000 (inquiry & cancelled excluded)
+      expect(totalRevenue).toBe(120_000);
+      // cost: 200*550 = 110000
+      // gross = 120000 - 110000 = 10000
+      expect(totalGross).toBe(10_000);
+
+      // --- Conversion Metrics ---
+      const conv = await getConversionMetrics(tenant.id);
+      expect(conv.totalInquiries).toBe(4);
+      expect(conv.totalWon).toBe(1);
+      expect(conv.totalLost).toBe(1);
+      expect(conv.winRate).toBeCloseTo(0.5, 4);
+
+      // --- Loss Analysis ---
+      const loss = await getLossAnalysis(tenant.id);
+      expect(loss.totalCancelled).toBe(1);
+      expect(loss.reasons[0]?.reason).toBe('Price not competitive');
+
+      // --- Collections (no overdue invoices created) ---
+      const collections = await getCollections(tenant.id);
+      expect(collections.length).toBe(0);
+    });
   });
 });

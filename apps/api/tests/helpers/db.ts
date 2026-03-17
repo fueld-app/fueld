@@ -266,7 +266,24 @@ async function _doEnsureTestSchemaCompat(): Promise<void> {
     ADD COLUMN IF NOT EXISTS brand_color text,
     ADD COLUMN IF NOT EXISTS vat_number text,
     ADD COLUMN IF NOT EXISTS fraud_prevention_text text,
-    ADD COLUMN IF NOT EXISTS companies_house_number text
+    ADD COLUMN IF NOT EXISTS companies_house_number text,
+    ADD COLUMN IF NOT EXISTS dismissed_conflicts jsonb DEFAULT '{}',
+    ADD COLUMN IF NOT EXISTS segments jsonb DEFAULT '{}',
+    ADD COLUMN IF NOT EXISTS parent_id uuid,
+    ADD COLUMN IF NOT EXISTS manual_overrides jsonb DEFAULT '[]',
+    ADD COLUMN IF NOT EXISTS seasearcher_id text,
+    ADD COLUMN IF NOT EXISTS company_imo text,
+    ADD COLUMN IF NOT EXISTS country_iso text,
+    ADD COLUMN IF NOT EXISTS year_formed integer,
+    ADD COLUMN IF NOT EXISTS company_roles jsonb,
+    ADD COLUMN IF NOT EXISTS fleet_size integer,
+    ADD COLUMN IF NOT EXISTS head_office_address text,
+    ADD COLUMN IF NOT EXISTS head_office_phone text,
+    ADD COLUMN IF NOT EXISTS head_office_email text,
+    ADD COLUMN IF NOT EXISTS website text,
+    ADD COLUMN IF NOT EXISTS is_sanctioned boolean DEFAULT false,
+    ADD COLUMN IF NOT EXISTS last_synced timestamptz,
+    ADD COLUMN IF NOT EXISTS responsible_user_id uuid
   `;
 
   await sql`
@@ -475,6 +492,35 @@ async function _doEnsureTestSchemaCompat(): Promise<void> {
       created_at timestamptz NOT NULL DEFAULT now(),
       updated_at timestamptz NOT NULL DEFAULT now()
     )
+  `;
+
+  // Migration 0054 – vessel sanction checks
+  await sql`
+    ALTER TABLE vessels
+    ADD COLUMN IF NOT EXISTS sanction_status text DEFAULT 'UNCHECKED',
+    ADD COLUMN IF NOT EXISTS last_sanction_check timestamptz
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS vessel_sanction_checks (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      tenant_id uuid NOT NULL REFERENCES tenants(id),
+      vessel_id uuid NOT NULL REFERENCES vessels(id) ON DELETE CASCADE,
+      status text NOT NULL,
+      source text NOT NULL DEFAULT 'TANKERTRACKERS',
+      matched_on text,
+      raw_data jsonb,
+      checked_at timestamptz NOT NULL DEFAULT now(),
+      created_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+
+  // Migration 0056 – order broker fields
+  await sql`
+    ALTER TABLE orders
+    ADD COLUMN IF NOT EXISTS broker_id uuid,
+    ADD COLUMN IF NOT EXISTS broker_contact_id uuid,
+    ADD COLUMN IF NOT EXISTS broker_gets_all boolean NOT NULL DEFAULT false
   `;
 
   } finally {

@@ -1,4 +1,4 @@
-import { eq, and, lt, sql, inArray, ne, isNotNull, gte, lte } from 'drizzle-orm';
+import { eq, and, lt, sql, inArray, ne, notInArray, isNotNull, gte, lte } from 'drizzle-orm';
 import { db } from '../../db';
 import {
   invoices,
@@ -127,10 +127,12 @@ export async function getTeamStats(
   // 2. Aggregate order items grouped by sales rep
   const fromDate = from ? new Date(`${from}T00:00:00`) : null;
   const toDate = to ? new Date(`${to}T23:59:59`) : null;
+  const revenueExcludedStatuses = ['INQUIRY', 'CANCELLED'];
   const baseConditions = [
     eq(orders.tenantId, tenantId),
     isNotNull(orders.salesRepId),
     inArray(orders.salesRepId, visibleTraderIds),
+    notInArray(orders.status, revenueExcludedStatuses),
   ];
   if (fromDate) baseConditions.push(gte(orders.createdAt, fromDate));
   if (toDate) baseConditions.push(lte(orders.createdAt, toDate));
