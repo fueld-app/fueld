@@ -20,7 +20,7 @@ import {
   imports: [SearchableDropdownComponent, FormsModule],
   template: `
     <div class="mb-4 grid gap-4 grid-cols-1 min-[900px]:grid-cols-2 min-[1600px]:grid-cols-4">
-      <!-- Client + Customer Contact + Customer Payment -->
+      <!-- Client + Customer Contact + Broker + Customer Payment -->
       <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <button
           type="button"
@@ -49,22 +49,113 @@ import {
         } @else {
           <p class="mt-1 text-sm font-semibold text-gray-900">{{ clientName() }}</p>
         }
+        <!-- Customer Contact (hidden when broker is set) -->
+        @if (!brokerId()) {
+          <div class="mt-3 border-t border-gray-100 pt-3">
+            <label class="text-xs font-medium text-gray-400">Contact Person</label>
+            @if (isReadonly()) {
+              <p class="mt-1 text-sm text-gray-900">{{ customerContactName() || '—' }}</p>
+            } @else {
+              <select
+                [ngModel]="customerContactId()"
+                (ngModelChange)="customerContactChange.emit($event)"
+                class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                       focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+              >
+                <option value="">— None —</option>
+                @for (c of customerContactOptions(); track c.value) {
+                  <option [value]="c.value">{{ c.label }}</option>
+                }
+              </select>
+            }
+          </div>
+        }
+        <!-- Broker section (collapsed to link when no broker) -->
         <div class="mt-3 border-t border-gray-100 pt-3">
-          <label class="text-xs font-medium text-gray-400">Contact Person</label>
-          @if (isReadonly()) {
-            <p class="mt-1 text-sm text-gray-900">{{ customerContactName() || '—' }}</p>
-          } @else {
-            <select
-              [ngModel]="customerContactId()"
-              (ngModelChange)="customerContactChange.emit($event)"
-              class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
-                     focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
-            >
-              <option value="">— None —</option>
-              @for (c of customerContactOptions(); track c.value) {
-                <option [value]="c.value">{{ c.label }}</option>
+          @if (!brokerId() && !isReadonly()) {
+            <button
+              type="button"
+              (click)="brokerExpanded = true"
+              class="text-xs text-brand-600 hover:underline cursor-pointer"
+              [class.hidden]="brokerExpanded"
+            >+ Add broker</button>
+          }
+          @if (brokerId() || brokerExpanded) {
+            <div class="flex items-center justify-between mb-1.5">
+              <button
+                type="button"
+                (click)="navigateToBroker()"
+                [disabled]="!brokerId()"
+                class="text-xs font-medium uppercase tracking-wider"
+                [class.text-gray-500]="!brokerId()"
+                [class.text-brand-600]="!!brokerId()"
+                [class.hover:underline]="!!brokerId()"
+                [class.cursor-pointer]="!!brokerId()"
+                [class.cursor-not-allowed]="!brokerId()"
+                [class.opacity-50]="!brokerId()"
+              >
+                Broker
+              </button>
+              @if (!brokerId() && !isReadonly()) {
+                <button
+                  type="button"
+                  (click)="brokerExpanded = false"
+                  class="text-xs text-gray-400 hover:text-gray-600 cursor-pointer"
+                >Cancel</button>
               }
-            </select>
+            </div>
+            @if (isReadonly()) {
+              <p class="mt-1 text-sm font-semibold text-gray-900">{{ brokerName() }}</p>
+            } @else {
+              <app-searchable-dropdown
+                [options]="brokerOptions()"
+                [selected]="brokerId()"
+                [asyncSearch]="true"
+                [loading]="brokerLoading()"
+                [clearable]="true"
+                placeholder="Search brokers..."
+                (searchChange)="brokerSearch.emit($event)"
+                (selectionChange)="brokerChange.emit($event)"
+              />
+            }
+            @if (brokerId()) {
+              <div class="mt-2">
+                <label class="text-xs font-medium text-gray-400">Broker Contact</label>
+                @if (isReadonly()) {
+                  <p class="mt-1 text-sm text-gray-900">{{ brokerContactName() || '—' }}</p>
+                } @else {
+                  <select
+                    [ngModel]="brokerContactId()"
+                    (ngModelChange)="brokerContactChange.emit($event)"
+                    class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                  >
+                    <option value="">— None —</option>
+                    @for (c of brokerContactOptions(); track c.value) {
+                      <option [value]="c.value">{{ c.label }}</option>
+                    }
+                  </select>
+                }
+              </div>
+              <div class="mt-2">
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <button
+                    type="button"
+                    (click)="brokerGetsAllChange.emit(!brokerGetsAll())"
+                    [disabled]="isReadonly()"
+                    class="relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
+                    [class]="brokerGetsAll() ? 'bg-brand-600' : 'bg-gray-300'"
+                  >
+                    <span
+                      class="pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                      [class.translate-x-4]="brokerGetsAll()"
+                      [class.translate-x-0]="!brokerGetsAll()"
+                    ></span>
+                  </button>
+                  <span class="text-xs text-gray-600">Broker gets all comms</span>
+                </label>
+              </div>
+            }
           }
         </div>
         <div class="mt-3 border-t border-gray-100 pt-3">
@@ -123,75 +214,6 @@ import {
         <div class="mt-3 border-t border-gray-100 pt-3">
           <ng-content select="[supplierPayment]"></ng-content>
         </div>
-      </div>
-
-      <!-- Broker -->
-      <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <button
-          type="button"
-          (click)="navigateToBroker()"
-          [disabled]="!brokerId()"
-          class="text-xs font-medium uppercase tracking-wider mb-1.5"
-          [class.text-gray-500]="!brokerId()"
-          [class.text-brand-600]="!!brokerId()"
-          [class.hover:underline]="!!brokerId()"
-          [class.cursor-pointer]="!!brokerId()"
-          [class.cursor-not-allowed]="!brokerId()"
-          [class.opacity-50]="!brokerId()"
-        >
-          Broker
-        </button>
-        @if (isReadonly()) {
-          <p class="mt-1 text-sm font-semibold text-gray-900">{{ brokerName() }}</p>
-        } @else {
-          <app-searchable-dropdown
-            [options]="brokerOptions()"
-            [selected]="brokerId()"
-            [asyncSearch]="true"
-            [loading]="brokerLoading()"
-            placeholder="Search brokers..."
-            (searchChange)="brokerSearch.emit($event)"
-            (selectionChange)="brokerChange.emit($event)"
-          />
-        }
-        @if (brokerId()) {
-          <div class="mt-3 border-t border-gray-100 pt-3">
-            <label class="text-xs font-medium text-gray-400">Contact Person</label>
-            @if (isReadonly()) {
-              <p class="mt-1 text-sm text-gray-900">{{ brokerContactName() || '—' }}</p>
-            } @else {
-              <select
-                [ngModel]="brokerContactId()"
-                (ngModelChange)="brokerContactChange.emit($event)"
-                class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
-                       focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
-              >
-                <option value="">— None —</option>
-                @for (c of brokerContactOptions(); track c.value) {
-                  <option [value]="c.value">{{ c.label }}</option>
-                }
-              </select>
-            }
-          </div>
-          <div class="mt-3 border-t border-gray-100 pt-3">
-            <label class="flex items-center gap-2 cursor-pointer">
-              <button
-                type="button"
-                (click)="brokerGetsAllChange.emit(!brokerGetsAll())"
-                [disabled]="isReadonly()"
-                class="relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
-                [class]="brokerGetsAll() ? 'bg-brand-600' : 'bg-gray-300'"
-              >
-                <span
-                  class="pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
-                  [class.translate-x-4]="brokerGetsAll()"
-                  [class.translate-x-0]="!brokerGetsAll()"
-                ></span>
-              </button>
-              <span class="text-xs text-gray-600">Broker gets all comms</span>
-            </label>
-          </div>
-        }
       </div>
 
       <!-- Voyage: Vessel + Place + ETA/ETD -->
@@ -337,6 +359,7 @@ import {
 })
 export class TradingDetailMetaCardsComponent {
   private readonly router = inject(Router);
+  brokerExpanded = false;
 
   readonly clientName = input.required<string>();
   readonly supplierName = input<string>('—');
