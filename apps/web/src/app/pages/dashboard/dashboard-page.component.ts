@@ -192,9 +192,9 @@ import { API } from '@app/core/config/api';
       }
 
       <!-- Pipeline & Loss Analysis -->
-      <div class="mt-8 grid gap-6 lg:grid-cols-2">
+      <div class="mt-8 grid gap-6 lg:grid-cols-2 min-w-0">
         <!-- Sales Funnel / Pipeline -->
-        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm min-w-0 overflow-hidden">
           <h3 class="text-lg font-semibold text-gray-900 mb-4">Sales Pipeline</h3>
           @if (pipelineStages().length === 0) {
             <p class="text-sm text-gray-500">No data for this period.</p>
@@ -220,7 +220,7 @@ import { API } from '@app/core/config/api';
         </div>
 
         <!-- Loss Analysis (cancel reasons) -->
-        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm min-w-0 overflow-hidden">
           <div class="flex items-center justify-between mb-4">
             <h3 class="text-lg font-semibold text-gray-900">Loss Analysis</h3>
             @if (lossAnalysis().totalCancelled > 0) {
