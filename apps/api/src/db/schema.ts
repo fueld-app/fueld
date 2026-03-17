@@ -688,7 +688,9 @@ export const orderItems = pgTable('order_items', {
   quantityMin: numeric('quantity_min', { precision: 12, scale: 3 }),
   quantityMax: numeric('quantity_max', { precision: 12, scale: 3 }),
   unit: text('unit').notNull().default('MT'),
+  costUnit: text('cost_unit').notNull().default('MT'),
   salesUnit: text('sales_unit').notNull().default('MT'),
+  costConversionFactor: numeric('cost_conversion_factor', { precision: 12, scale: 6 }).notNull().default('1'),
   unitConversionFactor: numeric('unit_conversion_factor', { precision: 12, scale: 6 }).notNull().default('1'),
 
   description: text('description'),

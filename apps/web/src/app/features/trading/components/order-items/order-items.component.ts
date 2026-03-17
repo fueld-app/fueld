@@ -36,7 +36,9 @@ export interface OrderItemRow {
   quantityMin: number | null;
   quantityMax: number | null;
   unit: string;
+  costUnit: string;
   salesUnit: string;
+  costConversionFactor: number;
   unitConversionFactor: number;
   costPrice: number;
   costCurrency: string;
@@ -195,6 +197,16 @@ export interface OrderItemsEconomics {
                              focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                     />
                     <span class="text-gray-400 text-xs">{{ row.unit }}</span>
+                    <select
+                      [ngModel]="row.unit"
+                      (ngModelChange)="updateField(i, 'unit', $event)"
+                      class="w-14 rounded border border-gray-200 px-0.5 py-1 text-[10px] text-gray-600
+                             focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                    >
+                      @for (u of unitOptions(); track u.value) {
+                        <option [value]="u.value">{{ u.label }}</option>
+                      }
+                    </select>
                     <button
                       type="button"
                       (click)="toggleSpread(row.id, i)"
@@ -237,13 +249,16 @@ export interface OrderItemsEconomics {
                       @if (row.costBarging) { <div class="text-gray-500">barging {{ row.costBarging }} {{ row.costBargingUnit || 'l/s' }}</div> }
                       @if (row.costCreditDays) { <div class="text-gray-500">{{ row.costCreditDays }} days</div> }
                       @if (row.costPriceFinalized) {
-                        <div class="font-medium text-gray-900">→ {{ row.costPrice | number:'1.2-4' }} {{ row.costCurrency }}/{{ row.unit }}</div>
+                        <div class="font-medium text-gray-900">→ {{ row.costPrice | number:'1.2-4' }} {{ row.costCurrency }}/{{ row.costUnit }}</div>
                       } @else {
                         <div class="italic text-amber-600">price TBD</div>
                       }
                     </div>
                   } @else {
-                    <span class="block text-right tabular-nums">{{ row.costPrice | number:'1.2-4' }} {{ row.costCurrency }}/{{ row.unit }}</span>
+                    <span class="block text-right tabular-nums">{{ row.costPrice | number:'1.2-4' }} {{ row.costCurrency }}/{{ row.costUnit }}</span>
+                    @if (row.unit !== row.costUnit) {
+                      <span class="block text-right text-xs text-gray-400">× {{ row.costConversionFactor | number:'1.2-4' }} {{ row.unit }}/{{ row.costUnit }}</span>
+                    }
                   }
                 } @else {
                   @if (row.costPricingModel === 'FORMULA') {
@@ -264,7 +279,7 @@ export interface OrderItemsEconomics {
                             <option [value]="c.value">{{ c.label }}</option>
                           }
                         </select>
-                        <span class="text-gray-400 text-xs shrink-0">/{{ row.unit }}</span>
+                        <span class="text-gray-400 text-xs shrink-0">/{{ row.costUnit }}</span>
                       </div>
                       <div class="flex items-center gap-1">
                         <span class="text-[10px] text-gray-500 shrink-0">+</span>
@@ -276,7 +291,7 @@ export interface OrderItemsEconomics {
                                  [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
                                  focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20"
                         />
-                        <span class="text-[10px] text-gray-400 shrink-0">/{{ row.unit }}</span>
+                        <span class="text-[10px] text-gray-400 shrink-0">/{{ row.costUnit }}</span>
                         <span class="text-[10px] text-gray-500 shrink-0">barg.</span>
                         <input type="number" step="0.01"
                           [ngModel]="row.costBarging ?? 0"
@@ -310,8 +325,8 @@ export interface OrderItemsEconomics {
                       </select>
                       <span class="text-gray-400 text-xs shrink-0">/</span>
                       <select
-                        [ngModel]="row.unit"
-                        (ngModelChange)="updateField(i, 'unit', $event)"
+                        [ngModel]="row.costUnit"
+                        (ngModelChange)="updateField(i, 'costUnit', $event)"
                         class="w-14 rounded-lg border border-gray-300 px-0.5 py-1.5 text-xs text-gray-700
                                focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
                       >
@@ -320,6 +335,20 @@ export interface OrderItemsEconomics {
                         }
                       </select>
                     </div>
+                    @if (row.unit !== row.costUnit) {
+                      <div class="mt-1 flex items-center gap-1 justify-end">
+                        <span class="text-[10px] text-gray-500">{{ conversionLabel(row.unit, row.costUnit) }}</span>
+                        <input
+                          type="number" step="0.0001" min="0"
+                          [ngModel]="row.costConversionFactor"
+                          (ngModelChange)="updateField(i, 'costConversionFactor', +$event)"
+                          class="w-14 rounded border border-gray-200 px-1 py-0.5 text-right text-[10px] tabular-nums
+                                 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
+                                 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20"
+                        />
+                        <span class="text-[10px] text-gray-400">{{ row.unit }}/{{ row.costUnit }}</span>
+                      </div>
+                    }
                   }
                   <!-- Pricing model toggle -->
                   @if (formulaPricingEnabled()) {
@@ -399,7 +428,7 @@ export interface OrderItemsEconomics {
                                  [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
                                  focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20"
                         />
-                        <span class="text-[10px] text-gray-400 shrink-0">/{{ row.unit }}</span>
+                        <span class="text-[10px] text-gray-400 shrink-0">/{{ row.salesUnit }}</span>
                         <span class="text-[10px] text-gray-500 shrink-0">barg.</span>
                         <input type="number" step="0.01"
                           [ngModel]="row.salesBarging ?? 0"
@@ -458,7 +487,7 @@ export interface OrderItemsEconomics {
                         >Dynamic</button>
                       }
                       @if (row.unit !== row.salesUnit) {
-                        <span class="text-[10px] text-gray-500 ml-auto">density</span>
+                        <span class="text-[10px] text-gray-500 ml-auto">{{ conversionLabel(row.unit, row.salesUnit) }}</span>
                         <input
                           type="number" step="0.0001" min="0"
                           [ngModel]="row.unitConversionFactor"
@@ -677,15 +706,34 @@ export interface OrderItemsEconomics {
               }
             </div>
 
-            <!-- Unit -->
+            <!-- Unit (base qty unit) -->
             <div>
-              <label class="mb-1 block text-xs font-medium text-gray-500">Cost Unit</label>
+              <label class="mb-1 block text-xs font-medium text-gray-500">Unit</label>
               @if (readonly()) {
                 <span class="text-sm text-gray-500">{{ row.unit }}</span>
               } @else {
                 <select
                   [ngModel]="row.unit"
                   (ngModelChange)="updateField(i, 'unit', $event)"
+                  class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                         focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                >
+                  @for (u of unitOptions(); track u.value) {
+                    <option [value]="u.value">{{ u.label }}</option>
+                  }
+                </select>
+              }
+            </div>
+
+            <!-- Cost Unit -->
+            <div>
+              <label class="mb-1 block text-xs font-medium text-gray-500">Cost Unit</label>
+              @if (readonly()) {
+                <span class="text-sm text-gray-500">{{ row.costUnit }}</span>
+              } @else {
+                <select
+                  [ngModel]="row.costUnit"
+                  (ngModelChange)="updateField(i, 'costUnit', $event)"
                   class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
                          focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
                 >
@@ -726,13 +774,13 @@ export interface OrderItemsEconomics {
                     @if (row.costPremium) { <div class="text-gray-500">+ {{ row.costPremium }} pmt</div> }
                     @if (row.costBarging) { <div class="text-gray-500">barging {{ row.costBarging }} {{ row.costBargingUnit || 'l/s' }}</div> }
                     @if (row.costPriceFinalized) {
-                      <div class="font-medium text-gray-900">→ {{ row.costPrice | number:'1.2-4' }} {{ row.costCurrency }}/{{ row.unit }}</div>
+                      <div class="font-medium text-gray-900">→ {{ row.costPrice | number:'1.2-4' }} {{ row.costCurrency }}/{{ row.costUnit }}</div>
                     } @else {
                       <div class="italic text-amber-600">price TBD</div>
                     }
                   </div>
                 } @else {
-                  <span class="text-sm tabular-nums">{{ row.costPrice | number:'1.2-4' }} {{ row.costCurrency }}/{{ row.unit }}</span>
+                  <span class="text-sm tabular-nums">{{ row.costPrice | number:'1.2-4' }} {{ row.costCurrency }}/{{ row.costUnit }}</span>
                 }
               } @else {
                 @if (formulaPricingEnabled()) {
@@ -856,7 +904,7 @@ export interface OrderItemsEconomics {
                   </div>
                   @if (row.unit !== row.salesUnit) {
                     <div class="mt-1 flex items-center gap-1 text-xs text-gray-500">
-                      <span>density</span>
+                      <span>{{ conversionLabel(row.unit, row.salesUnit) }}</span>
                       <input
                         type="number" step="0.0001" min="0"
                         [ngModel]="row.unitConversionFactor"
@@ -1178,7 +1226,9 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
       quantityMin: null,
       quantityMax: null,
       unit: 'MT',
+      costUnit: 'MT',
       salesUnit: 'MT',
+      costConversionFactor: 1,
       unitConversionFactor: 1,
       costPrice: 0,
       costCurrency: this.currency(),
@@ -1206,9 +1256,12 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
 
       (row as Record<string, unknown>)[field] = value;
 
-      // Auto-apply default conversion factor when unit, salesUnit, or product changes
+      // Auto-apply default conversion factor when unit, costUnit, salesUnit, or product changes
       if (field === 'unit' || field === 'salesUnit' || field === 'productType') {
         row.unitConversionFactor = this.lookupConversionFactor(row.productType, row.unit, row.salesUnit);
+      }
+      if (field === 'unit' || field === 'costUnit' || field === 'productType') {
+        row.costConversionFactor = this.lookupConversionFactor(row.productType, row.unit, row.costUnit);
       }
 
       // Auto-recalculate profit using main quantity
@@ -1296,13 +1349,25 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
 
   private computeCostBase(row: OrderItemRow): number {
     const qty = row.quantity || 0;
-    return (row.costPrice || 0) * qty * this.getFxRate(row.costCurrency);
+    const factor = row.costConversionFactor || 1;
+    return (row.costPrice || 0) * qty * factor * this.getFxRate(row.costCurrency);
   }
 
   private computeRevenueBase(row: OrderItemRow): number {
     const qty = row.quantity || 0;
     const factor = row.unitConversionFactor || 1;
     return (row.salesPrice || 0) * qty * factor * this.getFxRate(row.salesCurrency);
+  }
+
+  /** Label for conversion factor: "density" for mass↔volume, "conversion" otherwise. */
+  conversionLabel(fromUnit: string, toUnit: string): string {
+    const massUnits = new Set(['MT', 'MTS', 'KG']);
+    const volumeUnits = new Set(['CBM', 'BBL', 'GAL', 'LT', 'LPS']);
+    const fromMass = massUnits.has(fromUnit);
+    const fromVol = volumeUnits.has(fromUnit);
+    const toMass = massUnits.has(toUnit);
+    const toVol = volumeUnits.has(toUnit);
+    return (fromMass && toVol) || (fromVol && toMass) ? 'density' : 'conversion';
   }
 
   /** Look up a default conversion factor from admin settings (product-specific first, then generic fallback). */

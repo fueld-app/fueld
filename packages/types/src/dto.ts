@@ -737,7 +737,9 @@ export interface OrderItemDto {
   productType: ProductType;
   quantity: string;
   unit: string;
+  costUnit: string;
   salesUnit: string;
+  costConversionFactor: string;
   unitConversionFactor: string;
   description: string | null;
   costPrice: string | null;
@@ -821,6 +823,7 @@ export interface CreateOrderItemDto {
   productType: ProductType;
   quantity: string;
   unit?: string;
+  costUnit?: string;
   description?: string;
   costPrice?: string;
   costCurrency?: string;

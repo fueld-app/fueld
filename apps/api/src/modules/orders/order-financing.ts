@@ -15,6 +15,7 @@ export interface FinancingItemInput {
   quantity?: string | number | null;
   costPrice?: string | number | null;
   costCurrency?: string | null;
+  costConversionFactor?: string | number | null;
   salesPrice?: string | number | null;
   salesCurrency?: string | null;
   unitConversionFactor?: string | number | null;
@@ -80,8 +81,9 @@ export function getFinancingDays(input: FinancingTermsInput): number {
 export function calculateCostBase(item: FinancingItemInput): number {
   const quantity = parseNumber(item.quantity);
   const costPrice = parseNumber(item.costPrice);
+  const costConversionFactor = parseNumber(item.costConversionFactor) || 1;
   const costRate = getFxRate(normalizedCurrency(item.costCurrency));
-  return quantity * costPrice * costRate;
+  return quantity * costConversionFactor * costPrice * costRate;
 }
 
 export function calculateRevenueBase(item: FinancingItemInput): number {

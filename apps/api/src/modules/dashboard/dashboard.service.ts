@@ -127,7 +127,7 @@ export async function getTeamStats(
   // 2. Aggregate order items grouped by sales rep
   const fromDate = from ? new Date(`${from}T00:00:00`) : null;
   const toDate = to ? new Date(`${to}T23:59:59`) : null;
-  const revenueExcludedStatuses = ['INQUIRY', 'CANCELLED'];
+  const revenueExcludedStatuses = ['INQUIRY', 'CANCELLED'] as const;
   const baseConditions = [
     eq(orders.tenantId, tenantId),
     isNotNull(orders.salesRepId),
