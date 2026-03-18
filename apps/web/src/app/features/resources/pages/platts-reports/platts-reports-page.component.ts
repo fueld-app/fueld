@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, inject, signal, viewChild } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpParams } from '@angular/common/http';
@@ -173,10 +173,12 @@ import { PdfPreviewModalComponent } from '@app/shared/components/pdf-preview-mod
     <app-pdf-preview-modal />
   `,
 })
-export class PlattsReportsPageComponent implements OnInit {
+export class PlattsReportsPageComponent implements OnInit, OnDestroy {
   protected readonly auth = inject(AuthService);
   private readonly http = inject(HttpClient);
   readonly pdfModal = viewChild(PdfPreviewModalComponent);
+  private pollTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private readonly pollIntervalMs = 3000;
 
   protected readonly loading = signal(false);
   protected readonly uploading = signal(false);
@@ -198,6 +200,10 @@ export class PlattsReportsPageComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     await this.loadReports();
+  }
+
+  ngOnDestroy(): void {
+    this.stopPolling();
   }
 
   protected onSingleFileChange(event: Event): void {
@@ -232,6 +238,8 @@ export class PlattsReportsPageComponent implements OnInit {
       this.notice.set(`Uploaded ${file.name}. Parsing has started asynchronously.${warningText}`);
       this.selectedSingleFile.set(null);
       this.page.set(1);
+      this.upsertReport(response.data.report);
+      this.schedulePolling();
       await this.loadReports();
     } catch (error) {
       this.error.set(this.describeError(error, 'Failed to upload report'));
@@ -271,6 +279,7 @@ export class PlattsReportsPageComponent implements OnInit {
     this.notice.set(`Bulk import finished. ${successCount} uploaded, ${failureCount} failed. Parsing continues in the background.`);
     this.bulkFiles.set([]);
     this.page.set(1);
+    if (successCount > 0) this.schedulePolling();
     await this.loadReports();
     this.bulkUploading.set(false);
   }
@@ -301,7 +310,9 @@ export class PlattsReportsPageComponent implements OnInit {
       );
       if (!response.success) throw new Error(response.message ?? 'Failed to request reparse');
       this.notice.set(`Reparse requested for ${report.sourceFileName}. Parsing runs in the background.`);
-      await this.loadReports();
+      this.markReportStatus(report.id, 'PARSING');
+      this.schedulePolling();
+      await this.loadReports({ showLoading: false });
     } catch (error) {
       this.error.set(this.describeError(error, 'Failed to request reparse'));
     }
@@ -357,9 +368,12 @@ export class PlattsReportsPageComponent implements OnInit {
     }
   }
 
-  private async loadReports(): Promise<void> {
-    this.loading.set(true);
-    this.error.set(null);
+  private async loadReports(options: { showLoading?: boolean; isPolling?: boolean } = {}): Promise<void> {
+    const showLoading = options.showLoading ?? true;
+    const previousStatuses = new Map(this.reports().map((report) => [report.id, report.status]));
+
+    if (showLoading) this.loading.set(true);
+    if (!options.isPolling) this.error.set(null);
     try {
       let params = new HttpParams()
         .set('page', String(this.page()))
@@ -380,11 +394,79 @@ export class PlattsReportsPageComponent implements OnInit {
 
       this.reports.set(response.data.items);
       this.total.set(response.data.total);
+      this.syncPollingState(previousStatuses, response.data.items);
     } catch (error) {
-      this.error.set(this.describeError(error, 'Failed to load reports'));
+      if (!options.isPolling) {
+        this.error.set(this.describeError(error, 'Failed to load reports'));
+      } else {
+        this.schedulePolling();
+      }
     } finally {
-      this.loading.set(false);
+      if (showLoading) this.loading.set(false);
     }
+  }
+
+  private syncPollingState(previousStatuses: Map<string, string>, reports: PlattsReportDto[]): void {
+    const hasParsingReports = reports.some((report) => this.isParsingStatus(report.status));
+    if (hasParsingReports) {
+      this.schedulePolling();
+      return;
+    }
+
+    this.stopPolling();
+
+    const completedReport = reports.find((report) => {
+      const previousStatus = previousStatuses.get(report.id);
+      return previousStatus && this.isParsingStatus(previousStatus) && report.status === 'READY';
+    });
+    if (completedReport) {
+      this.notice.set(`Parsing finished for ${completedReport.sourceFileName}.`);
+    }
+
+    const failedReport = reports.find((report) => {
+      const previousStatus = previousStatuses.get(report.id);
+      return previousStatus && this.isParsingStatus(previousStatus) && report.status === 'FAILED';
+    });
+    if (failedReport?.parseError) {
+      this.error.set(failedReport.parseError);
+    }
+  }
+
+  private schedulePolling(): void {
+    if (this.pollTimeoutId != null) return;
+
+    this.pollTimeoutId = setTimeout(() => {
+      this.pollTimeoutId = null;
+      void this.loadReports({ showLoading: false, isPolling: true });
+    }, this.pollIntervalMs);
+  }
+
+  private stopPolling(): void {
+    if (this.pollTimeoutId == null) return;
+    clearTimeout(this.pollTimeoutId);
+    this.pollTimeoutId = null;
+  }
+
+  private isParsingStatus(status: string | null | undefined): boolean {
+    return status === 'UPLOADED' || status === 'PARSING';
+  }
+
+  private markReportStatus(reportId: string, status: string): void {
+    this.reports.update((reports) => reports.map((report) => (
+      report.id === reportId ? { ...report, status } : report
+    )));
+  }
+
+  private upsertReport(nextReport: PlattsReportDto): void {
+    this.reports.update((reports) => {
+      const existingIndex = reports.findIndex((report) => report.id === nextReport.id);
+      if (existingIndex >= 0) {
+        const copy = [...reports];
+        copy[existingIndex] = nextReport;
+        return copy;
+      }
+      return [nextReport, ...reports];
+    });
   }
 
   private describeError(error: unknown, fallback: string): string {
