@@ -34,6 +34,23 @@ fi
 log "Current active: ${ACTIVE_SLOT} (port ${ACTIVE_PORT})"
 log "Deploying to:   ${NEXT_SLOT} (port ${NEXT_PORT})"
 
+# ─── Prepare archived deploy payloads ───────────────────────────────
+if [ -f "$APP_DIR/staging/drizzle.tar.gz" ]; then
+  log "Extracting migration archive..."
+  rm -rf "$APP_DIR/staging/drizzle"
+  mkdir -p "$APP_DIR/staging/drizzle"
+  tar -xzf "$APP_DIR/staging/drizzle.tar.gz" -C "$APP_DIR/staging/drizzle"
+  rm -f "$APP_DIR/staging/drizzle.tar.gz"
+fi
+
+if [ -f "$APP_DIR/staging/web-browser.tar.gz" ]; then
+  log "Extracting frontend archive..."
+  rm -rf "$APP_DIR/staging/web"
+  mkdir -p "$APP_DIR/staging/web"
+  tar -xzf "$APP_DIR/staging/web-browser.tar.gz" -C "$APP_DIR/staging/web"
+  rm -f "$APP_DIR/staging/web-browser.tar.gz"
+fi
+
 # ─── 1. Deploy migration files ───────────────────────────────────────
 if [ -d "$APP_DIR/staging/drizzle" ]; then
   log "Updating migration files..."

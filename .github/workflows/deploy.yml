@@ -140,7 +140,7 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             ${{ env.VPS_USER }}@${{ env.VPS_HOST }} \
-            "mkdir -p /opt/fueld/staging/{web,drizzle}"
+            "mkdir -p /opt/fueld/staging"
 
       - name: Upload API binary
         run: |
@@ -148,17 +148,27 @@ jobs:
             apps/api/app-release \
             ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/opt/fueld/staging/app-release
 
-      - name: Upload frontend
+      - name: Package frontend for upload
         run: |
-          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r \
-            apps/web/dist/web/browser/* \
-            ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/opt/fueld/staging/web/
+          tar -C apps/web/dist/web/browser -czf /tmp/web-browser.tar.gz .
+          ls -lh /tmp/web-browser.tar.gz
 
-      - name: Upload drizzle migrations
+      - name: Upload frontend archive
         run: |
-          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r \
-            apps/api/drizzle/* \
-            ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/opt/fueld/staging/drizzle/
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            /tmp/web-browser.tar.gz \
+            ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/opt/fueld/staging/web-browser.tar.gz
+
+      - name: Package drizzle migrations for upload
+        run: |
+          tar -C apps/api/drizzle -czf /tmp/drizzle.tar.gz .
+          ls -lh /tmp/drizzle.tar.gz
+
+      - name: Upload drizzle migrations archive
+        run: |
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            /tmp/drizzle.tar.gz \
+            ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/opt/fueld/staging/drizzle.tar.gz
 
       - name: Upload deploy script
         run: |
