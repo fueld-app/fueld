@@ -796,7 +796,10 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
               } @else {
                 <div class="divide-y divide-gray-50 max-h-[400px] overflow-y-auto">
                   @for (o of placeOrders(); track o.id) {
-                    <div class="px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors">
+                    <a
+                      [routerLink]="[orderDetailRoute(o.status), o.id]"
+                      class="block px-5 py-3 text-sm transition-colors hover:bg-gray-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-inset"
+                    >
                       <div class="flex items-center justify-between">
                         <span class="font-medium text-gray-900 truncate">{{ o.vesselName }}</span>
                         <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
@@ -817,7 +820,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                           @if (o.etd) { <span>ETD {{ o.etd | date:'mediumDate' }}</span> }
                         </div>
                       }
-                    </div>
+                    </a>
                   }
                 </div>
               }
@@ -1214,6 +1217,9 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
               Are you sure you want to delete <strong>{{ place()!.name }}</strong>?
               This cannot be undone.
             </p>
+            @if (deleteError()) {
+              <p class="mt-3 text-sm text-red-600">{{ deleteError() }}</p>
+            }
             <div class="mt-5 flex justify-end gap-3">
               <button
                 (click)="showDeleteModal.set(false)"
@@ -1257,6 +1263,7 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
   readonly syncing = signal(false);
   readonly showDeleteModal = signal(false);
   readonly deletingPlace = signal(false);
+  readonly deleteError = signal('');
   readonly mapFullscreen = signal(false);
   readonly editingPlace = signal(false);
   readonly savingPlace = signal(false);
@@ -1930,6 +1937,7 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
 
   confirmDeletePlace(): void {
     if (!this.canDeleteEntity()) return;
+    this.deleteError.set('');
     this.showDeleteModal.set(true);
   }
 
@@ -1945,11 +1953,22 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
       );
       this.showDeleteModal.set(false);
       this.router.navigate(['/places']);
-    } catch (err) {
-      console.error('Delete failed:', err);
+    } catch (err: any) {
+      this.deleteError.set(err?.error?.message || 'Failed to delete place.');
     } finally {
       this.deletingPlace.set(false);
     }
+  }
+
+  orderDetailRoute(status?: string):
+    '/trading/orders'
+    | '/trading/inquiries'
+    | '/trading/completed-orders'
+    | '/trading/cancelled-orders' {
+    if (status === 'INQUIRY' || status === 'OFFER') return '/trading/inquiries';
+    if (status === 'PAID') return '/trading/completed-orders';
+    if (status === 'CANCELLED') return '/trading/cancelled-orders';
+    return '/trading/orders';
   }
 
   // ─── Navigation & helpers ────────────────────────────────────────────
