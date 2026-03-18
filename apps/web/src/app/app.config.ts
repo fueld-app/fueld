@@ -6,10 +6,7 @@ import {
 } from '@angular/core';
 import { provideRouter, withComponentInputBinding, TitleStrategy } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
-import { importProvidersFrom } from '@angular/core';
 import { provideServiceWorker } from '@angular/service-worker';
-import { NgxEchartsModule } from 'ngx-echarts';
-import * as echarts from 'echarts';
 
 import { routes } from './app.routes';
 import { authInterceptor } from './core/auth/auth.interceptor';
@@ -25,7 +22,6 @@ export const appConfig: ApplicationConfig = {
       enabled: !isDevMode(),
       registrationStrategy: 'registerWhenStable:30000',
     }),
-    importProvidersFrom(NgxEchartsModule.forRoot({ echarts })),
     { provide: TitleStrategy, useClass: FueldTitleStrategy },
   ],
 };
