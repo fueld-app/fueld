@@ -45,8 +45,8 @@ import { API } from '@app/core/config/api';
         </div>
 
         <!-- Date Range + Team Toggle -->
-        <div class="flex items-center justify-between gap-3 flex-shrink-0 sm:justify-end">
-          @if (auth.isAdmin()) {
+        <div class="flex w-full items-center justify-end gap-3 flex-shrink-0 sm:w-auto">
+          @if (canUseTeamView()) {
             <div class="flex items-center gap-2">
               <span class="text-sm font-medium text-gray-600">My Orders</span>
               <button
@@ -434,6 +434,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   readonly conversionMetrics = signal<ConversionMetricsDto>({ totalInquiries: 0, totalWon: 0, totalLost: 0, winRate: 0, avgDaysToClose: null });
   readonly topCreditGroups = signal<{ id: string; name: string; country: string | null; totalCreditLimit: string; totalCreditUsed: string; childCount: number }[]>([]);
   readonly followUps = signal<{ id: string; entityType: string; entityId: string; entityName: string; content: string; followUpDate: string; userName: string }[]>([]);
+  readonly canUseTeamView = computed(() => this.auth.isAdmin() || this.auth.isCreditManager());
 
   constructor() {}
 
@@ -506,7 +507,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
       params.set('to', this.formatDateForQuery(range.to));
     }
     // "My Orders" mode: filter server-side by current user
-    const isMyOrders = this.auth.isAdmin() ? !this.teamView() : true;
+    const isMyOrders = this.canUseTeamView() ? !this.teamView() : true;
     if (isMyOrders) {
       const uid = this.auth.user()?.id;
       if (uid) params.set('userId', uid);
@@ -562,7 +563,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   private applyTeamStats(): void {
     const traders = this.rawTraderStats();
     const userId = this.auth.user()?.id ?? null;
-    const filtered = this.auth.isAdmin() && !this.teamView() && userId
+    const filtered = this.canUseTeamView() && !this.teamView() && userId
       ? traders.filter((trader) => trader.traderId === userId)
       : traders;
 
