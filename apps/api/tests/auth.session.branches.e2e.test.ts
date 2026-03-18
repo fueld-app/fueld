@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
-import { users } from '../src/db/schema';
+import { tenants, users } from '../src/db/schema';
 import { getDb, seedAuthBasics, truncateAll } from './helpers/db';
 import { loginE2E, requestJson } from './helpers/e2e';
 
@@ -81,5 +81,36 @@ describe('auth session branch e2e', () => {
     expect(refreshAfterLogout.status).toBe(200);
     expect(refreshAfterLogout.data?.success).toBe(false);
     expect(String(refreshAfterLogout.data?.message ?? '')).toContain('Refresh token revoked or invalid');
+  });
+
+  it('recomputes requiresMfaSetup on refresh after 2FA enforcement is enabled', async () => {
+    const seeded = await seedAuthBasics();
+    const db = await getDb();
+
+    const login = await loginE2E(seeded.user.email, seeded.password);
+    expect(login.data?.success).toBe(true);
+    expect(login.data?.data?.requiresMfaSetup).toBeFalsy();
+
+    await db
+      .update(tenants)
+      .set({ settings: { enforce2FA: true }, updatedAt: new Date() })
+      .where(eq(tenants.id, seeded.tenant.id));
+
+    const refresh = await requestJson('/auth/refresh', {
+      method: 'POST',
+      body: { refreshToken: String(login.refreshToken ?? '') },
+    });
+
+    expect(refresh.status).toBe(200);
+    expect(refresh.data?.success).toBe(true);
+    expect(refresh.data?.data?.accessToken).toBeTruthy();
+    expect(refresh.data?.data?.refreshToken).toBeTruthy();
+    expect(refresh.data?.data?.requiresMfaSetup).toBe(true);
+
+    const protectedRes = await requestJson('/orders', {
+      token: String(login.accessToken ?? ''),
+    });
+    expect(protectedRes.status).toBe(403);
+    expect(String((protectedRes.data as { message?: string } | null)?.message ?? protectedRes.data ?? '')).toContain('MFA setup required');
   });
 });

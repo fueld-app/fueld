@@ -149,6 +149,13 @@ export class AuthService {
     localStorage.setItem(MFA_SETUP_REQUIRED_KEY, value ? '1' : '0');
   }
 
+  markMfaSetupRequired(): void {
+    this.setMfaSetupRequired(true);
+    if (!this.router.url.startsWith('/account/settings')) {
+      void this.router.navigate(['/account/settings']);
+    }
+  }
+
   private loadUser(): UserDto | null {
     try {
       const raw = localStorage.getItem(USER_KEY);
@@ -280,6 +287,11 @@ export class AuthService {
       }
 
       this.setTokens(res.data);
+      if (res.data.requiresMfaSetup) {
+        this.markMfaSetupRequired();
+      } else {
+        this.setMfaSetupRequired(false);
+      }
       return true;
     } catch (err: any) {
       // Only logout on 401/403 (invalid token). Network errors (0, 502, etc.)

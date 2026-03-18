@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
+import { eq } from 'drizzle-orm';
+import { tenants } from '../src/db/schema';
 import { seedAuthBasics, truncateAll } from './helpers/db';
+import { getDb } from './helpers/db';
 import { loginE2E, requestJson } from './helpers/e2e';
 
 describe('auth e2e', () => {
@@ -45,6 +48,25 @@ describe('auth e2e', () => {
     expect(refresh.data?.success).toBe(true);
     expect(refresh.data?.data?.accessToken).toBeTruthy();
     expect(refresh.data?.data?.refreshToken).toBeTruthy();
+  });
+
+  it('returns requiresMfaSetup on password login when tenant enforces 2FA', async () => {
+    const seeded = await seedAuthBasics();
+    const db = await getDb();
+
+    await db
+      .update(tenants)
+      .set({ settings: { enforce2FA: true }, updatedAt: new Date() })
+      .where(eq(tenants.id, seeded.tenant.id));
+
+    const login = await loginE2E(seeded.user.email, seeded.password);
+
+    expect(login.status).toBe(200);
+    expect(login.data?.success).toBe(true);
+    expect(login.data?.data?.requires2fa).toBe(false);
+    expect(login.data?.data?.requiresMfaSetup).toBe(true);
+    expect(login.accessToken).toBeTruthy();
+    expect(login.refreshToken).toBeTruthy();
   });
 
   it('revokes refresh token on logout', async () => {

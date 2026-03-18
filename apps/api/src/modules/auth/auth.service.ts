@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '../../db';
 import { users, tenants, type NewUser, type User, type TenantSettings } from '../../db/schema';
 import { hashPassword, verifyPassword } from './password.service';
+import { isPasskeyEnabled, userHasPasskeys } from './passkey.service';
 import {
   generateTotpSecret,
   verifyTotpToken,
@@ -41,6 +42,24 @@ export async function getAuthEnforcement(): Promise<{ enforce2FA: boolean }> {
   const tenant = await db.query.tenants.findFirst();
   const s = (tenant?.settings ?? {}) as TenantSettings;
   return { enforce2FA: s.enforce2FA ?? false };
+}
+
+export async function getMfaStatus(user: User): Promise<{
+  hasPasskeys: boolean;
+  requires2fa: boolean;
+  requiresMfaSetup: boolean;
+}> {
+  const passkeyConfig = await isPasskeyEnabled();
+  const hasPasskeys = passkeyConfig.enabled && await userHasPasskeys(user.id);
+  const enforcement = await getAuthEnforcement();
+  const requires2fa = user.is2faEnabled && !hasPasskeys;
+  const requiresMfaSetup = enforcement.enforce2FA && !!user.passwordHash && !user.is2faEnabled && !hasPasskeys;
+
+  return {
+    hasPasskeys,
+    requires2fa,
+    requiresMfaSetup,
+  };
 }
 
 // ── Registration ─────────────────────────────────────────────────────

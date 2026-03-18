@@ -1135,6 +1135,7 @@ export interface SetLeaveDto {
 export interface AuthTokensDto {
   accessToken: string;
   refreshToken: string;
+  requiresMfaSetup?: boolean;
 }
 
 /** Full login response (when 2FA is NOT required). */

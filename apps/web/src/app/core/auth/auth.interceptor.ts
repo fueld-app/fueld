@@ -38,6 +38,12 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
       if (error instanceof HttpErrorResponse && error.status === 401 && token) {
         return handle401(authService, req, next);
       }
+      if (error instanceof HttpErrorResponse && error.status === 403) {
+        const message = typeof error.error?.message === 'string' ? error.error.message : '';
+        if (message.includes('MFA setup required')) {
+          authService.markMfaSetupRequired();
+        }
+      }
       return throwError(() => error);
     }),
   );

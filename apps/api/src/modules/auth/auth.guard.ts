@@ -1,8 +1,6 @@
 import { Elysia } from 'elysia';
-import { eq } from 'drizzle-orm';
 import { jwtAccessPlugin, type JwtPayload } from './jwt.setup';
-import { db } from '../../db';
-import { users } from '../../db/schema';
+import { findUserById, getMfaStatus } from './auth.service';
 
 // ─── Auth Guard ──────────────────────────────────────────────────────
 // Reusable Elysia plugin that protects routes.
@@ -103,15 +101,17 @@ export const authGuard = new Elysia({ name: 'auth-guard' })
       // If getUserAllowedIps fails (e.g. user deleted), let it through to fail on other checks
     }
 
-    const [user] = await db
-      .select({ tenantId: users.tenantId })
-      .from(users)
-      .where(eq(users.id, userId))
-      .limit(1);
+    const user = await findUserById(userId);
 
     if (!user?.tenantId) {
       set.status = 401;
       throw new Error('User has no tenant');
+    }
+
+    const { requiresMfaSetup } = await getMfaStatus(user);
+    if (requiresMfaSetup) {
+      set.status = 403;
+      throw new Error('MFA setup required');
     }
 
     return {

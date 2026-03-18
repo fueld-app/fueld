@@ -11,7 +11,7 @@ import {
   clearRefreshToken,
   findUserById,
   findUserByEmail,
-  getAuthEnforcement,
+  getMfaStatus,
   generate2faSecret,
   enable2fa,
   disable2fa,
@@ -168,11 +168,11 @@ export const authController = new Elysia({ prefix: '/auth' })
           } satisfies ApiResponse<null>;
         }
 
-        const passkeyConfig = await isPasskeyEnabled();
-        const hasKeys = passkeyConfig.enabled && await userHasPasskeys(user.id);
-        const enforcement = await getAuthEnforcement();
-        const requires2fa = user.is2faEnabled && !hasKeys;
-        const requiresMfaSetup = enforcement.enforce2FA && !user.is2faEnabled && !hasKeys;
+        const {
+          hasPasskeys,
+          requires2fa,
+          requiresMfaSetup,
+        } = await getMfaStatus(user);
 
         // If 2FA is required, return a temporary token (sub only)
         // The client must call /auth/verify-2fa with this token + TOTP code
@@ -190,7 +190,7 @@ export const authController = new Elysia({ prefix: '/auth' })
             data: {
               requires2fa: true,
               tempToken,
-              hasPasskeys: hasKeys,
+              hasPasskeys,
             },
           } satisfies ApiResponse<unknown>;
         }
@@ -872,6 +872,8 @@ export const authController = new Elysia({ prefix: '/auth' })
           } satisfies ApiResponse<null>;
         }
 
+        const { requiresMfaSetup } = await getMfaStatus(user);
+
         const payload = userToPayload(user);
 
         const newAccessToken = await jwtAccess.sign(payload);
@@ -885,6 +887,7 @@ export const authController = new Elysia({ prefix: '/auth' })
           data: {
             accessToken: newAccessToken,
             refreshToken: newRefreshToken,
+            requiresMfaSetup,
           },
         } satisfies ApiResponse<unknown>;
       } catch (err) {
