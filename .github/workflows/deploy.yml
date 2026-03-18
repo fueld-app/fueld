@@ -68,7 +68,8 @@ jobs:
         if: ${{ github.event_name == 'workflow_run' }}
         run: |
           mkdir -p apps/api
-          cp /tmp/deploy-artifacts/api/app-release apps/api/app-release
+          gzip -dc /tmp/deploy-artifacts/api/api-release.gz > apps/api/app-release
+          chmod +x apps/api/app-release
 
       - name: Download web build artifact from Tests
         if: ${{ github.event_name == 'workflow_run' }}
