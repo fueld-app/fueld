@@ -866,6 +866,7 @@ function buildInvoiceDocument(data: {
     productType: string;
     quantity: string;
     unit: string;
+    priceUnit?: string;
     salesPrice: string | null;
     costPrice: string | null;
   }>;
@@ -1268,7 +1269,8 @@ export async function generateInvoicePdfBuffer(invoiceId: string): Promise<Buffe
     items: order.items.map((item) => ({
       productType: item.productType,
       quantity: item.deliveredQuantity ?? item.quantity,
-      unit: item.salesUnit ?? item.unit,
+      unit: item.unit,
+      priceUnit: item.salesUnit ?? item.unit,
       salesPrice: item.salesPrice,
       costPrice: item.costPrice,
     })),
@@ -1389,7 +1391,8 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
     items: order.items.map((item) => ({
       productType: item.productType,
       quantity: item.deliveredQuantity ?? item.quantity,
-      unit: item.salesUnit ?? item.unit,
+      unit: item.unit,
+      priceUnit: item.salesUnit ?? item.unit,
       salesPrice: item.salesPrice,
       costPrice: item.costPrice,
     })),
@@ -1500,6 +1503,7 @@ function buildOfferDocument(data: {
     quantityMin: string | null;
     quantityMax: string | null;
     unit: string;
+    priceUnit?: string;
     salesPrice: string | null;
     salesPricingModel?: string | null;
     salesReferenceName?: string | null;
@@ -1577,14 +1581,14 @@ function buildOfferDocument(data: {
     if (item.salesPricingModel === 'FORMULA') {
       const parts: Content[] = [];
       if (item.salesReferenceName) parts.push({ text: item.salesReferenceName, bold: true, fontSize: 9 });
-      if (item.salesPremium && parseFloat(item.salesPremium)) parts.push({ text: ` + ${formatNumber(item.salesPremium)} /${item.unit}`, fontSize: 8 });
+      if (item.salesPremium && parseFloat(item.salesPremium)) parts.push({ text: ` + ${formatNumber(item.salesPremium)} /${item.priceUnit ?? item.unit}`, fontSize: 8 });
       if (item.salesBarging && parseFloat(item.salesBarging)) parts.push({ text: `\nbarging ${formatNumber(item.salesBarging)} ${item.salesBargingUnit || 'l/s'}`, fontSize: 8 });
       if (item.salesPriceFinalized) {
-        parts.push({ text: `\n→ ${formatNumber(item.salesPrice)} ${data.currency}/${item.unit}`, fontSize: 8, bold: true });
+        parts.push({ text: `\n→ ${formatNumber(item.salesPrice)} ${data.currency}/${item.priceUnit ?? item.unit}`, fontSize: 8, bold: true });
       }
       priceCell = { text: parts, alignment: 'right' };
     } else {
-      priceCell = { text: `${data.currency}/${item.unit}  ${formatNumber(item.salesPrice)}`, alignment: 'right' };
+      priceCell = { text: `${data.currency}/${item.priceUnit ?? item.unit}  ${formatNumber(item.salesPrice)}`, alignment: 'right' };
     }
 
     return [
@@ -1931,7 +1935,8 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
       quantity: item.quantity,
       quantityMin: item.quantityMin,
       quantityMax: item.quantityMax,
-      unit: item.salesUnit ?? item.unit,
+      unit: item.unit,
+      priceUnit: item.salesUnit ?? item.unit,
       salesPrice: item.salesPrice,
       salesPricingModel: item.salesPricingModel,
       salesReferenceName: item.salesReferenceId ? (refNameMap.get(item.salesReferenceId) ?? null) : null,
@@ -2070,7 +2075,8 @@ export async function generateNominationPdfBuffer(orderId: string): Promise<{
       quantity: item.quantity,
       quantityMin: item.quantityMin,
       quantityMax: item.quantityMax,
-      unit: item.costUnit ?? item.unit,
+      unit: item.unit,
+      priceUnit: item.costUnit ?? item.unit,
       salesPrice: item.costPrice,
       salesPricingModel: item.costPricingModel,
       salesReferenceName: item.costReferenceId ? (nomRefNameMap.get(item.costReferenceId) ?? null) : null,
@@ -2155,6 +2161,7 @@ function buildProformaDocument(data: {
     description: string | null;
     quantity: string;
     unit: string;
+    priceUnit?: string;
     salesPrice: string | null;
     salesPricingModel?: string | null;
     salesReferenceName?: string | null;
@@ -2226,17 +2233,17 @@ function buildProformaDocument(data: {
     if (item.salesPricingModel === 'FORMULA') {
       const parts: Content[] = [];
       if (item.salesReferenceName) parts.push({ text: item.salesReferenceName, bold: true, fontSize: 9 });
-      if (item.salesPremium && parseFloat(item.salesPremium)) parts.push({ text: ` + ${formatNumber(item.salesPremium)} /${item.unit}`, fontSize: 8 });
+      if (item.salesPremium && parseFloat(item.salesPremium)) parts.push({ text: ` + ${formatNumber(item.salesPremium)} /${item.priceUnit ?? item.unit}`, fontSize: 8 });
       if (item.salesBarging && parseFloat(item.salesBarging)) parts.push({ text: `\nbarging ${formatNumber(item.salesBarging)} ${item.salesBargingUnit || 'l/s'}`, fontSize: 8 });
       if (item.salesPriceFinalized) {
-        parts.push({ text: `\n\u2192 ${formatNumber(item.salesPrice)} ${data.currency}/${item.unit}`, fontSize: 8, bold: true });
+        parts.push({ text: `\n\u2192 ${formatNumber(item.salesPrice)} ${data.currency}/${item.priceUnit ?? item.unit}`, fontSize: 8, bold: true });
         totalCell = { text: `${formatNumber(String(lineTotal), 2)} ${data.currency}`, alignment: 'right' };
       } else {
         totalCell = { text: 'TBD', alignment: 'right', italics: true, color: '#d97706' };
       }
       priceCell = { text: parts, alignment: 'right' };
     } else {
-      priceCell = { text: `${data.currency}/${item.unit}  ${formatNumber(item.salesPrice)}`, alignment: 'right' };
+      priceCell = { text: `${data.currency}/${item.priceUnit ?? item.unit}  ${formatNumber(item.salesPrice)}`, alignment: 'right' };
       totalCell = { text: `${formatNumber(String(lineTotal), 2)} ${data.currency}`, alignment: 'right' };
     }
 
@@ -2653,7 +2660,8 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
       productType: item.productType,
       description: item.description,
       quantity: item.quantity,
-      unit: item.salesUnit ?? item.unit,
+      unit: item.unit,
+      priceUnit: item.salesUnit ?? item.unit,
       salesPrice: item.salesPrice,
       salesPricingModel: item.salesPricingModel,
       salesReferenceName: item.salesReferenceId ? (proformaRefNameMap.get(item.salesReferenceId) ?? null) : null,
