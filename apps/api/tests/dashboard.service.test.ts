@@ -661,6 +661,49 @@ describe('dashboard.service', () => {
       expect(net).toBeCloseTo(gross - financing, 2);
     });
 
+    it('applies density conversion factors in dashboard gross and net profit totals', async () => {
+      const { tenant, client, vessel, place, user } = await seedBasics();
+      const db = await getDb();
+      const { createOrder, saveOrderItems } = await loadOrdersService();
+      const { getTeamStats } = await loadDashboardService();
+
+      const order = await createOrder({
+        tenantId: tenant.id,
+        clientId: client.id,
+        vesselId: vessel.id,
+        placeId: place.id,
+        salesRepId: user.id,
+        customerPaymentTermType: 'CREDIT',
+        customerCreditDays: 15,
+        supplierPaymentTermType: 'COD',
+      });
+      await db.update(orders).set({ status: 'CONFIRMED', updatedAt: new Date() }).where(eq(orders.id, order.id));
+      await saveOrderItems(order.id, [
+        {
+          productType: 'MGO',
+          quantity: '220',
+          unit: 'CBM',
+          costUnit: 'MT',
+          salesUnit: 'CBM',
+          costPrice: '1175',
+          costCurrency: 'USD',
+          costConversionFactor: '0.85',
+          salesPrice: '1195',
+          salesCurrency: 'USD',
+          unitConversionFactor: '1',
+        },
+      ]);
+
+      const stats = await getTeamStats(tenant.id, user.id);
+      const s = stats[0]!;
+
+      expect(Number(s.totalRevenue)).toBeCloseTo(262900, 2);
+      expect(Number(s.totalCost)).toBeCloseTo(219725, 2);
+      expect(Number(s.totalProfit)).toBeCloseTo(43175, 2);
+      expect(Number(s.totalFinancingCost)).toBeCloseTo(722.3836, 2);
+      expect(Number(s.totalNetProfit)).toBeCloseTo(42452.6164, 2);
+    });
+
     it('revenue excludes INQUIRY and CANCELLED orders', async () => {
       const { tenant, client, vessel, place, user } = await seedBasics();
       const db = await getDb();

@@ -61,4 +61,54 @@ describe('orders financing', () => {
     expect(listed.items[0]?.totalNetProfit).toBeCloseTo(27804.9315, 3);
     expect(listed.items[0]?.netMarginPct).toBeCloseTo(2.1258, 3);
   });
+
+  it('applies cost-side density conversion in list order economics', async () => {
+    const { tenant, client, vessel, place, user } = await seedBasics();
+    const db = await getDb();
+    const { createOrder, saveOrderItems, getOrderById, listOrders } = await loadOrdersService();
+
+    await db
+      .update(tenants)
+      .set({ settings: { financingRateAnnual: 0.08 }, updatedAt: new Date() })
+      .where(eq(tenants.id, tenant.id));
+
+    const order = await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+      customerPaymentTermType: 'CREDIT',
+      customerCreditDays: 15,
+      supplierPaymentTermType: 'COD',
+    });
+
+    await saveOrderItems(order.id, [
+      {
+        productType: 'MGO',
+        quantity: '220',
+        unit: 'CBM',
+        costUnit: 'MT',
+        salesUnit: 'CBM',
+        costPrice: '1175',
+        costCurrency: 'USD',
+        costConversionFactor: '0.85',
+        salesPrice: '1195',
+        salesCurrency: 'USD',
+        unitConversionFactor: '1',
+      },
+    ]);
+
+    const detail = await getOrderById(order.id);
+    const listed = await listOrders({ statuses: ['INQUIRY'] });
+    const listItem = listed.items[0];
+
+    expect(listItem).toBeDefined();
+    expect(detail).not.toBeNull();
+    expect(listItem?.totalValue).toBeCloseTo(262900, 3);
+    expect(listItem?.totalProfit).toBeCloseTo(43175, 3);
+    expect(listItem?.totalFinancingCost).toBeCloseTo(Number(detail?.totalFinancingCost ?? 0), 3);
+    expect(listItem?.totalNetProfit).toBeCloseTo(Number(detail?.totalNetProfit ?? 0), 3);
+    expect(listItem?.netMarginPct).toBeCloseTo(Number(detail?.netMarginPct ?? 0), 3);
+  });
 });

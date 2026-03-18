@@ -384,8 +384,10 @@ export async function listOrders(query?: ListOrdersQuery) {
           quantity: orderItems.quantity,
           costPrice: orderItems.costPrice,
           costCurrency: orderItems.costCurrency,
+          costConversionFactor: orderItems.costConversionFactor,
           salesPrice: orderItems.salesPrice,
           salesCurrency: orderItems.salesCurrency,
+          unitConversionFactor: orderItems.unitConversionFactor,
         })
         .from(orderItems)
         .where(inArray(orderItems.orderId, orderIds)),
