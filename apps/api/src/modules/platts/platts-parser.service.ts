@@ -1,7 +1,6 @@
 import { basename } from 'node:path';
-import { PDFParse } from 'pdf-parse';
 
-export const PLATTS_PARSER_VERSION = '2026-03-18c';
+export const PLATTS_PARSER_VERSION = '2026-03-18d';
 
 export interface ParsedPlattsEntry {
   rawText: string;
@@ -258,15 +257,39 @@ function extractMocDetails(rawText: string): ParsedPlattsEntry {
   return entry;
 }
 
-async function extractPdfText(pdfBuffer: Buffer): Promise<string> {
-  const parser = new PDFParse({ data: pdfBuffer });
+async function extractPdfText(filePath: string): Promise<string> {
+  let process: Bun.Subprocess<'ignore', 'pipe', 'pipe'>;
 
   try {
-    const result = await parser.getText();
-    return result.text ?? '';
-  } finally {
-    await parser.destroy();
+    process = Bun.spawn([
+      'pdftotext',
+      '-layout',
+      '-nopgbrk',
+      '-enc',
+      'UTF-8',
+      filePath,
+      '-',
+    ], {
+      stdout: 'pipe',
+      stderr: 'pipe',
+      stdin: 'ignore',
+    });
+  } catch (error) {
+    throw new Error(`pdftotext is not available: ${error instanceof Error ? error.message : String(error)}`);
   }
+
+  const [stdoutText, stderrText, exitCode] = await Promise.all([
+    new Response(process.stdout).text(),
+    new Response(process.stderr).text(),
+    process.exited,
+  ]);
+
+  if (exitCode !== 0) {
+    const detail = stderrText.trim() || `exit code ${exitCode}`;
+    throw new Error(`pdftotext failed: ${detail}`);
+  }
+
+  return stdoutText;
 }
 
 export function parsePlattsText(text: string, sourceFileName: string): ParsedPlattsReport {
@@ -328,14 +351,12 @@ export function parsePlattsText(text: string, sourceFileName: string): ParsedPla
 
 export async function extractPlattsPdfMetadata(filePath: string): Promise<ParsedMetadata> {
   const fileName = basename(filePath);
-  const pdfBuffer = Buffer.from(await Bun.file(filePath).arrayBuffer());
-  const text = await extractPdfText(pdfBuffer);
+  const text = await extractPdfText(filePath);
   return extractMetadata(text, fileName);
 }
 
 export async function parsePlattsPdfFile(filePath: string): Promise<ParsedPlattsReport> {
   const fileName = basename(filePath);
-  const pdfBuffer = Buffer.from(await Bun.file(filePath).arrayBuffer());
-  const text = await extractPdfText(pdfBuffer);
+  const text = await extractPdfText(filePath);
   return parsePlattsText(text, fileName);
 }

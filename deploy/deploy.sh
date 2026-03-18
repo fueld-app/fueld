@@ -83,6 +83,13 @@ if ! command -v pg_dump &>/dev/null || ! command -v psql &>/dev/null; then
   sudo apt-get install -y -qq postgresql-client || warn "Could not install postgresql-client automatically"
 fi
 
+# Install PDF text extraction utility needed for Platts parsing (idempotent)
+if ! command -v pdftotext &>/dev/null; then
+  log "Installing poppler-utils for Platts PDF parsing..."
+  sudo apt-get update -qq || warn "Could not refresh apt package index (continuing)"
+  sudo apt-get install -y -qq poppler-utils || warn "Could not install poppler-utils automatically"
+fi
+
 # Install build tools needed for 'build from source' (idempotent)
 if ! command -v cmake &>/dev/null || ! command -v g++ &>/dev/null; then
   log "Installing cmake, g++, make for LLM build-from-source..."

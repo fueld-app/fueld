@@ -32,6 +32,7 @@ apt-get install -y -qq \
   nginx \
   certbot python3-certbot-nginx python3-certbot-dns-cloudflare \
   postgresql postgresql-client postgresql-contrib \
+  poppler-utils \
   curl unzip jq git ufw fail2ban
 
 # ─── 3. Firewall ─────────────────────────────────────────────────────
