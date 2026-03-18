@@ -55,6 +55,8 @@ import { runScheduledChecks } from './modules/risk-monitoring/risk-monitoring.se
 import { vesselSanctionsController } from './modules/vessel-sanctions/vessel-sanctions.controller';
 import { runScheduledVesselSanctionChecks } from './modules/vessel-sanctions/vessel-sanctions.service';
 import { reconnectStoredSessions as reconnectWhatsAppSessions } from './modules/whatsapp/whatsapp.service';
+import { plattsController } from './modules/platts/platts.controller';
+import { resumePendingPlattsParseJobs } from './modules/platts/platts.service';
 import { getBuildInfo } from './lib/build-info';
 import { assertCredentialsEncryptionConfig } from './lib/crypto';
 import { isRestoreModeActive } from './modules/admin/backup-state';
@@ -372,6 +374,7 @@ export async function createApp(options: CreateAppOptions = {}) {
     .use(pushController)
     .use(whatsappController)
     .use(rfqController)
+    .use(plattsController)
     .use(riskMonitoringController)
     .use(vesselSanctionsController)
     .get('/uploads/avatars/:filename', async ({ params, set }) => {
@@ -648,6 +651,7 @@ export async function createApp(options: CreateAppOptions = {}) {
     startInquiryReminderJob();
     registerAutoSyncHooks();
     reconnectWhatsAppSessions();
+    resumePendingPlattsParseJobs();
     startRiskMonitoringJob();
     startVesselSanctionJob();
   }

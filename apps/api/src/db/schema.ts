@@ -129,6 +129,27 @@ export const pricingModelEnum = pgEnum('pricing_model', [
   'FORMULA',
 ]);
 
+export const plattsReportStatusEnum = pgEnum('platts_report_status', [
+  'UPLOADED',
+  'PARSING',
+  'READY',
+  'FAILED',
+  'SUPERSEDED',
+]);
+
+export const plattsReportFamilyEnum = pgEnum('platts_report_family', [
+  'EUROPEAN_MARKETSCAN',
+]);
+
+export const plattsSectionTypeEnum = pgEnum('platts_section_type', [
+  'TRADES',
+  'BIDS',
+  'OFFERS',
+  'WITHDRAWALS',
+  'COMMENTARY',
+  'OTHER',
+]);
+
 // ═══════════════════════════════════════════════════════════════════════
 //  1. MULTI-TENANCY ROOT
 // ═══════════════════════════════════════════════════════════════════════
@@ -709,6 +730,7 @@ export const orderItems = pgTable('order_items', {
   // ── Formula pricing (cost side) ───────────────────────────────────
   costPricingModel: pricingModelEnum('cost_pricing_model').notNull().default('FIXED'),
   costReferenceId: uuid('cost_reference_id').references(() => priceReferences.id, { onDelete: 'set null' }),
+  costPlattsEntryId: uuid('cost_platts_entry_id').references(() => plattsReportEntries.id, { onDelete: 'set null' }),
   costPremium: numeric('cost_premium', { precision: 12, scale: 4 }),
   costBarging: numeric('cost_barging', { precision: 12, scale: 4 }),
   costBargingUnit: text('cost_barging_unit'),
@@ -718,6 +740,7 @@ export const orderItems = pgTable('order_items', {
   // ── Formula pricing (sell side) ───────────────────────────────────
   salesPricingModel: pricingModelEnum('sales_pricing_model').notNull().default('FIXED'),
   salesReferenceId: uuid('sales_reference_id').references(() => priceReferences.id, { onDelete: 'set null' }),
+  salesPlattsEntryId: uuid('sales_platts_entry_id').references(() => plattsReportEntries.id, { onDelete: 'set null' }),
   salesPremium: numeric('sales_premium', { precision: 12, scale: 4 }),
   salesBarging: numeric('sales_barging', { precision: 12, scale: 4 }),
   salesBargingUnit: text('sales_barging_unit'),
@@ -791,6 +814,79 @@ export const documentRevisions = pgTable('document_revisions', {
   fileSize: integer('file_size').notNull(),
   generatedBy: uuid('generated_by').references(() => users.id),
   issuedAt: timestamp('issued_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+//  12b. PLATTS REPORTS
+// ═══════════════════════════════════════════════════════════════════════
+
+export const plattsReports = pgTable('platts_reports', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  family: plattsReportFamilyEnum('family').notNull().default('EUROPEAN_MARKETSCAN'),
+  publicationDate: date('publication_date').notNull(),
+  title: text('title').notNull(),
+  sourceFileName: text('source_file_name').notNull(),
+  sourceFilePath: text('source_file_path').notNull(),
+  sourceMimeType: text('source_mime_type').notNull().default('application/pdf'),
+  sourceFileSize: integer('source_file_size').notNull(),
+  uploadedBy: uuid('uploaded_by').references(() => users.id, { onDelete: 'set null' }),
+  status: plattsReportStatusEnum('status').notNull().default('UPLOADED'),
+  parserVersion: text('parser_version'),
+  parseError: text('parse_error'),
+  commentary: jsonb('commentary').$type<string[]>().default([]),
+  isCanonical: boolean('is_canonical').notNull().default(false),
+  supersededByReportId: uuid('superseded_by_report_id'),
+  parsedAt: timestamp('parsed_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const plattsReportSections = pgTable('platts_report_sections', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  reportId: uuid('report_id').notNull().references(() => plattsReports.id, { onDelete: 'cascade' }),
+  sortOrder: integer('sort_order').notNull().default(0),
+  type: plattsSectionTypeEnum('type').notNull().default('OTHER'),
+  heading: text('heading').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const plattsReportEntries = pgTable('platts_report_entries', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  reportId: uuid('report_id').notNull().references(() => plattsReports.id, { onDelete: 'cascade' }),
+  sectionId: uuid('section_id').notNull().references(() => plattsReportSections.id, { onDelete: 'cascade' }),
+  sortOrder: integer('sort_order').notNull().default(0),
+  rawText: text('raw_text').notNull(),
+  entryKind: text('entry_kind'),
+  marketRegion: text('market_region'),
+  marketBasis: text('market_basis'),
+  instrument: text('instrument'),
+  product: text('product'),
+  windowLabel: text('window_label'),
+  company: text('company'),
+  counterparty: text('counterparty'),
+  action: text('action'),
+  priceRaw: text('price_raw'),
+  priceValue: doublePrecision('price_value'),
+  priceUnit: text('price_unit'),
+  quantityRaw: text('quantity_raw'),
+  quantityValue: doublePrecision('quantity_value'),
+  quantityUnit: text('quantity_unit'),
+  timestampText: text('timestamp_text'),
+  confidence: doublePrecision('confidence'),
+  metadata: jsonb('metadata').$type<Record<string, unknown> | null>(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const plattsReportImports = pgTable('platts_report_imports', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  reportId: uuid('report_id').notNull().references(() => plattsReports.id, { onDelete: 'cascade' }),
+  importMode: text('import_mode').notNull().default('single'),
+  importBatchId: text('import_batch_id'),
+  sha256Hex: text('sha256_hex').notNull(),
+  uploadedBy: uuid('uploaded_by').references(() => users.id, { onDelete: 'set null' }),
+  notes: text('notes'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -1103,6 +1199,7 @@ export const tenantsRelations = relations(tenants, ({ many }) => ({
   orders: many(orders),
   teams: many(teams),
   companyGroups: many(companyGroups),
+  plattsReports: many(plattsReports),
 }));
 
 export const teamsRelations = relations(teams, ({ one, many }) => ({
@@ -1134,6 +1231,8 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   invoiceComments: many(invoiceComments),
   auditLogs: many(auditLogs),
   passkeys: many(passkeys),
+  uploadedPlattsReports: many(plattsReports),
+  plattsImports: many(plattsReportImports),
 }));
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1258,6 +1357,16 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
 
 export const orderItemsRelations = relations(orderItems, ({ one }) => ({
   order: one(orders, { fields: [orderItems.orderId], references: [orders.id] }),
+  costPlattsEntry: one(plattsReportEntries, {
+    fields: [orderItems.costPlattsEntryId],
+    references: [plattsReportEntries.id],
+    relationName: 'costPlattsSignal',
+  }),
+  salesPlattsEntry: one(plattsReportEntries, {
+    fields: [orderItems.salesPlattsEntryId],
+    references: [plattsReportEntries.id],
+    relationName: 'salesPlattsSignal',
+  }),
 }));
 
 export const orderAttachmentsRelations = relations(orderAttachments, ({ one }) => ({
@@ -1276,6 +1385,31 @@ export const documentRevisionsRelations = relations(documentRevisions, ({ one })
   order: one(orders, { fields: [documentRevisions.orderId], references: [orders.id] }),
   invoice: one(invoices, { fields: [documentRevisions.invoiceId], references: [invoices.id] }),
   generatedByUser: one(users, { fields: [documentRevisions.generatedBy], references: [users.id] }),
+}));
+
+export const plattsReportsRelations = relations(plattsReports, ({ one, many }) => ({
+  tenant: one(tenants, { fields: [plattsReports.tenantId], references: [tenants.id] }),
+  uploader: one(users, { fields: [plattsReports.uploadedBy], references: [users.id] }),
+  sections: many(plattsReportSections),
+  entries: many(plattsReportEntries),
+  imports: many(plattsReportImports),
+}));
+
+export const plattsReportSectionsRelations = relations(plattsReportSections, ({ one, many }) => ({
+  report: one(plattsReports, { fields: [plattsReportSections.reportId], references: [plattsReports.id] }),
+  entries: many(plattsReportEntries),
+}));
+
+export const plattsReportEntriesRelations = relations(plattsReportEntries, ({ one, many }) => ({
+  report: one(plattsReports, { fields: [plattsReportEntries.reportId], references: [plattsReports.id] }),
+  section: one(plattsReportSections, { fields: [plattsReportEntries.sectionId], references: [plattsReportSections.id] }),
+  costLinkedOrderItems: many(orderItems, { relationName: 'costPlattsSignal' }),
+  salesLinkedOrderItems: many(orderItems, { relationName: 'salesPlattsSignal' }),
+}));
+
+export const plattsReportImportsRelations = relations(plattsReportImports, ({ one }) => ({
+  report: one(plattsReports, { fields: [plattsReportImports.reportId], references: [plattsReports.id] }),
+  uploader: one(users, { fields: [plattsReportImports.uploadedBy], references: [users.id] }),
 }));
 
 export const invoiceCommentsRelations = relations(invoiceComments, ({ one }) => ({

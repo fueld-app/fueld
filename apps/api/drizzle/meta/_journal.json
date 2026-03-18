@@ -414,6 +414,20 @@
       "when": 1742684400000,
       "tag": "0058_comment_followups",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1742770800000,
+      "tag": "0059_platts_reports",
+      "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1742857200000,
+      "tag": "0060_order_item_platts_signals",
+      "breakpoints": true
     }
   ]
 }

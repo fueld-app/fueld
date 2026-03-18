@@ -126,3 +126,24 @@ export enum PricingModel {
   Fixed = 'FIXED',
   Formula = 'FORMULA',
 }
+
+export enum PlattsReportStatus {
+  Uploaded = 'UPLOADED',
+  Parsing = 'PARSING',
+  Ready = 'READY',
+  Failed = 'FAILED',
+  Superseded = 'SUPERSEDED',
+}
+
+export enum PlattsReportFamily {
+  EuropeanMarketscan = 'EUROPEAN_MARKETSCAN',
+}
+
+export enum PlattsSectionType {
+  Trades = 'TRADES',
+  Bids = 'BIDS',
+  Offers = 'OFFERS',
+  Withdrawals = 'WITHDRAWALS',
+  Commentary = 'COMMENTARY',
+  Other = 'OTHER',
+}

@@ -1,8 +1,8 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { and, eq, gt, isNull, lte } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNull, lte } from 'drizzle-orm';
 import type { SubmitSupplierInquiryQuoteDto, SupplierInquiryItemQuoteDto } from '@fueld/types';
 import { db } from '../../db';
-import { companyContacts, counterparties, supplierInquiries, supplierInquiryItemQuotes, type SupplierInquiry, users } from '../../db/schema';
+import { companyContacts, counterparties, plattsReportEntries, supplierInquiries, supplierInquiryItemQuotes, type SupplierInquiry, users } from '../../db/schema';
 import { getOrderById } from '../orders/orders.service';
 import { getInquirySettings } from '../admin/settings.service';
 import { logActivity } from '../activity/activity.service';
@@ -130,6 +130,21 @@ export async function getSupplierInquiryOrderContext(orderId: string): Promise<S
   const order = await getOrderById(orderId);
   if (!order) return null;
 
+  const signalIds = Array.from(new Set(
+    (order.items ?? [])
+      .flatMap((item: any) => [item.costPlattsEntryId, item.salesPlattsEntryId])
+      .filter((value: string | null | undefined): value is string => Boolean(value)),
+  ));
+
+  const signalMap = new Map<string, string>();
+  if (signalIds.length > 0) {
+    const rows = await db
+      .select({ id: plattsReportEntries.id, rawText: plattsReportEntries.rawText })
+      .from(plattsReportEntries)
+      .where(inArray(plattsReportEntries.id, signalIds));
+    for (const row of rows) signalMap.set(row.id, row.rawText);
+  }
+
   return {
     currency: order.currency ?? 'USD',
     items: (order.items ?? []).map((item: any) => ({
@@ -140,6 +155,7 @@ export async function getSupplierInquiryOrderContext(orderId: string): Promise<S
       description: item.description ?? null,
       price: null,
       currency: order.currency ?? 'USD',
+      marketSignal: signalMap.get(item.costPlattsEntryId) ?? signalMap.get(item.salesPlattsEntryId) ?? null,
       note: null,
     })),
   };

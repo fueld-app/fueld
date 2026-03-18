@@ -140,8 +140,18 @@ Commands (from `apps/api`):
 ```bash
 bun run db:generate
 bun run db:migrate
+bun run db:repair-journal
 bun run db:studio
 ```
+
+If a long-lived local database has schema changes that were applied outside the current Drizzle journal history, repair the journal before rerunning migrations:
+
+```bash
+DATABASE_URL=postgres://fueld:fueld@localhost:5432/fueld bun run db:repair-journal
+DATABASE_URL=postgres://fueld:fueld@localhost:5432/fueld bun run db:migrate
+```
+
+`db:repair-journal` only backfills missing rows in `drizzle.__drizzle_migrations` for databases that already contain the Fueld schema. It is for local drift recovery, not for bootstrapping a new database.
 
 ### API startup migration behavior
 

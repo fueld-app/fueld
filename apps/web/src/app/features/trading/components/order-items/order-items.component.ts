@@ -13,7 +13,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
-import { ProductType, PricingModel } from '@fueld/types';
+import { ProductType, PricingModel, type PlattsSuggestionsResponseDto } from '@fueld/types';
 import { Subscription } from 'rxjs';
 import {
   SearchableDropdownComponent,
@@ -51,6 +51,7 @@ export interface OrderItemRow {
   // Formula pricing — cost side
   costPricingModel: PricingModel;
   costReferenceId?: string | null;
+  costPlattsEntryId?: string | null;
   costReferenceName?: string | null;
   costPremium?: number | null;
   costBarging?: number | null;
@@ -60,6 +61,7 @@ export interface OrderItemRow {
   // Formula pricing — sell side
   salesPricingModel: PricingModel;
   salesReferenceId?: string | null;
+  salesPlattsEntryId?: string | null;
   salesReferenceName?: string | null;
   salesPremium?: number | null;
   salesBarging?: number | null;
@@ -280,6 +282,19 @@ export interface OrderItemsEconomics {
                         </select>
                         <span class="text-gray-400 text-xs shrink-0">/{{ row.costUnit }}</span>
                       </div>
+                        @if (plattsMatches(row.id).length) {
+                          <div class="flex flex-wrap gap-1.5">
+                            @for (match of plattsMatches(row.id).slice(0, 2); track match.entryId) {
+                              <button
+                                type="button"
+                                (click)="selectPlattsMatch(i, 'cost', match.entryId)"
+                                [class]="isPlattsMatchSelected(row, 'cost', match.entryId) ? 'rounded-full border border-emerald-300 bg-emerald-50 px-2 py-1 text-left text-[10px] font-medium text-emerald-800' : 'rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-left text-[10px] font-medium text-gray-600 hover:border-brand-300 hover:text-brand-700'"
+                              >
+                                {{ match.priceRaw || 'Signal' }} {{ match.marketRegion || match.instrument || '' }}
+                              </button>
+                            }
+                          </div>
+                        }
                       <div class="flex items-center gap-1">
                         <span class="text-[10px] text-gray-500 shrink-0">+</span>
                         <input type="number" step="0.01"
@@ -417,6 +432,19 @@ export interface OrderItemsEconomics {
                           }
                         </select>
                       </div>
+                        @if (plattsMatches(row.id).length) {
+                          <div class="flex flex-wrap gap-1.5">
+                            @for (match of plattsMatches(row.id).slice(0, 2); track match.entryId) {
+                              <button
+                                type="button"
+                                (click)="selectPlattsMatch(i, 'sales', match.entryId)"
+                                [class]="isPlattsMatchSelected(row, 'sales', match.entryId) ? 'rounded-full border border-emerald-300 bg-emerald-50 px-2 py-1 text-left text-[10px] font-medium text-emerald-800' : 'rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-left text-[10px] font-medium text-gray-600 hover:border-brand-300 hover:text-brand-700'"
+                              >
+                                {{ match.priceRaw || 'Signal' }} {{ match.marketRegion || match.instrument || '' }}
+                              </button>
+                            }
+                          </div>
+                        }
                       <div class="flex items-center gap-1">
                         <span class="text-[10px] text-gray-500 shrink-0">+</span>
                         <input type="number" step="0.01"
@@ -795,6 +823,19 @@ export interface OrderItemsEconomics {
                 @if (row.costPricingModel === 'FORMULA') {
                   <div class="space-y-1.5">
                     <app-searchable-dropdown [options]="priceRefOptions()" [selected]="row.costReferenceId ?? ''" placeholder="Reference..." (selectionChange)="updateField(i, 'costReferenceId', $event)" />
+                    @if (plattsMatches(row.id).length) {
+                      <div class="flex flex-wrap gap-1.5">
+                        @for (match of plattsMatches(row.id).slice(0, 2); track match.entryId) {
+                          <button
+                            type="button"
+                            (click)="selectPlattsMatch(i, 'cost', match.entryId)"
+                            [class]="isPlattsMatchSelected(row, 'cost', match.entryId) ? 'rounded-full border border-emerald-300 bg-emerald-50 px-2 py-1 text-left text-[10px] font-medium text-emerald-800' : 'rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-left text-[10px] font-medium text-gray-600'"
+                          >
+                            {{ match.priceRaw || 'Signal' }} {{ match.marketRegion || match.instrument || '' }}
+                          </button>
+                        }
+                      </div>
+                    }
                     <input type="number" step="0.01" [ngModel]="row.costPremium ?? 0" (ngModelChange)="updateField(i, 'costPremium', +$event)" placeholder="Premium pmt"
                       class="w-full rounded border border-gray-200 px-2 py-1 text-xs tabular-nums focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20" />
                     <div class="flex gap-1">
@@ -868,6 +909,19 @@ export interface OrderItemsEconomics {
                 @if (row.salesPricingModel === 'FORMULA') {
                   <div class="space-y-1.5">
                     <app-searchable-dropdown [options]="priceRefOptions()" [selected]="row.salesReferenceId ?? ''" placeholder="Reference..." (selectionChange)="updateField(i, 'salesReferenceId', $event)" />
+                    @if (plattsMatches(row.id).length) {
+                      <div class="flex flex-wrap gap-1.5">
+                        @for (match of plattsMatches(row.id).slice(0, 2); track match.entryId) {
+                          <button
+                            type="button"
+                            (click)="selectPlattsMatch(i, 'sales', match.entryId)"
+                            [class]="isPlattsMatchSelected(row, 'sales', match.entryId) ? 'rounded-full border border-emerald-300 bg-emerald-50 px-2 py-1 text-left text-[10px] font-medium text-emerald-800' : 'rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-left text-[10px] font-medium text-gray-600'"
+                          >
+                            {{ match.priceRaw || 'Signal' }} {{ match.marketRegion || match.instrument || '' }}
+                          </button>
+                        }
+                      </div>
+                    }
                     <input type="number" step="0.01" [ngModel]="row.salesPremium ?? 0" (ngModelChange)="updateField(i, 'salesPremium', +$event)" placeholder="Premium pmt"
                       class="w-full rounded border border-gray-200 px-2 py-1 text-xs tabular-nums focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20" />
                     <div class="flex gap-1">
@@ -1047,6 +1101,7 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   readonly unitConversionsInput = input<{ productType?: string; fromUnit: string; toUnit: string; factor: number }[]>([]);
   readonly currencyOptionsInput = input<DropdownOption[]>([]);
   readonly priceReferencesInput = input<{ id: string; name: string; code: string }[]>([]);
+  readonly plattsSuggestionsInput = input<PlattsSuggestionsResponseDto['items']>([]);
   readonly itemsChange = output<OrderItemRow[]>();
   readonly economicsChange = output<OrderItemsEconomics>();
   readonly displayCurrencyChange = output<string>();
@@ -1174,6 +1229,10 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
     this.priceReferencesInput().map((r) => ({ value: r.id, label: r.name })),
   );
 
+  readonly plattsSuggestionsByKey = computed(() =>
+    new Map(this.plattsSuggestionsInput().map((item) => [item.key, item.matches] as const)),
+  );
+
   /** Whether formula pricing is available (at least one price reference configured). */
   readonly formulaPricingEnabled = computed(() => this.priceReferencesInput().length > 0);
   // ─── Computed totals ─────────────────────────────────────────────
@@ -1254,6 +1313,17 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
       const row = { ...updated[index]! };
 
       (row as Record<string, unknown>)[field] = value;
+
+      if (field === 'productType') {
+        row.costPlattsEntryId = null;
+        row.salesPlattsEntryId = null;
+      }
+      if (field === 'costPricingModel' && value !== PricingModel.Formula && value !== 'FORMULA') {
+        row.costPlattsEntryId = null;
+      }
+      if (field === 'salesPricingModel' && value !== PricingModel.Formula && value !== 'FORMULA') {
+        row.salesPlattsEntryId = null;
+      }
 
       // Auto-apply default conversion factor when unit, costUnit, salesUnit, or product changes
       if (field === 'unit' || field === 'salesUnit' || field === 'productType') {
@@ -1417,5 +1487,28 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
     if (!refId) return '';
     const ref = this.priceReferencesInput().find((r) => r.id === refId);
     return ref ? ref.name : '';
+  }
+
+  plattsMatches(rowId: string): PlattsSuggestionsResponseDto['items'][number]['matches'] {
+    return this.plattsSuggestionsByKey().get(rowId) ?? [];
+  }
+
+  selectPlattsMatch(index: number, side: 'cost' | 'sales', entryId: string): void {
+    this.rows.update((prev) => {
+      const updated = [...prev];
+      const row = { ...updated[index]! };
+      if (side === 'cost') {
+        row.costPlattsEntryId = row.costPlattsEntryId === entryId ? null : entryId;
+      } else {
+        row.salesPlattsEntryId = row.salesPlattsEntryId === entryId ? null : entryId;
+      }
+      updated[index] = row;
+      return updated;
+    });
+    this.emitChange();
+  }
+
+  isPlattsMatchSelected(row: OrderItemRow, side: 'cost' | 'sales', entryId: string): boolean {
+    return side === 'cost' ? row.costPlattsEntryId === entryId : row.salesPlattsEntryId === entryId;
   }
 }

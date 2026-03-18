@@ -254,6 +254,29 @@ export const routes: Routes = [
           ),
         title: 'Vessels',
       },
+      // ── Resources ──
+      {
+        path: 'resources',
+        children: [
+          { path: '', redirectTo: 'platts', pathMatch: 'full' },
+          {
+            path: 'platts',
+            loadComponent: () =>
+              import('./features/resources/pages/platts-reports/platts-reports-page.component').then(
+                (m) => m.PlattsReportsPageComponent,
+              ),
+            title: 'Resources > Platts',
+          },
+          {
+            path: 'platts/:id',
+            loadComponent: () =>
+              import('./features/resources/pages/platts-report-detail/platts-report-detail-page.component').then(
+                (m) => m.PlattsReportDetailPageComponent,
+              ),
+            title: 'Resources > Platts',
+          },
+        ],
+      },
       // ── Admin ──
       {
         path: 'admin',

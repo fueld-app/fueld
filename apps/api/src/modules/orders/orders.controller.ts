@@ -395,6 +395,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
             // Formula pricing (cost side)
             costPricingModel: t.Optional(t.Nullable(t.String())),
             costReferenceId: t.Optional(t.Nullable(t.String())),
+            costPlattsEntryId: t.Optional(t.Nullable(t.String())),
             costPremium: t.Optional(t.Nullable(t.String())),
             costBarging: t.Optional(t.Nullable(t.String())),
             costBargingUnit: t.Optional(t.Nullable(t.String())),
@@ -403,6 +404,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
             // Formula pricing (sell side)
             salesPricingModel: t.Optional(t.Nullable(t.String())),
             salesReferenceId: t.Optional(t.Nullable(t.String())),
+            salesPlattsEntryId: t.Optional(t.Nullable(t.String())),
             salesPremium: t.Optional(t.Nullable(t.String())),
             salesBarging: t.Optional(t.Nullable(t.String())),
             salesBargingUnit: t.Optional(t.Nullable(t.String())),

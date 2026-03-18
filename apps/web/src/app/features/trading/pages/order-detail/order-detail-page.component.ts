@@ -29,6 +29,7 @@ import {
   type CreditLineDto,
   type CompanyContactDto,
   type BankAccountDto,
+  type PlattsSuggestionsResponseDto,
 } from '@fueld/types';
 
 import {
@@ -162,6 +163,13 @@ interface InquiryReplyRecommendation {
   mostComplete: boolean;
   fastest: boolean;
   score: number;
+}
+
+interface PlattsSuggestionViewModel {
+  key: string;
+  productType: PlattsSuggestionsResponseDto['items'][number]['productType'];
+  description: string | null;
+  matches: PlattsSuggestionsResponseDto['items'][number]['matches'];
 }
 
 @Component({
@@ -1021,10 +1029,118 @@ interface InquiryReplyRecommendation {
       [unitConversionsInput]="configuredUnitConversions()"
       [currencyOptionsInput]="configuredCurrencies()"
       [priceReferencesInput]="configuredPriceReferences()"
+      [plattsSuggestionsInput]="plattsSuggestionItems()"
       (itemsChange)="onItemsChange($event)"
       (economicsChange)="onItemEconomicsChange($event)"
       (displayCurrencyChange)="itemDisplayCurrency.set($event)"
     />
+
+    <div class="mt-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 class="text-sm font-semibold uppercase tracking-wider text-gray-700">Platts Signals</h3>
+          <p class="mt-1 text-xs text-gray-500">
+            Canonical Platts matches for the current line items.
+            @if (plattsSuggestionsMeta()) {
+              <span>
+                Using {{ plattsSuggestionsMeta()!.matchedPublicationDate ?? plattsSuggestionsMeta()!.requestedPublicationDate }}
+                @if (plattsSuggestionsMeta()!.usedFallbackReport) {
+                  <span>(closest available canonical report)</span>
+                }
+              </span>
+            }
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          @if (plattsSuggestionsMeta()?.reportTitle && plattsSuggestionsMeta()?.reportId) {
+            <button
+              type="button"
+              (click)="openPlattsReport(plattsSuggestionsMeta()!.reportId!)"
+              class="inline-flex items-center rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:border-brand-300 hover:text-brand-700"
+            >
+              Open source report
+            </button>
+          }
+          <button
+            type="button"
+            (click)="loadPlattsSuggestions()"
+            [disabled]="plattsSuggestionsLoading()"
+            class="inline-flex items-center rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {{ plattsSuggestionsLoading() ? 'Refreshing...' : 'Refresh signals' }}
+          </button>
+        </div>
+      </div>
+
+      @if (plattsSuggestionsError()) {
+        <div class="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+          {{ plattsSuggestionsError() }}
+        </div>
+      } @else if (plattsSuggestionsLoading() && !plattsSuggestionItems().length) {
+        <div class="mt-4 text-sm text-gray-500">Loading Platts matches...</div>
+      } @else if (!plattsSuggestionItems().length) {
+        <div class="mt-4 text-sm text-gray-500">No Platts suggestions available for the current items yet.</div>
+      } @else {
+        <div class="mt-4 grid gap-3 xl:grid-cols-2">
+          @for (item of plattsSuggestionItems(); track item.key) {
+            <div class="rounded-xl border border-gray-200 p-4">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <div class="text-sm font-semibold text-gray-900">{{ item.productType }}</div>
+                  @if (item.description) {
+                    <div class="mt-1 text-xs text-gray-500">{{ item.description }}</div>
+                  }
+                </div>
+                <div class="text-[11px] uppercase tracking-wide text-gray-400">{{ item.matches.length }} match{{ item.matches.length === 1 ? '' : 'es' }}</div>
+              </div>
+
+              @if (!item.matches.length) {
+                <div class="mt-3 text-sm text-gray-500">No canonical Platts entries matched this line item.</div>
+              } @else {
+                <div class="mt-3 space-y-2">
+                  @for (match of item.matches; track match.entryId) {
+                    <button
+                      type="button"
+                      (click)="openPlattsReport(match.reportId)"
+                      class="block w-full rounded-lg border border-gray-200 px-3 py-3 text-left transition-colors hover:border-brand-300 hover:bg-brand-50/40"
+                    >
+                      <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
+                        <span class="font-semibold text-gray-700">{{ match.company || 'Market' }}</span>
+                        @if (match.action) {
+                          <span>{{ match.action }}</span>
+                        }
+                        @if (match.counterparty) {
+                          <span>vs {{ match.counterparty }}</span>
+                        }
+                        @if (match.priceRaw) {
+                          <span>{{ match.priceRaw }}</span>
+                        }
+                        @if (match.quantityRaw) {
+                          <span>{{ match.quantityRaw }}</span>
+                        }
+                      </div>
+                      <div class="mt-1 text-sm text-gray-800">{{ match.rawText }}</div>
+                      <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-gray-500">
+                        @if (match.instrument) {
+                          <span>{{ match.instrument }}</span>
+                        }
+                        @if (match.windowLabel) {
+                          <span>{{ match.windowLabel }}</span>
+                        }
+                        @if (match.marketRegion) {
+                          <span>{{ match.marketRegion }}</span>
+                        }
+                        <span>score {{ match.score }}</span>
+                      </div>
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+    </div>
 
     <!-- Delivery + Payments + Attachments + Comments -->
     @if (allowDeliveredEdit() || orderId() || order()?.id) {
@@ -1584,6 +1700,9 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   readonly configuredCurrencies = signal<DropdownOption[]>([]);
   readonly configuredPriceReferences = signal<{ id: string; name: string; code: string }[]>([]);
   readonly configuredAttachmentTypes = signal<string[]>(['BDR', 'OTHER']);
+  readonly plattsSuggestions = signal<PlattsSuggestionsResponseDto | null>(null);
+  readonly plattsSuggestionsLoading = signal(false);
+  readonly plattsSuggestionsError = signal<string | null>(null);
 
   /** Whether the user has linked WhatsApp in Settings */
   readonly waLinked = signal(false);
@@ -1639,6 +1758,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   readonly autoSaving = signal(false);
   readonly lastSaved = signal<Date | null>(null);
   private autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  private plattsSuggestionTimer: ReturnType<typeof setTimeout> | null = null;
   private changeVersion = signal(0);
 
   // ─── Computed ────────────────────────────────────────────────────
@@ -1702,6 +1822,9 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     const status = this.order()?.status;
     return status === OrderStatus.Paid || status === OrderStatus.Cancelled;
   });
+
+  readonly plattsSuggestionsMeta = computed(() => this.plattsSuggestions());
+  readonly plattsSuggestionItems = computed<PlattsSuggestionViewModel[]>(() => this.plattsSuggestions()?.items ?? []);
 
   readonly canRecordPayment = computed(() => this.order()?.status !== OrderStatus.Cancelled);
 
@@ -2009,6 +2132,9 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     if (this.autoSaveTimer) {
       clearTimeout(this.autoSaveTimer);
     }
+    if (this.plattsSuggestionTimer) {
+      clearTimeout(this.plattsSuggestionTimer);
+    }
   }
 
   private detailBaseRouteForStatus(status: string):
@@ -2145,6 +2271,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
             // Formula pricing
             costPricingModel: item.costPricingModel ?? PricingModel.Fixed,
             costReferenceId: item.costReferenceId ?? null,
+            costPlattsEntryId: item.costPlattsEntryId ?? null,
             costReferenceName: item.costReferenceName ?? null,
             costPremium: item.costPremium != null ? parseFloat(item.costPremium) : null,
             costBarging: item.costBarging != null ? parseFloat(item.costBarging) : null,
@@ -2153,6 +2280,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
             costPriceFinalized: item.costPriceFinalized ?? false,
             salesPricingModel: item.salesPricingModel ?? PricingModel.Fixed,
             salesReferenceId: item.salesReferenceId ?? null,
+            salesPlattsEntryId: item.salesPlattsEntryId ?? null,
             salesReferenceName: item.salesReferenceName ?? null,
             salesPremium: item.salesPremium != null ? parseFloat(item.salesPremium) : null,
             salesBarging: item.salesBarging != null ? parseFloat(item.salesBarging) : null,
@@ -2165,6 +2293,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
         await this.loadCustomerCreditLines(d.clientId);
         await this.loadSupplierCreditLines(d.supplierId);
         await this.loadReferenceData();
+        await this.loadPlattsSuggestions();
         await this.loadCompanyContacts('customer', d.clientId);
         if (d.supplierId) await this.loadCompanyContacts('supplier', d.supplierId);
         if (d.brokerId) await this.loadCompanyContacts('broker', d.brokerId);
@@ -2787,7 +2916,61 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
 
   onItemsChange(items: OrderItemRow[]): void {
     this.itemRows.set(items);
+    this.queuePlattsSuggestionsLoad();
     this.triggerAutosave();
+  }
+
+  async loadPlattsSuggestions(): Promise<void> {
+    const items = this.itemRows()
+      .filter((item) => item.productType)
+      .map((item) => ({
+        key: item.id,
+        productType: item.productType,
+        description: item.description?.trim() || null,
+      }));
+
+    if (items.length === 0) {
+      this.plattsSuggestions.set(null);
+      this.plattsSuggestionsError.set(null);
+      return;
+    }
+
+    const publicationDate = (this.order()?.eta ?? new Date().toISOString()).slice(0, 10);
+    this.plattsSuggestionsLoading.set(true);
+    this.plattsSuggestionsError.set(null);
+
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<PlattsSuggestionsResponseDto>>(`${API_URL}/platts/suggestions`, {
+          publicationDate,
+          items,
+          limitPerItem: 3,
+        }),
+      );
+
+      if (res.success) {
+        this.plattsSuggestions.set(res.data);
+      } else {
+        this.plattsSuggestions.set(null);
+        this.plattsSuggestionsError.set(res.message || 'Failed to load Platts signals.');
+      }
+    } catch {
+      this.plattsSuggestions.set(null);
+      this.plattsSuggestionsError.set('Failed to load Platts signals.');
+    } finally {
+      this.plattsSuggestionsLoading.set(false);
+    }
+  }
+
+  openPlattsReport(reportId: string): void {
+    void this.router.navigate(['/resources/platts', reportId]);
+  }
+
+  private queuePlattsSuggestionsLoad(): void {
+    if (this.plattsSuggestionTimer) clearTimeout(this.plattsSuggestionTimer);
+    this.plattsSuggestionTimer = setTimeout(() => {
+      void this.loadPlattsSuggestions();
+    }, 250);
   }
 
   onInvoicingCompanyChange(companyId: string): void {
@@ -3250,6 +3433,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   onEtaChange(eta: string): void {
     const iso = eta ? `${eta}T12:00:00.000Z` : null;
     this.order.update((o) => (o ? { ...o, eta: iso } : o));
+    this.queuePlattsSuggestionsLoad();
     this.triggerAutosave();
   }
 
@@ -3341,12 +3525,14 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
         deliveredQuantity: r.deliveredQuantity != null ? String(r.deliveredQuantity) : null,
         costPricingModel: r.costPricingModel ?? 'FIXED',
         costReferenceId: r.costReferenceId ?? null,
+        costPlattsEntryId: r.costPlattsEntryId ?? null,
         costPremium: r.costPremium != null ? String(r.costPremium) : null,
         costBarging: r.costBarging != null ? String(r.costBarging) : null,
         costBargingUnit: r.costBargingUnit ?? null,
         costCreditDays: r.costCreditDays ?? null,
         salesPricingModel: r.salesPricingModel ?? 'FIXED',
         salesReferenceId: r.salesReferenceId ?? null,
+        salesPlattsEntryId: r.salesPlattsEntryId ?? null,
         salesPremium: r.salesPremium != null ? String(r.salesPremium) : null,
         salesBarging: r.salesBarging != null ? String(r.salesBarging) : null,
         salesBargingUnit: r.salesBargingUnit ?? null,
@@ -3637,12 +3823,14 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
         deliveredQuantity: r.deliveredQuantity != null ? String(r.deliveredQuantity) : null,
         costPricingModel: r.costPricingModel ?? 'FIXED',
         costReferenceId: r.costReferenceId ?? null,
+        costPlattsEntryId: r.costPlattsEntryId ?? null,
         costPremium: r.costPremium != null ? String(r.costPremium) : null,
         costBarging: r.costBarging != null ? String(r.costBarging) : null,
         costBargingUnit: r.costBargingUnit ?? null,
         costCreditDays: r.costCreditDays ?? null,
         salesPricingModel: r.salesPricingModel ?? 'FIXED',
         salesReferenceId: r.salesReferenceId ?? null,
+        salesPlattsEntryId: r.salesPlattsEntryId ?? null,
         salesPremium: r.salesPremium != null ? String(r.salesPremium) : null,
         salesBarging: r.salesBarging != null ? String(r.salesBarging) : null,
         salesBargingUnit: r.salesBargingUnit ?? null,

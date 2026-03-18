@@ -13,6 +13,9 @@ import type {
   RiskHitSeverity,
   RiskOverrideStatus,
   PricingModel,
+  PlattsReportStatus,
+  PlattsReportFamily,
+  PlattsSectionType,
 } from './enums';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -727,6 +730,131 @@ export interface PriceReferenceSettingsDto {
   references: PriceReferenceDto[];
 }
 
+export interface PlattsReportImportDto {
+  id: string;
+  reportId: string;
+  importMode: string;
+  importBatchId: string | null;
+  sha256Hex: string;
+  notes: string | null;
+  uploadedBy: string | null;
+  createdAt: string;
+}
+
+export interface PlattsReportDto {
+  id: string;
+  tenantId: string;
+  family: PlattsReportFamily;
+  publicationDate: string;
+  title: string;
+  sourceFileName: string;
+  sourceMimeType: string;
+  sourceFileSize: number;
+  uploadedBy: string | null;
+  uploadedByName: string | null;
+  status: PlattsReportStatus;
+  parserVersion: string | null;
+  parseError: string | null;
+  isCanonical: boolean;
+  supersededByReportId: string | null;
+  parsedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PlattsReportEntryDto {
+  id: string;
+  reportId: string;
+  sectionId: string;
+  sortOrder: number;
+  rawText: string;
+  entryKind: string | null;
+  marketRegion: string | null;
+  marketBasis: string | null;
+  instrument: string | null;
+  product: string | null;
+  windowLabel: string | null;
+  company: string | null;
+  counterparty: string | null;
+  action: string | null;
+  priceRaw: string | null;
+  priceValue: number | null;
+  priceUnit: string | null;
+  quantityRaw: string | null;
+  quantityValue: number | null;
+  quantityUnit: string | null;
+  timestampText: string | null;
+  confidence: number | null;
+  metadata: Record<string, unknown> | null;
+}
+
+export interface PlattsReportSectionDto {
+  id: string;
+  reportId: string;
+  sortOrder: number;
+  type: PlattsSectionType;
+  heading: string;
+  entries: PlattsReportEntryDto[];
+}
+
+export interface PlattsReportDetailDto extends PlattsReportDto {
+  commentary: string[];
+  sections: PlattsReportSectionDto[];
+  imports: PlattsReportImportDto[];
+}
+
+export interface CreatePlattsReportResponseDto {
+  report: PlattsReportDto;
+  warnings: string[];
+}
+
+export interface PlattsSuggestionRequestItemDto {
+  key: string;
+  productType: ProductType;
+  description?: string | null;
+}
+
+export interface PlattsSuggestionMatchDto {
+  entryId: string;
+  reportId: string;
+  reportTitle: string;
+  reportPublicationDate: string;
+  sectionType: PlattsSectionType;
+  sectionHeading: string;
+  rawText: string;
+  company: string | null;
+  counterparty: string | null;
+  action: string | null;
+  instrument: string | null;
+  windowLabel: string | null;
+  marketRegion: string | null;
+  product: string | null;
+  priceRaw: string | null;
+  priceValue: number | null;
+  quantityRaw: string | null;
+  quantityValue: number | null;
+  timestampText: string | null;
+  confidence: number | null;
+  score: number;
+}
+
+export interface PlattsSuggestionItemDto {
+  key: string;
+  productType: ProductType;
+  description: string | null;
+  matches: PlattsSuggestionMatchDto[];
+}
+
+export interface PlattsSuggestionsResponseDto {
+  family: PlattsReportFamily;
+  requestedPublicationDate: string;
+  matchedPublicationDate: string | null;
+  reportId: string | null;
+  reportTitle: string | null;
+  usedFallbackReport: boolean;
+  items: PlattsSuggestionItemDto[];
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  ORDER ITEM (line items)
 // ═══════════════════════════════════════════════════════════════════════
@@ -755,6 +883,7 @@ export interface OrderItemDto {
   // Formula pricing (cost side)
   costPricingModel: PricingModel;
   costReferenceId?: string | null;
+  costPlattsEntryId?: string | null;
   costReferenceName?: string | null;
   costPremium?: string | null;
   costBarging?: string | null;
@@ -764,6 +893,7 @@ export interface OrderItemDto {
   // Formula pricing (sell side)
   salesPricingModel: PricingModel;
   salesReferenceId?: string | null;
+  salesPlattsEntryId?: string | null;
   salesReferenceName?: string | null;
   salesPremium?: string | null;
   salesBarging?: string | null;
@@ -780,6 +910,7 @@ export interface SupplierInquiryItemQuoteDto {
   description: string | null;
   price: string | null;
   currency: string;
+  marketSignal?: string | null;
   note?: string | null;
 }
 

@@ -25,4 +25,12 @@ DATABASE_URL=postgres://fueld:fueld@localhost:5432/fueld_test bun run db:migrate
 TEST_DATABASE_URL=postgres://fueld:fueld@localhost:5432/fueld_test bun run test:e2e
 ```
 
+If a reused local DB starts failing on old migrations because the schema is ahead of `drizzle.__drizzle_migrations`, repair the journal first and then rerun migrations:
+
+```bash
+cd apps/api
+DATABASE_URL=postgres://fueld:fueld@localhost:5432/fueld_test bun run db:repair-journal
+DATABASE_URL=postgres://fueld:fueld@localhost:5432/fueld_test bun run db:migrate
+```
+
 If `TEST_DATABASE_URL` is not set, tests still enforce the safety checks on the resolved DB URL.

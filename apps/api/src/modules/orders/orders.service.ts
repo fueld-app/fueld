@@ -121,6 +121,7 @@ interface SaveItemInput {
   // Formula pricing (cost side)
   costPricingModel?: string | null;
   costReferenceId?: string | null;
+  costPlattsEntryId?: string | null;
   costPremium?: string | null;
   costBarging?: string | null;
   costBargingUnit?: string | null;
@@ -129,6 +130,7 @@ interface SaveItemInput {
   // Formula pricing (sell side)
   salesPricingModel?: string | null;
   salesReferenceId?: string | null;
+  salesPlattsEntryId?: string | null;
   salesPremium?: string | null;
   salesBarging?: string | null;
   salesBargingUnit?: string | null;
@@ -643,6 +645,7 @@ export async function getOrderById(idOrNumber: string) {
       // Formula pricing (cost side)
       costPricingModel: i.costPricingModel ?? 'FIXED',
       costReferenceId: i.costReferenceId ?? null,
+      costPlattsEntryId: i.costPlattsEntryId ?? null,
       costReferenceName: i.costReferenceId ? (refNameMap.get(i.costReferenceId) ?? null) : null,
       costPremium: i.costPremium ?? null,
       costBarging: i.costBarging ?? null,
@@ -652,6 +655,7 @@ export async function getOrderById(idOrNumber: string) {
       // Formula pricing (sell side)
       salesPricingModel: i.salesPricingModel ?? 'FIXED',
       salesReferenceId: i.salesReferenceId ?? null,
+      salesPlattsEntryId: i.salesPlattsEntryId ?? null,
       salesReferenceName: i.salesReferenceId ? (refNameMap.get(i.salesReferenceId) ?? null) : null,
       salesPremium: i.salesPremium ?? null,
       salesBarging: i.salesBarging ?? null,
@@ -835,6 +839,7 @@ export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
       // Formula pricing (cost side)
       costPricingModel: (item.costPricingModel as any) ?? 'FIXED',
       costReferenceId: item.costReferenceId ?? null,
+      costPlattsEntryId: item.costPlattsEntryId ?? null,
       costPremium: item.costPremium ?? null,
       costBarging: item.costBarging ?? null,
       costBargingUnit: item.costBargingUnit ?? null,
@@ -843,6 +848,7 @@ export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
       // Formula pricing (sell side)
       salesPricingModel: (item.salesPricingModel as any) ?? 'FIXED',
       salesReferenceId: item.salesReferenceId ?? null,
+      salesPlattsEntryId: item.salesPlattsEntryId ?? null,
       salesPremium: item.salesPremium ?? null,
       salesBarging: item.salesBarging ?? null,
       salesBargingUnit: item.salesBargingUnit ?? null,
