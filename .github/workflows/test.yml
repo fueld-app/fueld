@@ -94,14 +94,6 @@ jobs:
             migration_check=true
           fi
 
-          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
-            api_build="$api_validation"
-            web_build="$web_validation"
-          else
-            api_build=true
-            web_build=true
-          fi
-
           if [ "$api_validation" = true ] && [ "$web_validation" = true ]; then
             change_profile=shared
           elif [ "$api_validation" = true ]; then
@@ -110,6 +102,17 @@ jobs:
             change_profile=web-only
           elif [ "$types_validation" = true ]; then
             change_profile=types-only
+          fi
+
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            api_build="$api_validation"
+            web_build="$web_validation"
+          elif [ "$change_profile" = "infra-only" ]; then
+            api_build=false
+            web_build=false
+          else
+            api_build=true
+            web_build=true
           fi
 
           echo "change_profile=$change_profile" >> "$GITHUB_OUTPUT"

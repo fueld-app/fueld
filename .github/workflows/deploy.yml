@@ -18,10 +18,74 @@ permissions:
   actions: read
 
 jobs:
+  inspect-run:
+    name: Inspect tested artifacts
+    runs-on: ubuntu-latest
+    outputs:
+      should_deploy: ${{ steps.inspect.outputs.should_deploy }}
+    steps:
+      - name: Determine deploy eligibility
+        id: inspect
+        env:
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            echo "should_deploy=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "## Deploy Eligibility"
+              echo ""
+              echo "- should_deploy: true"
+              echo "- reason: manual workflow_dispatch"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          artifacts_json=$(curl -fsSL \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts")
+
+          artifact_names=$(printf '%s' "$artifacts_json" | jq -r '.artifacts[].name')
+          printf 'Artifacts for run %s:\n%s\n' "$RUN_ID" "$artifact_names"
+
+          has_api=false
+          has_web=false
+          has_meta=false
+
+          if printf '%s\n' "$artifact_names" | grep -qx 'api-release'; then
+            has_api=true
+          fi
+          if printf '%s\n' "$artifact_names" | grep -qx 'web-browser'; then
+            has_web=true
+          fi
+          if printf '%s\n' "$artifact_names" | grep -qx 'build-info'; then
+            has_meta=true
+          fi
+
+          should_deploy=false
+          if [ "$has_api" = true ] && [ "$has_web" = true ] && [ "$has_meta" = true ]; then
+            should_deploy=true
+          fi
+
+          echo "should_deploy=$should_deploy" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Deploy Eligibility"
+            echo ""
+            echo "- api-release: $has_api"
+            echo "- web-browser: $has_web"
+            echo "- build-info: $has_meta"
+            echo "- should_deploy: $should_deploy"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   deploy:
     name: Build & Deploy
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    needs: inspect-run
+    if: ${{ (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success') && needs.inspect-run.outputs.should_deploy == 'true' }}
     environment: production
     env:
       DEPLOY_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
