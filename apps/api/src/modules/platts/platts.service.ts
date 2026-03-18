@@ -407,6 +407,8 @@ function inferMarketRegion(text: string | null): string | null {
 
 function classifyEntryKind(entry: ParsedPlattsEntry): string {
   if (entry.company && entry.action) return 'STRUCTURED';
+  if (entry.metadata?.rowKind === 'assessment') return 'ASSESSMENT';
+  if (entry.marketBasis) return 'MARKET_CONTEXT';
   if (/^PLATTS /i.test(entry.rawText)) return 'INSTRUMENT_CONTEXT';
   if (/BASIS/i.test(entry.rawText)) return 'MARKET_CONTEXT';
   if (/^NO\s+(TRADES|BIDS|OFFERS|WITHDRAWALS)\s+REPORTED$/i.test(entry.rawText)) return 'STATUS_LINE';
@@ -500,7 +502,7 @@ function buildEntryDto(row: typeof plattsReportEntries.$inferSelect): PlattsRepo
   };
 }
 
-async function persistParsedReport(report: ReportRow, parsed: Awaited<ReturnType<typeof parsePlattsPdfFile>>): Promise<void> {
+async function persistParsedReport(report: ReportRow, parsed: ReturnType<typeof parsePlattsPdfFile>): Promise<void> {
   await db.delete(plattsReportEntries).where(eq(plattsReportEntries.reportId, report.id));
   await db.delete(plattsReportSections).where(eq(plattsReportSections.reportId, report.id));
 
@@ -539,7 +541,10 @@ async function persistParsedReport(report: ReportRow, parsed: Awaited<ReturnType
     for (let entryIndex = 0; entryIndex < section.entries.length; entryIndex += 1) {
       const entry = section.entries[entryIndex]!;
 
-      if (/BASIS/i.test(entry.rawText)) {
+      if (entry.marketBasis) {
+        currentMarketBasis = entry.marketBasis;
+        currentMarketRegion = entry.marketRegion ?? inferMarketRegion(entry.rawText) ?? currentMarketRegion;
+      } else if (/BASIS/i.test(entry.rawText)) {
         currentMarketBasis = entry.rawText;
         currentMarketRegion = inferMarketRegion(entry.rawText) ?? currentMarketRegion;
       }
@@ -560,8 +565,8 @@ async function persistParsedReport(report: ReportRow, parsed: Awaited<ReturnType
         sortOrder: entryIndex,
         rawText: entry.rawText,
         entryKind: classifyEntryKind(entry),
-        marketRegion: currentMarketRegion,
-        marketBasis: currentMarketBasis,
+        marketRegion: entry.marketRegion ?? currentMarketRegion,
+        marketBasis: entry.marketBasis ?? currentMarketBasis,
         instrument: currentInstrument,
         product: currentProduct,
         windowLabel: currentWindowLabel,
@@ -578,6 +583,7 @@ async function persistParsedReport(report: ReportRow, parsed: Awaited<ReturnType
         confidence: entry.company && entry.action ? 0.95 : instrumentLine.instrument ? 0.85 : currentMarketBasis ? 0.75 : null,
         metadata: {
           sectionHeading: section.heading,
+          ...(entry.metadata ?? {}),
         },
       });
     }
@@ -599,7 +605,7 @@ async function parseSingleReport(reportId: string): Promise<void> {
       })
       .where(eq(plattsReports.id, reportId));
 
-    const parsed = await parsePlattsPdfFile(resolveStoredPath(report.sourceFilePath));
+    const parsed = parsePlattsPdfFile(resolveStoredPath(report.sourceFilePath));
     await persistParsedReport(report, parsed);
   } catch (error) {
     const message = getErrorMessage(error, 'Unknown parse failure');
@@ -673,9 +679,9 @@ export async function createPlattsReportFromUpload(params: {
     throw new Error(`Failed to save uploaded PDF to storage: ${getErrorMessage(error, 'Unknown filesystem error')}`);
   }
 
-  let metadata: Awaited<ReturnType<typeof extractPlattsPdfMetadata>>;
+  let metadata: ReturnType<typeof extractPlattsPdfMetadata>;
   try {
-    metadata = await extractPlattsPdfMetadata(storedAbsolutePath);
+    metadata = extractPlattsPdfMetadata(storedAbsolutePath);
   } catch (error) {
     throw new Error(`Failed to read uploaded PDF metadata: ${getErrorMessage(error, 'Unknown PDF parsing error')}`);
   }

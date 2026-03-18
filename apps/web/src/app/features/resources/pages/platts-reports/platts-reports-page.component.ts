@@ -299,11 +299,11 @@ export class PlattsReportsPageComponent implements OnInit {
       const response = await firstValueFrom(
         this.http.post<ApiResponse<PlattsReportDto>>(`${API}/platts/reports/${report.id}/reparse`, {}),
       );
-      if (!response.success) throw new Error(response.message ?? 'Failed to queue reparse');
-      this.notice.set(`Queued ${report.sourceFileName} for reparsing.`);
+      if (!response.success) throw new Error(response.message ?? 'Failed to request reparse');
+      this.notice.set(`Reparse requested for ${report.sourceFileName}. Parsing runs in the background.`);
       await this.loadReports();
     } catch (error) {
-      this.error.set(this.describeError(error, 'Failed to queue reparse'));
+      this.error.set(this.describeError(error, 'Failed to request reparse'));
     }
   }
 

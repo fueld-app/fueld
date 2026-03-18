@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, inject, signal, viewChild } from '@angular/core';
 import { DatePipe, DecimalPipe, TitleCasePipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -71,7 +71,7 @@ import { PdfPreviewModalComponent } from '@app/shared/components/pdf-preview-mod
             @if (currentReport.commentary.length === 0) {
               <p class="mt-3 text-sm text-gray-500">No commentary was extracted.</p>
             }
-            <div class="mt-4 space-y-3">
+            <div class="mt-4 max-h-[30rem] space-y-3 overflow-y-auto pr-2">
               @for (paragraph of currentReport.commentary; track paragraph) {
                 <p class="text-sm leading-6 text-gray-700">{{ paragraph }}</p>
               }
@@ -104,7 +104,7 @@ import { PdfPreviewModalComponent } from '@app/shared/components/pdf-preview-mod
         </section>
 
         <section class="space-y-4">
-          @for (section of currentReport.sections; track section.id) {
+          @for (section of getVisibleSections(currentReport); track section.id) {
             <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
               <div class="border-b border-gray-200 px-6 py-4">
                 <h2 class="text-lg font-semibold text-gray-900">{{ section.heading }}</h2>
@@ -112,32 +112,148 @@ import { PdfPreviewModalComponent } from '@app/shared/components/pdf-preview-mod
               </div>
 
               <div class="overflow-x-auto">
+                @if (getSectionDisplayMode(section) === 'assessment') {
+                  <table class="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead class="bg-gray-50">
+                      <tr>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Product</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Basis</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Code</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Range</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Mid</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Change</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                      @for (entry of getVisibleAssessmentEntries(section); track entry.id) {
+                        @if (getAssessmentMetadata(entry); as assessment) {
+                          <tr>
+                            <td class="px-4 py-3 text-gray-700">{{ assessment.product || '—' }}</td>
+                            <td class="px-4 py-3 text-gray-700">{{ assessment.basisHeader || entry.marketBasis || '—' }}</td>
+                            <td class="px-4 py-3 font-mono text-gray-700">{{ assessment.code || '—' }}</td>
+                            <td class="px-4 py-3 text-gray-700">{{ assessment.rangeText || '—' }}</td>
+                            <td class="px-4 py-3 text-gray-700">{{ assessment.mid || '—' }}</td>
+                            <td class="px-4 py-3 text-gray-700">{{ assessment.change || '—' }}</td>
+                          </tr>
+                        }
+                      }
+                    </tbody>
+                  </table>
+                } @else if (getSectionDisplayMode(section) === 'delivery-basis') {
                 <table class="min-w-full divide-y divide-gray-200 text-sm">
                   <thead class="bg-gray-50">
                     <tr>
-                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Raw Text</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Product</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Code</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Delivery Basis</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-100">
+                    @for (entry of getVisibleDeliveryBasisEntries(section); track entry.id) {
+                      @if (getDeliveryBasisMetadata(entry); as deliveryBasis) {
+                        <tr>
+                          <td class="px-4 py-3 text-gray-700">{{ deliveryBasis.product || '—' }}</td>
+                          <td class="px-4 py-3 font-mono text-gray-700">{{ deliveryBasis.code || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700">{{ deliveryBasis.deliveryBasis || '—' }}</td>
+                        </tr>
+                      }
+                    }
+                  </tbody>
+                </table>
+                } @else if (getSectionDisplayMode(section) === 'market-data') {
+                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead class="bg-gray-50">
+                    <tr>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Context</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Participant</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Action</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Counterparty</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Price</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Quantity</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Time</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-100">
+                    @for (entry of getVisibleMarketDataEntries(section); track entry.id) {
+                      @if (getMarketDataMetadata(entry); as marketData) {
+                        <tr>
+                          <td class="px-4 py-3 text-gray-700">{{ marketData.marketContext || entry.instrument || entry.windowLabel || entry.marketBasis || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700">{{ entry.company || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700">{{ entry.action || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700">{{ entry.counterparty || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700">{{ entry.priceRaw || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700">{{ entry.quantityRaw || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700">{{ entry.timestampText || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700">{{ marketData.statusText || '—' }}</td>
+                        </tr>
+                      }
+                    }
+                  </tbody>
+                </table>
+                } @else if (getSectionDisplayMode(section) === 'moc') {
+                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead class="bg-gray-50">
+                    <tr>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Basis</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Participant</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Action</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Counterparty</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Price</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Quantity</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Time</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-100">
+                    @for (entry of getVisibleMocEntries(section); track entry.id) {
+                      @if (getMocMetadata(entry); as moc) {
+                        <tr>
+                          <td class="px-4 py-3 text-gray-700">{{ entry.marketBasis || entry.marketRegion || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700">{{ entry.company || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700">{{ entry.action || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700">{{ entry.counterparty || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700">{{ entry.priceRaw || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700">{{ entry.quantityRaw || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700">{{ entry.timestampText || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700">{{ moc.statusText || '—' }}</td>
+                        </tr>
+                      }
+                    }
+                  </tbody>
+                </table>
+                } @else {
+                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead class="bg-gray-50">
+                    <tr>
                       <th class="px-4 py-3 text-left font-semibold text-gray-600">Company</th>
                       <th class="px-4 py-3 text-left font-semibold text-gray-600">Action</th>
                       <th class="px-4 py-3 text-left font-semibold text-gray-600">Counterparty</th>
                       <th class="px-4 py-3 text-left font-semibold text-gray-600">Price</th>
                       <th class="px-4 py-3 text-left font-semibold text-gray-600">Quantity</th>
                       <th class="px-4 py-3 text-left font-semibold text-gray-600">Market</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Instrument</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Time</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-gray-100">
-                    @for (entry of section.entries; track entry.id) {
+                    @for (entry of getVisibleStructuredEntries(section); track entry.id) {
                       <tr>
-                        <td class="px-4 py-3 text-gray-700">{{ entry.rawText }}</td>
                         <td class="px-4 py-3 text-gray-700">{{ entry.company || '—' }}</td>
                         <td class="px-4 py-3 text-gray-700">{{ entry.action || '—' }}</td>
                         <td class="px-4 py-3 text-gray-700">{{ entry.counterparty || '—' }}</td>
                         <td class="px-4 py-3 text-gray-700">{{ entry.priceRaw || '—' }}</td>
                         <td class="px-4 py-3 text-gray-700">{{ entry.quantityRaw || '—' }}</td>
                         <td class="px-4 py-3 text-gray-700">{{ entry.marketRegion || entry.marketBasis || '—' }}</td>
+                        <td class="px-4 py-3 text-gray-700">{{ entry.instrument || entry.windowLabel || '—' }}</td>
+                        <td class="px-4 py-3 text-gray-700">{{ entry.timestampText || '—' }}</td>
+                        <td class="px-4 py-3 text-gray-700">{{ getEntryStatus(entry) || '—' }}</td>
                       </tr>
                     }
                   </tbody>
                 </table>
+                }
               </div>
             </div>
           }
@@ -148,19 +264,158 @@ import { PdfPreviewModalComponent } from '@app/shared/components/pdf-preview-mod
     <app-pdf-preview-modal />
   `,
 })
-export class PlattsReportDetailPageComponent implements OnInit {
+export class PlattsReportDetailPageComponent implements OnInit, OnDestroy {
   protected readonly auth = inject(AuthService);
   private readonly http = inject(HttpClient);
   private readonly route = inject(ActivatedRoute);
   readonly pdfModal = viewChild(PdfPreviewModalComponent);
+  private pollTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private readonly pollIntervalMs = 3000;
 
   protected readonly loading = signal(false);
   protected readonly report = signal<PlattsReportDetailDto | null>(null);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
 
+  protected getSectionDisplayMode(section: PlattsReportDetailDto['sections'][number]): 'assessment' | 'delivery-basis' | 'market-data' | 'moc' | 'structured' {
+    if (section.entries.some((entry) => this.getAssessmentMetadata(entry) !== null)) return 'assessment';
+    if (section.entries.some((entry) => this.getDeliveryBasisMetadata(entry) !== null)) return 'delivery-basis';
+    if (section.entries.some((entry) => this.getMarketDataMetadata(entry) !== null)) return 'market-data';
+    if (section.entries.some((entry) => this.getMocMetadata(entry) !== null)) return 'moc';
+    return 'structured';
+  }
+
+  protected getVisibleSections(report: PlattsReportDetailDto): PlattsReportDetailDto['sections'] {
+    return report.sections.filter((section) => this.hasVisibleSectionContent(section));
+  }
+
+  protected getVisibleAssessmentEntries(section: PlattsReportDetailDto['sections'][number]): PlattsReportDetailDto['sections'][number]['entries'] {
+    return section.entries.filter((entry) => this.getAssessmentMetadata(entry) !== null);
+  }
+
+  protected getVisibleDeliveryBasisEntries(section: PlattsReportDetailDto['sections'][number]): PlattsReportDetailDto['sections'][number]['entries'] {
+    return section.entries.filter((entry) => this.getDeliveryBasisMetadata(entry) !== null);
+  }
+
+  protected getVisibleMarketDataEntries(section: PlattsReportDetailDto['sections'][number]): PlattsReportDetailDto['sections'][number]['entries'] {
+    return section.entries.filter((entry) => this.isActionableMarketDataEntry(entry));
+  }
+
+  protected getVisibleMocEntries(section: PlattsReportDetailDto['sections'][number]): PlattsReportDetailDto['sections'][number]['entries'] {
+    return section.entries.filter((entry) => this.isActionableMocEntry(entry));
+  }
+
+  protected getVisibleStructuredEntries(section: PlattsReportDetailDto['sections'][number]): PlattsReportDetailDto['sections'][number]['entries'] {
+    return section.entries.filter((entry) => this.isActionableStructuredEntry(entry));
+  }
+
+  protected getAssessmentMetadata(entry: PlattsReportDetailDto['sections'][number]['entries'][number]): AssessmentMetadata | null {
+    const metadata = entry.metadata;
+    if (!metadata || metadata['rowKind'] !== 'assessment') return null;
+
+    return {
+      product: typeof metadata['product'] === 'string' ? metadata['product'] : null,
+      code: typeof metadata['code'] === 'string' ? metadata['code'] : null,
+      rangeText: typeof metadata['rangeText'] === 'string' ? metadata['rangeText'] : null,
+      mid: typeof metadata['mid'] === 'string' ? metadata['mid'] : null,
+      change: typeof metadata['change'] === 'string' ? metadata['change'] : null,
+      basisHeader: typeof metadata['basisHeader'] === 'string' ? metadata['basisHeader'] : null,
+    };
+  }
+
+  protected getDeliveryBasisMetadata(entry: PlattsReportDetailDto['sections'][number]['entries'][number]): DeliveryBasisMetadata | null {
+    const metadata = entry.metadata;
+    if (!metadata || metadata['rowKind'] !== 'delivery-basis') return null;
+
+    return {
+      product: typeof metadata['product'] === 'string' ? metadata['product'] : entry.product,
+      code: typeof metadata['code'] === 'string' ? metadata['code'] : null,
+      deliveryBasis: typeof metadata['deliveryBasis'] === 'string' ? metadata['deliveryBasis'] : null,
+    };
+  }
+
+  protected getMarketDataMetadata(entry: PlattsReportDetailDto['sections'][number]['entries'][number]): MarketDataMetadata | null {
+    const metadata = entry.metadata;
+    if (!metadata || metadata['rowKind'] !== 'market-data') return null;
+
+    return {
+      marketContext: typeof metadata['marketContext'] === 'string' ? metadata['marketContext'] : null,
+      statusText: typeof metadata['statusText'] === 'string' ? metadata['statusText'] : null,
+    };
+  }
+
+  protected getMocMetadata(entry: PlattsReportDetailDto['sections'][number]['entries'][number]): MocMetadata | null {
+    const metadata = entry.metadata;
+    if (!metadata || metadata['rowKind'] !== 'moc') return null;
+
+    return {
+      statusText: typeof metadata['statusText'] === 'string' ? metadata['statusText'] : null,
+    };
+  }
+
+  protected getEntryStatus(entry: PlattsReportDetailDto['sections'][number]['entries'][number]): string | null {
+    if (/^NO\s+(TRADES|BIDS|OFFERS|WITHDRAWALS)\s+REPORTED$/i.test(entry.rawText)) {
+      return entry.rawText;
+    }
+    if (!entry.company && !entry.action && !entry.counterparty && !entry.priceRaw && !entry.quantityRaw) {
+      return entry.rawText;
+    }
+    return null;
+  }
+
+  private hasVisibleSectionContent(section: PlattsReportDetailDto['sections'][number]): boolean {
+    const mode = this.getSectionDisplayMode(section);
+
+    if (mode === 'assessment') {
+      return section.entries.some((entry) => this.getAssessmentMetadata(entry) !== null);
+    }
+
+    if (mode === 'delivery-basis') {
+      return section.entries.some((entry) => this.getDeliveryBasisMetadata(entry) !== null);
+    }
+
+    if (mode === 'market-data') {
+      return section.entries.some((entry) => this.isActionableMarketDataEntry(entry));
+    }
+
+    if (mode === 'moc') {
+      return section.entries.some((entry) => this.isActionableMocEntry(entry));
+    }
+
+    return section.entries.some((entry) => this.isActionableStructuredEntry(entry));
+  }
+
+  private isActionableMarketDataEntry(entry: PlattsReportDetailDto['sections'][number]['entries'][number]): boolean {
+    return this.getMarketDataMetadata(entry) !== null
+      && Boolean(entry.company || entry.action || entry.counterparty || entry.priceRaw || entry.quantityRaw || entry.timestampText);
+  }
+
+  private isActionableMocEntry(entry: PlattsReportDetailDto['sections'][number]['entries'][number]): boolean {
+    return this.getMocMetadata(entry) !== null
+      && Boolean(entry.company || entry.action || entry.counterparty || entry.priceRaw || entry.quantityRaw || entry.timestampText);
+  }
+
+  private isActionableStructuredEntry(entry: PlattsReportDetailDto['sections'][number]['entries'][number]): boolean {
+    return Boolean(
+      entry.company
+      || entry.action
+      || entry.counterparty
+      || entry.priceRaw
+      || entry.quantityRaw
+      || entry.marketRegion
+      || entry.marketBasis
+      || entry.instrument
+      || entry.windowLabel
+      || entry.timestampText,
+    );
+  }
+
   async ngOnInit(): Promise<void> {
     await this.loadReport();
+  }
+
+  ngOnDestroy(): void {
+    this.stopPolling();
   }
 
   protected async previewSource(): Promise<void> {
@@ -189,11 +444,11 @@ export class PlattsReportDetailPageComponent implements OnInit {
       const response = await firstValueFrom(
         this.http.post<ApiResponse<PlattsReportDto>>(`${API}/platts/reports/${currentReport.id}/reparse`, {}),
       );
-      if (!response.success) throw new Error(response.message ?? 'Failed to queue reparse');
-      this.notice.set('Report queued for reparsing.');
-      await this.loadReport();
+      if (!response.success) throw new Error(response.message ?? 'Failed to request reparse');
+      this.notice.set('Reparse requested. Parsing runs in the background.');
+      await this.loadReport({ showLoading: false });
     } catch (error) {
-      this.error.set(this.describeError(error, 'Failed to queue reparse'));
+      this.error.set(this.describeError(error, 'Failed to request reparse'));
     }
   }
 
@@ -218,15 +473,19 @@ export class PlattsReportDetailPageComponent implements OnInit {
     }
   }
 
-  private async loadReport(): Promise<void> {
+  private async loadReport(options: { showLoading?: boolean; isPolling?: boolean } = {}): Promise<void> {
     const reportId = this.route.snapshot.paramMap.get('id');
     if (!reportId) {
       this.error.set('Missing report id');
       return;
     }
 
-    this.loading.set(true);
-    this.error.set(null);
+    const showLoading = options.showLoading ?? true;
+    const previousStatus = this.report()?.status ?? null;
+
+    if (showLoading) this.loading.set(true);
+    if (!options.isPolling) this.error.set(null);
+
     try {
       const response = await firstValueFrom(
         this.http.get<ApiResponse<PlattsReportDetailDto>>(`${API}/platts/reports/${reportId}`),
@@ -234,16 +493,82 @@ export class PlattsReportDetailPageComponent implements OnInit {
       if (!response.success || !response.data) {
         throw new Error(response.message ?? 'Failed to load report');
       }
+
       this.report.set(response.data);
+      this.syncPollingState(previousStatus, response.data);
     } catch (error) {
-      this.error.set(this.describeError(error, 'Failed to load report'));
+      if (!options.isPolling) {
+        this.error.set(this.describeError(error, 'Failed to load report'));
+      } else {
+        this.schedulePolling();
+      }
     } finally {
-      this.loading.set(false);
+      if (showLoading) this.loading.set(false);
     }
+  }
+
+  private syncPollingState(previousStatus: string | null, report: PlattsReportDetailDto): void {
+    if (this.isParsingStatus(report.status)) {
+      this.schedulePolling();
+      return;
+    }
+
+    this.stopPolling();
+
+    if (previousStatus && this.isParsingStatus(previousStatus) && report.status === 'READY') {
+      this.notice.set('Parsing finished. Report updated automatically.');
+    }
+
+    if (previousStatus && this.isParsingStatus(previousStatus) && report.status === 'FAILED') {
+      this.error.set(report.parseError || 'Parsing failed.');
+    }
+  }
+
+  private schedulePolling(): void {
+    if (this.pollTimeoutId != null) return;
+
+    this.pollTimeoutId = setTimeout(() => {
+      this.pollTimeoutId = null;
+      void this.loadReport({ showLoading: false, isPolling: true });
+    }, this.pollIntervalMs);
+  }
+
+  private stopPolling(): void {
+    if (this.pollTimeoutId == null) return;
+    clearTimeout(this.pollTimeoutId);
+    this.pollTimeoutId = null;
+  }
+
+  private isParsingStatus(status: string | null | undefined): boolean {
+    return status === 'UPLOADED' || status === 'PARSING';
   }
 
   private describeError(error: unknown, fallback: string): string {
     if (error instanceof Error && error.message.trim()) return error.message;
     return fallback;
   }
+}
+
+interface AssessmentMetadata {
+  product: string | null;
+  code: string | null;
+  rangeText: string | null;
+  mid: string | null;
+  change: string | null;
+  basisHeader: string | null;
+}
+
+interface DeliveryBasisMetadata {
+  product: string | null;
+  code: string | null;
+  deliveryBasis: string | null;
+}
+
+interface MarketDataMetadata {
+  marketContext: string | null;
+  statusText: string | null;
+}
+
+interface MocMetadata {
+  statusText: string | null;
 }

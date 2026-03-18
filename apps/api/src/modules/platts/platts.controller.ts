@@ -217,7 +217,7 @@ export const plattsController = new Elysia({ prefix: '/platts' })
         }
         return { success: true, data } satisfies ApiResponse<PlattsReportDto>;
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to queue reparse';
+        const message = error instanceof Error ? error.message : 'Failed to request reparse';
         set.status = 400;
         return { success: false, data: null, message } satisfies ApiResponse<null>;
       }

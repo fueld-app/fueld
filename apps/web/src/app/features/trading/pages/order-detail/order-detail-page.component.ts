@@ -7,7 +7,9 @@ import {
   viewChild,
   OnInit,
   OnDestroy,
+  AfterViewInit,
   effect,
+  ElementRef,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClient, type HttpResponse } from '@angular/common/http';
@@ -1030,16 +1032,21 @@ interface PlattsSuggestionViewModel {
     <!--  Financing Summary + Platts Signals (side-by-side on desktop) -->
     <!-- ═════════════════════════════════════════════════════════════ -->
     <div class="mt-4 grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2">
-      <app-order-financing-summary
-        class="block"
-        [baseCurrency]="itemDisplayCurrency()"
-        [financingRateAnnual]="financingRateAnnual()"
-        [financingDays]="financingDays()"
-        [financingDayCountConvention]="financingDayCountConvention()"
-        [economics]="itemEconomics()"
-      />
+      <div #financingSummaryContainer class="block">
+        <app-order-financing-summary
+          class="block"
+          [baseCurrency]="itemDisplayCurrency()"
+          [financingRateAnnual]="financingRateAnnual()"
+          [financingDays]="financingDays()"
+          [financingDayCountConvention]="financingDayCountConvention()"
+          [economics]="itemEconomics()"
+        />
+      </div>
 
-    <div class="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+    <div
+      class="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
+      [style.max-height.px]="plattsSignalsMaxHeight()"
+    >
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 class="text-sm font-semibold uppercase tracking-wider text-gray-700">Platts Signals</h3>
@@ -1085,7 +1092,7 @@ interface PlattsSuggestionViewModel {
       } @else if (!plattsSuggestionItems().length) {
         <div class="mt-4 text-sm text-gray-500">No Platts suggestions available for the current items yet.</div>
       } @else {
-        <div class="mt-4 grid gap-3 overflow-y-auto">
+        <div class="mt-4 grid min-h-0 flex-1 gap-3 overflow-y-auto pr-1">
           @for (item of plattsSuggestionItems(); track item.key) {
             <div class="rounded-xl border border-gray-200 p-4">
               <div class="flex items-start justify-between gap-3">
@@ -1602,7 +1609,7 @@ interface PlattsSuggestionViewModel {
     `,
   ],
 })
-export class OrderDetailPageComponent implements OnInit, OnDestroy {
+export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly http = inject(HttpClient);
@@ -1612,6 +1619,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   readonly emailModal = viewChild(SendEmailModalComponent);
   readonly pdfModal = viewChild(PdfPreviewModalComponent);
   readonly inquiryModal = viewChild(SendInquiryModalComponent);
+  readonly financingSummaryContainer = viewChild<ElementRef<HTMLElement>>('financingSummaryContainer');
 
   // ─── Email compose state ─────────────────────────────────────────
 
@@ -1711,6 +1719,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   readonly plattsSuggestions = signal<PlattsSuggestionsResponseDto | null>(null);
   readonly plattsSuggestionsLoading = signal(false);
   readonly plattsSuggestionsError = signal<string | null>(null);
+  readonly plattsSignalsMaxHeight = signal<number | null>(null);
 
   /** Whether the user has linked WhatsApp in Settings */
   readonly waLinked = signal(false);
@@ -1767,7 +1776,9 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   readonly lastSaved = signal<Date | null>(null);
   private autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
   private plattsSuggestionTimer: ReturnType<typeof setTimeout> | null = null;
+  private financingSummaryResizeObserver: ResizeObserver | null = null;
   private changeVersion = signal(0);
+  private readonly handleWindowResize = () => this.syncPlattsSignalsHeight();
 
   // ─── Computed ────────────────────────────────────────────────────
 
@@ -2136,6 +2147,18 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     this.checkWhatsAppLinked();
   }
 
+  ngAfterViewInit(): void {
+    const container = this.financingSummaryContainer()?.nativeElement;
+    if (!container) return;
+
+    this.financingSummaryResizeObserver = new ResizeObserver(() => {
+      this.syncPlattsSignalsHeight();
+    });
+    this.financingSummaryResizeObserver.observe(container);
+    window.addEventListener('resize', this.handleWindowResize);
+    this.syncPlattsSignalsHeight();
+  }
+
   ngOnDestroy(): void {
     if (this.autoSaveTimer) {
       clearTimeout(this.autoSaveTimer);
@@ -2143,6 +2166,21 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     if (this.plattsSuggestionTimer) {
       clearTimeout(this.plattsSuggestionTimer);
     }
+    this.financingSummaryResizeObserver?.disconnect();
+    this.financingSummaryResizeObserver = null;
+    window.removeEventListener('resize', this.handleWindowResize);
+  }
+
+  private syncPlattsSignalsHeight(): void {
+    const container = this.financingSummaryContainer()?.nativeElement;
+    if (!container) return;
+
+    if (!window.matchMedia('(min-width: 1024px)').matches) {
+      this.plattsSignalsMaxHeight.set(null);
+      return;
+    }
+
+    this.plattsSignalsMaxHeight.set(Math.ceil(container.getBoundingClientRect().height));
   }
 
   private detailBaseRouteForStatus(status: string):
@@ -2984,7 +3022,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   onInvoicingCompanyChange(companyId: string): void {
     this.order.update((o) => o ? { ...o, invoicingCompanyId: companyId || null, bankAccountId: null } : o);
     this.bankAccounts.set([]);
-    if (companyId) this.loadBankAccounts(companyId);
+    if (companyId) void this.loadBankAccounts(companyId, { autoSelect: true });
     this.triggerAutosave();
   }
 
@@ -2993,15 +3031,50 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     this.triggerAutosave();
   }
 
-  private async loadBankAccounts(companyId: string): Promise<void> {
+  private async loadBankAccounts(companyId: string, options?: { autoSelect?: boolean }): Promise<void> {
     try {
       const res = await firstValueFrom(
         this.http.get<ApiResponse<BankAccountDto[]>>(
           `${API_URL}/admin/settings/companies/${companyId}/bank-accounts`,
         ),
       );
-      if (res.success) this.bankAccounts.set(res.data);
+      if (res.success) {
+        this.bankAccounts.set(res.data);
+        if (options?.autoSelect) {
+          this.applyPreferredBankAccountSelection(res.data);
+        }
+      }
     } catch { /* silently ignore */ }
+  }
+
+  private applyPreferredBankAccountSelection(accounts: BankAccountDto[]): void {
+    const preferredBankAccount = this.getPreferredBankAccount(accounts);
+    const preferredBankAccountId = preferredBankAccount?.id ?? null;
+
+    if (this.order()?.bankAccountId === preferredBankAccountId) {
+      return;
+    }
+
+    this.order.update((order) => (order ? { ...order, bankAccountId: preferredBankAccountId } : order));
+    this.triggerAutosave();
+  }
+
+  private getPreferredBankAccount(accounts: BankAccountDto[]): BankAccountDto | null {
+    if (accounts.length === 0) return null;
+
+    const orderCurrency = this.normalizeCurrencyCode(this.order()?.currency);
+    if (orderCurrency) {
+      const currencyMatches = accounts.filter((account) => this.normalizeCurrencyCode(account.currency) === orderCurrency);
+      if (currencyMatches.length > 0) {
+        return currencyMatches.find((account) => account.isDefault) ?? currencyMatches[0];
+      }
+    }
+
+    return accounts.find((account) => account.isDefault) ?? accounts[0] ?? null;
+  }
+
+  private normalizeCurrencyCode(currency: string | null | undefined): string {
+    return (currency ?? '').trim().toUpperCase();
   }
 
   async searchClients(term: string): Promise<void> {
@@ -3463,6 +3536,14 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
 
   onCurrencyChange(currency: string): void {
     this.order.update((o) => (o ? { ...o, currency } : o));
+    if (this.bankAccounts().length > 0) {
+      this.applyPreferredBankAccountSelection(this.bankAccounts());
+    } else {
+      const invoicingCompanyId = this.order()?.invoicingCompanyId;
+      if (invoicingCompanyId) {
+        void this.loadBankAccounts(invoicingCompanyId, { autoSelect: true });
+      }
+    }
     this.triggerAutosave();
   }
 
