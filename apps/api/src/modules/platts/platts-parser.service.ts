@@ -1,7 +1,7 @@
 import { basename } from 'node:path';
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { PDFParse } from 'pdf-parse';
 
-export const PLATTS_PARSER_VERSION = '2026-03-18b';
+export const PLATTS_PARSER_VERSION = '2026-03-18c';
 
 export interface ParsedPlattsEntry {
   rawText: string;
@@ -29,12 +29,6 @@ export interface ParsedPlattsReport {
 interface ParsedMetadata {
   title: string;
   publicationDate: string;
-}
-
-interface PdfTextItem {
-  str: string;
-  transform: number[];
-  hasEOL?: boolean;
 }
 
 const MONTHS = new Map([
@@ -264,86 +258,14 @@ function extractMocDetails(rawText: string): ParsedPlattsEntry {
   return entry;
 }
 
-function isPdfTextItem(item: unknown): item is PdfTextItem {
-  return typeof item === 'object'
-    && item !== null
-    && 'str' in item
-    && typeof item.str === 'string'
-    && 'transform' in item
-    && Array.isArray(item.transform);
-}
-
-function flushPdfLine(lines: string[], parts: string[]): void {
-  if (parts.length === 0) return;
-
-  const line = parts
-    .join(' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  if (line.length > 0) {
-    lines.push(line);
-  }
-
-  parts.length = 0;
-}
-
 async function extractPdfText(pdfBuffer: Buffer): Promise<string> {
-  const loadingTask = getDocument({
-    data: new Uint8Array(pdfBuffer),
-    useWorkerFetch: false,
-    isEvalSupported: false,
-    disableFontFace: true,
-    useSystemFonts: true,
-  });
-
-  const pdf = await loadingTask.promise;
+  const parser = new PDFParse({ data: pdfBuffer });
 
   try {
-    const pageTexts: string[] = [];
-
-    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-      const page = await pdf.getPage(pageNumber);
-      const content = await page.getTextContent();
-      const lines: string[] = [];
-      const parts: string[] = [];
-      let lastY: number | null = null;
-
-      for (const item of content.items) {
-        if (!isPdfTextItem(item)) continue;
-
-        const currentY = item.transform.length > 5 && Number.isFinite(item.transform[5])
-          ? item.transform[5]!
-          : null;
-
-        if (lastY !== null && currentY !== null && Math.abs(currentY - lastY) > 2) {
-          flushPdfLine(lines, parts);
-        }
-
-        const text = item.str.trim();
-        if (text.length > 0) {
-          parts.push(text);
-        }
-
-        if (item.hasEOL) {
-          flushPdfLine(lines, parts);
-        }
-
-        if (currentY !== null) {
-          lastY = currentY;
-        }
-      }
-
-      flushPdfLine(lines, parts);
-      pageTexts.push(lines.join('\n'));
-    }
-
-    return pageTexts
-      .map((pageText) => pageText.trim())
-      .filter((pageText) => pageText.length > 0)
-      .join('\n');
+    const result = await parser.getText();
+    return result.text ?? '';
   } finally {
-    await loadingTask.destroy();
+    await parser.destroy();
   }
 }
 
