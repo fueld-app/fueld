@@ -20,6 +20,25 @@ import {
   replaceCanonicalPlattsReport,
 } from './platts.service';
 
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    const candidate = error.message;
+    if (typeof candidate === 'string' && candidate.trim().length > 0) {
+      return candidate;
+    }
+  }
+
+  if (typeof error === 'string' && error.trim().length > 0) {
+    return error;
+  }
+
+  return fallback;
+}
+
 function requireAdmin(role: string): void {
   if (role !== 'ADMIN') {
     throw new Error('Admin access required');
@@ -131,7 +150,8 @@ export const plattsController = new Elysia({ prefix: '/platts' })
         set.status = 201;
         return { success: true, data } satisfies ApiResponse<CreatePlattsReportResponseDto>;
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to upload Platts report';
+        console.error('[Platts] Upload failed:', error);
+        const message = getErrorMessage(error, 'Failed to upload Platts report');
         set.status = 400;
         return { success: false, data: null, message } satisfies ApiResponse<null>;
       }

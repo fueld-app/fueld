@@ -152,6 +152,33 @@ function resolveStoredPath(relativePath: string): string {
   return join(process.cwd(), relativePath);
 }
 
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+
+  if (typeof error === 'object' && error !== null) {
+    const candidate = 'message' in error ? error.message : null;
+    if (typeof candidate === 'string' && candidate.trim().length > 0) {
+      return candidate;
+    }
+
+    const code = 'code' in error ? error.code : null;
+    const detail = 'detail' in error ? error.detail : null;
+    const parts = [code, detail]
+      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+    if (parts.length > 0) {
+      return parts.join(': ');
+    }
+  }
+
+  if (typeof error === 'string' && error.trim().length > 0) {
+    return error;
+  }
+
+  return fallback;
+}
+
 function normalizeFilename(fileName: string): string {
   return fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
 }
@@ -575,7 +602,7 @@ async function parseSingleReport(reportId: string): Promise<void> {
     const parsed = await parsePlattsPdfFile(resolveStoredPath(report.sourceFilePath));
     await persistParsedReport(report, parsed);
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown parse failure';
+    const message = getErrorMessage(error, 'Unknown parse failure');
     await markReportStatus(reportId, 'FAILED', message);
   }
 }
@@ -639,56 +666,76 @@ export async function createPlattsReportFromUpload(params: {
   const storedRelativePath = join('uploads', 'platts', tenantSegment, reportId, 'source.pdf');
   const storedAbsolutePath = resolveStoredPath(storedRelativePath);
 
-  await mkdir(dirname(storedAbsolutePath), { recursive: true });
-  await Bun.write(storedAbsolutePath, fileBuffer);
+  try {
+    await mkdir(dirname(storedAbsolutePath), { recursive: true });
+    await Bun.write(storedAbsolutePath, fileBuffer);
+  } catch (error) {
+    throw new Error(`Failed to save uploaded PDF to storage: ${getErrorMessage(error, 'Unknown filesystem error')}`);
+  }
 
-  const metadata = await extractPlattsPdfMetadata(storedAbsolutePath);
+  let metadata: Awaited<ReturnType<typeof extractPlattsPdfMetadata>>;
+  try {
+    metadata = await extractPlattsPdfMetadata(storedAbsolutePath);
+  } catch (error) {
+    throw new Error(`Failed to read uploaded PDF metadata: ${getErrorMessage(error, 'Unknown PDF parsing error')}`);
+  }
+
   const family = params.family ?? 'EUROPEAN_MARKETSCAN';
   const warnings: string[] = [];
 
-  const [existingCanonical] = await db
-    .select({ id: plattsReports.id })
-    .from(plattsReports)
-    .where(and(
-      eq(plattsReports.tenantId, params.tenantId),
-      eq(plattsReports.family, family),
-      eq(plattsReports.publicationDate, metadata.publicationDate),
-      eq(plattsReports.isCanonical, true),
-    ))
-    .limit(1);
+  let existingCanonical: { id: string } | undefined;
+  try {
+    [existingCanonical] = await db
+      .select({ id: plattsReports.id })
+      .from(plattsReports)
+      .where(and(
+        eq(plattsReports.tenantId, params.tenantId),
+        eq(plattsReports.family, family),
+        eq(plattsReports.publicationDate, metadata.publicationDate),
+        eq(plattsReports.isCanonical, true),
+      ))
+      .limit(1);
+  } catch (error) {
+    throw new Error(`Failed to check existing Platts reports: ${getErrorMessage(error, 'Unknown database error')}`);
+  }
 
   if (existingCanonical) {
     warnings.push('A canonical Platts report already exists for this publication date. This upload was saved as non-canonical history.');
   }
 
-  const [insertedReport] = await db
-    .insert(plattsReports)
-    .values({
-      id: reportId,
-      tenantId: params.tenantId,
-      family,
-      publicationDate: metadata.publicationDate,
-      title: metadata.title,
-      sourceFileName: fileName,
-      sourceFilePath: storedRelativePath,
-      sourceMimeType: params.file.type || 'application/pdf',
-      sourceFileSize: params.file.size,
-      uploadedBy: params.userId,
-      status: 'UPLOADED',
-      parserVersion: PLATTS_PARSER_VERSION,
-      isCanonical: existingCanonical == null,
-      commentary: [],
-    })
-    .returning();
+  let insertedReport: typeof plattsReports.$inferSelect;
+  try {
+    [insertedReport] = await db
+      .insert(plattsReports)
+      .values({
+        id: reportId,
+        tenantId: params.tenantId,
+        family,
+        publicationDate: metadata.publicationDate,
+        title: metadata.title,
+        sourceFileName: fileName,
+        sourceFilePath: storedRelativePath,
+        sourceMimeType: params.file.type || 'application/pdf',
+        sourceFileSize: params.file.size,
+        uploadedBy: params.userId,
+        status: 'UPLOADED',
+        parserVersion: PLATTS_PARSER_VERSION,
+        isCanonical: existingCanonical == null,
+        commentary: [],
+      })
+      .returning();
 
-  await db.insert(plattsReportImports).values({
-    reportId,
-    importMode: params.importMode ?? 'single',
-    importBatchId: params.importBatchId ?? null,
-    sha256Hex: fileHash,
-    uploadedBy: params.userId,
-    notes: params.notes ?? null,
-  });
+    await db.insert(plattsReportImports).values({
+      reportId,
+      importMode: params.importMode ?? 'single',
+      importBatchId: params.importBatchId ?? null,
+      sha256Hex: fileHash,
+      uploadedBy: params.userId,
+      notes: params.notes ?? null,
+    });
+  } catch (error) {
+    throw new Error(`Failed to store Platts report record: ${getErrorMessage(error, 'Unknown database error')}`);
+  }
 
   await logActivity({
     tenantId: params.tenantId,
