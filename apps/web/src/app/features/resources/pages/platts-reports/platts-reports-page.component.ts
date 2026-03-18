@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
+import { PlattsReportStatus } from '@fueld/types';
 import type {
   ApiResponse,
   CreatePlattsReportResponseDto,
@@ -310,7 +311,7 @@ export class PlattsReportsPageComponent implements OnInit, OnDestroy {
       );
       if (!response.success) throw new Error(response.message ?? 'Failed to request reparse');
       this.notice.set(`Reparse requested for ${report.sourceFileName}. Parsing runs in the background.`);
-      this.markReportStatus(report.id, 'PARSING');
+      this.markReportStatus(report.id, PlattsReportStatus.Parsing);
       this.schedulePolling();
       await this.loadReports({ showLoading: false });
     } catch (error) {
@@ -451,7 +452,7 @@ export class PlattsReportsPageComponent implements OnInit, OnDestroy {
     return status === 'UPLOADED' || status === 'PARSING';
   }
 
-  private markReportStatus(reportId: string, status: string): void {
+  private markReportStatus(reportId: string, status: PlattsReportStatus): void {
     this.reports.update((reports) => reports.map((report) => (
       report.id === reportId ? { ...report, status } : report
     )));
