@@ -67,9 +67,7 @@ jobs:
       - name: Restore API binary artifact
         if: ${{ github.event_name == 'workflow_run' }}
         run: |
-          mkdir -p apps/api
-          gzip -dc /tmp/deploy-artifacts/api/api-release.gz > apps/api/app-release
-          chmod +x apps/api/app-release
+          ls -lh /tmp/deploy-artifacts/api/api-release.gz
 
       - name: Download web build artifact from Tests
         if: ${{ github.event_name == 'workflow_run' }}
@@ -122,6 +120,12 @@ jobs:
           cd apps/api
           bun build src/index.ts --compile --bytecode --minify --target=bun-linux-x64 --outfile app-release
 
+      - name: Package API binary for upload
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          gzip -9 -c apps/api/app-release > /tmp/api-release.gz
+          ls -lh apps/api/app-release /tmp/api-release.gz
+
       # ─── Build Frontend ────────────────────────────────────────────
       - name: Build Frontend
         if: ${{ github.event_name == 'workflow_dispatch' }}
@@ -144,9 +148,15 @@ jobs:
 
       - name: Upload API binary
         run: |
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            API_BINARY_PATH=/tmp/deploy-artifacts/api/api-release.gz
+          else
+            API_BINARY_PATH=/tmp/api-release.gz
+          fi
+
           scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-            apps/api/app-release \
-            ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/opt/fueld/staging/app-release
+            "$API_BINARY_PATH" \
+            ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/opt/fueld/staging/app-release.gz
 
       - name: Package frontend for upload
         run: |

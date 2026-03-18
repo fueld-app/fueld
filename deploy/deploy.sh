@@ -35,6 +35,13 @@ log "Current active: ${ACTIVE_SLOT} (port ${ACTIVE_PORT})"
 log "Deploying to:   ${NEXT_SLOT} (port ${NEXT_PORT})"
 
 # ─── Prepare archived deploy payloads ───────────────────────────────
+if [ -f "$APP_DIR/staging/app-release.gz" ]; then
+  log "Extracting API binary archive..."
+  gzip -dc "$APP_DIR/staging/app-release.gz" > "$APP_DIR/staging/app-release"
+  chmod +x "$APP_DIR/staging/app-release"
+  rm -f "$APP_DIR/staging/app-release.gz"
+fi
+
 if [ -f "$APP_DIR/staging/drizzle.tar.gz" ]; then
   log "Extracting migration archive..."
   rm -rf "$APP_DIR/staging/drizzle"
