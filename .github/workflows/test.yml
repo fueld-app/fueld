@@ -14,9 +14,104 @@ env:
   BUN_VERSION: '1.3.10'
 
 jobs:
+  changes:
+    name: Detect changed areas
+    runs-on: ubuntu-latest
+    outputs:
+      api_validation: ${{ steps.filter.outputs.api_validation }}
+      web_validation: ${{ steps.filter.outputs.web_validation }}
+      types_validation: ${{ steps.filter.outputs.types_validation }}
+      api_build: ${{ steps.filter.outputs.api_build }}
+      web_build: ${{ steps.filter.outputs.web_build }}
+      migration_check: ${{ steps.filter.outputs.migration_check }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Compute change filters
+        id: filter
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            echo "api_validation=true" >> "$GITHUB_OUTPUT"
+            echo "web_validation=true" >> "$GITHUB_OUTPUT"
+            echo "types_validation=true" >> "$GITHUB_OUTPUT"
+            echo "api_build=true" >> "$GITHUB_OUTPUT"
+            echo "web_build=true" >> "$GITHUB_OUTPUT"
+            echo "migration_check=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+          fi
+
+          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            echo "api_validation=true" >> "$GITHUB_OUTPUT"
+            echo "web_validation=true" >> "$GITHUB_OUTPUT"
+            echo "types_validation=true" >> "$GITHUB_OUTPUT"
+            echo "api_build=true" >> "$GITHUB_OUTPUT"
+            echo "web_build=true" >> "$GITHUB_OUTPUT"
+            echo "migration_check=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          CHANGED_FILES="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+          printf 'Changed files:\n%s\n' "$CHANGED_FILES"
+
+          matches() {
+            local pattern="$1"
+            printf '%s\n' "$CHANGED_FILES" | grep -Eq "$pattern"
+          }
+
+          api_validation=false
+          web_validation=false
+          types_validation=false
+          migration_check=false
+
+          if matches '^(apps/api/|packages/types/|bun.lock|package.json|tsconfig.base.json|scripts/release/|\.github/actions/setup-ci/|\.github/workflows/test.yml)$'; then
+            api_validation=true
+          fi
+
+          if matches '^(apps/web/|packages/types/|bun.lock|package.json|tsconfig.base.json|scripts/release/|\.github/actions/setup-ci/|\.github/workflows/test.yml)$'; then
+            web_validation=true
+          fi
+
+          if matches '^(packages/types/|bun.lock|package.json|tsconfig.base.json|\.github/workflows/test.yml)$'; then
+            types_validation=true
+          fi
+
+          if matches '^apps/api/drizzle/'; then
+            migration_check=true
+          fi
+
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            api_build="$api_validation"
+            web_build="$web_validation"
+          else
+            api_build=true
+            web_build=true
+          fi
+
+          echo "api_validation=$api_validation" >> "$GITHUB_OUTPUT"
+          echo "web_validation=$web_validation" >> "$GITHUB_OUTPUT"
+          echo "types_validation=$types_validation" >> "$GITHUB_OUTPUT"
+          echo "api_build=$api_build" >> "$GITHUB_OUTPUT"
+          echo "web_build=$web_build" >> "$GITHUB_OUTPUT"
+          echo "migration_check=$migration_check" >> "$GITHUB_OUTPUT"
+
   migration-journal:
     name: Migration journal check
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.migration_check == 'true' }}
     steps:
       - name: Checkout repository
         id: checkout
@@ -54,6 +149,8 @@ jobs:
   types:
     name: Types
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.types_validation == 'true' }}
     steps:
       - name: Checkout repository
         id: checkout
@@ -79,6 +176,8 @@ jobs:
   api-typecheck:
     name: API (typecheck)
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.api_validation == 'true' }}
     steps:
       - name: Checkout repository
         id: checkout
@@ -104,6 +203,8 @@ jobs:
   api-build:
     name: API (build)
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.api_build == 'true' }}
     steps:
       - name: Checkout repository
         id: checkout
@@ -191,6 +292,8 @@ jobs:
   api-postgres:
     name: API (${{ matrix.name }})
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.api_validation == 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -258,6 +361,8 @@ jobs:
   web-unit:
     name: Web (unit)
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.web_validation == 'true' }}
     steps:
       - name: Checkout repository
         id: checkout
@@ -284,6 +389,8 @@ jobs:
   web-typecheck:
     name: Web (typecheck)
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.web_validation == 'true' }}
     steps:
       - name: Checkout repository
         id: checkout
@@ -310,6 +417,8 @@ jobs:
   web-build:
     name: Web (build)
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.web_build == 'true' }}
     steps:
       - name: Checkout repository
         id: checkout
