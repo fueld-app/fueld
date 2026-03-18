@@ -78,15 +78,15 @@ jobs:
           migration_check=false
           change_profile=infra-only
 
-          if matches '^(apps/api/|packages/types/|bun.lock|package.json|tsconfig.base.json|scripts/release/|\.github/actions/setup-ci/|\.github/workflows/test.yml)$'; then
+          if matches '^(apps/api/|packages/types/|scripts/release/|\.github/actions/setup-ci/)|^(bun.lock|package.json|tsconfig.base.json|\.github/workflows/test.yml)$'; then
             api_validation=true
           fi
 
-          if matches '^(apps/web/|packages/types/|bun.lock|package.json|tsconfig.base.json|scripts/release/|\.github/actions/setup-ci/|\.github/workflows/test.yml)$'; then
+          if matches '^(apps/web/|packages/types/|scripts/release/|\.github/actions/setup-ci/)|^(bun.lock|package.json|tsconfig.base.json|\.github/workflows/test.yml)$'; then
             web_validation=true
           fi
 
-          if matches '^(packages/types/|bun.lock|package.json|tsconfig.base.json|\.github/workflows/test.yml)$'; then
+          if matches '^packages/types/|^(bun.lock|package.json|tsconfig.base.json|\.github/workflows/test.yml)$'; then
             types_validation=true
           fi
 
