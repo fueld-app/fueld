@@ -1247,19 +1247,49 @@ export async function generateInvoicePdfBuffer(invoiceId: string): Promise<Buffe
     }
   }
 
+  // Resolve price reference names for formula-priced items
+  const invRefIds = new Set<string>();
+  for (const item of order.items) {
+    if (item.salesReferenceId) invRefIds.add(item.salesReferenceId);
+  }
+  const invRefNameMap = new Map<string, string>();
+  if (invRefIds.size > 0) {
+    const refs = await db.select({ id: priceReferences.id, name: priceReferences.name })
+      .from(priceReferences)
+      .where(inArray(priceReferences.id, [...invRefIds]));
+    for (const r of refs) invRefNameMap.set(r.id, r.name);
+  }
+
   const docData = {
-    invoiceNumber: invoice.invoiceNumber,
     orderNumber: order.orderNumber ?? null,
-    dueDate: invoice.dueDate,
     clientName: order.client.name,
     clientCountry: order.client.country,
     clientAddress: order.client.headOfficeAddress ?? null,
+    customerContactName: null,
+    customerContactRole: null,
+    customerContactPhone: null,
+    customerContactEmail: null,
     vesselName: order.vessel.name,
     vesselImo: order.vessel.imo,
     portName: order.place.name,
-    salesRepName: order.salesRep?.name ?? null,
+    eta: order.eta?.toISOString() ?? null,
+    etd: order.etd?.toISOString() ?? null,
+    timezone: order.place.timezone ?? null,
+    currency: order.currency ?? 'USD',
+    fromName: order.salesRep?.name ?? null,
+    fromEmail: order.salesRep?.email ?? null,
+    fromPhone: order.salesRep?.phone ?? null,
     paymentTerms: formatCustomerPaymentTerms(order.customerPaymentTermType, order.customerCreditDays),
     customerNote: order.customerNote ?? null,
+    termsAndConditions: order.termsAndConditions ?? null,
+    placeRemark: order.placeRemark ?? order.place.orderRemark ?? null,
+    companyName: order.invoicingCompany?.name ?? null,
+    companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
+    companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
+    companyEmail: order.invoicingCompany?.headOfficeEmail ?? null,
+    companyRegistrationNumber: getCompanyRegistrationNumber(order.invoicingCompany),
+    companyWebsite: order.invoicingCompany?.website ?? null,
+    companyLogoDataUrl,
     itemNotes: order.items
       .filter((item) => item.customerNote)
       .map((item) => ({
@@ -1268,29 +1298,30 @@ export async function generateInvoicePdfBuffer(invoiceId: string): Promise<Buffe
       })),
     items: order.items.map((item) => ({
       productType: item.productType,
+      description: item.description,
       quantity: item.deliveredQuantity ?? item.quantity,
       unit: item.unit,
       priceUnit: item.salesUnit ?? item.unit,
       salesPrice: item.salesPrice,
-      costPrice: item.costPrice,
+      salesPricingModel: item.salesPricingModel,
+      salesReferenceName: item.salesReferenceId ? (invRefNameMap.get(item.salesReferenceId) ?? null) : null,
+      salesPremium: item.salesPremium,
+      salesBarging: item.salesBarging,
+      salesBargingUnit: item.salesBargingUnit,
+      salesCreditDays: item.salesCreditDays,
+      salesPriceFinalized: item.salesPriceFinalized,
     })),
-    totalAmount: invoice.amount,
-    bank,
     createdAt: invoice.createdAt,
-    companyName: order.invoicingCompany?.name ?? null,
-    vatNumber: order.invoicingCompany?.vatNumber ?? null,
-    companyRegistrationNumber: getCompanyRegistrationNumber(order.invoicingCompany),
-    fraudPreventionText: order.invoicingCompany?.fraudPreventionText ?? null,
-    latePaymentInterest: order.invoicingCompany?.latePaymentInterest ?? null,
     verifyUrl,
     verifyLink,
-    companyLogoDataUrl,
-    companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
-    companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
-    companyEmail: order.invoicingCompany?.headOfficeEmail ?? null,
+    fraudPreventionText: order.invoicingCompany?.fraudPreventionText ?? null,
+    bank,
+    vatNumber: order.invoicingCompany?.vatNumber ?? null,
+    latePaymentInterest: order.invoicingCompany?.latePaymentInterest ?? null,
+    docTitle: 'INVOICE',
   };
 
-  const docDefinition = buildInvoiceDocument(docData);
+  const docDefinition = buildProformaDocument(docData);
   return createPdfBuffer(docDefinition);
 }
 
@@ -1342,12 +1373,6 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
   }
 
   const invoiceNumber = invoice?.invoiceNumber ?? `PREVIEW-${orderId.slice(0, 8).toUpperCase()}`;
-  const dueDate = invoice?.dueDate ?? computeDueDate(
-    invoice?.createdAt ?? order.createdAt,
-    order.customerPaymentTermType,
-    order.customerCreditDays,
-    order.deliveredAt ?? order.eta,
-  );
 
   const bank = await loadOrderBankDetails(order.bankAccountId, order.invoicingCompanyId);
 
@@ -1369,19 +1394,49 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
     }
   }
 
+  // Resolve price reference names for formula-priced items
+  const invoiceRefIds = new Set<string>();
+  for (const item of order.items) {
+    if (item.salesReferenceId) invoiceRefIds.add(item.salesReferenceId);
+  }
+  const invoiceRefNameMap = new Map<string, string>();
+  if (invoiceRefIds.size > 0) {
+    const refs = await db.select({ id: priceReferences.id, name: priceReferences.name })
+      .from(priceReferences)
+      .where(inArray(priceReferences.id, [...invoiceRefIds]));
+    for (const r of refs) invoiceRefNameMap.set(r.id, r.name);
+  }
+
   const docData = {
-    invoiceNumber,
     orderNumber: order.orderNumber ?? null,
-    dueDate,
     clientName: order.client.name,
     clientCountry: order.client.country,
     clientAddress: order.client.headOfficeAddress ?? null,
+    customerContactName: order.customerContact?.name ?? null,
+    customerContactRole: order.customerContact?.role ?? null,
+    customerContactPhone: order.customerContact?.phone ?? null,
+    customerContactEmail: order.customerContact?.email ?? null,
     vesselName: order.vessel.name,
     vesselImo: order.vessel.imo,
     portName: order.place.name,
-    salesRepName: order.salesRep?.name ?? null,
+    eta: order.eta?.toISOString() ?? null,
+    etd: order.etd?.toISOString() ?? null,
+    timezone: order.place.timezone ?? null,
+    currency: order.currency ?? 'USD',
+    fromName: order.salesRep?.name ?? null,
+    fromEmail: order.salesRep?.email ?? null,
+    fromPhone: order.salesRep?.phone ?? null,
     paymentTerms: formatCustomerPaymentTerms(order.customerPaymentTermType, order.customerCreditDays),
     customerNote: order.customerNote ?? null,
+    termsAndConditions: order.termsAndConditions ?? null,
+    placeRemark: order.placeRemark ?? order.place.orderRemark ?? null,
+    companyName: order.invoicingCompany?.name ?? null,
+    companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
+    companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
+    companyEmail: order.invoicingCompany?.headOfficeEmail ?? null,
+    companyRegistrationNumber: getCompanyRegistrationNumber(order.invoicingCompany),
+    companyWebsite: order.invoicingCompany?.website ?? null,
+    companyLogoDataUrl,
     itemNotes: order.items
       .filter((item) => item.customerNote)
       .map((item) => ({
@@ -1390,30 +1445,31 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
       })),
     items: order.items.map((item) => ({
       productType: item.productType,
+      description: item.description,
       quantity: item.deliveredQuantity ?? item.quantity,
       unit: item.unit,
       priceUnit: item.salesUnit ?? item.unit,
       salesPrice: item.salesPrice,
-      costPrice: item.costPrice,
+      salesPricingModel: item.salesPricingModel,
+      salesReferenceName: item.salesReferenceId ? (invoiceRefNameMap.get(item.salesReferenceId) ?? null) : null,
+      salesPremium: item.salesPremium,
+      salesBarging: item.salesBarging,
+      salesBargingUnit: item.salesBargingUnit,
+      salesCreditDays: item.salesCreditDays,
+      salesPriceFinalized: item.salesPriceFinalized,
     })),
-    totalAmount: invoice?.amount ?? null,
-    bank,
     createdAt: invoice?.createdAt ?? order.createdAt,
-    companyName: order.invoicingCompany?.name ?? null,
-    vatNumber: order.invoicingCompany?.vatNumber ?? null,
-    companyRegistrationNumber: getCompanyRegistrationNumber(order.invoicingCompany),
-    fraudPreventionText: order.invoicingCompany?.fraudPreventionText ?? null,
-    latePaymentInterest: order.invoicingCompany?.latePaymentInterest ?? null,
     verifyUrl,
     verifyLink,
-    companyLogoDataUrl,
-    companyAddress: order.invoicingCompany?.headOfficeAddress ?? null,
-    companyPhone: order.invoicingCompany?.headOfficePhone ?? null,
-    companyEmail: order.invoicingCompany?.headOfficeEmail ?? null,
-    printMeta: null,
+    fraudPreventionText: order.invoicingCompany?.fraudPreventionText ?? null,
+    bank,
+    vatNumber: order.invoicingCompany?.vatNumber ?? null,
+    latePaymentInterest: order.invoicingCompany?.latePaymentInterest ?? null,
+    docTitle: 'INVOICE',
+    printMeta: null as DocumentPrintMeta | null,
   };
 
-  const docDefinition = buildInvoiceDocument(docData);
+  const docDefinition = buildProformaDocument(docData);
   const buffer = await createPdfBuffer(docDefinition);
   const fileName = `Fueld_Invoice_${invoiceNumber.replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`;
   const revision = await persistDocumentRevision({
@@ -1433,7 +1489,7 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
     } catch {
       // keep existing QR (or null) if token QR generation fails
     }
-    const finalized = buildInvoiceDocument({
+    const finalized = buildProformaDocument({
       ...docData,
       verifyUrl: verifyTokenQr,
       verifyLink: verifyTokenLink,
@@ -2179,6 +2235,7 @@ function buildProformaDocument(data: {
   vatNumber?: string | null;
   latePaymentInterest?: string | null;
   placeRemark?: string | null;
+  docTitle?: string;
   printMeta?: DocumentPrintMeta | null;
 }): TDocumentDefinitions {
   // ── Prepare data ──────────────────────────────────────────────────
@@ -2315,7 +2372,7 @@ function buildProformaDocument(data: {
       margin: [40, 30, 0, 0],
       columns: [
         { width: 150, stack: currentPage === 1 ? customerBlock : [{ text: '' }], margin: [0, customerTopOffset, 0, 0] },
-        { width: '*', text: 'PROFORMA INVOICE', style: 'docTitle', alignment: 'center', margin: [10, 0, 10, 0], noWrap: true },
+        { width: '*', text: data.docTitle ?? 'PROFORMA INVOICE', style: 'docTitle', alignment: 'center', margin: [10, 0, 10, 0], noWrap: true },
         { width: 150, stack: rightStack, margin: [0, 0, 40, 0] },
       ],
     } as Content;
