@@ -53,52 +53,16 @@ interface PriceSnapshotPayload {
   fxRates?: FxRatesPayload;
 }
 
-interface JsonPatchOperation {
-  op: 'add' | 'remove' | 'replace';
-  path: string;
-  value?: unknown;
-}
-
 interface PricePatchPayload {
-  baseVersion: string;
   version: string;
-  operations: JsonPatchOperation[];
-}
-
-function deepClone<T>(value: T): T {
-  return value === undefined ? value : structuredClone(value);
-}
-
-function cloneFxRates(fxRates: FxRatesPayload): FxRatesPayload {
-  return deepClone(fxRates);
-}
-
-function clonePriceSnapshot(snapshot: PriceSnapshotPayload): PriceSnapshotPayload {
-  return deepClone(snapshot);
-}
-
-function parseJsonPointer(path: string): string[] {
-  if (!path.startsWith('/')) return [];
-  return path
-    .slice(1)
-    .split('/')
-    .map((segment) => segment.replace(/~1/g, '/').replace(/~0/g, '~'));
-}
-
-function getPatchParent(document: Record<string, unknown>, segments: string[]): Record<string, unknown> | null {
-  let current: unknown = document;
-
-  for (let index = 0; index < segments.length - 1; index++) {
-    const segment = segments[index]!;
-    if (!current || typeof current !== 'object' || !(segment in (current as Record<string, unknown>))) {
-      return null;
-    }
-    current = (current as Record<string, unknown>)[segment];
-  }
-
-  return current && typeof current === 'object'
-    ? (current as Record<string, unknown>)
-    : null;
+  pricesByTicker?: Record<string, CommodityPrice>;
+  removedTickers?: string[];
+  fxRates?: {
+    base?: string;
+    rates?: Record<string, number>;
+    changes?: Record<string, { change: number; changePercent: number }>;
+    updatedAt?: string | null;
+  };
 }
 
 interface SearchResult {
@@ -876,26 +840,39 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   }
 
   private applyPricePatch(data: PricePatchPayload): void {
-    if (this.priceVersion() !== data.baseVersion) {
-      this.requestLatestPrices();
-      return;
+    this.priceVersion.set(data.version);
+    if (data.pricesByTicker || data.removedTickers?.length) {
+      const nextPrices = { ...this.commodityPriceMap() };
+
+      for (const ticker of data.removedTickers ?? []) {
+        delete nextPrices[ticker];
+      }
+
+      Object.assign(nextPrices, data.pricesByTicker ?? {});
+      this.commodityPriceMap.set(nextPrices);
     }
 
-    const currentSnapshot: PriceSnapshotPayload = {
-      version: this.priceVersion() ?? '',
-      pricesByTicker: { ...this.commodityPriceMap() },
-      fxRates: this.fxRatesState()
-        ? cloneFxRates(this.fxRatesState()!)
-        : undefined,
-    };
+    if (data.fxRates) {
+      const currentFx = this.fxRatesState() ?? {
+        base: 'USD',
+        rates: { USD: 1 },
+        changes: {},
+        updatedAt: null,
+      };
 
-    const nextSnapshot = this.applyJsonPatch(currentSnapshot, data.operations);
-    if (!nextSnapshot) {
-      this.requestLatestPrices();
-      return;
+      this.applyFxRatesState({
+        base: data.fxRates.base ?? currentFx.base,
+        rates: {
+          ...currentFx.rates,
+          ...(data.fxRates.rates ?? {}),
+        },
+        changes: {
+          ...(currentFx.changes ?? {}),
+          ...(data.fxRates.changes ?? {}),
+        },
+        updatedAt: data.fxRates.updatedAt ?? currentFx.updatedAt,
+      });
     }
-
-    this.applyPriceSnapshot(nextSnapshot);
   }
 
   private requestLatestPrices(): void {
@@ -903,39 +880,6 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
       type: 'get-prices',
       knownVersion: this.priceVersion() ?? undefined,
     });
-  }
-
-  private applyJsonPatch(snapshot: PriceSnapshotPayload, operations: JsonPatchOperation[]): PriceSnapshotPayload | null {
-    const draft = clonePriceSnapshot(snapshot);
-
-    for (const operation of operations) {
-      const segments = parseJsonPointer(operation.path);
-      if (segments.length === 0) {
-        return null;
-      }
-
-      const parent = getPatchParent(draft as unknown as Record<string, unknown>, segments);
-      if (parent === null) {
-        return null;
-      }
-
-      const key = segments[segments.length - 1]!;
-      if (operation.op === 'remove') {
-        if (!(key in parent)) {
-          return null;
-        }
-        delete parent[key];
-        continue;
-      }
-
-      parent[key] = deepClone(operation.value);
-    }
-
-    if (!draft.version || !draft.pricesByTicker) {
-      return null;
-    }
-
-    return draft;
   }
 
   private applyFxRatesState(fxRates: FxRatesPayload | null): void {
