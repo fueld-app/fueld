@@ -94,6 +94,75 @@ let PricingData: protobuf.Type | null = null;
 let yahooReconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let brentStaleTimer: ReturnType<typeof setInterval> | null = null;
 
+function isSameCommodityPrice(
+  current: CommodityPrice | null,
+  next: Omit<CommodityPrice, 'updatedAt'>,
+): boolean {
+  if (!current) return false;
+  return current.ticker === next.ticker
+    && current.name === next.name
+    && current.price === next.price
+    && current.change === next.change
+    && current.changePercent === next.changePercent
+    && current.currency === next.currency;
+}
+
+function updateCommodityPrice(
+  current: CommodityPrice | null,
+  next: Omit<CommodityPrice, 'updatedAt'>,
+): CommodityPrice | null {
+  if (isSameCommodityPrice(current, next)) {
+    return current;
+  }
+
+  return {
+    ...next,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function isSameFxRates(current: FxRates, next: Omit<FxRates, 'updatedAt'>): boolean {
+  if (current.base !== next.base) return false;
+
+  const currentRateEntries = Object.entries(current.rates).sort(([a], [b]) => a.localeCompare(b));
+  const nextRateEntries = Object.entries(next.rates).sort(([a], [b]) => a.localeCompare(b));
+  if (currentRateEntries.length !== nextRateEntries.length) return false;
+  for (let index = 0; index < currentRateEntries.length; index++) {
+    const currentEntry = currentRateEntries[index];
+    const nextEntry = nextRateEntries[index];
+    if (!currentEntry || !nextEntry) return false;
+    if (currentEntry[0] !== nextEntry[0] || currentEntry[1] !== nextEntry[1]) return false;
+  }
+
+  const currentChangeEntries = Object.entries(current.changes).sort(([a], [b]) => a.localeCompare(b));
+  const nextChangeEntries = Object.entries(next.changes).sort(([a], [b]) => a.localeCompare(b));
+  if (currentChangeEntries.length !== nextChangeEntries.length) return false;
+  for (let index = 0; index < currentChangeEntries.length; index++) {
+    const currentEntry = currentChangeEntries[index];
+    const nextEntry = nextChangeEntries[index];
+    if (!currentEntry || !nextEntry) return false;
+    if (currentEntry[0] !== nextEntry[0]) return false;
+    if (currentEntry[1].change !== nextEntry[1].change || currentEntry[1].changePercent !== nextEntry[1].changePercent) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function updateFxRates(next: Omit<FxRates, 'updatedAt'>): boolean {
+  if (isSameFxRates(fxRates, next)) {
+    return false;
+  }
+
+  fxRates = {
+    ...next,
+    updatedAt: new Date().toISOString(),
+  };
+
+  return true;
+}
+
 // ─── Yahoo Finance WebSocket (Brent Oil) ─────────────────────────────
 
 const YAHOO_PROTO_FALLBACK = `syntax = "proto3";
@@ -203,15 +272,17 @@ function connectYahooWs(): void {
         const changePercent = obj.changePercent ?? 0;
         const change = obj.change ?? (obj.previousClose ? price - obj.previousClose : 0);
 
-        brentPrice = {
+        const nextBrentPrice = updateCommodityPrice(brentPrice, {
           ticker: 'BZ=F',
           name: 'Brent Oil',
           price: round2(price),
           change: round2(change),
           changePercent: round2(changePercent),
           currency: obj.currency || 'USD',
-          updatedAt: new Date().toISOString(),
-        };
+        });
+
+        if (nextBrentPrice === brentPrice) return;
+        brentPrice = nextBrentPrice;
 
         broadcast();
       } else if (obj.id && obj.price && FX_TICKER_TO_CURRENCY[obj.id]) {
@@ -220,7 +291,8 @@ function connectYahooWs(): void {
         const fxPrevClose = obj.previousClose;
         const fxChange = obj.change ?? (fxPrevClose ? fxPrice - fxPrevClose : 0);
         const fxChangePct = obj.changePercent ?? (fxPrevClose ? ((fxPrice - fxPrevClose) / fxPrevClose) * 100 : 0);
-        fxRates = {
+
+        const didUpdateFx = updateFxRates({
           base: FX_BASE,
           rates: {
             ...fxRates.rates,
@@ -230,8 +302,8 @@ function connectYahooWs(): void {
             ...fxRates.changes,
             [currency]: { change: round2(fxChange), changePercent: round2(fxChangePct) },
           },
-          updatedAt: new Date().toISOString(),
-        };
+        });
+        if (!didUpdateFx) return;
         broadcast();
       }
     } catch (err: any) {
@@ -253,7 +325,16 @@ async function fetchBrentRest(): Promise<void> {
   try {
     const price = await fetchYahooChart('BZ=F', 'Brent Oil');
     if (price) {
-      brentPrice = price;
+      const nextBrentPrice = updateCommodityPrice(brentPrice, {
+        ticker: price.ticker,
+        name: price.name,
+        price: price.price,
+        change: price.change,
+        changePercent: price.changePercent,
+        currency: price.currency,
+      });
+      if (nextBrentPrice === brentPrice) return;
+      brentPrice = nextBrentPrice;
       broadcast();
     }
   } catch (err: any) {
@@ -303,15 +384,20 @@ async function fetchGasOil(): Promise<void> {
     const changePercent =
       previousClose !== 0 ? (change / previousClose) * 100 : 0;
 
-    gasoilPrice = {
+    const nextGasoilPrice = updateCommodityPrice(gasoilPrice, {
       ticker: 'LGO',
       name: 'Gasoil',
       price: round2(price),
       change: round2(change),
       changePercent: round2(changePercent),
       currency: 'USD',
-      updatedAt: new Date().toISOString(),
-    };
+    });
+
+    if (nextGasoilPrice === gasoilPrice) {
+      return;
+    }
+
+    gasoilPrice = nextGasoilPrice;
 
     broadcast();
   } catch (err: any) {
@@ -323,8 +409,16 @@ async function fetchGasOil(): Promise<void> {
 async function fetchGasOilYahoo(): Promise<void> {
   const price = await fetchYahooChart('LGOc1', 'Gasoil');
   if (price) {
-    price.ticker = 'LGO';
-    gasoilPrice = price;
+    const nextGasoilPrice = updateCommodityPrice(gasoilPrice, {
+      ticker: 'LGO',
+      name: price.name,
+      price: price.price,
+      change: price.change,
+      changePercent: price.changePercent,
+      currency: price.currency,
+    });
+    if (nextGasoilPrice === gasoilPrice) return;
+    gasoilPrice = nextGasoilPrice;
     broadcast();
   }
 }
@@ -348,12 +442,12 @@ async function fetchFxRates(): Promise<void> {
   );
 
   if (updated) {
-    fxRates = {
+    const didUpdateFx = updateFxRates({
       base: FX_BASE,
       rates: nextRates,
       changes: { ...fxRates.changes, ...nextChanges },
-      updatedAt: new Date().toISOString(),
-    };
+    });
+    if (!didUpdateFx) return;
     broadcast();
   }
 }
@@ -403,14 +497,19 @@ function broadcast(): void {
 
   // Build a fingerprint from the actual data values (including updatedAt for freshness)
   const fingerprint = payload.prices
-    .map((p) => `${p.ticker}:${p.price}:${p.change}:${p.updatedAt}`)
+    .map((p) => `${p.ticker}:${p.price}:${p.change}:${p.changePercent}:${p.currency}`)
     .join('|')
     + '||'
-    + (payload.fxRates?.updatedAt ?? '')
+    + (payload.fxRates?.base ?? '')
     + '||'
     + Object.entries(payload.fxRates?.rates ?? {})
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([k, v]) => `${k}:${v}`)
+      .join('|')
+    + '||'
+    + Object.entries(payload.fxRates?.changes ?? {})
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => `${k}:${v.change}:${v.changePercent}`)
       .join('|');
 
   if (fingerprint === lastBroadcastHash) return; // no change
@@ -490,4 +589,28 @@ export async function reloadCurrencies(): Promise<void> {
 
   // Immediately fetch REST rates for new currencies
   await fetchFxRates();
+}
+
+export function __resetPriceStateForTests(): void {
+  brentPrice = null;
+  gasoilPrice = null;
+  fxRates = {
+    base: FX_BASE,
+    rates: { [FX_BASE]: 1 },
+    changes: {},
+    updatedAt: null,
+  };
+  lastBroadcastHash = '';
+}
+
+export function __applyBrentPriceForTests(next: Omit<CommodityPrice, 'updatedAt'>): void {
+  const updatedPrice = updateCommodityPrice(brentPrice, next);
+  if (updatedPrice === brentPrice) return;
+  brentPrice = updatedPrice;
+  broadcast();
+}
+
+export function __applyFxRatesForTests(next: Omit<FxRates, 'updatedAt'>): void {
+  if (!updateFxRates(next)) return;
+  broadcast();
 }
