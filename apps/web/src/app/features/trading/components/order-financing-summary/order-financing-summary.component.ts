@@ -18,7 +18,7 @@ import type { OrderItemsEconomics } from '../order-items/order-items.component';
         </div>
       </div>
 
-      <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+      <div class="mt-4 grid gap-3 grid-cols-2 lg:grid-cols-3">
         <div class="rounded-xl border border-gray-200 bg-gray-50/70 p-4">
           <p class="text-xs font-medium uppercase tracking-wider text-gray-500">Gross Profit</p>
           <p class="mt-2 text-2xl font-semibold" [class.text-green-600]="economics().totalGrossProfit > 0" [class.text-red-600]="economics().totalGrossProfit < 0">

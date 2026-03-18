@@ -60,23 +60,25 @@ interface Comment {
               class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none resize-none"
             ></textarea>
 
-            <!-- Follow-up date row -->
             <div class="mt-1.5 flex items-center gap-3 flex-wrap">
-              <label class="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  [checked]="showFollowUpInput()"
-                  (change)="toggleFollowUpInput()"
-                  class="h-3.5 w-3.5 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
-                />
-                Follow-up
-              </label>
-              @if (showFollowUpInput()) {
-                <input
-                  type="date"
-                  [(ngModel)]="newFollowUpDate"
-                  class="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
-                />
+              @if (enableFollowUp()) {
+                <!-- Follow-up date row -->
+                <label class="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    [checked]="showFollowUpInput()"
+                    (change)="toggleFollowUpInput()"
+                    class="h-3.5 w-3.5 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                  />
+                  Follow-up
+                </label>
+                @if (showFollowUpInput()) {
+                  <input
+                    type="date"
+                    [(ngModel)]="newFollowUpDate"
+                    class="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
+                  />
+                }
               }
               <div class="ml-auto">
                 <button
@@ -229,6 +231,7 @@ export class CommentsCardComponent implements OnDestroy {
 
   readonly entityType = input.required<string>();
   readonly entityId = input.required<string>();
+  readonly enableFollowUp = input(true);
 
   readonly comments = signal<Comment[]>([]);
   readonly loading = signal(true);

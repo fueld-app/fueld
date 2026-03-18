@@ -1004,15 +1004,6 @@ interface PlattsSuggestionViewModel {
       </div>
     }
 
-    <app-order-financing-summary
-      class="mt-4 block"
-      [baseCurrency]="itemDisplayCurrency()"
-      [financingRateAnnual]="financingRateAnnual()"
-      [financingDays]="financingDays()"
-      [financingDayCountConvention]="financingDayCountConvention()"
-      [economics]="itemEconomics()"
-    />
-
     <!-- ═════════════════════════════════════════════════════════════ -->
     <!--  Editable Items Grid                                         -->
     <!-- ═════════════════════════════════════════════════════════════ -->
@@ -1035,7 +1026,20 @@ interface PlattsSuggestionViewModel {
       (displayCurrencyChange)="itemDisplayCurrency.set($event)"
     />
 
-    <div class="mt-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+    <!-- ═════════════════════════════════════════════════════════════ -->
+    <!--  Financing Summary + Platts Signals (side-by-side on desktop) -->
+    <!-- ═════════════════════════════════════════════════════════════ -->
+    <div class="mt-4 grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2">
+      <app-order-financing-summary
+        class="block"
+        [baseCurrency]="itemDisplayCurrency()"
+        [financingRateAnnual]="financingRateAnnual()"
+        [financingDays]="financingDays()"
+        [financingDayCountConvention]="financingDayCountConvention()"
+        [economics]="itemEconomics()"
+      />
+
+    <div class="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 class="text-sm font-semibold uppercase tracking-wider text-gray-700">Platts Signals</h3>
@@ -1081,7 +1085,7 @@ interface PlattsSuggestionViewModel {
       } @else if (!plattsSuggestionItems().length) {
         <div class="mt-4 text-sm text-gray-500">No Platts suggestions available for the current items yet.</div>
       } @else {
-        <div class="mt-4 grid gap-3 xl:grid-cols-2">
+        <div class="mt-4 grid gap-3 overflow-y-auto">
           @for (item of plattsSuggestionItems(); track item.key) {
             <div class="rounded-xl border border-gray-200 p-4">
               <div class="flex items-start justify-between gap-3">
@@ -1140,6 +1144,7 @@ interface PlattsSuggestionViewModel {
           }
         </div>
       }
+    </div>
     </div>
 
     <!-- Delivery + Payments + Attachments + Comments -->
@@ -1272,7 +1277,7 @@ interface PlattsSuggestionViewModel {
         </div>
         @if (orderId()) {
           <div class="h-full max-h-[520px] overflow-auto">
-            <app-comments-card entityType="order" [entityId]="orderId()" />
+            <app-comments-card entityType="order" [entityId]="orderId()" [enableFollowUp]="false" />
           </div>
         }
         }
