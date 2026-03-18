@@ -39,12 +39,11 @@ export interface PriceSnapshotPayload {
 export interface FxRatesPatch {
   base?: string;
   rates?: Record<string, number>;
-  changes?: Record<string, { change: number; changePercent: number }>;
+  changes?: Record<string, Partial<{ change: number; changePercent: number }>>;
   updatedAt?: string | null;
 }
 
 export interface PricePatchPayload {
-  version: string;
   pricesByTicker?: Record<string, CommodityPrice>;
   removedTickers?: string[];
   fxRates?: FxRatesPatch;
@@ -55,6 +54,46 @@ export interface FxRates {
   rates: Record<string, number>;
   changes: Record<string, { change: number; changePercent: number }>;
   updatedAt: string | null;
+}
+
+interface WireCommodityPrice {
+  n: string;
+  p: number;
+  d: number;
+  dp: number;
+  c: string;
+  u: string;
+}
+
+interface WireFxChange {
+  d?: number;
+  p?: number;
+}
+
+interface WireFxRatesPayload {
+  b: string;
+  r: Record<string, number>;
+  c?: Record<string, WireFxChange>;
+  u: string | null;
+}
+
+interface WireFxRatesPatch {
+  b?: string;
+  r?: Record<string, number>;
+  c?: Record<string, WireFxChange>;
+  u?: string | null;
+}
+
+export interface WirePriceSnapshotPayload {
+  v: string;
+  p: Record<string, WireCommodityPrice>;
+  f?: WireFxRatesPayload;
+}
+
+export interface WirePricePatchPayload {
+  p?: Record<string, WireCommodityPrice>;
+  x?: string[];
+  f?: WireFxRatesPatch;
 }
 
 // ─── Config ──────────────────────────────────────────────────────────
@@ -184,12 +223,22 @@ function buildPricePatchPayload(
       Object.entries(nextFx.rates).filter(([currency, rate]) => prevFx?.rates?.[currency] !== rate),
     );
     const changesPatch = Object.fromEntries(
-      Object.entries(nextFx.changes).filter(([currency, change]) => {
-        const prevChange = prevFx?.changes?.[currency];
-        return !prevChange
-          || prevChange.change !== change.change
-          || prevChange.changePercent !== change.changePercent;
-      }),
+      Object.entries(nextFx.changes)
+        .map(([currency, change]) => {
+          const prevChange = prevFx?.changes?.[currency];
+          const partialChange: Partial<{ change: number; changePercent: number }> = {};
+
+          if (!prevChange || prevChange.change !== change.change) {
+            partialChange.change = change.change;
+          }
+
+          if (!prevChange || prevChange.changePercent !== change.changePercent) {
+            partialChange.changePercent = change.changePercent;
+          }
+
+          return Object.keys(partialChange).length > 0 ? [currency, partialChange] : null;
+        })
+        .filter((entry): entry is [string, Partial<{ change: number; changePercent: number }>] => entry !== null),
     );
 
     if (!prevFx || prevFx.base !== nextFx.base || Object.keys(ratesPatch).length > 0 || Object.keys(changesPatch).length > 0) {
@@ -207,10 +256,80 @@ function buildPricePatchPayload(
   }
 
   return {
-    version: next.version,
     pricesByTicker: Object.keys(pricesByTicker).length > 0 ? pricesByTicker : undefined,
     removedTickers: removedTickers.length > 0 ? removedTickers : undefined,
     fxRates: fxPatch,
+  };
+}
+
+function encodeCommodityPrice(price: CommodityPrice): WireCommodityPrice {
+  return {
+    n: price.name,
+    p: price.price,
+    d: price.change,
+    dp: price.changePercent,
+    c: price.currency,
+    u: price.updatedAt,
+  };
+}
+
+function encodeFxRatesPayload(payload: FxRates): WireFxRatesPayload {
+  const changes = Object.fromEntries(
+    Object.entries(payload.changes).map(([currency, change]) => [
+      currency,
+      {
+        d: change.change,
+        p: change.changePercent,
+      },
+    ]),
+  );
+
+  return {
+    b: payload.base,
+    r: payload.rates,
+    c: Object.keys(changes).length > 0 ? changes : undefined,
+    u: payload.updatedAt,
+  };
+}
+
+function encodeFxRatesPatch(payload: FxRatesPatch): WireFxRatesPatch {
+  const changes = Object.fromEntries(
+    Object.entries(payload.changes ?? {}).map(([currency, change]) => [
+      currency,
+      {
+        ...(change.change !== undefined ? { d: change.change } : {}),
+        ...(change.changePercent !== undefined ? { p: change.changePercent } : {}),
+      },
+    ]),
+  );
+
+  return {
+    b: payload.base,
+    r: payload.rates,
+    c: Object.keys(changes).length > 0 ? changes : undefined,
+    u: payload.updatedAt,
+  };
+}
+
+function encodePriceSnapshotPayload(payload: PriceSnapshotPayload): WirePriceSnapshotPayload {
+  return {
+    v: payload.version,
+    p: Object.fromEntries(
+      Object.entries(payload.pricesByTicker).map(([ticker, price]) => [ticker, encodeCommodityPrice(price)]),
+    ),
+    f: payload.fxRates ? encodeFxRatesPayload(payload.fxRates) : undefined,
+  };
+}
+
+function encodePricePatchPayload(payload: PricePatchPayload): WirePricePatchPayload {
+  return {
+    p: payload.pricesByTicker
+      ? Object.fromEntries(
+          Object.entries(payload.pricesByTicker).map(([ticker, price]) => [ticker, encodeCommodityPrice(price)]),
+        )
+      : undefined,
+    x: payload.removedTickers,
+    f: payload.fxRates ? encodeFxRatesPatch(payload.fxRates) : undefined,
   };
 }
 
@@ -613,7 +732,7 @@ function broadcast(): void {
 
   if (!lastBroadcastSnapshot) {
     lastBroadcastSnapshot = snapshot;
-    broadcastToAll({ type: 'prices:snapshot', data: snapshot });
+    broadcastToAll({ type: 'prices:snapshot', data: encodePriceSnapshotPayload(snapshot) });
     return;
   }
 
@@ -621,7 +740,7 @@ function broadcast(): void {
   if (!patch) return;
 
   lastBroadcastSnapshot = snapshot;
-  broadcastToAll({ type: 'prices:patch', data: patch });
+  broadcastToAll({ type: 'prices:patch', data: encodePricePatchPayload(patch) });
 }
 
 function round2(n: number): number {
@@ -673,6 +792,10 @@ export function getLatestPricePayload(): PricesPayload {
 
 export function getLatestPriceSnapshot(): PriceSnapshotPayload {
   return buildPriceSnapshotPayload();
+}
+
+export function getLatestPriceSnapshotForWire(): WirePriceSnapshotPayload {
+  return encodePriceSnapshotPayload(buildPriceSnapshotPayload());
 }
 
 export function getFxRate(currency: string): number {

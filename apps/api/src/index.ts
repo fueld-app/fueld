@@ -43,7 +43,7 @@ import {
 import { getNearbyVessels, getNearbyVesselPositions, syncPlaceFromSeasearcher } from './modules/lloyds/lli.service';
 import { syncVesselFromSeasearcher } from './modules/vessels/vessel.service';
 import { syncCompanyFromSeasearcher } from './modules/companies/company.service';
-import { startPricePolling, getLatestPriceSnapshot } from './modules/prices/price.service';
+import { startPricePolling, getLatestPriceSnapshot, getLatestPriceSnapshotForWire } from './modules/prices/price.service';
 import { jwtAccessPlugin } from './modules/auth/jwt.setup';
 import { db } from './db';
 import { users } from './db/schema';
@@ -606,11 +606,16 @@ export async function createApp(options: CreateAppOptions = {}) {
 
             case 'get-prices': {
               const payload = getLatestPriceSnapshot();
+              const knownVersion = typeof data.k === 'string'
+                ? data.k
+                : typeof data.knownVersion === 'string'
+                  ? data.knownVersion
+                  : undefined;
               if (
                 (Object.keys(payload.pricesByTicker).length > 0 || payload.fxRates)
-                && data.knownVersion !== payload.version
+                && knownVersion !== payload.version
               ) {
-                ws.send(JSON.stringify({ type: 'prices:snapshot', data: payload }));
+                ws.send(JSON.stringify({ type: 'prices:snapshot', data: getLatestPriceSnapshotForWire() }));
               }
               break;
             }

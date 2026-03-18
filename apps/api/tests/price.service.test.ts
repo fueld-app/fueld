@@ -52,7 +52,7 @@ describe('price.service basics', () => {
     expect((broadcastToAll.mock.calls as unknown[][])[0]?.[0]).toMatchObject({
       type: 'prices:snapshot',
       data: {
-        version: snapshot.version,
+        v: snapshot.version,
       },
     });
     expect(snapshot.version.length > 0).toBe(true);
@@ -103,17 +103,58 @@ describe('price.service basics', () => {
     expect((broadcastToAll.mock.calls as unknown[][])[1]?.[0]).toMatchObject({
       type: 'prices:patch',
       data: {
-        version: snapshot.version,
-        pricesByTicker: {
+        p: {
           'BZ=F': {
-            ticker: 'BZ=F',
-            price: 104.21,
+            p: 104.21,
           },
         },
       },
     });
     expect(snapshot.version.length > 0).toBe(true);
     expect(snapshot.version.length <= 16).toBe(true);
+  });
+
+  test('emits only changed FX subfields in patches', () => {
+    priceService.__resetPriceStateForTests();
+    broadcastToAll.mockClear();
+
+    priceService.__applyFxRatesForTests({
+      base: 'USD',
+      rates: { USD: 1, EUR: 0.92 },
+      changes: { EUR: { change: 0, changePercent: -0.41 } },
+    });
+
+    priceService.__applyFxRatesForTests({
+      base: 'USD',
+      rates: { USD: 1, EUR: 0.92 },
+      changes: { EUR: { change: 0, changePercent: -0.42 } },
+    });
+
+    expect(broadcastToAll).toHaveBeenCalledTimes(2);
+    expect((broadcastToAll.mock.calls as unknown[][])[1]?.[0]).toMatchObject({
+      type: 'prices:patch',
+      data: {
+        f: {
+          c: {
+            EUR: {
+              p: -0.42,
+            },
+          },
+        },
+      },
+    });
+    expect((broadcastToAll.mock.calls as unknown[][])[1]?.[0]).not.toMatchObject({
+      data: {
+        version: expect.anything(),
+        f: {
+          c: {
+            EUR: {
+              d: 0,
+            },
+          },
+        },
+      },
+    });
   });
 
   test('latest payload always includes fx rates object and price list', () => {

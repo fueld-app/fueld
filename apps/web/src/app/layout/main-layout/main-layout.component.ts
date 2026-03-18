@@ -54,14 +54,119 @@ interface PriceSnapshotPayload {
 }
 
 interface PricePatchPayload {
-  version: string;
   pricesByTicker?: Record<string, CommodityPrice>;
   removedTickers?: string[];
   fxRates?: {
     base?: string;
     rates?: Record<string, number>;
-    changes?: Record<string, { change: number; changePercent: number }>;
+    changes?: Record<string, Partial<{ change: number; changePercent: number }>>;
     updatedAt?: string | null;
+  };
+}
+
+interface WireCommodityPrice {
+  n: string;
+  p: number;
+  d: number;
+  dp: number;
+  c: string;
+  u: string;
+}
+
+interface WireFxRatesPayload {
+  b: string;
+  r: Record<string, number>;
+  c?: Record<string, { d?: number; p?: number }>;
+  u: string | null;
+}
+
+interface WirePriceSnapshotPayload {
+  v: string;
+  p: Record<string, WireCommodityPrice>;
+  f?: WireFxRatesPayload;
+}
+
+interface WirePricePatchPayload {
+  p?: Record<string, WireCommodityPrice>;
+  x?: string[];
+  f?: {
+    b?: string;
+    r?: Record<string, number>;
+    c?: Record<string, { d?: number; p?: number }>;
+    u?: string | null;
+  };
+}
+
+function decodeCommodityPrices(pricesByTicker: Record<string, WireCommodityPrice> | undefined): Record<string, CommodityPrice> {
+  if (!pricesByTicker) return {};
+
+  return Object.fromEntries(
+    Object.entries(pricesByTicker).map(([ticker, price]) => [
+      ticker,
+      {
+        ticker,
+        name: price.n,
+        price: price.p,
+        change: price.d,
+        changePercent: price.dp,
+        currency: price.c,
+        updatedAt: price.u,
+      },
+    ]),
+  );
+}
+
+function decodeFxRatesPayload(fxRates: WireFxRatesPayload | undefined): FxRatesPayload | undefined {
+  if (!fxRates) return undefined;
+
+  return {
+    base: fxRates.b,
+    rates: fxRates.r,
+    changes: fxRates.c
+      ? Object.fromEntries(
+          Object.entries(fxRates.c).map(([currency, change]) => [
+            currency,
+            {
+              change: change.d ?? 0,
+              changePercent: change.p ?? 0,
+            },
+          ]),
+        )
+      : undefined,
+    updatedAt: fxRates.u,
+  };
+}
+
+function decodePriceSnapshotPayload(data: WirePriceSnapshotPayload): PriceSnapshotPayload {
+  return {
+    version: data.v,
+    pricesByTicker: decodeCommodityPrices(data.p),
+    fxRates: decodeFxRatesPayload(data.f),
+  };
+}
+
+function decodePricePatchPayload(data: WirePricePatchPayload): PricePatchPayload {
+  return {
+    pricesByTicker: data.p ? decodeCommodityPrices(data.p) : undefined,
+    removedTickers: data.x,
+    fxRates: data.f
+      ? {
+          base: data.f.b,
+          rates: data.f.r,
+          changes: data.f.c
+            ? Object.fromEntries(
+                Object.entries(data.f.c).map(([currency, change]) => [
+                  currency,
+                  {
+                    ...(change.d !== undefined ? { change: change.d } : {}),
+                    ...(change.p !== undefined ? { changePercent: change.p } : {}),
+                  },
+                ]),
+              )
+            : undefined,
+          updatedAt: data.f.u,
+        }
+      : undefined,
   };
 }
 
@@ -742,11 +847,11 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
     // Subscribe to commodity price updates from WebSocket
     const priceSnapshotSub = this.wsService
-      .on<PriceSnapshotPayload>('prices:snapshot')
-      .subscribe((data) => this.applyPriceSnapshot(data));
+      .on<WirePriceSnapshotPayload>('prices:snapshot')
+      .subscribe((data) => this.applyPriceSnapshot(decodePriceSnapshotPayload(data)));
     const pricePatchSub = this.wsService
-      .on<PricePatchPayload>('prices:patch')
-      .subscribe((data) => this.applyPricePatch(data));
+      .on<WirePricePatchPayload>('prices:patch')
+      .subscribe((data) => this.applyPricePatch(decodePricePatchPayload(data)));
     const priceConnectedSub = this.wsService
       .onRaw('connected')
       .subscribe(() => {
@@ -840,7 +945,6 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   }
 
   private applyPricePatch(data: PricePatchPayload): void {
-    this.priceVersion.set(data.version);
     if (data.pricesByTicker || data.removedTickers?.length) {
       const nextPrices = { ...this.commodityPriceMap() };
 
@@ -859,6 +963,15 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
         changes: {},
         updatedAt: null,
       };
+      const nextChanges = { ...(currentFx.changes ?? {}) };
+
+      for (const [currency, changePatch] of Object.entries(data.fxRates.changes ?? {})) {
+        const previousChange = nextChanges[currency] ?? { change: 0, changePercent: 0 };
+        nextChanges[currency] = {
+          change: changePatch.change ?? previousChange.change,
+          changePercent: changePatch.changePercent ?? previousChange.changePercent,
+        };
+      }
 
       this.applyFxRatesState({
         base: data.fxRates.base ?? currentFx.base,
@@ -866,10 +979,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
           ...currentFx.rates,
           ...(data.fxRates.rates ?? {}),
         },
-        changes: {
-          ...(currentFx.changes ?? {}),
-          ...(data.fxRates.changes ?? {}),
-        },
+        changes: nextChanges,
         updatedAt: data.fxRates.updatedAt ?? currentFx.updatedAt,
       });
     }
@@ -878,7 +988,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   private requestLatestPrices(): void {
     this.wsService.send({
       type: 'get-prices',
-      knownVersion: this.priceVersion() ?? undefined,
+      k: this.priceVersion() ?? undefined,
     });
   }
 
