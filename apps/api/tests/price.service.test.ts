@@ -103,13 +103,23 @@ describe('price.service basics', () => {
     expect((broadcastToAll.mock.calls as unknown[][])[1]?.[0]).toMatchObject({
       type: 'prices:patch',
       data: {
+        baseVersion: expect.any(String),
         version: snapshot.version,
-        pricesByTicker: {
-          'BZ=F': {
-            ticker: 'BZ=F',
-            price: 104.21,
+        operations: [
+          {
+            op: 'replace',
+            path: '/version',
+            value: snapshot.version,
           },
-        },
+          {
+            op: 'replace',
+            path: '/pricesByTicker/BZ=F',
+            value: expect.objectContaining({
+              ticker: 'BZ=F',
+              price: 104.21,
+            }),
+          },
+        ],
       },
     });
     expect(snapshot.version.length > 0).toBe(true);

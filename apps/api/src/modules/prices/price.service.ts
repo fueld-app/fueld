@@ -36,18 +36,16 @@ export interface PriceSnapshotPayload {
   fxRates?: FxRates;
 }
 
-export interface FxRatesPatch {
-  base?: string;
-  rates?: Record<string, number>;
-  changes?: Record<string, { change: number; changePercent: number }>;
-  updatedAt?: string | null;
+export interface JsonPatchOperation {
+  op: 'add' | 'remove' | 'replace';
+  path: string;
+  value?: unknown;
 }
 
 export interface PricePatchPayload {
+  baseVersion: string;
   version: string;
-  pricesByTicker?: Record<string, CommodityPrice>;
-  removedTickers?: string[];
-  fxRates?: FxRatesPatch;
+  operations: JsonPatchOperation[];
 }
 
 export interface FxRates {
@@ -164,54 +162,90 @@ function buildPricePatchPayload(
   previous: PriceSnapshotPayload,
   next: PriceSnapshotPayload,
 ): PricePatchPayload | null {
-  const pricesByTicker: Record<string, CommodityPrice> = {};
-  const removedTickers = Object.keys(previous.pricesByTicker).filter(
-    (ticker) => !next.pricesByTicker[ticker],
-  );
+  const operations: JsonPatchOperation[] = [
+    { op: 'replace', path: '/version', value: next.version },
+  ];
+
+  for (const ticker of Object.keys(previous.pricesByTicker)) {
+    if (!next.pricesByTicker[ticker]) {
+      operations.push({ op: 'remove', path: `/pricesByTicker/${escapeJsonPointer(ticker)}` });
+    }
+  }
 
   for (const [ticker, price] of Object.entries(next.pricesByTicker)) {
     const prev = previous.pricesByTicker[ticker];
     if (!prev || !isSameCommodityPrice(prev, price)) {
-      pricesByTicker[ticker] = price;
+      operations.push({
+        op: prev ? 'replace' : 'add',
+        path: `/pricesByTicker/${escapeJsonPointer(ticker)}`,
+        value: price,
+      });
     }
   }
 
-  let fxPatch: FxRatesPatch | undefined;
   const prevFx = previous.fxRates;
   const nextFx = next.fxRates;
-  if (nextFx) {
-    const ratesPatch = Object.fromEntries(
-      Object.entries(nextFx.rates).filter(([currency, rate]) => prevFx?.rates?.[currency] !== rate),
-    );
-    const changesPatch = Object.fromEntries(
-      Object.entries(nextFx.changes).filter(([currency, change]) => {
-        const prevChange = prevFx?.changes?.[currency];
-        return !prevChange
-          || prevChange.change !== change.change
-          || prevChange.changePercent !== change.changePercent;
-      }),
-    );
+  if (prevFx && !nextFx) {
+    operations.push({ op: 'remove', path: '/fxRates' });
+  } else if (nextFx) {
+    if (!prevFx) {
+      operations.push({ op: 'add', path: '/fxRates', value: nextFx });
+    } else {
+      if (prevFx.base !== nextFx.base) {
+        operations.push({ op: 'replace', path: '/fxRates/base', value: nextFx.base });
+      }
 
-    if (!prevFx || prevFx.base !== nextFx.base || Object.keys(ratesPatch).length > 0 || Object.keys(changesPatch).length > 0) {
-      fxPatch = {
-        base: prevFx?.base !== nextFx.base ? nextFx.base : undefined,
-        rates: Object.keys(ratesPatch).length > 0 ? ratesPatch : undefined,
-        changes: Object.keys(changesPatch).length > 0 ? changesPatch : undefined,
-        updatedAt: nextFx.updatedAt,
-      };
+      for (const currency of Object.keys(prevFx.rates)) {
+        if (!(currency in nextFx.rates)) {
+          operations.push({ op: 'remove', path: `/fxRates/rates/${escapeJsonPointer(currency)}` });
+        }
+      }
+
+      for (const [currency, rate] of Object.entries(nextFx.rates)) {
+        if (!(currency in prevFx.rates)) {
+          operations.push({ op: 'add', path: `/fxRates/rates/${escapeJsonPointer(currency)}`, value: rate });
+        } else if (prevFx.rates[currency] !== rate) {
+          operations.push({ op: 'replace', path: `/fxRates/rates/${escapeJsonPointer(currency)}`, value: rate });
+        }
+      }
+
+      for (const currency of Object.keys(prevFx.changes)) {
+        if (!(currency in nextFx.changes)) {
+          operations.push({ op: 'remove', path: `/fxRates/changes/${escapeJsonPointer(currency)}` });
+        }
+      }
+
+      for (const [currency, change] of Object.entries(nextFx.changes)) {
+        const prevChange = prevFx.changes[currency];
+        if (!prevChange) {
+          operations.push({ op: 'add', path: `/fxRates/changes/${escapeJsonPointer(currency)}`, value: change });
+        } else if (
+          prevChange.change !== change.change
+          || prevChange.changePercent !== change.changePercent
+        ) {
+          operations.push({ op: 'replace', path: `/fxRates/changes/${escapeJsonPointer(currency)}`, value: change });
+        }
+      }
+
+      if (prevFx.updatedAt !== nextFx.updatedAt) {
+        operations.push({ op: 'replace', path: '/fxRates/updatedAt', value: nextFx.updatedAt });
+      }
     }
   }
 
-  if (Object.keys(pricesByTicker).length === 0 && removedTickers.length === 0 && !fxPatch) {
+  if (operations.length === 1) {
     return null;
   }
 
   return {
+    baseVersion: previous.version,
     version: next.version,
-    pricesByTicker: Object.keys(pricesByTicker).length > 0 ? pricesByTicker : undefined,
-    removedTickers: removedTickers.length > 0 ? removedTickers : undefined,
-    fxRates: fxPatch,
+    operations,
   };
+}
+
+function escapeJsonPointer(value: string): string {
+  return value.replace(/~/g, '~0').replace(/\//g, '~1');
 }
 
 function isSameCommodityPrice(
