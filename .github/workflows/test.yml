@@ -304,7 +304,6 @@ jobs:
           done
 
           wait "$build_pid"
-          strip app-release 2>/dev/null || true
           test -f app-release
           gzip -9 -c app-release > /tmp/api-release.gz
           ls -lh app-release /tmp/api-release.gz
