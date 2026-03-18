@@ -10,6 +10,7 @@
 
 import { broadcastToAll } from '../activity/session-tracker';
 import { getCurrencySettings } from '../admin/settings.service';
+import { createHash } from 'node:crypto';
 import * as protobuf from 'protobufjs';
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -132,13 +133,15 @@ function buildSnapshotVersion(data: {
     .map(([currency, change]) => `${currency}:${change.change}:${change.changePercent}`)
     .join('|');
 
-  return [
+  const fingerprint = [
     priceFingerprint,
     data.fxRates?.base ?? '',
     fxRatesFingerprint,
     fxChangesFingerprint,
     data.fxRates?.updatedAt ?? '',
   ].join('||');
+
+  return createHash('sha256').update(fingerprint).digest('base64url').slice(0, 16);
 }
 
 function buildPriceSnapshotPayload(): PriceSnapshotPayload {

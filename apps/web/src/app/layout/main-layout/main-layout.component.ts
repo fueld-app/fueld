@@ -730,10 +730,12 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     this.priceSub.add(pricePatchSub);
     this.priceSub.add(priceConnectedSub);
 
-    this.wsService.send({
-      type: 'get-prices',
-      knownVersion: this.priceVersion() ?? undefined,
-    });
+    if (this.wsService.authenticated()) {
+      this.wsService.send({
+        type: 'get-prices',
+        knownVersion: this.priceVersion() ?? undefined,
+      });
+    }
 
     // Send presence on every route navigation (with slight delay for TitleStrategy)
     this.routerSub = this.router.events
