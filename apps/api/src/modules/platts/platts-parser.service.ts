@@ -1,5 +1,5 @@
 import { basename } from 'node:path';
-import { PDFParse } from 'pdf-parse';
+import pdfParse from 'pdf-parse/lib/pdf-parse.js';
 
 export const PLATTS_PARSER_VERSION = '2026-03-18a';
 
@@ -259,13 +259,8 @@ function extractMocDetails(rawText: string): ParsedPlattsEntry {
 }
 
 async function extractPdfText(pdfBuffer: Buffer): Promise<string> {
-  const parser = new PDFParse({ data: pdfBuffer });
-  try {
-    const result = await parser.getText();
-    return result.text ?? '';
-  } finally {
-    await parser.destroy();
-  }
+  const result = await pdfParse(pdfBuffer);
+  return result.text ?? '';
 }
 
 export function parsePlattsText(text: string, sourceFileName: string): ParsedPlattsReport {
