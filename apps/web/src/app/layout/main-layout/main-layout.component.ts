@@ -47,6 +47,24 @@ interface FxRatesPayload {
   updatedAt: string | null;
 }
 
+interface PriceSnapshotPayload {
+  version: string;
+  pricesByTicker: Record<string, CommodityPrice>;
+  fxRates?: FxRatesPayload;
+}
+
+interface PricePatchPayload {
+  version: string;
+  pricesByTicker?: Record<string, CommodityPrice>;
+  removedTickers?: string[];
+  fxRates?: {
+    base?: string;
+    rates?: Record<string, number>;
+    changes?: Record<string, { change: number; changePercent: number }>;
+    updatedAt?: string | null;
+  };
+}
+
 interface SearchResult {
   id: string;
   name: string;
@@ -648,7 +666,12 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   private readonly newInquiryModal = inject(NewInquiryModalService);
 
   readonly sidebarOpen = signal(false);
-  readonly commodityPrices = signal<CommodityPrice[]>([]);
+  private readonly commodityPriceMap = signal<Record<string, CommodityPrice>>({});
+  readonly commodityPrices = computed(() =>
+    Object.values(this.commodityPriceMap()).sort((left, right) => left.name.localeCompare(right.name)),
+  );
+  private readonly fxRatesState = signal<FxRatesPayload | null>(null);
+  private readonly priceVersion = signal<string | null>(null);
   readonly eurRate = signal<number | null>(null);
   readonly eurChange = signal<number>(0);
   readonly eurChangePercent = signal<number>(0);
@@ -688,29 +711,29 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     this.pricesTickTimer = setInterval(() => this.pricesTick.update((n) => n + 1), 30_000);
 
     // Subscribe to commodity price updates from WebSocket
-    this.priceSub = this.wsService
-      .on<{ prices: CommodityPrice[]; fxRates?: FxRatesPayload }>('prices')
-      .subscribe((data) => {
-        this.commodityPrices.set(data.prices);
-
-        const eur = data.fxRates?.rates?.['EUR'];
-        if (typeof eur === 'number' && eur !== 0) {
-          this.eurRate.set(1 / eur);
-          const eurChanges = data.fxRates?.changes?.['EUR'];
-          // EUR rate change is inverted since we display USD/EUR (= 1/EUR)
-          const eurPrevClose = eur - (eurChanges?.change ?? 0);
-          const usdEurNow = 1 / eur;
-          const usdEurPrev = eurPrevClose !== 0 ? 1 / eurPrevClose : usdEurNow;
-          this.eurChange.set(Math.round((usdEurNow - usdEurPrev) * 100) / 100);
-          this.eurChangePercent.set(usdEurPrev !== 0 ? Math.round(((usdEurNow - usdEurPrev) / usdEurPrev) * 10000) / 100 : 0);
-          this.fxUpdatedAt.set(data.fxRates?.updatedAt ?? null);
-        } else {
-          this.eurRate.set(null);
-          this.eurChange.set(0);
-          this.eurChangePercent.set(0);
-          this.fxUpdatedAt.set(null);
-        }
+    const priceSnapshotSub = this.wsService
+      .on<PriceSnapshotPayload>('prices:snapshot')
+      .subscribe((data) => this.applyPriceSnapshot(data));
+    const pricePatchSub = this.wsService
+      .on<PricePatchPayload>('prices:patch')
+      .subscribe((data) => this.applyPricePatch(data));
+    const priceConnectedSub = this.wsService
+      .onRaw('connected')
+      .subscribe(() => {
+        this.wsService.send({
+          type: 'get-prices',
+          knownVersion: this.priceVersion() ?? undefined,
+        });
       });
+    this.priceSub = new Subscription();
+    this.priceSub.add(priceSnapshotSub);
+    this.priceSub.add(pricePatchSub);
+    this.priceSub.add(priceConnectedSub);
+
+    this.wsService.send({
+      type: 'get-prices',
+      knownVersion: this.priceVersion() ?? undefined,
+    });
 
     // Send presence on every route navigation (with slight delay for TitleStrategy)
     this.routerSub = this.router.events
@@ -782,6 +805,70 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     if (this.screenshotHandler) {
       document.removeEventListener('keydown', this.screenshotHandler as EventListener);
     }
+  }
+
+  private applyPriceSnapshot(data: PriceSnapshotPayload): void {
+    this.priceVersion.set(data.version);
+    this.commodityPriceMap.set(data.pricesByTicker ?? {});
+    this.applyFxRatesState(data.fxRates ?? null);
+  }
+
+  private applyPricePatch(data: PricePatchPayload): void {
+    this.priceVersion.set(data.version);
+    if (data.pricesByTicker || data.removedTickers?.length) {
+      const nextPrices = { ...this.commodityPriceMap() };
+
+      for (const ticker of data.removedTickers ?? []) {
+        delete nextPrices[ticker];
+      }
+
+      Object.assign(nextPrices, data.pricesByTicker ?? {});
+      this.commodityPriceMap.set(nextPrices);
+    }
+
+    if (data.fxRates) {
+      const currentFx = this.fxRatesState() ?? {
+        base: 'USD',
+        rates: { USD: 1 },
+        changes: {},
+        updatedAt: null,
+      };
+
+      this.applyFxRatesState({
+        base: data.fxRates.base ?? currentFx.base,
+        rates: {
+          ...currentFx.rates,
+          ...(data.fxRates.rates ?? {}),
+        },
+        changes: {
+          ...(currentFx.changes ?? {}),
+          ...(data.fxRates.changes ?? {}),
+        },
+        updatedAt: data.fxRates.updatedAt ?? currentFx.updatedAt,
+      });
+    }
+  }
+
+  private applyFxRatesState(fxRates: FxRatesPayload | null): void {
+    this.fxRatesState.set(fxRates);
+
+    const eur = fxRates?.rates?.['EUR'];
+    if (typeof eur === 'number' && eur !== 0) {
+      this.eurRate.set(1 / eur);
+      const eurChanges = fxRates?.changes?.['EUR'];
+      const eurPrevClose = eur - (eurChanges?.change ?? 0);
+      const usdEurNow = 1 / eur;
+      const usdEurPrev = eurPrevClose !== 0 ? 1 / eurPrevClose : usdEurNow;
+      this.eurChange.set(Math.round((usdEurNow - usdEurPrev) * 100) / 100);
+      this.eurChangePercent.set(usdEurPrev !== 0 ? Math.round(((usdEurNow - usdEurPrev) / usdEurPrev) * 10000) / 100 : 0);
+      this.fxUpdatedAt.set(fxRates?.updatedAt ?? null);
+      return;
+    }
+
+    this.eurRate.set(null);
+    this.eurChange.set(0);
+    this.eurChangePercent.set(0);
+    this.fxUpdatedAt.set(null);
   }
 
   reloadForUpdate(): void {

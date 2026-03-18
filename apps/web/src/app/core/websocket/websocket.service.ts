@@ -161,6 +161,7 @@ export class WebSocketService {
         if (msg.type === 'connected') {
           this.authenticated.set(true);
           console.log('[WS] Authenticated');
+          this.messages$.next(msg);
           this.flushPending();
           return;
         }

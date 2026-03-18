@@ -29,6 +29,26 @@ export interface PricesPayload {
   fxRates?: FxRates;
 }
 
+export interface PriceSnapshotPayload {
+  version: string;
+  pricesByTicker: Record<string, CommodityPrice>;
+  fxRates?: FxRates;
+}
+
+export interface FxRatesPatch {
+  base?: string;
+  rates?: Record<string, number>;
+  changes?: Record<string, { change: number; changePercent: number }>;
+  updatedAt?: string | null;
+}
+
+export interface PricePatchPayload {
+  version: string;
+  pricesByTicker?: Record<string, CommodityPrice>;
+  removedTickers?: string[];
+  fxRates?: FxRatesPatch;
+}
+
 export interface FxRates {
   base: string;
   rates: Record<string, number>;
@@ -93,6 +113,103 @@ let yahooWs: WebSocket | null = null;
 let PricingData: protobuf.Type | null = null;
 let yahooReconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let brentStaleTimer: ReturnType<typeof setInterval> | null = null;
+let lastBroadcastSnapshot: PriceSnapshotPayload | null = null;
+
+function buildSnapshotVersion(data: {
+  pricesByTicker: Record<string, CommodityPrice>;
+  fxRates?: FxRates;
+}): string {
+  const priceFingerprint = Object.entries(data.pricesByTicker)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([ticker, price]) => `${ticker}:${price.price}:${price.change}:${price.changePercent}:${price.currency}:${price.updatedAt}`)
+    .join('|');
+  const fxRatesFingerprint = Object.entries(data.fxRates?.rates ?? {})
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([currency, rate]) => `${currency}:${rate}`)
+    .join('|');
+  const fxChangesFingerprint = Object.entries(data.fxRates?.changes ?? {})
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([currency, change]) => `${currency}:${change.change}:${change.changePercent}`)
+    .join('|');
+
+  return [
+    priceFingerprint,
+    data.fxRates?.base ?? '',
+    fxRatesFingerprint,
+    fxChangesFingerprint,
+    data.fxRates?.updatedAt ?? '',
+  ].join('||');
+}
+
+function buildPriceSnapshotPayload(): PriceSnapshotPayload {
+  const pricesByTicker = Object.fromEntries(
+    getLatestPrices().map((price) => [price.ticker, price]),
+  );
+
+  const snapshotCore = {
+    pricesByTicker,
+    fxRates,
+  };
+
+  return {
+    version: buildSnapshotVersion(snapshotCore),
+    ...snapshotCore,
+  };
+}
+
+function buildPricePatchPayload(
+  previous: PriceSnapshotPayload,
+  next: PriceSnapshotPayload,
+): PricePatchPayload | null {
+  const pricesByTicker: Record<string, CommodityPrice> = {};
+  const removedTickers = Object.keys(previous.pricesByTicker).filter(
+    (ticker) => !next.pricesByTicker[ticker],
+  );
+
+  for (const [ticker, price] of Object.entries(next.pricesByTicker)) {
+    const prev = previous.pricesByTicker[ticker];
+    if (!prev || !isSameCommodityPrice(prev, price)) {
+      pricesByTicker[ticker] = price;
+    }
+  }
+
+  let fxPatch: FxRatesPatch | undefined;
+  const prevFx = previous.fxRates;
+  const nextFx = next.fxRates;
+  if (nextFx) {
+    const ratesPatch = Object.fromEntries(
+      Object.entries(nextFx.rates).filter(([currency, rate]) => prevFx?.rates?.[currency] !== rate),
+    );
+    const changesPatch = Object.fromEntries(
+      Object.entries(nextFx.changes).filter(([currency, change]) => {
+        const prevChange = prevFx?.changes?.[currency];
+        return !prevChange
+          || prevChange.change !== change.change
+          || prevChange.changePercent !== change.changePercent;
+      }),
+    );
+
+    if (!prevFx || prevFx.base !== nextFx.base || Object.keys(ratesPatch).length > 0 || Object.keys(changesPatch).length > 0) {
+      fxPatch = {
+        base: prevFx?.base !== nextFx.base ? nextFx.base : undefined,
+        rates: Object.keys(ratesPatch).length > 0 ? ratesPatch : undefined,
+        changes: Object.keys(changesPatch).length > 0 ? changesPatch : undefined,
+        updatedAt: nextFx.updatedAt,
+      };
+    }
+  }
+
+  if (Object.keys(pricesByTicker).length === 0 && removedTickers.length === 0 && !fxPatch) {
+    return null;
+  }
+
+  return {
+    version: next.version,
+    pricesByTicker: Object.keys(pricesByTicker).length > 0 ? pricesByTicker : undefined,
+    removedTickers: removedTickers.length > 0 ? removedTickers : undefined,
+    fxRates: fxPatch,
+  };
+}
 
 function isSameCommodityPrice(
   current: CommodityPrice | null,
@@ -487,35 +604,21 @@ async function fetchYahooChart(ticker: string, name: string): Promise<CommodityP
 
 // ─── Broadcast ───────────────────────────────────────────────────────
 
-// ─── Broadcast (deduplicated) ────────────────────────────────────────
-
-let lastBroadcastHash = '';
-
 function broadcast(): void {
-  const payload = getLatestPricePayload();
-  if (payload.prices.length === 0 && !payload.fxRates) return;
+  const snapshot = buildPriceSnapshotPayload();
+  if (Object.keys(snapshot.pricesByTicker).length === 0 && !snapshot.fxRates) return;
 
-  // Build a fingerprint from the actual data values (including updatedAt for freshness)
-  const fingerprint = payload.prices
-    .map((p) => `${p.ticker}:${p.price}:${p.change}:${p.changePercent}:${p.currency}`)
-    .join('|')
-    + '||'
-    + (payload.fxRates?.base ?? '')
-    + '||'
-    + Object.entries(payload.fxRates?.rates ?? {})
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([k, v]) => `${k}:${v}`)
-      .join('|')
-    + '||'
-    + Object.entries(payload.fxRates?.changes ?? {})
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([k, v]) => `${k}:${v.change}:${v.changePercent}`)
-      .join('|');
+  if (!lastBroadcastSnapshot) {
+    lastBroadcastSnapshot = snapshot;
+    broadcastToAll({ type: 'prices:snapshot', data: snapshot });
+    return;
+  }
 
-  if (fingerprint === lastBroadcastHash) return; // no change
-  lastBroadcastHash = fingerprint;
+  const patch = buildPricePatchPayload(lastBroadcastSnapshot, snapshot);
+  if (!patch) return;
 
-  broadcastToAll({ type: 'prices', data: payload });
+  lastBroadcastSnapshot = snapshot;
+  broadcastToAll({ type: 'prices:patch', data: patch });
 }
 
 function round2(n: number): number {
@@ -565,6 +668,10 @@ export function getLatestPricePayload(): PricesPayload {
   };
 }
 
+export function getLatestPriceSnapshot(): PriceSnapshotPayload {
+  return buildPriceSnapshotPayload();
+}
+
 export function getFxRate(currency: string): number {
   const code = currency.toUpperCase();
   if (code === FX_BASE) return 1;
@@ -600,7 +707,7 @@ export function __resetPriceStateForTests(): void {
     changes: {},
     updatedAt: null,
   };
-  lastBroadcastHash = '';
+  lastBroadcastSnapshot = null;
 }
 
 export function __applyBrentPriceForTests(next: Omit<CommodityPrice, 'updatedAt'>): void {

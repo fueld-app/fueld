@@ -47,6 +47,12 @@ describe('price.service basics', () => {
     });
 
     expect(broadcastToAll).toHaveBeenCalledTimes(1);
+    expect((broadcastToAll.mock.calls as unknown[][])[0]?.[0]).toMatchObject({
+      type: 'prices:snapshot',
+      data: {
+        version: expect.any(String),
+      },
+    });
   });
 
   test('deduplicates identical FX updates', () => {
@@ -65,10 +71,47 @@ describe('price.service basics', () => {
     expect(broadcastToAll).toHaveBeenCalledTimes(1);
   });
 
+  test('emits a patch with only changed Brent ticker fields after initial snapshot', () => {
+    priceService.__resetPriceStateForTests();
+    broadcastToAll.mockClear();
+
+    priceService.__applyBrentPriceForTests({
+      ticker: 'BZ=F',
+      name: 'Brent Oil',
+      price: 104.16,
+      change: 4.77,
+      changePercent: 4.8,
+      currency: 'USD',
+    });
+
+    priceService.__applyBrentPriceForTests({
+      ticker: 'BZ=F',
+      name: 'Brent Oil',
+      price: 104.21,
+      change: 4.82,
+      changePercent: 4.85,
+      currency: 'USD',
+    });
+
+    expect(broadcastToAll).toHaveBeenCalledTimes(2);
+    expect((broadcastToAll.mock.calls as unknown[][])[1]?.[0]).toMatchObject({
+      type: 'prices:patch',
+      data: {
+        version: expect.any(String),
+        pricesByTicker: {
+          'BZ=F': {
+            ticker: 'BZ=F',
+            price: 104.21,
+          },
+        },
+      },
+    });
+  });
+
   test('latest payload always includes fx rates object and price list', () => {
     priceService.__resetPriceStateForTests();
-    const payload = priceService.getLatestPricePayload();
-    expect(Array.isArray(payload.prices)).toBe(true);
+    const payload = priceService.getLatestPriceSnapshot();
+    expect(payload.pricesByTicker).toEqual({});
     expect(payload.fxRates?.base).toBe('USD');
     expect(payload.fxRates?.rates?.USD).toBe(1);
   });

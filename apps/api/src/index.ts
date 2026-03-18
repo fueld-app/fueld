@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import { Elysia, t } from 'elysia';
 import { swagger } from '@elysiajs/swagger';
 import { cors } from '@elysiajs/cors';
@@ -42,7 +43,7 @@ import {
 import { getNearbyVessels, getNearbyVesselPositions, syncPlaceFromSeasearcher } from './modules/lloyds/lli.service';
 import { syncVesselFromSeasearcher } from './modules/vessels/vessel.service';
 import { syncCompanyFromSeasearcher } from './modules/companies/company.service';
-import { startPricePolling, getLatestPricePayload } from './modules/prices/price.service';
+import { startPricePolling, getLatestPriceSnapshot } from './modules/prices/price.service';
 import { jwtAccessPlugin } from './modules/auth/jwt.setup';
 import { db } from './db';
 import { users } from './db/schema';
@@ -467,16 +468,6 @@ export async function createApp(options: CreateAppOptions = {}) {
           console.log(`[WS] Authenticated connection from ${raw['email']} (${socketId})`);
           ws.send(JSON.stringify({ type: 'connected', message: 'WebSocket authenticated' }));
 
-          setTimeout(() => {
-            try {
-              const payload = getLatestPricePayload();
-              if (payload.prices.length > 0 || payload.fxRates) {
-                ws.send(JSON.stringify({ type: 'prices', data: payload }));
-              }
-            } catch {
-              // ws may have closed
-            }
-          }, 500);
         } catch {
           console.log('[WS] Connection rejected: token verification failed');
           ws.send(JSON.stringify({ type: 'auth-error', message: 'Token verification failed' }));
@@ -614,9 +605,12 @@ export async function createApp(options: CreateAppOptions = {}) {
             }
 
             case 'get-prices': {
-              const payload = getLatestPricePayload();
-              if (payload.prices.length > 0 || payload.fxRates) {
-                ws.send(JSON.stringify({ type: 'prices', data: payload }));
+              const payload = getLatestPriceSnapshot();
+              if (
+                (Object.keys(payload.pricesByTicker).length > 0 || payload.fxRates)
+                && data.knownVersion !== payload.version
+              ) {
+                ws.send(JSON.stringify({ type: 'prices:snapshot', data: payload }));
               }
               break;
             }
