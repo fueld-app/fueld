@@ -142,9 +142,9 @@ jobs:
         run: |
           set -euo pipefail
           cd apps/api
-          echo "Starting API build at $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          echo "Starting API release build at $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 
-          bun run build > /tmp/api-build.log 2>&1 &
+          bun run build:release > /tmp/api-build.log 2>&1 &
           build_pid=$!
           started_at=$(date +%s)
           max_seconds=900
@@ -168,7 +168,8 @@ jobs:
           done
 
           wait "$build_pid"
-          echo "API build finished at $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          test -f app-release
+          echo "API release build finished at $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
       - name: Upload API binary artifact
         uses: actions/upload-artifact@v4
         with:
