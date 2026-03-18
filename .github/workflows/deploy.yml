@@ -13,12 +13,18 @@ env:
   DOMAIN: riviera-marine.fueld.app
   BUN_VERSION: '1.3.10'
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   deploy:
     name: Build & Deploy
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     environment: production
+    env:
+      DEPLOY_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
     concurrency:
       group: deploy-production
       cancel-in-progress: false
@@ -28,6 +34,8 @@ jobs:
         id: checkout
         uses: actions/checkout@v6
         continue-on-error: true
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
 
       - name: Fallback checkout via archive download
         if: steps.checkout.outcome == 'failure'
@@ -35,25 +43,63 @@ jobs:
           curl -fL --retry 5 --retry-all-errors --retry-delay 3 \
             -H "Authorization: Bearer ${{ github.token }}" \
             -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${DEPLOY_SHA}" \
             -o repo.tar.gz
           tar -xzf repo.tar.gz --strip-components=1
           rm repo.tar.gz
 
-      - name: Setup Bun
-        run: |
-          curl -fsSL https://bun.sh/install | bash -s "bun-v${{ env.BUN_VERSION }}"
-          echo "$HOME/.bun/bin" >> $GITHUB_PATH
-
-      - name: Setup Node.js (for Angular CLI)
-        uses: actions/setup-node@v6
+      - name: Setup dependencies for manual deploys
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        uses: ./.github/actions/setup-ci
         with:
-          node-version: 22
+          bun-version: ${{ env.BUN_VERSION }}
+          node-version: '22'
 
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+      - name: Download API binary artifact from Tests
+        if: ${{ github.event_name == 'workflow_run' }}
+        uses: actions/download-artifact@v5
+        with:
+          name: api-release
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: /tmp/deploy-artifacts/api
+
+      - name: Restore API binary artifact
+        if: ${{ github.event_name == 'workflow_run' }}
+        run: |
+          mkdir -p apps/api
+          cp /tmp/deploy-artifacts/api/app-release apps/api/app-release
+
+      - name: Download web build artifact from Tests
+        if: ${{ github.event_name == 'workflow_run' }}
+        uses: actions/download-artifact@v5
+        with:
+          name: web-browser
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: /tmp/deploy-artifacts/web
+
+      - name: Restore web build artifact
+        if: ${{ github.event_name == 'workflow_run' }}
+        run: |
+          mkdir -p apps/web/dist/web/browser
+          cp -R /tmp/deploy-artifacts/web/. apps/web/dist/web/browser/
+
+      - name: Download build metadata artifact from Tests
+        if: ${{ github.event_name == 'workflow_run' }}
+        uses: actions/download-artifact@v5
+        with:
+          name: build-info
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: /tmp/deploy-artifacts/meta
+
+      - name: Restore build metadata artifact
+        if: ${{ github.event_name == 'workflow_run' }}
+        run: cp /tmp/deploy-artifacts/meta/build-info.json build-info.json
 
       - name: Generate build metadata
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
           APP_VERSION=$(cat VERSION)
           SHORT_SHA=$(git rev-parse --short=7 HEAD)
@@ -70,12 +116,14 @@ jobs:
 
       # ─── Build API binary ─────────────────────────────────────────
       - name: Build API (standalone binary)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
           cd apps/api
           bun build src/index.ts --compile --bytecode --minify --target=bun-linux-x64 --outfile app-release
 
       # ─── Build Frontend ────────────────────────────────────────────
       - name: Build Frontend
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
           cd apps/web
           bunx ng build --configuration production

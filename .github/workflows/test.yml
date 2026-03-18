@@ -6,6 +6,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   BUN_VERSION: '1.3.10'
 
@@ -65,12 +69,10 @@ jobs:
             -o repo.tar.gz
           tar -xzf repo.tar.gz --strip-components=1
           rm repo.tar.gz
-      - name: Setup Bun
-        run: |
-          curl -fsSL https://bun.sh/install | bash -s "bun-v${{ env.BUN_VERSION }}"
-          echo "$HOME/.bun/bin" >> $GITHUB_PATH
-      - name: Install dependencies
-        run: bun install
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-ci
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
       - name: Run types tests
         run: bun test packages/types/tests
 
@@ -92,12 +94,10 @@ jobs:
             -o repo.tar.gz
           tar -xzf repo.tar.gz --strip-components=1
           rm repo.tar.gz
-      - name: Setup Bun
-        run: |
-          curl -fsSL https://bun.sh/install | bash -s "bun-v${{ env.BUN_VERSION }}"
-          echo "$HOME/.bun/bin" >> $GITHUB_PATH
-      - name: Install dependencies
-        run: bun install
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-ci
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
       - name: Typecheck
         run: cd apps/api && bun run typecheck
 
@@ -119,12 +119,24 @@ jobs:
             -o repo.tar.gz
           tar -xzf repo.tar.gz --strip-components=1
           rm repo.tar.gz
-      - name: Setup Bun
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-ci
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - name: Generate build metadata
         run: |
-          curl -fsSL https://bun.sh/install | bash -s "bun-v${{ env.BUN_VERSION }}"
-          echo "$HOME/.bun/bin" >> $GITHUB_PATH
-      - name: Install dependencies
-        run: bun install
+          APP_VERSION=$(cat VERSION)
+          SHORT_SHA=$(git rev-parse --short=7 HEAD)
+          BRANCH_NAME=${GITHUB_REF_NAME:-main}
+          BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          DEPLOY_VERSION="${APP_VERSION}+build.${GITHUB_RUN_NUMBER}.sha.${SHORT_SHA}"
+          APP_VERSION="$APP_VERSION" \
+          GIT_SHA="$GITHUB_SHA" \
+          GIT_BRANCH="$BRANCH_NAME" \
+          BUILD_TIME="$BUILD_TIME" \
+          DEPLOY_VERSION="$DEPLOY_VERSION" \
+          GITHUB_RUN_NUMBER="$GITHUB_RUN_NUMBER" \
+          bun run build:meta
       - name: Build
         shell: bash
         run: |
@@ -157,6 +169,20 @@ jobs:
 
           wait "$build_pid"
           echo "API build finished at $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+      - name: Upload API binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-release
+          path: apps/api/app-release
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload build metadata artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-info
+          path: build-info.json
+          if-no-files-found: error
+          retention-days: 7
 
   api-mocked:
     name: API (mocked)
@@ -190,12 +216,10 @@ jobs:
             -o repo.tar.gz
           tar -xzf repo.tar.gz --strip-components=1
           rm repo.tar.gz
-      - name: Setup Bun
-        run: |
-          curl -fsSL https://bun.sh/install | bash -s "bun-v${{ env.BUN_VERSION }}"
-          echo "$HOME/.bun/bin" >> $GITHUB_PATH
-      - name: Install dependencies
-        run: bun install
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-ci
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
 
       - name: Wait for Postgres
         run: |
@@ -243,12 +267,10 @@ jobs:
             -o repo.tar.gz
           tar -xzf repo.tar.gz --strip-components=1
           rm repo.tar.gz
-      - name: Setup Bun
-        run: |
-          curl -fsSL https://bun.sh/install | bash -s "bun-v${{ env.BUN_VERSION }}"
-          echo "$HOME/.bun/bin" >> $GITHUB_PATH
-      - name: Install dependencies
-        run: bun install
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-ci
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
 
       - name: Wait for Postgres
         run: |
@@ -296,12 +318,10 @@ jobs:
             -o repo.tar.gz
           tar -xzf repo.tar.gz --strip-components=1
           rm repo.tar.gz
-      - name: Setup Bun
-        run: |
-          curl -fsSL https://bun.sh/install | bash -s "bun-v${{ env.BUN_VERSION }}"
-          echo "$HOME/.bun/bin" >> $GITHUB_PATH
-      - name: Install dependencies
-        run: bun install
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-ci
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
 
       - name: Wait for Postgres
         run: |
@@ -335,15 +355,11 @@ jobs:
             -o repo.tar.gz
           tar -xzf repo.tar.gz --strip-components=1
           rm repo.tar.gz
-      - name: Setup Bun
-        run: |
-          curl -fsSL https://bun.sh/install | bash -s "bun-v${{ env.BUN_VERSION }}"
-          echo "$HOME/.bun/bin" >> $GITHUB_PATH
-      - uses: actions/setup-node@v6
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-ci
         with:
-          node-version: 22
-      - name: Install dependencies
-        run: bun install
+          bun-version: ${{ env.BUN_VERSION }}
+          node-version: '22'
       - name: Run web unit tests
         run: cd apps/web && CI=true NG_CLI_ANALYTICS=false bun run test
 
@@ -365,15 +381,11 @@ jobs:
             -o repo.tar.gz
           tar -xzf repo.tar.gz --strip-components=1
           rm repo.tar.gz
-      - name: Setup Bun
-        run: |
-          curl -fsSL https://bun.sh/install | bash -s "bun-v${{ env.BUN_VERSION }}"
-          echo "$HOME/.bun/bin" >> $GITHUB_PATH
-      - uses: actions/setup-node@v6
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-ci
         with:
-          node-version: 22
-      - name: Install dependencies
-        run: bun install
+          bun-version: ${{ env.BUN_VERSION }}
+          node-version: '22'
       - name: Typecheck
         run: cd apps/web && bunx tsc --noEmit -p tsconfig.json
 
@@ -395,17 +407,20 @@ jobs:
             -o repo.tar.gz
           tar -xzf repo.tar.gz --strip-components=1
           rm repo.tar.gz
-      - name: Setup Bun
-        run: |
-          curl -fsSL https://bun.sh/install | bash -s "bun-v${{ env.BUN_VERSION }}"
-          echo "$HOME/.bun/bin" >> $GITHUB_PATH
-      - uses: actions/setup-node@v6
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-ci
         with:
-          node-version: 22
-      - name: Install dependencies
-        run: bun install
+          bun-version: ${{ env.BUN_VERSION }}
+          node-version: '22'
       - name: Build
         run: cd apps/web && CI=true NG_CLI_ANALYTICS=false bun run build
+      - name: Upload web build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-browser
+          path: apps/web/dist/web/browser
+          if-no-files-found: error
+          retention-days: 7
 
   # NOTE: Web Playwright E2E is intentionally not run in CI.
   # Run locally from apps/web: `bun run pw:install && bun run test:e2e`

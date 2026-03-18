@@ -34,15 +34,7 @@ fi
 log "Current active: ${ACTIVE_SLOT} (port ${ACTIVE_PORT})"
 log "Deploying to:   ${NEXT_SLOT} (port ${NEXT_PORT})"
 
-# ─── 1. Deploy frontend ──────────────────────────────────────────────
-if [ -d "$APP_DIR/staging/web" ]; then
-  log "Deploying frontend..."
-  rm -rf "$APP_DIR/web"
-  mv "$APP_DIR/staging/web" "$APP_DIR/web"
-  log "Frontend deployed"
-fi
-
-# ─── 2. Deploy migration files ───────────────────────────────────────
+# ─── 1. Deploy migration files ───────────────────────────────────────
 if [ -d "$APP_DIR/staging/drizzle" ]; then
   log "Updating migration files..."
   rm -rf "$APP_DIR/drizzle"
@@ -50,7 +42,7 @@ if [ -d "$APP_DIR/staging/drizzle" ]; then
   log "Migration files updated"
 fi
 
-# ─── 3. Deploy backend binary ────────────────────────────────────────
+# ─── 2. Deploy backend binary ────────────────────────────────────────
 if [ -f "$APP_DIR/staging/app-release" ]; then
   log "Deploying backend binary to ${NEXT_SLOT}..."
   mkdir -p "$APP_DIR/$NEXT_SLOT"
@@ -62,11 +54,11 @@ else
   exit 1
 fi
 
-# ─── 3b. Ensure LLM + prompts directories exist ──────────────────────
+# ─── 2b. Ensure LLM + prompts directories exist ──────────────────────
 mkdir -p "$APP_DIR/llm/bin" "$APP_DIR/llm/models" "$APP_DIR/prompts"
 log "LLM + prompts directories ensured"
 
-# ─── 3c. Deploy build metadata ───────────────────────────────────────
+# ─── 2c. Deploy build metadata ───────────────────────────────────────
 if [ -f "$APP_DIR/staging/build-info.json" ]; then
   mv "$APP_DIR/staging/build-info.json" "$APP_DIR/build-info.json"
   log "Build metadata deployed"
@@ -96,7 +88,7 @@ if ! command -v cmake &>/dev/null || ! command -v g++ &>/dev/null; then
   sudo apt-get install -y -qq cmake g++ make || warn "Could not install build tools (non-fatal)"
 fi
 
-# ─── 3d. Patch systemd unit ReadWritePaths if missing dirs ───────────
+# ─── 2d. Patch systemd unit ReadWritePaths if missing dirs ───────────
 UNIT_FILE="/etc/systemd/system/fueld-api@.service"
 NEED_RELOAD=false
 if [ -f "$UNIT_FILE" ]; then
@@ -118,7 +110,7 @@ if [ -f "$UNIT_FILE" ]; then
   fi
 fi
 
-# ─── 4. Start new slot ───────────────────────────────────────────────
+# ─── 3. Start new slot ───────────────────────────────────────────────
 log "Starting fueld-api@${NEXT_SLOT}..."
 sudo systemctl stop "fueld-api@${NEXT_SLOT}" 2>/dev/null || true
 sudo systemctl reset-failed "fueld-api@${NEXT_SLOT}" 2>/dev/null || true
@@ -133,7 +125,7 @@ if ! systemctl is-active --quiet "fueld-api@${NEXT_SLOT}"; then
   exit 1
 fi
 
-# ─── 5. Health check new slot ────────────────────────────────────────
+# ─── 4. Health check new slot ────────────────────────────────────────
 log "Health checking ${NEXT_SLOT} on port ${NEXT_PORT}..."
 HEALTHY=false
 for i in $(seq 1 $HEALTH_RETRIES); do
@@ -154,6 +146,14 @@ if [ "$HEALTHY" = false ]; then
 fi
 
 log "Health check passed ✓"
+
+# ─── 5. Promote frontend after API health passes ─────────────────────
+if [ -d "$APP_DIR/staging/web" ]; then
+  log "Promoting frontend after healthy API start..."
+  rm -rf "$APP_DIR/web"
+  mv "$APP_DIR/staging/web" "$APP_DIR/web"
+  log "Frontend deployed"
+fi
 
 # ─── 6. Switch nginx upstream ────────────────────────────────────────
 log "Switching nginx upstream to port ${NEXT_PORT}..."

@@ -1,0 +1,48 @@
+name: Setup CI Dependencies
+description: Restore caches, install Bun, optionally install Node.js, and install workspace dependencies.
+
+inputs:
+  bun-version:
+    description: Bun version to install
+    required: true
+  node-version:
+    description: Optional Node.js version for Angular/tooling jobs
+    required: false
+    default: ''
+  install:
+    description: Whether to run bun install
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Restore Bun and workspace caches
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.bun/install/cache
+          node_modules
+          apps/web/.angular/cache
+        key: ${{ runner.os }}-bun-${{ inputs.bun-version }}-node-${{ inputs.node-version || 'none' }}-${{ hashFiles('bun.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-bun-${{ inputs.bun-version }}-node-${{ inputs.node-version || 'none' }}-
+          ${{ runner.os }}-bun-${{ inputs.bun-version }}-
+          ${{ runner.os }}-bun-
+
+    - name: Setup Bun
+      shell: bash
+      run: |
+        curl -fsSL https://bun.sh/install | bash -s "bun-v${{ inputs.bun-version }}"
+        echo "$HOME/.bun/bin" >> $GITHUB_PATH
+
+    - name: Setup Node.js
+      if: ${{ inputs.node-version != '' }}
+      uses: actions/setup-node@v6
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Install dependencies
+      if: ${{ inputs.install == 'true' }}
+      shell: bash
+      run: bun install --frozen-lockfile
