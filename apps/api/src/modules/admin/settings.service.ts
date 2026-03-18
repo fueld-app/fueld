@@ -817,7 +817,7 @@ export async function updateProductSettings(products: string[]): Promise<{ produ
 //  UNIT SETTINGS
 // ═══════════════════════════════════════════════════════════════════════
 
-const DEFAULT_UNITS = ['MT', 'CBM', 'LT', 'BBL', 'GAL', 'KG'];
+const DEFAULT_UNITS = ['MT', 'MTS', 'CBM', 'LT', 'BBL', 'GAL', 'KG'];
 
 export async function getUnitSettings(): Promise<{ units: string[] }> {
   const tenant = await db.query.tenants.findFirst();

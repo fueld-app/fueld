@@ -1208,6 +1208,7 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
 
   private static readonly DEFAULT_UNITS: DropdownOption[] = [
     { value: 'MT', label: 'MT' },
+    { value: 'MTS', label: 'MTS' },
     { value: 'CBM', label: 'CBM' },
     { value: 'LT', label: 'LT' },
     { value: 'BBL', label: 'BBL' },
@@ -1222,7 +1223,18 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
 
   readonly unitOptions = computed(() => {
     const fromInput = this.unitOptionsInput();
-    return fromInput.length > 0 ? fromInput : OrderItemsComponent.DEFAULT_UNITS;
+    const baseOptions = fromInput.length > 0 ? fromInput : OrderItemsComponent.DEFAULT_UNITS;
+    const options = new Map(baseOptions.map((option) => [option.value, option] as const));
+
+    for (const row of this.rows()) {
+      for (const unit of [row.unit, row.costUnit, row.salesUnit]) {
+        if (unit && !options.has(unit)) {
+          options.set(unit, { value: unit, label: unit });
+        }
+      }
+    }
+
+    return [...options.values()];
   });
 
   readonly priceRefOptions = computed<DropdownOption[]>(() =>
