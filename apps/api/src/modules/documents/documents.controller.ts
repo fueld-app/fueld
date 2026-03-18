@@ -1025,7 +1025,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             items: order.items.map((i: any) => ({
               quantity: i.quantity,
               quantityMin: i.quantityMin,
-              unit: i.unit,
+              unit: i.costUnit ?? i.unit,
               productType: i.productType,
               description: i.description,
             })),
@@ -1049,7 +1049,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           items: order.items.map((i: any) => ({
             quantity: i.quantity,
             quantityMin: i.quantityMin,
-            unit: i.unit,
+            unit: i.costUnit ?? i.unit,
             productType: i.productType,
             description: i.description,
           })),

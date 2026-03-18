@@ -2070,7 +2070,7 @@ export async function generateNominationPdfBuffer(orderId: string): Promise<{
       quantity: item.quantity,
       quantityMin: item.quantityMin,
       quantityMax: item.quantityMax,
-      unit: item.unit,
+      unit: item.costUnit ?? item.unit,
       salesPrice: item.costPrice,
       salesPricingModel: item.costPricingModel,
       salesReferenceName: item.costReferenceId ? (nomRefNameMap.get(item.costReferenceId) ?? null) : null,

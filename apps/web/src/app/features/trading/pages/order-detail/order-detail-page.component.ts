@@ -1565,7 +1565,7 @@ interface PlattsSuggestionViewModel {
       [vesselImo]="vessel()?.imo ?? null"
       [eta]="order()?.eta ?? null"
       [etd]="order()?.etd ?? null"
-      [items]="itemRows()"
+      [items]="inquiryItems()"
       (sendInquiry)="onSendInquiry($event)"
       (sendWhatsAppInquiry)="onSendInquiryWhatsApp($event)"
     />
@@ -1633,6 +1633,9 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   readonly vessels = signal<VesselDto[]>([]);
   readonly places = signal<PlaceDto[]>([]);
   readonly itemRows = signal<OrderItemRow[]>([]);
+  readonly inquiryItems = computed(() =>
+    this.itemRows().map((r) => ({ productType: r.productType, quantity: r.quantity, quantityMin: r.quantityMin, unit: r.costUnit ?? r.unit })),
+  );
   readonly itemEconomics = signal<OrderItemsEconomics>({
     totalQuantity: 0,
     totalCost: 0,
