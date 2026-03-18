@@ -470,6 +470,36 @@ const NAVIGATION: NavItem[] = [
         </div>
       </header>
 
+      @if (auth.mfaSetupRequired()) {
+        <section class="border-b border-amber-200 bg-amber-50/90 px-4 py-3 sm:px-6 lg:px-8">
+          <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div class="flex items-start gap-3">
+              <div class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l4.58 8.146c.75 1.334-.213 2.995-1.742 2.995H5.42c-1.53 0-2.492-1.66-1.743-2.995l4.58-8.146zM11 7a1 1 0 10-2 0v2a1 1 0 102 0V7zm-1 6a1.25 1.25 0 100-2.5A1.25 1.25 0 0010 13z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div>
+                <p class="text-sm font-semibold text-amber-950">Security setup required</p>
+                <p class="mt-1 text-sm text-amber-900">
+                  Your organisation requires two-factor authentication before normal access is restored.
+                  Finish setup in account settings using an authenticator app or a passkey.
+                </p>
+              </div>
+            </div>
+
+            @if (router.url !== '/account/settings') {
+              <a
+                routerLink="/account/settings"
+                class="inline-flex items-center justify-center rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
+              >
+                Complete Security Setup
+              </a>
+            }
+          </div>
+        </section>
+      }
+
       <!-- Page content -->
       <main class="app-main flex-1 px-4 pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pt-8">
         <router-outlet />
@@ -650,7 +680,7 @@ const NAVIGATION: NavItem[] = [
 export class MainLayoutComponent implements OnInit, OnDestroy {
   protected readonly auth = inject(AuthService);
   private readonly http = inject(HttpClient);
-  private readonly router = inject(Router);
+  protected readonly router = inject(Router);
   private readonly wsService = inject(WebSocketService);
   private readonly titleService = inject(Title);
   private readonly updateService = inject(AppUpdateService);

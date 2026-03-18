@@ -22,6 +22,55 @@ import type { PasskeyDto, ApiResponse } from '@fueld/types';
   imports: [FormsModule, DatePipe],
   template: `
     <div class="mx-auto">
+      @if (auth.mfaSetupRequired()) {
+        <section class="mb-6 overflow-hidden rounded-3xl border border-amber-300 bg-gradient-to-br from-amber-50 via-white to-orange-50 shadow-sm">
+          <div class="grid gap-5 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:px-8">
+            <div>
+              <div class="inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-amber-800">
+                Action Required
+              </div>
+              <h1 class="mt-3 text-2xl font-bold tracking-tight text-gray-900">Set up two-factor authentication to continue</h1>
+              <p class="mt-2 max-w-2xl text-sm leading-6 text-gray-700">
+                Your account is signed in, but your organisation will not allow normal access until you add a second factor.
+                Complete either option below: verify an authenticator app code or register a passkey on this device.
+              </p>
+              <div class="mt-4 flex flex-wrap gap-3 text-sm">
+                <a
+                  href="#two-factor-card"
+                  class="inline-flex items-center justify-center rounded-lg bg-amber-600 px-4 py-2 font-semibold text-white shadow-sm transition-colors hover:bg-amber-700"
+                >
+                  Set Up Authenticator App
+                </a>
+                <a
+                  href="#passkeys-card"
+                  class="inline-flex items-center justify-center rounded-lg border border-amber-300 bg-white px-4 py-2 font-semibold text-amber-900 transition-colors hover:bg-amber-100"
+                >
+                  Register a Passkey
+                </a>
+              </div>
+            </div>
+
+            <div class="rounded-2xl border border-amber-200 bg-white/80 p-4 lg:w-80">
+              <p class="text-sm font-semibold text-gray-900">What happens next</p>
+              <ul class="mt-3 space-y-2 text-sm text-gray-700">
+                <li class="flex gap-2">
+                  <span class="mt-0.5 text-amber-600">1.</span>
+                  <span>Choose authenticator app or passkey below.</span>
+                </li>
+                <li class="flex gap-2">
+                  <span class="mt-0.5 text-amber-600">2.</span>
+                  <span>Complete verification once.</span>
+                </li>
+                <li class="flex gap-2">
+                  <span class="mt-0.5 text-amber-600">3.</span>
+                  <span>Fueld unlocks normal navigation automatically.</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+      }
+
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
       <!-- Profile: Phone Number -->
@@ -165,13 +214,26 @@ import type { PasskeyDto, ApiResponse } from '@fueld/types';
       }
 
       <!-- Two-Factor Authentication -->
-      <div class="flex flex-col rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+      <div
+        id="two-factor-card"
+        class="flex flex-col rounded-2xl border bg-white p-8 shadow-sm"
+        [class.border-amber-300]="auth.mfaSetupRequired()"
+        [class.ring-2]="auth.mfaSetupRequired()"
+        [class.ring-amber-200]="auth.mfaSetupRequired()"
+        [class.border-gray-200]="!auth.mfaSetupRequired()"
+      >
         <h1
           class="text-xl font-bold text-gray-900"
         >Two-Factor Authentication</h1>
         <p class="mt-1 text-sm text-gray-500">
           Secure your account with a time-based one-time password (TOTP).
         </p>
+
+        @if (auth.mfaSetupRequired()) {
+          <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Complete this setup now to unlock the rest of the app.
+          </div>
+        }
 
         @if (errorMessage()) {
           <div class="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
@@ -334,7 +396,14 @@ import type { PasskeyDto, ApiResponse } from '@fueld/types';
       <!-- ═══════════════════════════════════════════════════════════ -->
       <!--  Passkeys (FIDO2 / WebAuthn)                               -->
       <!-- ═══════════════════════════════════════════════════════════ -->
-      <div class="flex flex-col rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+      <div
+        id="passkeys-card"
+        class="flex flex-col rounded-2xl border bg-white p-8 shadow-sm"
+        [class.border-amber-300]="auth.mfaSetupRequired()"
+        [class.ring-2]="auth.mfaSetupRequired()"
+        [class.ring-amber-200]="auth.mfaSetupRequired()"
+        [class.border-gray-200]="!auth.mfaSetupRequired()"
+      >
         <div class="flex items-start gap-4">
           <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-600" viewBox="0 0 20 20" fill="currentColor">
@@ -348,6 +417,12 @@ import type { PasskeyDto, ApiResponse } from '@fueld/types';
             </p>
           </div>
         </div>
+
+        @if (auth.mfaSetupRequired()) {
+          <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            If you prefer not to use an authenticator app, registering one passkey also satisfies the requirement.
+          </div>
+        }
 
         @if (passkeyError()) {
           <div class="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
@@ -576,7 +651,7 @@ import type { PasskeyDto, ApiResponse } from '@fueld/types';
   `,
 })
 export class TwoFactorSetupPageComponent implements OnInit, OnDestroy {
-  private readonly auth = inject(AuthService);
+  protected readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly http = inject(HttpClient);
   private readonly wsService = inject(WebSocketService);
