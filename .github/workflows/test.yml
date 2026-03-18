@@ -184,24 +184,39 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  api-mocked:
-    name: API (mocked)
+  api-postgres:
+    name: API (${{ matrix.name }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: mocked
+            db-suffix: mocked
+            test-script: test:mocked
+          - name: db
+            db-suffix: db
+            test-script: test:db
+          - name: e2e
+            db-suffix: e2e
+            test-script: test:e2e
     env:
       TEST_DB_BASE_URL: postgres://fueld:fueld@localhost:5432
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: fueld
+          POSTGRES_PASSWORD: fueld
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fueld -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     steps:
-      - name: Start Postgres
-        run: |
-          for attempt in 1 2 3; do
-            echo "Attempt $attempt: starting Postgres..."
-            docker rm -f postgres 2>/dev/null || true
-            docker pull postgres:17-alpine && \
-            docker run -d --name postgres -p 5432:5432 \
-              -e POSTGRES_USER=fueld -e POSTGRES_PASSWORD=fueld -e POSTGRES_DB=postgres \
-              postgres:17-alpine && break
-            echo "Attempt $attempt failed, retrying in 5s..."
-            sleep 5
-          done
       - name: Checkout repository
         id: checkout
         uses: actions/checkout@v6
@@ -220,7 +235,6 @@ jobs:
         uses: ./.github/actions/setup-ci
         with:
           bun-version: ${{ env.BUN_VERSION }}
-
       - name: Wait for Postgres
         run: |
           cd apps/api
@@ -228,114 +242,14 @@ jobs:
       - name: Create fresh test database
         run: |
           cd apps/api
-          bun -e "import postgres from 'postgres'; const base=process.env.TEST_DB_BASE_URL; const dbName='fueld_test_mocked_' + (process.env.GITHUB_RUN_ID ?? String(Date.now())); const sql=postgres(base + '/postgres',{max:1}); try { await sql.unsafe('CREATE DATABASE ' + dbName); } finally { await sql.end({timeout:5}); } console.log(dbName);" > /tmp/dbname
+          bun -e "import postgres from 'postgres'; const base=process.env.TEST_DB_BASE_URL; const suffix=process.env.DB_SUFFIX; const runId=process.env.GITHUB_RUN_ID ?? String(Date.now()); const runAttempt=process.env.GITHUB_RUN_ATTEMPT ?? '1'; const dbName='fueld_test_' + suffix + '_' + runId + '_' + runAttempt; const sql=postgres(base + '/postgres',{max:1}); try { await sql.unsafe('CREATE DATABASE ' + dbName); } finally { await sql.end({timeout:5}); } console.log(dbName);" > /tmp/dbname
           echo "TEST_DATABASE_URL=${TEST_DB_BASE_URL}/$(cat /tmp/dbname)" >> $GITHUB_ENV
+        env:
+          DB_SUFFIX: ${{ matrix.db-suffix }}
       - name: Migrate
         run: cd apps/api && DATABASE_URL="$TEST_DATABASE_URL" bun run db:migrate
       - name: Run tests
-        run: cd apps/api && TEST_DATABASE_URL="$TEST_DATABASE_URL" bun run test:mocked
-
-  api-db:
-    name: API (db)
-    runs-on: ubuntu-latest
-    env:
-      TEST_DB_BASE_URL: postgres://fueld:fueld@localhost:5432
-    steps:
-      - name: Start Postgres
-        run: |
-          for attempt in 1 2 3; do
-            echo "Attempt $attempt: starting Postgres..."
-            docker rm -f postgres 2>/dev/null || true
-            docker pull postgres:17-alpine && \
-            docker run -d --name postgres -p 5432:5432 \
-              -e POSTGRES_USER=fueld -e POSTGRES_PASSWORD=fueld -e POSTGRES_DB=postgres \
-              postgres:17-alpine && break
-            echo "Attempt $attempt failed, retrying in 5s..."
-            sleep 5
-          done
-      - name: Checkout repository
-        id: checkout
-        uses: actions/checkout@v6
-        continue-on-error: true
-      - name: Fallback checkout via archive download
-        if: steps.checkout.outcome == 'failure'
-        run: |
-          curl -fL --retry 5 --retry-all-errors --retry-delay 3 \
-            -H "Authorization: Bearer ${{ github.token }}" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}" \
-            -o repo.tar.gz
-          tar -xzf repo.tar.gz --strip-components=1
-          rm repo.tar.gz
-      - name: Setup dependencies
-        uses: ./.github/actions/setup-ci
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
-
-      - name: Wait for Postgres
-        run: |
-          cd apps/api
-          bun -e "import postgres from 'postgres'; const base=process.env.TEST_DB_BASE_URL; const sql=postgres(base + '/postgres',{max:1,connect_timeout:2}); const deadline=Date.now()+60_000; while(true){ try{ await sql.unsafe('select 1'); break; } catch(e){ if(Date.now()>deadline){ console.error('Postgres not ready:', String(e?.message ?? e)); process.exit(1);} await new Promise(r=>setTimeout(r,1000)); } } await sql.end({timeout:5}); console.log('Postgres is ready');"
-      - name: Create fresh test database
-        run: |
-          cd apps/api
-          bun -e "import postgres from 'postgres'; const base=process.env.TEST_DB_BASE_URL; const dbName='fueld_test_db_' + (process.env.GITHUB_RUN_ID ?? String(Date.now())); const sql=postgres(base + '/postgres',{max:1}); try { await sql.unsafe('CREATE DATABASE ' + dbName); } finally { await sql.end({timeout:5}); } console.log(dbName);" > /tmp/dbname
-          echo "TEST_DATABASE_URL=${TEST_DB_BASE_URL}/$(cat /tmp/dbname)" >> $GITHUB_ENV
-      - name: Migrate
-        run: cd apps/api && DATABASE_URL="$TEST_DATABASE_URL" bun run db:migrate
-      - name: Run tests
-        run: cd apps/api && TEST_DATABASE_URL="$TEST_DATABASE_URL" bun run test:db
-
-  api-e2e:
-    name: API (e2e)
-    runs-on: ubuntu-latest
-    env:
-      TEST_DB_BASE_URL: postgres://fueld:fueld@localhost:5432
-    steps:
-      - name: Start Postgres
-        run: |
-          for attempt in 1 2 3; do
-            echo "Attempt $attempt: starting Postgres..."
-            docker rm -f postgres 2>/dev/null || true
-            docker pull postgres:17-alpine && \
-            docker run -d --name postgres -p 5432:5432 \
-              -e POSTGRES_USER=fueld -e POSTGRES_PASSWORD=fueld -e POSTGRES_DB=postgres \
-              postgres:17-alpine && break
-            echo "Attempt $attempt failed, retrying in 5s..."
-            sleep 5
-          done
-      - name: Checkout repository
-        id: checkout
-        uses: actions/checkout@v6
-        continue-on-error: true
-      - name: Fallback checkout via archive download
-        if: steps.checkout.outcome == 'failure'
-        run: |
-          curl -fL --retry 5 --retry-all-errors --retry-delay 3 \
-            -H "Authorization: Bearer ${{ github.token }}" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${GITHUB_SHA}" \
-            -o repo.tar.gz
-          tar -xzf repo.tar.gz --strip-components=1
-          rm repo.tar.gz
-      - name: Setup dependencies
-        uses: ./.github/actions/setup-ci
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
-
-      - name: Wait for Postgres
-        run: |
-          cd apps/api
-          bun -e "import postgres from 'postgres'; const base=process.env.TEST_DB_BASE_URL; const sql=postgres(base + '/postgres',{max:1,connect_timeout:2}); const deadline=Date.now()+60_000; while(true){ try{ await sql.unsafe('select 1'); break; } catch(e){ if(Date.now()>deadline){ console.error('Postgres not ready:', String(e?.message ?? e)); process.exit(1);} await new Promise(r=>setTimeout(r,1000)); } } await sql.end({timeout:5}); console.log('Postgres is ready');"
-      - name: Create fresh test database
-        run: |
-          cd apps/api
-          bun -e "import postgres from 'postgres'; const base=process.env.TEST_DB_BASE_URL; const dbName='fueld_test_e2e_' + (process.env.GITHUB_RUN_ID ?? String(Date.now())); const sql=postgres(base + '/postgres',{max:1}); try { await sql.unsafe('CREATE DATABASE ' + dbName); } finally { await sql.end({timeout:5}); } console.log(dbName);" > /tmp/dbname
-          echo "TEST_DATABASE_URL=${TEST_DB_BASE_URL}/$(cat /tmp/dbname)" >> $GITHUB_ENV
-      - name: Migrate
-        run: cd apps/api && DATABASE_URL="$TEST_DATABASE_URL" bun run db:migrate
-      - name: Run tests
-        run: cd apps/api && TEST_DATABASE_URL="$TEST_DATABASE_URL" bun run test:e2e
+        run: cd apps/api && TEST_DATABASE_URL="$TEST_DATABASE_URL" bun run ${{ matrix.test-script }}
 
   web-unit:
     name: Web (unit)
