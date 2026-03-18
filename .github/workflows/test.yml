@@ -18,6 +18,7 @@ jobs:
     name: Detect changed areas
     runs-on: ubuntu-latest
     outputs:
+      change_profile: ${{ steps.filter.outputs.change_profile }}
       api_validation: ${{ steps.filter.outputs.api_validation }}
       web_validation: ${{ steps.filter.outputs.web_validation }}
       types_validation: ${{ steps.filter.outputs.types_validation }}
@@ -75,6 +76,7 @@ jobs:
           web_validation=false
           types_validation=false
           migration_check=false
+          change_profile=infra-only
 
           if matches '^(apps/api/|packages/types/|bun.lock|package.json|tsconfig.base.json|scripts/release/|\.github/actions/setup-ci/|\.github/workflows/test.yml)$'; then
             api_validation=true
@@ -100,12 +102,45 @@ jobs:
             web_build=true
           fi
 
+          if [ "$api_validation" = true ] && [ "$web_validation" = true ]; then
+            change_profile=shared
+          elif [ "$api_validation" = true ]; then
+            change_profile=api-only
+          elif [ "$web_validation" = true ]; then
+            change_profile=web-only
+          elif [ "$types_validation" = true ]; then
+            change_profile=types-only
+          fi
+
+          echo "change_profile=$change_profile" >> "$GITHUB_OUTPUT"
           echo "api_validation=$api_validation" >> "$GITHUB_OUTPUT"
           echo "web_validation=$web_validation" >> "$GITHUB_OUTPUT"
           echo "types_validation=$types_validation" >> "$GITHUB_OUTPUT"
           echo "api_build=$api_build" >> "$GITHUB_OUTPUT"
           echo "web_build=$web_build" >> "$GITHUB_OUTPUT"
           echo "migration_check=$migration_check" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Test Run Profile"
+            echo ""
+            echo "- Event: ${GITHUB_EVENT_NAME}"
+            echo "- Change profile: ${change_profile}"
+            echo "- API validation: ${api_validation}"
+            echo "- Web validation: ${web_validation}"
+            echo "- Types validation: ${types_validation}"
+            echo "- API build: ${api_build}"
+            echo "- Web build: ${web_build}"
+            echo "- Migration check: ${migration_check}"
+            echo ""
+            echo "### Changed Files"
+            echo '```text'
+            if [ -n "$CHANGED_FILES" ]; then
+              printf '%s\n' "$CHANGED_FILES"
+            else
+              echo "(none detected)"
+            fi
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   migration-journal:
     name: Migration journal check
