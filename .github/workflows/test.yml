@@ -78,7 +78,7 @@ jobs:
           migration_check=false
           change_profile=infra-only
 
-          if matches '^(apps/api/|packages/types/|scripts/release/|\.github/actions/setup-ci/)|^(bun.lock|package.json|tsconfig.base.json|\.github/workflows/test.yml)$'; then
+            if matches '^(apps/api/|packages/types/|scripts/release/|scripts/platts-parser/|\.github/actions/setup-ci/)|^(bun.lock|package.json|tsconfig.base.json|\.github/workflows/test.yml)$'; then
             api_validation=true
           fi
 
