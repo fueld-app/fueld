@@ -1829,7 +1829,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   readonly deliveredQtyComplete = computed(() =>
     this.itemRows().length > 0
-    && this.itemRows().every((row) => row.deliveredQuantity != null && Number.isFinite(Number(row.deliveredQuantity))),
+    && this.itemRows().every((row) => this.parseDecimalValue(row.deliveredQuantity) !== null),
   );
 
   readonly hasBdrAttachment = computed(() =>
@@ -2933,6 +2933,20 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     return new Date(utcTime).toISOString();
   }
 
+  private parseDecimalValue(value: unknown): number | null {
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : null;
+    }
+
+    if (typeof value !== 'string') return null;
+
+    const normalized = value.trim().replace(/\s+/g, '').replace(',', '.');
+    if (!normalized) return null;
+
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
   private normalizeTimeZone(timeZone: string): string {
     try {
       new Intl.DateTimeFormat('en-US', { timeZone }).format(new Date());
@@ -3841,7 +3855,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       return;
     }
     if (!this.order()?.deliveredAt) {
-      this.showToast('error', 'Enter delivered date and time before marking delivered.');
+      this.showToast('error', 'Enter delivered date before marking delivered.');
       return;
     }
     if (!this.deliveredQtyComplete()) {

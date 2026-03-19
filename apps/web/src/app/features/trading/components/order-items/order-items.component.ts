@@ -232,7 +232,7 @@ export interface OrderItemsEconomics {
                   <input
                     type="number" step="0.001" min="0"
                     [ngModel]="row.deliveredQuantity ?? row.quantity"
-                    (ngModelChange)="updateField(i, 'deliveredQuantity', +$event)"
+                    (ngModelChange)="updateField(i, 'deliveredQuantity', parseDecimalInput($event))"
                     class="w-24 rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm tabular-nums
                            focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                   />
@@ -1021,7 +1021,7 @@ export interface OrderItemsEconomics {
                 <label class="mb-1 block text-xs font-medium text-gray-500">Delivered Qty</label>
                 <input type="number" step="0.001" min="0"
                   [ngModel]="row.deliveredQuantity ?? row.quantity"
-                  (ngModelChange)="updateField(i, 'deliveredQuantity', +$event)"
+                  (ngModelChange)="updateField(i, 'deliveredQuantity', parseDecimalInput($event))"
                   class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
                          focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                 />
@@ -1351,6 +1351,20 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
       return updated;
     });
     this.emitChange();
+  }
+
+  parseDecimalInput(value: unknown): number | null {
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : null;
+    }
+
+    if (typeof value !== 'string') return null;
+
+    const normalized = value.trim().replace(/\s+/g, '').replace(',', '.');
+    if (!normalized) return null;
+
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
   }
 
   /** Update the main quantity (used for calculations/invoicing) */

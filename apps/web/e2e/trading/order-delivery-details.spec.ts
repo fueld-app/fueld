@@ -14,7 +14,7 @@ async function createOrderFromInquiry(page: import('@playwright/test').Page): Pr
   await expect(page.getByRole('heading', { name: 'Order Detail' })).toBeVisible();
 }
 
-test('delivered at uses a date-only input and autosaves without time entry', async ({ page }) => {
+test('delivered flow saves custom delivered quantities and marks the order delivered', async ({ page }) => {
   test.setTimeout(90_000);
 
   await loginViaUi(page, {
@@ -28,7 +28,7 @@ test('delivered at uses a date-only input and autosaves without time entry', asy
   await expect(deliveredAtInput).toBeVisible();
   await expect(deliveredAtInput).toHaveAttribute('type', 'date');
 
-  const saveRequest = page.waitForRequest((request) => {
+  const deliveredDateSaveRequest = page.waitForRequest((request) => {
     if (request.method() !== 'PUT') return false;
 
     let pathname = '';
@@ -45,6 +45,53 @@ test('delivered at uses a date-only input and autosaves without time entry', asy
   });
 
   await deliveredAtInput.fill('2026-01-09');
-  await saveRequest;
+  await deliveredDateSaveRequest;
   await expect(deliveredAtInput).toHaveValue('2026-01-09');
+
+  const lineRows = page.locator('app-order-items tbody tr');
+  await expect(lineRows).toHaveCount(1);
+  await lineRows.nth(0).locator('input[step="0.001"][min="0"]').nth(1).fill('330.146');
+
+  const attachmentsHeading = page.getByRole('heading', { name: 'Attachments' });
+  const attachmentsCard = attachmentsHeading.locator('..').locator('..');
+  await attachmentsCard.locator('select').first().selectOption({ value: 'BDR' });
+
+  const pdfBuffer = Buffer.from('%PDF-1.4\n%\u00E2\u00E3\u00CF\u00D3\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n');
+  await attachmentsCard.getByRole('button', { name: 'Choose File' }).setInputFiles({
+    name: 'bdr.pdf',
+    mimeType: 'application/pdf',
+    buffer: pdfBuffer,
+  });
+
+  const uploadButton = attachmentsCard.getByRole('button', { name: 'Upload' });
+  await expect(uploadButton).toBeEnabled();
+
+  const uploadResponse = page.waitForResponse((response) => {
+    return response.request().method() === 'POST' && response.url().includes('/attachments');
+  });
+
+  await uploadButton.click();
+  await uploadResponse;
+  await expect(page.getByRole('button', { name: 'bdr.pdf' })).toBeVisible();
+
+  const deliveredStatusRequest = page.waitForRequest((request) => {
+    if (request.method() !== 'PUT') return false;
+
+    let pathname = '';
+    try {
+      pathname = new URL(request.url()).pathname;
+    } catch {
+      return false;
+    }
+
+    if (!/\/orders\/[^/]+\/status$/.test(pathname)) return false;
+
+    const payload = request.postDataJSON() as { status?: string };
+    return payload.status === 'DELIVERED';
+  });
+
+  await page.getByRole('button', { name: 'Actions' }).click();
+  await page.getByRole('menuitem', { name: 'Mark Delivered' }).click();
+  await deliveredStatusRequest;
+  await expect(page.getByText('DELIVERED', { exact: true })).toBeVisible({ timeout: 15_000 });
 });
