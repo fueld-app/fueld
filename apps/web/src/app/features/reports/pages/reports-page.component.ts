@@ -59,20 +59,25 @@ type ExportFormat = 'csv' | 'xlsx';
         </div>
 
         <div class="flex items-center gap-3">
+          <div
+            aria-live="polite"
+            class="inline-flex min-h-10 items-center rounded-lg border px-3 py-2 text-sm font-medium transition-colors"
+            [class.border-sky-200]="loading()"
+            [class.bg-sky-50]="loading()"
+            [class.text-sky-700]="loading()"
+            [class.border-gray-200]="!loading()"
+            [class.bg-gray-50]="!loading()"
+            [class.text-gray-500]="!loading()"
+            data-testid="reports-loading-indicator"
+          >
+            {{ loading() ? (data() ? 'Updating…' : 'Loading…') : 'Live updates on' }}
+          </div>
           <button
             type="button"
             (click)="clearFilters()"
             class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50"
           >
             Reset filters
-          </button>
-          <button
-            type="button"
-            (click)="reload()"
-            class="inline-flex items-center justify-center rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
-            [disabled]="loading()"
-          >
-            {{ loading() ? 'Loading…' : 'Refresh' }}
           </button>
         </div>
       </div>
