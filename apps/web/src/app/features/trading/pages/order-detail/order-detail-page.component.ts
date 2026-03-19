@@ -1829,7 +1829,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   readonly deliveredQtyComplete = computed(() =>
     this.itemRows().length > 0
-    && this.itemRows().every((row) => this.parseDecimalValue(row.deliveredQuantity) !== null),
+    && this.itemRows().every((row) => this.getEffectiveDeliveredQuantity(row) !== null),
   );
 
   readonly hasBdrAttachment = computed(() =>
@@ -2309,7 +2309,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
             profit: parseFloat(item.profit) || 0,
             paymentTerms: item.paymentTerms ?? '',
             customerNote: item.customerNote ?? '',
-            deliveredQuantity: item.deliveredQuantity ? parseFloat(item.deliveredQuantity) : null,
+            deliveredQuantity: item.deliveredQuantity != null ? parseFloat(item.deliveredQuantity) : null,
             // Formula pricing
             costPricingModel: item.costPricingModel ?? PricingModel.Fixed,
             costReferenceId: item.costReferenceId ?? null,
@@ -2945,6 +2945,56 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
     const parsed = Number(normalized);
     return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  private getEffectiveDeliveredQuantity(row: OrderItemRow): number | null {
+    const deliveredQuantity = this.parseDecimalValue(row.deliveredQuantity);
+    if (deliveredQuantity !== null) return deliveredQuantity;
+    return this.parseDecimalValue(row.quantity);
+  }
+
+  private buildItemPayload(rows: OrderItemRow[], options?: { fillMissingDeliveredQuantity?: boolean }) {
+    const fillMissingDeliveredQuantity = options?.fillMissingDeliveredQuantity ?? false;
+
+    return rows.map((r) => {
+      const deliveredQuantity = fillMissingDeliveredQuantity
+        ? this.getEffectiveDeliveredQuantity(r)
+        : this.parseDecimalValue(r.deliveredQuantity);
+
+      return {
+        productType: r.productType,
+        quantity: String(r.quantity),
+        quantityMin: r.quantityMin != null ? String(r.quantityMin) : null,
+        quantityMax: String(r.quantityMax ?? r.quantity),
+        unit: r.unit,
+        costUnit: r.costUnit,
+        salesUnit: r.salesUnit,
+        costConversionFactor: r.costConversionFactor != null ? String(r.costConversionFactor) : '1',
+        unitConversionFactor: r.unitConversionFactor != null ? String(r.unitConversionFactor) : '1',
+        description: r.description || null,
+        costPrice: r.costPrice ? String(r.costPrice) : null,
+        costCurrency: r.costCurrency,
+        salesPrice: r.salesPrice ? String(r.salesPrice) : null,
+        salesCurrency: r.salesCurrency,
+        paymentTerms: r.paymentTerms || null,
+        customerNote: r.customerNote ?? null,
+        deliveredQuantity: deliveredQuantity != null ? String(deliveredQuantity) : null,
+        costPricingModel: r.costPricingModel ?? 'FIXED',
+        costReferenceId: r.costReferenceId ?? null,
+        costPlattsEntryId: r.costPlattsEntryId ?? null,
+        costPremium: r.costPremium != null ? String(r.costPremium) : null,
+        costBarging: r.costBarging != null ? String(r.costBarging) : null,
+        costBargingUnit: r.costBargingUnit ?? null,
+        costCreditDays: r.costCreditDays ?? null,
+        salesPricingModel: r.salesPricingModel ?? 'FIXED',
+        salesReferenceId: r.salesReferenceId ?? null,
+        salesPlattsEntryId: r.salesPlattsEntryId ?? null,
+        salesPremium: r.salesPremium != null ? String(r.salesPremium) : null,
+        salesBarging: r.salesBarging != null ? String(r.salesBarging) : null,
+        salesBargingUnit: r.salesBargingUnit ?? null,
+        salesCreditDays: r.salesCreditDays ?? null,
+      };
+    });
   }
 
   private normalizeTimeZone(timeZone: string): string {
@@ -3604,38 +3654,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         }),
       );
 
-      const itemPayload = this.itemRows().map((r) => ({
-        productType: r.productType,
-        quantity: String(r.quantity),
-        quantityMin: r.quantityMin != null ? String(r.quantityMin) : null,
-        quantityMax: String(r.quantityMax ?? r.quantity),
-        unit: r.unit,
-        costUnit: r.costUnit,
-        salesUnit: r.salesUnit,
-        costConversionFactor: r.costConversionFactor != null ? String(r.costConversionFactor) : '1',
-        unitConversionFactor: r.unitConversionFactor != null ? String(r.unitConversionFactor) : '1',
-        description: r.description || null,
-        costPrice: r.costPrice ? String(r.costPrice) : null,
-        costCurrency: r.costCurrency ?? o.currency,
-        salesPrice: r.salesPrice ? String(r.salesPrice) : null,
-        salesCurrency: r.salesCurrency ?? o.currency,
-        paymentTerms: r.paymentTerms || null,
-        customerNote: r.customerNote ?? null,
-        deliveredQuantity: r.deliveredQuantity != null ? String(r.deliveredQuantity) : null,
-        costPricingModel: r.costPricingModel ?? 'FIXED',
-        costReferenceId: r.costReferenceId ?? null,
-        costPlattsEntryId: r.costPlattsEntryId ?? null,
-        costPremium: r.costPremium != null ? String(r.costPremium) : null,
-        costBarging: r.costBarging != null ? String(r.costBarging) : null,
-        costBargingUnit: r.costBargingUnit ?? null,
-        costCreditDays: r.costCreditDays ?? null,
-        salesPricingModel: r.salesPricingModel ?? 'FIXED',
-        salesReferenceId: r.salesReferenceId ?? null,
-        salesPlattsEntryId: r.salesPlattsEntryId ?? null,
-        salesPremium: r.salesPremium != null ? String(r.salesPremium) : null,
-        salesBarging: r.salesBarging != null ? String(r.salesBarging) : null,
-        salesBargingUnit: r.salesBargingUnit ?? null,
-        salesCreditDays: r.salesCreditDays ?? null,
+      const itemPayload = this.buildItemPayload(this.itemRows()).map((item) => ({
+        ...item,
+        costCurrency: item.costCurrency ?? o.currency,
+        salesCurrency: item.salesCurrency ?? o.currency,
       }));
 
       await firstValueFrom(
@@ -3846,10 +3868,12 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   private async markDelivered(): Promise<void> {
     const status = this.order()?.status;
+    const id = this.orderId();
     if (status !== OrderStatus.Confirmed) {
       this.showToast('error', 'Only confirmed orders can be marked as delivered.');
       return;
     }
+    if (!id) return;
     if (!this.hasLineItems()) {
       this.showToast('error', 'Add at least one line item before marking delivered.');
       return;
@@ -3864,6 +3888,23 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     }
     if (!this.hasBdrAttachment()) {
       this.showToast('error', 'Upload a BDR attachment before marking delivered.');
+      return;
+    }
+
+    const normalizedRows = this.itemRows().map((row) => ({
+      ...row,
+      deliveredQuantity: this.getEffectiveDeliveredQuantity(row),
+    }));
+
+    try {
+      await firstValueFrom(
+        this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}/items`, {
+          items: this.buildItemPayload(normalizedRows, { fillMissingDeliveredQuantity: true }),
+        }),
+      );
+      this.itemRows.set(normalizedRows);
+    } catch {
+      this.showToast('error', 'Failed to save delivered quantities.');
       return;
     }
 
@@ -3902,38 +3943,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         }),
       );
 
-      const itemPayload = this.itemRows().map((r) => ({
-        productType: r.productType,
-        quantity: String(r.quantity),
-        quantityMin: r.quantityMin != null ? String(r.quantityMin) : null,
-        quantityMax: String(r.quantityMax ?? r.quantity),
-        unit: r.unit,
-        costUnit: r.costUnit,
-        salesUnit: r.salesUnit,
-        costConversionFactor: r.costConversionFactor != null ? String(r.costConversionFactor) : '1',
-        unitConversionFactor: r.unitConversionFactor != null ? String(r.unitConversionFactor) : '1',
-        description: r.description || null,
-        costPrice: r.costPrice ? String(r.costPrice) : null,
-        costCurrency: r.costCurrency ?? o.currency,
-        salesPrice: r.salesPrice ? String(r.salesPrice) : null,
-        salesCurrency: r.salesCurrency ?? o.currency,
-        paymentTerms: r.paymentTerms || null,
-        customerNote: r.customerNote ?? null,
-        deliveredQuantity: r.deliveredQuantity != null ? String(r.deliveredQuantity) : null,
-        costPricingModel: r.costPricingModel ?? 'FIXED',
-        costReferenceId: r.costReferenceId ?? null,
-        costPlattsEntryId: r.costPlattsEntryId ?? null,
-        costPremium: r.costPremium != null ? String(r.costPremium) : null,
-        costBarging: r.costBarging != null ? String(r.costBarging) : null,
-        costBargingUnit: r.costBargingUnit ?? null,
-        costCreditDays: r.costCreditDays ?? null,
-        salesPricingModel: r.salesPricingModel ?? 'FIXED',
-        salesReferenceId: r.salesReferenceId ?? null,
-        salesPlattsEntryId: r.salesPlattsEntryId ?? null,
-        salesPremium: r.salesPremium != null ? String(r.salesPremium) : null,
-        salesBarging: r.salesBarging != null ? String(r.salesBarging) : null,
-        salesBargingUnit: r.salesBargingUnit ?? null,
-        salesCreditDays: r.salesCreditDays ?? null,
+      const itemPayload = this.buildItemPayload(this.itemRows()).map((item) => ({
+        ...item,
+        costCurrency: item.costCurrency ?? o.currency,
+        salesCurrency: item.salesCurrency ?? o.currency,
       }));
 
       await firstValueFrom(
