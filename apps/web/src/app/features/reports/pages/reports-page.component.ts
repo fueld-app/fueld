@@ -83,7 +83,7 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
         </div>
       </div>
 
-      <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm" data-testid="reports-filter-bar">
+      <section class="min-w-0 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm" data-testid="reports-filter-bar">
         <div class="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400">Report Filters</h2>
@@ -93,14 +93,14 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
             Comparison: {{ comparisonModeLabel(comparisonMode()) }}
           </div>
         </div>
-        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-          <div class="relative" #dateDropdown>
-            <label class="flex flex-col gap-1 text-sm text-gray-600">
+        <div class="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-6">
+          <div class="relative min-w-0" #dateDropdown>
+            <label class="flex min-w-0 flex-col gap-1 text-sm text-gray-600">
               <span>Date Range</span>
               <button
                 type="button"
                 (click)="dateDropdownOpen.set(!dateDropdownOpen())"
-                class="flex items-center justify-between gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm transition-colors hover:bg-gray-50 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
+                class="flex w-full min-w-0 items-center justify-between gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm transition-colors hover:bg-gray-50 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
                 data-testid="reports-date-filter-trigger"
               >
                 <span class="flex items-center gap-2 truncate">
@@ -116,7 +116,7 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
             </label>
 
             @if (dateDropdownOpen()) {
-              <div class="absolute left-0 z-30 mt-2 w-[22rem] max-w-[calc(100vw-2rem)] origin-top-left rounded-xl border border-gray-200 bg-white shadow-lg ring-1 ring-black/5 max-h-[calc(100vh-140px)] overflow-y-auto">
+              <div class="absolute left-0 z-30 mt-2 w-full min-w-0 max-w-[calc(100vw-2rem)] origin-top-left rounded-xl border border-gray-200 bg-white shadow-lg ring-1 ring-black/5 max-h-[calc(100vh-140px)] overflow-y-auto sm:w-[22rem]">
                 <div class="py-1">
                   @for (preset of datePresets; track preset.key) {
                     <button
@@ -137,19 +137,19 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
                 </div>
                 <div class="border-t border-gray-100 px-4 py-3">
                   <p class="mb-2 text-xs font-medium uppercase tracking-[0.18em] text-gray-500">Custom Range</p>
-                  <div class="flex items-center gap-2">
+                  <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <input
                       type="date"
                       [value]="customDateFrom()"
                       (change)="customDateFrom.set(($any($event.target).value || ''))"
-                      class="min-w-0 flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      class="w-full min-w-0 flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     />
                     <span class="shrink-0 px-1 text-xs text-gray-400">to</span>
                     <input
                       type="date"
                       [value]="customDateTo()"
                       (change)="customDateTo.set(($any($event.target).value || ''))"
-                      class="min-w-0 flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      class="w-full min-w-0 flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     />
                   </div>
                   <button
@@ -164,45 +164,45 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
               </div>
             }
           </div>
-          <label class="flex flex-col gap-1 text-sm text-gray-600">
+          <label class="flex min-w-0 flex-col gap-1 text-sm text-gray-600">
             <span>Trader</span>
-            <select [value]="traderId() ?? ''" (change)="onTraderChange($event)" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
+            <select [value]="traderId() ?? ''" (change)="onTraderChange($event)" class="w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
               <option value="">All</option>
               @for (option of data()?.filterOptions?.traders ?? []; track option.id) {
                 <option [value]="option.id">{{ option.label }}</option>
               }
             </select>
           </label>
-          <label class="flex flex-col gap-1 text-sm text-gray-600">
+          <label class="flex min-w-0 flex-col gap-1 text-sm text-gray-600">
             <span>Team</span>
-            <select [value]="teamId() ?? ''" (change)="onTeamChange($event)" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
+            <select [value]="teamId() ?? ''" (change)="onTeamChange($event)" class="w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
               <option value="">All</option>
               @for (option of data()?.filterOptions?.teams ?? []; track option.id) {
                 <option [value]="option.id">{{ option.label }}</option>
               }
             </select>
           </label>
-          <label class="flex flex-col gap-1 text-sm text-gray-600">
+          <label class="flex min-w-0 flex-col gap-1 text-sm text-gray-600">
             <span>Customer</span>
-            <select [value]="customerId() ?? ''" (change)="onCustomerChange($event)" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
+            <select [value]="customerId() ?? ''" (change)="onCustomerChange($event)" class="w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
               <option value="">All</option>
               @for (option of data()?.filterOptions?.customers ?? []; track option.id) {
                 <option [value]="option.id">{{ option.label }}</option>
               }
             </select>
           </label>
-          <label class="flex flex-col gap-1 text-sm text-gray-600">
+          <label class="flex min-w-0 flex-col gap-1 text-sm text-gray-600">
             <span>Product</span>
-            <select [value]="productType() ?? ''" (change)="onProductTypeChange($event)" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
+            <select [value]="productType() ?? ''" (change)="onProductTypeChange($event)" class="w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
               <option value="">All</option>
               @for (option of data()?.filterOptions?.products ?? []; track option.id) {
                 <option [value]="option.id">{{ option.label }}</option>
               }
             </select>
           </label>
-          <label class="flex flex-col gap-1 text-sm text-gray-600">
+          <label class="flex min-w-0 flex-col gap-1 text-sm text-gray-600">
             <span>Comparison</span>
-            <select data-testid="reports-comparison-mode" [value]="comparisonMode()" (change)="onComparisonModeChange($event)" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
+            <select data-testid="reports-comparison-mode" [value]="comparisonMode()" (change)="onComparisonModeChange($event)" class="w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
               <option value="NONE">None</option>
               <option value="PREVIOUS_PERIOD">Previous period</option>
               <option value="PREVIOUS_MONTH">Previous month</option>
