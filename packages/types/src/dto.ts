@@ -1295,6 +1295,200 @@ export interface ConversionMetricsDto {
   avgDaysToClose: number | null;
 }
 
+export type ReportVisibilityScope = 'SELF' | 'TEAM' | 'ALL';
+
+/** Effective reporting access for the current user. */
+export interface ReportsAccessDto {
+  role: Role;
+  scope: ReportVisibilityScope;
+  canExport: boolean;
+  canViewFinance: boolean;
+  canViewTeamPerformance: boolean;
+  canViewCollections: boolean;
+  canManageSharedViews: boolean;
+  canManageSchedules: boolean;
+}
+
+/** Report filter state shared between the UI, saved views, and schedules. */
+export interface ReportFiltersDto {
+  from?: string;
+  to?: string;
+  traderId?: string | null;
+  teamId?: string | null;
+  customerId?: string | null;
+  productType?: string | null;
+}
+
+/** Generic select option used by report filter dropdowns. */
+export interface ReportFilterOptionDto {
+  id: string;
+  label: string;
+  subtitle?: string | null;
+}
+
+/** Available filter options for the current reporting scope. */
+export interface ReportFilterOptionsDto {
+  traders: ReportFilterOptionDto[];
+  teams: ReportFilterOptionDto[];
+  customers: ReportFilterOptionDto[];
+  products: ReportFilterOptionDto[];
+}
+
+/** Trader performance row for the Release 1 reports section. */
+export interface TraderPerformanceReportRowDto {
+  traderId: string;
+  traderName: string;
+  traderEmail: string;
+  teamName: string | null;
+  orderCount: number;
+  wonCount: number;
+  lostCount: number;
+  winRate: number;
+  totalVolume: string;
+  totalRevenue: string;
+  totalGrossProfit: string;
+  totalFinancingCost: string;
+  totalNetProfit: string;
+  avgDealSize: string;
+}
+
+/** Trader performance report payload. */
+export interface TraderPerformanceReportDto {
+  rows: TraderPerformanceReportRowDto[];
+  totals: {
+    orderCount: number;
+    wonCount: number;
+    lostCount: number;
+    winRate: number;
+    totalVolume: string;
+    totalRevenue: string;
+    totalGrossProfit: string;
+    totalFinancingCost: string;
+    totalNetProfit: string;
+    avgDealSize: string;
+  };
+}
+
+/** Invoice aging row for the Release 1 reports section. */
+export interface InvoiceAgingReportRowDto {
+  invoiceId: string;
+  invoiceNumber: string;
+  orderId: string;
+  clientName: string;
+  vesselName: string;
+  traderName: string | null;
+  dueDate: string;
+  status: InvoiceStatus;
+  amount: string;
+  amountPaid: string;
+  outstandingAmount: string;
+  daysOverdue: number;
+  agingBucket: string;
+}
+
+/** Summary bucket for invoice aging. */
+export interface InvoiceAgingBucketDto {
+  label: string;
+  count: number;
+  outstandingAmount: string;
+}
+
+/** Invoice aging report payload. */
+export interface InvoiceAgingReportDto {
+  rows: InvoiceAgingReportRowDto[];
+  buckets: InvoiceAgingBucketDto[];
+  totalInvoices: number;
+  totalOutstanding: string;
+}
+
+/** Commercial summary report payload. */
+export interface CommercialSummaryReportDto {
+  conversion: ConversionMetricsDto;
+  lossAnalysis: LossAnalysisResponseDto;
+  pipeline: PipelineStageDto[];
+}
+
+/** Margin analysis row grouped by a commercial dimension. */
+export interface MarginAnalysisRowDto {
+  key: string;
+  label: string;
+  orderCount: number;
+  totalVolume: string;
+  totalRevenue: string;
+  totalGrossProfit: string;
+  totalFinancingCost: string;
+  totalNetProfit: string;
+  netMarginPct: number | null;
+}
+
+/** Monthly trend point for margin analysis. */
+export interface MarginTrendPointDto {
+  month: string;
+  orderCount: number;
+  totalRevenue: string;
+  totalNetProfit: string;
+  netMarginPct: number | null;
+}
+
+/** Margin analysis report payload. */
+export interface MarginAnalysisReportDto {
+  byCustomer: MarginAnalysisRowDto[];
+  byProduct: MarginAnalysisRowDto[];
+  byVessel: MarginAnalysisRowDto[];
+  monthlyTrend: MarginTrendPointDto[];
+}
+
+/** Shared saved report preset. */
+export interface SavedReportViewDto {
+  id: string;
+  name: string;
+  description: string | null;
+  filters: ReportFiltersDto;
+  createdAt: string;
+  updatedAt: string;
+  createdByName: string | null;
+}
+
+export type ReportScheduleType = 'SUMMARY' | 'MARGIN_ANALYSIS';
+export type ReportScheduleDeliveryMode = 'HTML' | 'CSV' | 'XLSX' | 'CSV_XLSX';
+export type ReportScheduleBodyMode = 'HTML_SUMMARY' | 'ATTACHMENT_ONLY';
+
+/** Scheduled report delivery configuration. */
+export interface ReportScheduleDto {
+  id: string;
+  name: string;
+  description: string | null;
+  reportType: ReportScheduleType;
+  deliveryMode: ReportScheduleDeliveryMode;
+  bodyMode: ReportScheduleBodyMode;
+  hourUtc: number;
+  recipientRoles: Role[];
+  extraEmails: string[];
+  filters: ReportFiltersDto;
+  isActive: boolean;
+  lastSentAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Release 1 reports landing payload. */
+export interface ReleaseOneReportsDto {
+  generatedAt: string;
+  access: ReportsAccessDto;
+  traderPerformance: TraderPerformanceReportDto;
+  invoiceAging: InvoiceAgingReportDto;
+  commercialSummary: CommercialSummaryReportDto;
+}
+
+/** Release 2 reports payload with richer filters and margin analysis. */
+export interface ReleaseTwoReportsDto extends ReleaseOneReportsDto {
+  filtersApplied: ReportFiltersDto;
+  filterOptions: ReportFilterOptionsDto;
+  savedViews: SavedReportViewDto[];
+  schedules: ReportScheduleDto[];
+  marginAnalysis: MarginAnalysisReportDto;
+}
+
 /** Request to send an invoice email. */
 export interface SendInvoiceRequestDto {
   accessToken: string;

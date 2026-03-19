@@ -76,6 +76,7 @@ import { API } from '@app/core/config/api';
           </button>
           <button
             (click)="activeTab.set('log')"
+            data-testid="activity-log-tab"
             class="pb-3 text-sm font-medium border-b-2 transition-colors"
             [class]="activeTab() === 'log'
               ? 'border-brand-600 text-brand-600'
@@ -213,6 +214,7 @@ import { API } from '@app/core/config/api';
           <select
             [ngModel]="filterEntity()"
             (ngModelChange)="filterEntity.set($event); loadLogs()"
+            data-testid="activity-log-entity-filter"
             class="app-input px-3 py-1.5"
           >
             <option value="">All Entities</option>
@@ -224,6 +226,8 @@ import { API } from '@app/core/config/api';
             <option value="credit_line">Credit Line</option>
             <option value="team">Team</option>
             <option value="user">User</option>
+            <option value="report_saved_view">Report Saved View</option>
+            <option value="report_schedule">Report Schedule</option>
           </select>
           <select
             [ngModel]="filterUserId()"
@@ -701,6 +705,8 @@ export class ActivityLogPageComponent implements OnInit, OnDestroy {
       user: 'Users',
       company_group: 'Company Groups',
       integration: 'Integrations',
+      report_saved_view: 'Report Saved Views',
+      report_schedule: 'Report Schedules',
     };
     return labels[entityType] || entityType.charAt(0).toUpperCase() + entityType.slice(1);
   }

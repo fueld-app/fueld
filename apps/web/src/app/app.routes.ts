@@ -62,6 +62,14 @@ export const routes: Routes = [
           ),
         title: 'Analytics',
       },
+      {
+        path: 'reports',
+        loadComponent: () =>
+          import('./features/reports/pages/reports-page.component').then(
+            (m) => m.ReportsPageComponent,
+          ),
+        title: 'Reports',
+      },
       // ── Trading ──
       {
         path: 'trading',

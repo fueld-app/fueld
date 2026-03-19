@@ -251,6 +251,48 @@ export interface TenantSettings {
     mode: 'multi' | 'single';
     options: { key: string; label: string; description?: string }[];
   }[];
+  // Shared report presets and schedules
+  reportsSettings?: {
+    savedViews?: {
+      id: string;
+      name: string;
+      description?: string | null;
+      filters?: {
+        from?: string;
+        to?: string;
+        traderId?: string | null;
+        teamId?: string | null;
+        customerId?: string | null;
+        productType?: string | null;
+      };
+      createdAt: string;
+      updatedAt: string;
+      createdByName?: string | null;
+    }[];
+    schedules?: {
+      id: string;
+      name: string;
+      description?: string | null;
+      reportType: 'SUMMARY' | 'MARGIN_ANALYSIS';
+      deliveryMode?: 'HTML' | 'CSV' | 'XLSX' | 'CSV_XLSX';
+      bodyMode?: 'HTML_SUMMARY' | 'ATTACHMENT_ONLY';
+      hourUtc: number;
+      recipientRoles: string[];
+      extraEmails?: string[];
+      filters?: {
+        from?: string;
+        to?: string;
+        traderId?: string | null;
+        teamId?: string | null;
+        customerId?: string | null;
+        productType?: string | null;
+      };
+      isActive?: boolean;
+      lastSentAt?: string | null;
+      createdAt: string;
+      updatedAt: string;
+    }[];
+  };
 }
 
 export const tenants = pgTable('tenants', {

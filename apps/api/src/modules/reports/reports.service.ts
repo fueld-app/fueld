@@ -1,0 +1,1735 @@
+import { and, asc, eq, gte, inArray, isNotNull, lte, ne, sql } from 'drizzle-orm';
+import type {
+  CommercialSummaryReportDto,
+  ConversionMetricsDto,
+  InvoiceAgingReportDto,
+  InvoiceAgingReportRowDto,
+  LossAnalysisResponseDto,
+  MarginAnalysisReportDto,
+  MarginAnalysisRowDto,
+  MarginTrendPointDto,
+  PipelineStageDto,
+  ReleaseOneReportsDto,
+  ReleaseTwoReportsDto,
+  ReportFilterOptionsDto,
+  ReportScheduleBodyMode,
+  ReportFiltersDto,
+  ReportScheduleDeliveryMode,
+  ReportScheduleDto,
+  ReportScheduleType,
+  ReportsAccessDto,
+  SavedReportViewDto,
+  TraderPerformanceReportDto,
+  TraderPerformanceReportRowDto,
+} from '@fueld/types';
+import { Role } from '@fueld/types';
+import * as XLSX from 'xlsx';
+import { db } from '../../db';
+import {
+  counterparties,
+  invoices,
+  orderItems,
+  orders,
+  teams,
+  tenants,
+  type TenantSettings,
+  users,
+  vessels,
+} from '../../db/schema';
+import { sendNotificationEmail } from '../../lib/email';
+import { logActivity } from '../activity/activity.service';
+import { calculateOrderEconomics, calculateRevenueBase, getFinancingRateAnnual } from '../orders/order-financing';
+
+const MANAGE_SHARED_REPORT_ROLES: Role[] = [
+  Role.Admin,
+  Role.Finance,
+  Role.Teamlead,
+  Role.CreditManager,
+];
+
+type StoredReportSettings = NonNullable<TenantSettings['reportsSettings']>;
+
+type ScopedOrderRow = {
+  orderId: string;
+  traderId: string;
+  traderName: string;
+  traderEmail: string;
+  teamId: string | null;
+  teamName: string | null;
+  clientId: string;
+  clientName: string;
+  vesselId: string;
+  vesselName: string;
+  status: string;
+  createdAt: Date;
+  closedAt: Date | null;
+  customerPaymentTermType: string | null;
+  customerCreditDays: number | null;
+  supplierPaymentTermType: string | null;
+  supplierCreditDays: number | null;
+};
+
+type ScopedItemRow = {
+  orderId: string;
+  productType: string;
+  quantity: string | number | null;
+  costPrice: string | number | null;
+  costCurrency: string | null;
+  costConversionFactor: string | number | null;
+  salesPrice: string | number | null;
+  salesCurrency: string | null;
+  unitConversionFactor: string | number | null;
+};
+
+type ReportAccessContext = {
+  access: ReportsAccessDto;
+  userIds: string[] | null;
+  teamId: string | null;
+};
+
+type ScopedDataset = {
+  filtersApplied: ReportFiltersDto;
+  orderRows: ScopedOrderRow[];
+  itemRows: ScopedItemRow[];
+  itemsByOrder: Map<string, ScopedItemRow[]>;
+  financingRateAnnual: number;
+};
+
+function parseNumber(value: string | number | null | undefined): number {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+function formatMoney(value: number): string {
+  return value.toFixed(2);
+}
+
+function formatQuantity(value: number): string {
+  return value.toFixed(3);
+}
+
+function formatPercentValue(numerator: number, denominator: number): number {
+  return denominator > 0 ? numerator / denominator : 0;
+}
+
+function escapeCsv(value: string | number | null | undefined): string {
+  const raw = value === null || value === undefined ? '' : String(value);
+  if (raw.includes(',') || raw.includes('"') || raw.includes('\n')) {
+    return `"${raw.replace(/"/g, '""')}"`;
+  }
+  return raw;
+}
+
+function buildCsv(rows: Array<Array<string | number | null | undefined>>): string {
+  return rows.map((row) => row.map((cell) => escapeCsv(cell)).join(',')).join('\n');
+}
+
+function buildFileSuffix(filters: ReportFiltersDto): string {
+  if (filters.from || filters.to) {
+    return [filters.from ?? 'start', filters.to ?? 'end'].join('_');
+  }
+  return new Date().toISOString().slice(0, 10);
+}
+
+function normalizeDeliveryMode(mode?: ReportScheduleDeliveryMode | null): ReportScheduleDeliveryMode {
+  return mode === 'CSV' || mode === 'XLSX' || mode === 'CSV_XLSX' ? mode : 'HTML';
+}
+
+function normalizeBodyMode(mode?: ReportScheduleBodyMode | null): ReportScheduleBodyMode {
+  return mode === 'ATTACHMENT_ONLY' ? 'ATTACHMENT_ONLY' : 'HTML_SUMMARY';
+}
+
+function resolveScheduleBodyMode(
+  deliveryMode?: ReportScheduleDeliveryMode | null,
+  bodyMode?: ReportScheduleBodyMode | null,
+): ReportScheduleBodyMode {
+  const normalizedDeliveryMode = normalizeDeliveryMode(deliveryMode);
+  const normalizedBodyMode = normalizeBodyMode(bodyMode);
+  return normalizedDeliveryMode === 'HTML' ? 'HTML_SUMMARY' : normalizedBodyMode;
+}
+
+function normalizeScheduleRecipientRoles(recipientRoles?: Role[]): Role[] {
+  return Array.from(new Set((recipientRoles ?? []).filter(Boolean)));
+}
+
+function normalizeExtraEmails(extraEmails?: string[]): string[] {
+  return Array.from(new Set((extraEmails ?? []).map((email) => email.trim()).filter(Boolean)));
+}
+
+function getAgingBucket(dueDate: string, today: string): { label: string; daysOverdue: number } {
+  const dueMs = new Date(dueDate).getTime();
+  const todayMs = new Date(today).getTime();
+  const diffDays = Math.floor((todayMs - dueMs) / 86_400_000);
+
+  if (diffDays <= 0) return { label: 'CURRENT', daysOverdue: 0 };
+  if (diffDays <= 30) return { label: '1-30', daysOverdue: diffDays };
+  if (diffDays <= 60) return { label: '31-60', daysOverdue: diffDays };
+  if (diffDays <= 90) return { label: '61-90', daysOverdue: diffDays };
+  return { label: '90+', daysOverdue: diffDays };
+}
+
+function monthKey(date: Date): string {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+function normalizeReportSettings(settings?: TenantSettings['reportsSettings'] | null): StoredReportSettings {
+  return {
+    savedViews: [...(settings?.savedViews ?? [])],
+    schedules: [...(settings?.schedules ?? [])],
+  };
+}
+
+function normalizeFilterValue(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+function normalizeReportFilters(filters: ReportFiltersDto | undefined, context: ReportAccessContext): ReportFiltersDto {
+  const traderId = normalizeFilterValue(filters?.traderId ?? undefined);
+  const teamId = normalizeFilterValue(filters?.teamId ?? undefined);
+  const customerId = normalizeFilterValue(filters?.customerId ?? undefined);
+  const productType = normalizeFilterValue(filters?.productType ?? undefined);
+
+  const normalized: ReportFiltersDto = {
+    from: normalizeFilterValue(filters?.from ?? undefined) ?? undefined,
+    to: normalizeFilterValue(filters?.to ?? undefined) ?? undefined,
+    customerId,
+    productType,
+  };
+
+  if (context.userIds === null) {
+    normalized.traderId = traderId;
+    normalized.teamId = teamId;
+    return normalized;
+  }
+
+  normalized.traderId = traderId && context.userIds.includes(traderId) ? traderId : null;
+  normalized.teamId = context.teamId && teamId === context.teamId ? teamId : null;
+  return normalized;
+}
+
+async function getTenantSettingsRow(tenantId: string) {
+  const tenant = await db.query.tenants.findFirst({
+    where: eq(tenants.id, tenantId),
+    columns: { id: true, name: true, settings: true },
+  });
+
+  if (!tenant) throw new Error('Tenant not found');
+  return tenant;
+}
+
+async function updateTenantReportSettings(
+  tenantId: string,
+  updater: (current: StoredReportSettings) => StoredReportSettings,
+): Promise<StoredReportSettings> {
+  const tenant = await getTenantSettingsRow(tenantId);
+  const currentSettings = (tenant.settings ?? {}) as TenantSettings;
+  const nextReportSettings = updater(normalizeReportSettings(currentSettings.reportsSettings));
+  const nextSettings: TenantSettings = {
+    ...currentSettings,
+    reportsSettings: nextReportSettings,
+  };
+
+  await db.update(tenants).set({ settings: nextSettings, updatedAt: new Date() }).where(eq(tenants.id, tenantId));
+  return nextReportSettings;
+}
+
+async function logReportConfigActivity(params: {
+  tenantId: string;
+  userId: string;
+  action: 'CREATE' | 'UPDATE' | 'DELETE';
+  entityType: 'report_saved_view' | 'report_schedule';
+  entityId: string;
+  entityName: string;
+  httpMethod: 'POST' | 'PATCH' | 'DELETE';
+  httpPath: string;
+  metadata: Record<string, unknown>;
+}) {
+  await logActivity({
+    userId: params.userId,
+    tenantId: params.tenantId,
+    action: params.action,
+    entityType: params.entityType,
+    entityId: params.entityId,
+    entityName: params.entityName,
+    httpMethod: params.httpMethod,
+    httpPath: params.httpPath,
+    metadata: params.metadata,
+  });
+}
+
+async function resolveReportAccessContext(
+  tenantId: string,
+  requestingUserId: string,
+): Promise<ReportAccessContext> {
+  const requestingUser = await db.query.users.findFirst({
+    where: eq(users.id, requestingUserId),
+    columns: { id: true, role: true, teamId: true },
+  });
+
+  if (!requestingUser) throw new Error('User not found');
+
+  const canManage = MANAGE_SHARED_REPORT_ROLES.includes(requestingUser.role as Role);
+  const canViewAll = [Role.Admin, Role.Finance, Role.CreditManager].includes(requestingUser.role as Role);
+
+  if (canViewAll) {
+    return {
+      access: {
+        role: requestingUser.role as Role,
+        scope: 'ALL',
+        canExport: true,
+        canViewFinance: true,
+        canViewTeamPerformance: true,
+        canViewCollections: true,
+        canManageSharedViews: canManage,
+        canManageSchedules: canManage,
+      },
+      userIds: null,
+      teamId: requestingUser.teamId ?? null,
+    };
+  }
+
+  if (requestingUser.role === Role.Teamlead && requestingUser.teamId) {
+    const teamMembers = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.tenantId, tenantId), eq(users.teamId, requestingUser.teamId), inArray(users.role, [Role.Trader, Role.Teamlead])));
+
+    return {
+      access: {
+        role: requestingUser.role as Role,
+        scope: teamMembers.length > 1 ? 'TEAM' : 'SELF',
+        canExport: true,
+        canViewFinance: false,
+        canViewTeamPerformance: teamMembers.length > 1,
+        canViewCollections: true,
+        canManageSharedViews: canManage,
+        canManageSchedules: canManage,
+      },
+      userIds: teamMembers.map((member) => member.id),
+      teamId: requestingUser.teamId,
+    };
+  }
+
+  const delegatedUsers = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.tenantId, tenantId), eq(users.delegateId, requestingUserId), eq(users.isOnLeave, true)));
+
+  return {
+    access: {
+      role: requestingUser.role as Role,
+      scope: 'SELF',
+      canExport: true,
+      canViewFinance: false,
+      canViewTeamPerformance: false,
+      canViewCollections: true,
+      canManageSharedViews: false,
+      canManageSchedules: false,
+    },
+    userIds: Array.from(new Set([requestingUserId, ...delegatedUsers.map((user) => user.id)])),
+    teamId: requestingUser.teamId ?? null,
+  };
+}
+
+function assertCanManageSharedViews(context: ReportAccessContext): void {
+  if (!context.access.canManageSharedViews) {
+    throw new Error('Forbidden: insufficient role to manage shared report views');
+  }
+}
+
+function assertCanManageSchedules(context: ReportAccessContext): void {
+  if (!context.access.canManageSchedules) {
+    throw new Error('Forbidden: insufficient role to manage report schedules');
+  }
+}
+
+async function fetchScopedDataset(
+  tenantId: string,
+  context: ReportAccessContext,
+  filters: ReportFiltersDto,
+): Promise<ScopedDataset> {
+  const filtersApplied = normalizeReportFilters(filters, context);
+  const conditions = [eq(orders.tenantId, tenantId), isNotNull(orders.salesRepId)];
+  if (filtersApplied.from) conditions.push(gte(orders.createdAt, new Date(`${filtersApplied.from}T00:00:00`)));
+  if (filtersApplied.to) conditions.push(lte(orders.createdAt, new Date(`${filtersApplied.to}T23:59:59`)));
+  if (context.userIds) conditions.push(inArray(orders.salesRepId, context.userIds));
+  if (filtersApplied.traderId) conditions.push(eq(orders.salesRepId, filtersApplied.traderId));
+  if (filtersApplied.customerId) conditions.push(eq(orders.clientId, filtersApplied.customerId));
+
+  const orderRows = await db
+    .select({
+      orderId: orders.id,
+      traderId: orders.salesRepId,
+      traderName: users.name,
+      traderEmail: users.email,
+      teamId: users.teamId,
+      teamName: teams.name,
+      clientId: counterparties.id,
+      clientName: counterparties.name,
+      vesselId: vessels.id,
+      vesselName: vessels.name,
+      status: orders.status,
+      createdAt: orders.createdAt,
+      closedAt: orders.closedAt,
+      customerPaymentTermType: orders.customerPaymentTermType,
+      customerCreditDays: orders.customerCreditDays,
+      supplierPaymentTermType: orders.supplierPaymentTermType,
+      supplierCreditDays: orders.supplierCreditDays,
+    })
+    .from(orders)
+    .innerJoin(users, eq(orders.salesRepId, users.id))
+    .leftJoin(teams, eq(users.teamId, teams.id))
+    .innerJoin(counterparties, eq(orders.clientId, counterparties.id))
+    .innerJoin(vessels, eq(orders.vesselId, vessels.id))
+    .where(and(...conditions));
+
+  const teamFilteredOrderRows = filtersApplied.teamId
+    ? orderRows.filter((row) => row.teamId === filtersApplied.teamId)
+    : orderRows;
+
+  const tenant = await db.query.tenants.findFirst({
+    where: eq(tenants.id, tenantId),
+    columns: { settings: true },
+  });
+  const financingRateAnnual = getFinancingRateAnnual((tenant?.settings ?? {}) as TenantSettings);
+
+  if (teamFilteredOrderRows.length === 0) {
+    return {
+      filtersApplied,
+      orderRows: [],
+      itemRows: [],
+      itemsByOrder: new Map(),
+      financingRateAnnual,
+    };
+  }
+
+  const itemRows = await db
+    .select({
+      orderId: orderItems.orderId,
+      productType: orderItems.productType,
+      quantity: orderItems.quantity,
+      costPrice: orderItems.costPrice,
+      costCurrency: orderItems.costCurrency,
+      costConversionFactor: orderItems.costConversionFactor,
+      salesPrice: orderItems.salesPrice,
+      salesCurrency: orderItems.salesCurrency,
+      unitConversionFactor: orderItems.unitConversionFactor,
+    })
+    .from(orderItems)
+    .where(and(
+      inArray(orderItems.orderId, teamFilteredOrderRows.map((row) => row.orderId)),
+      ...(filtersApplied.productType ? [eq(orderItems.productType, filtersApplied.productType as any)] : []),
+    ));
+
+  const itemsByOrder = new Map<string, ScopedItemRow[]>();
+  for (const item of itemRows) {
+    const current = itemsByOrder.get(item.orderId) ?? [];
+    current.push(item as ScopedItemRow);
+    itemsByOrder.set(item.orderId, current);
+  }
+
+  const filteredOrderRows = filtersApplied.productType
+    ? teamFilteredOrderRows.filter((row) => itemsByOrder.has(row.orderId))
+    : teamFilteredOrderRows;
+
+  return {
+    filtersApplied,
+    orderRows: filteredOrderRows as ScopedOrderRow[],
+    itemRows: itemRows as ScopedItemRow[],
+    itemsByOrder,
+    financingRateAnnual,
+  };
+}
+
+function buildEconomicsByOrder(dataset: ScopedDataset) {
+  const revenueEligibleStatuses = new Set(['OFFER', 'CONFIRMED', 'DELIVERED', 'INVOICED', 'PAID']);
+  const orderEconomics = new Map<string, ReturnType<typeof calculateOrderEconomics>>();
+
+  for (const order of dataset.orderRows) {
+    if (!revenueEligibleStatuses.has(order.status)) continue;
+    const economics = calculateOrderEconomics(
+      {
+        customerPaymentTermType: order.customerPaymentTermType,
+        customerCreditDays: order.customerCreditDays,
+        supplierPaymentTermType: order.supplierPaymentTermType,
+        supplierCreditDays: order.supplierCreditDays,
+      },
+      dataset.itemsByOrder.get(order.orderId) ?? [],
+      dataset.financingRateAnnual,
+    );
+    orderEconomics.set(order.orderId, economics);
+  }
+
+  return orderEconomics;
+}
+
+function emptyTraderPerformanceReport(): TraderPerformanceReportDto {
+  return {
+    rows: [],
+    totals: {
+      orderCount: 0,
+      wonCount: 0,
+      lostCount: 0,
+      winRate: 0,
+      totalVolume: '0.000',
+      totalRevenue: '0.00',
+      totalGrossProfit: '0.00',
+      totalFinancingCost: '0.00',
+      totalNetProfit: '0.00',
+      avgDealSize: '0.00',
+    },
+  };
+}
+
+function buildTraderPerformanceReport(dataset: ScopedDataset): TraderPerformanceReportDto {
+  if (dataset.orderRows.length === 0) return emptyTraderPerformanceReport();
+
+  const economicsByOrder = buildEconomicsByOrder(dataset);
+  const wonStatuses = new Set(['CONFIRMED', 'DELIVERED', 'INVOICED', 'PAID']);
+  const stats = new Map<string, {
+    row: TraderPerformanceReportRowDto;
+    totalRevenueValue: number;
+    totalNetProfitValue: number;
+  }>();
+
+  for (const order of dataset.orderRows) {
+    const current = stats.get(order.traderId) ?? {
+      row: {
+        traderId: order.traderId,
+        traderName: order.traderName,
+        traderEmail: order.traderEmail,
+        teamName: order.teamName,
+        orderCount: 0,
+        wonCount: 0,
+        lostCount: 0,
+        winRate: 0,
+        totalVolume: '0.000',
+        totalRevenue: '0.00',
+        totalGrossProfit: '0.00',
+        totalFinancingCost: '0.00',
+        totalNetProfit: '0.00',
+        avgDealSize: '0.00',
+      },
+      totalRevenueValue: 0,
+      totalNetProfitValue: 0,
+    };
+
+    if (order.status === 'CANCELLED') {
+      current.row.lostCount += 1;
+      current.row.winRate = formatPercentValue(current.row.wonCount, current.row.wonCount + current.row.lostCount);
+      stats.set(order.traderId, current);
+      continue;
+    }
+
+    if (wonStatuses.has(order.status)) {
+      current.row.wonCount += 1;
+      current.row.winRate = formatPercentValue(current.row.wonCount, current.row.wonCount + current.row.lostCount);
+    }
+
+    const economics = economicsByOrder.get(order.orderId);
+    if (!economics) {
+      stats.set(order.traderId, current);
+      continue;
+    }
+
+    current.row.orderCount += 1;
+    current.totalRevenueValue += economics.totalRevenueBase;
+    current.totalNetProfitValue += economics.totalNetProfit;
+    current.row.totalVolume = formatQuantity(parseNumber(current.row.totalVolume) + economics.totalQuantity);
+    current.row.totalRevenue = formatMoney(current.totalRevenueValue);
+    current.row.totalGrossProfit = formatMoney(parseNumber(current.row.totalGrossProfit) + economics.totalGrossProfit);
+    current.row.totalFinancingCost = formatMoney(parseNumber(current.row.totalFinancingCost) + economics.totalFinancingCost);
+    current.row.totalNetProfit = formatMoney(current.totalNetProfitValue);
+    current.row.avgDealSize = formatMoney(current.row.orderCount > 0 ? current.totalRevenueValue / current.row.orderCount : 0);
+    stats.set(order.traderId, current);
+  }
+
+  const rows = Array.from(stats.values())
+    .map((entry) => entry.row)
+    .sort((left, right) => parseNumber(right.totalNetProfit) - parseNumber(left.totalNetProfit));
+
+  const totalRevenue = rows.reduce((sum, row) => sum + parseNumber(row.totalRevenue), 0);
+  const totalOrders = rows.reduce((sum, row) => sum + row.orderCount, 0);
+  const totalWon = rows.reduce((sum, row) => sum + row.wonCount, 0);
+  const totalLost = rows.reduce((sum, row) => sum + row.lostCount, 0);
+
+  return {
+    rows,
+    totals: {
+      orderCount: totalOrders,
+      wonCount: totalWon,
+      lostCount: totalLost,
+      winRate: formatPercentValue(totalWon, totalWon + totalLost),
+      totalVolume: formatQuantity(rows.reduce((sum, row) => sum + parseNumber(row.totalVolume), 0)),
+      totalRevenue: formatMoney(totalRevenue),
+      totalGrossProfit: formatMoney(rows.reduce((sum, row) => sum + parseNumber(row.totalGrossProfit), 0)),
+      totalFinancingCost: formatMoney(rows.reduce((sum, row) => sum + parseNumber(row.totalFinancingCost), 0)),
+      totalNetProfit: formatMoney(rows.reduce((sum, row) => sum + parseNumber(row.totalNetProfit), 0)),
+      avgDealSize: formatMoney(totalOrders > 0 ? totalRevenue / totalOrders : 0),
+    },
+  };
+}
+
+function emptyInvoiceAgingReport(): InvoiceAgingReportDto {
+  return {
+    rows: [],
+    buckets: ['CURRENT', '1-30', '31-60', '61-90', '90+'].map((label) => ({ label, count: 0, outstandingAmount: '0.00' })),
+    totalInvoices: 0,
+    totalOutstanding: '0.00',
+  };
+}
+
+async function buildInvoiceAgingReport(
+  tenantId: string,
+  context: ReportAccessContext,
+  filters: ReportFiltersDto,
+  dataset: ScopedDataset,
+): Promise<InvoiceAgingReportDto> {
+  if (dataset.orderRows.length === 0) return emptyInvoiceAgingReport();
+
+  const today = new Date().toISOString().slice(0, 10);
+  const conditions = [
+    eq(orders.tenantId, tenantId),
+    ne(invoices.status, 'PAID'),
+    ne(invoices.status, 'VOID'),
+    inArray(orders.id, dataset.orderRows.map((row) => row.orderId)),
+  ];
+  if (context.userIds) conditions.push(inArray(orders.salesRepId, context.userIds));
+  if (filters.from) conditions.push(gte(invoices.dueDate, filters.from));
+  if (filters.to) conditions.push(lte(invoices.dueDate, filters.to));
+
+  const invoiceRows = await db
+    .select({
+      invoiceId: invoices.id,
+      invoiceNumber: invoices.invoiceNumber,
+      orderId: orders.id,
+      clientName: counterparties.name,
+      vesselName: vessels.name,
+      traderName: users.name,
+      dueDate: invoices.dueDate,
+      status: invoices.status,
+      amount: invoices.amount,
+      amountPaid: invoices.amountPaid,
+    })
+    .from(invoices)
+    .innerJoin(orders, eq(invoices.orderId, orders.id))
+    .innerJoin(counterparties, eq(orders.clientId, counterparties.id))
+    .innerJoin(vessels, eq(orders.vesselId, vessels.id))
+    .leftJoin(users, eq(orders.salesRepId, users.id))
+    .where(and(...conditions))
+    .orderBy(asc(invoices.dueDate));
+
+  const rows: InvoiceAgingReportRowDto[] = invoiceRows.map((row) => {
+    const amount = parseNumber(row.amount);
+    const amountPaid = parseNumber(row.amountPaid);
+    const outstandingAmount = Math.max(0, amount - amountPaid);
+    const bucket = getAgingBucket(row.dueDate, today);
+
+    return {
+      invoiceId: row.invoiceId,
+      invoiceNumber: row.invoiceNumber,
+      orderId: row.orderId,
+      clientName: row.clientName,
+      vesselName: row.vesselName,
+      traderName: row.traderName ?? null,
+      dueDate: row.dueDate,
+      status: row.status as InvoiceAgingReportRowDto['status'],
+      amount: formatMoney(amount),
+      amountPaid: formatMoney(amountPaid),
+      outstandingAmount: formatMoney(outstandingAmount),
+      daysOverdue: bucket.daysOverdue,
+      agingBucket: bucket.label,
+    };
+  });
+
+  const bucketOrder = ['CURRENT', '1-30', '31-60', '61-90', '90+'];
+  const bucketMap = new Map<string, { count: number; outstandingAmount: number }>();
+  for (const label of bucketOrder) bucketMap.set(label, { count: 0, outstandingAmount: 0 });
+
+  for (const row of rows) {
+    const current = bucketMap.get(row.agingBucket) ?? { count: 0, outstandingAmount: 0 };
+    current.count += 1;
+    current.outstandingAmount += parseNumber(row.outstandingAmount);
+    bucketMap.set(row.agingBucket, current);
+  }
+
+  return {
+    rows,
+    buckets: bucketOrder.map((label) => ({
+      label,
+      count: bucketMap.get(label)?.count ?? 0,
+      outstandingAmount: formatMoney(bucketMap.get(label)?.outstandingAmount ?? 0),
+    })),
+    totalInvoices: rows.length,
+    totalOutstanding: formatMoney(rows.reduce((sum, row) => sum + parseNumber(row.outstandingAmount), 0)),
+  };
+}
+
+function buildPipelineSummary(dataset: ScopedDataset): PipelineStageDto[] {
+  const stats = new Map<string, { count: number; totalValue: number }>();
+  for (const order of dataset.orderRows) {
+    const current = stats.get(order.status) ?? { count: 0, totalValue: 0 };
+    current.count += 1;
+    for (const item of dataset.itemsByOrder.get(order.orderId) ?? []) {
+      current.totalValue += calculateRevenueBase(item);
+    }
+    stats.set(order.status, current);
+  }
+
+  return Array.from(stats.entries()).map(([status, values]) => ({
+    status,
+    count: values.count,
+    totalValue: formatMoney(values.totalValue),
+  }));
+}
+
+async function buildLossAnalysisFromDb(tenantId: string, context: ReportAccessContext, filters: ReportFiltersDto): Promise<LossAnalysisResponseDto> {
+  const normalized = normalizeReportFilters(filters, context);
+  const conditions = [eq(orders.tenantId, tenantId), eq(orders.status, 'CANCELLED'), isNotNull(orders.lossReason)];
+  if (normalized.from) conditions.push(gte(orders.createdAt, new Date(`${normalized.from}T00:00:00`)));
+  if (normalized.to) conditions.push(lte(orders.createdAt, new Date(`${normalized.to}T23:59:59`)));
+  if (context.userIds) conditions.push(inArray(orders.salesRepId, context.userIds));
+  if (normalized.traderId) conditions.push(eq(orders.salesRepId, normalized.traderId));
+  if (normalized.customerId) conditions.push(eq(orders.clientId, normalized.customerId));
+
+  const rows = await db
+    .select({ reason: orders.lossReason, count: sql<number>`count(*)::int`.as('count') })
+    .from(orders)
+    .where(and(...conditions))
+    .groupBy(orders.lossReason)
+    .orderBy(sql`count(*) desc`);
+
+  const totalCancelled = rows.reduce((sum, row) => sum + Number(row.count), 0);
+  return {
+    totalCancelled,
+    reasons: rows.map((row) => ({
+      reason: row.reason ?? 'Unknown',
+      count: Number(row.count),
+      percentage: formatPercentValue(Number(row.count), totalCancelled),
+    })),
+  };
+}
+
+function buildConversionMetrics(dataset: ScopedDataset): ConversionMetricsDto {
+  const wonStatuses = new Set(['CONFIRMED', 'DELIVERED', 'INVOICED', 'PAID']);
+  let totalWon = 0;
+  let totalLost = 0;
+  let closeDaysSum = 0;
+  let closeDaysCount = 0;
+
+  for (const order of dataset.orderRows) {
+    if (wonStatuses.has(order.status)) {
+      totalWon += 1;
+      if (order.closedAt) {
+        closeDaysSum += (new Date(order.closedAt).getTime() - new Date(order.createdAt).getTime()) / 86_400_000;
+        closeDaysCount += 1;
+      }
+    } else if (order.status === 'CANCELLED') {
+      totalLost += 1;
+    }
+  }
+
+  return {
+    totalInquiries: dataset.orderRows.length,
+    totalWon,
+    totalLost,
+    winRate: formatPercentValue(totalWon, totalWon + totalLost),
+    avgDaysToClose: closeDaysCount > 0 ? Number((closeDaysSum / closeDaysCount).toFixed(1)) : null,
+  };
+}
+
+async function buildCommercialSummary(
+  tenantId: string,
+  context: ReportAccessContext,
+  filters: ReportFiltersDto,
+  dataset: ScopedDataset,
+): Promise<CommercialSummaryReportDto> {
+  const lossAnalysis = await buildLossAnalysisFromDb(tenantId, context, filters);
+  return {
+    conversion: buildConversionMetrics(dataset),
+    lossAnalysis,
+    pipeline: buildPipelineSummary(dataset),
+  };
+}
+
+function accumulateMarginRow(
+  map: Map<string, { row: MarginAnalysisRowDto; revenue: number; netProfit: number }>,
+  key: string,
+  label: string,
+  values: { orderCount?: number; quantity: number; revenue: number; grossProfit: number; financingCost: number; netProfit: number },
+) {
+  const current = map.get(key) ?? {
+    row: {
+      key,
+      label,
+      orderCount: 0,
+      totalVolume: '0.000',
+      totalRevenue: '0.00',
+      totalGrossProfit: '0.00',
+      totalFinancingCost: '0.00',
+      totalNetProfit: '0.00',
+      netMarginPct: null,
+    },
+    revenue: 0,
+    netProfit: 0,
+  };
+
+  current.row.orderCount += values.orderCount ?? 0;
+  current.row.totalVolume = formatQuantity(parseNumber(current.row.totalVolume) + values.quantity);
+  current.revenue += values.revenue;
+  current.netProfit += values.netProfit;
+  current.row.totalRevenue = formatMoney(current.revenue);
+  current.row.totalGrossProfit = formatMoney(parseNumber(current.row.totalGrossProfit) + values.grossProfit);
+  current.row.totalFinancingCost = formatMoney(parseNumber(current.row.totalFinancingCost) + values.financingCost);
+  current.row.totalNetProfit = formatMoney(current.netProfit);
+  current.row.netMarginPct = current.revenue > 0 ? Number(((current.netProfit / current.revenue) * 100).toFixed(2)) : null;
+  map.set(key, current);
+}
+
+function buildMarginAnalysis(dataset: ScopedDataset): MarginAnalysisReportDto {
+  const economicsByOrder = buildEconomicsByOrder(dataset);
+  const byCustomer = new Map<string, { row: MarginAnalysisRowDto; revenue: number; netProfit: number }>();
+  const byProduct = new Map<string, { row: MarginAnalysisRowDto; revenue: number; netProfit: number }>();
+  const byVessel = new Map<string, { row: MarginAnalysisRowDto; revenue: number; netProfit: number }>();
+  const monthlyTrend = new Map<string, { revenue: number; netProfit: number; orderCount: number }>();
+
+  for (const order of dataset.orderRows) {
+    const economics = economicsByOrder.get(order.orderId);
+    if (!economics) continue;
+
+    accumulateMarginRow(byCustomer, order.clientId, order.clientName, {
+      orderCount: 1,
+      quantity: economics.totalQuantity,
+      revenue: economics.totalRevenueBase,
+      grossProfit: economics.totalGrossProfit,
+      financingCost: economics.totalFinancingCost,
+      netProfit: economics.totalNetProfit,
+    });
+
+    accumulateMarginRow(byVessel, order.vesselId, order.vesselName, {
+      orderCount: 1,
+      quantity: economics.totalQuantity,
+      revenue: economics.totalRevenueBase,
+      grossProfit: economics.totalGrossProfit,
+      financingCost: economics.totalFinancingCost,
+      netProfit: economics.totalNetProfit,
+    });
+
+    const trendKey = monthKey(order.createdAt);
+    const currentTrend = monthlyTrend.get(trendKey) ?? { revenue: 0, netProfit: 0, orderCount: 0 };
+    currentTrend.orderCount += 1;
+    currentTrend.revenue += economics.totalRevenueBase;
+    currentTrend.netProfit += economics.totalNetProfit;
+    monthlyTrend.set(trendKey, currentTrend);
+
+    const items = dataset.itemsByOrder.get(order.orderId) ?? [];
+    economics.lineEconomics.forEach((line, index) => {
+      const item = items[index];
+      if (!item) return;
+      accumulateMarginRow(byProduct, item.productType, item.productType, {
+        quantity: line.quantity,
+        revenue: line.revenueBase,
+        grossProfit: line.grossProfit,
+        financingCost: line.financingCost,
+        netProfit: line.netProfit,
+      });
+    });
+  }
+
+  const sortRows = (rows: Map<string, { row: MarginAnalysisRowDto }>) => Array.from(rows.values())
+    .map((entry) => entry.row)
+    .sort((left, right) => parseNumber(right.totalNetProfit) - parseNumber(left.totalNetProfit));
+
+  const trendRows: MarginTrendPointDto[] = Array.from(monthlyTrend.entries())
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([month, values]) => ({
+      month,
+      orderCount: values.orderCount,
+      totalRevenue: formatMoney(values.revenue),
+      totalNetProfit: formatMoney(values.netProfit),
+      netMarginPct: values.revenue > 0 ? Number(((values.netProfit / values.revenue) * 100).toFixed(2)) : null,
+    }));
+
+  return {
+    byCustomer: sortRows(byCustomer),
+    byProduct: sortRows(byProduct),
+    byVessel: sortRows(byVessel),
+    monthlyTrend: trendRows,
+  };
+}
+
+async function buildFilterOptions(tenantId: string, context: ReportAccessContext): Promise<ReportFilterOptionsDto> {
+  const userConditions = [eq(users.tenantId, tenantId), eq(users.isActive, true)];
+  if (context.userIds) userConditions.push(inArray(users.id, context.userIds));
+
+  const [traderRows, teamRows, customerRows, productRows] = await Promise.all([
+    db.select({ id: users.id, label: users.name, subtitle: users.email }).from(users).where(and(...userConditions)).orderBy(asc(users.name)),
+    context.teamId
+      ? db.select({ id: teams.id, label: teams.name }).from(teams).where(eq(teams.id, context.teamId)).orderBy(asc(teams.name))
+      : db.select({ id: teams.id, label: teams.name }).from(teams).where(eq(teams.tenantId, tenantId)).orderBy(asc(teams.name)),
+    db.select({ id: counterparties.id, label: counterparties.name }).from(counterparties).where(eq(counterparties.tenantId, tenantId)).orderBy(asc(counterparties.name)),
+    db.selectDistinct({ id: orderItems.productType, label: orderItems.productType }).from(orderItems).orderBy(asc(orderItems.productType)),
+  ]);
+
+  return {
+    traders: traderRows,
+    teams: teamRows,
+    customers: customerRows,
+    products: productRows,
+  };
+}
+
+function mapSavedViews(settings: StoredReportSettings): SavedReportViewDto[] {
+  return (settings.savedViews ?? []).map((view) => ({
+    id: view.id,
+    name: view.name,
+    description: view.description ?? null,
+    filters: view.filters ?? {},
+    createdAt: view.createdAt,
+    updatedAt: view.updatedAt,
+    createdByName: view.createdByName ?? null,
+  }));
+}
+
+function mapSchedules(settings: StoredReportSettings): ReportScheduleDto[] {
+  return (settings.schedules ?? []).map((schedule) => ({
+    id: schedule.id,
+    name: schedule.name,
+    description: schedule.description ?? null,
+    reportType: schedule.reportType,
+    deliveryMode: normalizeDeliveryMode(schedule.deliveryMode),
+    bodyMode: resolveScheduleBodyMode(schedule.deliveryMode, schedule.bodyMode),
+    hourUtc: schedule.hourUtc,
+    recipientRoles: (schedule.recipientRoles ?? []) as Role[],
+    extraEmails: schedule.extraEmails ?? [],
+    filters: schedule.filters ?? {},
+    isActive: schedule.isActive ?? true,
+    lastSentAt: schedule.lastSentAt ?? null,
+    createdAt: schedule.createdAt,
+    updatedAt: schedule.updatedAt,
+  }));
+}
+
+export async function getReleaseOneReports(
+  tenantId: string,
+  requestingUserId: string,
+  filters: ReportFiltersDto,
+): Promise<ReleaseOneReportsDto> {
+  const context = await resolveReportAccessContext(tenantId, requestingUserId);
+  const dataset = await fetchScopedDataset(tenantId, context, filters);
+  const [invoiceAging, commercialSummary] = await Promise.all([
+    buildInvoiceAgingReport(tenantId, context, dataset.filtersApplied, dataset),
+    buildCommercialSummary(tenantId, context, dataset.filtersApplied, dataset),
+  ]);
+
+  return {
+    generatedAt: new Date().toISOString(),
+    access: context.access,
+    traderPerformance: buildTraderPerformanceReport(dataset),
+    invoiceAging,
+    commercialSummary,
+  };
+}
+
+export async function getReleaseTwoReports(
+  tenantId: string,
+  requestingUserId: string,
+  filters: ReportFiltersDto,
+): Promise<ReleaseTwoReportsDto> {
+  const context = await resolveReportAccessContext(tenantId, requestingUserId);
+  const tenant = await getTenantSettingsRow(tenantId);
+  const settings = normalizeReportSettings(((tenant.settings ?? {}) as TenantSettings).reportsSettings);
+  const dataset = await fetchScopedDataset(tenantId, context, filters);
+  const [invoiceAging, commercialSummary, filterOptions] = await Promise.all([
+    buildInvoiceAgingReport(tenantId, context, dataset.filtersApplied, dataset),
+    buildCommercialSummary(tenantId, context, dataset.filtersApplied, dataset),
+    buildFilterOptions(tenantId, context),
+  ]);
+
+  return {
+    generatedAt: new Date().toISOString(),
+    access: context.access,
+    filtersApplied: dataset.filtersApplied,
+    filterOptions,
+    savedViews: mapSavedViews(settings),
+    schedules: mapSchedules(settings),
+    traderPerformance: buildTraderPerformanceReport(dataset),
+    invoiceAging,
+    commercialSummary,
+    marginAnalysis: buildMarginAnalysis(dataset),
+  };
+}
+
+export async function createSavedReportView(
+  tenantId: string,
+  requestingUserId: string,
+  userName: string | null,
+  input: { name: string; description?: string | null; filters?: ReportFiltersDto },
+): Promise<SavedReportViewDto[]> {
+  const context = await resolveReportAccessContext(tenantId, requestingUserId);
+  assertCanManageSharedViews(context);
+  const now = new Date().toISOString();
+  const filters = normalizeReportFilters(input.filters ?? {}, context);
+  const settings = await updateTenantReportSettings(tenantId, (current) => ({
+    ...current,
+    savedViews: [
+      {
+        id: crypto.randomUUID(),
+        name: input.name.trim(),
+        description: input.description?.trim() || null,
+        filters,
+        createdAt: now,
+        updatedAt: now,
+        createdByName: userName,
+      },
+      ...(current.savedViews ?? []),
+    ],
+  }));
+
+  const createdView = settings.savedViews?.[0];
+  if (createdView) {
+    await logReportConfigActivity({
+      tenantId,
+      userId: requestingUserId,
+      action: 'CREATE',
+      entityType: 'report_saved_view',
+      entityId: createdView.id,
+      entityName: createdView.name,
+      httpMethod: 'POST',
+      httpPath: '/reports/saved-views',
+      metadata: {
+        name: createdView.name,
+        description: createdView.description ?? null,
+        filters: createdView.filters ?? {},
+      },
+    });
+  }
+
+  return mapSavedViews(settings);
+}
+
+export async function updateSavedReportView(
+  tenantId: string,
+  requestingUserId: string,
+  savedViewId: string,
+  input: { name: string; description?: string | null; filters?: ReportFiltersDto },
+): Promise<SavedReportViewDto[]> {
+  const context = await resolveReportAccessContext(tenantId, requestingUserId);
+  assertCanManageSharedViews(context);
+  const now = new Date().toISOString();
+  const filters = normalizeReportFilters(input.filters ?? {}, context);
+
+  const settings = await updateTenantReportSettings(tenantId, (current) => ({
+    ...current,
+    savedViews: (current.savedViews ?? []).map((view) => view.id === savedViewId
+      ? {
+          ...view,
+          name: input.name.trim(),
+          description: input.description?.trim() || null,
+          filters,
+          updatedAt: now,
+        }
+      : view),
+  }));
+
+  const updatedView = settings.savedViews?.find((view) => view.id === savedViewId);
+  if (!updatedView) throw new Error('Saved view not found');
+
+  await logReportConfigActivity({
+    tenantId,
+    userId: requestingUserId,
+    action: 'UPDATE',
+    entityType: 'report_saved_view',
+    entityId: updatedView.id,
+    entityName: updatedView.name,
+    httpMethod: 'PATCH',
+    httpPath: `/reports/saved-views/${savedViewId}`,
+    metadata: {
+      name: updatedView.name,
+      description: updatedView.description ?? null,
+      filters: updatedView.filters ?? {},
+    },
+  });
+
+  return mapSavedViews(settings);
+}
+
+export async function deleteSavedReportView(
+  tenantId: string,
+  requestingUserId: string,
+  savedViewId: string,
+): Promise<SavedReportViewDto[]> {
+  const context = await resolveReportAccessContext(tenantId, requestingUserId);
+  assertCanManageSharedViews(context);
+  const tenant = await getTenantSettingsRow(tenantId);
+  const existingView = normalizeReportSettings(((tenant.settings ?? {}) as TenantSettings).reportsSettings)
+    .savedViews
+    ?.find((view) => view.id === savedViewId);
+  const settings = await updateTenantReportSettings(tenantId, (current) => ({
+    ...current,
+    savedViews: (current.savedViews ?? []).filter((view) => view.id !== savedViewId),
+  }));
+
+  if (!existingView) throw new Error('Saved view not found');
+
+  await logReportConfigActivity({
+    tenantId,
+    userId: requestingUserId,
+    action: 'DELETE',
+    entityType: 'report_saved_view',
+    entityId: existingView.id,
+    entityName: existingView.name,
+    httpMethod: 'DELETE',
+    httpPath: `/reports/saved-views/${savedViewId}`,
+    metadata: {
+      name: existingView.name,
+      description: existingView.description ?? null,
+      filters: existingView.filters ?? {},
+    },
+  });
+
+  return mapSavedViews(settings);
+}
+
+export async function createReportSchedule(
+  tenantId: string,
+  requestingUserId: string,
+  input: {
+    name: string;
+    description?: string | null;
+    reportType: ReportScheduleType;
+    deliveryMode?: ReportScheduleDeliveryMode;
+    bodyMode?: ReportScheduleBodyMode;
+    hourUtc: number;
+    recipientRoles: Role[];
+    extraEmails?: string[];
+    filters?: ReportFiltersDto;
+  },
+): Promise<ReportScheduleDto[]> {
+  const context = await resolveReportAccessContext(tenantId, requestingUserId);
+  assertCanManageSchedules(context);
+  const now = new Date().toISOString();
+  const filters = normalizeReportFilters(input.filters ?? {}, context);
+  const settings = await updateTenantReportSettings(tenantId, (current) => ({
+    ...current,
+    schedules: [
+      {
+        id: crypto.randomUUID(),
+        name: input.name.trim(),
+        description: input.description?.trim() || null,
+        reportType: input.reportType,
+        deliveryMode: normalizeDeliveryMode(input.deliveryMode),
+        bodyMode: resolveScheduleBodyMode(input.deliveryMode, input.bodyMode),
+        hourUtc: Math.max(0, Math.min(23, Math.round(input.hourUtc))),
+        recipientRoles: normalizeScheduleRecipientRoles(input.recipientRoles),
+        extraEmails: normalizeExtraEmails(input.extraEmails),
+        filters,
+        isActive: true,
+        lastSentAt: null,
+        createdAt: now,
+        updatedAt: now,
+      },
+      ...(current.schedules ?? []),
+    ],
+  }));
+
+  const createdSchedule = settings.schedules?.[0];
+  if (createdSchedule) {
+    await logReportConfigActivity({
+      tenantId,
+      userId: requestingUserId,
+      action: 'CREATE',
+      entityType: 'report_schedule',
+      entityId: createdSchedule.id,
+      entityName: createdSchedule.name,
+      httpMethod: 'POST',
+      httpPath: '/reports/schedules',
+      metadata: {
+        reportType: createdSchedule.reportType,
+        deliveryMode: normalizeDeliveryMode(createdSchedule.deliveryMode),
+        bodyMode: resolveScheduleBodyMode(createdSchedule.deliveryMode, createdSchedule.bodyMode),
+        hourUtc: createdSchedule.hourUtc,
+        recipientRoles: createdSchedule.recipientRoles,
+        extraEmails: createdSchedule.extraEmails ?? [],
+      },
+    });
+  }
+
+  return mapSchedules(settings);
+}
+
+export async function updateReportSchedule(
+  tenantId: string,
+  requestingUserId: string,
+  scheduleId: string,
+  input: {
+    name: string;
+    description?: string | null;
+    reportType: ReportScheduleType;
+    deliveryMode?: ReportScheduleDeliveryMode;
+    bodyMode?: ReportScheduleBodyMode;
+    hourUtc: number;
+    recipientRoles: Role[];
+    extraEmails?: string[];
+    filters?: ReportFiltersDto;
+    isActive?: boolean;
+  },
+): Promise<ReportScheduleDto[]> {
+  const context = await resolveReportAccessContext(tenantId, requestingUserId);
+  assertCanManageSchedules(context);
+  const now = new Date().toISOString();
+  const filters = normalizeReportFilters(input.filters ?? {}, context);
+
+  const settings = await updateTenantReportSettings(tenantId, (current) => ({
+    ...current,
+    schedules: (current.schedules ?? []).map((schedule) => schedule.id === scheduleId
+      ? {
+          ...schedule,
+          name: input.name.trim(),
+          description: input.description?.trim() || null,
+          reportType: input.reportType,
+          deliveryMode: normalizeDeliveryMode(input.deliveryMode),
+          bodyMode: resolveScheduleBodyMode(input.deliveryMode, input.bodyMode),
+          hourUtc: Math.max(0, Math.min(23, Math.round(input.hourUtc))),
+          recipientRoles: normalizeScheduleRecipientRoles(input.recipientRoles),
+          extraEmails: normalizeExtraEmails(input.extraEmails),
+          filters,
+          isActive: input.isActive ?? schedule.isActive ?? true,
+          updatedAt: now,
+        }
+      : schedule),
+  }));
+
+  const updatedSchedule = settings.schedules?.find((schedule) => schedule.id === scheduleId);
+  if (!updatedSchedule) throw new Error('Schedule not found');
+
+  await logReportConfigActivity({
+    tenantId,
+    userId: requestingUserId,
+    action: 'UPDATE',
+    entityType: 'report_schedule',
+    entityId: updatedSchedule.id,
+    entityName: updatedSchedule.name,
+    httpMethod: 'PATCH',
+    httpPath: `/reports/schedules/${scheduleId}`,
+    metadata: {
+      reportType: updatedSchedule.reportType,
+      deliveryMode: normalizeDeliveryMode(updatedSchedule.deliveryMode),
+      bodyMode: resolveScheduleBodyMode(updatedSchedule.deliveryMode, updatedSchedule.bodyMode),
+      hourUtc: updatedSchedule.hourUtc,
+      recipientRoles: updatedSchedule.recipientRoles,
+      extraEmails: updatedSchedule.extraEmails ?? [],
+      isActive: updatedSchedule.isActive ?? true,
+    },
+  });
+
+  return mapSchedules(settings);
+}
+
+export async function deleteReportSchedule(
+  tenantId: string,
+  requestingUserId: string,
+  scheduleId: string,
+): Promise<ReportScheduleDto[]> {
+  const context = await resolveReportAccessContext(tenantId, requestingUserId);
+  assertCanManageSchedules(context);
+  const tenant = await getTenantSettingsRow(tenantId);
+  const existingSchedule = normalizeReportSettings(((tenant.settings ?? {}) as TenantSettings).reportsSettings)
+    .schedules
+    ?.find((schedule) => schedule.id === scheduleId);
+  const settings = await updateTenantReportSettings(tenantId, (current) => ({
+    ...current,
+    schedules: (current.schedules ?? []).filter((schedule) => schedule.id !== scheduleId),
+  }));
+
+  if (!existingSchedule) throw new Error('Schedule not found');
+
+  await logReportConfigActivity({
+    tenantId,
+    userId: requestingUserId,
+    action: 'DELETE',
+    entityType: 'report_schedule',
+    entityId: existingSchedule.id,
+    entityName: existingSchedule.name,
+    httpMethod: 'DELETE',
+    httpPath: `/reports/schedules/${scheduleId}`,
+    metadata: {
+      reportType: existingSchedule.reportType,
+      deliveryMode: normalizeDeliveryMode(existingSchedule.deliveryMode),
+      bodyMode: resolveScheduleBodyMode(existingSchedule.deliveryMode, existingSchedule.bodyMode),
+      hourUtc: existingSchedule.hourUtc,
+      recipientRoles: existingSchedule.recipientRoles,
+      extraEmails: existingSchedule.extraEmails ?? [],
+    },
+  });
+
+  return mapSchedules(settings);
+}
+
+export async function exportTraderPerformanceCsv(
+  tenantId: string,
+  requestingUserId: string,
+  filters: ReportFiltersDto,
+): Promise<{ fileName: string; csv: string }> {
+  const report = await getReleaseTwoReports(tenantId, requestingUserId, filters);
+  const csv = buildCsv([
+    ['Trader', 'Team', 'Orders', 'Won', 'Lost', 'Win Rate %', 'Volume', 'Revenue USD', 'Gross Profit USD', 'Financing Cost USD', 'Net Profit USD', 'Avg Deal Size USD'],
+    ...report.traderPerformance.rows.map((row) => [
+      row.traderName,
+      row.teamName,
+      row.orderCount,
+      row.wonCount,
+      row.lostCount,
+      (row.winRate * 100).toFixed(1),
+      row.totalVolume,
+      row.totalRevenue,
+      row.totalGrossProfit,
+      row.totalFinancingCost,
+      row.totalNetProfit,
+      row.avgDealSize,
+    ]),
+    [],
+    ['TOTAL', '', report.traderPerformance.totals.orderCount, report.traderPerformance.totals.wonCount, report.traderPerformance.totals.lostCount, (report.traderPerformance.totals.winRate * 100).toFixed(1), report.traderPerformance.totals.totalVolume, report.traderPerformance.totals.totalRevenue, report.traderPerformance.totals.totalGrossProfit, report.traderPerformance.totals.totalFinancingCost, report.traderPerformance.totals.totalNetProfit, report.traderPerformance.totals.avgDealSize],
+  ]);
+
+  return { fileName: `trader-performance_${buildFileSuffix(report.filtersApplied)}.csv`, csv };
+}
+
+export async function exportInvoiceAgingCsv(
+  tenantId: string,
+  requestingUserId: string,
+  filters: ReportFiltersDto,
+): Promise<{ fileName: string; csv: string }> {
+  const report = await getReleaseTwoReports(tenantId, requestingUserId, filters);
+  const csv = buildCsv([
+    ['Invoice', 'Client', 'Vessel', 'Trader', 'Due Date', 'Status', 'Amount USD', 'Paid USD', 'Outstanding USD', 'Days Overdue', 'Bucket'],
+    ...report.invoiceAging.rows.map((row) => [row.invoiceNumber, row.clientName, row.vesselName, row.traderName, row.dueDate, row.status, row.amount, row.amountPaid, row.outstandingAmount, row.daysOverdue, row.agingBucket]),
+    [],
+    ['BUCKET', 'COUNT', 'OUTSTANDING USD'],
+    ...report.invoiceAging.buckets.map((bucket) => [bucket.label, bucket.count, bucket.outstandingAmount]),
+    [],
+    ['TOTAL OPEN INVOICES', report.invoiceAging.totalInvoices, report.invoiceAging.totalOutstanding],
+  ]);
+
+  return { fileName: `invoice-aging_${buildFileSuffix(report.filtersApplied)}.csv`, csv };
+}
+
+export async function exportCommercialSummaryCsv(
+  tenantId: string,
+  requestingUserId: string,
+  filters: ReportFiltersDto,
+): Promise<{ fileName: string; csv: string }> {
+  const report = await getReleaseTwoReports(tenantId, requestingUserId, filters);
+  const csv = buildCsv([
+    ['METRIC', 'VALUE'],
+    ['Total Inquiries', report.commercialSummary.conversion.totalInquiries],
+    ['Won', report.commercialSummary.conversion.totalWon],
+    ['Lost', report.commercialSummary.conversion.totalLost],
+    ['Win Rate %', (report.commercialSummary.conversion.winRate * 100).toFixed(1)],
+    ['Avg Days To Close', report.commercialSummary.conversion.avgDaysToClose ?? ''],
+    [],
+    ['LOSS REASON', 'COUNT', 'PERCENTAGE'],
+    ...report.commercialSummary.lossAnalysis.reasons.map((reason) => [reason.reason, reason.count, (reason.percentage * 100).toFixed(1)]),
+    [],
+    ['PIPELINE STATUS', 'COUNT', 'VALUE USD'],
+    ...report.commercialSummary.pipeline.map((stage) => [stage.status, stage.count, stage.totalValue]),
+  ]);
+
+  return { fileName: `commercial-summary_${buildFileSuffix(report.filtersApplied)}.csv`, csv };
+}
+
+export async function exportMarginAnalysisCsv(
+  tenantId: string,
+  requestingUserId: string,
+  filters: ReportFiltersDto,
+): Promise<{ fileName: string; csv: string }> {
+  const report = await getReleaseTwoReports(tenantId, requestingUserId, filters);
+  const section = (title: string, rows: MarginAnalysisRowDto[]) => [
+    [title],
+    ['Label', 'Orders', 'Volume', 'Revenue USD', 'Gross Profit USD', 'Financing Cost USD', 'Net Profit USD', 'Net Margin %'],
+    ...rows.map((row) => [row.label, row.orderCount, row.totalVolume, row.totalRevenue, row.totalGrossProfit, row.totalFinancingCost, row.totalNetProfit, row.netMarginPct ?? '']),
+    [],
+  ];
+  const csv = buildCsv([
+    ...section('BY CUSTOMER', report.marginAnalysis.byCustomer),
+    ...section('BY PRODUCT', report.marginAnalysis.byProduct),
+    ...section('BY VESSEL', report.marginAnalysis.byVessel),
+    ['MONTH', 'ORDERS', 'REVENUE USD', 'NET PROFIT USD', 'NET MARGIN %'],
+    ...report.marginAnalysis.monthlyTrend.map((point) => [point.month, point.orderCount, point.totalRevenue, point.totalNetProfit, point.netMarginPct ?? '']),
+  ]);
+  return { fileName: `margin-analysis_${buildFileSuffix(report.filtersApplied)}.csv`, csv };
+}
+
+export async function exportTraderPerformanceXlsx(
+  tenantId: string,
+  requestingUserId: string,
+  filters: ReportFiltersDto,
+): Promise<{ fileName: string; content: Buffer }> {
+  const report = await getReleaseTwoReports(tenantId, requestingUserId, filters);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(report.traderPerformance.rows.map((row) => ({
+    Trader: row.traderName,
+    Team: row.teamName,
+    Orders: row.orderCount,
+    Won: row.wonCount,
+    Lost: row.lostCount,
+    'Win Rate %': Number((row.winRate * 100).toFixed(1)),
+    Volume: Number(row.totalVolume),
+    'Revenue USD': Number(row.totalRevenue),
+    'Gross Profit USD': Number(row.totalGrossProfit),
+    'Financing Cost USD': Number(row.totalFinancingCost),
+    'Net Profit USD': Number(row.totalNetProfit),
+    'Avg Deal Size USD': Number(row.avgDealSize),
+  }))), 'Trader Performance');
+
+  return {
+    fileName: `trader-performance_${buildFileSuffix(report.filtersApplied)}.xlsx`,
+    content: XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer,
+  };
+}
+
+export async function exportInvoiceAgingXlsx(
+  tenantId: string,
+  requestingUserId: string,
+  filters: ReportFiltersDto,
+): Promise<{ fileName: string; content: Buffer }> {
+  const report = await getReleaseTwoReports(tenantId, requestingUserId, filters);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(report.invoiceAging.rows.map((row) => ({
+    Invoice: row.invoiceNumber,
+    Client: row.clientName,
+    Vessel: row.vesselName,
+    Trader: row.traderName,
+    'Due Date': row.dueDate,
+    Status: row.status,
+    'Amount USD': Number(row.amount),
+    'Paid USD': Number(row.amountPaid),
+    'Outstanding USD': Number(row.outstandingAmount),
+    'Days Overdue': row.daysOverdue,
+    Bucket: row.agingBucket,
+  }))), 'Invoice Aging');
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(report.invoiceAging.buckets.map((bucket) => ({
+    Bucket: bucket.label,
+    Count: bucket.count,
+    'Outstanding USD': Number(bucket.outstandingAmount),
+  }))), 'Buckets');
+
+  return {
+    fileName: `invoice-aging_${buildFileSuffix(report.filtersApplied)}.xlsx`,
+    content: XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer,
+  };
+}
+
+export async function exportCommercialSummaryXlsx(
+  tenantId: string,
+  requestingUserId: string,
+  filters: ReportFiltersDto,
+): Promise<{ fileName: string; content: Buffer }> {
+  const report = await getReleaseTwoReports(tenantId, requestingUserId, filters);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    ['Metric', 'Value'],
+    ['Total Inquiries', report.commercialSummary.conversion.totalInquiries],
+    ['Won', report.commercialSummary.conversion.totalWon],
+    ['Lost', report.commercialSummary.conversion.totalLost],
+    ['Win Rate %', Number((report.commercialSummary.conversion.winRate * 100).toFixed(1))],
+    ['Avg Days To Close', report.commercialSummary.conversion.avgDaysToClose ?? ''],
+  ]), 'Conversion');
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(report.commercialSummary.lossAnalysis.reasons.map((row) => ({
+    Reason: row.reason,
+    Count: row.count,
+    'Percentage %': Number((row.percentage * 100).toFixed(1)),
+  }))), 'Loss Reasons');
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(report.commercialSummary.pipeline.map((row) => ({
+    Status: row.status,
+    Count: row.count,
+    'Value USD': Number(row.totalValue),
+  }))), 'Pipeline');
+
+  return {
+    fileName: `commercial-summary_${buildFileSuffix(report.filtersApplied)}.xlsx`,
+    content: XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer,
+  };
+}
+
+export async function exportMarginAnalysisXlsx(
+  tenantId: string,
+  requestingUserId: string,
+  filters: ReportFiltersDto,
+): Promise<{ fileName: string; content: Buffer }> {
+  const report = await getReleaseTwoReports(tenantId, requestingUserId, filters);
+  return {
+    fileName: `margin-analysis_${buildFileSuffix(report.filtersApplied)}.xlsx`,
+    content: buildMarginWorkbook(report),
+  };
+}
+
+function buildSummaryBundleCsv(report: ReleaseTwoReportsDto): string {
+  return buildCsv([
+    ['TRADER PERFORMANCE'],
+    ['Trader', 'Team', 'Orders', 'Won', 'Lost', 'Win Rate %', 'Revenue USD', 'Net Profit USD'],
+    ...report.traderPerformance.rows.map((row) => [row.traderName, row.teamName, row.orderCount, row.wonCount, row.lostCount, (row.winRate * 100).toFixed(1), row.totalRevenue, row.totalNetProfit]),
+    [],
+    ['INVOICE AGING'],
+    ['Invoice', 'Client', 'Outstanding USD', 'Days Overdue', 'Bucket'],
+    ...report.invoiceAging.rows.map((row) => [row.invoiceNumber, row.clientName, row.outstandingAmount, row.daysOverdue, row.agingBucket]),
+    [],
+    ['COMMERCIAL SUMMARY'],
+    ['Metric', 'Value'],
+    ['Total Inquiries', report.commercialSummary.conversion.totalInquiries],
+    ['Won', report.commercialSummary.conversion.totalWon],
+    ['Lost', report.commercialSummary.conversion.totalLost],
+    ['Win Rate %', (report.commercialSummary.conversion.winRate * 100).toFixed(1)],
+  ]);
+}
+
+function buildSummaryWorkbook(report: ReleaseTwoReportsDto): Buffer {
+  const workbook = XLSX.utils.book_new();
+
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(report.traderPerformance.rows.map((row) => ({
+    Trader: row.traderName,
+    Team: row.teamName,
+    Orders: row.orderCount,
+    Won: row.wonCount,
+    Lost: row.lostCount,
+    'Win Rate %': Number((row.winRate * 100).toFixed(1)),
+    'Revenue USD': Number(row.totalRevenue),
+    'Net Profit USD': Number(row.totalNetProfit),
+  }))), 'Trader Performance');
+
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(report.invoiceAging.rows.map((row) => ({
+    Invoice: row.invoiceNumber,
+    Client: row.clientName,
+    Trader: row.traderName,
+    'Due Date': row.dueDate,
+    'Outstanding USD': Number(row.outstandingAmount),
+    'Days Overdue': row.daysOverdue,
+    Bucket: row.agingBucket,
+  }))), 'Invoice Aging');
+
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    ['Metric', 'Value'],
+    ['Total Inquiries', report.commercialSummary.conversion.totalInquiries],
+    ['Won', report.commercialSummary.conversion.totalWon],
+    ['Lost', report.commercialSummary.conversion.totalLost],
+    ['Win Rate %', Number((report.commercialSummary.conversion.winRate * 100).toFixed(1))],
+    ['Avg Days To Close', report.commercialSummary.conversion.avgDaysToClose ?? ''],
+    [],
+    ['Loss Reason', 'Count', 'Percentage'],
+    ...report.commercialSummary.lossAnalysis.reasons.map((reason) => [reason.reason, reason.count, Number((reason.percentage * 100).toFixed(1))]),
+  ]), 'Commercial Summary');
+
+  return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+}
+
+function buildMarginWorkbook(report: ReleaseTwoReportsDto): Buffer {
+  const workbook = XLSX.utils.book_new();
+  const toSheetRows = (rows: MarginAnalysisRowDto[]) => rows.map((row) => ({
+    Label: row.label,
+    Orders: row.orderCount,
+    Volume: Number(row.totalVolume),
+    'Revenue USD': Number(row.totalRevenue),
+    'Gross Profit USD': Number(row.totalGrossProfit),
+    'Financing Cost USD': Number(row.totalFinancingCost),
+    'Net Profit USD': Number(row.totalNetProfit),
+    'Net Margin %': row.netMarginPct ?? '',
+  }));
+
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(toSheetRows(report.marginAnalysis.byCustomer)), 'By Customer');
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(toSheetRows(report.marginAnalysis.byProduct)), 'By Product');
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(toSheetRows(report.marginAnalysis.byVessel)), 'By Vessel');
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(report.marginAnalysis.monthlyTrend.map((row) => ({
+    Month: row.month,
+    Orders: row.orderCount,
+    'Revenue USD': Number(row.totalRevenue),
+    'Net Profit USD': Number(row.totalNetProfit),
+    'Net Margin %': row.netMarginPct ?? '',
+  }))), 'Monthly Trend');
+
+  return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+}
+
+function buildScheduledAttachments(schedule: ReportScheduleDto, report: ReleaseTwoReportsDto) {
+  const suffix = buildFileSuffix(report.filtersApplied);
+  const attachments: Array<{ filename: string; content: string | Buffer; contentType: string }> = [];
+  const wantsCsv = schedule.deliveryMode === 'CSV' || schedule.deliveryMode === 'CSV_XLSX';
+  const wantsXlsx = schedule.deliveryMode === 'XLSX' || schedule.deliveryMode === 'CSV_XLSX';
+  const baseName = schedule.reportType === 'MARGIN_ANALYSIS' ? 'margin-analysis' : 'summary';
+
+  if (wantsCsv) {
+    attachments.push({
+      filename: `${baseName}_${suffix}.csv`,
+      content: schedule.reportType === 'MARGIN_ANALYSIS' ? buildCsv([
+        ['MONTH', 'ORDERS', 'REVENUE USD', 'NET PROFIT USD', 'NET MARGIN %'],
+        ...report.marginAnalysis.monthlyTrend.map((point) => [point.month, point.orderCount, point.totalRevenue, point.totalNetProfit, point.netMarginPct ?? '']),
+      ]) : buildSummaryBundleCsv(report),
+      contentType: 'text/csv; charset=utf-8',
+    });
+  }
+
+  if (wantsXlsx) {
+    attachments.push({
+      filename: `${baseName}_${suffix}.xlsx`,
+      content: schedule.reportType === 'MARGIN_ANALYSIS' ? buildMarginWorkbook(report) : buildSummaryWorkbook(report),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+  }
+
+  return attachments;
+}
+
+function buildSummaryEmailHtml(tenantName: string, report: ReleaseTwoReportsDto): string {
+  const topTraders = report.traderPerformance.rows.slice(0, 5)
+    .map((row) => `<tr><td style="padding:6px 0;">${row.traderName}</td><td style="padding:6px 0; text-align:right;">${formatMoney(parseNumber(row.totalNetProfit))}</td></tr>`)
+    .join('');
+  const agingRows = report.invoiceAging.buckets
+    .map((bucket) => `<tr><td style="padding:6px 0;">${bucket.label}</td><td style="padding:6px 0; text-align:right;">${bucket.count}</td><td style="padding:6px 0; text-align:right;">${bucket.outstandingAmount}</td></tr>`)
+    .join('');
+
+  return `
+    <div style="font-family: Arial, sans-serif; color:#111827; line-height:1.5;">
+      <h2 style="margin:0 0 12px;">${tenantName} report summary</h2>
+      <p style="margin:0 0 18px; color:#6b7280;">Generated ${new Date(report.generatedAt).toUTCString()}</p>
+      <div style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:12px; margin-bottom:18px;">
+        <div style="border:1px solid #e5e7eb; border-radius:12px; padding:12px;">
+          <div style="font-size:12px; color:#6b7280; text-transform:uppercase; letter-spacing:0.08em;">Net Profit</div>
+          <div style="font-size:24px; font-weight:600;">${report.traderPerformance.totals.totalNetProfit} USD</div>
+        </div>
+        <div style="border:1px solid #e5e7eb; border-radius:12px; padding:12px;">
+          <div style="font-size:12px; color:#6b7280; text-transform:uppercase; letter-spacing:0.08em;">Win Rate</div>
+          <div style="font-size:24px; font-weight:600;">${(report.commercialSummary.conversion.winRate * 100).toFixed(1)}%</div>
+        </div>
+      </div>
+      <h3 style="margin:0 0 8px;">Top traders by net profit</h3>
+      <table style="width:100%; border-collapse:collapse; margin-bottom:18px;"><tbody>${topTraders || '<tr><td>No trader data</td></tr>'}</tbody></table>
+      <h3 style="margin:0 0 8px;">Invoice aging</h3>
+      <table style="width:100%; border-collapse:collapse;"><tbody>${agingRows}</tbody></table>
+    </div>
+  `;
+}
+
+function buildMarginEmailHtml(tenantName: string, report: ReleaseTwoReportsDto): string {
+  const topCustomers = report.marginAnalysis.byCustomer.slice(0, 5)
+    .map((row) => `<tr><td style="padding:6px 0;">${row.label}</td><td style="padding:6px 0; text-align:right;">${row.totalNetProfit}</td><td style="padding:6px 0; text-align:right;">${row.netMarginPct ?? '—'}%</td></tr>`)
+    .join('');
+  const trendRows = report.marginAnalysis.monthlyTrend
+    .map((point) => `<tr><td style="padding:6px 0;">${point.month}</td><td style="padding:6px 0; text-align:right;">${point.totalRevenue}</td><td style="padding:6px 0; text-align:right;">${point.totalNetProfit}</td></tr>`)
+    .join('');
+
+  return `
+    <div style="font-family: Arial, sans-serif; color:#111827; line-height:1.5;">
+      <h2 style="margin:0 0 12px;">${tenantName} margin analysis</h2>
+      <p style="margin:0 0 18px; color:#6b7280;">Generated ${new Date(report.generatedAt).toUTCString()}</p>
+      <h3 style="margin:0 0 8px;">Top customers by net profit</h3>
+      <table style="width:100%; border-collapse:collapse; margin-bottom:18px;"><tbody>${topCustomers || '<tr><td>No customer data</td></tr>'}</tbody></table>
+      <h3 style="margin:0 0 8px;">Monthly trend</h3>
+      <table style="width:100%; border-collapse:collapse;"><tbody>${trendRows || '<tr><td>No trend data</td></tr>'}</tbody></table>
+    </div>
+  `;
+}
+
+async function runScheduleForTenant(tenantId: string, tenantName: string, schedule: ReportScheduleDto): Promise<boolean> {
+  const userRows = await db
+    .select({ email: users.email })
+    .from(users)
+    .where(and(eq(users.tenantId, tenantId), eq(users.isActive, true), inArray(users.role, schedule.recipientRoles)));
+
+  const recipients = Array.from(new Set([
+    ...userRows.map((row) => row.email),
+    ...schedule.extraEmails,
+  ].map((value) => value.trim()).filter(Boolean)));
+
+  if (recipients.length === 0) return false;
+
+  const report = await getReleaseTwoReports(tenantId, userRows.length > 0 ? (await db.query.users.findFirst({ where: and(eq(users.tenantId, tenantId), eq(users.role, Role.Admin)), columns: { id: true } }))?.id ?? '' : '', schedule.filters ?? {});
+  if (!report) return false;
+
+  const html = schedule.reportType === 'MARGIN_ANALYSIS'
+    ? buildMarginEmailHtml(tenantName, report)
+    : buildSummaryEmailHtml(tenantName, report);
+
+  const effectiveBodyMode = resolveScheduleBodyMode(schedule.deliveryMode, schedule.bodyMode);
+  const htmlBody = effectiveBodyMode === 'ATTACHMENT_ONLY'
+    ? '<div style="font-family: Arial, sans-serif; color:#111827; line-height:1.5;"><p>Your scheduled Fueld report is attached.</p></div>'
+    : html;
+  const textBody = effectiveBodyMode === 'ATTACHMENT_ONLY'
+    ? 'Your scheduled Fueld report is attached.'
+    : undefined;
+
+  return sendNotificationEmail(recipients, `Fueld report: ${schedule.name}`, htmlBody, {
+    textContent: textBody,
+    attachments: buildScheduledAttachments(schedule, report),
+  });
+}
+
+export async function runDueReportSchedules(now = new Date()): Promise<void> {
+  const tenantsWithSettings = await db.select({ id: tenants.id, name: tenants.name, settings: tenants.settings }).from(tenants);
+  const hourUtc = now.getUTCHours();
+  const todayKey = now.toISOString().slice(0, 10);
+
+  for (const tenant of tenantsWithSettings) {
+    const currentSettings = (tenant.settings ?? {}) as TenantSettings;
+    const reportSettings = normalizeReportSettings(currentSettings.reportsSettings);
+    let updated = false;
+
+    const adminUser = await db.query.users.findFirst({
+      where: and(eq(users.tenantId, tenant.id), eq(users.role, Role.Admin)),
+      columns: { id: true },
+    });
+    if (!adminUser) continue;
+
+    for (const schedule of reportSettings.schedules ?? []) {
+      if (schedule.isActive === false) continue;
+      if (Math.round(schedule.hourUtc) !== hourUtc) continue;
+      if ((schedule.lastSentAt ?? '').slice(0, 10) === todayKey) continue;
+
+      const sent = await runScheduleForTenant(tenant.id, tenant.name, {
+        id: schedule.id,
+        name: schedule.name,
+        description: schedule.description ?? null,
+        reportType: schedule.reportType,
+        deliveryMode: normalizeDeliveryMode(schedule.deliveryMode),
+        bodyMode: resolveScheduleBodyMode(schedule.deliveryMode, schedule.bodyMode),
+        hourUtc: schedule.hourUtc,
+        recipientRoles: (schedule.recipientRoles ?? []) as Role[],
+        extraEmails: schedule.extraEmails ?? [],
+        filters: schedule.filters ?? {},
+        isActive: schedule.isActive ?? true,
+        lastSentAt: schedule.lastSentAt ?? null,
+        createdAt: schedule.createdAt,
+        updatedAt: schedule.updatedAt,
+      });
+      if (!sent) continue;
+
+      schedule.lastSentAt = now.toISOString();
+      schedule.updatedAt = now.toISOString();
+      updated = true;
+    }
+
+    if (updated) {
+      await db.update(tenants)
+        .set({ settings: { ...currentSettings, reportsSettings: reportSettings }, updatedAt: new Date() })
+        .where(eq(tenants.id, tenant.id));
+    }
+  }
+}
+
+export function startReportsScheduleJob(): void {
+  const intervalMs = 60 * 60 * 1000;
+  const run = async () => {
+    try {
+      await runDueReportSchedules();
+    } catch (error) {
+      console.error('[Reports] Scheduled delivery failed:', error);
+    }
+  };
+
+  setTimeout(run, 20_000);
+  setInterval(run, intervalMs);
+  console.log('[Reports] Background job started (interval: 1h)');
+}

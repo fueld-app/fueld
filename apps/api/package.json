@@ -42,7 +42,8 @@
     "qrcode": "^1.5.4",
     "reflect-metadata": "^0.2.2",
     "tz-lookup": "^6.1.25",
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/bun": "latest",

@@ -11,6 +11,8 @@ import { supplierQuoteController } from './modules/documents/supplier-quote.cont
 import { startInquiryReminderJob } from './modules/documents/supplier-inquiry.service';
 import { verifyController } from './modules/documents/verify.controller';
 import { dashboardController } from './modules/dashboard/dashboard.controller';
+import { reportsController } from './modules/reports/reports.controller';
+import { startReportsScheduleJob } from './modules/reports/reports.service';
 import { lloydsController } from './modules/lloyds';
 import { companiesController } from './modules/companies/companies.controller';
 import { vesselsController } from './modules/vessels/vessels.controller';
@@ -281,6 +283,7 @@ export async function createApp(options: CreateAppOptions = {}) {
             { name: 'Orders', description: 'Bunker order management' },
             { name: 'Documents', description: 'Invoice PDF generation & email' },
             { name: 'Dashboard', description: 'Collections, pipeline & team stats' },
+            { name: 'Reports', description: 'Historical, exportable reporting surfaces' },
             { name: 'Lloyd\'s', description: 'Lloyd\'s List Intelligence vessel, port & company lookup' },
             { name: 'Push', description: 'Push notification subscriptions' },
           ],
@@ -351,12 +354,15 @@ export async function createApp(options: CreateAppOptions = {}) {
     .onAfterResponse({ as: 'global' }, ({ request, set, body }) => {
       const status = typeof set.status === 'number' ? set.status : 200;
       logFromRequest(request, status, body);
-    })
+    }) as any;
+
+  app
     .use(authController)
     .use(documentsController)
     .use(supplierQuoteController)
     .use(verifyController)
     .use(dashboardController)
+    .use(reportsController)
     .use(lloydsController)
     .use(companiesController)
     .use(vesselsController)
@@ -378,7 +384,7 @@ export async function createApp(options: CreateAppOptions = {}) {
     .use(plattsController)
     .use(riskMonitoringController)
     .use(vesselSanctionsController)
-    .get('/uploads/avatars/:filename', async ({ params, set }) => {
+    .get('/uploads/avatars/:filename', async ({ params, set }: { params: { filename: string }; set: any }) => {
       const { join } = await import('path');
       const path = join(process.cwd(), 'uploads/avatars', params.filename);
       const file = Bun.file(path);
@@ -390,7 +396,7 @@ export async function createApp(options: CreateAppOptions = {}) {
       set.headers['cache-control'] = 'public, max-age=3600';
       return file;
     })
-    .get('/uploads/logos/:filename', async ({ params, set }) => {
+    .get('/uploads/logos/:filename', async ({ params, set }: { params: { filename: string }; set: any }) => {
       const { join } = await import('path');
       const path = join(process.cwd(), 'uploads/logos', params.filename);
       const file = Bun.file(path);
@@ -402,7 +408,7 @@ export async function createApp(options: CreateAppOptions = {}) {
       set.headers['cache-control'] = 'public, max-age=3600';
       return file;
     })
-    .get('/uploads/attachments/:filename', async ({ params, set }) => {
+    .get('/uploads/attachments/:filename', async ({ params, set }: { params: { filename: string }; set: any }) => {
       const { join } = await import('path');
       const path = join(process.cwd(), 'uploads/attachments', params.filename);
       const file = Bun.file(path);
@@ -420,7 +426,7 @@ export async function createApp(options: CreateAppOptions = {}) {
         token: t.String(),
       }),
 
-      async open(ws) {
+      async open(ws: any) {
         const token = ws.data.query.token;
 
         try {
@@ -475,7 +481,7 @@ export async function createApp(options: CreateAppOptions = {}) {
         }
       },
 
-      async message(ws, message) {
+      async message(ws: any, message: any) {
         const auth = (ws.data as any).auth;
         if (!auth) {
           ws.send(JSON.stringify({ type: 'auth-error', message: 'Not authenticated' }));
@@ -634,7 +640,7 @@ export async function createApp(options: CreateAppOptions = {}) {
         }
       },
 
-      close(ws) {
+      close(ws: any) {
         const auth = (ws.data as any).auth;
         const socketId = (ws.data as any).socketId;
         if (socketId) {
@@ -648,6 +654,7 @@ export async function createApp(options: CreateAppOptions = {}) {
     startPruneJob();
     startPricePolling();
     startInquiryReminderJob();
+    startReportsScheduleJob();
     registerAutoSyncHooks();
     reconnectWhatsAppSessions();
     resumePendingPlattsParseJobs();

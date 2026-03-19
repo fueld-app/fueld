@@ -26,6 +26,12 @@ type SmtpConfig = {
   secure: boolean;
 };
 
+type EmailAttachment = {
+  filename: string;
+  content: string | Buffer;
+  contentType?: string;
+};
+
 function getSmtpConfigFromEnv(): SmtpConfig | null {
   const host = process.env['SMTP_HOST'];
   const port = Number(process.env['SMTP_PORT'] ?? '587');
@@ -217,6 +223,10 @@ export async function sendNotificationEmail(
   to: string | string[],
   subject: string,
   htmlContent: string,
+  options?: {
+    textContent?: string;
+    attachments?: EmailAttachment[];
+  },
 ): Promise<boolean> {
   const cfg = await getSmtpConfig();
   if (!cfg) {
@@ -228,7 +238,7 @@ export async function sendNotificationEmail(
   if (!transporter) return false;
 
   const recipients = Array.isArray(to) ? to.join(', ') : to;
-  const plainText = htmlContent.replace(/<[^>]*>/g, '');
+  const plainText = options?.textContent ?? htmlContent.replace(/<[^>]*>/g, '');
 
   await transporter.sendMail({
     from: cfg.from,
@@ -236,6 +246,7 @@ export async function sendNotificationEmail(
     subject,
     text: plainText,
     html: htmlContent,
+    attachments: options?.attachments,
   });
 
   return true;

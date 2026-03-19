@@ -202,6 +202,11 @@ const NAVIGATION: NavItem[] = [
     route: '/',
   },
   {
+    label: 'Reports',
+    icon: 'M3 3h18v18H3V3zm4 12h2V9H7v6zm4 0h2V6h-2v9zm4 0h2v-4h-2v4z',
+    route: '/reports',
+  },
+  {
     label: 'Trading',
     icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
     children: [
