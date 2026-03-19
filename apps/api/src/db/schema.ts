@@ -273,12 +273,15 @@ export interface TenantSettings {
       id: string;
       name: string;
       description?: string | null;
+      reportMode?: 'SUMMARY' | 'EXCEPTIONS';
       reportType: 'SUMMARY' | 'MARGIN_ANALYSIS';
       deliveryMode?: 'HTML' | 'CSV' | 'XLSX' | 'CSV_XLSX';
       bodyMode?: 'HTML_SUMMARY' | 'ATTACHMENT_ONLY';
       hourUtc: number;
       recipientRoles: string[];
       extraEmails?: string[];
+      exceptionTypes?: ('NEGATIVE_NET_PROFIT_ORDER' | 'SEVERELY_OVERDUE_INVOICE' | 'LOW_MARGIN_CUSTOMER')[];
+      sendOnlyWhenNonEmpty?: boolean;
       filters?: {
         from?: string;
         to?: string;

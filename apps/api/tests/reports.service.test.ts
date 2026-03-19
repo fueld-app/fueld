@@ -43,6 +43,33 @@ beforeEach(async () => {
 });
 
 describe('reports.service', () => {
+  test('builds variance data for the previous comparison window', async () => {
+    const { tenant, user, client, vessel, place } = await seedBasics();
+    const db = await getDb();
+    const { createOrder, saveOrderItems } = await loadOrdersService();
+
+    await db.update(users).set({ role: Role.Admin, updatedAt: new Date() }).where(eq(users.id, user.id));
+
+    const currentOrder = await createOrder({ tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: user.id });
+    const previousOrder = await createOrder({ tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: user.id });
+
+    await saveOrderItems(currentOrder.id, [{ productType: 'VLSFO', quantity: '10', unit: 'MT', salesPrice: '120', costPrice: '90' }]);
+    await saveOrderItems(previousOrder.id, [{ productType: 'VLSFO', quantity: '10', unit: 'MT', salesPrice: '100', costPrice: '90' }]);
+
+    await db.update(orders).set({ status: 'CONFIRMED', createdAt: new Date('2026-03-12T00:00:00.000Z'), updatedAt: new Date() }).where(eq(orders.id, currentOrder.id));
+    await db.update(orders).set({ status: 'CONFIRMED', createdAt: new Date('2026-03-05T00:00:00.000Z'), updatedAt: new Date() }).where(eq(orders.id, previousOrder.id));
+
+    const report = await reportsModule.getReleaseTwoReports(tenant.id, user.id, {
+      from: '2026-03-10',
+      to: '2026-03-19',
+      comparisonMode: 'PREVIOUS_PERIOD',
+    });
+
+    expect(report.variance.summary).not.toBeNull();
+    expect(report.variance.comparison?.previousFrom).toBe('2026-02-28');
+    expect(report.variance.topTraderMovers[0]?.label).toBe(user.name);
+  });
+
   test('limits team lead reports to their team scope', async () => {
     const { tenant, client, vessel, place, user } = await seedBasics();
     const db = await getDb();
@@ -188,5 +215,64 @@ describe('reports.service', () => {
 
     const auditEntries = await db.select().from(activityLogs).where(eq(activityLogs.entityType, 'report_schedule'));
     expect(auditEntries.map((entry) => entry.action).sort()).toEqual(['CREATE', 'DELETE', 'UPDATE']);
+  });
+
+  test('returns scoped trader drilldown rows for team leads only inside their team', async () => {
+    const { tenant, client, vessel, place, user } = await seedBasics();
+    const db = await getDb();
+    const { createOrder, saveOrderItems } = await loadOrdersService();
+
+    const [teamA] = await db.insert(teams).values({ tenantId: tenant.id, name: 'Alpha' }).returning();
+    const [teamB] = await db.insert(teams).values({ tenantId: tenant.id, name: 'Beta' }).returning();
+    await db.update(users).set({ role: Role.Teamlead, teamId: teamA.id, updatedAt: new Date() }).where(eq(users.id, user.id));
+
+    const [teammate] = await db.insert(users).values({ tenantId: tenant.id, email: 'scoped@fueld.test', name: 'Scoped Trader', role: Role.Trader, teamId: teamA.id }).returning();
+    const [outsider] = await db.insert(users).values({ tenantId: tenant.id, email: 'outside@fueld.test', name: 'Outside Trader', role: Role.Trader, teamId: teamB.id }).returning();
+
+    const teamOrder = await createOrder({ tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: teammate.id });
+    const outsideOrder = await createOrder({ tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: outsider.id });
+    await saveOrderItems(teamOrder.id, [{ productType: 'VLSFO', quantity: '10', unit: 'MT', salesPrice: '110', costPrice: '90' }]);
+    await saveOrderItems(outsideOrder.id, [{ productType: 'VLSFO', quantity: '10', unit: 'MT', salesPrice: '110', costPrice: '90' }]);
+    await db.update(orders).set({ status: 'CONFIRMED', updatedAt: new Date() }).where(eq(orders.id, teamOrder.id));
+    await db.update(orders).set({ status: 'CONFIRMED', updatedAt: new Date() }).where(eq(orders.id, outsideOrder.id));
+
+    const detail = await reportsModule.getReportDrilldown(tenant.id, user.id, {
+      dimension: 'TRADER',
+      value: teammate.id,
+      from: '2026-01-01',
+      to: '2026-12-31',
+    });
+
+    expect(detail.dataset).toBe('ORDERS');
+    expect(detail.orders).toHaveLength(1);
+    expect(detail.orders[0]?.traderId).toBe(teammate.id);
+  });
+
+  test('skips exception schedules when send-only-if-non-empty is enabled and nothing matches', async () => {
+    const { tenant, user, client, vessel, place } = await seedBasics();
+    const db = await getDb();
+    const { createOrder, saveOrderItems } = await loadOrdersService();
+
+    await db.update(users).set({ role: Role.Admin, updatedAt: new Date() }).where(eq(users.id, user.id));
+
+    const order = await createOrder({ tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: user.id });
+    await saveOrderItems(order.id, [{ productType: 'VLSFO', quantity: '10', unit: 'MT', salesPrice: '120', costPrice: '100' }]);
+    await db.update(orders).set({ status: 'CONFIRMED', updatedAt: new Date() }).where(eq(orders.id, order.id));
+
+    await reportsModule.createReportSchedule(tenant.id, user.id, {
+      name: 'Exception digest',
+      reportMode: 'EXCEPTIONS',
+      reportType: 'SUMMARY',
+      deliveryMode: 'HTML',
+      bodyMode: 'HTML_SUMMARY',
+      hourUtc: 10,
+      recipientRoles: [Role.Admin],
+      exceptionTypes: ['NEGATIVE_NET_PROFIT_ORDER'],
+      sendOnlyWhenNonEmpty: true,
+      filters: {},
+    });
+
+    await reportsModule.runDueReportSchedules(new Date('2026-03-19T10:00:00.000Z'));
+    expect(sentMails).toHaveLength(0);
   });
 });

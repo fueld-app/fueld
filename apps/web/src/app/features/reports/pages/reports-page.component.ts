@@ -5,16 +5,21 @@ import { firstValueFrom } from 'rxjs';
 import type {
   ApiResponse,
   ReleaseTwoReportsDto,
+  ReportComparisonMode,
+  ReportDrilldownResponseDto,
+  ReportDrilldownTarget,
+  ReportExceptionType,
   ReportFiltersDto,
   ReportScheduleBodyMode,
   ReportScheduleDeliveryMode,
+  ReportScheduleMode,
   ReportScheduleType,
   SavedReportViewDto,
 } from '@fueld/types';
 import { Role } from '@fueld/types';
 import { API } from '@app/core/config/api';
 
-type ExportKind = 'trader-performance' | 'invoice-aging' | 'commercial-summary' | 'margin-analysis';
+type ExportKind = 'trader-performance' | 'invoice-aging' | 'commercial-summary' | 'margin-analysis' | 'exceptions';
 type ExportFormat = 'csv' | 'xlsx';
 
 @Component({
@@ -73,7 +78,7 @@ type ExportFormat = 'csv' | 'xlsx';
       </div>
 
       <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
           <label class="flex flex-col gap-1 text-sm text-gray-600">
             <span>From</span>
             <input type="date" [value]="from()" (change)="from.set(($any($event.target).value || defaultFrom()))" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100" />
@@ -118,6 +123,16 @@ type ExportFormat = 'csv' | 'xlsx';
               }
             </select>
           </label>
+          <label class="flex flex-col gap-1 text-sm text-gray-600">
+            <span>Comparison</span>
+            <select [value]="comparisonMode()" (change)="comparisonMode.set($any($event.target).value)" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
+              <option value="NONE">None</option>
+              <option value="PREVIOUS_PERIOD">Previous period</option>
+              <option value="PREVIOUS_MONTH">Previous month</option>
+              <option value="PREVIOUS_QUARTER">Previous quarter</option>
+              <option value="PREVIOUS_YEAR">Previous year</option>
+            </select>
+          </label>
         </div>
       </section>
 
@@ -141,6 +156,85 @@ type ExportFormat = 'csv' | 'xlsx';
             </div>
           }
         </div>
+
+        @if (reportData.variance.summary; as varianceSummary) {
+          <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 class="text-lg font-semibold text-gray-900">Variance</h2>
+                <p class="text-sm text-gray-500">{{ reportData.variance.comparison?.label || 'Comparison disabled' }}</p>
+              </div>
+            </div>
+            <div class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+              <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <div class="text-xs uppercase tracking-[0.18em] text-gray-400">Revenue</div>
+                <div class="mt-2 text-lg font-semibold text-gray-900">{{ formatCurrency(varianceSummary.totalRevenue.deltaValue) }}</div>
+                <div class="text-sm text-gray-500">{{ varianceSummary.totalRevenue.deltaPct ?? '—' }}%</div>
+              </div>
+              <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <div class="text-xs uppercase tracking-[0.18em] text-gray-400">Net Profit</div>
+                <div class="mt-2 text-lg font-semibold text-gray-900">{{ formatCurrency(varianceSummary.totalNetProfit.deltaValue) }}</div>
+                <div class="text-sm text-gray-500">{{ varianceSummary.totalNetProfit.deltaPct ?? '—' }}%</div>
+              </div>
+              <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <div class="text-xs uppercase tracking-[0.18em] text-gray-400">Outstanding</div>
+                <div class="mt-2 text-lg font-semibold text-gray-900">{{ formatCurrency(varianceSummary.totalOutstanding.deltaValue) }}</div>
+                <div class="text-sm text-gray-500">{{ varianceSummary.totalOutstanding.deltaPct ?? '—' }}%</div>
+              </div>
+              <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <div class="text-xs uppercase tracking-[0.18em] text-gray-400">Win Rate</div>
+                <div class="mt-2 text-lg font-semibold text-gray-900">{{ varianceSummary.winRate.deltaValue }} pts</div>
+                <div class="text-sm text-gray-500">{{ varianceSummary.winRate.deltaPct ?? '—' }}%</div>
+              </div>
+              <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <div class="text-xs uppercase tracking-[0.18em] text-gray-400">Avg Deal</div>
+                <div class="mt-2 text-lg font-semibold text-gray-900">{{ formatCurrency(varianceSummary.avgDealSize.deltaValue) }}</div>
+                <div class="text-sm text-gray-500">{{ varianceSummary.avgDealSize.deltaPct ?? '—' }}%</div>
+              </div>
+            </div>
+            <div class="mt-6 grid gap-4 xl:grid-cols-3">
+              <div>
+                <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400">Trader Movers</h3>
+                <div class="mt-3 space-y-2">
+                  @for (row of reportData.variance.topTraderMovers; track row.key) {
+                    <button type="button" (click)="openOrderDrilldown('TRADER', row.key)" class="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm hover:bg-white">
+                      <span class="font-medium text-gray-900">{{ row.label }}</span>
+                      <span class="text-gray-500">{{ formatCurrency(row.deltaValue) }}</span>
+                    </button>
+                  } @empty {
+                    <p class="text-sm text-gray-500">No comparison data available.</p>
+                  }
+                </div>
+              </div>
+              <div>
+                <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400">Customer Movers</h3>
+                <div class="mt-3 space-y-2">
+                  @for (row of reportData.variance.topCustomerMovers; track row.key) {
+                    <button type="button" (click)="openOrderDrilldown('CUSTOMER', row.key)" class="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm hover:bg-white">
+                      <span class="font-medium text-gray-900">{{ row.label }}</span>
+                      <span class="text-gray-500">{{ formatCurrency(row.deltaValue) }}</span>
+                    </button>
+                  } @empty {
+                    <p class="text-sm text-gray-500">No comparison data available.</p>
+                  }
+                </div>
+              </div>
+              <div>
+                <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400">Product Movers</h3>
+                <div class="mt-3 space-y-2">
+                  @for (row of reportData.variance.topProductMovers; track row.key) {
+                    <button type="button" (click)="openOrderDrilldown('PRODUCT', row.key)" class="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm hover:bg-white">
+                      <span class="font-medium text-gray-900">{{ row.label }}</span>
+                      <span class="text-gray-500">{{ formatCurrency(row.deltaValue) }}</span>
+                    </button>
+                  } @empty {
+                    <p class="text-sm text-gray-500">No comparison data available.</p>
+                  }
+                </div>
+              </div>
+            </div>
+          </section>
+        }
 
         @if (reportData.access.canManageSharedViews || reportData.savedViews.length > 0) {
           <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -219,6 +313,7 @@ type ExportFormat = 'csv' | 'xlsx';
                   <th class="px-5 py-3 font-medium">Net</th>
                   <th class="px-5 py-3 font-medium">Win Rate</th>
                   <th class="px-5 py-3 font-medium">Avg Deal</th>
+                  <th class="px-5 py-3 font-medium"></th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100 bg-white text-gray-700">
@@ -235,10 +330,15 @@ type ExportFormat = 'csv' | 'xlsx';
                     <td class="px-5 py-3">{{ formatCurrency(row.totalNetProfit) }}</td>
                     <td class="px-5 py-3">{{ formatPercent(row.winRate) }}</td>
                     <td class="px-5 py-3">{{ formatCurrency(row.avgDealSize) }}</td>
+                    <td class="px-5 py-3 text-right">
+                      <button type="button" (click)="openOrderDrilldown('TRADER', row.traderId)" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">
+                        Drill-down
+                      </button>
+                    </td>
                   </tr>
                 } @empty {
                   <tr>
-                    <td colspan="8" class="px-5 py-8 text-center text-sm text-gray-500">No trader performance data found for the selected period.</td>
+                    <td colspan="9" class="px-5 py-8 text-center text-sm text-gray-500">No trader performance data found for the selected period.</td>
                   </tr>
                 }
               </tbody>
@@ -269,6 +369,9 @@ type ExportFormat = 'csv' | 'xlsx';
                   <p class="text-xs font-medium uppercase tracking-[0.18em] text-gray-400">{{ bucket.label }}</p>
                   <p class="mt-2 text-lg font-semibold text-gray-900">{{ bucket.count }}</p>
                   <p class="text-sm text-gray-500">{{ formatCurrency(bucket.outstandingAmount) }}</p>
+                  <button type="button" (click)="openInvoiceDrilldown(bucket.label)" class="mt-3 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">
+                    Open invoices
+                  </button>
                 </div>
               }
             </div>
@@ -401,6 +504,9 @@ type ExportFormat = 'csv' | 'xlsx';
                       <span class="text-sm text-gray-500">{{ row.netMarginPct ?? '—' }}%</span>
                     </div>
                     <div class="mt-1 text-sm text-gray-600">{{ formatCurrency(row.totalNetProfit) }} net on {{ formatCurrency(row.totalRevenue) }} revenue</div>
+                    <button type="button" (click)="openOrderDrilldown('CUSTOMER', row.key)" class="mt-3 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">
+                      Open orders
+                    </button>
                   </div>
                 } @empty {
                   <p class="text-sm text-gray-500">No customer margin data in the selected period.</p>
@@ -417,6 +523,9 @@ type ExportFormat = 'csv' | 'xlsx';
                       <span class="text-sm text-gray-500">{{ row.netMarginPct ?? '—' }}%</span>
                     </div>
                     <div class="mt-1 text-sm text-gray-600">{{ formatCurrency(row.totalNetProfit) }} net on {{ formatCurrency(row.totalRevenue) }} revenue</div>
+                    <button type="button" (click)="openOrderDrilldown('PRODUCT', row.key)" class="mt-3 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">
+                      Open orders
+                    </button>
                   </div>
                 } @empty {
                   <p class="text-sm text-gray-500">No product margin data in the selected period.</p>
@@ -442,6 +551,126 @@ type ExportFormat = 'csv' | 'xlsx';
           </div>
         </section>
 
+        <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 class="text-lg font-semibold text-gray-900">Exceptions</h2>
+              <p class="text-sm text-gray-500">High-signal issues surfaced from the current report scope.</p>
+            </div>
+            <div class="flex gap-2">
+              <button type="button" (click)="exportReport('exceptions', 'csv')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                Export CSV
+              </button>
+              <button type="button" (click)="exportReport('exceptions', 'xlsx')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                Export XLSX
+              </button>
+            </div>
+          </div>
+          <div class="mt-4 flex flex-wrap gap-2">
+            @for (entry of reportData.exceptions.byType; track entry.type) {
+              <span class="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
+                {{ exceptionTypeLabel(entry.type) }} · {{ entry.count }}
+              </span>
+            } @empty {
+              <span class="text-sm text-gray-500">No active exceptions in this scope.</span>
+            }
+          </div>
+          <div class="mt-4 space-y-3">
+            @for (row of reportData.exceptions.rows; track row.type + '-' + row.entityId) {
+              <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div class="font-medium text-gray-900">{{ row.title }}</div>
+                    <div class="text-sm text-gray-500">{{ row.description }}</div>
+                  </div>
+                  <div class="text-right text-sm">
+                    <div class="font-medium text-gray-900">{{ row.primaryValue }}</div>
+                    <div class="text-gray-500">{{ row.secondaryValue || exceptionTypeLabel(row.type) }}</div>
+                  </div>
+                </div>
+              </div>
+            } @empty {
+              <p class="text-sm text-gray-500">No report exceptions matched the selected filters.</p>
+            }
+          </div>
+        </section>
+
+        @if (drilldownData() || drilldownLoading() || drilldownError()) {
+          <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div class="flex items-center justify-between gap-4">
+              <div>
+                <h2 class="text-lg font-semibold text-gray-900">Drill-down</h2>
+                <p class="text-sm text-gray-500">{{ drilldownData()?.title || 'Inspect the source records behind a summary row.' }}</p>
+              </div>
+              <button type="button" (click)="closeDrilldown()" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                Close
+              </button>
+            </div>
+
+            @if (drilldownLoading()) {
+              <div class="mt-4 text-sm text-gray-500">Loading drill-down…</div>
+            } @else if (drilldownError()) {
+              <div class="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ drilldownError() }}</div>
+            } @else if (drilldownData(); as detail) {
+              <div class="mt-4 overflow-x-auto">
+                @if (detail.dataset === 'ORDERS') {
+                  <table class="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead class="bg-gray-50 text-left text-gray-500">
+                      <tr>
+                        <th class="px-4 py-3 font-medium">Customer</th>
+                        <th class="px-4 py-3 font-medium">Vessel</th>
+                        <th class="px-4 py-3 font-medium">Trader</th>
+                        <th class="px-4 py-3 font-medium">Status</th>
+                        <th class="px-4 py-3 font-medium">Revenue</th>
+                        <th class="px-4 py-3 font-medium">Net</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 bg-white text-gray-700">
+                      @for (row of detail.orders; track row.orderId) {
+                        <tr>
+                          <td class="px-4 py-3">{{ row.clientName }}</td>
+                          <td class="px-4 py-3">{{ row.vesselName }}</td>
+                          <td class="px-4 py-3">{{ row.traderName }}</td>
+                          <td class="px-4 py-3">{{ row.status }}</td>
+                          <td class="px-4 py-3">{{ formatCurrency(row.totalRevenue) }}</td>
+                          <td class="px-4 py-3">{{ formatCurrency(row.totalNetProfit) }}</td>
+                        </tr>
+                      } @empty {
+                        <tr><td colspan="6" class="px-4 py-6 text-center text-sm text-gray-500">No order rows matched this drill-down.</td></tr>
+                      }
+                    </tbody>
+                  </table>
+                } @else {
+                  <table class="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead class="bg-gray-50 text-left text-gray-500">
+                      <tr>
+                        <th class="px-4 py-3 font-medium">Invoice</th>
+                        <th class="px-4 py-3 font-medium">Customer</th>
+                        <th class="px-4 py-3 font-medium">Trader</th>
+                        <th class="px-4 py-3 font-medium">Due</th>
+                        <th class="px-4 py-3 font-medium">Outstanding</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 bg-white text-gray-700">
+                      @for (row of detail.invoices; track row.invoiceId) {
+                        <tr>
+                          <td class="px-4 py-3">{{ row.invoiceNumber }}</td>
+                          <td class="px-4 py-3">{{ row.clientName }}</td>
+                          <td class="px-4 py-3">{{ row.traderName || '—' }}</td>
+                          <td class="px-4 py-3">{{ row.dueDate }}</td>
+                          <td class="px-4 py-3">{{ formatCurrency(row.outstandingAmount) }}</td>
+                        </tr>
+                      } @empty {
+                        <tr><td colspan="5" class="px-4 py-6 text-center text-sm text-gray-500">No invoice rows matched this drill-down.</td></tr>
+                      }
+                    </tbody>
+                  </table>
+                }
+              </div>
+            }
+          </section>
+        }
+
         @if (reportData.access.canManageSchedules || reportData.schedules.length > 0) {
           <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -454,6 +683,10 @@ type ExportFormat = 'csv' | 'xlsx';
                   <div class="grid gap-3 sm:grid-cols-2">
                     <input type="text" data-testid="reports-schedule-name" [value]="scheduleName()" (input)="scheduleName.set(($any($event.target).value || '').trimStart())" placeholder="Schedule name" class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100" />
                     <input type="text" data-testid="reports-schedule-description" [value]="scheduleDescription()" (input)="scheduleDescription.set(($any($event.target).value || '').trimStart())" placeholder="Description (optional)" class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100" />
+                    <select [value]="scheduleMode()" (change)="scheduleMode.set($any($event.target).value)" class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
+                      <option value="SUMMARY">Summary</option>
+                      <option value="EXCEPTIONS">Exceptions</option>
+                    </select>
                     <select data-testid="reports-schedule-report-type" [value]="scheduleReportType()" (change)="scheduleReportType.set($any($event.target).value)" class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
                       <option value="SUMMARY">Summary</option>
                       <option value="MARGIN_ANALYSIS">Margin analysis</option>
@@ -475,6 +708,19 @@ type ExportFormat = 'csv' | 'xlsx';
                     </select>
                     <input type="text" data-testid="reports-schedule-extra-emails" [value]="scheduleExtraEmails()" (input)="scheduleExtraEmails.set(($any($event.target).value || '').trimStart())" placeholder="Extra emails, comma-separated" class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100" />
                   </div>
+                  @if (scheduleMode() === 'EXCEPTIONS') {
+                    <div class="flex flex-wrap gap-2">
+                      @for (type of ['NEGATIVE_NET_PROFIT_ORDER', 'SEVERELY_OVERDUE_INVOICE', 'LOW_MARGIN_CUSTOMER']; track type) {
+                        <button type="button" (click)="toggleScheduleExceptionType($any(type))" class="rounded-full border px-3 py-1.5 text-sm font-medium transition-colors" [class.border-red-600]="scheduleExceptionTypeSelected($any(type))" [class.bg-red-600]="scheduleExceptionTypeSelected($any(type))" [class.text-white]="scheduleExceptionTypeSelected($any(type))" [class.border-gray-300]="!scheduleExceptionTypeSelected($any(type))" [class.bg-white]="!scheduleExceptionTypeSelected($any(type))" [class.text-gray-700]="!scheduleExceptionTypeSelected($any(type))">
+                          {{ exceptionTypeLabel($any(type)) }}
+                        </button>
+                      }
+                    </div>
+                    <label class="flex items-center gap-2 text-sm text-gray-600">
+                      <input type="checkbox" [checked]="scheduleSendOnlyWhenNonEmpty()" (change)="scheduleSendOnlyWhenNonEmpty.set(($any($event.target).checked))" class="rounded border-gray-300" />
+                      Send only when exceptions exist
+                    </label>
+                  }
                   @if (editingScheduleId()) {
                     <label class="flex items-center gap-2 text-sm text-gray-600">
                       <input type="checkbox" [checked]="scheduleActive()" (change)="scheduleActive.set(($any($event.target).checked))" class="rounded border-gray-300" />
@@ -507,8 +753,11 @@ type ExportFormat = 'csv' | 'xlsx';
                 <div class="flex flex-col gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 lg:flex-row lg:items-center lg:justify-between" [attr.data-testid]="'reports-schedule-card-' + schedule.id">
                   <div>
                     <div class="font-medium text-gray-900">{{ schedule.name }}</div>
-                    <div class="text-sm text-gray-500">{{ schedule.reportType === 'MARGIN_ANALYSIS' ? 'Margin analysis' : 'Summary' }} · {{ schedule.hourUtc }}:00 UTC · {{ formatRecipientRoles(schedule.recipientRoles) }}</div>
+                    <div class="text-sm text-gray-500">{{ scheduleModeLabel(schedule.reportMode) }} · {{ schedule.reportType === 'MARGIN_ANALYSIS' ? 'Margin analysis' : 'Summary' }} · {{ schedule.hourUtc }}:00 UTC · {{ formatRecipientRoles(schedule.recipientRoles) }}</div>
                     <div class="text-xs text-gray-500">Delivery: {{ describeDeliveryMode(schedule.deliveryMode) }} · {{ describeBodyMode(schedule.bodyMode) }} · {{ schedule.isActive ? 'Active' : 'Paused' }}</div>
+                    @if (schedule.reportMode === 'EXCEPTIONS') {
+                      <div class="text-xs text-gray-500">{{ schedule.sendOnlyWhenNonEmpty ? 'Send only when non-empty' : 'Always send' }} · {{ formatExceptionTypes(schedule.exceptionTypes) }}</div>
+                    }
                     <div class="text-xs text-gray-500">Last sent: {{ schedule.lastSentAt || 'Not sent yet' }}</div>
                   </div>
                   @if (reportData.access.canManageSchedules) {
@@ -549,9 +798,13 @@ export class ReportsPageComponent {
   readonly teamId = signal<string | null>(null);
   readonly customerId = signal<string | null>(null);
   readonly productType = signal<string | null>(null);
+  readonly comparisonMode = signal<ReportComparisonMode>('PREVIOUS_PERIOD');
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly data = signal<ReleaseTwoReportsDto | null>(null);
+  readonly drilldownLoading = signal(false);
+  readonly drilldownError = signal<string | null>(null);
+  readonly drilldownData = signal<ReportDrilldownResponseDto | null>(null);
 
   readonly editingViewId = signal<string | null>(null);
   readonly newViewName = signal('');
@@ -561,6 +814,7 @@ export class ReportsPageComponent {
   readonly editingScheduleId = signal<string | null>(null);
   readonly scheduleName = signal('');
   readonly scheduleDescription = signal('');
+  readonly scheduleMode = signal<ReportScheduleMode>('SUMMARY');
   readonly scheduleReportType = signal<ReportScheduleType>('SUMMARY');
   readonly scheduleDeliveryMode = signal<ReportScheduleDeliveryMode>('HTML');
   readonly scheduleBodyMode = signal<ReportScheduleBodyMode>('HTML_SUMMARY');
@@ -568,6 +822,8 @@ export class ReportsPageComponent {
   readonly scheduleRecipientRoles = signal<Role[]>([Role.Admin, Role.Finance]);
   readonly scheduleHourValue = computed(() => `${this.scheduleHourUtc()}`);
   readonly scheduleExtraEmails = signal('');
+  readonly scheduleExceptionTypes = signal<ReportExceptionType[]>([]);
+  readonly scheduleSendOnlyWhenNonEmpty = signal(true);
   readonly scheduleActive = signal(true);
   readonly savingSchedule = signal(false);
 
@@ -709,12 +965,15 @@ export class ReportsPageComponent {
       const payload = {
         name: this.scheduleName().trim(),
         description: this.scheduleDescription().trim() || undefined,
+        reportMode: this.scheduleMode(),
         reportType: this.scheduleReportType(),
         deliveryMode: this.scheduleDeliveryMode(),
         bodyMode: this.scheduleBodyMode(),
         hourUtc: this.scheduleHourUtc(),
         recipientRoles: this.scheduleRecipientRoles(),
         extraEmails: this.scheduleExtraEmails().split(',').map((value) => value.trim()).filter(Boolean),
+        exceptionTypes: this.scheduleExceptionTypes(),
+        sendOnlyWhenNonEmpty: this.scheduleSendOnlyWhenNonEmpty(),
         filters: this.currentFilters(),
         isActive: this.scheduleActive(),
       };
@@ -739,12 +998,15 @@ export class ReportsPageComponent {
     this.editingScheduleId.set(schedule.id);
     this.scheduleName.set(schedule.name);
     this.scheduleDescription.set(schedule.description ?? '');
+    this.scheduleMode.set(schedule.reportMode);
     this.scheduleReportType.set(schedule.reportType);
     this.scheduleDeliveryMode.set(schedule.deliveryMode);
     this.scheduleBodyMode.set(schedule.bodyMode);
     this.scheduleHourUtc.set(schedule.hourUtc);
     this.scheduleRecipientRoles.set([...schedule.recipientRoles]);
     this.scheduleExtraEmails.set(schedule.extraEmails.join(', '));
+    this.scheduleExceptionTypes.set([...schedule.exceptionTypes]);
+    this.scheduleSendOnlyWhenNonEmpty.set(schedule.sendOnlyWhenNonEmpty);
     this.scheduleActive.set(schedule.isActive);
     this.applyFilters(schedule.filters);
   }
@@ -753,12 +1015,15 @@ export class ReportsPageComponent {
     this.editingScheduleId.set(null);
     this.scheduleName.set('');
     this.scheduleDescription.set('');
+    this.scheduleMode.set('SUMMARY');
     this.scheduleReportType.set('SUMMARY');
     this.scheduleDeliveryMode.set('HTML');
     this.scheduleBodyMode.set('HTML_SUMMARY');
     this.scheduleHourUtc.set(8);
     this.scheduleRecipientRoles.set([Role.Admin, Role.Finance]);
     this.scheduleExtraEmails.set('');
+    this.scheduleExceptionTypes.set([]);
+    this.scheduleSendOnlyWhenNonEmpty.set(true);
     this.scheduleActive.set(true);
   }
 
@@ -779,12 +1044,15 @@ export class ReportsPageComponent {
       const response = await firstValueFrom(this.http.patch<ApiResponse<ReleaseTwoReportsDto['schedules']>>(`${API}/reports/schedules/${schedule.id}`, {
         name: schedule.name,
         description: schedule.description ?? undefined,
+        reportMode: schedule.reportMode,
         reportType: schedule.reportType,
         deliveryMode: schedule.deliveryMode,
         bodyMode: schedule.bodyMode,
         hourUtc: schedule.hourUtc,
         recipientRoles: schedule.recipientRoles,
         extraEmails: schedule.extraEmails,
+        exceptionTypes: schedule.exceptionTypes,
+        sendOnlyWhenNonEmpty: schedule.sendOnlyWhenNonEmpty,
         filters: schedule.filters,
         isActive: !schedule.isActive,
       }));
@@ -807,6 +1075,47 @@ export class ReportsPageComponent {
     void this.reload();
   }
 
+  async openOrderDrilldown(dimension: Extract<ReportDrilldownTarget, 'TRADER' | 'CUSTOMER' | 'PRODUCT'>, value: string): Promise<void> {
+    this.drilldownLoading.set(true);
+    this.drilldownError.set(null);
+
+    try {
+      const params = new URLSearchParams(this.buildQuery());
+      params.set('dimension', dimension);
+      params.set('value', value);
+      const response = await firstValueFrom(this.http.get<ApiResponse<ReportDrilldownResponseDto>>(`${API}/reports/drilldown/orders?${params.toString()}`));
+      if (!response.success) throw new Error(response.message ?? 'Failed to load drilldown');
+      this.drilldownData.set(response.data);
+    } catch (error) {
+      this.drilldownError.set(this.describeError(error, 'Failed to load drilldown'));
+    } finally {
+      this.drilldownLoading.set(false);
+    }
+  }
+
+  async openInvoiceDrilldown(bucket: string): Promise<void> {
+    this.drilldownLoading.set(true);
+    this.drilldownError.set(null);
+
+    try {
+      const params = new URLSearchParams(this.buildQuery());
+      params.set('dimension', 'AGING_BUCKET');
+      params.set('value', bucket);
+      const response = await firstValueFrom(this.http.get<ApiResponse<ReportDrilldownResponseDto>>(`${API}/reports/drilldown/invoices?${params.toString()}`));
+      if (!response.success) throw new Error(response.message ?? 'Failed to load drilldown');
+      this.drilldownData.set(response.data);
+    } catch (error) {
+      this.drilldownError.set(this.describeError(error, 'Failed to load drilldown'));
+    } finally {
+      this.drilldownLoading.set(false);
+    }
+  }
+
+  closeDrilldown(): void {
+    this.drilldownData.set(null);
+    this.drilldownError.set(null);
+  }
+
   toggleScheduleRole(role: Role): void {
     const current = this.scheduleRecipientRoles();
     this.scheduleRecipientRoles.set(current.includes(role)
@@ -816,6 +1125,17 @@ export class ReportsPageComponent {
 
   scheduleRoleSelected(role: Role): boolean {
     return this.scheduleRecipientRoles().includes(role);
+  }
+
+  toggleScheduleExceptionType(type: ReportExceptionType): void {
+    const current = this.scheduleExceptionTypes();
+    this.scheduleExceptionTypes.set(current.includes(type)
+      ? current.filter((value) => value !== type)
+      : [...current, type]);
+  }
+
+  scheduleExceptionTypeSelected(type: ReportExceptionType): boolean {
+    return this.scheduleExceptionTypes().includes(type);
   }
 
   onScheduleHourChange(event: Event): void {
@@ -834,6 +1154,36 @@ export class ReportsPageComponent {
     }
   }
 
+  comparisonModeLabel(mode: ReportComparisonMode): string {
+    switch (mode) {
+      case 'PREVIOUS_MONTH':
+        return 'Previous month';
+      case 'PREVIOUS_QUARTER':
+        return 'Previous quarter';
+      case 'PREVIOUS_YEAR':
+        return 'Previous year';
+      case 'PREVIOUS_PERIOD':
+        return 'Previous period';
+      default:
+        return 'No comparison';
+    }
+  }
+
+  exceptionTypeLabel(type: ReportExceptionType): string {
+    switch (type) {
+      case 'NEGATIVE_NET_PROFIT_ORDER':
+        return 'Negative net profit orders';
+      case 'SEVERELY_OVERDUE_INVOICE':
+        return 'Severely overdue invoices';
+      case 'LOW_MARGIN_CUSTOMER':
+        return 'Low-margin customers';
+    }
+  }
+
+  scheduleModeLabel(mode: ReportScheduleMode): string {
+    return mode === 'EXCEPTIONS' ? 'Exceptions' : 'Summary';
+  }
+
   roleLabel(role: Role): string {
     switch (role) {
       case Role.Teamlead:
@@ -847,6 +1197,10 @@ export class ReportsPageComponent {
 
   formatRecipientRoles(roles: Role[]): string {
     return roles.map((role) => this.roleLabel(role)).join(', ');
+  }
+
+  formatExceptionTypes(types: ReportExceptionType[]): string {
+    return types.length > 0 ? types.map((type) => this.exceptionTypeLabel(type)).join(', ') : 'All exception types';
   }
 
   describeDeliveryMode(mode: ReportScheduleDeliveryMode): string {
@@ -920,6 +1274,7 @@ export class ReportsPageComponent {
     if (filters.teamId) params.set('teamId', filters.teamId);
     if (filters.customerId) params.set('customerId', filters.customerId);
     if (filters.productType) params.set('productType', filters.productType);
+    if (this.comparisonMode() !== 'NONE') params.set('comparisonMode', this.comparisonMode());
     return params.toString();
   }
 

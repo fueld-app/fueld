@@ -1319,6 +1319,124 @@ export interface ReportFiltersDto {
   productType?: string | null;
 }
 
+export type ReportComparisonMode =
+  | 'NONE'
+  | 'PREVIOUS_PERIOD'
+  | 'PREVIOUS_MONTH'
+  | 'PREVIOUS_QUARTER'
+  | 'PREVIOUS_YEAR';
+
+export type ReportVarianceDirection = 'UP' | 'DOWN' | 'FLAT';
+
+export interface ReportComparisonWindowDto {
+  mode: ReportComparisonMode;
+  label: string;
+  currentFrom?: string;
+  currentTo?: string;
+  previousFrom?: string;
+  previousTo?: string;
+}
+
+export interface ReportVarianceValueDto {
+  currentValue: string;
+  previousValue: string;
+  deltaValue: string;
+  deltaPct: number | null;
+  direction: ReportVarianceDirection;
+}
+
+export interface ReportVarianceRowDto {
+  key: string;
+  label: string;
+  currentValue: string;
+  previousValue: string;
+  deltaValue: string;
+  deltaPct: number | null;
+  direction: ReportVarianceDirection;
+}
+
+export interface ReportsVarianceDto {
+  comparison: ReportComparisonWindowDto | null;
+  summary: {
+    totalRevenue: ReportVarianceValueDto;
+    totalNetProfit: ReportVarianceValueDto;
+    totalOutstanding: ReportVarianceValueDto;
+    winRate: ReportVarianceValueDto;
+    avgDealSize: ReportVarianceValueDto;
+  } | null;
+  topTraderMovers: ReportVarianceRowDto[];
+  topCustomerMovers: ReportVarianceRowDto[];
+  topProductMovers: ReportVarianceRowDto[];
+}
+
+export type ReportDrilldownDataset = 'ORDERS' | 'INVOICES';
+export type ReportDrilldownTarget = 'TRADER' | 'CUSTOMER' | 'PRODUCT' | 'AGING_BUCKET';
+
+export interface ReportDrilldownOrderRowDto {
+  orderId: string;
+  traderId: string;
+  traderName: string;
+  clientId: string;
+  clientName: string;
+  vesselId: string;
+  vesselName: string;
+  status: string;
+  createdAt: string;
+  totalQuantity: string;
+  totalRevenue: string;
+  totalGrossProfit: string;
+  totalFinancingCost: string;
+  totalNetProfit: string;
+  netMarginPct: number | null;
+}
+
+export interface ReportDrilldownInvoiceRowDto {
+  invoiceId: string;
+  invoiceNumber: string;
+  orderId: string;
+  clientName: string;
+  vesselName: string;
+  traderName: string | null;
+  dueDate: string;
+  status: InvoiceStatus;
+  outstandingAmount: string;
+  daysOverdue: number;
+  agingBucket: string;
+}
+
+export interface ReportDrilldownResponseDto {
+  title: string;
+  dataset: ReportDrilldownDataset;
+  target: ReportDrilldownTarget;
+  totalCount: number;
+  orders: ReportDrilldownOrderRowDto[];
+  invoices: ReportDrilldownInvoiceRowDto[];
+}
+
+export type ReportExceptionType =
+  | 'NEGATIVE_NET_PROFIT_ORDER'
+  | 'SEVERELY_OVERDUE_INVOICE'
+  | 'LOW_MARGIN_CUSTOMER';
+
+export type ReportExceptionSeverity = 'HIGH' | 'MEDIUM';
+
+export interface ReportExceptionRowDto {
+  type: ReportExceptionType;
+  severity: ReportExceptionSeverity;
+  entityType: 'order' | 'invoice' | 'customer';
+  entityId: string;
+  title: string;
+  description: string;
+  primaryValue: string;
+  secondaryValue?: string | null;
+}
+
+export interface ReportsExceptionsDto {
+  totalCount: number;
+  byType: Array<{ type: ReportExceptionType; count: number }>;
+  rows: ReportExceptionRowDto[];
+}
+
 /** Generic select option used by report filter dropdowns. */
 export interface ReportFilterOptionDto {
   id: string;
@@ -1452,18 +1570,22 @@ export interface SavedReportViewDto {
 export type ReportScheduleType = 'SUMMARY' | 'MARGIN_ANALYSIS';
 export type ReportScheduleDeliveryMode = 'HTML' | 'CSV' | 'XLSX' | 'CSV_XLSX';
 export type ReportScheduleBodyMode = 'HTML_SUMMARY' | 'ATTACHMENT_ONLY';
+export type ReportScheduleMode = 'SUMMARY' | 'EXCEPTIONS';
 
 /** Scheduled report delivery configuration. */
 export interface ReportScheduleDto {
   id: string;
   name: string;
   description: string | null;
+  reportMode: ReportScheduleMode;
   reportType: ReportScheduleType;
   deliveryMode: ReportScheduleDeliveryMode;
   bodyMode: ReportScheduleBodyMode;
   hourUtc: number;
   recipientRoles: Role[];
   extraEmails: string[];
+  exceptionTypes: ReportExceptionType[];
+  sendOnlyWhenNonEmpty: boolean;
   filters: ReportFiltersDto;
   isActive: boolean;
   lastSentAt: string | null;
@@ -1487,6 +1609,8 @@ export interface ReleaseTwoReportsDto extends ReleaseOneReportsDto {
   savedViews: SavedReportViewDto[];
   schedules: ReportScheduleDto[];
   marginAnalysis: MarginAnalysisReportDto;
+  variance: ReportsVarianceDto;
+  exceptions: ReportsExceptionsDto;
 }
 
 /** Request to send an invoice email. */

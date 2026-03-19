@@ -9,6 +9,14 @@ import type {
   MarginAnalysisRowDto,
   MarginTrendPointDto,
   PipelineStageDto,
+  ReportComparisonMode,
+  ReportComparisonWindowDto,
+  ReportDrilldownOrderRowDto,
+  ReportDrilldownResponseDto,
+  ReportDrilldownTarget,
+  ReportExceptionRowDto,
+  ReportExceptionType,
+  ReportScheduleMode,
   ReleaseOneReportsDto,
   ReleaseTwoReportsDto,
   ReportFilterOptionsDto,
@@ -18,6 +26,8 @@ import type {
   ReportScheduleDto,
   ReportScheduleType,
   ReportsAccessDto,
+  ReportsExceptionsDto,
+  ReportsVarianceDto,
   SavedReportViewDto,
   TraderPerformanceReportDto,
   TraderPerformanceReportRowDto,
@@ -95,6 +105,15 @@ type ScopedDataset = {
   financingRateAnnual: number;
 };
 
+type ReportsQueryInput = ReportFiltersDto & {
+  comparisonMode?: ReportComparisonMode | null;
+};
+
+type ReportDrilldownInput = ReportFiltersDto & {
+  dimension: ReportDrilldownTarget;
+  value: string;
+};
+
 function parseNumber(value: string | number | null | undefined): number {
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
   if (typeof value === 'string') {
@@ -116,6 +135,10 @@ function formatPercentValue(numerator: number, denominator: number): number {
   return denominator > 0 ? numerator / denominator : 0;
 }
 
+function formatPercentDisplay(value: number): string {
+  return (value * 100).toFixed(1);
+}
+
 function escapeCsv(value: string | number | null | undefined): string {
   const raw = value === null || value === undefined ? '' : String(value);
   if (raw.includes(',') || raw.includes('"') || raw.includes('\n')) {
@@ -133,6 +156,160 @@ function buildFileSuffix(filters: ReportFiltersDto): string {
     return [filters.from ?? 'start', filters.to ?? 'end'].join('_');
   }
   return new Date().toISOString().slice(0, 10);
+}
+
+function normalizeComparisonMode(mode?: ReportComparisonMode | null): ReportComparisonMode {
+  switch (mode) {
+    case 'PREVIOUS_PERIOD':
+    case 'PREVIOUS_MONTH':
+    case 'PREVIOUS_QUARTER':
+    case 'PREVIOUS_YEAR':
+      return mode;
+    default:
+      return 'NONE';
+  }
+}
+
+function normalizeScheduleMode(mode?: ReportScheduleMode | null): ReportScheduleMode {
+  return mode === 'EXCEPTIONS' ? 'EXCEPTIONS' : 'SUMMARY';
+}
+
+function normalizeExceptionTypes(exceptionTypes?: ReportExceptionType[] | null): ReportExceptionType[] {
+  return Array.from(new Set((exceptionTypes ?? []).filter((value): value is ReportExceptionType => Boolean(value))));
+}
+
+function startOfDayUtc(value: string): Date {
+  return new Date(`${value}T00:00:00.000Z`);
+}
+
+function formatDateOnly(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function addDays(date: Date, days: number): Date {
+  const next = new Date(date);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+}
+
+function addMonths(date: Date, months: number): Date {
+  const next = new Date(date);
+  next.setUTCMonth(next.getUTCMonth() + months);
+  return next;
+}
+
+function addYears(date: Date, years: number): Date {
+  const next = new Date(date);
+  next.setUTCFullYear(next.getUTCFullYear() + years);
+  return next;
+}
+
+function buildComparisonWindow(filters: ReportFiltersDto, mode?: ReportComparisonMode | null): ReportComparisonWindowDto | null {
+  const normalizedMode = normalizeComparisonMode(mode);
+  if (normalizedMode === 'NONE' || !filters.from || !filters.to) return null;
+
+  const currentFrom = startOfDayUtc(filters.from);
+  const currentTo = startOfDayUtc(filters.to);
+  let previousFrom: Date;
+  let previousTo: Date;
+  let label: string;
+
+  switch (normalizedMode) {
+    case 'PREVIOUS_MONTH':
+      previousFrom = addMonths(currentFrom, -1);
+      previousTo = addMonths(currentTo, -1);
+      label = 'vs previous month';
+      break;
+    case 'PREVIOUS_QUARTER':
+      previousFrom = addMonths(currentFrom, -3);
+      previousTo = addMonths(currentTo, -3);
+      label = 'vs previous quarter';
+      break;
+    case 'PREVIOUS_YEAR':
+      previousFrom = addYears(currentFrom, -1);
+      previousTo = addYears(currentTo, -1);
+      label = 'vs previous year';
+      break;
+    case 'PREVIOUS_PERIOD': {
+      const durationDays = Math.max(1, Math.round((currentTo.getTime() - currentFrom.getTime()) / 86_400_000) + 1);
+      previousTo = addDays(currentFrom, -1);
+      previousFrom = addDays(previousTo, -(durationDays - 1));
+      label = 'vs previous period';
+      break;
+    }
+    default:
+      return null;
+  }
+
+  return {
+    mode: normalizedMode,
+    label,
+    currentFrom: filters.from,
+    currentTo: filters.to,
+    previousFrom: formatDateOnly(previousFrom),
+    previousTo: formatDateOnly(previousTo),
+  };
+}
+
+function reportDirection(delta: number): 'UP' | 'DOWN' | 'FLAT' {
+  if (delta > 0.00001) return 'UP';
+  if (delta < -0.00001) return 'DOWN';
+  return 'FLAT';
+}
+
+function buildVarianceValue(currentValue: number, previousValue: number, formatter: (value: number) => string) {
+  const deltaValue = currentValue - previousValue;
+  return {
+    currentValue: formatter(currentValue),
+    previousValue: formatter(previousValue),
+    deltaValue: formatter(deltaValue),
+    deltaPct: Math.abs(previousValue) > 0.00001 ? Number((((deltaValue / previousValue) * 100)).toFixed(1)) : null,
+    direction: reportDirection(deltaValue),
+  };
+}
+
+function buildVarianceRows(
+  currentRows: Array<{ key: string; label: string; value: number }>,
+  previousRows: Array<{ key: string; label: string; value: number }>,
+): ReportsVarianceDto['topTraderMovers'] {
+  const previousMap = new Map(previousRows.map((row) => [row.key, row]));
+  const currentMap = new Map(currentRows.map((row) => [row.key, row]));
+  const keys = new Set([...currentMap.keys(), ...previousMap.keys()]);
+
+  return Array.from(keys).map((key) => {
+    const current = currentMap.get(key);
+    const previous = previousMap.get(key);
+    const currentValue = current?.value ?? 0;
+    const previousValue = previous?.value ?? 0;
+    const deltaValue = currentValue - previousValue;
+    return {
+      key,
+      label: current?.label ?? previous?.label ?? key,
+      currentValue: formatMoney(currentValue),
+      previousValue: formatMoney(previousValue),
+      deltaValue: formatMoney(deltaValue),
+      deltaPct: Math.abs(previousValue) > 0.00001 ? Number((((deltaValue / previousValue) * 100)).toFixed(1)) : null,
+      direction: reportDirection(deltaValue),
+    };
+  }).sort((left, right) => Math.abs(parseNumber(right.deltaValue)) - Math.abs(parseNumber(left.deltaValue))).slice(0, 8);
+}
+
+function emptyVariance(): ReportsVarianceDto {
+  return {
+    comparison: null,
+    summary: null,
+    topTraderMovers: [],
+    topCustomerMovers: [],
+    topProductMovers: [],
+  };
+}
+
+function emptyExceptions(): ReportsExceptionsDto {
+  return {
+    totalCount: 0,
+    byType: [],
+    rows: [],
+  };
 }
 
 function normalizeDeliveryMode(mode?: ReportScheduleDeliveryMode | null): ReportScheduleDeliveryMode {
@@ -901,18 +1078,160 @@ function mapSchedules(settings: StoredReportSettings): ReportScheduleDto[] {
     id: schedule.id,
     name: schedule.name,
     description: schedule.description ?? null,
+    reportMode: normalizeScheduleMode(schedule.reportMode),
     reportType: schedule.reportType,
     deliveryMode: normalizeDeliveryMode(schedule.deliveryMode),
     bodyMode: resolveScheduleBodyMode(schedule.deliveryMode, schedule.bodyMode),
     hourUtc: schedule.hourUtc,
     recipientRoles: (schedule.recipientRoles ?? []) as Role[],
     extraEmails: schedule.extraEmails ?? [],
+    exceptionTypes: normalizeExceptionTypes(schedule.exceptionTypes as ReportExceptionType[] | undefined),
+    sendOnlyWhenNonEmpty: schedule.sendOnlyWhenNonEmpty ?? false,
     filters: schedule.filters ?? {},
     isActive: schedule.isActive ?? true,
     lastSentAt: schedule.lastSentAt ?? null,
     createdAt: schedule.createdAt,
     updatedAt: schedule.updatedAt,
   }));
+}
+
+async function buildVariance(
+  tenantId: string,
+  context: ReportAccessContext,
+  currentFilters: ReportFiltersDto,
+  current: {
+    traderPerformance: TraderPerformanceReportDto;
+    invoiceAging: InvoiceAgingReportDto;
+    commercialSummary: CommercialSummaryReportDto;
+    marginAnalysis: MarginAnalysisReportDto;
+  },
+  comparisonMode?: ReportComparisonMode | null,
+): Promise<ReportsVarianceDto> {
+  const comparison = buildComparisonWindow(currentFilters, comparisonMode);
+  if (!comparison || !comparison.previousFrom || !comparison.previousTo) return emptyVariance();
+
+  const previousFilters: ReportFiltersDto = {
+    ...currentFilters,
+    from: comparison.previousFrom,
+    to: comparison.previousTo,
+  };
+  const previousDataset = await fetchScopedDataset(tenantId, context, previousFilters);
+  const [previousInvoiceAging, previousCommercialSummary] = await Promise.all([
+    buildInvoiceAgingReport(tenantId, context, previousDataset.filtersApplied, previousDataset),
+    buildCommercialSummary(tenantId, context, previousDataset.filtersApplied, previousDataset),
+  ]);
+  const previousTraderPerformance = buildTraderPerformanceReport(previousDataset);
+  const previousMarginAnalysis = buildMarginAnalysis(previousDataset);
+
+  return {
+    comparison,
+    summary: {
+      totalRevenue: buildVarianceValue(
+        parseNumber(current.traderPerformance.totals.totalRevenue),
+        parseNumber(previousTraderPerformance.totals.totalRevenue),
+        formatMoney,
+      ),
+      totalNetProfit: buildVarianceValue(
+        parseNumber(current.traderPerformance.totals.totalNetProfit),
+        parseNumber(previousTraderPerformance.totals.totalNetProfit),
+        formatMoney,
+      ),
+      totalOutstanding: buildVarianceValue(
+        parseNumber(current.invoiceAging.totalOutstanding),
+        parseNumber(previousInvoiceAging.totalOutstanding),
+        formatMoney,
+      ),
+      winRate: buildVarianceValue(
+        current.commercialSummary.conversion.winRate * 100,
+        previousCommercialSummary.conversion.winRate * 100,
+        (value) => value.toFixed(1),
+      ),
+      avgDealSize: buildVarianceValue(
+        parseNumber(current.traderPerformance.totals.avgDealSize),
+        parseNumber(previousTraderPerformance.totals.avgDealSize),
+        formatMoney,
+      ),
+    },
+    topTraderMovers: buildVarianceRows(
+      current.traderPerformance.rows.map((row) => ({ key: row.traderId, label: row.traderName, value: parseNumber(row.totalNetProfit) })),
+      previousTraderPerformance.rows.map((row) => ({ key: row.traderId, label: row.traderName, value: parseNumber(row.totalNetProfit) })),
+    ),
+    topCustomerMovers: buildVarianceRows(
+      current.marginAnalysis.byCustomer.map((row) => ({ key: row.key, label: row.label, value: parseNumber(row.totalNetProfit) })),
+      previousMarginAnalysis.byCustomer.map((row) => ({ key: row.key, label: row.label, value: parseNumber(row.totalNetProfit) })),
+    ),
+    topProductMovers: buildVarianceRows(
+      current.marginAnalysis.byProduct.map((row) => ({ key: row.key, label: row.label, value: parseNumber(row.totalNetProfit) })),
+      previousMarginAnalysis.byProduct.map((row) => ({ key: row.key, label: row.label, value: parseNumber(row.totalNetProfit) })),
+    ),
+  };
+}
+
+function buildExceptions(
+  dataset: ScopedDataset,
+  invoiceAging: InvoiceAgingReportDto,
+  marginAnalysis: MarginAnalysisReportDto,
+): ReportsExceptionsDto {
+  const economicsByOrder = buildEconomicsByOrder(dataset);
+  const rows: ReportExceptionRowDto[] = [];
+
+  for (const order of dataset.orderRows) {
+    const economics = economicsByOrder.get(order.orderId);
+    if (!economics || economics.totalNetProfit >= 0) continue;
+    rows.push({
+      type: 'NEGATIVE_NET_PROFIT_ORDER',
+      severity: 'HIGH',
+      entityType: 'order',
+      entityId: order.orderId,
+      title: `${order.clientName} / ${order.vesselName}`,
+      description: `${order.traderName} order is running at a negative net profit.`,
+      primaryValue: formatMoney(economics.totalNetProfit),
+      secondaryValue: `${formatMoney(economics.totalRevenueBase)} revenue`,
+    });
+  }
+
+  for (const invoice of invoiceAging.rows) {
+    if (invoice.daysOverdue < 61) continue;
+    rows.push({
+      type: 'SEVERELY_OVERDUE_INVOICE',
+      severity: invoice.daysOverdue >= 90 ? 'HIGH' : 'MEDIUM',
+      entityType: 'invoice',
+      entityId: invoice.invoiceId,
+      title: invoice.invoiceNumber,
+      description: `${invoice.clientName} is ${invoice.daysOverdue} days overdue.`,
+      primaryValue: invoice.outstandingAmount,
+      secondaryValue: invoice.agingBucket,
+    });
+  }
+
+  for (const customer of marginAnalysis.byCustomer) {
+    if (customer.netMarginPct === null || customer.netMarginPct >= 5 || parseNumber(customer.totalRevenue) < 1000) continue;
+    rows.push({
+      type: 'LOW_MARGIN_CUSTOMER',
+      severity: customer.netMarginPct < 2 ? 'HIGH' : 'MEDIUM',
+      entityType: 'customer',
+      entityId: customer.key,
+      title: customer.label,
+      description: 'Customer margin is below the operating threshold.',
+      primaryValue: `${customer.netMarginPct.toFixed(1)}%`,
+      secondaryValue: `${customer.totalRevenue} revenue`,
+    });
+  }
+
+  const byTypeMap = new Map<ReportExceptionType, number>();
+  for (const row of rows) {
+    byTypeMap.set(row.type, (byTypeMap.get(row.type) ?? 0) + 1);
+  }
+
+  return {
+    totalCount: rows.length,
+    byType: Array.from(byTypeMap.entries()).map(([type, count]) => ({ type, count })),
+    rows: rows.sort((left, right) => {
+      const severityDelta = (left.severity === 'HIGH' ? 1 : 0) - (right.severity === 'HIGH' ? 1 : 0);
+      if (severityDelta !== 0) return severityDelta > 0 ? -1 : 1;
+      return left.title.localeCompare(right.title);
+    }).slice(0, 25),
+  };
 }
 
 export async function getReleaseOneReports(
@@ -939,7 +1258,7 @@ export async function getReleaseOneReports(
 export async function getReleaseTwoReports(
   tenantId: string,
   requestingUserId: string,
-  filters: ReportFiltersDto,
+  filters: ReportsQueryInput,
 ): Promise<ReleaseTwoReportsDto> {
   const context = await resolveReportAccessContext(tenantId, requestingUserId);
   const tenant = await getTenantSettingsRow(tenantId);
@@ -951,6 +1270,16 @@ export async function getReleaseTwoReports(
     buildFilterOptions(tenantId, context),
   ]);
 
+  const traderPerformance = buildTraderPerformanceReport(dataset);
+  const marginAnalysis = buildMarginAnalysis(dataset);
+  const variance = await buildVariance(tenantId, context, dataset.filtersApplied, {
+    traderPerformance,
+    invoiceAging,
+    commercialSummary,
+    marginAnalysis,
+  }, filters.comparisonMode);
+  const exceptions = buildExceptions(dataset, invoiceAging, marginAnalysis);
+
   return {
     generatedAt: new Date().toISOString(),
     access: context.access,
@@ -958,10 +1287,12 @@ export async function getReleaseTwoReports(
     filterOptions,
     savedViews: mapSavedViews(settings),
     schedules: mapSchedules(settings),
-    traderPerformance: buildTraderPerformanceReport(dataset),
+    traderPerformance,
     invoiceAging,
     commercialSummary,
-    marginAnalysis: buildMarginAnalysis(dataset),
+    marginAnalysis,
+    variance,
+    exceptions,
   };
 }
 
@@ -1102,12 +1433,15 @@ export async function createReportSchedule(
   input: {
     name: string;
     description?: string | null;
+    reportMode?: ReportScheduleMode;
     reportType: ReportScheduleType;
     deliveryMode?: ReportScheduleDeliveryMode;
     bodyMode?: ReportScheduleBodyMode;
     hourUtc: number;
     recipientRoles: Role[];
     extraEmails?: string[];
+    exceptionTypes?: ReportExceptionType[];
+    sendOnlyWhenNonEmpty?: boolean;
     filters?: ReportFiltersDto;
   },
 ): Promise<ReportScheduleDto[]> {
@@ -1122,12 +1456,15 @@ export async function createReportSchedule(
         id: crypto.randomUUID(),
         name: input.name.trim(),
         description: input.description?.trim() || null,
+        reportMode: normalizeScheduleMode(input.reportMode),
         reportType: input.reportType,
         deliveryMode: normalizeDeliveryMode(input.deliveryMode),
         bodyMode: resolveScheduleBodyMode(input.deliveryMode, input.bodyMode),
         hourUtc: Math.max(0, Math.min(23, Math.round(input.hourUtc))),
         recipientRoles: normalizeScheduleRecipientRoles(input.recipientRoles),
         extraEmails: normalizeExtraEmails(input.extraEmails),
+        exceptionTypes: normalizeExceptionTypes(input.exceptionTypes),
+        sendOnlyWhenNonEmpty: input.sendOnlyWhenNonEmpty ?? false,
         filters,
         isActive: true,
         lastSentAt: null,
@@ -1150,12 +1487,15 @@ export async function createReportSchedule(
       httpMethod: 'POST',
       httpPath: '/reports/schedules',
       metadata: {
+        reportMode: normalizeScheduleMode(createdSchedule.reportMode),
         reportType: createdSchedule.reportType,
         deliveryMode: normalizeDeliveryMode(createdSchedule.deliveryMode),
         bodyMode: resolveScheduleBodyMode(createdSchedule.deliveryMode, createdSchedule.bodyMode),
         hourUtc: createdSchedule.hourUtc,
         recipientRoles: createdSchedule.recipientRoles,
         extraEmails: createdSchedule.extraEmails ?? [],
+        exceptionTypes: createdSchedule.exceptionTypes ?? [],
+        sendOnlyWhenNonEmpty: createdSchedule.sendOnlyWhenNonEmpty ?? false,
       },
     });
   }
@@ -1170,12 +1510,15 @@ export async function updateReportSchedule(
   input: {
     name: string;
     description?: string | null;
+    reportMode?: ReportScheduleMode;
     reportType: ReportScheduleType;
     deliveryMode?: ReportScheduleDeliveryMode;
     bodyMode?: ReportScheduleBodyMode;
     hourUtc: number;
     recipientRoles: Role[];
     extraEmails?: string[];
+    exceptionTypes?: ReportExceptionType[];
+    sendOnlyWhenNonEmpty?: boolean;
     filters?: ReportFiltersDto;
     isActive?: boolean;
   },
@@ -1192,12 +1535,15 @@ export async function updateReportSchedule(
           ...schedule,
           name: input.name.trim(),
           description: input.description?.trim() || null,
+          reportMode: normalizeScheduleMode(input.reportMode ?? schedule.reportMode),
           reportType: input.reportType,
           deliveryMode: normalizeDeliveryMode(input.deliveryMode),
           bodyMode: resolveScheduleBodyMode(input.deliveryMode, input.bodyMode),
           hourUtc: Math.max(0, Math.min(23, Math.round(input.hourUtc))),
           recipientRoles: normalizeScheduleRecipientRoles(input.recipientRoles),
           extraEmails: normalizeExtraEmails(input.extraEmails),
+          exceptionTypes: normalizeExceptionTypes(input.exceptionTypes ?? schedule.exceptionTypes),
+          sendOnlyWhenNonEmpty: input.sendOnlyWhenNonEmpty ?? schedule.sendOnlyWhenNonEmpty ?? false,
           filters,
           isActive: input.isActive ?? schedule.isActive ?? true,
           updatedAt: now,
@@ -1218,12 +1564,15 @@ export async function updateReportSchedule(
     httpMethod: 'PATCH',
     httpPath: `/reports/schedules/${scheduleId}`,
     metadata: {
+      reportMode: normalizeScheduleMode(updatedSchedule.reportMode),
       reportType: updatedSchedule.reportType,
       deliveryMode: normalizeDeliveryMode(updatedSchedule.deliveryMode),
       bodyMode: resolveScheduleBodyMode(updatedSchedule.deliveryMode, updatedSchedule.bodyMode),
       hourUtc: updatedSchedule.hourUtc,
       recipientRoles: updatedSchedule.recipientRoles,
       extraEmails: updatedSchedule.extraEmails ?? [],
+      exceptionTypes: updatedSchedule.exceptionTypes ?? [],
+      sendOnlyWhenNonEmpty: updatedSchedule.sendOnlyWhenNonEmpty ?? false,
       isActive: updatedSchedule.isActive ?? true,
     },
   });
@@ -1259,12 +1608,15 @@ export async function deleteReportSchedule(
     httpMethod: 'DELETE',
     httpPath: `/reports/schedules/${scheduleId}`,
     metadata: {
+      reportMode: normalizeScheduleMode(existingSchedule.reportMode),
       reportType: existingSchedule.reportType,
       deliveryMode: normalizeDeliveryMode(existingSchedule.deliveryMode),
       bodyMode: resolveScheduleBodyMode(existingSchedule.deliveryMode, existingSchedule.bodyMode),
       hourUtc: existingSchedule.hourUtc,
       recipientRoles: existingSchedule.recipientRoles,
       extraEmails: existingSchedule.extraEmails ?? [],
+      exceptionTypes: existingSchedule.exceptionTypes ?? [],
+      sendOnlyWhenNonEmpty: existingSchedule.sendOnlyWhenNonEmpty ?? false,
     },
   });
 
@@ -1469,6 +1821,109 @@ export async function exportMarginAnalysisXlsx(
   };
 }
 
+export async function exportExceptionsCsv(
+  tenantId: string,
+  requestingUserId: string,
+  filters: ReportsQueryInput,
+): Promise<{ fileName: string; csv: string }> {
+  const report = await getReleaseTwoReports(tenantId, requestingUserId, filters);
+  const csv = buildCsv([
+    ['Type', 'Severity', 'Title', 'Description', 'Primary Value', 'Secondary Value'],
+    ...report.exceptions.rows.map((row) => [row.type, row.severity, row.title, row.description, row.primaryValue, row.secondaryValue ?? '']),
+  ]);
+
+  return { fileName: `report-exceptions_${buildFileSuffix(report.filtersApplied)}.csv`, csv };
+}
+
+export async function exportExceptionsXlsx(
+  tenantId: string,
+  requestingUserId: string,
+  filters: ReportsQueryInput,
+): Promise<{ fileName: string; content: Buffer }> {
+  const report = await getReleaseTwoReports(tenantId, requestingUserId, filters);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(report.exceptions.rows.map((row) => ({
+    Type: row.type,
+    Severity: row.severity,
+    Title: row.title,
+    Description: row.description,
+    'Primary Value': row.primaryValue,
+    'Secondary Value': row.secondaryValue ?? '',
+  }))), 'Exceptions');
+
+  return {
+    fileName: `report-exceptions_${buildFileSuffix(report.filtersApplied)}.xlsx`,
+    content: XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer,
+  };
+}
+
+function buildOrderDrilldownRows(dataset: ScopedDataset, orderRows: ScopedOrderRow[]): ReportDrilldownOrderRowDto[] {
+  const economicsByOrder = buildEconomicsByOrder(dataset);
+  return orderRows.map((order) => {
+    const economics = economicsByOrder.get(order.orderId);
+    return {
+      orderId: order.orderId,
+      traderId: order.traderId,
+      traderName: order.traderName,
+      clientId: order.clientId,
+      clientName: order.clientName,
+      vesselId: order.vesselId,
+      vesselName: order.vesselName,
+      status: order.status,
+      createdAt: order.createdAt.toISOString(),
+      totalQuantity: formatQuantity(economics?.totalQuantity ?? 0),
+      totalRevenue: formatMoney(economics?.totalRevenueBase ?? 0),
+      totalGrossProfit: formatMoney(economics?.totalGrossProfit ?? 0),
+      totalFinancingCost: formatMoney(economics?.totalFinancingCost ?? 0),
+      totalNetProfit: formatMoney(economics?.totalNetProfit ?? 0),
+      netMarginPct: economics?.netMarginPct ?? null,
+    };
+  }).sort((left, right) => parseNumber(right.totalNetProfit) - parseNumber(left.totalNetProfit));
+}
+
+export async function getReportDrilldown(
+  tenantId: string,
+  requestingUserId: string,
+  input: ReportDrilldownInput,
+): Promise<ReportDrilldownResponseDto> {
+  const context = await resolveReportAccessContext(tenantId, requestingUserId);
+
+  if (input.dimension === 'AGING_BUCKET') {
+    const dataset = await fetchScopedDataset(tenantId, context, input);
+    const invoiceAging = await buildInvoiceAgingReport(tenantId, context, dataset.filtersApplied, dataset);
+    const invoices = invoiceAging.rows.filter((row) => row.agingBucket === input.value);
+    return {
+      title: `Invoices in ${input.value}`,
+      dataset: 'INVOICES',
+      target: 'AGING_BUCKET',
+      totalCount: invoices.length,
+      orders: [],
+      invoices,
+    };
+  }
+
+  const dataset = await fetchScopedDataset(tenantId, context, input);
+  const orders = dataset.orderRows.filter((row) => {
+    if (input.dimension === 'TRADER') return row.traderId === input.value;
+    if (input.dimension === 'CUSTOMER') return row.clientId === input.value;
+    if (input.dimension === 'PRODUCT') return (dataset.itemsByOrder.get(row.orderId) ?? []).some((item) => item.productType === input.value);
+    return false;
+  });
+
+  return {
+    title: input.dimension === 'TRADER'
+      ? `Orders for ${orders[0]?.traderName ?? input.value}`
+      : input.dimension === 'CUSTOMER'
+        ? `Orders for ${orders[0]?.clientName ?? input.value}`
+        : `Orders for ${input.value}`,
+    dataset: 'ORDERS',
+    target: input.dimension,
+    totalCount: orders.length,
+    orders: buildOrderDrilldownRows(dataset, orders),
+    invoices: [],
+  };
+}
+
 function buildSummaryBundleCsv(report: ReleaseTwoReportsDto): string {
   return buildCsv([
     ['TRADER PERFORMANCE'],
@@ -1559,23 +2014,53 @@ function buildScheduledAttachments(schedule: ReportScheduleDto, report: ReleaseT
   const attachments: Array<{ filename: string; content: string | Buffer; contentType: string }> = [];
   const wantsCsv = schedule.deliveryMode === 'CSV' || schedule.deliveryMode === 'CSV_XLSX';
   const wantsXlsx = schedule.deliveryMode === 'XLSX' || schedule.deliveryMode === 'CSV_XLSX';
-  const baseName = schedule.reportType === 'MARGIN_ANALYSIS' ? 'margin-analysis' : 'summary';
+  const baseName = schedule.reportMode === 'EXCEPTIONS'
+    ? 'exceptions'
+    : schedule.reportType === 'MARGIN_ANALYSIS'
+      ? 'margin-analysis'
+      : 'summary';
+  const exceptionRows = schedule.exceptionTypes.length > 0
+    ? report.exceptions.rows.filter((row) => schedule.exceptionTypes.includes(row.type))
+    : report.exceptions.rows;
 
   if (wantsCsv) {
     attachments.push({
       filename: `${baseName}_${suffix}.csv`,
-      content: schedule.reportType === 'MARGIN_ANALYSIS' ? buildCsv([
-        ['MONTH', 'ORDERS', 'REVENUE USD', 'NET PROFIT USD', 'NET MARGIN %'],
-        ...report.marginAnalysis.monthlyTrend.map((point) => [point.month, point.orderCount, point.totalRevenue, point.totalNetProfit, point.netMarginPct ?? '']),
-      ]) : buildSummaryBundleCsv(report),
+      content: schedule.reportMode === 'EXCEPTIONS'
+        ? buildCsv([
+            ['Type', 'Severity', 'Title', 'Description', 'Primary Value', 'Secondary Value'],
+            ...exceptionRows.map((row) => [row.type, row.severity, row.title, row.description, row.primaryValue, row.secondaryValue ?? '']),
+          ])
+        : schedule.reportType === 'MARGIN_ANALYSIS'
+          ? buildCsv([
+              ['MONTH', 'ORDERS', 'REVENUE USD', 'NET PROFIT USD', 'NET MARGIN %'],
+              ...report.marginAnalysis.monthlyTrend.map((point) => [point.month, point.orderCount, point.totalRevenue, point.totalNetProfit, point.netMarginPct ?? '']),
+            ])
+          : buildSummaryBundleCsv(report),
       contentType: 'text/csv; charset=utf-8',
     });
   }
 
   if (wantsXlsx) {
+    const workbook = schedule.reportMode === 'EXCEPTIONS'
+      ? (() => {
+          const nextWorkbook = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(nextWorkbook, XLSX.utils.json_to_sheet(exceptionRows.map((row) => ({
+            Type: row.type,
+            Severity: row.severity,
+            Title: row.title,
+            Description: row.description,
+            'Primary Value': row.primaryValue,
+            'Secondary Value': row.secondaryValue ?? '',
+          }))), 'Exceptions');
+          return XLSX.write(nextWorkbook, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
+        })()
+      : schedule.reportType === 'MARGIN_ANALYSIS'
+        ? buildMarginWorkbook(report)
+        : buildSummaryWorkbook(report);
     attachments.push({
       filename: `${baseName}_${suffix}.xlsx`,
-      content: schedule.reportType === 'MARGIN_ANALYSIS' ? buildMarginWorkbook(report) : buildSummaryWorkbook(report),
+      content: workbook,
       contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
   }
@@ -1633,6 +2118,20 @@ function buildMarginEmailHtml(tenantName: string, report: ReleaseTwoReportsDto):
   `;
 }
 
+function buildExceptionsEmailHtml(tenantName: string, rows: ReportExceptionRowDto[]): string {
+  const tableRows = rows.slice(0, 10)
+    .map((row) => `<tr><td style="padding:6px 0;">${row.title}</td><td style="padding:6px 0;">${row.type}</td><td style="padding:6px 0; text-align:right;">${row.primaryValue}</td></tr>`)
+    .join('');
+
+  return `
+    <div style="font-family: Arial, sans-serif; color:#111827; line-height:1.5;">
+      <h2 style="margin:0 0 12px;">${tenantName} report exceptions</h2>
+      <p style="margin:0 0 18px; color:#6b7280;">${rows.length} exception${rows.length === 1 ? '' : 's'} matched the current schedule.</p>
+      <table style="width:100%; border-collapse:collapse;"><tbody>${tableRows || '<tr><td>No exceptions</td></tr>'}</tbody></table>
+    </div>
+  `;
+}
+
 async function runScheduleForTenant(tenantId: string, tenantName: string, schedule: ReportScheduleDto): Promise<boolean> {
   const userRows = await db
     .select({ email: users.email })
@@ -1649,9 +2148,18 @@ async function runScheduleForTenant(tenantId: string, tenantName: string, schedu
   const report = await getReleaseTwoReports(tenantId, userRows.length > 0 ? (await db.query.users.findFirst({ where: and(eq(users.tenantId, tenantId), eq(users.role, Role.Admin)), columns: { id: true } }))?.id ?? '' : '', schedule.filters ?? {});
   if (!report) return false;
 
-  const html = schedule.reportType === 'MARGIN_ANALYSIS'
-    ? buildMarginEmailHtml(tenantName, report)
-    : buildSummaryEmailHtml(tenantName, report);
+  const exceptionRows = schedule.exceptionTypes.length > 0
+    ? report.exceptions.rows.filter((row) => schedule.exceptionTypes.includes(row.type))
+    : report.exceptions.rows;
+  if (schedule.reportMode === 'EXCEPTIONS' && schedule.sendOnlyWhenNonEmpty && exceptionRows.length === 0) {
+    return false;
+  }
+
+  const html = schedule.reportMode === 'EXCEPTIONS'
+    ? buildExceptionsEmailHtml(tenantName, exceptionRows)
+    : schedule.reportType === 'MARGIN_ANALYSIS'
+      ? buildMarginEmailHtml(tenantName, report)
+      : buildSummaryEmailHtml(tenantName, report);
 
   const effectiveBodyMode = resolveScheduleBodyMode(schedule.deliveryMode, schedule.bodyMode);
   const htmlBody = effectiveBodyMode === 'ATTACHMENT_ONLY'
@@ -1692,12 +2200,15 @@ export async function runDueReportSchedules(now = new Date()): Promise<void> {
         id: schedule.id,
         name: schedule.name,
         description: schedule.description ?? null,
+        reportMode: normalizeScheduleMode(schedule.reportMode),
         reportType: schedule.reportType,
         deliveryMode: normalizeDeliveryMode(schedule.deliveryMode),
         bodyMode: resolveScheduleBodyMode(schedule.deliveryMode, schedule.bodyMode),
         hourUtc: schedule.hourUtc,
         recipientRoles: (schedule.recipientRoles ?? []) as Role[],
         extraEmails: schedule.extraEmails ?? [],
+        exceptionTypes: normalizeExceptionTypes(schedule.exceptionTypes as ReportExceptionType[] | undefined),
+        sendOnlyWhenNonEmpty: schedule.sendOnlyWhenNonEmpty ?? false,
         filters: schedule.filters ?? {},
         isActive: schedule.isActive ?? true,
         lastSentAt: schedule.lastSentAt ?? null,
