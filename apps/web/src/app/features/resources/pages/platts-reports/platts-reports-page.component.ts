@@ -100,8 +100,56 @@ import { PdfPreviewModalComponent } from '@app/shared/components/pdf-preview-mod
       </section>
 
       <section class="max-w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200 text-sm">
+        @if (reports().length === 0 && !loading()) {
+          <div class="px-4 py-10 text-center text-sm text-gray-500">No Platts reports found for the current filters.</div>
+        } @else {
+          <div class="space-y-3 p-4 md:hidden">
+            @for (report of reports(); track report.id) {
+              <article class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">{{ report.publicationDate | date:'mediumDate' }}</div>
+                    <h2 class="mt-1 text-sm font-semibold text-gray-900">{{ report.title }}</h2>
+                    <p class="mt-1 break-words text-xs text-gray-500">{{ report.sourceFileName }}</p>
+                  </div>
+                  <span class="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold" [class]="statusClass(report.status)">
+                    {{ report.status }}
+                  </span>
+                </div>
+
+                <dl class="mt-4 grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Canonical</dt>
+                    <dd class="mt-1 text-gray-700">{{ report.isCanonical ? 'Yes' : 'No' }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Uploaded By</dt>
+                    <dd class="mt-1 text-gray-700">{{ report.uploadedByName || 'Unknown' }}</dd>
+                  </div>
+                  <div class="col-span-2">
+                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Created</dt>
+                    <dd class="mt-1 text-gray-700">{{ report.createdAt | date:'medium' }}</dd>
+                  </div>
+                </dl>
+
+                @if (report.parseError) {
+                  <div class="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{{ report.parseError }}</div>
+                }
+
+                <div class="mt-4 flex flex-wrap gap-2">
+                  <a [routerLink]="['/resources/platts', report.id]" class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">Open</a>
+                  <button (click)="previewSource(report)" class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">PDF</button>
+                  <button (click)="reparse(report)" class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">Reparse</button>
+                  @if (auth.isAdmin() && !report.isCanonical && report.status === 'READY') {
+                    <button (click)="makeCanonical(report)" class="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-600">Make Canonical</button>
+                  }
+                </div>
+              </article>
+            }
+          </div>
+
+          <div class="hidden overflow-x-auto md:block">
+            <table class="min-w-full divide-y divide-gray-200 text-sm">
             <thead class="bg-gray-50">
               <tr>
                 <th class="px-4 py-3 text-left font-semibold text-gray-600">Publication Date</th>
@@ -114,11 +162,6 @@ import { PdfPreviewModalComponent } from '@app/shared/components/pdf-preview-mod
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
-              @if (reports().length === 0 && !loading()) {
-                <tr>
-                  <td colspan="7" class="px-4 py-10 text-center text-sm text-gray-500">No Platts reports found for the current filters.</td>
-                </tr>
-              }
               @for (report of reports(); track report.id) {
                 <tr class="align-top">
                   <td class="px-4 py-3 text-gray-900">{{ report.publicationDate | date:'mediumDate' }}</td>
@@ -157,12 +200,13 @@ import { PdfPreviewModalComponent } from '@app/shared/components/pdf-preview-mod
                 </tr>
               }
             </tbody>
-          </table>
-        </div>
+            </table>
+          </div>
+        }
 
-        <div class="flex items-center justify-between border-t border-gray-200 px-4 py-3 text-sm text-gray-600">
+        <div class="flex flex-col gap-3 border-t border-gray-200 px-4 py-3 text-sm text-gray-600 sm:flex-row sm:items-center sm:justify-between">
           <div>{{ total() }} report(s)</div>
-          <div class="flex items-center gap-3">
+          <div class="flex items-center justify-between gap-3 sm:justify-start">
             <button (click)="previousPage()" [disabled]="page() <= 1 || loading()" class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50">Previous</button>
             <span>Page {{ page() }}</span>
             <button (click)="nextPage()" [disabled]="page() * pageSize >= total() || loading()" class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50">Next</button>
