@@ -318,6 +318,41 @@ describe('ReportsPageComponent', () => {
     expect(component.drilldownData()?.orders[0]?.clientName).toBe('ACME');
   });
 
+  it('auto refreshes after filter changes', async () => {
+    const payload = buildReportPayload();
+    const getCalls: string[] = [];
+
+    await TestBed.configureTestingModule({
+      imports: [ReportsPageComponent],
+      providers: [
+        provideRouter([]),
+        {
+          provide: HttpClient,
+          useValue: {
+            get: (url: string) => {
+              getCalls.push(url);
+              return of({ success: true, data: payload });
+            },
+            post: () => of({ success: true, data: payload.schedules }),
+            delete: () => of({ success: true, data: payload.schedules }),
+            patch: () => of({ success: true, data: payload.schedules }),
+          },
+        },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(ReportsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const component = fixture.componentInstance;
+    component.onComparisonModeChange({ target: { value: 'PREVIOUS_YEAR' } } as unknown as Event);
+    await new Promise((resolve) => setTimeout(resolve, 350));
+
+    expect(getCalls.filter((url) => url.includes('/reports/release-two')).length).toBeGreaterThanOrEqual(2);
+    expect(getCalls.some((url) => url.includes('/reports/release-two?') && url.includes('comparisonMode=PREVIOUS_YEAR'))).toBe(true);
+  });
+
   it('posts exception schedule configuration', async () => {
     const payload = buildReportPayload();
     const postCalls: Array<{ url: string; body: unknown }> = [];

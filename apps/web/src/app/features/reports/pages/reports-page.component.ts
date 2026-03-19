@@ -90,15 +90,15 @@ type ExportFormat = 'csv' | 'xlsx';
         <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
           <label class="flex flex-col gap-1 text-sm text-gray-600">
             <span>From</span>
-            <input type="date" [value]="from()" (change)="from.set(($any($event.target).value || defaultFrom()))" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100" />
+            <input type="date" [value]="from()" (change)="onFromChange($event)" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100" />
           </label>
           <label class="flex flex-col gap-1 text-sm text-gray-600">
             <span>To</span>
-            <input type="date" [value]="to()" (change)="to.set(($any($event.target).value || today()))" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100" />
+            <input type="date" [value]="to()" (change)="onToChange($event)" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100" />
           </label>
           <label class="flex flex-col gap-1 text-sm text-gray-600">
             <span>Trader</span>
-            <select [value]="traderId() ?? ''" (change)="traderId.set(($any($event.target).value || null))" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
+            <select [value]="traderId() ?? ''" (change)="onTraderChange($event)" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
               <option value="">All</option>
               @for (option of data()?.filterOptions?.traders ?? []; track option.id) {
                 <option [value]="option.id">{{ option.label }}</option>
@@ -107,7 +107,7 @@ type ExportFormat = 'csv' | 'xlsx';
           </label>
           <label class="flex flex-col gap-1 text-sm text-gray-600">
             <span>Team</span>
-            <select [value]="teamId() ?? ''" (change)="teamId.set(($any($event.target).value || null))" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
+            <select [value]="teamId() ?? ''" (change)="onTeamChange($event)" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
               <option value="">All</option>
               @for (option of data()?.filterOptions?.teams ?? []; track option.id) {
                 <option [value]="option.id">{{ option.label }}</option>
@@ -116,7 +116,7 @@ type ExportFormat = 'csv' | 'xlsx';
           </label>
           <label class="flex flex-col gap-1 text-sm text-gray-600">
             <span>Customer</span>
-            <select [value]="customerId() ?? ''" (change)="customerId.set(($any($event.target).value || null))" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
+            <select [value]="customerId() ?? ''" (change)="onCustomerChange($event)" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
               <option value="">All</option>
               @for (option of data()?.filterOptions?.customers ?? []; track option.id) {
                 <option [value]="option.id">{{ option.label }}</option>
@@ -125,7 +125,7 @@ type ExportFormat = 'csv' | 'xlsx';
           </label>
           <label class="flex flex-col gap-1 text-sm text-gray-600">
             <span>Product</span>
-            <select [value]="productType() ?? ''" (change)="productType.set(($any($event.target).value || null))" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
+            <select [value]="productType() ?? ''" (change)="onProductTypeChange($event)" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
               <option value="">All</option>
               @for (option of data()?.filterOptions?.products ?? []; track option.id) {
                 <option [value]="option.id">{{ option.label }}</option>
@@ -134,7 +134,7 @@ type ExportFormat = 'csv' | 'xlsx';
           </label>
           <label class="flex flex-col gap-1 text-sm text-gray-600">
             <span>Comparison</span>
-            <select data-testid="reports-comparison-mode" [value]="comparisonMode()" (change)="comparisonMode.set($any($event.target).value)" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
+            <select data-testid="reports-comparison-mode" [value]="comparisonMode()" (change)="onComparisonModeChange($event)" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
               <option value="NONE">None</option>
               <option value="PREVIOUS_PERIOD">Previous period</option>
               <option value="PREVIOUS_MONTH">Previous month</option>
@@ -809,6 +809,7 @@ type ExportFormat = 'csv' | 'xlsx';
 })
 export class ReportsPageComponent {
   private readonly http = inject(HttpClient);
+  private autoReloadHandle: ReturnType<typeof setTimeout> | null = null;
 
   readonly utcHours = Array.from({ length: 24 }, (_, index) => index);
   readonly scheduleRoleOptions: Role[] = [Role.Admin, Role.Finance, Role.Teamlead, Role.CreditManager];
@@ -880,6 +881,13 @@ export class ReportsPageComponent {
 
   constructor() {
     void this.reload();
+  }
+
+  ngOnDestroy(): void {
+    if (this.autoReloadHandle !== null) {
+      clearTimeout(this.autoReloadHandle);
+      this.autoReloadHandle = null;
+    }
   }
 
   async reload(): Promise<void> {
@@ -976,7 +984,7 @@ export class ReportsPageComponent {
 
   applySavedView(view: SavedReportViewDto): void {
     this.applyFilters(view.filters);
-    void this.reload();
+    this.queueAutoReload();
   }
 
   async saveSchedule(): Promise<void> {
@@ -1095,7 +1103,42 @@ export class ReportsPageComponent {
     this.teamId.set(null);
     this.customerId.set(null);
     this.productType.set(null);
-    void this.reload();
+    this.queueAutoReload();
+  }
+
+  onFromChange(event: Event): void {
+    this.from.set((event.target as HTMLInputElement | null)?.value || this.defaultFrom());
+    this.queueAutoReload();
+  }
+
+  onToChange(event: Event): void {
+    this.to.set((event.target as HTMLInputElement | null)?.value || this.today());
+    this.queueAutoReload();
+  }
+
+  onTraderChange(event: Event): void {
+    this.traderId.set((event.target as HTMLSelectElement | null)?.value || null);
+    this.queueAutoReload();
+  }
+
+  onTeamChange(event: Event): void {
+    this.teamId.set((event.target as HTMLSelectElement | null)?.value || null);
+    this.queueAutoReload();
+  }
+
+  onCustomerChange(event: Event): void {
+    this.customerId.set((event.target as HTMLSelectElement | null)?.value || null);
+    this.queueAutoReload();
+  }
+
+  onProductTypeChange(event: Event): void {
+    this.productType.set((event.target as HTMLSelectElement | null)?.value || null);
+    this.queueAutoReload();
+  }
+
+  onComparisonModeChange(event: Event): void {
+    this.comparisonMode.set(((event.target as HTMLSelectElement | null)?.value as ReportComparisonMode | '') || 'NONE');
+    this.queueAutoReload();
   }
 
   async openOrderDrilldown(dimension: Extract<ReportDrilldownTarget, 'TRADER' | 'CUSTOMER' | 'PRODUCT'>, value: string): Promise<void> {
@@ -1327,5 +1370,16 @@ export class ReportsPageComponent {
   private describeError(error: unknown, fallback: string): string {
     if (error instanceof Error && error.message) return error.message;
     return fallback;
+  }
+
+  private queueAutoReload(): void {
+    if (this.autoReloadHandle !== null) {
+      clearTimeout(this.autoReloadHandle);
+    }
+
+    this.autoReloadHandle = setTimeout(() => {
+      this.autoReloadHandle = null;
+      void this.reload();
+    }, 250);
   }
 }
