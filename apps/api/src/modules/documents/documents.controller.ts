@@ -8,7 +8,7 @@ import { getPortSuppliers } from '../lloyds/lli.service';
 import { logActivity } from '../activity/activity.service';
 import { sendWhatsAppGroupMessage } from '../whatsapp/whatsapp.service';
 import { db } from '../../db';
-import { users, counterparties, invoices as invoicesTable, companyContacts, companyEmails, supplierInquiries, supplierInquiryItemQuotes, portSuppliers, emailLog, tenants, orders } from '../../db/schema';
+import { users, counterparties, invoices as invoicesTable, companyContacts, companyEmails, supplierInquiries, supplierInquiryItemQuotes, portSuppliers, emailLog, tenants, orders, orderAttachments } from '../../db/schema';
 import { getEmailTemplate, getApplicableEmailRules, renderTemplate, type TemplateVariables } from '../admin/email-settings.service';
 import { getInquirySettings } from '../admin/settings.service';
 import { applyStaleSupplierInquiryStatuses, createSupplierQuoteToken, getSupplierQuoteExpiryDate, getSupplierQuoteFormUrl, getSupplierInquiryOrderContext, saveSupplierInquiryResponse } from './supplier-inquiry.service';
@@ -45,6 +45,40 @@ function buildInquiryTemplateVariables(params: {
     name: preferredName,
     quoteFormUrl,
   };
+}
+
+async function loadSelectedOrderAttachments(orderId: string, attachmentIds: string[]) {
+  if (attachmentIds.length === 0) return [];
+
+  const rows = await db
+    .select()
+    .from(orderAttachments)
+    .where(and(
+      eq(orderAttachments.orderId, orderId),
+      inArray(orderAttachments.id, attachmentIds),
+    ));
+
+  if (rows.length !== attachmentIds.length) {
+    throw new Error('One or more selected attachments were not found on this order');
+  }
+
+  if (rows.some((row) => String(row.type ?? '').toUpperCase() !== 'BDR')) {
+    throw new Error('Only BDR attachments can be added to invoice emails');
+  }
+
+  return Promise.all(rows.map(async (row) => {
+    const normalizedPath = row.filePath.startsWith('/') ? row.filePath : `/${row.filePath}`;
+    const file = Bun.file(`${process.cwd()}${normalizedPath}`);
+    if (!(await file.exists())) {
+      throw new Error(`Attachment file is missing: ${row.fileName}`);
+    }
+
+    return {
+      filename: row.fileName,
+      content: Buffer.from(await file.arrayBuffer()),
+      contentType: row.mimeType,
+    };
+  }));
 }
 
 function calculateInquiryResponseHours(sentAt: Date | null, respondedAt: Date | null): number | null {
@@ -283,6 +317,22 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           return { success: false, message: `Unknown document type: ${body.documentType}` };
       }
 
+      const attachmentIds = [...new Set((body.attachmentIds ?? []).filter(Boolean))];
+      if (attachmentIds.length > 0 && docType !== 'INVOICE') {
+        set.status = 400;
+        return { success: false, message: 'Additional attachments are only supported for invoice emails' };
+      }
+
+      let attachments: Array<{ filename: string; content: Buffer; contentType?: string }> = [];
+      if (attachmentIds.length > 0) {
+        try {
+          attachments = await loadSelectedOrderAttachments(orderId, attachmentIds);
+        } catch (error: any) {
+          set.status = 400;
+          return { success: false, message: error?.message ?? 'Failed to load selected attachments' };
+        }
+      }
+
       // Send the email
       const { channel } = await sendDocumentEmail({
         documentType: docType,
@@ -298,6 +348,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         htmlBody: body.htmlBody,
         pdfBuffer,
         pdfFileName,
+        attachments,
       });
 
       // Log to activity timeline
@@ -337,6 +388,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         bccEmails: t.Optional(t.Array(t.String({ format: 'email' }), { description: 'BCC email addresses' })),
         subject: t.String({ description: 'Email subject line' }),
         htmlBody: t.String({ description: 'HTML email body' }),
+        attachmentIds: t.Optional(t.Array(t.String(), { description: 'Order attachment ids to include with the email' })),
       }),
       detail: {
         tags: ['Documents'],

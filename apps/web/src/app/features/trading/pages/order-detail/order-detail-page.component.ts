@@ -44,7 +44,7 @@ import {
   HeaderActionsComponent,
   type HeaderAction,
 } from '../../components/header-actions/header-actions.component';
-import { SendEmailModalComponent, type SendEmailPayload, type DocumentEmailType, type SendWhatsAppPayload } from '../../components/send-email-modal/send-email-modal.component';
+import { SendEmailModalComponent, type SendEmailPayload, type DocumentEmailType, type SendWhatsAppPayload, type SendEmailAttachmentOption } from '../../components/send-email-modal/send-email-modal.component';
 import { SendInquiryModalComponent, type SendInquiryPayload, type SendInquiryWhatsAppPayload } from '../../components/send-inquiry-modal/send-inquiry-modal.component';
 import type { DropdownOption } from '../../../../shared/components/searchable-dropdown/searchable-dropdown.component';
 import { FormsModule } from '@angular/forms';
@@ -295,6 +295,7 @@ interface PlattsSuggestionViewModel {
       [invoicingCompanyId]="order()?.invoicingCompanyId ?? ''"
       [invoicingCompanyName]="invoicingCompanyName()"
       [ownCompanies]="ownCompanies()"
+      [allowBankAccountEdit]="allowBankAccountEdit()"
       [responsibleUserId]="order()?.salesRepId ?? ''"
       [responsibleOptions]="responsibleUserOptions()"
       (clientSearch)="searchClients($event)"
@@ -1560,6 +1561,7 @@ interface PlattsSuggestionViewModel {
       [senderEmail]="auth.userEmail()"
       [pdfFileName]="emailPdfFileName()"
       [orderId]="orderId()"
+      [extraAttachments]="invoiceEmailAttachmentOptions()"
       [waLinked]="waLinked()"
       [defaultPhone]="order()?.brokerGetsAll && brokerContact()?.phone ? brokerContact()?.phone ?? null : customerContact()?.phone ?? null"
       (sendEmail)="onSendEmail($event)"
@@ -1821,6 +1823,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       || status === OrderStatus.Invoiced;
   });
 
+  readonly allowBankAccountEdit = computed(() => {
+    const status = this.order()?.status;
+    return status === OrderStatus.Delivered || status === OrderStatus.Invoiced;
+  });
+
   readonly deliveredAtLocal = computed(() => {
     const iso = this.order()?.deliveredAt;
     if (!iso) return '';
@@ -1834,6 +1841,15 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   readonly hasBdrAttachment = computed(() =>
     this.attachments().some((att) => (att.type ?? '').toUpperCase() === 'BDR'),
+  );
+  readonly invoiceEmailAttachmentOptions = computed<SendEmailAttachmentOption[]>(() =>
+    this.attachments()
+      .filter((att) => (att.type ?? '').toUpperCase() === 'BDR')
+      .map((att) => ({
+        id: att.id,
+        fileName: att.fileName,
+        label: `BDR uploaded ${new Date(att.createdAt).toLocaleDateString('en-GB')}`,
+      })),
   );
 
   readonly isPaidOrCancelled = computed(() => {
@@ -4212,6 +4228,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
           bccEmails: payload.bccEmails,
           subject: payload.subject,
           htmlBody: payload.htmlBody,
+          attachmentIds: payload.attachmentIds,
         },
       )
       .subscribe({

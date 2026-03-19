@@ -33,6 +33,12 @@ import { API_URL } from '@app/core/config/api';
 
 export type DocumentEmailType = 'OFFER' | 'CONFIRMATION' | 'NOMINATION' | 'PROFORMA' | 'INVOICE';
 
+export interface SendEmailAttachmentOption {
+  id: string;
+  fileName: string;
+  label?: string;
+}
+
 export interface SendEmailPayload {
   documentType: DocumentEmailType;
   recipientEmail: string;
@@ -40,6 +46,7 @@ export interface SendEmailPayload {
   bccEmails: string[];
   subject: string;
   htmlBody: string;
+  attachmentIds: string[];
 }
 
 export interface SendWhatsAppPayload {
@@ -375,6 +382,38 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
               </button>
             </div>
 
+            @if (showExtraAttachments()) {
+              <div class="rounded-xl border border-gray-200 bg-gray-50/80 p-4">
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 class="text-sm font-semibold text-gray-900">Additional attachments</h3>
+                    <p class="mt-0.5 text-xs text-gray-500">Select BDR files to include with the invoice email.</p>
+                  </div>
+                  <span class="rounded-full bg-white px-2 py-1 text-[11px] font-medium text-gray-500 ring-1 ring-gray-200">
+                    {{ selectedAttachmentIds().length }} selected
+                  </span>
+                </div>
+                <div class="mt-3 space-y-2">
+                  @for (attachment of visibleExtraAttachments(); track attachment.id) {
+                    <label class="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 transition-colors hover:border-brand-300 hover:bg-brand-50/40">
+                      <input
+                        type="checkbox"
+                        class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                        [checked]="isAttachmentSelected(attachment.id)"
+                        (change)="toggleAttachmentSelection(attachment.id, $any($event.target).checked)"
+                      />
+                      <div class="min-w-0 flex-1">
+                        <div class="truncate font-medium text-gray-800">{{ attachment.fileName }}</div>
+                        @if (attachment.label) {
+                          <div class="truncate text-xs text-gray-500">{{ attachment.label }}</div>
+                        }
+                      </div>
+                    </label>
+                  }
+                </div>
+              </div>
+            }
+
             <!-- PDF Preview iframe -->
             @if (pdfPreviewUrl()) {
               <div class="rounded-lg border border-gray-200 overflow-hidden">
@@ -549,6 +588,7 @@ export class SendEmailModalComponent {
   readonly senderEmail = input<string>('');
   readonly pdfFileName = input<string>('');
   readonly orderId = input<string>('');
+  readonly extraAttachments = input<SendEmailAttachmentOption[]>([]);
   /** Whether the current user has linked WhatsApp in Settings */
   readonly waLinked = input(false);
   /** Pre-fill phone number from the contact person */
@@ -572,6 +612,7 @@ export class SendEmailModalComponent {
   readonly showBcc = signal(false);
   readonly loadingPreview = signal(false);
   readonly pdfPreviewUrl = signal<SafeResourceUrl | null>(null);
+  readonly selectedAttachmentIds = signal<string[]>([]);
 
   subject = '';
   waPhoneNumber = '';
@@ -583,6 +624,10 @@ export class SendEmailModalComponent {
   readonly docLabel = computed(
     () => DOC_LABELS[this.documentType()] ?? 'Document',
   );
+  readonly visibleExtraAttachments = computed(() =>
+    this.documentType() === 'INVOICE' ? this.extraAttachments() : [],
+  );
+  readonly showExtraAttachments = computed(() => this.visibleExtraAttachments().length > 0);
 
   hasRecipient(): boolean {
     return (this.toInput()?.getEmails()?.length ?? 0) > 0;
@@ -608,6 +653,10 @@ export class SendEmailModalComponent {
     this.htmlBody = defaults.htmlBody;
     this.waPhoneNumber = this.defaultPhone() ?? '';
     this.pdfPreviewUrl.set(null);
+    const availableAttachmentIds = this.visibleExtraAttachments().map((attachment) => attachment.id);
+    this.selectedAttachmentIds.set(
+      availableAttachmentIds.length === 1 ? availableAttachmentIds : [],
+    );
 
     if (
       (defaults.bccEmails?.length ?? 0) > 0 ||
@@ -765,6 +814,20 @@ export class SendEmailModalComponent {
       bccEmails: this.bccInput()?.getEmails() ?? [],
       subject: this.subject,
       htmlBody: this.htmlBody,
+      attachmentIds: this.selectedAttachmentIds(),
+    });
+  }
+
+  isAttachmentSelected(attachmentId: string): boolean {
+    return this.selectedAttachmentIds().includes(attachmentId);
+  }
+
+  toggleAttachmentSelection(attachmentId: string, checked: boolean): void {
+    this.selectedAttachmentIds.update((current) => {
+      if (checked) {
+        return current.includes(attachmentId) ? current : [...current, attachmentId];
+      }
+      return current.filter((id) => id !== attachmentId);
     });
   }
 

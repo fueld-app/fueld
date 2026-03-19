@@ -331,7 +331,7 @@ import {
         <!-- Bank Account -->
         <div class="mt-3 border-t border-gray-100 pt-3">
           <label class="text-xs font-medium text-gray-400">Bank Account</label>
-          @if (isReadonly()) {
+          @if (isReadonly() && !allowBankAccountEdit()) {
             <p class="mt-1 text-sm text-gray-900">{{ bankAccountLabel() }}</p>
           } @else {
             <select
@@ -406,6 +406,7 @@ export class TradingDetailMetaCardsComponent {
   readonly invoicingCompanyId = input<string>('');
   readonly invoicingCompanyName = input<string>('-');
   readonly ownCompanies = input<OwnCompanyDto[]>([]);
+  readonly allowBankAccountEdit = input<boolean>(false);
   readonly bankAccountId = input<string>('');
   readonly bankAccountOptions = input<BankAccountDto[]>([]);
   readonly responsibleUserId = input<string>('');

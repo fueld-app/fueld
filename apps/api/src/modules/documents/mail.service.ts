@@ -59,6 +59,38 @@ export interface SendDocumentEmailOptions {
   pdfBuffer?: Buffer;
   /** PDF file name */
   pdfFileName?: string;
+  /** Additional attachments appended after the main document PDF */
+  attachments?: Array<{
+    filename: string;
+    content: Buffer;
+    contentType?: string;
+  }>;
+}
+
+function buildAttachments(options: SendDocumentEmailOptions) {
+  const attachments: Array<{
+    filename: string;
+    content: Buffer;
+    contentType: string;
+  }> = [];
+
+  if (options.pdfBuffer && options.pdfFileName) {
+    attachments.push({
+      filename: options.pdfFileName,
+      content: options.pdfBuffer,
+      contentType: 'application/pdf',
+    });
+  }
+
+  for (const attachment of options.attachments ?? []) {
+    attachments.push({
+      filename: attachment.filename,
+      content: attachment.content,
+      contentType: attachment.contentType ?? 'application/octet-stream',
+    });
+  }
+
+  return attachments;
 }
 
 // ─── Microsoft Graph API ─────────────────────────────────────────────
@@ -81,6 +113,7 @@ interface GraphMailPayload {
 }
 
 async function sendViaGraph(options: SendDocumentEmailOptions, accessToken: string): Promise<void> {
+  const attachments = buildAttachments(options);
 
   const payload: GraphMailPayload = {
     message: {
@@ -92,14 +125,14 @@ async function sendViaGraph(options: SendDocumentEmailOptions, accessToken: stri
       toRecipients: [
         { emailAddress: { address: options.recipientEmail } },
       ],
-      ...(options.pdfBuffer && options.pdfFileName ? {
+      ...(attachments.length > 0 ? {
         attachments: [
-          {
+          ...attachments.map((attachment) => ({
             '@odata.type': '#microsoft.graph.fileAttachment',
-            name: options.pdfFileName,
-            contentType: 'application/pdf',
-            contentBytes: options.pdfBuffer.toString('base64'),
-          },
+            name: attachment.filename,
+            contentType: attachment.contentType,
+            contentBytes: attachment.content.toString('base64'),
+          })),
         ],
       } : {}),
     },
@@ -149,6 +182,8 @@ async function sendViaSmtp(options: SendDocumentEmailOptions): Promise<void> {
 
   const fromAddress = `"${options.senderName}" <${smtpCfg.from}>`;
 
+  const attachments = buildAttachments(options);
+
   await transporter.sendMail({
     from: fromAddress,
     replyTo: `"${options.senderName}" <${options.senderEmail}>`,
@@ -157,14 +192,12 @@ async function sendViaSmtp(options: SendDocumentEmailOptions): Promise<void> {
     bcc: options.bccEmails.length > 0 ? options.bccEmails.join(', ') : undefined,
     subject: options.subject,
     html: options.htmlBody,
-    ...(options.pdfBuffer && options.pdfFileName ? {
-      attachments: [
-        {
-          filename: options.pdfFileName,
-          content: options.pdfBuffer,
-          contentType: 'application/pdf',
-        },
-      ],
+    ...(attachments.length > 0 ? {
+      attachments: attachments.map((attachment) => ({
+        filename: attachment.filename,
+        content: attachment.content,
+        contentType: attachment.contentType,
+      })),
     } : {}),
   });
 }
