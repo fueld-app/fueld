@@ -7,6 +7,7 @@ import { join } from 'path';
 import type { ApiResponse } from '@fueld/types';
 import { authController } from './modules/auth';
 import { documentsController } from './modules/documents/documents.controller';
+import { supplierNominationController } from './modules/documents/supplier-nomination.controller';
 import { supplierQuoteController } from './modules/documents/supplier-quote.controller';
 import { startInquiryReminderJob } from './modules/documents/supplier-inquiry.service';
 import { verifyController } from './modules/documents/verify.controller';
@@ -359,6 +360,7 @@ export async function createApp(options: CreateAppOptions = {}) {
   app
     .use(authController)
     .use(documentsController)
+    .use(supplierNominationController)
     .use(supplierQuoteController)
     .use(verifyController)
     .use(dashboardController)

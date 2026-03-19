@@ -35,6 +35,14 @@ export const routes: Routes = [
       ),
     title: 'Supplier Quote',
   },
+  {
+    path: 'supplier-nomination/:token',
+    loadComponent: () =>
+      import('./features/trading/pages/public-supplier-nomination/public-supplier-nomination-page.component').then(
+        (m) => m.PublicSupplierNominationPageComponent,
+      ),
+    title: 'Supplier Delivery Confirmation',
+  },
 
   // ─── Protected routes (inside main layout) ─────────────────────
   {

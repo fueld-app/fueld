@@ -1572,6 +1572,10 @@ function buildOfferDocument(data: {
   createdAt: Date;
   docTitle?: string;
   verifyUrl?: string | null;
+  supplierResponseUrl?: string | null;
+  supplierResponseQrUrl?: string | null;
+  supplierResponseTitle?: string | null;
+  supplierResponseText?: string | null;
   printMeta?: DocumentPrintMeta | null;
 }): TDocumentDefinitions {
   // ── Prepare data ──────────────────────────────────────────────────
@@ -1837,6 +1841,35 @@ function buildOfferDocument(data: {
         placeRemark: data.placeRemark,
       }),
 
+      ...(data.supplierResponseUrl ? [
+        { text: data.supplierResponseTitle ?? 'Supplier response', style: 'sectionLabel', margin: [0, 10, 0, 6] } as Content,
+        {
+          columns: [
+            {
+              width: '*',
+              stack: [
+                { text: data.supplierResponseText ?? 'Confirm delivery completion, submit the exact delivery time, and upload the BDRs via this secure link.', margin: [0, 0, 0, 6] } as Content,
+                {
+                  text: data.supplierResponseUrl,
+                  link: data.supplierResponseUrl,
+                  color: '#1d4ed8',
+                  decoration: 'underline',
+                  fontSize: 9,
+                } as Content,
+              ],
+            },
+            ...(data.supplierResponseQrUrl ? [{
+              width: 'auto',
+              stack: [
+                { image: data.supplierResponseQrUrl, fit: [80, 80], alignment: 'right' } as Content,
+                { text: 'Scan to open delivery response form', fontSize: 7, color: '#6b7280', alignment: 'center', margin: [0, 4, 0, 0] } as Content,
+              ],
+            } as Content] : []),
+          ],
+          margin: [0, 0, 0, 6],
+        } as Content,
+      ] : []),
+
       // Sign-off (with optional QR code on the right)
       { text: '', margin: [0, 8, 0, 0] } as Content,
       ...(data.verifyUrl ? [{
@@ -2044,7 +2077,7 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
  * Generate a supplier-facing nomination PDF for a given order ID.
  * Reuses the confirmation layout and content structure.
  */
-export async function generateNominationPdfBuffer(orderId: string): Promise<{
+export async function generateNominationPdfBuffer(orderId: string, options?: { responseUrl?: string | null }): Promise<{
   buffer: Buffer;
   fileName: string;
   revision: DocumentRevisionInfo;
@@ -2074,6 +2107,14 @@ export async function generateNominationPdfBuffer(orderId: string): Promise<{
   }
 
   const companyLogoDataUrl = tryLoadLogoDataUrl(order.invoicingCompany?.logoUrl ?? null);
+  let supplierResponseQrUrl: string | null = null;
+  if (options?.responseUrl) {
+    try {
+      supplierResponseQrUrl = await QRCode.toDataURL(options.responseUrl, { width: 160, margin: 1 });
+    } catch {
+      supplierResponseQrUrl = null;
+    }
+  }
 
   // Resolve price reference names for formula-priced items
   const nomRefIds = new Set<string>();
@@ -2145,6 +2186,10 @@ export async function generateNominationPdfBuffer(orderId: string): Promise<{
     createdAt: order.createdAt,
     docTitle: 'NOMINATION',
     verifyUrl: null as string | null,
+    supplierResponseUrl: options?.responseUrl ?? null,
+    supplierResponseQrUrl,
+    supplierResponseTitle: 'Delivery confirmation link',
+    supplierResponseText: 'Please confirm delivery completion, provide the exact delivery time, and upload the BDRs through this secure link.',
     printMeta: null,
   };
 

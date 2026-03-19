@@ -32,6 +32,7 @@ import {
   type CompanyContactDto,
   type BankAccountDto,
   type PlattsSuggestionsResponseDto,
+  type SupplierNominationSummaryDto,
 } from '@fueld/types';
 
 import {
@@ -1179,6 +1180,52 @@ interface PlattsSuggestionViewModel {
               Delivered quantities can be edited in the items grid above.
               The final invoice will use delivered quantities.
             </p>
+            @if (supplierNomination()) {
+              <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 p-4 text-sm text-amber-900">
+                <div class="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Supplier submission</div>
+                <div class="mt-2 space-y-2">
+                  <div>
+                    <div class="text-[11px] font-medium uppercase tracking-[0.14em] text-amber-700/80">Status</div>
+                    <div class="mt-1 font-semibold">{{ supplierNomination()!.status }}</div>
+                  </div>
+                  @if (supplierNomination()!.deliveryCompletedAt) {
+                    <div>
+                      <div class="text-[11px] font-medium uppercase tracking-[0.14em] text-amber-700/80">Supplier exact delivery time</div>
+                      <div class="mt-1 font-semibold">{{ supplierNomination()!.deliveryCompletedAt | date : 'medium' }}</div>
+                    </div>
+                  }
+                  @if (order()?.deliveredAt) {
+                    <div>
+                      <div class="text-[11px] font-medium uppercase tracking-[0.14em] text-amber-700/80">Internal delivered date</div>
+                      <div class="mt-1 font-semibold">{{ order()!.deliveredAt | date : 'mediumDate' }}</div>
+                    </div>
+                  }
+                  @if (supplierNominationDateMismatch()) {
+                    <div class="rounded-lg border border-amber-300 bg-white/80 px-3 py-2 text-xs text-amber-800">
+                      Supplier-submitted delivery date differs from the internal delivered date.
+                    </div>
+                  }
+                  @if (supplierNomination()!.supplierReference) {
+                    <div>
+                      <div class="text-[11px] font-medium uppercase tracking-[0.14em] text-amber-700/80">Supplier reference</div>
+                      <div class="mt-1">{{ supplierNomination()!.supplierReference }}</div>
+                    </div>
+                  }
+                  @if (supplierNomination()!.attachments.length > 0) {
+                    <div>
+                      <div class="text-[11px] font-medium uppercase tracking-[0.14em] text-amber-700/80">BDRs uploaded</div>
+                      <div class="mt-1 font-semibold">{{ supplierNomination()!.attachments.length }}</div>
+                    </div>
+                  }
+                  @if (supplierNomination()!.supplierComment) {
+                    <div>
+                      <div class="text-[11px] font-medium uppercase tracking-[0.14em] text-amber-700/80">Comment</div>
+                      <div class="mt-1 whitespace-pre-line">{{ supplierNomination()!.supplierComment }}</div>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
           </div>
         }
         @if (orderId() || order()?.id) {
@@ -1678,6 +1725,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly vesselSearchLoading = signal(false);
   readonly placeSearchLoading = signal(false);
   readonly attachments = signal<OrderAttachmentDto[]>([]);
+  readonly supplierNomination = signal<SupplierNominationSummaryDto | null>(null);
   readonly uploadingAttachment = signal(false);
   readonly attachmentType = signal('OTHER');
   selectedAttachment: File | null = null;
@@ -1838,6 +1886,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     this.itemRows().length > 0
     && this.itemRows().every((row) => this.getEffectiveDeliveredQuantity(row) !== null),
   );
+  readonly supplierNominationDateMismatch = computed(() => {
+    const internalDate = this.order()?.deliveredAt?.slice(0, 10) ?? null;
+    const supplierDate = this.supplierNomination()?.deliveryCompletedAt?.slice(0, 10) ?? null;
+    return !!internalDate && !!supplierDate && internalDate !== supplierDate;
+  });
 
   readonly hasBdrAttachment = computed(() =>
     this.attachments().some((att) => (att.type ?? '').toUpperCase() === 'BDR'),
@@ -2371,6 +2424,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
       await this.loadAttachments();
       await this.loadPayments();
+      await this.loadSupplierNominationSummary();
     } catch {
       this.showToast('error', 'Failed to load order.');
     }
@@ -2386,6 +2440,19 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       if (res.success) this.attachments.set(res.data ?? []);
     } catch {
       this.attachments.set([]);
+    }
+  }
+
+  private async loadSupplierNominationSummary(): Promise<void> {
+    const id = this.orderId();
+    if (!id) return;
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<SupplierNominationSummaryDto | null>>(`${API_URL}/orders/${id}/nomination-response`),
+      );
+      this.supplierNomination.set(res.success ? (res.data ?? null) : null);
+    } catch {
+      this.supplierNomination.set(null);
     }
   }
 

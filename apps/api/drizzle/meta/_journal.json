@@ -428,6 +428,13 @@
       "when": 1742857200000,
       "tag": "0060_order_item_platts_signals",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1742860800000,
+      "tag": "0061_supplier_nominations",
+      "breakpoints": true
     }
   ]
 }

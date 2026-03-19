@@ -12,6 +12,7 @@ import { users, counterparties, invoices as invoicesTable, companyContacts, comp
 import { getEmailTemplate, getApplicableEmailRules, renderTemplate, type TemplateVariables } from '../admin/email-settings.service';
 import { getInquirySettings } from '../admin/settings.service';
 import { applyStaleSupplierInquiryStatuses, createSupplierQuoteToken, getSupplierQuoteExpiryDate, getSupplierQuoteFormUrl, getSupplierInquiryOrderContext, saveSupplierInquiryResponse } from './supplier-inquiry.service';
+import { createSupplierNominationLink, getSupplierNominationFormUrl, getSupplierNominationSummary } from './supplier-nomination.service';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Documents Controller
@@ -45,6 +46,24 @@ function buildInquiryTemplateVariables(params: {
     name: preferredName,
     quoteFormUrl,
   };
+}
+
+function buildNominationResponseLinkCardHtml(responseUrl: string): string {
+  return `
+    <div style="margin-top: 24px; border: 1px solid #dbeafe; border-radius: 12px; background: #f8fbff; padding: 18px;">
+      <p style="margin: 0 0 12px; line-height: 1.6; color: #1f2937;">Please confirm delivery completion, submit the exact delivery time, and upload the BDRs here:</p>
+      <a href="${responseUrl}" style="display: inline-block; border-radius: 999px; background: #1e3a5f; color: #ffffff; font-weight: 700; text-decoration: none; padding: 10px 16px;">Confirm delivery and upload BDRs</a>
+      <p style="margin: 10px 0 0; font-size: 12px; line-height: 1.5; color: #6b7280;">If the button does not open, copy this URL into your browser: ${responseUrl}</p>
+    </div>
+  `;
+}
+
+function injectNominationResponseLink(htmlBody: string, responseUrl: string): string {
+  const replaced = htmlBody.replace(/\{\{nominationResponseUrl\}\}|\$\{nominationResponseUrl\}/g, responseUrl);
+  if (replaced.includes(responseUrl)) {
+    return replaced;
+  }
+  return `${replaced}${buildNominationResponseLinkCardHtml(responseUrl)}`;
 }
 
 async function loadSelectedOrderAttachments(orderId: string, attachmentIds: string[]) {
@@ -182,6 +201,28 @@ export const documentsController = new Elysia({ prefix: '/orders' })
     },
   )
 
+  .get(
+    '/:id/nomination-response',
+    async ({ params, set }) => {
+      const orderId = await resolveOrderId(params.id);
+      if (!orderId) {
+        set.status = 404;
+        return { success: false, data: null, message: 'Order not found' };
+      }
+
+      const summary = await getSupplierNominationSummary(orderId);
+      return { success: true, data: summary };
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: {
+        tags: ['Documents'],
+        summary: 'Get latest supplier nomination response for an order',
+        security: [{ bearerAuth: [] }],
+      },
+    },
+  )
+
   // ── GET /orders/:id/proforma/pdf ───────────────────────────────────
   .get(
     '/:id/proforma/pdf',
@@ -280,6 +321,20 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       const docType = body.documentType as DocumentEmailType;
       let pdfBuffer: Buffer;
       let pdfFileName: string;
+      let nominationResponseUrl: string | null = null;
+
+      if (docType === 'NOMINATION') {
+        if (!order.supplierId) { set.status = 400; return { success: false, message: 'Select a supplier first' }; }
+        const { rawToken } = await createSupplierNominationLink({
+          orderId,
+          supplierId: order.supplierId,
+          contactId: order.supplierContactId ?? null,
+          email: body.recipientEmail,
+          subject: body.subject,
+          sentByUserId: auth.userId,
+        });
+        nominationResponseUrl = getSupplierNominationFormUrl(rawToken);
+      }
 
       switch (docType) {
         case 'OFFER':
@@ -293,7 +348,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         case 'NOMINATION': {
           if (!order.supplierId) { set.status = 400; return { success: false, message: 'Select a supplier first' }; }
           if (!order.invoicingCompanyId) { set.status = 400; return { success: false, message: 'Select an invoicing company first' }; }
-          const result = await generateNominationPdfBuffer(orderId);
+          const result = await generateNominationPdfBuffer(orderId, { responseUrl: nominationResponseUrl });
           pdfBuffer = result.buffer;
           pdfFileName = result.fileName;
           break;
@@ -333,6 +388,10 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         }
       }
 
+      const htmlBody = docType === 'NOMINATION' && nominationResponseUrl
+        ? injectNominationResponseLink(body.htmlBody, nominationResponseUrl)
+        : body.htmlBody;
+
       // Send the email
       const { channel } = await sendDocumentEmail({
         documentType: docType,
@@ -345,7 +404,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         ccEmails: body.ccEmails ?? [],
         bccEmails: body.bccEmails ?? [],
         subject: body.subject,
-        htmlBody: body.htmlBody,
+        htmlBody,
         pdfBuffer,
         pdfFileName,
         attachments,
@@ -518,6 +577,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         contactName: '',
         name: '',
         quoteFormUrl: '',
+        nominationResponseUrl: docType === 'NOMINATION' ? '${nominationResponseUrl}' : '',
       };
 
       let subject: string;

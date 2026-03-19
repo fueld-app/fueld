@@ -138,6 +138,7 @@ export interface TemplateVariables {
   contactName?: string;
   name?: string;
   quoteFormUrl?: string;
+  nominationResponseUrl?: string;
 }
 
 /**
@@ -168,4 +169,5 @@ export const TEMPLATE_VARIABLES = [
   { key: 'contactName', label: 'Supplier contact name', example: 'Jane Bunker' },
   { key: 'name', label: 'Preferred greeting name', example: 'Jane Bunker' },
   { key: 'quoteFormUrl', label: 'Secure supplier quote form URL', example: 'https://app.fueld.com/supplier-quote/abc123' },
+  { key: 'nominationResponseUrl', label: 'Secure supplier nomination response URL', example: 'https://app.fueld.com/supplier-nomination/abc123' },
 ];

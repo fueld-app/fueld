@@ -1397,6 +1397,7 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
   items: many(orderItems),
   invoices: many(invoices),
   attachments: many(orderAttachments),
+  supplierNominations: many(supplierNominations),
   documentRevisions: many(documentRevisions),
 }));
 
@@ -1414,9 +1415,10 @@ export const orderItemsRelations = relations(orderItems, ({ one }) => ({
   }),
 }));
 
-export const orderAttachmentsRelations = relations(orderAttachments, ({ one }) => ({
+export const orderAttachmentsRelations = relations(orderAttachments, ({ one, many }) => ({
   order: one(orders, { fields: [orderAttachments.orderId], references: [orders.id] }),
   uploader: one(users, { fields: [orderAttachments.uploadedBy], references: [users.id] }),
+  supplierNominationLinks: many(supplierNominationAttachments),
 }));
 
 export const invoicesRelations = relations(invoices, ({ one, many }) => ({
@@ -1769,6 +1771,57 @@ export type SupplierInquiry = typeof supplierInquiries.$inferSelect;
 export type NewSupplierInquiry = typeof supplierInquiries.$inferInsert;
 export type SupplierInquiryItemQuote = typeof supplierInquiryItemQuotes.$inferSelect;
 export type NewSupplierInquiryItemQuote = typeof supplierInquiryItemQuotes.$inferInsert;
+
+// ═══════════════════════════════════════════════════════════════════════
+//  SUPPLIER NOMINATIONS (supplier-facing delivery confirmation links)
+// ═══════════════════════════════════════════════════════════════════════
+
+export const supplierNominations = pgTable('supplier_nominations', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
+  supplierId: uuid('supplier_id').notNull().references(() => counterparties.id, { onDelete: 'cascade' }),
+  contactId: uuid('contact_id').references(() => companyContacts.id, { onDelete: 'set null' }),
+  email: text('email').notNull(),
+  subject: text('subject').notNull(),
+  status: text('status').notNull().default('SENT'), // 'SENT' | 'OPENED' | 'SUBMITTED' | 'EXPIRED' | 'SUPERSEDED'
+  responseTokenHash: text('response_token_hash'),
+  responseTokenExpiresAt: timestamp('response_token_expires_at', { withTimezone: true }),
+  openedAt: timestamp('opened_at', { withTimezone: true }),
+  respondedAt: timestamp('responded_at', { withTimezone: true }),
+  deliveryCompletedConfirmed: boolean('delivery_completed_confirmed').notNull().default(false),
+  deliveryCompletedAt: timestamp('delivery_completed_at', { withTimezone: true }),
+  supplierReference: text('supplier_reference'),
+  supplierComment: text('supplier_comment'),
+  sentByUserId: uuid('sent_by_user_id').references(() => users.id),
+  sentAt: timestamp('sent_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const supplierNominationAttachments = pgTable('supplier_nomination_attachments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  supplierNominationId: uuid('supplier_nomination_id').notNull().references(() => supplierNominations.id, { onDelete: 'cascade' }),
+  orderAttachmentId: uuid('order_attachment_id').notNull().references(() => orderAttachments.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const supplierNominationsRelations = relations(supplierNominations, ({ one, many }) => ({
+  order: one(orders, { fields: [supplierNominations.orderId], references: [orders.id] }),
+  supplier: one(counterparties, { fields: [supplierNominations.supplierId], references: [counterparties.id] }),
+  contact: one(companyContacts, { fields: [supplierNominations.contactId], references: [companyContacts.id] }),
+  sentByUser: one(users, { fields: [supplierNominations.sentByUserId], references: [users.id] }),
+  attachments: many(supplierNominationAttachments),
+}));
+
+export const supplierNominationAttachmentsRelations = relations(supplierNominationAttachments, ({ one }) => ({
+  supplierNomination: one(supplierNominations, { fields: [supplierNominationAttachments.supplierNominationId], references: [supplierNominations.id] }),
+  orderAttachment: one(orderAttachments, { fields: [supplierNominationAttachments.orderAttachmentId], references: [orderAttachments.id] }),
+}));
+
+export type SupplierNomination = typeof supplierNominations.$inferSelect;
+export type NewSupplierNomination = typeof supplierNominations.$inferInsert;
+export type SupplierNominationAttachment = typeof supplierNominationAttachments.$inferSelect;
+export type NewSupplierNominationAttachment = typeof supplierNominationAttachments.$inferInsert;
 
 // ═══════════════════════════════════════════════════════════════════════
 //  RISK MONITORING

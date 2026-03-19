@@ -936,6 +936,62 @@ export interface PublicSupplierInquiryDto {
   items: SupplierInquiryItemQuoteDto[];
 }
 
+export interface PublicSupplierNominationItemDto {
+  orderItemId: string;
+  productType: ProductType;
+  quantity: string;
+  unit: string;
+  description: string | null;
+}
+
+export interface SupplierNominationAttachmentDto {
+  id: string;
+  fileName: string;
+  fileSize: number;
+  createdAt: string;
+}
+
+export interface PublicSupplierNominationDto {
+  supplierName: string;
+  contactName: string | null;
+  vesselName: string;
+  vesselImo: string | null;
+  portName: string;
+  eta: string | null;
+  etd: string | null;
+  orderNumber: string | null;
+  status: string;
+  sentAt: string;
+  openedAt: string | null;
+  respondedAt: string | null;
+  deliveryCompletedConfirmed: boolean;
+  deliveryCompletedAt: string | null;
+  supplierReference: string | null;
+  supplierComment: string | null;
+  attachments: SupplierNominationAttachmentDto[];
+  items: PublicSupplierNominationItemDto[];
+}
+
+export interface SubmitSupplierNominationResponseDto {
+  deliveryCompletedConfirmed: boolean;
+  deliveryCompletedAt: string;
+  supplierReference?: string | null;
+  supplierComment?: string | null;
+}
+
+export interface SupplierNominationSummaryDto {
+  id: string;
+  status: string;
+  sentAt: string;
+  openedAt: string | null;
+  respondedAt: string | null;
+  deliveryCompletedConfirmed: boolean;
+  deliveryCompletedAt: string | null;
+  supplierReference: string | null;
+  supplierComment: string | null;
+  attachments: SupplierNominationAttachmentDto[];
+}
+
 export interface SubmitSupplierInquiryQuoteDto {
   canDeliver: boolean;
   declineReason?: string | null;
