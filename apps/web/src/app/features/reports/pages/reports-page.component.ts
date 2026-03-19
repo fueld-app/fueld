@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -21,6 +21,7 @@ import { API } from '@app/core/config/api';
 
 type ExportKind = 'trader-performance' | 'invoice-aging' | 'commercial-summary' | 'margin-analysis' | 'exceptions';
 type ExportFormat = 'csv' | 'xlsx';
+type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this_month' | 'last_30_days' | 'this_quarter' | 'year_to_date' | 'custom';
 
 @Component({
   selector: 'app-reports-page',
@@ -92,15 +93,77 @@ type ExportFormat = 'csv' | 'xlsx';
             Comparison: {{ comparisonModeLabel(comparisonMode()) }}
           </div>
         </div>
-        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
-          <label class="flex flex-col gap-1 text-sm text-gray-600">
-            <span>From</span>
-            <input type="date" [value]="from()" (change)="onFromChange($event)" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100" />
-          </label>
-          <label class="flex flex-col gap-1 text-sm text-gray-600">
-            <span>To</span>
-            <input type="date" [value]="to()" (change)="onToChange($event)" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100" />
-          </label>
+        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+          <div class="relative" #dateDropdown>
+            <label class="flex flex-col gap-1 text-sm text-gray-600">
+              <span>Date Range</span>
+              <button
+                type="button"
+                (click)="dateDropdownOpen.set(!dateDropdownOpen())"
+                class="flex items-center justify-between gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm transition-colors hover:bg-gray-50 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
+                data-testid="reports-date-filter-trigger"
+              >
+                <span class="flex items-center gap-2 truncate">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd" />
+                  </svg>
+                  <span class="truncate">{{ dateRangeLabel() }}</span>
+                </span>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 011.06 0L10 11.94l3.72-3.72a.75.75 0 111.06 1.06l-4.25 4.25a.75.75 0 01-1.06 0L5.22 9.28a.75.75 0 010-1.06z" clip-rule="evenodd" />
+                </svg>
+              </button>
+            </label>
+
+            @if (dateDropdownOpen()) {
+              <div class="absolute left-0 z-30 mt-2 w-[22rem] max-w-[calc(100vw-2rem)] origin-top-left rounded-xl border border-gray-200 bg-white shadow-lg ring-1 ring-black/5 max-h-[calc(100vh-140px)] overflow-y-auto">
+                <div class="py-1">
+                  @for (preset of datePresets; track preset.key) {
+                    <button
+                      type="button"
+                      (click)="selectDatePreset(preset.key)"
+                      class="flex w-full items-center justify-between px-4 py-2 text-sm transition-colors"
+                      [class]="selectedDatePreset() === preset.key ? 'bg-brand-50 text-brand-700 font-medium' : 'text-gray-700 hover:bg-gray-50'"
+                      [attr.data-testid]="'reports-date-preset-' + preset.key"
+                    >
+                      <span>{{ preset.label }}</span>
+                      @if (selectedDatePreset() === preset.key) {
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-brand-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                          <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                        </svg>
+                      }
+                    </button>
+                  }
+                </div>
+                <div class="border-t border-gray-100 px-4 py-3">
+                  <p class="mb-2 text-xs font-medium uppercase tracking-[0.18em] text-gray-500">Custom Range</p>
+                  <div class="flex items-center gap-2">
+                    <input
+                      type="date"
+                      [value]="customDateFrom()"
+                      (change)="customDateFrom.set(($any($event.target).value || ''))"
+                      class="min-w-0 flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    />
+                    <span class="shrink-0 px-1 text-xs text-gray-400">to</span>
+                    <input
+                      type="date"
+                      [value]="customDateTo()"
+                      (change)="customDateTo.set(($any($event.target).value || ''))"
+                      class="min-w-0 flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    (click)="applyCustomRange()"
+                    class="mt-2 w-full rounded-md bg-brand-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-brand-700"
+                    data-testid="reports-date-custom-apply"
+                  >
+                    Apply
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
           <label class="flex flex-col gap-1 text-sm text-gray-600">
             <span>Trader</span>
             <select [value]="traderId() ?? ''" (change)="onTraderChange($event)" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
@@ -815,6 +878,14 @@ type ExportFormat = 'csv' | 'xlsx';
 export class ReportsPageComponent {
   private readonly http = inject(HttpClient);
   private autoReloadHandle: ReturnType<typeof setTimeout> | null = null;
+  readonly dateDropdownRef = viewChild<ElementRef>('dateDropdown');
+
+  private readonly clickOutsideHandler = (event: MouseEvent) => {
+    const dropdown = this.dateDropdownRef();
+    if (this.dateDropdownOpen() && dropdown && !dropdown.nativeElement.contains(event.target as Node)) {
+      this.dateDropdownOpen.set(false);
+    }
+  };
 
   readonly utcHours = Array.from({ length: 24 }, (_, index) => index);
   readonly scheduleRoleOptions: Role[] = [Role.Admin, Role.Finance, Role.Teamlead, Role.CreditManager];
@@ -823,6 +894,31 @@ export class ReportsPageComponent {
   readonly defaultFrom = signal(this.formatDateInput(new Date(new Date().getFullYear(), 0, 1)));
   readonly from = signal(this.defaultFrom());
   readonly to = signal(this.today());
+  readonly dateDropdownOpen = signal(false);
+  readonly selectedDatePreset = signal<DatePresetKey>('year_to_date');
+  readonly customDateFrom = signal(this.defaultFrom());
+  readonly customDateTo = signal(this.today());
+  readonly datePresets: Array<{ key: Exclude<DatePresetKey, 'custom'>; label: string }> = [
+    { key: 'today', label: 'Today' },
+    { key: 'yesterday', label: 'Yesterday' },
+    { key: 'this_week', label: 'This Week' },
+    { key: 'last_7_days', label: 'Last 7 Days' },
+    { key: 'this_month', label: 'This Month' },
+    { key: 'last_30_days', label: 'Last 30 Days' },
+    { key: 'this_quarter', label: 'This Quarter' },
+    { key: 'year_to_date', label: 'Year to Date' },
+  ];
+  readonly dateRangeLabel = computed(() => {
+    const preset = this.selectedDatePreset();
+    if (preset === 'custom') {
+      const from = this.customDateFrom();
+      const to = this.customDateTo();
+      if (from && to) return `${this.formatShortDate(from)} - ${this.formatShortDate(to)}`;
+      return 'Custom Range';
+    }
+
+    return this.datePresets.find((option) => option.key === preset)?.label ?? 'Year to Date';
+  });
   readonly traderId = signal<string | null>(null);
   readonly teamId = signal<string | null>(null);
   readonly customerId = signal<string | null>(null);
@@ -885,10 +981,12 @@ export class ReportsPageComponent {
   });
 
   constructor() {
+    document.addEventListener('click', this.clickOutsideHandler);
     void this.reload();
   }
 
   ngOnDestroy(): void {
+    document.removeEventListener('click', this.clickOutsideHandler);
     if (this.autoReloadHandle !== null) {
       clearTimeout(this.autoReloadHandle);
       this.autoReloadHandle = null;
@@ -1102,8 +1200,7 @@ export class ReportsPageComponent {
   }
 
   clearFilters(): void {
-    this.from.set(this.defaultFrom());
-    this.to.set(this.today());
+    this.syncDateFilterState(this.defaultFrom(), this.today());
     this.traderId.set(null);
     this.teamId.set(null);
     this.customerId.set(null);
@@ -1111,13 +1208,18 @@ export class ReportsPageComponent {
     this.queueAutoReload();
   }
 
-  onFromChange(event: Event): void {
-    this.from.set((event.target as HTMLInputElement | null)?.value || this.defaultFrom());
+  selectDatePreset(preset: Exclude<DatePresetKey, 'custom'>): void {
+    const { from, to } = this.resolveDatePreset(preset);
+    this.syncDateFilterState(from, to, preset);
+    this.dateDropdownOpen.set(false);
     this.queueAutoReload();
   }
 
-  onToChange(event: Event): void {
-    this.to.set((event.target as HTMLInputElement | null)?.value || this.today());
+  applyCustomRange(): void {
+    const from = this.customDateFrom() || this.from();
+    const to = this.customDateTo() || this.to();
+    this.syncDateFilterState(from || this.defaultFrom(), to || this.today(), 'custom');
+    this.dateDropdownOpen.set(false);
     this.queueAutoReload();
   }
 
@@ -1328,8 +1430,7 @@ export class ReportsPageComponent {
   }
 
   private applyFilters(filters: ReportFiltersDto): void {
-    this.from.set(filters.from || this.defaultFrom());
-    this.to.set(filters.to || this.today());
+    this.syncDateFilterState(filters.from || this.defaultFrom(), filters.to || this.today());
     this.traderId.set(filters.traderId ?? null);
     this.teamId.set(filters.teamId ?? null);
     this.customerId.set(filters.customerId ?? null);
@@ -1354,6 +1455,79 @@ export class ReportsPageComponent {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  }
+
+  private formatShortDate(value: string): string {
+    const date = new Date(`${value}T00:00:00`);
+    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
+  private syncDateFilterState(from: string, to: string, preset?: DatePresetKey): void {
+    this.from.set(from);
+    this.to.set(to);
+    this.customDateFrom.set(from);
+    this.customDateTo.set(to);
+
+    if (preset) {
+      this.selectedDatePreset.set(preset);
+      return;
+    }
+
+    this.selectedDatePreset.set(this.matchDatePreset(from, to) ?? 'custom');
+  }
+
+  private matchDatePreset(from: string, to: string): Exclude<DatePresetKey, 'custom'> | null {
+    for (const preset of this.datePresets) {
+      const range = this.resolveDatePreset(preset.key);
+      if (range.from === from && range.to === to) {
+        return preset.key;
+      }
+    }
+
+    return null;
+  }
+
+  private resolveDatePreset(preset: Exclude<DatePresetKey, 'custom'>): { from: string; to: string } {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    let from = new Date(today);
+    let to = new Date(today);
+
+    switch (preset) {
+      case 'today':
+        break;
+      case 'yesterday':
+        from.setDate(from.getDate() - 1);
+        to = new Date(from);
+        break;
+      case 'this_week': {
+        const day = today.getDay();
+        from.setDate(today.getDate() - (day === 0 ? 6 : day - 1));
+        break;
+      }
+      case 'last_7_days':
+        from.setDate(from.getDate() - 6);
+        break;
+      case 'this_month':
+        from = new Date(today.getFullYear(), today.getMonth(), 1);
+        break;
+      case 'last_30_days':
+        from.setDate(from.getDate() - 29);
+        break;
+      case 'this_quarter': {
+        const quarter = Math.floor(today.getMonth() / 3);
+        from = new Date(today.getFullYear(), quarter * 3, 1);
+        break;
+      }
+      case 'year_to_date':
+        from = new Date(today.getFullYear(), 0, 1);
+        break;
+    }
+
+    return {
+      from: this.formatDateInput(from),
+      to: this.formatDateInput(to),
+    };
   }
 
   private extractFileName(contentDisposition: string | null): string | null {
