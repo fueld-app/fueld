@@ -20,7 +20,7 @@ import { PdfPreviewModalComponent } from '@app/shared/components/pdf-preview-mod
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, DatePipe, RouterLink, PdfPreviewModalComponent],
   template: `
-    <div class="space-y-6 p-6">
+    <div class="space-y-6 pb-2 min-w-0">
       <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 class="text-2xl font-bold text-gray-900">Platts</h1>
@@ -62,7 +62,7 @@ import { PdfPreviewModalComponent } from '@app/shared/components/pdf-preview-mod
         <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{{ notice() }}</div>
       }
 
-      <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+      <section class="max-w-full rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
           <div class="xl:col-span-2">
             <label class="text-xs font-semibold uppercase tracking-wide text-gray-500">Search</label>
@@ -99,7 +99,7 @@ import { PdfPreviewModalComponent } from '@app/shared/components/pdf-preview-mod
         </div>
       </section>
 
-      <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+      <section class="max-w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200 text-sm">
             <thead class="bg-gray-50">

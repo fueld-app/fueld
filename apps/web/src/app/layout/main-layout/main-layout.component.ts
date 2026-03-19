@@ -606,7 +606,7 @@ const NAVIGATION: NavItem[] = [
       }
 
       <!-- Page content -->
-      <main class="app-main flex-1 px-4 pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pt-8">
+      <main class="app-main flex-1 px-4 pt-4 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] sm:px-6 sm:pt-6 sm:pb-8 lg:px-8 lg:pt-8 lg:pb-10">
         <router-outlet />
       </main>
     </div>
