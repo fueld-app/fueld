@@ -119,6 +119,43 @@ function buildReportPayload(): ReleaseTwoReportsDto {
 }
 
 describe('ReportsPageComponent', () => {
+  it('uses previous period comparison by default on first load', async () => {
+    const payload = buildReportPayload();
+    const getCalls: string[] = [];
+
+    await TestBed.configureTestingModule({
+      imports: [ReportsPageComponent],
+      providers: [
+        provideRouter([]),
+        {
+          provide: HttpClient,
+          useValue: {
+            get: (url: string) => {
+              getCalls.push(url);
+              return of({ success: true, data: payload });
+            },
+            post: () => of({ success: true, data: payload.schedules }),
+            delete: () => of({ success: true, data: payload.schedules }),
+            patch: () => of({ success: true, data: payload.schedules }),
+          },
+        },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(ReportsPageComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const component = fixture.componentInstance;
+    const text = fixture.nativeElement.textContent as string;
+
+    expect(component.comparisonMode()).toBe('PREVIOUS_PERIOD');
+    expect(getCalls.some((url) => url.includes('/reports/release-two?') && url.includes('comparisonMode=PREVIOUS_PERIOD'))).toBe(true);
+    expect(text).toContain('Comparison: Previous period');
+    expect(text).toContain('vs previous period');
+  });
+
   it('updates an existing saved view through the patch endpoint', async () => {
     const payload = buildReportPayload();
     const patchCalls: Array<{ url: string; body: unknown }> = [];

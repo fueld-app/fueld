@@ -67,6 +67,50 @@ describe('reports.service', () => {
 
     expect(report.variance.summary).not.toBeNull();
     expect(report.variance.comparison?.previousFrom).toBe('2026-02-28');
+    expect(report.variance.comparison?.previousTo).toBe('2026-03-09');
+    expect(report.variance.summary?.totalRevenue).toEqual({
+      currentValue: '1200.00',
+      previousValue: '1000.00',
+      deltaValue: '200.00',
+      deltaPct: 20,
+      direction: 'UP',
+    });
+    expect(report.variance.summary?.totalNetProfit).toEqual({
+      currentValue: '300.00',
+      previousValue: '100.00',
+      deltaValue: '200.00',
+      deltaPct: 200,
+      direction: 'UP',
+    });
+    expect(report.variance.summary?.avgDealSize).toEqual({
+      currentValue: '1200.00',
+      previousValue: '1000.00',
+      deltaValue: '200.00',
+      deltaPct: 20,
+      direction: 'UP',
+    });
+    expect(report.variance.summary?.winRate).toEqual({
+      currentValue: '100.0',
+      previousValue: '100.0',
+      deltaValue: '0.0',
+      deltaPct: 0,
+      direction: 'FLAT',
+    });
+    expect(report.variance.summary?.totalOutstanding).toEqual({
+      currentValue: '0.00',
+      previousValue: '0.00',
+      deltaValue: '0.00',
+      deltaPct: null,
+      direction: 'FLAT',
+    });
+    expect(report.variance.topTraderMovers[0]).toMatchObject({
+      label: user.name,
+      currentValue: '300.00',
+      previousValue: '100.00',
+      deltaValue: '200.00',
+      deltaPct: 200,
+      direction: 'UP',
+    });
     expect(report.variance.topTraderMovers[0]?.label).toBe(user.name);
   });
 
