@@ -285,7 +285,6 @@ import {
               type="date"
               [ngModel]="formatDateForInput(eta())"
               (ngModelChange)="etaChange.emit($event)"
-              [min]="minDateTime()"
               class="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-900
                      focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
             />
@@ -303,7 +302,7 @@ import {
                 type="date"
                 [ngModel]="formatDateForInput(etd())"
                 (ngModelChange)="etdChange.emit($event)"
-                [min]="etaMinDateTime() || minDateTime()"
+                [min]="etaMinDateTime()"
                 class="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-900
                        focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
               />
@@ -386,7 +385,6 @@ export class TradingDetailMetaCardsComponent {
 
   readonly eta = input<string | null>(null);
   readonly etd = input<string | null>(null);
-  readonly minDateTime = input<string>('');
   readonly etaMinDateTime = input<string>('');
   readonly timezone = input<string>('UTC');
   readonly showEtd = input<boolean>(true);

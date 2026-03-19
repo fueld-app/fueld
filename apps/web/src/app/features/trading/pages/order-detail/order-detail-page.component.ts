@@ -290,7 +290,6 @@ interface PlattsSuggestionViewModel {
       [isReadonly]="isReadonly()"
       [eta]="order()?.eta ?? null"
       [etd]="order()?.etd ?? null"
-      [minDateTime]="minDateTime()"
       [etaMinDateTime]="etaMinDateTime()"
       [timezone]="placeTimezone()"
       [invoicingCompanyId]="order()?.invoicingCompanyId ?? ''"
@@ -1919,13 +1918,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       return tz;
     }
   });
-  readonly minDateTime = computed(() =>
-    this.formatDateForInput(new Date(), this.placeTimezone()),
-  );
   readonly etaMinDateTime = computed(() => {
     const eta = this.order()?.eta;
-    if (eta) return this.formatDateForInput(new Date(eta), this.placeTimezone());
-    return this.minDateTime();
+    if (!eta) return '';
+    return this.formatDateForInput(new Date(eta), this.placeTimezone());
   });
 
   readonly paymentsTotal = computed(() =>

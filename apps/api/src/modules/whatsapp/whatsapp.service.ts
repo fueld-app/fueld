@@ -172,6 +172,11 @@ async function useDbAuthState(userId: string) {
 // ─── Connection Management ───────────────────────────────────────────
 
 export async function startWhatsAppSession(userId: string): Promise<{ qr?: string; status: string }> {
+  const waSettings = await getWhatsAppSettings();
+  if (!waSettings.enabled) {
+    return { status: 'disabled' };
+  }
+
   // If already connected, return status
   const existing = connections.get(userId);
   if (existing) {
@@ -518,6 +523,9 @@ export async function sendWhatsAppMessage(
 
 export async function reconnectStoredSessions(): Promise<void> {
   try {
+    const waSettings = await getWhatsAppSettings();
+    if (!waSettings.enabled) return;
+
     const sessions = await db
       .select({ userId: whatsappSessions.userId })
       .from(whatsappSessions);

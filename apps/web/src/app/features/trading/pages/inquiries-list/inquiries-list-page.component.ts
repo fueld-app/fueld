@@ -340,7 +340,6 @@ interface LliSearchResult {
                 <input
                   id="new-eta"
                   type="date"
-                  [min]="minDate"
                   [ngModel]="newEta()"
                   (ngModelChange)="onEtaChange($event)"
                   class="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm shadow-sm
@@ -509,11 +508,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   readonly newEta = signal('');
   readonly newEtd = signal('');
 
-  /** Today's date in YYYY-MM-DD format for min attribute */
-  readonly minDate = new Date().toISOString().split('T')[0];
-
-  /** ETD min is ETA if set, otherwise today */
-  readonly etdMinDate = computed(() => this.newEta() || this.minDate);
+  readonly etdMinDate = computed(() => this.newEta() || '');
 
   readonly canCreateInquiry = computed(
     () => !!this.newClientId() && !!this.newVesselId() && !!this.newPlaceId(),
