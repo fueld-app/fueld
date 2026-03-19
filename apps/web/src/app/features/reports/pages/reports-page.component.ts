@@ -55,7 +55,7 @@ type ExportFormat = 'csv' | 'xlsx';
               }
             }
           </div>
-          <p class="mt-1 text-sm text-gray-500">Historical, filterable reporting for trader performance, collections, commercial conversion, and margin analysis.</p>
+          <p class="mt-1 max-w-3xl text-sm text-gray-500">Historical, filterable reporting for trader performance, collections, commercial conversion, and margin analysis, with comparison windows, drill-downs, and exception monitoring.</p>
         </div>
 
         <div class="flex items-center gap-3">
@@ -77,7 +77,16 @@ type ExportFormat = 'csv' | 'xlsx';
         </div>
       </div>
 
-      <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+      <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm" data-testid="reports-filter-bar">
+        <div class="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400">Report Filters</h2>
+            <p class="text-sm text-gray-500">Choose a reporting slice, then compare it against a prior period or open the underlying records.</p>
+          </div>
+          <div class="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-600">
+            Comparison: {{ comparisonModeLabel(comparisonMode()) }}
+          </div>
+        </div>
         <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
           <label class="flex flex-col gap-1 text-sm text-gray-600">
             <span>From</span>
@@ -125,7 +134,7 @@ type ExportFormat = 'csv' | 'xlsx';
           </label>
           <label class="flex flex-col gap-1 text-sm text-gray-600">
             <span>Comparison</span>
-            <select [value]="comparisonMode()" (change)="comparisonMode.set($any($event.target).value)" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
+            <select data-testid="reports-comparison-mode" [value]="comparisonMode()" (change)="comparisonMode.set($any($event.target).value)" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
               <option value="NONE">None</option>
               <option value="PREVIOUS_PERIOD">Previous period</option>
               <option value="PREVIOUS_MONTH">Previous month</option>
@@ -158,11 +167,14 @@ type ExportFormat = 'csv' | 'xlsx';
         </div>
 
         @if (reportData.variance.summary; as varianceSummary) {
-          <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm" data-testid="reports-variance-section">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 class="text-lg font-semibold text-gray-900">Variance</h2>
                 <p class="text-sm text-gray-500">{{ reportData.variance.comparison?.label || 'Comparison disabled' }}</p>
+              </div>
+              <div class="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-600">
+                Current window vs prior baseline
               </div>
             </div>
             <div class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
@@ -197,7 +209,7 @@ type ExportFormat = 'csv' | 'xlsx';
                 <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400">Trader Movers</h3>
                 <div class="mt-3 space-y-2">
                   @for (row of reportData.variance.topTraderMovers; track row.key) {
-                    <button type="button" (click)="openOrderDrilldown('TRADER', row.key)" class="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm hover:bg-white">
+                    <button type="button" [attr.data-testid]="'reports-variance-trader-' + row.key" (click)="openOrderDrilldown('TRADER', row.key)" class="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm hover:bg-white">
                       <span class="font-medium text-gray-900">{{ row.label }}</span>
                       <span class="text-gray-500">{{ formatCurrency(row.deltaValue) }}</span>
                     </button>
@@ -210,7 +222,7 @@ type ExportFormat = 'csv' | 'xlsx';
                 <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400">Customer Movers</h3>
                 <div class="mt-3 space-y-2">
                   @for (row of reportData.variance.topCustomerMovers; track row.key) {
-                    <button type="button" (click)="openOrderDrilldown('CUSTOMER', row.key)" class="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm hover:bg-white">
+                    <button type="button" [attr.data-testid]="'reports-variance-customer-' + row.key" (click)="openOrderDrilldown('CUSTOMER', row.key)" class="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm hover:bg-white">
                       <span class="font-medium text-gray-900">{{ row.label }}</span>
                       <span class="text-gray-500">{{ formatCurrency(row.deltaValue) }}</span>
                     </button>
@@ -223,7 +235,7 @@ type ExportFormat = 'csv' | 'xlsx';
                 <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400">Product Movers</h3>
                 <div class="mt-3 space-y-2">
                   @for (row of reportData.variance.topProductMovers; track row.key) {
-                    <button type="button" (click)="openOrderDrilldown('PRODUCT', row.key)" class="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm hover:bg-white">
+                    <button type="button" [attr.data-testid]="'reports-variance-product-' + row.key" (click)="openOrderDrilldown('PRODUCT', row.key)" class="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm hover:bg-white">
                       <span class="font-medium text-gray-900">{{ row.label }}</span>
                       <span class="text-gray-500">{{ formatCurrency(row.deltaValue) }}</span>
                     </button>
@@ -331,7 +343,7 @@ type ExportFormat = 'csv' | 'xlsx';
                     <td class="px-5 py-3">{{ formatPercent(row.winRate) }}</td>
                     <td class="px-5 py-3">{{ formatCurrency(row.avgDealSize) }}</td>
                     <td class="px-5 py-3 text-right">
-                      <button type="button" (click)="openOrderDrilldown('TRADER', row.traderId)" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">
+                      <button type="button" [attr.data-testid]="'reports-trader-drilldown-' + row.traderId" (click)="openOrderDrilldown('TRADER', row.traderId)" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">
                         Drill-down
                       </button>
                     </td>
@@ -345,6 +357,87 @@ type ExportFormat = 'csv' | 'xlsx';
             </table>
           </div>
         </section>
+
+        @if (drilldownData() || drilldownLoading() || drilldownError()) {
+          <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm" data-testid="reports-drilldown-panel">
+            <div class="flex items-center justify-between gap-4">
+              <div>
+                <h2 class="text-lg font-semibold text-gray-900">Drill-down</h2>
+                <p class="text-sm text-gray-500">{{ drilldownData()?.title || 'Inspect the source records behind a summary row.' }}</p>
+              </div>
+              <button type="button" data-testid="reports-drilldown-close" (click)="closeDrilldown()" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                Close
+              </button>
+            </div>
+            @if (drilldownData(); as detailBadge) {
+              <div class="mt-3 inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
+                {{ detailBadge.totalCount }} record{{ detailBadge.totalCount === 1 ? '' : 's' }} in {{ detailBadge.dataset.toLowerCase() }}
+              </div>
+            }
+
+            @if (drilldownLoading()) {
+              <div class="mt-4 text-sm text-gray-500">Loading drill-down…</div>
+            } @else if (drilldownError()) {
+              <div class="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ drilldownError() }}</div>
+            } @else if (drilldownData(); as detail) {
+              <div class="mt-4 overflow-x-auto">
+                @if (detail.dataset === 'ORDERS') {
+                  <table class="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead class="bg-gray-50 text-left text-gray-500">
+                      <tr>
+                        <th class="px-4 py-3 font-medium">Customer</th>
+                        <th class="px-4 py-3 font-medium">Vessel</th>
+                        <th class="px-4 py-3 font-medium">Trader</th>
+                        <th class="px-4 py-3 font-medium">Status</th>
+                        <th class="px-4 py-3 font-medium">Revenue</th>
+                        <th class="px-4 py-3 font-medium">Net</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 bg-white text-gray-700">
+                      @for (row of detail.orders; track row.orderId) {
+                        <tr>
+                          <td class="px-4 py-3">{{ row.clientName }}</td>
+                          <td class="px-4 py-3">{{ row.vesselName }}</td>
+                          <td class="px-4 py-3">{{ row.traderName }}</td>
+                          <td class="px-4 py-3">{{ row.status }}</td>
+                          <td class="px-4 py-3">{{ formatCurrency(row.totalRevenue) }}</td>
+                          <td class="px-4 py-3">{{ formatCurrency(row.totalNetProfit) }}</td>
+                        </tr>
+                      } @empty {
+                        <tr><td colspan="6" class="px-4 py-6 text-center text-sm text-gray-500">No order rows matched this drill-down.</td></tr>
+                      }
+                    </tbody>
+                  </table>
+                } @else {
+                  <table class="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead class="bg-gray-50 text-left text-gray-500">
+                      <tr>
+                        <th class="px-4 py-3 font-medium">Invoice</th>
+                        <th class="px-4 py-3 font-medium">Customer</th>
+                        <th class="px-4 py-3 font-medium">Trader</th>
+                        <th class="px-4 py-3 font-medium">Due</th>
+                        <th class="px-4 py-3 font-medium">Outstanding</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 bg-white text-gray-700">
+                      @for (row of detail.invoices; track row.invoiceId) {
+                        <tr>
+                          <td class="px-4 py-3">{{ row.invoiceNumber }}</td>
+                          <td class="px-4 py-3">{{ row.clientName }}</td>
+                          <td class="px-4 py-3">{{ row.traderName || '—' }}</td>
+                          <td class="px-4 py-3">{{ row.dueDate }}</td>
+                          <td class="px-4 py-3">{{ formatCurrency(row.outstandingAmount) }}</td>
+                        </tr>
+                      } @empty {
+                        <tr><td colspan="5" class="px-4 py-6 text-center text-sm text-gray-500">No invoice rows matched this drill-down.</td></tr>
+                      }
+                    </tbody>
+                  </table>
+                }
+              </div>
+            }
+          </section>
+        }
 
         <section class="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
           <div class="rounded-2xl border border-gray-200 bg-white shadow-sm">
@@ -365,11 +458,11 @@ type ExportFormat = 'csv' | 'xlsx';
 
             <div class="grid gap-3 border-b border-gray-100 px-5 py-4 sm:grid-cols-5">
               @for (bucket of reportData.invoiceAging.buckets; track bucket.label) {
-                <div class="rounded-xl border border-gray-200 bg-gray-50/80 p-3">
+                <div class="rounded-xl border border-gray-200 bg-gray-50/80 p-3" [attr.data-testid]="'reports-aging-bucket-' + bucket.label">
                   <p class="text-xs font-medium uppercase tracking-[0.18em] text-gray-400">{{ bucket.label }}</p>
                   <p class="mt-2 text-lg font-semibold text-gray-900">{{ bucket.count }}</p>
                   <p class="text-sm text-gray-500">{{ formatCurrency(bucket.outstandingAmount) }}</p>
-                  <button type="button" (click)="openInvoiceDrilldown(bucket.label)" class="mt-3 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">
+                  <button type="button" [attr.data-testid]="'reports-invoice-drilldown-' + bucket.label" (click)="openInvoiceDrilldown(bucket.label)" class="mt-3 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">
                     Open invoices
                   </button>
                 </div>
@@ -504,7 +597,7 @@ type ExportFormat = 'csv' | 'xlsx';
                       <span class="text-sm text-gray-500">{{ row.netMarginPct ?? '—' }}%</span>
                     </div>
                     <div class="mt-1 text-sm text-gray-600">{{ formatCurrency(row.totalNetProfit) }} net on {{ formatCurrency(row.totalRevenue) }} revenue</div>
-                    <button type="button" (click)="openOrderDrilldown('CUSTOMER', row.key)" class="mt-3 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">
+                    <button type="button" [attr.data-testid]="'reports-customer-drilldown-' + row.key" (click)="openOrderDrilldown('CUSTOMER', row.key)" class="mt-3 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">
                       Open orders
                     </button>
                   </div>
@@ -523,7 +616,7 @@ type ExportFormat = 'csv' | 'xlsx';
                       <span class="text-sm text-gray-500">{{ row.netMarginPct ?? '—' }}%</span>
                     </div>
                     <div class="mt-1 text-sm text-gray-600">{{ formatCurrency(row.totalNetProfit) }} net on {{ formatCurrency(row.totalRevenue) }} revenue</div>
-                    <button type="button" (click)="openOrderDrilldown('PRODUCT', row.key)" class="mt-3 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">
+                    <button type="button" [attr.data-testid]="'reports-product-drilldown-' + row.key" (click)="openOrderDrilldown('PRODUCT', row.key)" class="mt-3 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">
                       Open orders
                     </button>
                   </div>
@@ -551,35 +644,41 @@ type ExportFormat = 'csv' | 'xlsx';
           </div>
         </section>
 
-        <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+        <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm" data-testid="reports-exceptions-section">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 class="text-lg font-semibold text-gray-900">Exceptions</h2>
-              <p class="text-sm text-gray-500">High-signal issues surfaced from the current report scope.</p>
+              <p class="text-sm text-gray-500">High-signal issues surfaced from the current report scope, ready for export or scheduled delivery.</p>
             </div>
-            <div class="flex gap-2">
-              <button type="button" (click)="exportReport('exceptions', 'csv')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+            <div class="flex flex-wrap items-center gap-2">
+              <div class="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-medium text-red-700" data-testid="reports-exceptions-total">
+                {{ reportData.exceptions.totalCount }} open exception{{ reportData.exceptions.totalCount === 1 ? '' : 's' }}
+              </div>
+              <button type="button" data-testid="reports-exceptions-export-csv" (click)="exportReport('exceptions', 'csv')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
                 Export CSV
               </button>
-              <button type="button" (click)="exportReport('exceptions', 'xlsx')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+              <button type="button" data-testid="reports-exceptions-export-xlsx" (click)="exportReport('exceptions', 'xlsx')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
                 Export XLSX
               </button>
             </div>
           </div>
           <div class="mt-4 flex flex-wrap gap-2">
             @for (entry of reportData.exceptions.byType; track entry.type) {
-              <span class="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
+              <span class="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700" [attr.data-testid]="'reports-exception-chip-' + entry.type">
                 {{ exceptionTypeLabel(entry.type) }} · {{ entry.count }}
               </span>
             } @empty {
               <span class="text-sm text-gray-500">No active exceptions in this scope.</span>
             }
           </div>
-          <div class="mt-4 space-y-3">
+          <div class="mt-4 grid gap-3 lg:grid-cols-2">
             @for (row of reportData.exceptions.rows; track row.type + '-' + row.entityId) {
-              <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3" [attr.data-testid]="'reports-exception-row-' + row.entityId">
                 <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
+                    <div class="mb-2 inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]" [class.border-red-200]="row.severity === 'HIGH'" [class.bg-red-50]="row.severity === 'HIGH'" [class.text-red-700]="row.severity === 'HIGH'" [class.border-amber-200]="row.severity !== 'HIGH'" [class.bg-amber-50]="row.severity !== 'HIGH'" [class.text-amber-700]="row.severity !== 'HIGH'">
+                      {{ row.severity }}
+                    </div>
                     <div class="font-medium text-gray-900">{{ row.title }}</div>
                     <div class="text-sm text-gray-500">{{ row.description }}</div>
                   </div>
@@ -595,82 +694,6 @@ type ExportFormat = 'csv' | 'xlsx';
           </div>
         </section>
 
-        @if (drilldownData() || drilldownLoading() || drilldownError()) {
-          <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div class="flex items-center justify-between gap-4">
-              <div>
-                <h2 class="text-lg font-semibold text-gray-900">Drill-down</h2>
-                <p class="text-sm text-gray-500">{{ drilldownData()?.title || 'Inspect the source records behind a summary row.' }}</p>
-              </div>
-              <button type="button" (click)="closeDrilldown()" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
-                Close
-              </button>
-            </div>
-
-            @if (drilldownLoading()) {
-              <div class="mt-4 text-sm text-gray-500">Loading drill-down…</div>
-            } @else if (drilldownError()) {
-              <div class="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ drilldownError() }}</div>
-            } @else if (drilldownData(); as detail) {
-              <div class="mt-4 overflow-x-auto">
-                @if (detail.dataset === 'ORDERS') {
-                  <table class="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead class="bg-gray-50 text-left text-gray-500">
-                      <tr>
-                        <th class="px-4 py-3 font-medium">Customer</th>
-                        <th class="px-4 py-3 font-medium">Vessel</th>
-                        <th class="px-4 py-3 font-medium">Trader</th>
-                        <th class="px-4 py-3 font-medium">Status</th>
-                        <th class="px-4 py-3 font-medium">Revenue</th>
-                        <th class="px-4 py-3 font-medium">Net</th>
-                      </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100 bg-white text-gray-700">
-                      @for (row of detail.orders; track row.orderId) {
-                        <tr>
-                          <td class="px-4 py-3">{{ row.clientName }}</td>
-                          <td class="px-4 py-3">{{ row.vesselName }}</td>
-                          <td class="px-4 py-3">{{ row.traderName }}</td>
-                          <td class="px-4 py-3">{{ row.status }}</td>
-                          <td class="px-4 py-3">{{ formatCurrency(row.totalRevenue) }}</td>
-                          <td class="px-4 py-3">{{ formatCurrency(row.totalNetProfit) }}</td>
-                        </tr>
-                      } @empty {
-                        <tr><td colspan="6" class="px-4 py-6 text-center text-sm text-gray-500">No order rows matched this drill-down.</td></tr>
-                      }
-                    </tbody>
-                  </table>
-                } @else {
-                  <table class="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead class="bg-gray-50 text-left text-gray-500">
-                      <tr>
-                        <th class="px-4 py-3 font-medium">Invoice</th>
-                        <th class="px-4 py-3 font-medium">Customer</th>
-                        <th class="px-4 py-3 font-medium">Trader</th>
-                        <th class="px-4 py-3 font-medium">Due</th>
-                        <th class="px-4 py-3 font-medium">Outstanding</th>
-                      </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100 bg-white text-gray-700">
-                      @for (row of detail.invoices; track row.invoiceId) {
-                        <tr>
-                          <td class="px-4 py-3">{{ row.invoiceNumber }}</td>
-                          <td class="px-4 py-3">{{ row.clientName }}</td>
-                          <td class="px-4 py-3">{{ row.traderName || '—' }}</td>
-                          <td class="px-4 py-3">{{ row.dueDate }}</td>
-                          <td class="px-4 py-3">{{ formatCurrency(row.outstandingAmount) }}</td>
-                        </tr>
-                      } @empty {
-                        <tr><td colspan="5" class="px-4 py-6 text-center text-sm text-gray-500">No invoice rows matched this drill-down.</td></tr>
-                      }
-                    </tbody>
-                  </table>
-                }
-              </div>
-            }
-          </section>
-        }
-
         @if (reportData.access.canManageSchedules || reportData.schedules.length > 0) {
           <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -683,7 +706,7 @@ type ExportFormat = 'csv' | 'xlsx';
                   <div class="grid gap-3 sm:grid-cols-2">
                     <input type="text" data-testid="reports-schedule-name" [value]="scheduleName()" (input)="scheduleName.set(($any($event.target).value || '').trimStart())" placeholder="Schedule name" class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100" />
                     <input type="text" data-testid="reports-schedule-description" [value]="scheduleDescription()" (input)="scheduleDescription.set(($any($event.target).value || '').trimStart())" placeholder="Description (optional)" class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100" />
-                    <select [value]="scheduleMode()" (change)="scheduleMode.set($any($event.target).value)" class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
+                    <select data-testid="reports-schedule-mode" [value]="scheduleMode()" (change)="scheduleMode.set($any($event.target).value)" class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
                       <option value="SUMMARY">Summary</option>
                       <option value="EXCEPTIONS">Exceptions</option>
                     </select>
@@ -711,13 +734,13 @@ type ExportFormat = 'csv' | 'xlsx';
                   @if (scheduleMode() === 'EXCEPTIONS') {
                     <div class="flex flex-wrap gap-2">
                       @for (type of ['NEGATIVE_NET_PROFIT_ORDER', 'SEVERELY_OVERDUE_INVOICE', 'LOW_MARGIN_CUSTOMER']; track type) {
-                        <button type="button" (click)="toggleScheduleExceptionType($any(type))" class="rounded-full border px-3 py-1.5 text-sm font-medium transition-colors" [class.border-red-600]="scheduleExceptionTypeSelected($any(type))" [class.bg-red-600]="scheduleExceptionTypeSelected($any(type))" [class.text-white]="scheduleExceptionTypeSelected($any(type))" [class.border-gray-300]="!scheduleExceptionTypeSelected($any(type))" [class.bg-white]="!scheduleExceptionTypeSelected($any(type))" [class.text-gray-700]="!scheduleExceptionTypeSelected($any(type))">
+                        <button type="button" [attr.data-testid]="'reports-schedule-exception-type-' + type" (click)="toggleScheduleExceptionType($any(type))" class="rounded-full border px-3 py-1.5 text-sm font-medium transition-colors" [class.border-red-600]="scheduleExceptionTypeSelected($any(type))" [class.bg-red-600]="scheduleExceptionTypeSelected($any(type))" [class.text-white]="scheduleExceptionTypeSelected($any(type))" [class.border-gray-300]="!scheduleExceptionTypeSelected($any(type))" [class.bg-white]="!scheduleExceptionTypeSelected($any(type))" [class.text-gray-700]="!scheduleExceptionTypeSelected($any(type))">
                           {{ exceptionTypeLabel($any(type)) }}
                         </button>
                       }
                     </div>
                     <label class="flex items-center gap-2 text-sm text-gray-600">
-                      <input type="checkbox" [checked]="scheduleSendOnlyWhenNonEmpty()" (change)="scheduleSendOnlyWhenNonEmpty.set(($any($event.target).checked))" class="rounded border-gray-300" />
+                      <input data-testid="reports-schedule-send-only-non-empty" type="checkbox" [checked]="scheduleSendOnlyWhenNonEmpty()" (change)="scheduleSendOnlyWhenNonEmpty.set(($any($event.target).checked))" class="rounded border-gray-300" />
                       Send only when exceptions exist
                     </label>
                   }
