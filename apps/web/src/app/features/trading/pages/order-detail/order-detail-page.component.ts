@@ -1167,7 +1167,7 @@ interface PlattsSuggestionViewModel {
                 }
               </label>
               <input
-                type="datetime-local"
+                type="date"
                 [ngModel]="deliveredAtLocal()"
                 (ngModelChange)="onDeliveredAtChange($event)"
                 class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm
@@ -1824,7 +1824,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly deliveredAtLocal = computed(() => {
     const iso = this.order()?.deliveredAt;
     if (!iso) return '';
-    return this.formatDateTimeForInput(new Date(iso), this.placeTimezone());
+    return this.formatDateForInput(new Date(iso), this.placeTimezone());
   });
 
   readonly deliveredQtyComplete = computed(() =>
@@ -3521,7 +3521,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   onDeliveredAtChange(value: string): void {
-    const iso = value ? this.toUtcIsoFromZonedInput(value, this.placeTimezone()) : null;
+    const iso = value ? `${value}T12:00:00.000Z` : null;
     this.order.update((o) => (o ? { ...o, deliveredAt: iso } : o));
     this.triggerAutosave();
   }
