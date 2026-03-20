@@ -28,6 +28,12 @@ import { firstValueFrom } from 'rxjs';
 import { API } from '@app/core/config/api';
 import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.service';
 
+interface TeamUserOption {
+  id: string;
+  name: string;
+  email: string;
+}
+
 interface CompanySearchResult {
   source: 'local' | 'seasearcher';
   localId?: string;
@@ -86,6 +92,16 @@ interface LliSearchResult {
             [clearable]="true"
             (searchChange)="searchBrokerFilter($event)"
             (selectionChange)="onBrokerFilterChange($event)"
+          />
+        </div>
+        <div class="w-56">
+          <label class="mb-1 block text-xs font-medium text-gray-500">Responsible</label>
+          <app-searchable-dropdown
+            placeholder="Filter by responsible…"
+            [options]="responsibleFilterOptions()"
+            [selected]="filterResponsibleId()"
+            [clearable]="true"
+            (selectionChange)="onResponsibleFilterChange($event)"
           />
         </div>
       </div>
@@ -465,6 +481,11 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   readonly filterBrokerId = signal('');
   readonly brokerFilterOptions = signal<DropdownOption[]>([]);
   readonly brokerFilterLoading = signal(false);
+  readonly filterResponsibleId = signal('');
+  readonly teamUsers = signal<TeamUserOption[]>([]);
+  readonly responsibleFilterOptions = computed<DropdownOption[]>(() =>
+    this.teamUsers().map((user) => ({ value: user.id, label: user.name })),
+  );
 
   // ─── New inquiry modal ────────────────────────────────────────────
 
@@ -529,6 +550,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.loadInquiries();
+    void this.loadResponsibleUsers();
     if (!this.isOrders()) {
       this.loadDropdownData();
 
@@ -565,6 +587,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
       params.set('limit', String(this.pageSize()));
       if (this.searchTerm()) params.set('search', this.searchTerm());
       if (this.filterBrokerId()) params.set('brokerId', this.filterBrokerId());
+      if (this.filterResponsibleId()) params.set('salesRepId', this.filterResponsibleId());
       if (this.sortBy()) params.set('sortBy', this.sortBy());
       if (this.sortBy()) params.set('sortDir', this.sortDir());
 
@@ -596,6 +619,19 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
       if (placesRes.success) this.placesList.set(placesRes.data.places);
     } catch {
       // silently ignore — dropdowns will be empty
+    }
+  }
+
+  private async loadResponsibleUsers(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<TeamUserOption[]>>(`${API}/lloyds/users`),
+      );
+      if (res.success) {
+        this.teamUsers.set(res.data ?? []);
+      }
+    } catch {
+      this.teamUsers.set([]);
     }
   }
 
@@ -895,6 +931,12 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
 
   onBrokerFilterChange(value: string): void {
     this.filterBrokerId.set(value ?? '');
+    this.currentPage.set(1);
+    this.loadInquiries();
+  }
+
+  onResponsibleFilterChange(value: string): void {
+    this.filterResponsibleId.set(value ?? '');
     this.currentPage.set(1);
     this.loadInquiries();
   }

@@ -162,6 +162,7 @@ export async function getTeamStats(
       .select({
         orderId: orderItems.orderId,
         quantity: orderItems.quantity,
+        deliveredQuantity: orderItems.deliveredQuantity,
         costPrice: orderItems.costPrice,
         costCurrency: orderItems.costCurrency,
         costConversionFactor: orderItems.costConversionFactor,

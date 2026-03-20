@@ -83,6 +83,7 @@ type ScopedItemRow = {
   orderId: string;
   productType: string;
   quantity: string | number | null;
+  deliveredQuantity: string | number | null;
   costPrice: string | number | null;
   costCurrency: string | null;
   costConversionFactor: string | number | null;
@@ -590,6 +591,7 @@ async function fetchScopedDataset(
       orderId: orderItems.orderId,
       productType: orderItems.productType,
       quantity: orderItems.quantity,
+      deliveredQuantity: orderItems.deliveredQuantity,
       costPrice: orderItems.costPrice,
       costCurrency: orderItems.costCurrency,
       costConversionFactor: orderItems.costConversionFactor,

@@ -1250,7 +1250,7 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   // ─── Computed totals ─────────────────────────────────────────────
 
   readonly totalQty = computed(() =>
-    this.rows().reduce((s, r) => s + (r.quantity || 0), 0),
+    this.rows().reduce((s, r) => s + this.effectiveQuantity(r), 0),
   );
 
   readonly totalCost = computed(() =>
@@ -1282,7 +1282,7 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   });
 
   readonly totalDeliveredQty = computed(() =>
-    this.rows().reduce((s, r) => s + (r.deliveredQuantity ?? r.quantity ?? 0), 0),
+    this.rows().reduce((s, r) => s + this.effectiveQuantity(r), 0),
   );
 
   // ─── Actions ─────────────────────────────────────────────────────
@@ -1368,6 +1368,7 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   }
 
   /** Update the main quantity (used for calculations/invoicing) */
+  /** Update the ordered quantity; economics will use delivered quantity when one has been entered. */
   updateQuantity(index: number, value: number): void {
     this.rows.update((prev) => {
       const updated = [...prev];
@@ -1377,6 +1378,7 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
       if (row.quantityMin !== null && row.quantityMin > value) {
         row.quantityMin = value;
       }
+      // Auto-recalculate economics using delivered quantity when available.
       row.profit = this.profitForRow(row);
       updated[index] = row;
       return updated;
@@ -1394,6 +1396,7 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
         row.quantity = value;
       }
       // Profit always uses main qty
+      // Recalculate economics using delivered quantity when available.
       row.profit = this.profitForRow(row);
       updated[index] = row;
       return updated;
@@ -1441,15 +1444,18 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
     const rate = this.getFxRate(display);
     return rate > 0 ? usdAmount / rate : usdAmount;
   }
+  private effectiveQuantity(row: OrderItemRow): number {
+    return row.deliveredQuantity != null ? row.deliveredQuantity : (row.quantity || 0);
+  }
 
   private computeCostBase(row: OrderItemRow): number {
-    const qty = row.quantity || 0;
+    const qty = this.effectiveQuantity(row);
     const factor = row.costConversionFactor || 1;
     return (row.costPrice || 0) * qty * factor * this.getFxRate(row.costCurrency);
   }
 
   private computeRevenueBase(row: OrderItemRow): number {
-    const qty = row.quantity || 0;
+    const qty = this.effectiveQuantity(row);
     const factor = row.unitConversionFactor || 1;
     return (row.salesPrice || 0) * qty * factor * this.getFxRate(row.salesCurrency);
   }

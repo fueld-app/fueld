@@ -13,6 +13,7 @@ export interface FinancingTermsInput {
 
 export interface FinancingItemInput {
   quantity?: string | number | null;
+  deliveredQuantity?: string | number | null;
   costPrice?: string | number | null;
   costCurrency?: string | null;
   costConversionFactor?: string | number | null;
@@ -59,6 +60,13 @@ function normalizedCurrency(currency: string | null | undefined): string {
   return code || 'USD';
 }
 
+function getEffectiveQuantity(item: FinancingItemInput): number {
+  if (item.deliveredQuantity !== null && item.deliveredQuantity !== undefined) {
+    return parseNumber(item.deliveredQuantity);
+  }
+  return parseNumber(item.quantity);
+}
+
 export function getFinancingRateAnnual(settings?: TenantSettings | null): number {
   const value = settings?.financingRateAnnual;
   if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
@@ -79,7 +87,7 @@ export function getFinancingDays(input: FinancingTermsInput): number {
 }
 
 export function calculateCostBase(item: FinancingItemInput): number {
-  const quantity = parseNumber(item.quantity);
+  const quantity = getEffectiveQuantity(item);
   const costPrice = parseNumber(item.costPrice);
   const costConversionFactor = parseNumber(item.costConversionFactor) || 1;
   const costRate = getFxRate(normalizedCurrency(item.costCurrency));
@@ -87,7 +95,7 @@ export function calculateCostBase(item: FinancingItemInput): number {
 }
 
 export function calculateRevenueBase(item: FinancingItemInput): number {
-  const quantity = parseNumber(item.quantity);
+  const quantity = getEffectiveQuantity(item);
   const salesPrice = parseNumber(item.salesPrice);
   const conversionFactor = parseNumber(item.unitConversionFactor) || 1;
   const salesRate = getFxRate(normalizedCurrency(item.salesCurrency));
@@ -103,7 +111,7 @@ export function calculateLineEconomics(
   financingRateAnnual: number,
   financingDays: number,
 ): LineEconomics {
-  const quantity = parseNumber(item.quantity);
+  const quantity = getEffectiveQuantity(item);
   const costBase = calculateCostBase(item);
   const revenueBase = calculateRevenueBase(item);
   const grossProfit = revenueBase - costBase;
