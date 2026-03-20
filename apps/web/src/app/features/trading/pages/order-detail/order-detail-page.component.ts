@@ -210,7 +210,6 @@ interface PlattsSuggestionViewModel {
       [lastSaved]="lastSaved()"
     >
       <span subtitle-extra class="flex items-center gap-2">
-        <span class="text-gray-300">|</span>
         <span class="text-xs text-gray-500">Responsible:</span>
         <select
           [ngModel]="order()?.salesRepId ?? ''"
