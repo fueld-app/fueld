@@ -26,6 +26,7 @@ import { firstValueFrom } from 'rxjs';
 // ═══════════════════════════════════════════════════════════════════════
 
 import { API } from '@app/core/config/api';
+import { AuthService } from '@app/core/auth/auth.service';
 import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.service';
 
 interface TeamUserOption {
@@ -349,6 +350,18 @@ interface LliSearchResult {
               />
             </div>
 
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Responsible Trader <span class="text-gray-400 font-normal">(optional)</span></label>
+              <app-searchable-dropdown
+                [options]="responsibleFilterOptions()"
+                [selected]="newResponsibleUserId()"
+                placeholder="Select responsible trader..."
+                [clearable]="true"
+                (selectionChange)="newResponsibleUserId.set($event || '')"
+              />
+              <p class="mt-1 text-xs text-gray-500">Defaults to you if left empty. You can change Responsible later on the order detail page.</p>
+            </div>
+
             <!-- ETA/ETD date range -->
             <div class="grid grid-cols-2 gap-3">
               <div>
@@ -422,6 +435,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly auth = inject(AuthService);
   private readonly newInquiryModal = inject(NewInquiryModalService);
   private queryParamSub?: Subscription;
 
@@ -526,6 +540,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   readonly newClientId = signal('');
   readonly newVesselId = signal('');
   readonly newPlaceId = signal('');
+  readonly newResponsibleUserId = signal(this.auth.user()?.id ?? '');
   readonly newEta = signal('');
   readonly newEtd = signal('');
 
@@ -966,6 +981,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
           clientId: this.newClientId(),
           vesselId: this.newVesselId(),
           placeId: this.newPlaceId(),
+          salesRepId: this.newResponsibleUserId() || undefined,
           eta: this.newEta() || undefined,
           etd: this.newEtd() || undefined,
         }),
@@ -975,6 +991,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
         this.newClientId.set('');
         this.newVesselId.set('');
         this.newPlaceId.set('');
+        this.newResponsibleUserId.set(this.auth.user()?.id ?? '');
         this.newEta.set('');
         this.newEtd.set('');
         this.selectedClient.set(null);

@@ -184,6 +184,52 @@ describe('dashboard.service', () => {
     expect(filteredStats[0]?.traderId).toBe(traderTwo.id);
   });
 
+  it('returns team stats for credit managers across all visible traders', async () => {
+    const { tenant, client, vessel, place, user } = await seedBasics();
+    const db = await getDb();
+    const { createOrder, saveOrderItems } = await loadOrdersService();
+    const { getTeamStats } = await loadDashboardService();
+
+    await db.update(users).set({ role: 'CREDITMANAGER', updatedAt: new Date() }).where(eq(users.id, user.id));
+
+    const [traderTwo] = await db.insert(users).values({
+      tenantId: tenant.id,
+      email: 'trader.two@test.local',
+      name: 'Trader Two',
+      role: 'TRADER',
+    }).returning();
+
+    const ownOrder = await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+    });
+    await db.update(orders).set({ status: 'CONFIRMED', updatedAt: new Date() }).where(eq(orders.id, ownOrder.id));
+    await saveOrderItems(ownOrder.id, [
+      { productType: 'VLSFO', quantity: '10', unit: 'MT', salesPrice: '100', costPrice: '80' },
+    ]);
+
+    const otherOrder = await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: traderTwo.id,
+    });
+    await db.update(orders).set({ status: 'CONFIRMED', updatedAt: new Date() }).where(eq(orders.id, otherOrder.id));
+    await saveOrderItems(otherOrder.id, [
+      { productType: 'LSMGO', quantity: '20', unit: 'MT', salesPrice: '110', costPrice: '90' },
+    ]);
+
+    const stats = await getTeamStats(tenant.id, user.id);
+
+    expect(stats.length).toBe(2);
+    expect(stats.some((item) => item.traderId === user.id)).toBe(true);
+    expect(stats.some((item) => item.traderId === traderTwo.id)).toBe(true);
+  });
+
   it('includes delegated on-leave traders for non-admin users', async () => {
     const { tenant, client, vessel, place, user } = await seedBasics();
     const db = await getDb();

@@ -538,7 +538,7 @@ export async function getFollowUps(
  * Resolve which trader IDs a user is allowed to see:
  * - Always includes themselves
  * - If any on-leave user has delegated to them, include those users too
- * - Admins see all traders in the tenant
+ * - Admins and credit managers see all traders in the tenant
  */
 async function resolveVisibleTraderIds(
   tenantId: string,
@@ -551,8 +551,8 @@ async function resolveVisibleTraderIds(
 
   if (!requestingUser) return [];
 
-  // Admins see everyone
-  if (requestingUser.role === 'ADMIN') {
+  // Admins and credit managers see everyone
+  if (requestingUser.role === 'ADMIN' || requestingUser.role === 'CREDITMANAGER') {
     const allTraders = await db
       .select({ id: users.id })
       .from(users)
