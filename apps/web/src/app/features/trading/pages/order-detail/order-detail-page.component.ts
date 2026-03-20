@@ -214,8 +214,7 @@ interface PlattsSuggestionViewModel {
         <select
           [ngModel]="order()?.salesRepId ?? ''"
           (ngModelChange)="onResponsibleUserChange($event)"
-          [disabled]="isReadonly()"
-          class="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
+          class="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
         >
           <option value="">— None —</option>
           @for (u of teamUsers(); track u.id) {
