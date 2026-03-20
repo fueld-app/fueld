@@ -628,7 +628,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
         this.http.get<ApiResponse<TeamUserOption[]>>(`${API}/lloyds/users`),
       );
       if (res.success) {
-        this.teamUsers.set(res.data ?? []);
+        this.teamUsers.set(Array.isArray(res.data) ? res.data : []);
       }
     } catch {
       this.teamUsers.set([]);
