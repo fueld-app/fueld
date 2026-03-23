@@ -292,6 +292,7 @@ export interface PlaceSearchResult {
   latitude: number | null;
   longitude: number | null;
   unlocode?: string;
+  parentPlaceUnlocode?: string;
   admiraltyChart?: string;
   parentPlaceId?: string;
   parentPlaceName?: string;
@@ -318,6 +319,7 @@ export async function searchPlaces(query: {
         ilike(places.name, `%${term}%`),
         ilike(places.unlocode, `%${term}%`),
         sql`lower(replace(${places.unlocode}, ' ', '')) LIKE lower(${'%' + term.replace(/\s+/g, '') + '%'})`,
+        sql`lower((SELECT replace(p2.unlocode, ' ', '') FROM places p2 WHERE p2.id = ${places.parentPlaceId})) LIKE lower(${'%' + term.replace(/\s+/g, '') + '%'})`,
       )!,
     );
   }
@@ -325,7 +327,22 @@ export async function searchPlaces(query: {
 
   if (conditions.length > 0) {
     const localResults = await db
-      .select()
+      .select({
+        id: places.id,
+        lliPlaceId: places.lliPlaceId,
+        name: places.name,
+        country: places.country,
+        countryIso: places.countryIso,
+        area: places.area,
+        placeType: places.placeType,
+        lat: places.lat,
+        long: places.long,
+        unlocode: places.unlocode,
+        admiraltyChart: places.admiraltyChart,
+        parentPlaceId: places.parentPlaceId,
+        parentPlaceName: places.parentPlaceName,
+        parentPlaceUnlocode: sql<string | null>`(SELECT p2.unlocode FROM places p2 WHERE p2.id = ${places.parentPlaceId})`.as('parent_place_unlocode'),
+      })
       .from(places)
       .where(conditions.length === 1 ? conditions[0] : or(...conditions))
       .limit(50);
@@ -343,6 +360,8 @@ export async function searchPlaces(query: {
         latitude: p.lat,
         longitude: p.long,
         unlocode: p.unlocode ?? undefined,
+        parentPlaceUnlocode: p.parentPlaceUnlocode ?? undefined,
+        parentPlaceId: p.parentPlaceId ?? undefined,
         admiraltyChart: p.admiraltyChart ?? undefined,
         parentPlaceName: p.parentPlaceName ?? undefined,
       });
@@ -479,6 +498,7 @@ export async function listPlaces(query?: {
         ilike(places.name, `%${term}%`),
         ilike(places.unlocode, `%${term}%`),
         sql`lower(replace(${places.unlocode}, ' ', '')) LIKE lower(${'%' + term.replace(/\s+/g, '') + '%'})`,
+        sql`lower((SELECT replace(p2.unlocode, ' ', '') FROM places p2 WHERE p2.id = ${places.parentPlaceId})) LIKE lower(${'%' + term.replace(/\s+/g, '') + '%'})`,
       )!,
     );
   }
@@ -529,6 +549,7 @@ export async function listPlaces(query?: {
         admiraltyChart: places.admiraltyChart,
         parentPlaceId: places.parentPlaceId,
         parentPlaceName: places.parentPlaceName,
+        parentPlaceUnlocode: sql<string | null>`(SELECT p2.unlocode FROM places p2 WHERE p2.id = ${places.parentPlaceId})`.as('parent_place_unlocode'),
         responsibleUserId: places.responsibleUserId,
         responsibleUserName: responsibleUser.name,
         lliLastUpdated: places.lliLastUpdated,

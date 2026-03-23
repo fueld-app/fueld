@@ -184,6 +184,7 @@ interface LocalPlaceOption {
   id: string;
   name: string;
   unlocode?: string | null;
+  parentPlaceUnlocode?: string | null;
   country: string | null;
   source?: 'local' | 'lloyds';
   lliPlaceId?: string;
@@ -195,6 +196,7 @@ interface SupplyPlaceSearchResult {
   lliPlaceId?: string;
   name: string;
   unlocode?: string | null;
+  parentPlaceUnlocode?: string | null;
   country?: string | null;
 }
 
@@ -1415,8 +1417,8 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                           <div class="flex items-center justify-between rounded-md border border-brand-300 bg-brand-50 px-3 py-2 text-sm">
                             <div>
                               <span class="font-medium text-brand-800">{{ selectedSupplyPlace()!.name }}</span>
-                              @if (selectedSupplyPlace()!.unlocode) {
-                                <div class="mt-0.5 text-[11px] font-medium uppercase tracking-[0.12em] text-brand-700/80">{{ selectedSupplyPlace()!.unlocode!.replaceAll(' ', '') }}</div>
+                              @if (selectedSupplyPlace()!.unlocode || selectedSupplyPlace()!.parentPlaceUnlocode) {
+                                <div class="mt-0.5 text-[11px] font-medium uppercase tracking-[0.12em] text-brand-700/80">{{ (selectedSupplyPlace()!.unlocode ?? selectedSupplyPlace()!.parentPlaceUnlocode)!.replaceAll(' ', '') }}</div>
                               }
                               @if (selectedSupplyPlace()!.country) {
                                 <span class="ml-1 text-xs text-brand-700/80">{{ selectedSupplyPlace()!.country }}</span>
@@ -1458,8 +1460,8 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                                         <span class="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">Seasearcher</span>
                                       }
                                     </div>
-                                    @if (place.unlocode) {
-                                      <div class="text-[11px] font-medium uppercase tracking-[0.12em] text-gray-500">{{ place.unlocode.replaceAll(' ', '') }}</div>
+                                    @if (place.unlocode || place.parentPlaceUnlocode) {
+                                      <div class="text-[11px] font-medium uppercase tracking-[0.12em] text-gray-500">{{ (place.unlocode ?? place.parentPlaceUnlocode)!.replaceAll(' ', '') }}</div>
                                     }
                                     @if (place.source === 'lloyds') {
                                       <div class="text-[11px] text-gray-400">Import this place and add it as a supply port</div>
