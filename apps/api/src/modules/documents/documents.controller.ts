@@ -1,5 +1,5 @@
 import { Elysia, t } from 'elysia';
-import { eq, and, desc, inArray } from 'drizzle-orm';
+import { eq, and, desc, inArray, isNull } from 'drizzle-orm';
 import { authGuard } from '../auth/auth.guard';
 import { generateNominationPdfBuffer, generateOrderInvoicePdfBuffer, generateOfferPdfBuffer, generateProformaInvoicePdfBuffer, tryLoadLogoDataUrl, formatCustomerPaymentTerms } from './document.service';
 import { sendDocumentEmail, buildDocumentEmailHtml, buildDocumentEmailSubject, buildInquiryEmailHtml, type DocumentEmailType } from './mail.service';
@@ -716,7 +716,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             counterpartyId: companyContacts.counterpartyId,
           })
           .from(companyContacts)
-          .where(inArray(companyContacts.counterpartyId, [...companyIds])),
+          .where(and(inArray(companyContacts.counterpartyId, [...companyIds]), isNull(companyContacts.deletedAt))),
         db
           .select({
             id: companyEmails.id,
@@ -823,7 +823,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
               phone: companyContacts.phone,
             })
             .from(companyContacts)
-            .where(inArray(companyContacts.counterpartyId, supplierCompanyIds)),
+            .where(and(inArray(companyContacts.counterpartyId, supplierCompanyIds), isNull(companyContacts.deletedAt))),
         ]);
       }
 

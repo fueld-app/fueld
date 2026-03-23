@@ -52,6 +52,13 @@
       "breakpoints": true
     },
     {
+      "idx": 62,
+      "version": "7",
+      "when": 1774200000000,
+      "tag": "0062_company_contact_sync_overrides",
+      "breakpoints": true
+    },
+    {
       "idx": 7,
       "version": "7",
       "when": 1771200003000,

@@ -1177,6 +1177,8 @@ export const companyContacts = pgTable('company_contacts', {
   email: text('email'),
   notes: text('notes'),
   source: text('source').notNull().default('manual'), // 'manual' | 'seasearcher'
+  seasearcherPersonId: integer('seasearcher_person_id'),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

@@ -2,7 +2,7 @@
 //  Company Service — CRUD + Seasearcher sync for counterparties
 // ═══════════════════════════════════════════════════════════════════════
 
-import { eq, ilike, or, and, sql, asc, desc } from 'drizzle-orm';
+import { eq, ilike, or, and, sql, asc, desc, inArray, isNull } from 'drizzle-orm';
 import { db } from '../../db';
 import { counterparties, companyContacts, companyEmails, companyOffices, orders, vessels, places, users, vesselCompanies, customerPayments, creditApplications } from '../../db/schema';
 import type { CompanyEmailType } from '@fueld/types';
@@ -18,6 +18,16 @@ import {
 function isMissingCompanyRegistrationColumnError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   return /company_registration_number/i.test(error.message);
+}
+
+function buildSeasearcherContactFingerprint(contact: {
+  name?: string | null;
+  role?: string | null;
+  email?: string | null;
+}): string {
+  return [contact.name, contact.role, contact.email]
+    .map((value) => (value ?? '').trim().toLowerCase())
+    .join('|');
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -47,6 +57,7 @@ interface SeasearcherCompanyOffice {
   emailAddress: string | null;
   webAddress: string | null;
   personnel?: Array<{
+    personId: number;
     name: string;
     jobTitle: string;
   }>;
@@ -191,7 +202,7 @@ export async function listCompanies(query?: {
         isSanctioned: counterparties.isSanctioned,
         responsibleUserId: counterparties.responsibleUserId,
         responsibleUserName: users.name,
-        contactsCount: sql<number>`(SELECT count(*)::int FROM company_contacts cc WHERE cc.counterparty_id = ${counterparties.id})`,
+        contactsCount: sql<number>`(SELECT count(*)::int FROM company_contacts cc WHERE cc.counterparty_id = ${counterparties.id} AND cc.deleted_at IS NULL)`,
         parentId: counterparties.parentId,
         parentName: sql<string | null>`(SELECT c2.name FROM counterparties c2 WHERE c2.id = ${counterparties.parentId})`.as('parent_name'),
         segments: counterparties.segments,
@@ -950,7 +961,7 @@ export async function getCompanyContacts(counterpartyId: string) {
   return db
     .select()
     .from(companyContacts)
-    .where(eq(companyContacts.counterpartyId, counterpartyId))
+    .where(and(eq(companyContacts.counterpartyId, counterpartyId), isNull(companyContacts.deletedAt)))
     .orderBy(sql`${companyContacts.source} asc, ${companyContacts.name} asc`);
 }
 
@@ -978,10 +989,23 @@ export async function updateCompanyContact(
   contactId: string,
   data: { name?: string; role?: string; phone?: string; fax?: string; email?: string; notes?: string },
 ) {
+  const [current] = await db
+    .select({
+      id: companyContacts.id,
+      source: companyContacts.source,
+      seasearcherPersonId: companyContacts.seasearcherPersonId,
+    })
+    .from(companyContacts)
+    .where(eq(companyContacts.id, contactId))
+    .limit(1);
+  if (!current) return null;
+
   const [updated] = await db
     .update(companyContacts)
     .set({
       ...data,
+      ...(current.source === 'seasearcher' || current.seasearcherPersonId !== null ? { source: 'manual' } : {}),
+      deletedAt: null,
       updatedAt: new Date(),
     })
     .where(eq(companyContacts.id, contactId))
@@ -990,28 +1014,56 @@ export async function updateCompanyContact(
 }
 
 export async function deleteCompanyContact(contactId: string) {
+  const [current] = await db
+    .select({
+      id: companyContacts.id,
+      source: companyContacts.source,
+      seasearcherPersonId: companyContacts.seasearcherPersonId,
+    })
+    .from(companyContacts)
+    .where(eq(companyContacts.id, contactId))
+    .limit(1);
+  if (!current) return;
+
+  if (current.source === 'seasearcher' || current.seasearcherPersonId !== null) {
+    await db
+      .update(companyContacts)
+      .set({
+        deletedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(companyContacts.id, contactId));
+    return;
+  }
+
   await db.delete(companyContacts).where(eq(companyContacts.id, contactId));
 }
 
 /**
  * Sync contacts from Seasearcher enrichment data into the company_contacts table.
- * Replaces all 'seasearcher'-sourced contacts; manual contacts are preserved.
+ * Upserts synced contacts by personId, preserves manual overrides, and keeps
+ * deleted synced contacts hidden on future syncs.
  */
 export async function syncContactsFromSeasearcher(
   counterpartyId: string,
   headOffice: SeasearcherCompanyOffice | null,
 ) {
-  // Delete existing seasearcher-sourced contacts
-  await db
-    .delete(companyContacts)
-    .where(
-      and(
-        eq(companyContacts.counterpartyId, counterpartyId),
-        eq(companyContacts.source, 'seasearcher'),
-      ),
-    );
-
-  if (!headOffice?.personnel?.length) return;
+  if (!headOffice?.personnel?.length) {
+    await db
+      .update(companyContacts)
+      .set({
+        deletedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(companyContacts.counterpartyId, counterpartyId),
+          eq(companyContacts.source, 'seasearcher'),
+          isNull(companyContacts.deletedAt),
+        ),
+      );
+    return;
+  }
 
   // Build phone string from head office
   const phone = headOffice.telephoneNumbers?.length
@@ -1026,19 +1078,91 @@ export async function syncContactsFromSeasearcher(
         .join(', ')
     : null;
 
-  // Insert each contact person
-  const values = headOffice.personnel.map((c) => ({
-    counterpartyId,
-    name: c.name,
-    role: c.jobTitle || null,
-    phone,
-    fax,
-    email: headOffice.emailAddress ?? null,
-    source: 'seasearcher' as const,
-  }));
+  const existingContacts = await db
+    .select({
+      id: companyContacts.id,
+      source: companyContacts.source,
+      name: companyContacts.name,
+      role: companyContacts.role,
+      email: companyContacts.email,
+      seasearcherPersonId: companyContacts.seasearcherPersonId,
+      deletedAt: companyContacts.deletedAt,
+    })
+    .from(companyContacts)
+    .where(eq(companyContacts.counterpartyId, counterpartyId));
 
-  if (values.length) {
-    await db.insert(companyContacts).values(values);
+  const existingByPersonId = new Map<number, (typeof existingContacts)[number]>();
+  const legacyByFingerprint = new Map<string, (typeof existingContacts)[number]>();
+  for (const existing of existingContacts) {
+    if (existing.seasearcherPersonId !== null) {
+      existingByPersonId.set(existing.seasearcherPersonId, existing);
+      continue;
+    }
+    if (existing.source === 'seasearcher' && existing.deletedAt === null) {
+      legacyByFingerprint.set(buildSeasearcherContactFingerprint(existing), existing);
+    }
+  }
+
+  const seenPersonIds = new Set<number>();
+  for (const person of headOffice.personnel) {
+    seenPersonIds.add(person.personId);
+
+    const nextValues = {
+      name: person.name,
+      role: person.jobTitle || null,
+      phone,
+      fax,
+      email: headOffice.emailAddress ?? null,
+      seasearcherPersonId: person.personId,
+      deletedAt: null,
+      updatedAt: new Date(),
+    };
+    const existing = existingByPersonId.get(person.personId)
+      ?? legacyByFingerprint.get(buildSeasearcherContactFingerprint(nextValues));
+
+    if (existing) {
+      if (existing.deletedAt !== null) continue;
+
+      if (existing.source === 'manual') {
+        if (existing.seasearcherPersonId === null) {
+          await db
+            .update(companyContacts)
+            .set({ seasearcherPersonId: person.personId, updatedAt: new Date() })
+            .where(eq(companyContacts.id, existing.id));
+        }
+        continue;
+      }
+
+      await db
+        .update(companyContacts)
+        .set({
+          ...nextValues,
+          source: 'seasearcher',
+        })
+        .where(eq(companyContacts.id, existing.id));
+      continue;
+    }
+
+    await db.insert(companyContacts).values({
+      counterpartyId,
+      source: 'seasearcher',
+      ...nextValues,
+    });
+  }
+
+  const staleSyncedIds = existingContacts
+    .filter((contact) => contact.source === 'seasearcher' && contact.deletedAt === null)
+    .filter((contact) => contact.seasearcherPersonId !== null && !seenPersonIds.has(contact.seasearcherPersonId))
+    .map((contact) => contact.id);
+
+  if (staleSyncedIds.length) {
+    await db
+      .update(companyContacts)
+      .set({
+        deletedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(inArray(companyContacts.id, staleSyncedIds));
   }
 }
 
