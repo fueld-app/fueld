@@ -4,7 +4,7 @@
 
 import { eq, ilike, or, and, sql, asc, desc, inArray, isNull } from 'drizzle-orm';
 import { db } from '../../db';
-import { counterparties, companyContacts, companyEmails, companyOffices, orders, vessels, places, users, vesselCompanies, customerPayments, creditApplications } from '../../db/schema';
+import { counterparties, companyAttachments, companyContacts, companyEmails, companyOffices, orders, vessels, places, users, vesselCompanies, customerPayments, creditApplications } from '../../db/schema';
 import type { CompanyEmailType } from '@fueld/types';
 import {
   seasearcherCompanyDetail,
@@ -1329,6 +1329,74 @@ export async function deleteCompanyOffice(id: string) {
     .delete(companyOffices)
     .where(eq(companyOffices.id, id))
     .returning({ id: companyOffices.id, city: companyOffices.city });
+  return deleted ?? null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Company Attachments
+// ═══════════════════════════════════════════════════════════════════════
+
+export async function getCompanyAttachments(counterpartyId: string) {
+  const rows = await db
+    .select({
+      id: companyAttachments.id,
+      counterpartyId: companyAttachments.counterpartyId,
+      fileName: companyAttachments.fileName,
+      filePath: companyAttachments.filePath,
+      mimeType: companyAttachments.mimeType,
+      fileSize: companyAttachments.fileSize,
+      uploadedBy: companyAttachments.uploadedBy,
+      createdAt: companyAttachments.createdAt,
+    })
+    .from(companyAttachments)
+    .where(eq(companyAttachments.counterpartyId, counterpartyId))
+    .orderBy(desc(companyAttachments.createdAt));
+
+  return rows.map((row) => ({
+    ...row,
+    createdAt: row.createdAt.toISOString(),
+  }));
+}
+
+export async function createCompanyAttachment(input: {
+  counterpartyId: string;
+  fileName: string;
+  filePath: string;
+  mimeType: string;
+  fileSize: number;
+  uploadedBy?: string | null;
+}) {
+  const [created] = await db
+    .insert(companyAttachments)
+    .values({
+      counterpartyId: input.counterpartyId,
+      fileName: input.fileName,
+      filePath: input.filePath,
+      mimeType: input.mimeType,
+      fileSize: input.fileSize,
+      uploadedBy: input.uploadedBy ?? null,
+    })
+    .returning();
+
+  if (!created) return null;
+
+  return {
+    ...created,
+    createdAt: created.createdAt.toISOString(),
+  };
+}
+
+export async function deleteCompanyAttachment(id: string) {
+  const [deleted] = await db
+    .delete(companyAttachments)
+    .where(eq(companyAttachments.id, id))
+    .returning({
+      id: companyAttachments.id,
+      counterpartyId: companyAttachments.counterpartyId,
+      fileName: companyAttachments.fileName,
+      filePath: companyAttachments.filePath,
+    });
+
   return deleted ?? null;
 }
 

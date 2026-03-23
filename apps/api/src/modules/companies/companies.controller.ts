@@ -43,6 +43,9 @@ import {
   createCompanyContact,
   updateCompanyContact,
   deleteCompanyContact,
+  getCompanyAttachments,
+  createCompanyAttachment,
+  deleteCompanyAttachment,
   getCompanyEmails,
   addCompanyEmail,
   updateCompanyEmail,
@@ -719,6 +722,113 @@ export const companiesController = new Elysia({ prefix: '/companies' })
       detail: {
         tags: ['Companies'],
         summary: 'Get ports/places where this company is a supplier',
+      },
+    },
+  )
+
+  // ─── Company Attachments ─────────────────────────────────────────
+  .get(
+    '/local/:id/attachments',
+    async ({ params }) => {
+      try {
+        const attachments = await getCompanyAttachments(params.id);
+        return { success: true, data: attachments } satisfies ApiResponse<typeof attachments>;
+      } catch (err) {
+        console.error('[Companies] Failed to load attachments:', err);
+        return { success: false, data: [], message: 'Failed to load attachments' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: {
+        tags: ['Companies'],
+        summary: 'List attachments for a company',
+      },
+    },
+  )
+  .post(
+    '/local/:id/attachments',
+    async ({ params, body, auth }) => {
+      try {
+        const file = body.file;
+        const ext = (file.name.split('.').pop() ?? '').toLowerCase();
+        const allowedExtensions = new Set(['pdf', 'xls', 'xlsx', 'csv', 'png', 'jpg', 'jpeg', 'gif', 'webp']);
+
+        if (!allowedExtensions.has(ext)) {
+          return { success: false, data: null, message: 'Only PDF, XLS, XLSX, CSV or image files are allowed' };
+        }
+        if (file.size > 10 * 1024 * 1024) {
+          return { success: false, data: null, message: 'Attachment must be under 10 MB' };
+        }
+
+        const filename = `${params.id}-${crypto.randomUUID()}.${ext}`;
+        const { join } = await import('path');
+        const { mkdir } = await import('fs/promises');
+        const dir = join(process.cwd(), 'uploads/attachments');
+        await mkdir(dir, { recursive: true });
+        await Bun.write(join(dir, filename), file);
+
+        const record = await createCompanyAttachment({
+          counterpartyId: params.id,
+          fileName: file.name,
+          filePath: `/uploads/attachments/${filename}`,
+          mimeType: file.type || 'application/octet-stream',
+          fileSize: file.size,
+          uploadedBy: auth.sub,
+        });
+
+        if (!record) {
+          return { success: false, data: null, message: 'Failed to save attachment' };
+        }
+
+        return { success: true, data: record } satisfies ApiResponse<typeof record>;
+      } catch (err) {
+        console.error('[Companies] Upload attachment failed:', err);
+        return { success: false, data: null, message: 'Failed to upload attachment' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({
+        file: t.File(),
+      }),
+      detail: {
+        tags: ['Companies'],
+        summary: 'Upload an attachment for a company',
+      },
+    },
+  )
+  .delete(
+    '/attachments/:attachmentId',
+    async ({ params }) => {
+      try {
+        const deleted = await deleteCompanyAttachment(params.attachmentId);
+        if (!deleted) {
+          return { success: false, data: null, message: 'Attachment not found' };
+        }
+
+        try {
+          const { join } = await import('path');
+          const { unlink } = await import('fs/promises');
+          const prefix = '/uploads/attachments/';
+          if (deleted.filePath.startsWith(prefix)) {
+            await unlink(join(process.cwd(), 'uploads/attachments', deleted.filePath.slice(prefix.length)));
+          }
+        } catch {
+          // File may already be absent on disk; keep the database delete.
+        }
+
+        return { success: true, data: deleted } satisfies ApiResponse<typeof deleted>;
+      } catch (err) {
+        console.error('[Companies] Delete attachment failed:', err);
+        return { success: false, data: null, message: 'Failed to delete attachment' };
+      }
+    },
+    {
+      params: t.Object({ attachmentId: t.String() }),
+      detail: {
+        tags: ['Companies'],
+        summary: 'Delete a company attachment',
       },
     },
   )

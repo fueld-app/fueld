@@ -1220,6 +1220,21 @@ export const companyOffices = pgTable('company_offices', {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
+//  COMPANY ATTACHMENTS
+// ═══════════════════════════════════════════════════════════════════════
+
+export const companyAttachments = pgTable('company_attachments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  counterpartyId: uuid('counterparty_id').notNull().references(() => counterparties.id, { onDelete: 'cascade' }),
+  fileName: text('file_name').notNull(),
+  filePath: text('file_path').notNull(),
+  mimeType: text('mime_type').notNull(),
+  fileSize: integer('file_size').notNull(),
+  uploadedBy: uuid('uploaded_by').references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ═══════════════════════════════════════════════════════════════════════
 //  ENTITY COMMENTS (polymorphic — place, company, order, vessel)
 // ═══════════════════════════════════════════════════════════════════════
 

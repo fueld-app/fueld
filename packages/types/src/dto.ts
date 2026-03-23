@@ -1037,6 +1037,17 @@ export interface OrderAttachmentDto {
   createdAt: string;
 }
 
+export interface CompanyAttachmentDto {
+  id: string;
+  counterpartyId: string;
+  fileName: string;
+  filePath: string;
+  mimeType: string;
+  fileSize: number;
+  uploadedBy: string | null;
+  createdAt: string;
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  INVOICE
 // ═══════════════════════════════════════════════════════════════════════
