@@ -360,6 +360,7 @@ export interface SupplyPortDto {
   id: string;
   placeId: string;
   placeName: string;
+  placeCode: string | null;
   placeCountry: string | null;
   products: string[];
   note: string | null;

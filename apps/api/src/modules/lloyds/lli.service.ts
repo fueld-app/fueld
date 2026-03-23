@@ -1317,6 +1317,7 @@ export async function getSupplyPortsForCompany(companyId: string) {
       id: portSuppliers.id,
       placeId: portSuppliers.placeId,
       placeName: places.name,
+      placeCode: places.unlocode,
       placeCountry: places.country,
       products: portSuppliers.products,
       note: portSuppliers.note,

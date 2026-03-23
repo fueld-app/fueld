@@ -1554,7 +1554,12 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                     @for (sp of supplyPorts(); track sp.id) {
                       <div class="px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors">
                         <div class="flex items-center justify-between">
-                          <a [routerLink]="['/places', sp.placeId]" class="font-medium text-brand-700 hover:text-brand-900 hover:underline">{{ sp.placeName }}</a>
+                          <div class="min-w-0">
+                            <a [routerLink]="['/places', sp.placeId]" class="font-medium text-brand-700 hover:text-brand-900 hover:underline">{{ sp.placeName }}</a>
+                            @if (sp.placeCode) {
+                              <div class="mt-0.5 text-[11px] font-medium uppercase tracking-[0.12em] text-gray-400">{{ sp.placeCode.replaceAll(' ', '') }}</div>
+                            }
+                          </div>
                           @if (sp.placeCountry) {
                             <span class="inline-flex items-center gap-1.5 text-xs text-gray-500">
                               @if (placeCountryFlag(sp.placeCountry)) {
