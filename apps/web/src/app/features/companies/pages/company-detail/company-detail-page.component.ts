@@ -1560,7 +1560,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 } @else if (!supplyPorts().length) {
                   <div class="px-5 py-6 text-center text-sm text-gray-400">No supply ports added for this company</div>
                 } @else {
-                  <div class="divide-y divide-gray-50 max-h-[300px] overflow-y-auto">
+                  <div class="divide-y divide-gray-50 max-h-[420px] overflow-y-auto pb-2">
                     @for (sp of supplyPorts(); track sp.id) {
                       <div class="px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors">
                         <div class="flex items-center justify-between">
@@ -1570,15 +1570,33 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                               <div class="mt-0.5 text-[11px] font-medium uppercase tracking-[0.12em] text-gray-400">{{ sp.placeCode.replaceAll(' ', '') }}</div>
                             }
                           </div>
-                          @if (sp.placeCountry) {
-                            <span class="inline-flex items-center gap-1.5 text-xs text-gray-500">
-                              @if (placeCountryFlag(sp.placeCountry)) {
-                                <span>{{ placeCountryFlag(sp.placeCountry) }}</span>
-                              }
-                              <span>{{ placeCountryLabel(sp.placeCountry) }}</span>
-                            </span>
-                          }
+                          <div class="ml-3 flex items-start gap-2">
+                            @if (sp.placeCountry) {
+                              <span class="inline-flex items-center gap-1.5 text-xs text-gray-500 whitespace-nowrap">
+                                @if (placeCountryFlag(sp.placeCountry)) {
+                                  <span>{{ placeCountryFlag(sp.placeCountry) }}</span>
+                                }
+                                <span>{{ placeCountryLabel(sp.placeCountry) }}</span>
+                              </span>
+                            }
+                            <div class="flex items-center gap-0.5 shrink-0">
+                              <button (click)="openEditSupplyPort(sp)" class="rounded-md p-1 text-gray-400 hover:text-brand-600 transition-colors" title="Edit supply location">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
+                                  <path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" />
+                                </svg>
+                              </button>
+                              <button (click)="confirmDeleteSupplyPort(sp)" class="rounded-md p-1 text-gray-400 hover:text-red-500 transition-colors" title="Delete supply location">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
                         </div>
+                        @if (sp.contactName) {
+                          <div class="mt-1 text-xs text-gray-500">Contact: {{ sp.contactName }}</div>
+                        }
                         @if (sp.products && sp.products.length) {
                           <div class="flex flex-wrap gap-1 mt-1">
                             @for (prod of sp.products; track prod) {
@@ -1594,6 +1612,23 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                   </div>
                 }
               </div>
+
+            @if (deleteSupplyPortTarget()) {
+              <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" (click)="deleteSupplyPortTarget.set(null)">
+                <div class="rounded-xl bg-white p-6 shadow-xl max-w-sm mx-4" (click)="$event.stopPropagation()">
+                  <h3 class="text-lg font-semibold text-gray-900">Delete supply location?</h3>
+                  <p class="mt-2 text-sm text-gray-500">
+                    Are you sure you want to remove <strong>{{ deleteSupplyPortTarget()!.placeName }}</strong> from this company's supply locations?
+                  </p>
+                  <div class="mt-4 flex justify-end gap-2">
+                    <button (click)="deleteSupplyPortTarget.set(null)"
+                      class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+                    <button (click)="executeDeleteSupplyPort()"
+                      class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">Delete</button>
+                  </div>
+                </div>
+              </div>
+            }
 
             <!-- Company Segments -->
             @if (segmentCategories().length > 0) {
