@@ -125,7 +125,7 @@ describe('company.service local flows', () => {
       emailAddress: 'office@test.co',
       webAddress: 'https://office.test.co',
       personnel: [
-        { name: 'Sea Contact', jobTitle: 'Ops' },
+        { personId: 1, name: 'Sea Contact', jobTitle: 'Ops' },
       ],
     });
 
