@@ -362,9 +362,12 @@ export interface SupplyPortDto {
   placeName: string;
   placeCode: string | null;
   placeCountry: string | null;
+  contactId: string | null;
+  contactName: string | null;
   products: string[];
   note: string | null;
   createdAt: string;
+  updatedAt: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════════

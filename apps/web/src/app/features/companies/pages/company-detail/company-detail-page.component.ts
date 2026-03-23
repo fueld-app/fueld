@@ -1425,15 +1425,17 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                                 <span class="ml-2 inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">Imported from Seasearcher</span>
                               }
                             </div>
-                            <button
-                              type="button"
-                              (click)="clearSelectedSupplyPlace()"
-                              class="ml-2 text-brand-400 hover:text-brand-600 transition-colors"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-                              </svg>
-                            </button>
+                            @if (!editingSupplyPortId()) {
+                              <button
+                                type="button"
+                                (click)="clearSelectedSupplyPlace()"
+                                class="ml-2 text-brand-400 hover:text-brand-600 transition-colors"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                </svg>
+                              </button>
+                            }
                           </div>
                         } @else {
                           <input
@@ -1542,7 +1544,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                           [disabled]="savingSupplyPort() || !selectedSupplyPlace()"
                           class="rounded-md bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
                         >
-                          {{ savingSupplyPort() ? 'Adding...' : 'Add' }}
+                          {{ savingSupplyPort() ? (editingSupplyPortId() ? 'Saving...' : 'Adding...') : (editingSupplyPortId() ? 'Save' : 'Add') }}
                         </button>
                       </div>
                     </div>
@@ -2921,6 +2923,8 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly supplyPorts = signal<SupplyPortDto[]>([]);
   readonly supplyPortsLoading = signal(false);
   readonly showAddSupplyPort = signal(false);
+  readonly editingSupplyPortId = signal<string | null>(null);
+  readonly deleteSupplyPortTarget = signal<SupplyPortDto | null>(null);
   readonly supplyPlaceSearch = signal('');
   readonly supplyPlaceResults = signal<LocalPlaceOption[]>([]);
   readonly selectedSupplyPlace = signal<LocalPlaceOption | null>(null);
@@ -4292,6 +4296,8 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   }
 
   openAddSupplyPort(): void {
+    this.editingSupplyPortId.set(null);
+    this.deleteSupplyPortTarget.set(null);
     this.showAddSupplyPort.set(true);
     this.selectedSupplyPlace.set(null);
     this.supplyPlaceSearch.set('');
@@ -4300,11 +4306,61 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   }
 
   cancelAddSupplyPort(): void {
+    this.editingSupplyPortId.set(null);
     this.showAddSupplyPort.set(false);
     this.selectedSupplyPlace.set(null);
     this.supplyPlaceSearch.set('');
     this.supplyPlaceResults.set([]);
     this.supplyPortForm.set({ placeId: '', contactId: null, products: [], note: '' });
+  }
+  
+  openEditSupplyPort(supplyPort: SupplyPortDto): void {
+    this.editingSupplyPortId.set(supplyPort.id);
+    this.deleteSupplyPortTarget.set(null);
+    this.showAddSupplyPort.set(true);
+    this.selectedSupplyPlace.set({
+      id: supplyPort.placeId,
+      name: supplyPort.placeName,
+      unlocode: supplyPort.placeCode,
+      country: supplyPort.placeCountry,
+    });
+    this.supplyPlaceSearch.set('');
+    this.supplyPlaceResults.set([]);
+    this.supplyPortForm.set({
+      placeId: supplyPort.placeId,
+      contactId: supplyPort.contactId,
+      products: [...supplyPort.products],
+      note: supplyPort.note ?? '',
+    });
+  }
+  
+  confirmDeleteSupplyPort(supplyPort: SupplyPortDto): void {
+    this.deleteSupplyPortTarget.set(supplyPort);
+  }
+  
+  async executeDeleteSupplyPort(): Promise<void> {
+    const target = this.deleteSupplyPortTarget();
+    const companyId = this.company()?.id;
+    if (!target || !companyId) return;
+  
+    try {
+      const res = await firstValueFrom(
+        this.http.delete<ApiResponse<{ id: string }>>(`${API}/lloyds/places/suppliers/${target.id}`),
+      );
+      if (!res.success) {
+        this.showToast('error', res.message ?? 'Failed to delete supply location.');
+        return;
+      }
+      if (this.editingSupplyPortId() === target.id) {
+        this.cancelAddSupplyPort();
+      }
+      this.deleteSupplyPortTarget.set(null);
+      this.showToast('success', `Removed ${target.placeName} from supply locations.`);
+      await this.loadSupplyPorts(companyId);
+    } catch (err) {
+      console.error('Failed to delete supply location:', err);
+      this.showToast('error', 'Failed to delete supply location.');
+    }
   }
 
   onSupplyPlaceSearch(term: string): void {
@@ -4417,26 +4473,37 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
 
     this.savingSupplyPort.set(true);
     try {
-      const res = await firstValueFrom(
-        this.http.post<ApiResponse<unknown>>(`${API}/lloyds/places/local/${form.placeId}/suppliers`, {
-          companyId,
-          contactId: form.contactId,
-          products: form.products,
-          note: form.note.trim() || undefined,
-        }),
-      );
+      const editingSupplyPortId = this.editingSupplyPortId();
+      const res = editingSupplyPortId
+        ? await firstValueFrom(
+            this.http.put<ApiResponse<unknown>>(`${API}/lloyds/places/suppliers/${editingSupplyPortId}`, {
+              contactId: form.contactId,
+              products: form.products,
+              note: form.note.trim() || undefined,
+            }),
+          )
+        : await firstValueFrom(
+            this.http.post<ApiResponse<unknown>>(`${API}/lloyds/places/local/${form.placeId}/suppliers`, {
+              companyId,
+              contactId: form.contactId,
+              products: form.products,
+              note: form.note.trim() || undefined,
+            }),
+          );
 
       if (!res.success) {
-        this.showToast('error', res.message ?? 'Failed to add supply port.');
+        this.showToast('error', res.message ?? `Failed to ${editingSupplyPortId ? 'update' : 'add'} supply port.`);
         return;
       }
 
-      this.showToast('success', `Added ${selectedPlace.name} to supply ports.`);
+      this.showToast('success', editingSupplyPortId
+        ? `Updated ${selectedPlace.name} supply location.`
+        : `Added ${selectedPlace.name} to supply ports.`);
       this.cancelAddSupplyPort();
       await this.loadSupplyPorts(companyId);
     } catch (err) {
-      console.error('Failed to add supply port:', err);
-      this.showToast('error', 'Failed to add supply port.');
+      console.error('Failed to save supply port:', err);
+      this.showToast('error', 'Failed to save supply port.');
     } finally {
       this.savingSupplyPort.set(false);
     }

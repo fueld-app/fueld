@@ -1340,12 +1340,16 @@ export async function getSupplyPortsForCompany(companyId: string) {
       placeName: places.name,
       placeCode: places.unlocode,
       placeCountry: places.country,
+      contactId: portSuppliers.contactId,
+      contactName: companyContacts.name,
       products: portSuppliers.products,
       note: portSuppliers.note,
       createdAt: portSuppliers.createdAt,
+      updatedAt: portSuppliers.updatedAt,
     })
     .from(portSuppliers)
     .innerJoin(places, eq(portSuppliers.placeId, places.id))
+    .leftJoin(companyContacts, eq(portSuppliers.contactId, companyContacts.id))
     .where(eq(portSuppliers.companyId, companyId))
     .orderBy(places.name);
 }
