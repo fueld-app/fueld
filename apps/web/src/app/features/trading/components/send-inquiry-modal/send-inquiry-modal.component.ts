@@ -747,6 +747,8 @@ export class SendInquiryModalComponent {
   private readonly sanitizer = inject(DomSanitizer);
 
   readonly orderId = input.required<string>();
+  readonly senderName = input<string>('Fueld User');
+  readonly companyName = input<string>('Fueld');
   readonly placeId = input<string>('');
   readonly portName = input<string>('');
   readonly waLinked = input(false);
@@ -788,6 +790,7 @@ export class SendInquiryModalComponent {
     const vesselName = this.vesselName().trim() || 'Vessel';
     const vesselImo = this.vesselImo()?.trim() || null;
     const vesselLabel = vesselImo ? `${vesselName} (IMO: ${vesselImo})` : vesselName;
+    const companyName = this.companyName().trim() || 'Fueld';
     const deliveryLabel = this.deliveryWindowLabel();
     const responseLabel = this.responseDeadlineLabel();
     const itemLines = this.items().map((item) => {
@@ -798,7 +801,6 @@ export class SendInquiryModalComponent {
     });
 
     return [
-      `*RFQ*`,
       `Good day ${preferredName},`,
       '',
       supplier.personalNote?.trim() || null,
@@ -808,13 +810,13 @@ export class SendInquiryModalComponent {
       `*Place:* ${this.portName().trim() || 'Port'}`,
       deliveryLabel ? `*Delivery:* ${deliveryLabel}` : null,
       responseLabel ? `*Reply within:* ${responseLabel}` : null,
-      `*Account:* FUELD`,
+      `*Account:* ${companyName}`,
       '',
       '*Requested items:*',
       ...itemLines,
       '',
       'Best regards,',
-      'Fueld User',
+      this.senderName().trim() || 'Fueld User',
     ].filter((line): line is string => line !== null && line !== undefined).join('\n');
   });
 

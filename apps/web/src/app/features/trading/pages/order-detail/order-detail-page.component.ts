@@ -1616,6 +1616,8 @@ interface PlattsSuggestionViewModel {
     <!-- Send Inquiry Modal -->
     <app-send-inquiry-modal
       [orderId]="orderId()"
+      [senderName]="auth.userName()"
+      [companyName]="invoicingCompanyName()"
       [placeId]="order()?.placeId ?? ''"
       [portName]="port()?.name ?? ''"
       [waLinked]="waLinked()"

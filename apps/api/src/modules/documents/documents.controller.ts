@@ -158,7 +158,6 @@ function buildInquiryWhatsAppText(params: {
   });
 
   return [
-    `*RFQ*`,
     `Good day ${preferredName},`,
     '',
     params.personalNote?.trim() || null,
