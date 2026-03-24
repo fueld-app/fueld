@@ -561,6 +561,9 @@ export interface SendInquiryWhatsAppPayload {
             <!-- Body editor -->
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Email Body</label>
+              <p class="mb-2 text-xs leading-5 text-gray-500">
+                The content you edit here is the email body that will be sent. Recipient placeholders like name, senderName, and companyName are resolved separately for each recipient when sending.
+              </p>
               <div class="border border-gray-300 rounded-lg overflow-hidden">
                 <!-- Toolbar -->
                 <div class="flex items-center gap-1 border-b border-gray-200 bg-gray-50 px-2 py-1.5">
