@@ -6,7 +6,7 @@ import { sendDocumentEmail, buildDocumentEmailHtml, buildDocumentEmailSubject, b
 import { resolveOrderId, getOrderById } from '../orders/orders.service';
 import { getPortSuppliers } from '../lloyds/lli.service';
 import { logActivity } from '../activity/activity.service';
-import { sendWhatsAppGroupMessage } from '../whatsapp/whatsapp.service';
+import { sendWhatsAppGroupMessage, sendWhatsAppMessage } from '../whatsapp/whatsapp.service';
 import { db } from '../../db';
 import { users, counterparties, invoices as invoicesTable, companyContacts, companyEmails, supplierInquiries, supplierInquiryItemQuotes, portSuppliers, emailLog, tenants, orders, orderAttachments } from '../../db/schema';
 import { getEmailTemplate, getApplicableEmailRules, renderTemplate, type TemplateVariables } from '../admin/email-settings.service';
@@ -117,6 +117,67 @@ function formatDeadlineHumanDuration(deadlineIso: string): string {
   if (hours < 24) return `${hours} hours`;
   const days = Math.round(hours / 24);
   return days === 1 ? '1 day' : `${days} days`;
+}
+
+function formatInquiryQuantity(value: string | null | undefined): string {
+  if (!value) return '';
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  if (!/^\d+(?:\.\d+)?$/.test(trimmed)) return trimmed;
+  return trimmed.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+}
+
+function buildInquiryWhatsAppText(params: {
+  supplierName: string;
+  contactName?: string | null;
+  senderName: string;
+  companyName?: string | null;
+  vesselName: string;
+  vesselImo?: string | null;
+  portName: string;
+  etaFormatted?: string | null;
+  etdFormatted?: string | null;
+  responseDeadlineFormatted?: string | null;
+  personalNote?: string | null;
+  quoteFormUrl?: string | null;
+  items: Array<{ quantity: string; quantityMin?: string | null; unit: string; productType: string; description?: string | null }>;
+}): string {
+  const preferredName = params.contactName?.trim() || params.supplierName.trim() || 'there';
+  const vesselLabel = params.vesselImo
+    ? `${params.vesselName} (IMO: ${params.vesselImo})`
+    : params.vesselName;
+  const deliveryLabel = params.etaFormatted && params.etdFormatted
+    ? `${params.etaFormatted} to ${params.etdFormatted}`
+    : params.etaFormatted || params.etdFormatted || null;
+  const companyName = params.companyName?.trim() || 'FUELD';
+  const itemLines = params.items.map((item) => {
+    const max = formatInquiryQuantity(item.quantity);
+    const min = formatInquiryQuantity(item.quantityMin);
+    const qtyLabel = min && min !== max ? `${min} - ${max}` : max;
+    return `- ${qtyLabel} ${item.unit} ${item.productType}${item.description ? ` - ${item.description}` : ''}`;
+  });
+
+  return [
+    `*RFQ*`,
+    `Good day ${preferredName},`,
+    '',
+    params.personalNote?.trim() || null,
+    params.personalNote?.trim() ? '' : null,
+    'Please offer for the following:',
+    `*Vessel:* ${vesselLabel}`,
+    `*Place:* ${params.portName}`,
+    deliveryLabel ? `*Delivery:* ${deliveryLabel}` : null,
+    params.responseDeadlineFormatted ? `*Reply within:* ${params.responseDeadlineFormatted}` : null,
+    `*Account:* ${companyName}`,
+    '',
+    '*Requested items:*',
+    ...itemLines,
+    params.quoteFormUrl?.trim() ? '' : null,
+    params.quoteFormUrl?.trim() ? `Submit quote here: ${params.quoteFormUrl.trim()}` : null,
+    '',
+    `Best regards,`,
+    params.senderName,
+  ].filter((line): line is string => line !== null && line !== undefined).join('\n');
 }
 
 export const documentsController = new Elysia({ prefix: '/orders' })
@@ -1477,6 +1538,167 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       detail: {
         tags: ['Documents'],
         summary: 'Send inquiry emails to selected suppliers',
+        security: [{ bearerAuth: [] }],
+      },
+    },
+  )
+
+  .post(
+    '/:id/inquiry/send-whatsapp',
+    async ({ params, body, auth, set }) => {
+      const orderId = await resolveOrderId(params.id);
+      if (!orderId) { set.status = 404; return { success: false, message: 'Order not found' }; }
+
+      const order = await getOrderById(orderId);
+      if (!order) { set.status = 404; return { success: false, message: 'Order not found' }; }
+      if (!order.items?.length) {
+        set.status = 400;
+        return { success: false, message: 'Add at least one line item before sending inquiries' };
+      }
+
+      const [sender] = await db.select({ name: users.name }).from(users).where(eq(users.id, auth.userId)).limit(1);
+      const senderName = sender?.name ?? 'Fueld User';
+      const inquirySettings = await getInquirySettings();
+
+      const existingInquiries = await db
+        .select({ id: supplierInquiries.id, supplierId: supplierInquiries.supplierId })
+        .from(supplierInquiries)
+        .where(eq(supplierInquiries.orderId, orderId));
+      const existingInquiryBySupplierId = new Map(existingInquiries.map((inquiry) => [inquiry.supplierId, inquiry]));
+
+      const formatDate = (iso: string | null) => {
+        if (!iso) return null;
+        const date = new Date(iso);
+        return Number.isNaN(date.getTime())
+          ? null
+          : date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      };
+
+      const responseDeadlineAt = body.responseDeadlineAt ?? getDefaultInquiryResponseDeadline(inquirySettings.defaultResponseDeadlineHours);
+      const responseDeadlineFormatted = formatDeadlineHumanDuration(responseDeadlineAt);
+      const results: Array<{ recipientId: string; recipientName: string; phone: string; success: boolean; error?: string }> = [];
+
+      for (const target of body.recipients) {
+        try {
+          const quoteToken = inquirySettings.supplierResponseUrlEnabled ? createSupplierQuoteToken() : null;
+          const quoteTokenExpiresAt = quoteToken ? getSupplierQuoteExpiryDate() : null;
+          const quoteFormUrl = quoteToken ? getSupplierQuoteFormUrl(quoteToken.rawToken) : null;
+          const message = buildInquiryWhatsAppText({
+            supplierName: target.supplierName,
+            contactName: target.contactName ?? null,
+            senderName,
+            companyName: order.invoicingCompany?.name ?? 'Fueld',
+            vesselName: order.vessel?.name ?? 'Vessel',
+            vesselImo: order.vessel?.imo ?? null,
+            portName: order.place?.name ?? 'Port',
+            etaFormatted: formatDate(order.eta),
+            etdFormatted: formatDate(order.etd),
+            responseDeadlineFormatted,
+            personalNote: target.personalNote ?? null,
+            quoteFormUrl,
+            items: order.items.map((item: any) => ({
+              quantity: item.quantity,
+              quantityMin: item.quantityMin,
+              unit: item.unit,
+              productType: item.productType,
+              description: item.description,
+            })),
+          });
+
+          const waResult = await sendWhatsAppMessage(auth.userId, target.phone, message);
+          if (!waResult.success) {
+            throw new Error(waResult.message || 'Failed to send WhatsApp inquiry');
+          }
+
+          const existingInquiry = existingInquiryBySupplierId.get(target.supplierId);
+          if (existingInquiry) {
+            await db.delete(supplierInquiryItemQuotes).where(eq(supplierInquiryItemQuotes.supplierInquiryId, existingInquiry.id));
+            await db
+              .update(supplierInquiries)
+              .set({
+                email: target.phone,
+                contactId: target.contactId ?? null,
+                subject: body.subject?.trim() || `RFQ ${order.place?.name ?? 'Port'} - ${order.vessel?.name ?? 'Vessel'}`,
+                status: 'SENT',
+                quoteTokenHash: quoteToken?.tokenHash ?? null,
+                quoteTokenExpiresAt,
+                responseDeadlineAt: responseDeadlineAt ? new Date(responseDeadlineAt) : null,
+                reminderSentAt: null,
+                reminderCount: 0,
+                respondedAt: null,
+                quotedAt: null,
+                canDeliver: null,
+                declineReason: null,
+                quoteValidUntil: null,
+                deliveryWindow: null,
+                supplierPaymentTerms: null,
+                supplierComment: null,
+                sentByUserId: auth.userId,
+                sentAt: new Date(),
+                updatedAt: new Date(),
+              })
+              .where(eq(supplierInquiries.id, existingInquiry.id));
+          } else {
+            const [createdInquiry] = await db.insert(supplierInquiries).values({
+              orderId,
+              supplierId: target.supplierId,
+              contactId: target.contactId ?? null,
+              email: target.phone,
+              subject: body.subject?.trim() || `RFQ ${order.place?.name ?? 'Port'} - ${order.vessel?.name ?? 'Vessel'}`,
+              status: 'SENT',
+              quoteTokenHash: quoteToken?.tokenHash ?? null,
+              quoteTokenExpiresAt,
+              responseDeadlineAt: responseDeadlineAt ? new Date(responseDeadlineAt) : null,
+              reminderSentAt: null,
+              reminderCount: 0,
+              sentByUserId: auth.userId,
+            }).returning({ id: supplierInquiries.id, supplierId: supplierInquiries.supplierId });
+            if (createdInquiry) {
+              existingInquiryBySupplierId.set(createdInquiry.supplierId, createdInquiry);
+            }
+          }
+
+          results.push({
+            recipientId: target.supplierId,
+            recipientName: target.contactName?.trim() || target.supplierName,
+            phone: target.phone,
+            success: true,
+          });
+        } catch (err: any) {
+          console.error(`[Documents] Failed to send inquiry via WhatsApp to ${target.phone}:`, err);
+          results.push({
+            recipientId: target.supplierId,
+            recipientName: target.contactName?.trim() || target.supplierName,
+            phone: target.phone,
+            success: false,
+            error: err?.message ?? 'Failed to send WhatsApp inquiry',
+          });
+        }
+      }
+
+      return {
+        success: true,
+        message: `Sent inquiry via WhatsApp to ${results.filter((result) => result.success).length}/${results.length} recipients`,
+        data: results,
+      };
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({
+        recipients: t.Array(t.Object({
+          supplierId: t.String(),
+          supplierName: t.String(),
+          phone: t.String(),
+          contactId: t.Optional(t.String()),
+          contactName: t.Optional(t.String()),
+          personalNote: t.Optional(t.String()),
+        })),
+        subject: t.Optional(t.String()),
+        responseDeadlineAt: t.Optional(t.Nullable(t.String())),
+      }),
+      detail: {
+        tags: ['Documents'],
+        summary: 'Send supplier inquiries via WhatsApp',
         security: [{ bearerAuth: [] }],
       },
     },

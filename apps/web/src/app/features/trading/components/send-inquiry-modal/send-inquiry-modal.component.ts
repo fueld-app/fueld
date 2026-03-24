@@ -94,9 +94,10 @@ export interface SendInquiryWhatsAppPayload {
     phone: string;
     contactId?: string;
     contactName?: string;
+    personalNote?: string;
   }>;
   subject: string;
-  bodyText: string;
+  responseDeadlineAt?: string | null;
 }
 
 @Component({
@@ -1089,6 +1090,7 @@ export class SendInquiryModalComponent {
         phone: this.resolvedWhatsAppPhone(supplier),
         contactId: supplier.waContactId ?? undefined,
         contactName: supplier.waContactName ?? undefined,
+        personalNote: supplier.personalNote?.trim() || undefined,
       }))
       .filter((recipient) => !!recipient.phone) as SendInquiryWhatsAppPayload['recipients'];
 
@@ -1098,7 +1100,7 @@ export class SendInquiryModalComponent {
     this.sendWhatsAppInquiry.emit({
       recipients,
       subject: this.subject(),
-      bodyText: this.htmlToPlainText(this.htmlBody()),
+      responseDeadlineAt: this.toIsoFromDateTimeLocal(this.responseDeadlineAt()),
     });
   }
 
@@ -1380,16 +1382,5 @@ export class SendInquiryModalComponent {
       + Math.round(responseBonus)
       + Math.floor(lastAtPlace / 86400000)
       + Math.floor(lastOverall / 86400000 / 10);
-  }
-
-  private htmlToPlainText(html: string): string {
-    const container = document.createElement('div');
-    container.innerHTML = html;
-    const text = container.innerText
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
-    return this.subject().trim()
-      ? `${this.subject().trim()}\n\n${text}`.trim()
-      : text;
   }
 }

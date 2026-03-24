@@ -4201,28 +4201,33 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   async onSendInquiryWhatsApp(payload: SendInquiryWhatsAppPayload): Promise<void> {
-    if (payload.recipients.length === 0) return;
-
-    const message = payload.bodyText?.trim() || payload.subject?.trim() || `Inquiry — ${this.order()?.orderNumber ?? ''}`;
+    const id = this.orderId();
+    if (!id || payload.recipients.length === 0) return;
 
     try {
-      const results = await Promise.allSettled(
-        payload.recipients.map((recipient) =>
-          firstValueFrom(
-            this.http.post<ApiResponse<{ success: boolean }>>(`${API_URL}/whatsapp/send`, {
-              phone: recipient.phone,
-              message,
-            }),
-          ),
-        ),
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<Array<{ success: boolean }>>>(`${API_URL}/orders/${id}/inquiry/send-whatsapp`, {
+          recipients: payload.recipients,
+          subject: payload.subject,
+          responseDeadlineAt: payload.responseDeadlineAt ?? null,
+        }),
       );
-
-      const successCount = results.filter((result) => result.status === 'fulfilled').length;
       this.inquiryModal()?.waDone();
+
+      if (!res.success) {
+        this.showToast('error', res.message || 'Failed to send inquiry via WhatsApp. Is your device linked?');
+        return;
+      }
+
+      const successCount = res.data?.filter((result: any) => result.success).length ?? 0;
 
       if (successCount > 0) {
         this.showToast('success', `Inquiry sent via WhatsApp to ${successCount}/${payload.recipients.length} recipients`);
         this.inquiryModal()?.close();
+        void Promise.all([
+          this.loadInquiryReplies(),
+          this.loadInquirySupplierContext(),
+        ]);
         return;
       }
 
