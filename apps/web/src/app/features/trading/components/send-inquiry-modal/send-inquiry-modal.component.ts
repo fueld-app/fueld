@@ -590,36 +590,90 @@ export interface SendInquiryWhatsAppPayload {
               </div>
             </div>
 
-            <!-- Email preview (collapsed by default) -->
-            @if (htmlBody()) {
+            @if (htmlBody() || whatsappPreviewText()) {
               <details class="group">
                 <summary class="cursor-pointer text-sm text-gray-500 hover:text-gray-700 select-none">
-                  Preview email
-                </summary>
-                <div class="mt-2 rounded-lg border border-gray-200 bg-white p-4">
-                  <div class="inquiry-email-canvas min-h-[200px] overflow-auto" [innerHTML]="previewHtml()"></div>
-                </div>
-              </details>
-            }
-
-            @if (selectedWhatsAppCount() > 0 && whatsappPreviewText()) {
-              <details class="group">
-                <summary class="cursor-pointer text-sm text-gray-500 hover:text-gray-700 select-none">
-                  Preview WhatsApp RFQ
-                  @if (whatsappPreviewRecipientLabel()) {
-                    <span class="text-gray-400"> • {{ whatsappPreviewRecipientLabel() }}</span>
+                  Preview message
+                  @if (previewRecipientSummary()) {
+                    <span class="text-gray-400"> • {{ previewRecipientSummary() }}</span>
                   }
                 </summary>
-                <div class="mt-2 rounded-2xl border border-green-100 bg-[#e8f5e9] p-4 shadow-sm">
-                  <div class="mb-3 flex items-center gap-2 text-xs text-green-800/70">
-                    <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-green-600 text-white font-semibold">
-                      WA
-                    </span>
-                    <span>Preview of the message sent directly to the selected supplier</span>
+                <div class="mt-3 space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                  @if (previewCandidates().length > 1) {
+                    <div>
+                      <label for="preview-recipient" class="block text-xs font-medium uppercase tracking-[0.08em] text-gray-500">
+                        Preview recipient
+                      </label>
+                      <select
+                        id="preview-recipient"
+                        class="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                        [ngModel]="previewRecipientId()"
+                        (ngModelChange)="previewRecipientId.set($event)"
+                      >
+                        @for (candidate of previewCandidates(); track candidate.portSupplierId) {
+                          <option [value]="candidate.portSupplierId">{{ previewCandidateLabel(candidate) }}</option>
+                        }
+                      </select>
+                    </div>
+                  }
+
+                  <div class="flex items-center gap-2 border-b border-gray-200 pb-2">
+                    <button
+                      type="button"
+                      class="rounded-full px-3 py-1.5 text-sm font-medium transition-colors"
+                      [class.bg-white]="activePreviewTab() === 'email'"
+                      [class.text-gray-900]="activePreviewTab() === 'email'"
+                      [class.shadow-sm]="activePreviewTab() === 'email'"
+                      [class.text-gray-500]="activePreviewTab() !== 'email'"
+                      [class.cursor-not-allowed]="!hasPreviewEmail()"
+                      [disabled]="!hasPreviewEmail()"
+                      (click)="previewTab.set('email')"
+                    >
+                      Email
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded-full px-3 py-1.5 text-sm font-medium transition-colors"
+                      [class.bg-white]="activePreviewTab() === 'whatsapp'"
+                      [class.text-gray-900]="activePreviewTab() === 'whatsapp'"
+                      [class.shadow-sm]="activePreviewTab() === 'whatsapp'"
+                      [class.text-gray-500]="activePreviewTab() !== 'whatsapp'"
+                      [class.cursor-not-allowed]="!hasPreviewWhatsApp()"
+                      [disabled]="!hasPreviewWhatsApp()"
+                      (click)="previewTab.set('whatsapp')"
+                    >
+                      WhatsApp
+                    </button>
                   </div>
-                  <div class="rounded-2xl bg-white/70 px-4 py-3">
-                    <pre class="whitespace-pre-wrap break-words font-sans text-[13px] leading-6 text-gray-800">{{ whatsappPreviewText() }}</pre>
-                  </div>
+
+                  @if (activePreviewTab() === 'email') {
+                    <div class="rounded-lg border border-gray-200 bg-white p-4">
+                      @if (hasPreviewEmail()) {
+                        <div class="mb-3 text-xs text-gray-500">
+                          Preview of the email for {{ previewRecipientSummary() || 'the selected supplier' }}
+                        </div>
+                        <div class="inquiry-email-canvas min-h-[200px] overflow-auto" [innerHTML]="previewEmailHtml()"></div>
+                      } @else {
+                        <div class="text-sm text-gray-500">This recipient does not currently have an email destination selected.</div>
+                      }
+                    </div>
+                  } @else {
+                    <div class="rounded-2xl border border-green-100 bg-[#e8f5e9] p-4 shadow-sm">
+                      @if (hasPreviewWhatsApp()) {
+                        <div class="mb-3 flex items-center gap-2 text-xs text-green-800/70">
+                          <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-green-600 text-white font-semibold">
+                            WA
+                          </span>
+                          <span>Preview of the message sent directly to {{ previewRecipientSummary() || 'the selected supplier' }}</span>
+                        </div>
+                        <div class="rounded-2xl bg-white/70 px-4 py-3">
+                          <pre class="whitespace-pre-wrap break-words font-sans text-[13px] leading-6 text-gray-800">{{ whatsappPreviewText() }}</pre>
+                        </div>
+                      } @else {
+                        <div class="text-sm text-green-900/70">This recipient does not currently have a WhatsApp destination selected.</div>
+                      }
+                    </div>
+                  }
                 </div>
               </details>
             }
@@ -772,21 +826,45 @@ export class SendInquiryModalComponent {
   readonly subject = signal('');
   readonly htmlBody = signal('');
   readonly recipientTags = signal<EmailTag[]>([]);
-  readonly previewHtml = computed<SafeHtml>(() => this.sanitizer.bypassSecurityTrustHtml(this.htmlBody()));
   readonly responseDeadlineAt = signal('');
-  readonly whatsappPreviewRecipient = computed(() =>
-    this.suppliers().find((supplier) => supplier.selected && !!this.resolvedWhatsAppPhone(supplier)) ?? null,
+  readonly previewRecipientId = signal('');
+  readonly previewTab = signal<'email' | 'whatsapp'>('email');
+  readonly previewCandidates = computed(() =>
+    this.suppliers().filter((supplier) => supplier.selected && (!!this.resolvedRecipientEmail(supplier) || !!this.resolvedWhatsAppPhone(supplier))),
   );
-  readonly whatsappPreviewRecipientLabel = computed(() => {
-    const supplier = this.whatsappPreviewRecipient();
-    if (!supplier) return '';
-    return this.resolvedWhatsAppLabel(supplier) || supplier.supplierName;
+  readonly previewRecipient = computed(() => {
+    const candidates = this.previewCandidates();
+    if (candidates.length === 0) return null;
+    return candidates.find((supplier) => supplier.portSupplierId === this.previewRecipientId()) ?? candidates[0] ?? null;
+  });
+  readonly previewRecipientSummary = computed(() => {
+    const supplier = this.previewRecipient();
+    return supplier ? this.previewCandidateLabel(supplier) : '';
+  });
+  readonly hasPreviewEmail = computed(() => {
+    const supplier = this.previewRecipient();
+    return !!supplier && !!this.resolvedRecipientEmail(supplier);
+  });
+  readonly hasPreviewWhatsApp = computed(() => {
+    const supplier = this.previewRecipient();
+    return !!supplier && !!this.resolvedWhatsAppPhone(supplier);
+  });
+  readonly activePreviewTab = computed<'email' | 'whatsapp'>(() => {
+    const preferred = this.previewTab();
+    if (preferred === 'email' && this.hasPreviewEmail()) return 'email';
+    if (preferred === 'whatsapp' && this.hasPreviewWhatsApp()) return 'whatsapp';
+    if (this.hasPreviewEmail()) return 'email';
+    return 'whatsapp';
+  });
+  readonly previewEmailHtml = computed<SafeHtml>(() => {
+    const supplier = this.previewRecipient();
+    return this.sanitizer.bypassSecurityTrustHtml(this.renderEmailPreview(this.htmlBody(), supplier));
   });
   readonly whatsappPreviewText = computed(() => {
-    const supplier = this.whatsappPreviewRecipient();
+    const supplier = this.previewRecipient();
     if (!supplier) return '';
 
-    const preferredName = supplier.waContactName?.trim() || supplier.supplierName.trim() || 'there';
+    const preferredName = (supplier.waContactName?.trim() || supplier.contactName?.trim() || supplier.supplierName.trim() || 'there');
     const vesselName = this.vesselName().trim() || 'Vessel';
     const vesselImo = this.vesselImo()?.trim() || null;
     const vesselLabel = vesselImo ? `${vesselName} (IMO: ${vesselImo})` : vesselName;
@@ -863,6 +941,8 @@ export class SendInquiryModalComponent {
     this.open.set(true);
     this.recipientTags.set([]);
     this.responseDeadlineAt.set('');
+    this.previewRecipientId.set('');
+    this.previewTab.set('email');
     this.showAddSupplier.set(false);
     this.addSupplierQuery.set('');
     this.addSupplierResults.set([]);
@@ -875,6 +955,7 @@ export class SendInquiryModalComponent {
     this.sending.set(false);
     this.waSending.set(false);
     this.recipientTags.set([]);
+    this.previewRecipientId.set('');
     this.closed.emit();
   }
 
@@ -1310,6 +1391,19 @@ export class SendInquiryModalComponent {
     return supplier.contactName ? `${supplier.contactName} / Custom` : 'Custom email';
   }
 
+  previewCandidateLabel(supplier: SupplierRow): string {
+    const emailLabel = this.resolvedRecipientLabel(supplier);
+    const whatsappLabel = this.resolvedWhatsAppLabel(supplier);
+    const contactLabel = supplier.contactName || supplier.waContactName || supplier.supplierName;
+    const channelParts = [
+      this.resolvedRecipientEmail(supplier) ? 'Email' : '',
+      this.resolvedWhatsAppPhone(supplier) ? 'WhatsApp' : '',
+    ].filter(Boolean);
+
+    const detail = emailLabel || whatsappLabel || supplier.supplierName;
+    return `${contactLabel} - ${detail}${channelParts.length ? ` [${channelParts.join(' + ')}]` : ''}`;
+  }
+
   resolvedWhatsAppLabel(supplier: SupplierRow): string {
     const resolvedPhone = this.resolvedWhatsAppPhone(supplier);
     if (!resolvedPhone) return '';
@@ -1487,5 +1581,61 @@ export class SendInquiryModalComponent {
     if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'}`;
     const days = Math.round(hours / 24);
     return days === 1 ? '1 day' : `${days} days`;
+  }
+
+  private renderEmailPreview(html: string, supplier: SupplierRow | null): string {
+    if (!html) return '';
+
+    const templateVars = this.buildPreviewTemplateVariables(supplier);
+    let renderedHtml = this.renderTemplateVariables(html, templateVars);
+
+    const personalNote = supplier?.personalNote?.trim();
+    if (personalNote) {
+      const escapedNote = this.escapeHtml(personalNote).replace(/\n/g, '<br/>');
+      renderedHtml = `<p style="color:#374151;font-style:italic;margin-bottom:16px;">${escapedNote}</p>${renderedHtml}`;
+    }
+
+    return renderedHtml;
+  }
+
+  private buildPreviewTemplateVariables(supplier: SupplierRow | null): Record<string, string> {
+    const supplierName = supplier?.supplierName?.trim() || 'Supplier';
+    const contactName = supplier?.contactName?.trim() || supplier?.waContactName?.trim() || '';
+    const preferredName = contactName || supplierName || 'there';
+
+    return {
+      vesselName: this.vesselName().trim() || 'Vessel',
+      portName: this.portName().trim() || 'Port',
+      orderNumber: this.orderId().slice(0, 8).toUpperCase(),
+      documentLabel: 'Inquiry',
+      senderName: this.senderName().trim() || 'Fueld User',
+      companyName: this.companyName().trim() || 'Fueld',
+      paymentTerms: '',
+      customerNote: '',
+      supplierNote: '',
+      invoiceNumber: '',
+      supplierName,
+      contactName: contactName || supplierName,
+      name: preferredName,
+      quoteFormUrl: '#quote-form-generated-on-send',
+    };
+  }
+
+  private renderTemplateVariables(template: string, variables: Record<string, string>): string {
+    return Object.entries(variables).reduce((output, [key, value]) => {
+      const normalizedValue = value ?? '';
+      return output
+        .replaceAll(`\$\{${key}\}`, normalizedValue)
+        .replaceAll(`{{${key}}}`, normalizedValue);
+    }, template);
+  }
+
+  private escapeHtml(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 }
