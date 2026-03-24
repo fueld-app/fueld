@@ -601,6 +601,28 @@ export interface SendInquiryWhatsAppPayload {
                 </div>
               </details>
             }
+
+            @if (selectedWhatsAppCount() > 0 && whatsappPreviewText()) {
+              <details class="group">
+                <summary class="cursor-pointer text-sm text-gray-500 hover:text-gray-700 select-none">
+                  Preview WhatsApp RFQ
+                  @if (whatsappPreviewRecipientLabel()) {
+                    <span class="text-gray-400"> • {{ whatsappPreviewRecipientLabel() }}</span>
+                  }
+                </summary>
+                <div class="mt-2 rounded-2xl border border-green-100 bg-[#e8f5e9] p-4 shadow-sm">
+                  <div class="mb-3 flex items-center gap-2 text-xs text-green-800/70">
+                    <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-green-600 text-white font-semibold">
+                      WA
+                    </span>
+                    <span>Preview of the message sent directly to the selected supplier</span>
+                  </div>
+                  <div class="rounded-2xl bg-white/70 px-4 py-3">
+                    <pre class="whitespace-pre-wrap break-words font-sans text-[13px] leading-6 text-gray-800">{{ whatsappPreviewText() }}</pre>
+                  </div>
+                </div>
+              </details>
+            }
           </div>
 
           <!-- Footer -->
@@ -750,6 +772,51 @@ export class SendInquiryModalComponent {
   readonly recipientTags = signal<EmailTag[]>([]);
   readonly previewHtml = computed<SafeHtml>(() => this.sanitizer.bypassSecurityTrustHtml(this.htmlBody()));
   readonly responseDeadlineAt = signal('');
+  readonly whatsappPreviewRecipient = computed(() =>
+    this.suppliers().find((supplier) => supplier.selected && !!this.resolvedWhatsAppPhone(supplier)) ?? null,
+  );
+  readonly whatsappPreviewRecipientLabel = computed(() => {
+    const supplier = this.whatsappPreviewRecipient();
+    if (!supplier) return '';
+    return this.resolvedWhatsAppLabel(supplier) || supplier.supplierName;
+  });
+  readonly whatsappPreviewText = computed(() => {
+    const supplier = this.whatsappPreviewRecipient();
+    if (!supplier) return '';
+
+    const preferredName = supplier.waContactName?.trim() || supplier.supplierName.trim() || 'there';
+    const vesselName = this.vesselName().trim() || 'Vessel';
+    const vesselImo = this.vesselImo()?.trim() || null;
+    const vesselLabel = vesselImo ? `${vesselName} (IMO: ${vesselImo})` : vesselName;
+    const deliveryLabel = this.deliveryWindowLabel();
+    const responseLabel = this.responseDeadlineLabel();
+    const itemLines = this.items().map((item) => {
+      const max = this.formatInquiryQuantity(item.quantity);
+      const min = this.formatInquiryQuantity(item.quantityMin ?? null);
+      const qtyLabel = min && min !== max ? `${min} - ${max}` : max;
+      return `- ${qtyLabel} ${item.unit} ${item.productType}`;
+    });
+
+    return [
+      `*RFQ*`,
+      `Good day ${preferredName},`,
+      '',
+      supplier.personalNote?.trim() || null,
+      supplier.personalNote?.trim() ? '' : null,
+      'Please offer for the following:',
+      `*Vessel:* ${vesselLabel}`,
+      `*Place:* ${this.portName().trim() || 'Port'}`,
+      deliveryLabel ? `*Delivery:* ${deliveryLabel}` : null,
+      responseLabel ? `*Reply within:* ${responseLabel}` : null,
+      `*Account:* FUELD`,
+      '',
+      '*Requested items:*',
+      ...itemLines,
+      '',
+      'Best regards,',
+      'Fueld User',
+    ].filter((line): line is string => line !== null && line !== undefined).join('\n');
+  });
 
   // Add-supplier search state
   readonly showAddSupplier = signal(false);
@@ -1382,5 +1449,41 @@ export class SendInquiryModalComponent {
       + Math.round(responseBonus)
       + Math.floor(lastAtPlace / 86400000)
       + Math.floor(lastOverall / 86400000 / 10);
+  }
+
+  private formatInquiryQuantity(value: number | string | null | undefined): string {
+    if (value == null) return '';
+    const numeric = typeof value === 'number' ? value : Number(value);
+    if (Number.isFinite(numeric)) {
+      return Number.isInteger(numeric) ? numeric.toString() : numeric.toString();
+    }
+    return String(value).trim();
+  }
+
+  private deliveryWindowLabel(): string {
+    const eta = this.eta();
+    const etd = this.etd();
+    const formatDate = (value: string | null): string | null => {
+      if (!value) return null;
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return null;
+      return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    };
+    const etaLabel = formatDate(eta);
+    const etdLabel = formatDate(etd);
+    if (etaLabel && etdLabel) return `${etaLabel} to ${etdLabel}`;
+    return etaLabel || etdLabel || '';
+  }
+
+  private responseDeadlineLabel(): string {
+    const value = this.responseDeadlineAt();
+    if (!value) return '';
+    const deadline = new Date(value);
+    if (Number.isNaN(deadline.getTime())) return '';
+    const hours = Math.round((deadline.getTime() - Date.now()) / 3_600_000);
+    if (hours < 1) return '1 hour';
+    if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'}`;
+    const days = Math.round(hours / 24);
+    return days === 1 ? '1 day' : `${days} days`;
   }
 }
