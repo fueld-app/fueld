@@ -30,3 +30,5 @@ uploads/**
 # Local LLM binaries & models (large files, downloaded by scripts/llm/setup.sh)
 scripts/llm/bin/
 scripts/llm/models/
+scripts/llm/runtime-config.json
+scripts/llm/llama.log

@@ -22,7 +22,11 @@ interface ChatMessage {
 
 interface ChatCompletionChoice {
   index: number;
-  message: { role: string; content: string };
+  message: {
+    role: string;
+    content?: string;
+    reasoning_content?: string;
+  };
   finish_reason: string;
 }
 
@@ -31,6 +35,8 @@ interface ChatCompletionResponse {
   choices: ChatCompletionChoice[];
   usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
 }
+
+type LlmThinkingMode = 'production' | 'thinking';
 
 export interface LlmClientOptions {
   baseUrl?: string;
@@ -88,15 +94,20 @@ export class LlmClient {
     options?: {
       temperature?: number;
       maxTokens?: number;
+      thinkingMode?: LlmThinkingMode;
       /** JSON schema to enforce structured output */
       responseFormat?: { type: 'json_object' } | { type: 'text' };
     },
-  ): Promise<{ content: string; usage: { promptTokens: number; completionTokens: number; totalTokens: number } | null }> {
+  ): Promise<{ content: string; reasoning: string | null; usage: { promptTokens: number; completionTokens: number; totalTokens: number } | null }> {
+    const thinkingMode = options?.thinkingMode ?? 'production';
     const body: Record<string, unknown> = {
       messages,
       temperature: options?.temperature ?? 0.1,
       max_tokens: options?.maxTokens ?? 1024,
       stream: false,
+      chat_template_kwargs: {
+        enable_thinking: thinkingMode === 'thinking',
+      },
     };
 
     if (options?.responseFormat) {
@@ -116,7 +127,9 @@ export class LlmClient {
     }
 
     const data = (await res.json()) as ChatCompletionResponse;
-    const content = data.choices?.[0]?.message?.content;
+    const message = data.choices?.[0]?.message;
+  const reasoning = message?.reasoning_content?.trim() || null;
+  const content = message?.content?.trim() || reasoning || '';
 
     if (!content) {
       throw new Error('LLM returned empty response');
@@ -125,8 +138,7 @@ export class LlmClient {
     const usage = data.usage
       ? { promptTokens: data.usage.prompt_tokens, completionTokens: data.usage.completion_tokens, totalTokens: data.usage.total_tokens }
       : null;
-
-    return { content: content.trim(), usage };
+    return { content, reasoning, usage };
   }
 
   // ── Search-augmented chat ───────────────────────────────────────────
@@ -201,14 +213,19 @@ export class LlmClient {
     try {
       // Load the system prompt from the editable prompt file
       const systemPrompt = await loadPrompt('rfq-parsing');
+      const today = new Date().toISOString().slice(0, 10);
       const { content, usage } = await this.chatCompletion(
         [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: rfqText },
+          {
+            role: 'user',
+            content: `Today's date is ${today}. Extract the RFQ from the message below and return JSON only.\n\n${rfqText}`,
+          },
         ],
         {
-          temperature: 0.05,
-          maxTokens: 512,
+          temperature: 0,
+          maxTokens: 384,
+          thinkingMode: 'production',
           responseFormat: { type: 'json_object' },
         },
       );
