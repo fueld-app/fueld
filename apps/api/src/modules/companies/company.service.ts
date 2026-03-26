@@ -6,6 +6,7 @@ import { eq, ilike, or, and, sql, asc, desc, inArray, isNull } from 'drizzle-orm
 import { db } from '../../db';
 import { counterparties, companyAttachments, companyContacts, companyEmails, companyOffices, orders, vessels, places, users, vesselCompanies, customerPayments, creditApplications } from '../../db/schema';
 import type { CompanyEmailType } from '@fueld/types';
+import { matchLocalVessels } from '../vessels/vessel.service';
 import {
   seasearcherCompanyDetail,
   seasearcherCompanySearch,
@@ -128,6 +129,45 @@ interface SeasearcherCompanySearchResult {
 interface SeasearcherCompanySearchResponse {
   results: SeasearcherCompanySearchResult[];
   allMatchingCount: number;
+}
+
+interface SeasearcherFleetOwner {
+  type?: string | null;
+  typeCode?: string | null;
+  companyId?: string | null;
+  companyName?: string | null;
+}
+
+interface SeasearcherFleetVessel {
+  id?: string | null;
+  imo?: string | null;
+  name?: string | null;
+  owners?: SeasearcherFleetOwner[] | null;
+}
+
+interface GroupCompanyRecord {
+  id: string;
+  name: string;
+  seasearcherId: string | null;
+}
+
+interface GroupVesselRow {
+  id: string;
+  vesselId: string;
+  localVesselId: string | null;
+  seasearcherVesselId: string | null;
+  vesselName: string;
+  vesselImo: string | null;
+  companyId: string;
+  companyName: string;
+  role: string;
+  source: string | null;
+  contactId: string | null;
+  note: string | null;
+  addedById: string | null;
+  addedByName: string | null;
+  createdAt: Date | null;
+  updatedAt: Date | null;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1597,12 +1637,129 @@ export async function getGroupOrdersForCompany(parentId: string) {
     .orderBy(sql`${orders.createdAt} desc`);
 }
 
-/** Get vessels for a parent + all its children. */
-export async function getGroupVesselsForCompany(parentId: string) {
+async function getCompanyFamily(companyId: string): Promise<GroupCompanyRecord[]> {
+  const [company] = await db
+    .select({
+      id: counterparties.id,
+      parentId: counterparties.parentId,
+    })
+    .from(counterparties)
+    .where(eq(counterparties.id, companyId))
+    .limit(1);
+
+  if (!company) return [];
+
+  const rootId = company.parentId ?? company.id;
   return db
+    .select({
+      id: counterparties.id,
+      name: counterparties.name,
+      seasearcherId: counterparties.seasearcherId,
+    })
+    .from(counterparties)
+    .where(
+      or(
+        eq(counterparties.id, rootId),
+        eq(counterparties.parentId, rootId),
+      )!,
+    )
+    .orderBy(counterparties.name);
+}
+
+function normalizeGroupFleetRole(role?: string | null): string {
+  if (!role) return 'FLEET';
+  return role.trim().replace(/\s+/g, '_').toUpperCase();
+}
+
+function buildGroupVesselDedupKey(row: Pick<GroupVesselRow, 'companyId' | 'localVesselId' | 'seasearcherVesselId' | 'vesselImo' | 'vesselName' | 'role'>): string {
+  return [
+    row.companyId,
+    row.role,
+    row.localVesselId ?? row.seasearcherVesselId ?? row.vesselImo ?? row.vesselName.trim().toLowerCase(),
+  ].join('|');
+}
+
+async function getSeasearcherGroupVessels(family: GroupCompanyRecord[]): Promise<GroupVesselRow[]> {
+  const companies = family.filter((company) => company.seasearcherId);
+  if (!companies.length) return [];
+
+  const settled = await Promise.allSettled(
+    companies.map(async (company) => {
+      const fleet = await seasearcherCompanyFleet<{ results: SeasearcherFleetVessel[]; totalMatches: number }>(company.seasearcherId!);
+      return (fleet.results ?? []).flatMap((vessel) => {
+        const matchingOwners = (vessel.owners ?? []).filter(
+          (owner) => String(owner.companyId ?? '') === String(company.seasearcherId),
+        );
+
+        const owners = matchingOwners.length
+          ? matchingOwners
+          : [{
+              type: null,
+              typeCode: null,
+              companyId: company.seasearcherId,
+              companyName: company.name,
+            } satisfies SeasearcherFleetOwner];
+
+        return owners.map((owner, index) => ({
+          id: `ss:${company.id}:${vessel.id ?? vessel.imo ?? vessel.name ?? index}:${normalizeGroupFleetRole(owner.typeCode ?? owner.type)}`,
+          vesselId: String(vessel.id ?? vessel.imo ?? vessel.name ?? `${company.id}-${index}`),
+          localVesselId: null,
+          seasearcherVesselId: vessel.id ? String(vessel.id) : null,
+          vesselName: vessel.name?.trim() || 'Unknown vessel',
+          vesselImo: vessel.imo ? String(vessel.imo) : null,
+          companyId: company.id,
+          companyName: company.name,
+          role: normalizeGroupFleetRole(owner.typeCode ?? owner.type),
+          source: 'seasearcher',
+          contactId: null,
+          note: null,
+          addedById: null,
+          addedByName: null,
+          createdAt: null,
+          updatedAt: null,
+        }));
+      });
+    }),
+  );
+
+  const rows = settled.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
+  if (!rows.length) return rows;
+
+  const matches = await matchLocalVessels({
+    seasearcherIds: rows.map((row) => row.seasearcherVesselId ?? '').filter(Boolean),
+    imos: rows.map((row) => row.vesselImo ?? '').filter(Boolean),
+  });
+
+  const matchesBySeasearcherId = new Map(matches.map((match) => [match.seasearcherId ?? '', match]));
+  const matchesByImo = new Map(matches.map((match) => [match.imo ?? '', match]));
+
+  return rows.map((row) => {
+    const localMatch =
+      (row.seasearcherVesselId ? matchesBySeasearcherId.get(row.seasearcherVesselId) : null)
+      ?? (row.vesselImo ? matchesByImo.get(row.vesselImo) : null)
+      ?? null;
+
+    return {
+      ...row,
+      vesselId: localMatch?.id ?? row.vesselId,
+      localVesselId: localMatch?.id ?? null,
+    };
+  });
+}
+
+/** Get vessels for a company group (root parent + all direct children). */
+export async function getGroupVesselsForCompany(companyId: string) {
+  const family = await getCompanyFamily(companyId);
+  if (!family.length) return [];
+
+  const familyIds = family.map((company) => company.id);
+  const [manualRows, seasearcherRows] = await Promise.all([
+    db
     .select({
       id: vesselCompanies.id,
       vesselId: vesselCompanies.vesselId,
+      localVesselId: vesselCompanies.vesselId,
+      seasearcherVesselId: vessels.seasearcherId,
       vesselName: vessels.name,
       vesselImo: vessels.imo,
       companyId: vesselCompanies.companyId,
@@ -1619,13 +1776,25 @@ export async function getGroupVesselsForCompany(parentId: string) {
     .from(vesselCompanies)
     .innerJoin(vessels, eq(vesselCompanies.vesselId, vessels.id))
     .innerJoin(counterparties, eq(vesselCompanies.companyId, counterparties.id))
-    .where(
-      or(
-        eq(vesselCompanies.companyId, parentId),
-        sql`${vesselCompanies.companyId} IN (SELECT id FROM counterparties WHERE parent_id = ${parentId})`,
-      )!,
-    )
-    .orderBy(vesselCompanies.role, vessels.name);
+    .where(inArray(vesselCompanies.companyId, familyIds)),
+    getSeasearcherGroupVessels(family),
+  ]);
+
+  const merged = new Map<string, GroupVesselRow>();
+  for (const row of seasearcherRows) {
+    merged.set(buildGroupVesselDedupKey(row), row);
+  }
+  for (const row of manualRows) {
+    merged.set(buildGroupVesselDedupKey(row), row);
+  }
+
+  return Array.from(merged.values()).sort((left, right) => {
+    const companyCompare = left.companyName.localeCompare(right.companyName);
+    if (companyCompare !== 0) return companyCompare;
+    const roleCompare = left.role.localeCompare(right.role);
+    if (roleCompare !== 0) return roleCompare;
+    return left.vesselName.localeCompare(right.vesselName);
+  });
 }
 
 /** Top parent companies by aggregated credit exposure (parent + children). */

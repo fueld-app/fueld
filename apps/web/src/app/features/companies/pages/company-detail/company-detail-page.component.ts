@@ -232,6 +232,18 @@ interface FleetResponse {
   totalMatches: number;
 }
 
+interface GroupVesselRow {
+  id: string;
+  vesselId: string;
+  localVesselId: string | null;
+  seasearcherVesselId: string | null;
+  vesselName: string;
+  vesselImo: string | null;
+  companyName: string;
+  role: string;
+  source: string | null;
+}
+
 interface HierarchyNode {
   level: number;
   companyId: string;
@@ -2384,15 +2396,32 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                       </thead>
                       <tbody class="divide-y divide-gray-50">
                         @for (v of groupVessels(); track v.id) {
-                          <tr class="hover:bg-gray-50/50 transition-colors cursor-pointer" [routerLink]="['/vessels', v.vesselId]">
+                          <tr class="hover:bg-gray-50/50 transition-colors">
                             <td class="px-5 py-2.5 text-gray-700">{{ v.companyName }}</td>
                             <td class="px-5 py-2.5">
-                              <span class="font-medium text-gray-900">{{ v.vesselName }}</span>
+                              @if (v.localVesselId || v.seasearcherVesselId) {
+                                <button
+                                  type="button"
+                                  (click)="openGroupVessel(v)"
+                                  [disabled]="navigatingVesselId() === (v.seasearcherVesselId || v.localVesselId)"
+                                  class="font-medium text-brand-600 hover:text-brand-800 hover:underline text-left disabled:opacity-50"
+                                >
+                                  @if (navigatingVesselId() === (v.seasearcherVesselId || v.localVesselId)) {
+                                    <svg class="inline h-3 w-3 animate-spin mr-0.5" viewBox="0 0 24 24" fill="none">
+                                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                    </svg>
+                                  }
+                                  {{ v.vesselName }}
+                                </button>
+                              } @else {
+                                <span class="font-medium text-gray-900">{{ v.vesselName }}</span>
+                              }
                               @if (v.vesselImo) {
                                 <span class="ml-1 text-xs text-gray-400">{{ v.vesselImo }}</span>
                               }
                             </td>
-                            <td class="px-5 py-2.5 text-gray-600 capitalize">{{ v.role }}</td>
+                            <td class="px-5 py-2.5 text-gray-600">{{ formatRole(v.role) }}</td>
                             <td class="px-5 py-2.5">
                               <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
                                 [class]="v.source === 'manual' ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600'">
@@ -3108,7 +3137,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly linkingChildId = signal<string | null>(null);
   readonly showLinkChildModal = signal(false);
   readonly groupFleetMode = signal<'own' | 'group'>('own');
-  readonly groupVessels = signal<{ id: string; vesselId: string; vesselName: string; vesselImo: string | null; companyName: string; role: string; source: string | null }[]>([]);
+  readonly groupVessels = signal<GroupVesselRow[]>([]);
   readonly groupVesselsLoading = signal(false);
   readonly unlinkingChildId = signal<string | null>(null);
   private linkChildSearchTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -5211,7 +5240,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     this.groupVesselsLoading.set(true);
     try {
       const res = await firstValueFrom(
-        this.http.get<ApiResponse<any[]>>(`${API}/companies/local/${c.id}/group-vessels`),
+        this.http.get<ApiResponse<GroupVesselRow[]>>(`${API}/companies/local/${c.id}/group-vessels`),
       );
       if (res.success) {
         this.groupVessels.set(res.data);
@@ -5228,6 +5257,16 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     this.groupFleetMode.set(next);
     if (next === 'group' && this.groupVessels().length === 0) {
       this.loadGroupVessels();
+    }
+  }
+
+  openGroupVessel(vessel: GroupVesselRow): void {
+    if (vessel.localVesselId) {
+      this.router.navigate(['/vessels', vessel.localVesselId]);
+      return;
+    }
+    if (vessel.seasearcherVesselId) {
+      this.navigateToVessel(vessel.seasearcherVesselId);
     }
   }
 
