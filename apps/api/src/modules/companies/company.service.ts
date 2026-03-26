@@ -151,7 +151,7 @@ interface GroupCompanyRecord {
   seasearcherId: string | null;
 }
 
-interface GroupVesselRow {
+export interface GroupVesselRow {
   id: string;
   vesselId: string;
   localVesselId: string | null;
