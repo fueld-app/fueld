@@ -170,6 +170,17 @@ export interface GroupVesselRow {
   updatedAt: Date | null;
 }
 
+export interface GroupFleetResponse {
+  results: Array<Record<string, any>>;
+  totalMatches: number;
+  queriedCompanyCount: number;
+  totalCompanyCount: number;
+  truncated: boolean;
+  maxCompanies: number;
+}
+
+const GROUP_FLEET_MAX_COMPANIES = 12;
+
 // ═══════════════════════════════════════════════════════════════════════
 //  LIST COMPANIES (local DB, paginated)
 // ═══════════════════════════════════════════════════════════════════════
@@ -1663,7 +1674,10 @@ async function getCompanyFamily(companyId: string): Promise<GroupCompanyRecord[]
         eq(counterparties.parentId, rootId),
       )!,
     )
-    .orderBy(counterparties.name);
+    .orderBy(
+      sql`CASE WHEN ${counterparties.id} = ${rootId} THEN 0 ELSE 1 END`,
+      counterparties.name,
+    );
 }
 
 function normalizeGroupFleetRole(role?: string | null): string {
@@ -1745,6 +1759,40 @@ async function getSeasearcherGroupVessels(family: GroupCompanyRecord[]): Promise
       localVesselId: localMatch?.id ?? null,
     };
   });
+}
+
+export async function getGroupFleetForCompany(companyId: string): Promise<GroupFleetResponse> {
+  const family = await getCompanyFamily(companyId);
+  const companiesWithFleet = family.filter((company) => company.seasearcherId);
+  const queriedCompanies = companiesWithFleet.slice(0, GROUP_FLEET_MAX_COMPANIES);
+
+  const settled = await Promise.allSettled(
+    queriedCompanies.map(async (company) => {
+      const fleet = await seasearcherCompanyFleet<{ results: Array<Record<string, any>>; totalMatches: number }>(company.seasearcherId!);
+      return { company, fleet };
+    }),
+  );
+
+  const fulfilled = settled.filter(
+    (result): result is PromiseFulfilledResult<{ company: GroupCompanyRecord; fleet: { results: Array<Record<string, any>>; totalMatches: number } }> => result.status === 'fulfilled',
+  );
+
+  const results = fulfilled.flatMap(({ value }) =>
+    (value.fleet.results ?? []).map((vessel) => ({
+      ...vessel,
+      companyId: value.company.id,
+      companyName: value.company.name,
+    })),
+  );
+
+  return {
+    results,
+    totalMatches: fulfilled.reduce((sum, { value }) => sum + (value.fleet.totalMatches ?? value.fleet.results?.length ?? 0), 0),
+    queriedCompanyCount: queriedCompanies.length,
+    totalCompanyCount: companiesWithFleet.length,
+    truncated: companiesWithFleet.length > queriedCompanies.length,
+    maxCompanies: GROUP_FLEET_MAX_COMPANIES,
+  };
 }
 
 /** Get vessels for a company group (root parent + all direct children). */

@@ -60,6 +60,7 @@ import {
   removeParentCompany,
   getCompanyGroupAggregate,
   getGroupOrdersForCompany,
+  getGroupFleetForCompany,
   getGroupVesselsForCompany,
   getTopCreditGroups,
   updateCompanySegments,
@@ -1132,6 +1133,23 @@ export const companiesController = new Elysia({ prefix: '/companies' })
     {
       params: t.Object({ id: t.String() }),
       detail: { tags: ['Companies'], summary: 'Get vessels for a parent + all its children' },
+    },
+  )
+
+  // ─── Group fleet (parent + children) ───────────────────────────────
+  .get(
+    '/local/:id/group-fleet',
+    async ({ params }) => {
+      try {
+        const fleet = await getGroupFleetForCompany(params.id);
+        return { success: true, data: fleet } satisfies ApiResponse<typeof fleet>;
+      } catch (err: any) {
+        return { success: false, data: null, message: err.message ?? 'Failed to load group fleet' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: { tags: ['Companies'], summary: 'Get fleet for a parent + all its children with a bounded query limit' },
     },
   )
 

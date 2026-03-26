@@ -232,6 +232,20 @@ interface FleetResponse {
   totalMatches: number;
 }
 
+interface GroupFleetVessel extends FleetVessel {
+  companyId: string;
+  companyName: string;
+}
+
+interface GroupFleetResponse {
+  results: GroupFleetVessel[];
+  totalMatches: number;
+  queriedCompanyCount: number;
+  totalCompanyCount: number;
+  truncated: boolean;
+  maxCompanies: number;
+}
+
 interface GroupVesselRow {
   id: string;
   vesselId: string;
@@ -2054,12 +2068,28 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
             </div>
 
             <!-- Fleet Map -->
-            @if (fleetVesselsWithPosition().length) {
+            @if (fleetVesselsWithPosition().length || (groupFleetMode() === 'group' && groupFleetLoading())) {
               <div class="rounded-xl border border-gray-200 bg-white shadow-sm transition-all min-[900px]:order-[15]"
                    [class.fleet-map-fullscreen]="fleetMapFullscreen()">
                 <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between"
                      [class.hidden]="fleetMapFullscreen()">
-                  <h2 class="text-sm font-semibold text-gray-700">Fleet Map</h2>
+                  <div class="flex items-center gap-2">
+                    <h2 class="text-sm font-semibold text-gray-700">Fleet Map</h2>
+                    @if (groupFleetMode() === 'group') {
+                      <span class="inline-flex items-center rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-medium text-brand-700">Group</span>
+                    }
+                    @if (activeFleetTotalMatches(); as totalMatches) {
+                      <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
+                        {{ totalMatches }} vessels
+                      </span>
+                    }
+                    @if (groupFleetLimitNotice(); as notice) {
+                      <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700"
+                            [title]="'Showing first ' + notice.queried + ' of ' + notice.total + ' linked companies on the map'">
+                        {{ notice.queried }}/{{ notice.total }} companies
+                      </span>
+                    }
+                  </div>
                   <button
                     (click)="toggleFleetMapFullscreen()"
                     class="rounded-md p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
@@ -2071,8 +2101,17 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                   </button>
                 </div>
                 <div class="p-0 relative">
-                  <div #fleetMapEl class="fleet-map-container w-full rounded-b-xl"
-                       [style.height]="fleetMapFullscreen() ? '100vh' : '400px'"></div>
+                  @if (groupFleetMode() === 'group' && groupFleetLoading()) {
+                    <div class="flex items-center justify-center" [style.height]="fleetMapFullscreen() ? '100vh' : '400px'">
+                      <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                      </svg>
+                    </div>
+                  } @else {
+                    <div #fleetMapEl class="fleet-map-container w-full rounded-b-xl"
+                         [style.height]="fleetMapFullscreen() ? '100vh' : '400px'"></div>
+                  }
                   @if (fleetMapFullscreen()) {
                     <button
                       (click)="toggleFleetMapFullscreen()"
@@ -2109,9 +2148,15 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                   }
                 </div>
                 <div class="flex items-center gap-2">
-                  @if (fleet()) {
+                  @if (activeFleetTotalMatches(); as totalMatches) {
                     <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
-                      {{ fleet()!.totalMatches }} vessels
+                      {{ totalMatches }} vessels
+                    </span>
+                  }
+                  @if (groupFleetLimitNotice(); as notice) {
+                    <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700"
+                          [title]="'Showing first ' + notice.queried + ' of ' + notice.total + ' linked companies in group map mode'">
+                      {{ notice.queried }}/{{ notice.total }} companies
                     </span>
                   }
                   <button (click)="openAddVessel()"
@@ -3138,6 +3183,8 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly showLinkChildModal = signal(false);
   readonly groupFleetMode = signal<'own' | 'group'>('own');
   readonly groupVessels = signal<GroupVesselRow[]>([]);
+  readonly groupFleet = signal<GroupFleetResponse | null>(null);
+  readonly groupFleetLoading = signal(false);
   readonly groupVesselsLoading = signal(false);
   readonly unlinkingChildId = signal<string | null>(null);
   private linkChildSearchTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -3163,8 +3210,28 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly navigatingCompanyId = signal<string | null>(null);
   readonly navigatingVesselId = signal<string | null>(null);
 
+  readonly activeFleetData = computed(() => {
+    if (this.groupFleetMode() === 'group' && this.isParent()) {
+      return this.groupFleet();
+    }
+    return this.fleet();
+  });
+
+  readonly activeFleetTotalMatches = computed(() => this.activeFleetData()?.totalMatches ?? null);
+
+  readonly groupFleetLimitNotice = computed(() => {
+    if (this.groupFleetMode() !== 'group') return null;
+    const groupFleet = this.groupFleet();
+    if (!groupFleet?.truncated) return null;
+    return {
+      queried: groupFleet.queriedCompanyCount,
+      total: groupFleet.totalCompanyCount,
+      max: groupFleet.maxCompanies,
+    };
+  });
+
   readonly fleetVesselsWithPosition = computed(() => {
-    const f = this.fleet();
+    const f = this.activeFleetData();
     if (!f?.results) return [];
     return f.results.filter(v => v.latestInformation?.position?.lat && v.latestInformation?.position?.lng);
   });
@@ -3183,9 +3250,23 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     effect(() => {
       const el = this.fleetMapEl();
       const vessels = this.fleetVesselsWithPosition();
+      if (!vessels.length) {
+        if (this.vesselLayer) this.vesselLayer.clearLayers();
+        if (this.fleetMap) {
+          this.fleetMap.remove();
+          this.fleetMap = null;
+        }
+        this.vesselLayer = null;
+        this.fleetMapInitialized = false;
+        return;
+      }
       if (!this.fleetMapInitialized && vessels.length && el) {
         this.fleetMapInitialized = true;
         setTimeout(() => this.initFleetMap(), 50);
+        return;
+      }
+      if (this.fleetMap) {
+        this.refreshFleetMap(vessels);
       }
     });
   }
@@ -3253,6 +3334,11 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     this.companyOrders.set([]);
     this.companyVessels.set([]);
     this.fleet.set(null);
+    this.groupFleet.set(null);
+    this.groupFleetLoading.set(false);
+    this.groupVessels.set([]);
+    this.groupVesselsLoading.set(false);
+    this.groupFleetMode.set('own');
     this.fleetMatchBySeasearcherId.set({});
     this.fleetMatchByImo.set({});
     this.fleetRoleSelections.set({});
@@ -3605,6 +3691,9 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
       if (res.success && res.data) {
         this.fleet.set(res.data);
         this.loadFleetLocalMatches(res.data.results);
+        if (this.groupFleetMode() === 'own') {
+          this.refreshFleetMap(this.fleetVesselsWithPosition());
+        }
       }
     } catch {
       // ignore
@@ -3917,12 +4006,22 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
       this.addFleetVesselMarkers(this.fleetVesselsWithPosition());
     });
 
-    this.addFleetVesselMarkers(vessels);
+    this.refreshFleetMap(vessels);
+  }
 
-    // Fit bounds
+  private refreshFleetMap(vessels: Array<FleetVessel | GroupFleetVessel>): void {
+    if (!this.fleetMap || !this.vesselLayer) return;
+    this.addFleetVesselMarkers(vessels);
+    this.fitFleetMapToVessels(vessels);
+    this.fleetMap.invalidateSize();
+  }
+
+  private fitFleetMapToVessels(vessels: Array<FleetVessel | GroupFleetVessel>): void {
+    if (!this.fleetMap) return;
     const bounds = L.latLngBounds([]);
     for (const v of vessels) {
-      const pos = v.latestInformation!.position!;
+      const pos = v.latestInformation?.position;
+      if (!pos?.lat || !pos?.lng) continue;
       bounds.extend(L.latLng(pos.lat, pos.lng));
     }
     if (bounds.isValid()) {
@@ -3930,7 +4029,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  private addFleetVesselMarkers(vessels: FleetVessel[]): void {
+  private addFleetVesselMarkers(vessels: Array<FleetVessel | GroupFleetVessel>): void {
     if (!this.fleetMap || !this.vesselLayer) return;
 
     this.vesselLayer.clearLayers();
@@ -3950,10 +4049,12 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
       const breadth = v.breadthExtreme ? parseFloat(v.breadthExtreme) : null;
       const draught = v.draught ? parseFloat(v.draught) : null;
       const speed = v.latestInformation?.aisSpeed ?? null;
+      const companyName = 'companyName' in v ? v.companyName : null;
 
       const popupLines = [
         `<a href="javascript:void(0)" class="vessel-nav-link text-blue-600 hover:underline font-semibold" data-vessel-id="${v.id}">${v.name}</a>`,
         `IMO: ${v.imo}`,
+        companyName ? `Company: ${companyName}` : null,
         v.type ? `Type: ${v.type}` : null,
         v.flag ? `Flag: ${v.flag.name}` : null,
         loa || breadth
@@ -5252,12 +5353,38 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     }
   }
 
+  async loadGroupFleet(): Promise<void> {
+    const c = this.company();
+    if (!c) return;
+    this.groupFleetLoading.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<GroupFleetResponse>>(`${API}/companies/local/${c.id}/group-fleet`),
+      );
+      if (res.success && res.data) {
+        this.groupFleet.set(res.data);
+        if (this.groupFleetMode() === 'group') {
+          this.refreshFleetMap(this.fleetVesselsWithPosition());
+        }
+      }
+    } catch {
+      this.showToast('error', 'Failed to load group fleet map');
+    } finally {
+      this.groupFleetLoading.set(false);
+    }
+  }
+
   toggleFleetMode(): void {
     const next = this.groupFleetMode() === 'own' ? 'group' : 'own';
     this.groupFleetMode.set(next);
     if (next === 'group' && this.groupVessels().length === 0) {
       this.loadGroupVessels();
     }
+    if (next === 'group' && !this.groupFleet()) {
+      this.loadGroupFleet();
+      return;
+    }
+    this.refreshFleetMap(this.fleetVesselsWithPosition());
   }
 
   openGroupVessel(vessel: GroupVesselRow): void {
