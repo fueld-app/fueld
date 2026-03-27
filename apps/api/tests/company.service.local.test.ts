@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
-import { companyEmails, counterparties } from '../src/db/schema';
+import { companyContacts, companyEmails, counterparties } from '../src/db/schema';
 import { getDb, seedBasics, truncateAll } from './helpers/db';
 
 async function loadCompanyService() {
@@ -143,6 +143,69 @@ describe('company.service local flows', () => {
       .where(eq(counterparties.tenantId, tenant.id))
       .limit(1);
     expect(tenantCompanyCount).toBeTruthy();
+  });
+
+  it('keeps deleted legacy seasearcher contacts hidden on future syncs', async () => {
+    await seedBasics();
+    const db = await getDb();
+    const {
+      createCompany,
+      deleteCompanyContact,
+      getCompanyContacts,
+      syncContactsFromSeasearcher,
+    } = await loadCompanyService();
+
+    const company = await createCompany({
+      name: 'Legacy Contact Co',
+      types: ['CLIENT'],
+      country: 'Singapore',
+      countryIso: 'SG',
+    });
+
+    const [legacyImported] = await db
+      .insert(companyContacts)
+      .values({
+        counterpartyId: company.id,
+        name: 'Sea Contact',
+        role: 'Ops',
+        email: 'office@test.co',
+        phone: '+65 6123 4567',
+        source: 'seasearcher',
+        seasearcherPersonId: null,
+      })
+      .returning();
+
+    await deleteCompanyContact(legacyImported.id);
+
+    await syncContactsFromSeasearcher(company.id, {
+      officeId: 1,
+      country: 'Singapore',
+      town: 'Singapore',
+      countryCode: 'SG',
+      addressLine1: 'Street 1',
+      addressLine2: '',
+      addressLine3: '',
+      addressLine4: '',
+      postCode1: '018956',
+      telephoneNumbers: [{ countryDialingCode: '65', areaDialingCode: '', number: '61234567' }],
+      faxNumbers: [],
+      emailAddress: 'office@test.co',
+      webAddress: 'https://office.test.co',
+      personnel: [
+        { personId: 77, name: 'Sea Contact', jobTitle: 'Ops' },
+      ],
+    });
+
+    const visibleContacts = await getCompanyContacts(company.id);
+    expect(visibleContacts.some((c) => c.name === 'Sea Contact')).toBe(false);
+
+    const storedContacts = await db
+      .select()
+      .from(companyContacts)
+      .where(eq(companyContacts.counterpartyId, company.id));
+    expect(storedContacts).toHaveLength(1);
+    expect(storedContacts[0]?.id).toBe(legacyImported.id);
+    expect(storedContacts[0]?.deletedAt).not.toBeNull();
   });
 
   it('supports company email add/update/delete including primary switch', async () => {

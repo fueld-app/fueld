@@ -1149,7 +1149,7 @@ export async function syncContactsFromSeasearcher(
       existingByPersonId.set(existing.seasearcherPersonId, existing);
       continue;
     }
-    if (existing.source === 'seasearcher' && existing.deletedAt === null) {
+    if (existing.source === 'seasearcher') {
       legacyByFingerprint.set(buildSeasearcherContactFingerprint(existing), existing);
     }
   }
