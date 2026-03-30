@@ -108,14 +108,17 @@ function resolveNominationOrderSupplier(
 
 function countNominationItemsForSupplier(
   order: Awaited<ReturnType<typeof getOrderById>>,
-  orderSupplierId?: string | null,
+  orderSupplier?: { id: string | null; isPrimary?: boolean | null } | null,
 ): number {
   const items = order?.items ?? [];
   const supplierCount = order?.orderSuppliers?.length ?? 0;
-  if (!orderSupplierId || supplierCount <= 1) {
+  if (!orderSupplier?.id || supplierCount <= 1) {
     return items.length;
   }
-  return items.filter((item) => item.orderSupplierId === orderSupplierId).length;
+  return items.filter((item) => {
+    if (item.orderSupplierId === orderSupplier.id) return true;
+    return orderSupplier.isPrimary === true && !item.orderSupplierId;
+  }).length;
 }
 
 async function loadSelectedOrderAttachments(orderId: string, attachmentIds: string[]) {
@@ -292,7 +295,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         set.status = 400;
         return { success: false, message: 'Select a supplier before generating Nomination PDF' };
       }
-      if (countNominationItemsForSupplier(order, nominationSupplier.supplier.id) === 0) {
+      if (countNominationItemsForSupplier(order, nominationSupplier.supplier) === 0) {
         set.status = 400;
         return { success: false, message: 'Assign at least one line item to the selected supplier before generating Nomination PDF' };
       }
@@ -462,7 +465,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           set.status = 400;
           return { success: false, message: nominationSupplier.message ?? 'Select a supplier first' };
         }
-        if (countNominationItemsForSupplier(order, nominationSupplier.supplier.id) === 0) {
+        if (countNominationItemsForSupplier(order, nominationSupplier.supplier) === 0) {
           set.status = 400;
           return { success: false, message: 'Assign at least one line item to the selected supplier before sending Nomination' };
         }

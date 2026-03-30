@@ -2134,7 +2134,7 @@ function resolveNominationSupplierContext(
 
     const items = supplierLegs.length <= 1
       ? order.items
-      : order.items.filter((item) => item.orderSupplierId === selectedSupplier.id);
+      : order.items.filter((item) => item.orderSupplierId === selectedSupplier.id || (selectedSupplier.isPrimary && !item.orderSupplierId));
 
     return {
       selectedSupplier,

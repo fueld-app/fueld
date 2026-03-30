@@ -403,6 +403,17 @@ async function normalizePrimarySupplier(orderId: string, primarySupplierId?: str
   await syncLegacyOrderFieldsFromPrimary(orderId);
 }
 
+async function ensureUniqueOrderSupplierCompany(orderId: string, companyId: string, excludeSupplierRecordId?: string) {
+  const existing = await db
+    .select({ id: orderSuppliers.id })
+    .from(orderSuppliers)
+    .where(and(eq(orderSuppliers.orderId, orderId), eq(orderSuppliers.companyId, companyId)));
+
+  if (existing.some((supplier) => supplier.id !== excludeSupplierRecordId)) {
+    throw new Error('This supplier is already added to the order');
+  }
+}
+
 export async function addOrderSupplier(orderId: string, input: {
   companyId: string;
   contactId?: string | null;
@@ -417,6 +428,8 @@ export async function addOrderSupplier(orderId: string, input: {
     .from(orderSuppliers)
     .where(eq(orderSuppliers.orderId, orderId))
     .orderBy(desc(orderSuppliers.sortOrder));
+
+  await ensureUniqueOrderSupplierCompany(orderId, input.companyId);
 
   const [created] = await db
     .insert(orderSuppliers)
@@ -454,6 +467,10 @@ export async function updateOrderSupplierRecord(orderId: string, supplierRecordI
     .limit(1);
 
   if (!existing) return null;
+
+  if (input.companyId !== undefined) {
+    await ensureUniqueOrderSupplierCompany(orderId, input.companyId, supplierRecordId);
+  }
 
   const setData: Record<string, unknown> = { updatedAt: new Date() };
   if (input.companyId !== undefined) setData.companyId = input.companyId;

@@ -78,6 +78,8 @@ export const counterpartyTypeEnum = pgEnum('counterparty_type', [
   'SUPPLIER',
   'CLIENT',
   'BARGE',
+  'BROKER',
+  'AGENT',
 ]);
 
 export const invoiceStatusEnum = pgEnum('invoice_status', [
@@ -183,7 +185,7 @@ export interface TenantSettings {
   unitConversions?: { productType?: string; fromUnit: string; toUnit: string; factor: number }[];
   // Configurable currency options for order line items
   currencies?: string[];
-  // Configurable company types (e.g. CLIENT, SUPPLIER, BARGE)
+  // Configurable company types (e.g. CLIENT, SUPPLIER, BROKER, AGENT)
   companyTypes?: string[];
   // Configurable reasons required when cancelling inquiries
   inquiryCancelReasons?: string[];

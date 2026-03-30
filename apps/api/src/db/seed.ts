@@ -167,13 +167,19 @@ async function seed() {
   ];
   const suppliers = await db.insert(schema.counterparties).values(suppliersData).returning();
 
-  const bargesData = [
-    { tenantId: tenant.id, name: 'Barge Alpha', type: 'BARGE' as const, types: ['BARGE'], country: 'SG' },
-    { tenantId: tenant.id, name: 'Barge Bravo', type: 'BARGE' as const, types: ['BARGE'], country: 'AE' },
+  const brokersData = [
+    { tenantId: tenant.id, name: 'Aegean Trading Brokers', type: 'BROKER' as const, types: ['BROKER'], country: 'GR' },
+    { tenantId: tenant.id, name: 'Harbor Commercial Brokers', type: 'BROKER' as const, types: ['BROKER'], country: 'SG' },
   ];
-  const barges = await db.insert(schema.counterparties).values(bargesData).returning();
+  const brokers = await db.insert(schema.counterparties).values(brokersData).returning();
 
-  console.log(`  ✓ Counterparties: ${clients.length} clients, ${suppliers.length} suppliers, ${barges.length} barges`);
+  const agentsData = [
+    { tenantId: tenant.id, name: 'Portside Marine Agency', type: 'AGENT' as const, types: ['AGENT'], country: 'AE' },
+    { tenantId: tenant.id, name: 'Bluewater Port Services', type: 'AGENT' as const, types: ['AGENT'], country: 'NL' },
+  ];
+  const agents = await db.insert(schema.counterparties).values(agentsData).returning();
+
+  console.log(`  ✓ Counterparties: ${clients.length} clients, ${suppliers.length} suppliers, ${brokers.length} brokers, ${agents.length} agents`);
 
   // ─── 6. Orders ─────────────────────────────────────────────────────
   const ordersData = [

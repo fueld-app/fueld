@@ -57,6 +57,8 @@ export enum CounterpartyType {
   Supplier = 'SUPPLIER',
   Client = 'CLIENT',
   Barge = 'BARGE',
+  Broker = 'BROKER',
+  Agent = 'AGENT',
 }
 
 /** Invoice lifecycle status. */

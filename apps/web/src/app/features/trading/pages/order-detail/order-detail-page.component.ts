@@ -2022,9 +2022,19 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     return !!currentUserId && this.order()?.salesRepId === currentUserId;
   });
 
-  readonly supplierDropdownOptions = computed<DropdownOption[]>(() =>
-    this.suppliers().map((s) => ({ value: s.id, label: s.name })),
-  );
+  readonly supplierDropdownOptions = computed<DropdownOption[]>(() => {
+    const activeSupplierId = this.activeOrderSupplier()?.id ?? null;
+    const selectedCompanyIds = new Set(
+      this.orderSuppliers()
+        .filter((supplier) => supplier.id !== activeSupplierId)
+        .map((supplier) => supplier.companyId)
+        .filter((companyId) => !!companyId),
+    );
+
+    return this.suppliers()
+      .filter((supplier) => !selectedCompanyIds.has(supplier.id))
+      .map((supplier) => ({ value: supplier.id, label: supplier.name }));
+  });
 
   readonly clientDropdownOptions = computed<DropdownOption[]>(() =>
     this.clients().map((c) => ({ value: c.id, label: c.name })),
@@ -2682,7 +2692,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   private async loadSupplierCreditLines(counterpartyId: string | null | undefined): Promise<void> {
-    if (!counterpartyId) return;
+    if (!counterpartyId) {
+      this.supplierCreditLines.set([]);
+      return;
+    }
     this.supplierCreditLoading.set(true);
     try {
       const res = await firstValueFrom(
@@ -3318,32 +3331,45 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       return;
     }
 
-    const updatedSuppliers: OrderSupplierDto[] = [];
+    const preferredCompanyId = this.activeOrderSupplier()?.companyId ?? null;
     for (const supplier of suppliers) {
-      const res = await firstValueFrom(
-        this.http.put<ApiResponse<OrderSupplierDto>>(`${API_URL}/orders/${orderId}/suppliers/${supplier.id}`, {
-          companyId: supplier.companyId,
-          contactId: supplier.contactId ?? null,
-          paymentTermType: supplier.paymentTermType ?? null,
-          creditDays: supplier.creditDays ?? null,
-          note: supplier.note ?? null,
-          deliveredAt: supplier.deliveredAt ?? null,
-          sortOrder: supplier.sortOrder,
-          isPrimary: supplier.isPrimary,
-        }),
-      );
+      if (!supplier.companyId) continue;
+
+      const endpoint = this.isTemporaryOrderSupplierId(supplier.id)
+        ? `${API_URL}/orders/${orderId}/suppliers`
+        : `${API_URL}/orders/${orderId}/suppliers/${supplier.id}`;
+      const request$ = this.isTemporaryOrderSupplierId(supplier.id)
+        ? this.http.post<ApiResponse<OrderSupplierDto>>(endpoint, {
+            companyId: supplier.companyId,
+            contactId: supplier.contactId ?? null,
+            paymentTermType: supplier.paymentTermType ?? null,
+            creditDays: supplier.creditDays ?? null,
+            note: supplier.note ?? null,
+            deliveredAt: supplier.deliveredAt ?? null,
+            isPrimary: supplier.isPrimary,
+          })
+        : this.http.put<ApiResponse<OrderSupplierDto>>(endpoint, {
+            companyId: supplier.companyId,
+            contactId: supplier.contactId ?? null,
+            paymentTermType: supplier.paymentTermType ?? null,
+            creditDays: supplier.creditDays ?? null,
+            note: supplier.note ?? null,
+            deliveredAt: supplier.deliveredAt ?? null,
+            sortOrder: supplier.sortOrder,
+            isPrimary: supplier.isPrimary,
+          });
+
+      const res = await firstValueFrom(request$);
 
       if (!res.success || !res.data) {
         throw new Error(res.message ?? 'Failed to save supplier details');
       }
-
-      updatedSuppliers.push(res.data);
     }
 
-    this.orderSuppliers.set(updatedSuppliers);
+    await this.reloadOrderSuppliers(orderId, preferredCompanyId);
   }
 
-  private async reloadOrderSuppliers(orderId: string): Promise<void> {
+  private async reloadOrderSuppliers(orderId: string, preferredCompanyId?: string | null): Promise<void> {
     const res = await firstValueFrom(
       this.http.get<ApiResponse<OrderSupplierDto[]>>(`${API_URL}/orders/${orderId}/suppliers`),
     );
@@ -3351,11 +3377,103 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     if (!res.success || !res.data) return;
 
     this.orderSuppliers.set(res.data);
-    const preferredSupplierId = this.activeOrderSupplierId()
+    const currentActiveSupplierId = this.activeOrderSupplierId();
+    const preferredSupplierId = (currentActiveSupplierId && res.data.some((supplier) => supplier.id === currentActiveSupplierId)
+      ? currentActiveSupplierId
+      : null)
+      ?? res.data.find((supplier) => preferredCompanyId && supplier.companyId === preferredCompanyId)?.id
       ?? res.data.find((supplier) => supplier.isPrimary)?.id
       ?? res.data[0]?.id
       ?? null;
     this.activeOrderSupplierId.set(preferredSupplierId);
+  }
+
+  private isTemporaryOrderSupplierId(orderSupplierId: string | null | undefined): boolean {
+    return typeof orderSupplierId === 'string' && orderSupplierId.startsWith('temp:');
+  }
+
+  private async clearActiveSupplierSelection(): Promise<void> {
+    if (this.orderSuppliers().length === 0) {
+      this.order.update((order) => order
+        ? {
+            ...order,
+            supplierId: null,
+            supplierContactId: null,
+            supplierPaymentTermType: null,
+            supplierCreditDays: null,
+            supplierNote: null,
+            deliveredAt: null,
+          }
+        : order);
+      this.supplier.set(null);
+      this.supplierContact.set(null);
+      this.supplierContacts.set([]);
+      this.supplierCreditLines.set([]);
+      this.triggerAutosave();
+      return;
+    }
+
+    const activeSupplier = this.activeOrderSupplier();
+    if (!activeSupplier) return;
+
+    if (this.isTemporaryOrderSupplierId(activeSupplier.id)) {
+      this.orderSuppliers.update((suppliers) => suppliers.filter((supplier) => supplier.id !== activeSupplier.id));
+      const nextActive = this.activeOrderSupplier();
+      this.activeOrderSupplierId.set(nextActive?.id ?? null);
+      this.supplier.set(nextActive?.company ?? null);
+      this.supplierContact.set(nextActive?.contact ?? null);
+      await this.loadSupplierCreditLines(nextActive?.companyId ?? null);
+      if (nextActive?.companyId) {
+        await this.loadCompanyContacts('supplier', nextActive.companyId);
+      } else {
+        this.supplierContacts.set([]);
+      }
+      return;
+    }
+
+    const orderId = this.orderId();
+    if (!orderId) return;
+
+    try {
+      const res = await firstValueFrom(
+        this.http.delete<ApiResponse<{ id: string; isPrimary: boolean }>>(`${API_URL}/orders/${orderId}/suppliers/${activeSupplier.id}`),
+      );
+
+      if (!res.success) {
+        this.showToast('error', res.message ?? 'Failed to remove supplier.');
+        return;
+      }
+
+      await this.reloadOrderSuppliers(orderId);
+
+      const nextActive = this.activeOrderSupplier();
+      const latestDeliveredAt = this.orderSuppliers()
+        .map((supplier) => supplier.deliveredAt)
+        .filter((value): value is string => !!value)
+        .sort()
+        .at(-1) ?? null;
+      this.order.update((order) => order
+        ? {
+            ...order,
+            supplierId: nextActive?.companyId ?? null,
+            supplierContactId: nextActive?.contactId ?? null,
+            supplierPaymentTermType: nextActive?.paymentTermType ?? null,
+            supplierCreditDays: nextActive?.creditDays ?? null,
+            supplierNote: nextActive?.note ?? null,
+            deliveredAt: latestDeliveredAt,
+          }
+        : order);
+      this.supplier.set(nextActive?.company ?? null);
+      this.supplierContact.set(nextActive?.contact ?? null);
+      await this.loadSupplierCreditLines(nextActive?.companyId ?? null);
+      if (nextActive?.companyId) {
+        await this.loadCompanyContacts('supplier', nextActive.companyId);
+      } else {
+        this.supplierContacts.set([]);
+      }
+    } catch {
+      this.showToast('error', 'Failed to remove supplier.');
+    }
   }
 
   private normalizeTimeZone(timeZone: string): string {
@@ -3615,7 +3733,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   onActiveSupplierCompanyChange(supplierId: string): void {
-    if (!supplierId) return;
+    if (!supplierId) {
+      void this.clearActiveSupplierSelection();
+      return;
+    }
     const supplierData = this.suppliers().find((supplier) => supplier.id === supplierId)
       ?? (this.supplier()?.id === supplierId ? this.supplier() : null);
     if (this.orderSuppliers().length === 0) {
@@ -3660,36 +3781,33 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   async addSupplierTab(): Promise<void> {
-    const id = this.orderId();
     const activeSupplier = this.activeOrderSupplier();
-    if (!id || !activeSupplier?.companyId) {
-      this.showToast('error', 'Select a supplier before adding another supplier tab.');
+    if (this.orderSuppliers().some((supplier) => this.isTemporaryOrderSupplierId(supplier.id) && !supplier.companyId)) {
+      this.showToast('error', 'Choose a supplier in the new tab before adding another one.');
       return;
     }
 
-    try {
-      const res = await firstValueFrom(
-        this.http.post<ApiResponse<OrderSupplierDto>>(`${API_URL}/orders/${id}/suppliers`, {
-          companyId: activeSupplier.companyId,
-          contactId: activeSupplier.contactId ?? null,
-          paymentTermType: activeSupplier.paymentTermType ?? null,
-          creditDays: activeSupplier.creditDays ?? null,
-          note: activeSupplier.note ?? null,
-          deliveredAt: activeSupplier.deliveredAt ?? null,
-        }),
-      );
+    const tempId = `temp:${crypto.randomUUID()}`;
+    const nextSortOrder = Math.max(-1, ...this.orderSuppliers().map((supplier) => supplier.sortOrder ?? -1)) + 1;
+    const orderId = this.orderId() ?? activeSupplier?.orderId ?? '';
 
-      if (!res.success || !res.data) {
-        this.showToast('error', res.message ?? 'Failed to add supplier.');
-        return;
-      }
-
-      this.orderSuppliers.update((suppliers) => [...suppliers, res.data!]);
-      this.selectOrderSupplierTab(res.data.id);
-      this.showToast('success', 'Supplier tab added.');
-    } catch {
-      this.showToast('error', 'Failed to add supplier.');
-    }
+    this.orderSuppliers.update((suppliers) => [...suppliers, {
+      id: tempId,
+      orderId,
+      companyId: '',
+      contactId: null,
+      paymentTermType: null,
+      creditDays: null,
+      note: null,
+      sortOrder: nextSortOrder,
+      isPrimary: false,
+      deliveredAt: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      company: null,
+      contact: null,
+    }]);
+    this.selectOrderSupplierTab(tempId);
   }
 
   private updateActiveOrderSupplier(

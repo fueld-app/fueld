@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
-import { seedAuthBasics, truncateAll } from './helpers/db';
+import { counterparties } from '../src/db/schema';
+import { getDb, seedAuthBasics, truncateAll } from './helpers/db';
 import { loginE2E, requestJson, requestRaw } from './helpers/e2e';
 
 describe('orders controller branch e2e', () => {
@@ -252,5 +253,80 @@ describe('orders controller branch e2e', () => {
     expect(cancelConfirmedValidReason.data?.success).toBe(true);
     expect(cancelConfirmedValidReason.data?.data?.status).toBe('CANCELLED');
     expect(cancelConfirmedValidReason.data?.data?.lossReason).toBe('Price not competitive');
+  });
+
+  it('rejects duplicate suppliers on the same order', async () => {
+    const seeded = await seedAuthBasics();
+    const db = await getDb();
+    const login = await loginE2E(seeded.user.email, seeded.password);
+    const token = login.accessToken;
+
+    const [primarySupplier] = await db
+      .insert(counterparties)
+      .values({
+        tenantId: seeded.tenant.id,
+        name: 'Primary Duplicate Guard Supplier',
+        type: 'SUPPLIER',
+        types: ['SUPPLIER'],
+      })
+      .returning();
+
+    const [secondarySupplier] = await db
+      .insert(counterparties)
+      .values({
+        tenantId: seeded.tenant.id,
+        name: 'Secondary Duplicate Guard Supplier',
+        type: 'SUPPLIER',
+        types: ['SUPPLIER'],
+      })
+      .returning();
+
+    const created = await requestJson('/orders', {
+      method: 'POST',
+      token,
+      body: {
+        clientId: seeded.client.id,
+        vesselId: seeded.vessel.id,
+        placeId: seeded.place.id,
+        supplierId: primarySupplier!.id,
+      },
+    });
+
+    expect(created.status).toBe(200);
+    expect(created.data?.success).toBe(true);
+
+    const orderId = created.data?.data?.id as string;
+
+    const added = await requestJson(`/orders/${orderId}/suppliers`, {
+      method: 'POST',
+      token,
+      body: {
+        companyId: secondarySupplier!.id,
+      },
+    });
+    expect(added.status).toBe(200);
+    expect(added.data?.success).toBe(true);
+
+    const duplicateAdd = await requestJson(`/orders/${orderId}/suppliers`, {
+      method: 'POST',
+      token,
+      body: {
+        companyId: secondarySupplier!.id,
+      },
+    });
+    expect(duplicateAdd.status).toBe(200);
+    expect(duplicateAdd.data?.success).toBe(false);
+    expect(String(duplicateAdd.data?.message ?? '')).toContain('already added to the order');
+
+    const duplicateUpdate = await requestJson(`/orders/${orderId}/suppliers/${added.data?.data?.id}`, {
+      method: 'PUT',
+      token,
+      body: {
+        companyId: primarySupplier!.id,
+      },
+    });
+    expect(duplicateUpdate.status).toBe(200);
+    expect(duplicateUpdate.data?.success).toBe(false);
+    expect(String(duplicateUpdate.data?.message ?? '')).toContain('already added to the order');
   });
 });

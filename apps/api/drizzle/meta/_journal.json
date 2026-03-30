@@ -73,6 +73,20 @@
       "breakpoints": true
     },
     {
+      "idx": 65,
+      "version": "7",
+      "when": 1774900000000,
+      "tag": "0065_order_suppliers",
+      "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1775000000000,
+      "tag": "0066_company_types_broker_agent",
+      "breakpoints": true
+    },
+    {
       "idx": 7,
       "version": "7",
       "when": 1771200003000,

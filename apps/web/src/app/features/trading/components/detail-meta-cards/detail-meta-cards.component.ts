@@ -139,7 +139,7 @@ import {
                 [clearable]="true"
                 placeholder="Search brokers..."
                 (searchChange)="brokerSearch.emit($event)"
-                (selectionChange)="brokerChange.emit($event)"
+                (selectionChange)="handleBrokerSelection($event)"
               />
             }
             @if (brokerId()) {
@@ -207,7 +207,7 @@ import {
                 [clearable]="true"
                 placeholder="Search companies..."
                 (searchChange)="agentSearch.emit($event)"
-                (selectionChange)="agentChange.emit($event)"
+                (selectionChange)="handleAgentSelection($event)"
               />
             }
             @if (agentId()) {
@@ -268,6 +268,7 @@ import {
               [selected]="supplierId()"
               [asyncSearch]="true"
               [loading]="supplierLoading()"
+              [clearable]="true"
               placeholder="Search suppliers..."
               (searchChange)="supplierSearch.emit($event)"
               (selectionChange)="supplierChange.emit($event)"
@@ -566,6 +567,30 @@ export class TradingDetailMetaCardsComponent {
   openAgentTab(): void {
     this.agentExpanded.set(true);
     this.clientPartyTab.set('agent');
+  }
+
+  handleBrokerSelection(brokerId: string): void {
+    if (!brokerId) {
+      this.brokerExpanded.set(false);
+      if (this.activeClientPartyTab() === 'broker') {
+        this.clientPartyTab.set(this.showAgentTab() ? 'agent' : 'client');
+      }
+    } else {
+      this.brokerExpanded.set(true);
+    }
+    this.brokerChange.emit(brokerId);
+  }
+
+  handleAgentSelection(agentId: string): void {
+    if (!agentId) {
+      this.agentExpanded.set(false);
+      if (this.activeClientPartyTab() === 'agent') {
+        this.clientPartyTab.set(this.showBrokerTab() ? 'broker' : 'client');
+      }
+    } else {
+      this.agentExpanded.set(true);
+    }
+    this.agentChange.emit(agentId);
   }
 
   navigateToClient(): void {

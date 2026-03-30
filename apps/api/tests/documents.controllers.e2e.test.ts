@@ -158,6 +158,42 @@ describe('documents + verify controller e2e', () => {
     expect(invoice.headers.get('content-disposition')).toContain('attachment; filename="Fueld_Invoice_');
   });
 
+  it('allows nomination for the primary supplier when legacy items remain unassigned after adding a second supplier', async () => {
+    const { token, orderId, tenantId } = await seedDocumentReadyOrder();
+    const db = await getDb();
+
+    const [secondarySupplier] = await db
+      .insert(counterparties)
+      .values({
+        tenantId,
+        name: 'Supplier Co Legacy B',
+        type: 'SUPPLIER',
+        types: ['SUPPLIER'],
+        country: 'Sweden',
+      })
+      .returning();
+
+    const addedSupplier = await requestJson(`/orders/${orderId}/suppliers`, {
+      method: 'POST',
+      token,
+      body: {
+        companyId: secondarySupplier!.id,
+      },
+    });
+    expect(addedSupplier.status).toBe(200);
+    expect(addedSupplier.data?.success).toBe(true);
+
+    const detail = await requestJson(`/orders/${orderId}`, { token });
+    expect(detail.status).toBe(200);
+
+    const suppliers = detail.data?.data?.orderSuppliers ?? [];
+    const primarySupplier = suppliers.find((supplier: any) => supplier.companyId !== secondarySupplier!.id);
+    expect(primarySupplier?.id).toBeTruthy();
+
+    const nomination = await requestRaw(`/orders/${orderId}/nomination/pdf?orderSupplierId=${primarySupplier.id}`, { token });
+    expect(nomination.status).toBe(200);
+    expect(nomination.headers.get('content-type')).toContain('application/pdf');
+  });
   it('maps document controller validation branches for missing order and prerequisites', async () => {
     const seeded = await seedAuthBasics();
     const login = await loginE2E(seeded.user.email, seeded.password);

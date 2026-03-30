@@ -47,7 +47,7 @@ interface CompanySearchResult {
         <div>
           <h1 class="text-2xl font-bold text-gray-900">Companies</h1>
           <p class="mt-1 text-sm text-gray-500">
-            Manage clients, suppliers and barges.
+            Manage clients, suppliers, brokers and agents.
             Import from Seasearcher or create manually.
           </p>
         </div>
@@ -152,9 +152,9 @@ interface CompanySearchResult {
           class="rounded-lg border border-gray-300 py-2 pl-3 pr-8 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
         >
           <option value="">All Types</option>
-          <option value="CLIENT">Client</option>
-          <option value="SUPPLIER">Supplier</option>
-          <option value="BARGE">Barge</option>
+          @for (type of availableTypes(); track type) {
+            <option [value]="type">{{ typeLabel(type) }}</option>
+          }
         </select>
 
         <!-- Filter by responsible -->
@@ -364,7 +364,7 @@ interface CompanySearchResult {
                 <div class="col-span-2">
                   <label class="block text-sm font-medium text-gray-700 mb-1">Type(s) *</label>
                   <div class="flex flex-wrap gap-3">
-                    @for (opt of typeOptions; track opt.value) {
+                    @for (opt of typeOptions(); track opt.value) {
                       <label class="inline-flex items-center gap-1.5 cursor-pointer">
                         <input type="checkbox" [checked]="createForm().types.includes(opt.value)"
                           (change)="toggleType(opt.value)"
@@ -452,11 +452,8 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
     countryIso: '',
   });
   readonly countries = SORTED_COUNTRIES;
-  readonly typeOptions = [
-    { value: 'CLIENT', label: 'Client' },
-    { value: 'SUPPLIER', label: 'Supplier' },
-    { value: 'BARGE', label: 'Barge' },
-  ];
+  readonly availableTypes = signal<string[]>(['CLIENT', 'SUPPLIER', 'BROKER', 'AGENT']);
+  readonly typeOptions = () => this.availableTypes().map((type) => ({ value: type, label: this.typeLabel(type) }));
 
   ngOnInit(): void {
     // Restore page & filter from URL query params
@@ -475,6 +472,7 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
     if (segment) this.filterSegment.set(segment);
 
     this.loadCompanies();
+    this.loadCompanyTypes();
     this.loadUsers();
     this.loadSegmentCategories();
 
@@ -621,6 +619,19 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
     } catch { /* ignore */ }
   }
 
+  private async loadCompanyTypes(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ companyTypes: string[] }>>(`${API}/admin/settings/my-company-types`),
+      );
+      if (res.success && res.data?.companyTypes?.length) {
+        this.availableTypes.set(res.data.companyTypes);
+      }
+    } catch {
+      // Keep defaults if fetch fails
+    }
+  }
+
   // ─── Delete ────────────────────────────────────────────────────────
   confirmDelete(company: CounterpartyDto, event: Event): void {
     event.stopPropagation();
@@ -732,7 +743,8 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
     switch (type) {
       case 'CLIENT': return 'bg-blue-100 text-blue-700';
       case 'SUPPLIER': return 'bg-green-100 text-green-700';
-      case 'BARGE': return 'bg-amber-100 text-amber-700';
+      case 'BROKER': return 'bg-cyan-100 text-cyan-700';
+      case 'AGENT': return 'bg-indigo-100 text-indigo-700';
       default: return 'bg-gray-100 text-gray-700';
     }
   }

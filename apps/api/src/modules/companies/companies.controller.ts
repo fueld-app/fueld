@@ -352,7 +352,8 @@ export const companiesController = new Elysia({ prefix: '/companies' })
           t.Union([
             t.Literal('SUPPLIER'),
             t.Literal('CLIENT'),
-            t.Literal('BARGE'),
+            t.Literal('BROKER'),
+            t.Literal('AGENT'),
           ]),
           { minItems: 1 },
         ),
@@ -386,7 +387,8 @@ export const companiesController = new Elysia({ prefix: '/companies' })
           t.Union([
             t.Literal('SUPPLIER'),
             t.Literal('CLIENT'),
-            t.Literal('BARGE'),
+            t.Literal('BROKER'),
+            t.Literal('AGENT'),
           ]),
           { minItems: 1 },
         ),

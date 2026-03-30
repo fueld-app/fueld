@@ -3059,7 +3059,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     return [...groups.entries()].map(([group, roles]) => ({ group, roles }));
   });
 
-  readonly allTypes = signal<string[]>(['CLIENT', 'SUPPLIER', 'BARGE']);
+  readonly allTypes = signal<string[]>(['CLIENT', 'SUPPLIER', 'BROKER', 'AGENT']);
 
   // Inline editing state
   readonly editing = signal(false);
@@ -4302,7 +4302,8 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     switch (type) {
       case 'CLIENT': return 'bg-blue-100 text-blue-700';
       case 'SUPPLIER': return 'bg-green-100 text-green-700';
-      case 'BARGE': return 'bg-amber-100 text-amber-700';
+      case 'BROKER': return 'bg-cyan-100 text-cyan-700';
+      case 'AGENT': return 'bg-indigo-100 text-indigo-700';
       default: return 'bg-gray-100 text-gray-700';
     }
   }

@@ -958,7 +958,7 @@ export async function updateFinancingSettings(annualRate: number): Promise<{ ann
 //  COMPANY TYPE SETTINGS
 // ═══════════════════════════════════════════════════════════════════════
 
-const DEFAULT_COMPANY_TYPES = ['CLIENT', 'SUPPLIER', 'BARGE'];
+const DEFAULT_COMPANY_TYPES = ['CLIENT', 'SUPPLIER', 'BROKER', 'AGENT'];
 const DEFAULT_ATTACHMENT_TYPES = ['BDR', 'OTHER'];
 
 export async function getCompanyTypeSettings(): Promise<{ companyTypes: string[] }> {
