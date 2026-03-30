@@ -1,5 +1,5 @@
-ALTER TYPE counterparty_type ADD VALUE IF NOT EXISTS 'BROKER';
-ALTER TYPE counterparty_type ADD VALUE IF NOT EXISTS 'AGENT';
+ALTER TYPE "public"."counterparty_type" ADD VALUE IF NOT EXISTS 'BROKER';--> statement-breakpoint
+ALTER TYPE "public"."counterparty_type" ADD VALUE IF NOT EXISTS 'AGENT';--> statement-breakpoint
 
 WITH normalized AS (
   SELECT

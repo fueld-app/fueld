@@ -52,41 +52,6 @@
       "breakpoints": true
     },
     {
-      "idx": 62,
-      "version": "7",
-      "when": 1774200000000,
-      "tag": "0062_company_contact_sync_overrides",
-      "breakpoints": true
-    },
-    {
-      "idx": 63,
-      "version": "7",
-      "when": 1774300000000,
-      "tag": "0063_company_attachments",
-      "breakpoints": true
-    },
-    {
-      "idx": 64,
-      "version": "7",
-      "when": 1774800000000,
-      "tag": "0064_order_agent",
-      "breakpoints": true
-    },
-    {
-      "idx": 65,
-      "version": "7",
-      "when": 1774900000000,
-      "tag": "0065_order_suppliers",
-      "breakpoints": true
-    },
-    {
-      "idx": 66,
-      "version": "7",
-      "when": 1775000000000,
-      "tag": "0066_company_types_broker_agent",
-      "breakpoints": true
-    },
-    {
       "idx": 7,
       "version": "7",
       "when": 1771200003000,
@@ -472,10 +437,38 @@
       "breakpoints": true
     },
     {
+      "idx": 62,
+      "version": "7",
+      "when": 1774200000000,
+      "tag": "0062_company_contact_sync_overrides",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1774300000000,
+      "tag": "0063_company_attachments",
+      "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1774800000000,
+      "tag": "0064_order_agent",
+      "breakpoints": true
+    },
+    {
       "idx": 65,
       "version": "7",
       "when": 1774900000000,
       "tag": "0065_order_suppliers",
+      "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1775000000000,
+      "tag": "0066_company_types_broker_agent",
       "breakpoints": true
     }
   ]

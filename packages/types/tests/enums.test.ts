@@ -91,6 +91,8 @@ describe('enums', () => {
       Supplier: 'SUPPLIER',
       Client: 'CLIENT',
       Barge: 'BARGE',
+      Broker: 'BROKER',
+      Agent: 'AGENT',
     });
   });
 
