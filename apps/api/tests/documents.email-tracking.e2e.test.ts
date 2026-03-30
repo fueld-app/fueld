@@ -15,6 +15,7 @@ import {
   counterparties,
   emailLog,
   emailRules,
+  orderSuppliers,
   orders,
   places,
   portSuppliers,
@@ -1365,7 +1366,7 @@ describe('email tracking, inquiry send & WhatsApp group notifications', () => {
 
   describe('GET /orders/:id/inquiry/suppliers', () => {
     it('returns supplier performance stats for overall and place-specific deliveries', async () => {
-      const { token, orderId, tenantId, userId, supplier, place, client, vessel } = await seedDocumentReadyOrder();
+      const { token, orderId, tenantId, userId, supplier, supplier2, place, client, vessel } = await seedDocumentReadyOrder();
       const db = await getDb();
 
       const [otherPlace] = await db
@@ -1415,7 +1416,48 @@ describe('email tracking, inquiry send & WhatsApp group notifications', () => {
           currency: 'USD',
           deliveredAt: new Date('2026-01-15T10:00:00.000Z'),
         },
+        {
+          tenantId,
+          clientId: client.id,
+          vesselId: vessel.id,
+          placeId: place.id,
+          supplierId: supplier.id,
+          status: 'INVOICED',
+          currency: 'USD',
+          deliveredAt: new Date('2026-03-10T15:30:00.000Z'),
+        },
       ]).returning();
+
+      await db.insert(orderSuppliers).values([
+        {
+          orderId: historicalOrders[0]!.id,
+          companyId: supplier.id,
+          sortOrder: 0,
+          isPrimary: true,
+          deliveredAt: new Date('2026-02-20T10:00:00.000Z'),
+        },
+        {
+          orderId: historicalOrders[1]!.id,
+          companyId: supplier.id,
+          sortOrder: 0,
+          isPrimary: true,
+          deliveredAt: new Date('2026-01-15T10:00:00.000Z'),
+        },
+        {
+          orderId: historicalOrders[2]!.id,
+          companyId: supplier.id,
+          sortOrder: 0,
+          isPrimary: true,
+          deliveredAt: new Date('2026-03-10T15:30:00.000Z'),
+        },
+        {
+          orderId: historicalOrders[2]!.id,
+          companyId: supplier2.id,
+          sortOrder: 1,
+          isPrimary: false,
+          deliveredAt: new Date('2026-03-10T12:00:00.000Z'),
+        },
+      ]);
 
       await db.insert(supplierInquiries).values([
         {
@@ -1451,10 +1493,10 @@ describe('email tracking, inquiry send & WhatsApp group notifications', () => {
       expect(rows.length).toBe(1);
       expect(rows[0]?.supplierId).toBe(supplier.id);
       expect(rows[0]?.performance).toEqual({
-        deliveredCountOverall: 2,
-        deliveredCountAtPlace: 1,
-        lastDeliveredAtOverall: '2026-02-20T10:00:00.000Z',
-        lastDeliveredAtPlace: '2026-02-20T10:00:00.000Z',
+        deliveredCountOverall: 3,
+        deliveredCountAtPlace: 2,
+        lastDeliveredAtOverall: '2026-03-10T15:30:00.000Z',
+        lastDeliveredAtPlace: '2026-03-10T15:30:00.000Z',
         sentCount: 2,
         quotedCount: 1,
         declinedCount: 0,

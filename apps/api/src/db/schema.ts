@@ -750,12 +750,32 @@ export const priceReferences = pgTable('price_references', {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
+//  10c. ORDER SUPPLIERS (per-order supplier legs)
+// ═══════════════════════════════════════════════════════════════════════
+
+export const orderSuppliers = pgTable('order_suppliers', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
+  companyId: uuid('company_id').notNull().references(() => counterparties.id),
+  contactId: uuid('contact_id').references(() => companyContacts.id, { onDelete: 'set null' }),
+  paymentTermType: paymentTermTypeEnum('payment_term_type'),
+  creditDays: integer('credit_days'),
+  note: text('note'),
+  sortOrder: integer('sort_order').notNull().default(0),
+  isPrimary: boolean('is_primary').notNull().default(false),
+  deliveredAt: timestamp('delivered_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ═══════════════════════════════════════════════════════════════════════
 //  11. ORDER ITEMS (line items per order)
 // ═══════════════════════════════════════════════════════════════════════
 
 export const orderItems = pgTable('order_items', {
   id: uuid('id').defaultRandom().primaryKey(),
   orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
+  orderSupplierId: uuid('order_supplier_id').references(() => orderSuppliers.id, { onDelete: 'set null' }),
 
   productType: productTypeEnum('product_type').notNull(),
   quantity: numeric('quantity', { precision: 12, scale: 3 }).notNull(),
@@ -1417,6 +1437,7 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
     relationName: 'invoicingOrders',
   }),
   bankAccount: one(bankAccounts, { fields: [orders.bankAccountId], references: [bankAccounts.id] }),
+  orderSuppliers: many(orderSuppliers),
   items: many(orderItems),
   invoices: many(invoices),
   attachments: many(orderAttachments),
@@ -1424,8 +1445,17 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
   documentRevisions: many(documentRevisions),
 }));
 
+export const orderSuppliersRelations = relations(orderSuppliers, ({ one, many }) => ({
+  order: one(orders, { fields: [orderSuppliers.orderId], references: [orders.id] }),
+  company: one(counterparties, { fields: [orderSuppliers.companyId], references: [counterparties.id] }),
+  contact: one(companyContacts, { fields: [orderSuppliers.contactId], references: [companyContacts.id] }),
+  items: many(orderItems),
+  supplierNominations: many(supplierNominations),
+}));
+
 export const orderItemsRelations = relations(orderItems, ({ one }) => ({
   order: one(orders, { fields: [orderItems.orderId], references: [orders.id] }),
+  orderSupplier: one(orderSuppliers, { fields: [orderItems.orderSupplierId], references: [orderSuppliers.id] }),
   costPlattsEntry: one(plattsReportEntries, {
     fields: [orderItems.costPlattsEntryId],
     references: [plattsReportEntries.id],
@@ -1613,6 +1643,9 @@ export type NewVessel = typeof vessels.$inferInsert;
 
 export type Order = typeof orders.$inferSelect;
 export type NewOrder = typeof orders.$inferInsert;
+
+export type OrderSupplier = typeof orderSuppliers.$inferSelect;
+export type NewOrderSupplier = typeof orderSuppliers.$inferInsert;
 
 export type OrderItem = typeof orderItems.$inferSelect;
 export type NewOrderItem = typeof orderItems.$inferInsert;
@@ -1802,6 +1835,7 @@ export type NewSupplierInquiryItemQuote = typeof supplierInquiryItemQuotes.$infe
 export const supplierNominations = pgTable('supplier_nominations', {
   id: uuid('id').defaultRandom().primaryKey(),
   orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
+  orderSupplierId: uuid('order_supplier_id').references(() => orderSuppliers.id, { onDelete: 'set null' }),
   supplierId: uuid('supplier_id').notNull().references(() => counterparties.id, { onDelete: 'cascade' }),
   contactId: uuid('contact_id').references(() => companyContacts.id, { onDelete: 'set null' }),
   email: text('email').notNull(),
@@ -1830,6 +1864,7 @@ export const supplierNominationAttachments = pgTable('supplier_nomination_attach
 
 export const supplierNominationsRelations = relations(supplierNominations, ({ one, many }) => ({
   order: one(orders, { fields: [supplierNominations.orderId], references: [orders.id] }),
+  orderSupplier: one(orderSuppliers, { fields: [supplierNominations.orderSupplierId], references: [orderSuppliers.id] }),
   supplier: one(counterparties, { fields: [supplierNominations.supplierId], references: [counterparties.id] }),
   contact: one(companyContacts, { fields: [supplierNominations.contactId], references: [companyContacts.id] }),
   sentByUser: one(users, { fields: [supplierNominations.sentByUserId], references: [users.id] }),

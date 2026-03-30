@@ -41,6 +41,7 @@ export interface SendEmailAttachmentOption {
 
 export interface SendEmailPayload {
   documentType: DocumentEmailType;
+  orderSupplierId?: string | null;
   recipientEmail: string;
   ccEmails: string[];
   bccEmails: string[];
@@ -588,6 +589,7 @@ export class SendEmailModalComponent {
   readonly senderEmail = input<string>('');
   readonly pdfFileName = input<string>('');
   readonly orderId = input<string>('');
+  readonly nominationOrderSupplierId = input<string | null>(null);
   readonly extraAttachments = input<SendEmailAttachmentOption[]>([]);
   /** Whether the current user has linked WhatsApp in Settings */
   readonly waLinked = input(false);
@@ -769,8 +771,12 @@ export class SendEmailModalComponent {
     };
 
     this.loadingPreview.set(true);
+    const query = docType === 'NOMINATION' && this.nominationOrderSupplierId()
+      ? `?orderSupplierId=${encodeURIComponent(this.nominationOrderSupplierId()!)}`
+      : '';
+
     this.http
-      .get(`${API_URL}/orders/${oid}/${pdfEndpoints[docType]}/pdf`, {
+      .get(`${API_URL}/orders/${oid}/${pdfEndpoints[docType]}/pdf${query}`, {
         responseType: 'blob',
       })
       .subscribe({
@@ -809,6 +815,7 @@ export class SendEmailModalComponent {
 
     this.sendEmail.emit({
       documentType: this.documentType(),
+      orderSupplierId: this.documentType() === 'NOMINATION' ? this.nominationOrderSupplierId() : null,
       recipientEmail: toEmails[0],
       ccEmails: this.ccInput()?.getEmails() ?? [],
       bccEmails: this.bccInput()?.getEmails() ?? [],

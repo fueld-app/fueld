@@ -8,7 +8,7 @@ import { getPortSuppliers } from '../lloyds/lli.service';
 import { logActivity } from '../activity/activity.service';
 import { sendWhatsAppGroupMessage, sendWhatsAppMessage } from '../whatsapp/whatsapp.service';
 import { db } from '../../db';
-import { users, counterparties, invoices as invoicesTable, companyContacts, companyEmails, supplierInquiries, supplierInquiryItemQuotes, portSuppliers, emailLog, tenants, orders, orderAttachments } from '../../db/schema';
+import { users, counterparties, invoices as invoicesTable, companyContacts, companyEmails, supplierInquiries, supplierInquiryItemQuotes, portSuppliers, emailLog, tenants, orders, orderAttachments, orderSuppliers } from '../../db/schema';
 import { getEmailTemplate, getApplicableEmailRules, renderTemplate, type TemplateVariables } from '../admin/email-settings.service';
 import { getInquirySettings } from '../admin/settings.service';
 import { applyStaleSupplierInquiryStatuses, createSupplierQuoteToken, getSupplierQuoteExpiryDate, getSupplierQuoteFormUrl, getSupplierInquiryOrderContext, saveSupplierInquiryResponse } from './supplier-inquiry.service';
@@ -64,6 +64,58 @@ function injectNominationResponseLink(htmlBody: string, responseUrl: string): st
     return replaced;
   }
   return `${replaced}${buildNominationResponseLinkCardHtml(responseUrl)}`;
+}
+
+function resolveNominationOrderSupplier(
+  order: Awaited<ReturnType<typeof getOrderById>>,
+  orderSupplierId?: string | null,
+) {
+  const supplierLegs = order?.orderSuppliers ?? [];
+  if (supplierLegs.length > 0) {
+    if (orderSupplierId) {
+      const selected = supplierLegs.find((supplier) => supplier.id === orderSupplierId) ?? null;
+      if (!selected) {
+        return { supplier: null, message: 'Selected supplier does not belong to this order' };
+      }
+      return { supplier: selected, message: null };
+    }
+
+    if (supplierLegs.length > 1) {
+      return { supplier: null, message: 'Select which supplier you want to nominate first' };
+    }
+
+    return { supplier: supplierLegs[0]!, message: null };
+  }
+
+  if (!order?.supplierId) {
+    return { supplier: null, message: 'Select a supplier first' };
+  }
+
+  return {
+    supplier: {
+      id: null,
+      companyId: order.supplierId,
+      contactId: order.supplierContactId ?? null,
+      paymentTermType: order.supplierPaymentTermType ?? null,
+      creditDays: order.supplierCreditDays ?? null,
+      note: order.supplierNote ?? null,
+      company: order.supplier ?? null,
+      contact: order.supplierContact ?? null,
+    },
+    message: null,
+  };
+}
+
+function countNominationItemsForSupplier(
+  order: Awaited<ReturnType<typeof getOrderById>>,
+  orderSupplierId?: string | null,
+): number {
+  const items = order?.items ?? [];
+  const supplierCount = order?.orderSuppliers?.length ?? 0;
+  if (!orderSupplierId || supplierCount <= 1) {
+    return items.length;
+  }
+  return items.filter((item) => item.orderSupplierId === orderSupplierId).length;
 }
 
 async function loadSelectedOrderAttachments(orderId: string, attachmentIds: string[]) {
@@ -223,23 +275,41 @@ export const documentsController = new Elysia({ prefix: '/orders' })
   // ── GET /orders/:id/nomination/pdf ────────────────────────────────
   .get(
     '/:id/nomination/pdf',
-    async ({ params, set }) => {
+    async ({ params, query, set }) => {
       const orderId = await resolveOrderId(params.id);
       if (!orderId) { set.status = 404; return { success: false, message: 'Order not found' }; }
       const order = await getOrderById(orderId);
+      const nominationSupplier = resolveNominationOrderSupplier(order, query.orderSupplierId ?? null);
+      if (nominationSupplier.message) {
+        set.status = 400;
+        return { success: false, message: nominationSupplier.message };
+      }
       if (!order?.items?.length) {
         set.status = 400;
         return { success: false, message: 'Add at least one line item before generating documents' };
       }
-      if (!order?.supplierId) {
+      if (!nominationSupplier.supplier) {
         set.status = 400;
         return { success: false, message: 'Select a supplier before generating Nomination PDF' };
+      }
+      if (countNominationItemsForSupplier(order, nominationSupplier.supplier.id) === 0) {
+        set.status = 400;
+        return { success: false, message: 'Assign at least one line item to the selected supplier before generating Nomination PDF' };
       }
       if (!order?.invoicingCompanyId) {
         set.status = 400;
         return { success: false, message: 'Select an invoicing company before generating Nomination PDF' };
       }
-      const { buffer, fileName, revision } = await generateNominationPdfBuffer(orderId);
+
+      let result;
+      try {
+        result = await generateNominationPdfBuffer(orderId, { orderSupplierId: nominationSupplier.supplier.id ?? null });
+      } catch (error: any) {
+        set.status = 400;
+        return { success: false, message: error?.message ?? 'Failed to generate Nomination PDF' };
+      }
+
+      const { buffer, fileName, revision } = result;
 
       set.headers['Content-Type'] = 'application/pdf';
       set.headers['Content-Disposition'] = `attachment; filename="${fileName}"`;
@@ -253,6 +323,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
     },
     {
       params: t.Object({ id: t.String() }),
+      query: t.Object({ orderSupplierId: t.Optional(t.String()) }),
       detail: {
         tags: ['Documents'],
         summary: 'Generate nomination PDF for an order',
@@ -263,18 +334,19 @@ export const documentsController = new Elysia({ prefix: '/orders' })
 
   .get(
     '/:id/nomination-response',
-    async ({ params, set }) => {
+    async ({ params, query, set }) => {
       const orderId = await resolveOrderId(params.id);
       if (!orderId) {
         set.status = 404;
         return { success: false, data: null, message: 'Order not found' };
       }
 
-      const summary = await getSupplierNominationSummary(orderId);
+      const summary = await getSupplierNominationSummary(orderId, query.orderSupplierId ?? null);
       return { success: true, data: summary };
     },
     {
       params: t.Object({ id: t.String() }),
+      query: t.Object({ orderSupplierId: t.Optional(t.String()) }),
       detail: {
         tags: ['Documents'],
         summary: 'Get latest supplier nomination response for an order',
@@ -382,13 +454,25 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       let pdfBuffer: Buffer;
       let pdfFileName: string;
       let nominationResponseUrl: string | null = null;
+      let nominationSupplierId: string | null = null;
 
       if (docType === 'NOMINATION') {
-        if (!order.supplierId) { set.status = 400; return { success: false, message: 'Select a supplier first' }; }
+        const nominationSupplier = resolveNominationOrderSupplier(order, body.orderSupplierId ?? null);
+        if (nominationSupplier.message || !nominationSupplier.supplier) {
+          set.status = 400;
+          return { success: false, message: nominationSupplier.message ?? 'Select a supplier first' };
+        }
+        if (countNominationItemsForSupplier(order, nominationSupplier.supplier.id) === 0) {
+          set.status = 400;
+          return { success: false, message: 'Assign at least one line item to the selected supplier before sending Nomination' };
+        }
+
+        nominationSupplierId = nominationSupplier.supplier.id ?? null;
         const { rawToken } = await createSupplierNominationLink({
           orderId,
-          supplierId: order.supplierId,
-          contactId: order.supplierContactId ?? null,
+          orderSupplierId: nominationSupplierId,
+          supplierId: nominationSupplier.supplier.companyId,
+          contactId: nominationSupplier.supplier.contactId ?? null,
           email: body.recipientEmail,
           subject: body.subject,
           sentByUserId: auth.userId,
@@ -406,9 +490,11 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           break;
         }
         case 'NOMINATION': {
-          if (!order.supplierId) { set.status = 400; return { success: false, message: 'Select a supplier first' }; }
           if (!order.invoicingCompanyId) { set.status = 400; return { success: false, message: 'Select an invoicing company first' }; }
-          const result = await generateNominationPdfBuffer(orderId, { responseUrl: nominationResponseUrl });
+          const result = await generateNominationPdfBuffer(orderId, {
+            orderSupplierId: nominationSupplierId,
+            responseUrl: nominationResponseUrl,
+          });
           pdfBuffer = result.buffer;
           pdfFileName = result.fileName;
           break;
@@ -507,6 +593,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         bccEmails: t.Optional(t.Array(t.String({ format: 'email' }), { description: 'BCC email addresses' })),
         subject: t.String({ description: 'Email subject line' }),
         htmlBody: t.String({ description: 'HTML email body' }),
+        orderSupplierId: t.Optional(t.String({ description: 'Supplier leg to target for nomination emails' })),
         attachmentIds: t.Optional(t.Array(t.String(), { description: 'Order attachment ids to include with the email' })),
       }),
       detail: {
@@ -554,13 +641,14 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       let recipientEmail = '';
       let recipientName = '';
       if (docType === 'NOMINATION') {
-        recipientEmail = order.supplierContact?.email ?? '';
-        recipientName = order.supplierContact?.name ?? '';
-        // Try to get supplier name if we have supplierId
-        if (!recipientName && order.supplierId) {
-          const [supplier] = await db.select({ name: counterparties.name }).from(counterparties).where(eq(counterparties.id, order.supplierId)).limit(1);
-          recipientName = supplier?.name ?? '';
+        const nominationSupplier = resolveNominationOrderSupplier(order, body.orderSupplierId ?? null);
+        if (nominationSupplier.message || !nominationSupplier.supplier) {
+          set.status = 400;
+          return { success: false, message: nominationSupplier.message ?? 'Select a supplier first' };
         }
+
+        recipientEmail = nominationSupplier.supplier.contact?.email ?? '';
+        recipientName = nominationSupplier.supplier.contact?.name ?? nominationSupplier.supplier.company?.name ?? '';
       } else if (order.brokerGetsAll && order.brokerContact) {
         // Broker gets all customer-facing comms
         recipientEmail = order.brokerContact.email ?? '';
@@ -611,7 +699,16 @@ export const documentsController = new Elysia({ prefix: '/orders' })
 
       // Payment terms — use supplier terms for nominations, customer terms otherwise
       const paymentTerms = docType === 'NOMINATION'
-        ? formatCustomerPaymentTerms(order.supplierPaymentTermType, order.supplierCreditDays)
+        ? (() => {
+            const nominationSupplier = resolveNominationOrderSupplier(order, body.orderSupplierId ?? null);
+            if (!nominationSupplier.supplier) {
+              return formatCustomerPaymentTerms(order.supplierPaymentTermType, order.supplierCreditDays);
+            }
+            return formatCustomerPaymentTerms(
+              nominationSupplier.supplier.paymentTermType ?? null,
+              nominationSupplier.supplier.creditDays ?? null,
+            );
+          })()
         : formatCustomerPaymentTerms(order.customerPaymentTermType, order.customerCreditDays);
 
       // Invoice number (for invoice type) — fetch from invoices table
@@ -722,6 +819,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           t.Literal('PROFORMA'),
           t.Literal('INVOICE'),
         ]),
+        orderSupplierId: t.Optional(t.String()),
       }),
       detail: {
         tags: ['Documents'],
@@ -890,15 +988,17 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       const historicalDeliveredOrders = supplierCompanyIds.length > 0
         ? await db
             .select({
-              supplierId: orders.supplierId,
+              supplierId: orderSuppliers.companyId,
               placeId: orders.placeId,
-              deliveredAt: orders.deliveredAt,
+              deliveredAt: orderSuppliers.deliveredAt,
+              orderDeliveredAt: orders.deliveredAt,
               updatedAt: orders.updatedAt,
             })
-            .from(orders)
+            .from(orderSuppliers)
+            .innerJoin(orders, eq(orderSuppliers.orderId, orders.id))
             .where(
               and(
-                inArray(orders.supplierId, supplierCompanyIds),
+                inArray(orderSuppliers.companyId, supplierCompanyIds),
                 inArray(orders.status, ['DELIVERED', 'INVOICED', 'PAID']),
               ),
             )
@@ -956,7 +1056,11 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         const stats = performanceBySupplier.get(historicalOrder.supplierId);
         if (!stats) continue;
 
-        const deliveredIso = (historicalOrder.deliveredAt ?? historicalOrder.updatedAt)?.toISOString() ?? null;
+        const deliveredIso = (
+          historicalOrder.deliveredAt
+          ?? historicalOrder.orderDeliveredAt
+          ?? historicalOrder.updatedAt
+        )?.toISOString() ?? null;
         stats.deliveredCountOverall += 1;
         if (deliveredIso && (!stats.lastDeliveredAtOverall || deliveredIso > stats.lastDeliveredAtOverall)) {
           stats.lastDeliveredAtOverall = deliveredIso;

@@ -10,6 +10,7 @@ import {
   creditLines,
   counterparties,
   orders,
+  orderSuppliers,
   orderItems,
   creditLineCompanies,
   creditLineCounterparties,
@@ -36,12 +37,13 @@ async function calcUsedAmountForSupplier(counterpartyIds: string[]): Promise<str
       total: sql<string>`coalesce(sum(${orderItems.costPrice}::numeric * ${orderItems.quantity}::numeric), 0)::text`,
     })
     .from(orderItems)
+    .innerJoin(orderSuppliers, eq(orderItems.orderSupplierId, orderSuppliers.id))
     .innerJoin(orders, eq(orderItems.orderId, orders.id))
     .where(
       and(
-        inArray(orders.supplierId, counterpartyIds),
-        eq(orders.supplierPaymentTermType, 'CREDIT'),
-        inArray(orders.status, [...CUSTOMER_ACTIVE_STATUSES]),
+        inArray(orderSuppliers.companyId, counterpartyIds),
+        eq(orderSuppliers.paymentTermType, 'CREDIT'),
+        inArray(orders.status, [...SUPPLIER_ACTIVE_STATUSES]),
       ),
     );
   return row?.total ?? '0';

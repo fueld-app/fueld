@@ -3,7 +3,11 @@ import { and, desc, eq, gt, inArray, isNull, or } from 'drizzle-orm';
 import type { SupplierNominationAttachmentDto, SupplierNominationSummaryDto } from '@fueld/types';
 import { db } from '../../db';
 import {
+  counterparties,
   orderAttachments,
+  orders,
+  orderSuppliers,
+  companyContacts,
   supplierNominationAttachments,
   supplierNominations,
   type SupplierNomination,
@@ -61,7 +65,33 @@ export async function getSupplierNominationByToken(rawToken: string): Promise<Su
   return nomination ?? null;
 }
 
-export async function invalidateActiveSupplierNominations(orderId: string): Promise<number> {
+async function syncOrderDeliveredAtFromSuppliers(orderId: string): Promise<void> {
+  const rows = await db
+    .select({ deliveredAt: orderSuppliers.deliveredAt })
+    .from(orderSuppliers)
+    .where(eq(orderSuppliers.orderId, orderId));
+
+  const deliveredAtValues = rows
+    .map((row) => row.deliveredAt?.getTime() ?? 0)
+    .filter((value) => value > 0);
+
+  const deliveredAt = deliveredAtValues.length > 0
+    ? new Date(Math.max(...deliveredAtValues))
+    : null;
+
+  await db
+    .update(orders)
+    .set({
+      deliveredAt,
+      updatedAt: new Date(),
+    })
+    .where(eq(orders.id, orderId));
+}
+
+export async function invalidateActiveSupplierNominations(input: {
+  orderId: string;
+  orderSupplierId?: string | null;
+}): Promise<number> {
   const updated = await db
     .update(supplierNominations)
     .set({
@@ -70,7 +100,10 @@ export async function invalidateActiveSupplierNominations(orderId: string): Prom
       updatedAt: new Date(),
     })
     .where(and(
-      eq(supplierNominations.orderId, orderId),
+      eq(supplierNominations.orderId, input.orderId),
+      input.orderSupplierId
+        ? eq(supplierNominations.orderSupplierId, input.orderSupplierId)
+        : isNull(supplierNominations.orderSupplierId),
       inArray(supplierNominations.status, [...ACTIVE_SUPPLIER_NOMINATION_STATUSES]),
     ))
     .returning({ id: supplierNominations.id });
@@ -80,19 +113,24 @@ export async function invalidateActiveSupplierNominations(orderId: string): Prom
 
 export async function createSupplierNominationLink(input: {
   orderId: string;
+  orderSupplierId?: string | null;
   supplierId: string;
   contactId?: string | null;
   email: string;
   subject: string;
   sentByUserId?: string | null;
 }): Promise<{ nomination: SupplierNomination; rawToken: string }> {
-  await invalidateActiveSupplierNominations(input.orderId);
+  await invalidateActiveSupplierNominations({
+    orderId: input.orderId,
+    orderSupplierId: input.orderSupplierId ?? null,
+  });
 
   const token = createSupplierNominationToken();
   const [created] = await db
     .insert(supplierNominations)
     .values({
       orderId: input.orderId,
+      orderSupplierId: input.orderSupplierId ?? null,
       supplierId: input.supplierId,
       contactId: input.contactId ?? null,
       email: input.email,
@@ -169,6 +207,18 @@ export async function saveSupplierNominationResponse(input: {
     })
     .where(eq(supplierNominations.id, input.nomination.id));
 
+  if (input.nomination.orderSupplierId) {
+    await db
+      .update(orderSuppliers)
+      .set({
+        deliveredAt: deliveryCompletedAt,
+        updatedAt: new Date(),
+      })
+      .where(eq(orderSuppliers.id, input.nomination.orderSupplierId));
+
+    await syncOrderDeliveredAtFromSuppliers(input.nomination.orderId);
+  }
+
   return { success: true };
 }
 
@@ -203,24 +253,47 @@ export async function listSupplierNominationAttachments(supplierNominationId: st
   }));
 }
 
-export async function getLatestSupplierNominationForOrder(orderId: string): Promise<SupplierNomination | null> {
+export async function getLatestSupplierNominationForOrder(
+  orderId: string,
+  orderSupplierId?: string | null,
+): Promise<SupplierNomination | null> {
   const [nomination] = await db
     .select()
     .from(supplierNominations)
-    .where(eq(supplierNominations.orderId, orderId))
+    .where(and(
+      eq(supplierNominations.orderId, orderId),
+      orderSupplierId
+        ? eq(supplierNominations.orderSupplierId, orderSupplierId)
+        : undefined,
+    ))
     .orderBy(desc(supplierNominations.sentAt))
     .limit(1);
 
   return nomination ?? null;
 }
 
-export async function getSupplierNominationSummary(orderId: string): Promise<SupplierNominationSummaryDto | null> {
-  const nomination = await getLatestSupplierNominationForOrder(orderId);
+export async function getSupplierNominationSummary(
+  orderId: string,
+  orderSupplierId?: string | null,
+): Promise<SupplierNominationSummaryDto | null> {
+  const nomination = await getLatestSupplierNominationForOrder(orderId, orderSupplierId);
   if (!nomination) return null;
 
-  const attachments = await listSupplierNominationAttachments(nomination.id);
+  const [attachments, supplier] = await Promise.all([
+    listSupplierNominationAttachments(nomination.id),
+    db
+      .select({ name: counterparties.name })
+      .from(counterparties)
+      .where(eq(counterparties.id, nomination.supplierId))
+      .limit(1)
+      .then((rows) => rows[0] ?? null),
+  ]);
+
   return {
     id: nomination.id,
+    orderSupplierId: nomination.orderSupplierId ?? null,
+    supplierId: nomination.supplierId,
+    supplierName: supplier?.name ?? null,
     status: nomination.status,
     sentAt: nomination.sentAt.toISOString(),
     openedAt: nomination.openedAt?.toISOString() ?? null,

@@ -16,6 +16,10 @@ import { authGuard } from '../auth/auth.guard';
 import {
   listOrders,
   getOrderById,
+  getOrderSuppliers,
+  addOrderSupplier,
+  updateOrderSupplierRecord,
+  deleteOrderSupplierRecord,
   createOrder,
   updateOrder,
   deleteOrder,
@@ -108,6 +112,137 @@ export const ordersController = new Elysia({ prefix: '/orders' })
       detail: {
         tags: ['Orders'],
         summary: 'Get a single order with all relations and items',
+      },
+    },
+  )
+
+  // ─── Order Suppliers ───────────────────────────────────────────────
+  .get(
+    '/:id/suppliers',
+    async ({ params }) => {
+      try {
+        const orderId = await resolveOrderId(params.id);
+        if (!orderId) return { success: false, data: [], message: 'Order not found' };
+        const suppliers = await getOrderSuppliers(orderId);
+        return { success: true, data: suppliers } satisfies ApiResponse<typeof suppliers>;
+      } catch (err) {
+        console.error('[Orders] Supplier list failed:', err);
+        return { success: false, data: [], message: 'Failed to load order suppliers' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: {
+        tags: ['Orders'],
+        summary: 'List supplier legs for an order',
+      },
+    },
+  )
+  .post(
+    '/:id/suppliers',
+    async ({ params, body, auth }) => {
+      try {
+        const orderId = await resolveOrderId(params.id);
+        if (!orderId) return { success: false, data: null, message: 'Order not found' };
+        const supplier = await addOrderSupplier(orderId, body);
+        await logActivity({
+          userId: auth.sub,
+          action: 'UPDATE',
+          entityType: 'order',
+          entityId: orderId,
+          metadata: { action: 'add_supplier_leg', companyId: body.companyId },
+        });
+        return { success: true, data: supplier } satisfies ApiResponse<typeof supplier>;
+      } catch (err) {
+        console.error('[Orders] Add supplier failed:', err);
+        const message = err instanceof Error ? err.message : 'Failed to add order supplier';
+        return { success: false, data: null, message };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({
+        companyId: t.String(),
+        contactId: t.Optional(t.Nullable(t.String())),
+        paymentTermType: t.Optional(t.Nullable(PaymentTermTypeSchema)),
+        creditDays: t.Optional(t.Nullable(t.Number())),
+        note: t.Optional(t.Nullable(t.String())),
+        deliveredAt: t.Optional(t.Nullable(t.String())),
+        isPrimary: t.Optional(t.Boolean()),
+      }),
+      detail: {
+        tags: ['Orders'],
+        summary: 'Add a supplier leg to an order',
+      },
+    },
+  )
+  .put(
+    '/:id/suppliers/:supplierRecordId',
+    async ({ params, body, auth }) => {
+      try {
+        const orderId = await resolveOrderId(params.id);
+        if (!orderId) return { success: false, data: null, message: 'Order not found' };
+        const supplier = await updateOrderSupplierRecord(orderId, params.supplierRecordId, body);
+        if (!supplier) return { success: false, data: null, message: 'Order supplier not found' };
+        await logActivity({
+          userId: auth.sub,
+          action: 'UPDATE',
+          entityType: 'order',
+          entityId: orderId,
+          metadata: { action: 'update_supplier_leg', supplierRecordId: params.supplierRecordId },
+        });
+        return { success: true, data: supplier } satisfies ApiResponse<typeof supplier>;
+      } catch (err) {
+        console.error('[Orders] Update supplier failed:', err);
+        const message = err instanceof Error ? err.message : 'Failed to update order supplier';
+        return { success: false, data: null, message };
+      }
+    },
+    {
+      params: t.Object({ id: t.String(), supplierRecordId: t.String() }),
+      body: t.Object({
+        companyId: t.Optional(t.String()),
+        contactId: t.Optional(t.Nullable(t.String())),
+        paymentTermType: t.Optional(t.Nullable(PaymentTermTypeSchema)),
+        creditDays: t.Optional(t.Nullable(t.Number())),
+        note: t.Optional(t.Nullable(t.String())),
+        deliveredAt: t.Optional(t.Nullable(t.String())),
+        sortOrder: t.Optional(t.Number()),
+        isPrimary: t.Optional(t.Boolean()),
+      }),
+      detail: {
+        tags: ['Orders'],
+        summary: 'Update a supplier leg on an order',
+      },
+    },
+  )
+  .delete(
+    '/:id/suppliers/:supplierRecordId',
+    async ({ params, auth }) => {
+      try {
+        const orderId = await resolveOrderId(params.id);
+        if (!orderId) return { success: false, data: null, message: 'Order not found' };
+        const deleted = await deleteOrderSupplierRecord(orderId, params.supplierRecordId);
+        if (!deleted) return { success: false, data: null, message: 'Order supplier not found' };
+        await logActivity({
+          userId: auth.sub,
+          action: 'UPDATE',
+          entityType: 'order',
+          entityId: orderId,
+          metadata: { action: 'delete_supplier_leg', supplierRecordId: params.supplierRecordId },
+        });
+        return { success: true, data: deleted } satisfies ApiResponse<typeof deleted>;
+      } catch (err) {
+        console.error('[Orders] Delete supplier failed:', err);
+        const message = err instanceof Error ? err.message : 'Failed to remove order supplier';
+        return { success: false, data: null, message };
+      }
+    },
+    {
+      params: t.Object({ id: t.String(), supplierRecordId: t.String() }),
+      detail: {
+        tags: ['Orders'],
+        summary: 'Remove a supplier leg from an order',
       },
     },
   )
@@ -381,6 +516,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         items: t.Array(
           t.Object({
             id: t.Optional(t.String()),
+            orderSupplierId: t.Optional(t.Nullable(t.String())),
             productType: t.String(),
             quantity: t.String(),
             quantityMin: t.Optional(t.Nullable(t.String())),

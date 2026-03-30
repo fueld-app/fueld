@@ -215,4 +215,96 @@ describe('credit.service', () => {
     });
     expect(missingUpdate).toBeNull();
   });
+
+  it('computes supplier credit per supplier leg on the same order', async () => {
+    const { tenant, client, vessel, place, user } = await seedBasics();
+    const db = await getDb();
+    const { createCreditLine, getCreditLineById } = await loadCreditService();
+    const { addOrderSupplier, createOrder, getOrderById, saveOrderItems, updateOrderStatus } = await loadOrdersService();
+
+    const [supplierA] = await db
+      .insert(counterparties)
+      .values({
+        tenantId: tenant.id,
+        name: 'Supplier A',
+        type: 'SUPPLIER',
+        types: ['SUPPLIER'],
+      })
+      .returning();
+
+    const [supplierB] = await db
+      .insert(counterparties)
+      .values({
+        tenantId: tenant.id,
+        name: 'Supplier B',
+        type: 'SUPPLIER',
+        types: ['SUPPLIER'],
+      })
+      .returning();
+
+    const creditA = await createCreditLine({
+      type: 'SUPPLIER',
+      counterpartyIds: [supplierA!.id],
+      creditAmount: '1000.00',
+      currency: 'USD',
+      periodDays: 30,
+    });
+
+    const creditB = await createCreditLine({
+      type: 'SUPPLIER',
+      counterpartyIds: [supplierB!.id],
+      creditAmount: '1000.00',
+      currency: 'USD',
+      periodDays: 30,
+    });
+
+    const order = await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+      supplierId: supplierA!.id,
+      supplierPaymentTermType: 'CREDIT',
+    });
+
+    const detail = await getOrderById(order.id);
+    const primarySupplier = detail?.orderSuppliers?.find((supplier) => supplier.companyId === supplierA!.id);
+    expect(primarySupplier?.id).toBeTruthy();
+
+    const secondarySupplier = await addOrderSupplier(order.id, {
+      companyId: supplierB!.id,
+      paymentTermType: 'CREDIT',
+    });
+
+    await updateOrderStatus(order.id, 'CONFIRMED', user.id);
+    await saveOrderItems(order.id, [
+      {
+        productType: 'VLSFO',
+        quantity: '3',
+        orderSupplierId: primarySupplier!.id,
+        costPrice: '100',
+        costCurrency: 'USD',
+        salesPrice: '120',
+        salesCurrency: 'USD',
+      },
+      {
+        productType: 'MGO',
+        quantity: '5',
+        orderSupplierId: secondarySupplier!.id,
+        costPrice: '50',
+        costCurrency: 'USD',
+        salesPrice: '70',
+        salesCurrency: 'USD',
+      },
+    ]);
+
+    const enrichedA = await getCreditLineById(creditA!.id);
+    const enrichedB = await getCreditLineById(creditB!.id);
+
+    expect(enrichedA?.usedAmount).toBe('300.00');
+    expect(enrichedB?.usedAmount).toBe('250.00');
+    expect(enrichedA?.availableAmount).toBe('700.00');
+    expect(enrichedB?.availableAmount).toBe('750.00');
+  });
 });

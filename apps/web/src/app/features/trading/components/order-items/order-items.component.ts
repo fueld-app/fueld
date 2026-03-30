@@ -30,6 +30,7 @@ import { WebSocketService } from '../../../../core/websocket/websocket.service';
 /** Local mutable model for an order item row. */
 export interface OrderItemRow {
   id: string;
+  orderSupplierId?: string | null;
   productType: string;
   description: string;
   quantity: number;
@@ -118,6 +119,9 @@ export interface OrderItemsEconomics {
         <thead>
           <tr class="border-b border-gray-200 bg-gray-50/80">
             <th class="px-4 py-3 text-left font-medium text-gray-600 min-w-[140px]">Product</th>
+            @if (showSupplierColumn()) {
+              <th class="px-4 py-3 text-left font-medium text-gray-600 min-w-[160px]">Supplier</th>
+            }
             <th class="px-4 py-3 text-left font-medium text-gray-600 min-w-[180px]">Description</th>
             <th class="px-4 py-3 text-left font-medium text-gray-600 min-w-[120px]">Qty</th>
             @if (allowDeliveredEdit()) {
@@ -149,6 +153,26 @@ export interface OrderItemsEconomics {
                   />
                 }
               </td>
+
+              @if (showSupplierColumn()) {
+                <td class="px-4 py-2">
+                  @if (readonly()) {
+                    <span class="text-sm text-gray-700">{{ supplierLabel(row.orderSupplierId) }}</span>
+                  } @else {
+                    <select
+                      [ngModel]="row.orderSupplierId ?? ''"
+                      (ngModelChange)="updateField(i, 'orderSupplierId', $event || null)"
+                      class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                             focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                    >
+                      <option value="">Select supplier</option>
+                      @for (supplier of supplierOptions(); track supplier.value) {
+                        <option [value]="supplier.value">{{ supplier.label }}</option>
+                      }
+                    </select>
+                  }
+                </td>
+              }
 
               <!-- Description -->
               <td class="px-4 py-2">
@@ -669,6 +693,27 @@ export interface OrderItemsEconomics {
               }
             </div>
 
+            @if (showSupplierColumn()) {
+              <div class="col-span-2">
+                <label class="mb-1 block text-xs font-medium text-gray-500">Supplier</label>
+                @if (readonly()) {
+                  <span class="text-sm text-gray-700">{{ supplierLabel(row.orderSupplierId) }}</span>
+                } @else {
+                  <select
+                    [ngModel]="row.orderSupplierId ?? ''"
+                    (ngModelChange)="updateField(i, 'orderSupplierId', $event || null)"
+                    class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                  >
+                    <option value="">Select supplier</option>
+                    @for (supplier of supplierOptions(); track supplier.value) {
+                      <option [value]="supplier.value">{{ supplier.label }}</option>
+                    }
+                  </select>
+                }
+              </div>
+            }
+
             <!-- Description -->
             <div class="col-span-2">
               <label class="mb-1 block text-xs font-medium text-gray-500">Description</label>
@@ -1100,6 +1145,7 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   readonly unitOptionsInput = input<DropdownOption[]>([]);
   readonly unitConversionsInput = input<{ productType?: string; fromUnit: string; toUnit: string; factor: number }[]>([]);
   readonly currencyOptionsInput = input<DropdownOption[]>([]);
+  readonly supplierOptionsInput = input<DropdownOption[]>([]);
   readonly priceReferencesInput = input<{ id: string; name: string; code: string }[]>([]);
   readonly plattsSuggestionsInput = input<PlattsSuggestionsResponseDto['items']>([]);
   readonly itemsChange = output<OrderItemRow[]>();
@@ -1241,6 +1287,11 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
     this.priceReferencesInput().map((r) => ({ value: r.id, label: r.name })),
   );
 
+  readonly supplierOptions = computed(() => this.supplierOptionsInput());
+  readonly showSupplierColumn = computed(() =>
+    this.supplierOptions().length > 1 || this.rows().some((row) => !!row.orderSupplierId),
+  );
+
   readonly plattsSuggestionsByKey = computed(() =>
     new Map(this.plattsSuggestionsInput().map((item) => [item.key, item.matches] as const)),
   );
@@ -1290,6 +1341,7 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   addRow(): void {
     const newRow: OrderItemRow = {
       id: crypto.randomUUID(),
+      orderSupplierId: this.supplierOptions().length === 1 ? this.supplierOptions()[0]!.value : null,
       productType: '',
       description: '',
       quantity: 0,
@@ -1365,6 +1417,11 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
 
     const parsed = Number(normalized);
     return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  supplierLabel(orderSupplierId: string | null | undefined): string {
+    if (!orderSupplierId) return 'Unassigned';
+    return this.supplierOptions().find((supplier) => supplier.value === orderSupplierId)?.label ?? 'Unknown supplier';
   }
 
   /** Update the main quantity (used for calculations/invoicing) */

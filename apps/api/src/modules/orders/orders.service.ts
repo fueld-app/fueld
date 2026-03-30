@@ -8,6 +8,7 @@ import { eq, and, desc, asc, sql, ilike, inArray, or } from 'drizzle-orm';
 import { db } from '../../db';
 import {
   orders,
+  orderSuppliers,
   orderItems,
   orderAttachments,
   counterparties,
@@ -105,6 +106,7 @@ interface UpdateOrderInput {
 
 interface SaveItemInput {
   id?: string;
+  orderSupplierId?: string | null;
   productType: string;
   quantity: string;
   quantityMin?: string | null;
@@ -220,6 +222,281 @@ async function getCounterpartyById(counterpartyId: string | null | undefined) {
 
     return legacyRow ? { ...legacyRow, companyRegistrationNumber: null } : null;
   }
+}
+
+async function getCompanyContactById(contactId: string | null | undefined) {
+  if (!contactId) return null;
+
+  const [row] = await db
+    .select()
+    .from(companyContacts)
+    .where(eq(companyContacts.id, contactId))
+    .limit(1);
+
+  return row
+    ? { ...row, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() }
+    : null;
+}
+
+function normalizeOptionalTimestamp(value: string | Date | null | undefined): Date | null {
+  if (!value) return null;
+  const parsed = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+async function listOrderSuppliers(orderId: string) {
+  const rows = await db
+    .select()
+    .from(orderSuppliers)
+    .where(eq(orderSuppliers.orderId, orderId))
+    .orderBy(asc(orderSuppliers.sortOrder), asc(orderSuppliers.createdAt));
+
+  return Promise.all(rows.map(async (row) => ({
+    id: row.id,
+    orderId: row.orderId,
+    companyId: row.companyId,
+    contactId: row.contactId ?? null,
+    paymentTermType: row.paymentTermType ?? null,
+    creditDays: row.creditDays ?? null,
+    note: row.note ?? null,
+    sortOrder: row.sortOrder,
+    isPrimary: row.isPrimary,
+    deliveredAt: row.deliveredAt?.toISOString() ?? null,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+    company: await getCounterpartyById(row.companyId),
+    contact: await getCompanyContactById(row.contactId),
+  })));
+}
+
+function deriveOrderDeliveredAtIso(
+  orderDeliveredAt: Date | null,
+  suppliers: Array<{ deliveredAt: string | null }>,
+): string | null {
+  const candidateMs = [
+    orderDeliveredAt?.getTime() ?? 0,
+    ...suppliers
+      .map((supplier) => supplier.deliveredAt ? Date.parse(supplier.deliveredAt) : 0)
+      .filter((value) => Number.isFinite(value) && value > 0),
+  ];
+
+  const latestMs = Math.max(...candidateMs);
+  return latestMs > 0 ? new Date(latestMs).toISOString() : null;
+}
+
+async function syncPrimaryOrderSupplierFromLegacy(order: {
+  id: string;
+  supplierId: string | null;
+  supplierContactId: string | null;
+  supplierPaymentTermType: 'CREDIT' | 'COD' | 'PREPAY' | null;
+  supplierCreditDays: number | null;
+  supplierNote: string | null;
+  deliveredAt: Date | null;
+}) {
+  const [primarySupplier] = await db
+    .select()
+    .from(orderSuppliers)
+    .where(and(eq(orderSuppliers.orderId, order.id), eq(orderSuppliers.isPrimary, true)))
+    .orderBy(asc(orderSuppliers.sortOrder), asc(orderSuppliers.createdAt))
+    .limit(1);
+
+  if (!order.supplierId) {
+    if (primarySupplier) {
+      await db
+        .update(orderItems)
+        .set({ orderSupplierId: null, updatedAt: new Date() })
+        .where(eq(orderItems.orderSupplierId, primarySupplier.id));
+
+      await db.delete(orderSuppliers).where(eq(orderSuppliers.id, primarySupplier.id));
+    }
+    return;
+  }
+
+  const payload = {
+    companyId: order.supplierId,
+    contactId: order.supplierContactId ?? null,
+    paymentTermType: order.supplierPaymentTermType ?? null,
+    creditDays: order.supplierCreditDays ?? null,
+    note: order.supplierNote ?? null,
+    deliveredAt: normalizeOptionalTimestamp(order.deliveredAt),
+    updatedAt: new Date(),
+  };
+
+  if (primarySupplier) {
+    await db
+      .update(orderSuppliers)
+      .set(payload)
+      .where(eq(orderSuppliers.id, primarySupplier.id));
+    return;
+  }
+
+  await db.insert(orderSuppliers).values({
+    orderId: order.id,
+    companyId: payload.companyId,
+    contactId: payload.contactId,
+    paymentTermType: payload.paymentTermType,
+    creditDays: payload.creditDays,
+    note: payload.note,
+    deliveredAt: payload.deliveredAt,
+    sortOrder: 0,
+    isPrimary: true,
+  });
+}
+
+async function syncLegacyOrderFieldsFromPrimary(orderId: string) {
+  const suppliers = await db
+    .select()
+    .from(orderSuppliers)
+    .where(eq(orderSuppliers.orderId, orderId))
+    .orderBy(desc(orderSuppliers.isPrimary), asc(orderSuppliers.sortOrder), asc(orderSuppliers.createdAt));
+
+  const primary = suppliers.find((supplier) => supplier.isPrimary) ?? suppliers[0] ?? null;
+  const deliveredAtValues = suppliers
+    .map((supplier) => supplier.deliveredAt?.getTime() ?? 0)
+    .filter((value) => value > 0);
+  const latestDeliveredAt = deliveredAtValues.length > 0 ? new Date(Math.max(...deliveredAtValues)) : null;
+
+  await db
+    .update(orders)
+    .set({
+      supplierId: primary?.companyId ?? null,
+      supplierContactId: primary?.contactId ?? null,
+      supplierPaymentTermType: primary?.paymentTermType ?? null,
+      supplierCreditDays: primary?.creditDays ?? null,
+      supplierNote: primary?.note ?? null,
+      deliveredAt: latestDeliveredAt,
+      updatedAt: new Date(),
+    })
+    .where(eq(orders.id, orderId));
+}
+
+async function normalizePrimarySupplier(orderId: string, primarySupplierId?: string | null) {
+  const suppliers = await db
+    .select({ id: orderSuppliers.id, isPrimary: orderSuppliers.isPrimary })
+    .from(orderSuppliers)
+    .where(eq(orderSuppliers.orderId, orderId))
+    .orderBy(asc(orderSuppliers.sortOrder), asc(orderSuppliers.createdAt));
+
+  if (!suppliers.length) {
+    await syncLegacyOrderFieldsFromPrimary(orderId);
+    return;
+  }
+
+  const targetId = primarySupplierId ?? suppliers.find((supplier) => supplier.isPrimary)?.id ?? suppliers[0]!.id;
+
+  await db
+    .update(orderSuppliers)
+    .set({
+      isPrimary: false,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(orderSuppliers.orderId, orderId), eq(orderSuppliers.isPrimary, true)));
+
+  await db
+    .update(orderSuppliers)
+    .set({
+      isPrimary: true,
+      updatedAt: new Date(),
+    })
+    .where(eq(orderSuppliers.id, targetId));
+
+  await syncLegacyOrderFieldsFromPrimary(orderId);
+}
+
+export async function addOrderSupplier(orderId: string, input: {
+  companyId: string;
+  contactId?: string | null;
+  paymentTermType?: 'CREDIT' | 'COD' | 'PREPAY' | null;
+  creditDays?: number | null;
+  note?: string | null;
+  deliveredAt?: string | null;
+  isPrimary?: boolean;
+}) {
+  const existing = await db
+    .select({ id: orderSuppliers.id, sortOrder: orderSuppliers.sortOrder })
+    .from(orderSuppliers)
+    .where(eq(orderSuppliers.orderId, orderId))
+    .orderBy(desc(orderSuppliers.sortOrder));
+
+  const [created] = await db
+    .insert(orderSuppliers)
+    .values({
+      orderId,
+      companyId: input.companyId,
+      contactId: input.contactId ?? null,
+      paymentTermType: input.paymentTermType ?? null,
+      creditDays: input.creditDays ?? null,
+      note: input.note ?? null,
+      deliveredAt: normalizeOptionalTimestamp(input.deliveredAt),
+      sortOrder: (existing[0]?.sortOrder ?? -1) + 1,
+      isPrimary: existing.length === 0 || input.isPrimary === true,
+    })
+    .returning();
+
+  await normalizePrimarySupplier(orderId, created.isPrimary ? created.id : null);
+  return (await listOrderSuppliers(orderId)).find((supplier) => supplier.id === created.id) ?? null;
+}
+
+export async function updateOrderSupplierRecord(orderId: string, supplierRecordId: string, input: {
+  companyId?: string;
+  contactId?: string | null;
+  paymentTermType?: 'CREDIT' | 'COD' | 'PREPAY' | null;
+  creditDays?: number | null;
+  note?: string | null;
+  deliveredAt?: string | null;
+  sortOrder?: number;
+  isPrimary?: boolean;
+}) {
+  const [existing] = await db
+    .select()
+    .from(orderSuppliers)
+    .where(and(eq(orderSuppliers.id, supplierRecordId), eq(orderSuppliers.orderId, orderId)))
+    .limit(1);
+
+  if (!existing) return null;
+
+  const setData: Record<string, unknown> = { updatedAt: new Date() };
+  if (input.companyId !== undefined) setData.companyId = input.companyId;
+  if (input.contactId !== undefined) setData.contactId = input.contactId;
+  if (input.paymentTermType !== undefined) setData.paymentTermType = input.paymentTermType;
+  if (input.creditDays !== undefined) setData.creditDays = input.creditDays;
+  if (input.note !== undefined) setData.note = input.note;
+  if (input.deliveredAt !== undefined) setData.deliveredAt = normalizeOptionalTimestamp(input.deliveredAt);
+  if (input.sortOrder !== undefined) setData.sortOrder = input.sortOrder;
+  if (input.isPrimary !== undefined) setData.isPrimary = input.isPrimary;
+
+  await db
+    .update(orderSuppliers)
+    .set(setData)
+    .where(eq(orderSuppliers.id, supplierRecordId));
+
+  await normalizePrimarySupplier(orderId, input.isPrimary ? supplierRecordId : null);
+  return (await listOrderSuppliers(orderId)).find((supplier) => supplier.id === supplierRecordId) ?? null;
+}
+
+export async function deleteOrderSupplierRecord(orderId: string, supplierRecordId: string) {
+  const [usage] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(orderItems)
+    .where(and(eq(orderItems.orderId, orderId), eq(orderItems.orderSupplierId, supplierRecordId)));
+
+  if ((usage?.count ?? 0) > 0) {
+    throw new Error('Reassign line items before removing this supplier');
+  }
+
+  const [deleted] = await db
+    .delete(orderSuppliers)
+    .where(and(eq(orderSuppliers.id, supplierRecordId), eq(orderSuppliers.orderId, orderId)))
+    .returning({ id: orderSuppliers.id, isPrimary: orderSuppliers.isPrimary });
+
+  if (!deleted) return null;
+
+  await normalizePrimarySupplier(orderId, null);
+  return deleted;
+}
+
+export async function getOrderSuppliers(orderId: string) {
+  return listOrderSuppliers(orderId);
 }
 
 function normalizeOrderNumberTemplate(template: string): string {
@@ -503,7 +780,7 @@ export async function getOrderById(idOrNumber: string) {
   if (!row) return null;
 
   // Fetch relations in parallel
-  const [client, supplier, vessel, place, salesRep, invoicingCompany, items, customerContact, supplierContact, broker, brokerContact, agent, agentContact, tenant] =
+  const [client, supplier, vessel, place, salesRep, invoicingCompany, items, customerContact, supplierContact, broker, brokerContact, agent, agentContact, tenant, orderSupplierRows] =
     await Promise.all([
       getCounterpartyById(row.clientId),
       getCounterpartyById(row.supplierId),
@@ -573,6 +850,7 @@ export async function getOrderById(idOrNumber: string) {
         where: eq(tenants.id, row.tenantId),
         columns: { settings: true },
       }),
+      listOrderSuppliers(row.id),
     ]);
 
   const financingRateAnnual = getFinancingRateAnnual((tenant?.settings ?? {}) as TenantSettings);
@@ -602,12 +880,14 @@ export async function getOrderById(idOrNumber: string) {
     for (const r of refs) refNameMap.set(r.id, r.name);
   }
 
+  const deliveredAtIso = deriveOrderDeliveredAtIso(row.deliveredAt ?? null, orderSupplierRows);
+
   return {
     ...row,
     orderNumber: row.orderNumber,
     eta: row.eta?.toISOString() ?? null,
     etd: row.etd?.toISOString() ?? null,
-    deliveredAt: row.deliveredAt?.toISOString() ?? null,
+    deliveredAt: deliveredAtIso,
     closedAt: row.closedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -645,9 +925,11 @@ export async function getOrderById(idOrNumber: string) {
     brokerContact,
     agent,
     agentContact,
+    orderSuppliers: orderSupplierRows,
     items: items.map((i, index) => ({
       id: i.id,
       orderId: i.orderId,
+      orderSupplierId: i.orderSupplierId ?? null,
       productType: i.productType,
       quantity: i.quantity,
       quantityMin: i.quantityMin,
@@ -744,6 +1026,8 @@ export async function createOrder(input: CreateOrderInput) {
     .values(values)
     .returning();
 
+  await syncPrimaryOrderSupplierFromLegacy(created);
+
   return created;
 }
 
@@ -800,6 +1084,10 @@ export async function updateOrder(id: string, input: UpdateOrderInput) {
     .where(eq(orders.id, id))
     .returning();
 
+  if (updated) {
+    await syncPrimaryOrderSupplierFromLegacy(updated);
+  }
+
   return updated ?? null;
 }
 
@@ -831,9 +1119,23 @@ export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
     .where(eq(orders.id, orderId))
     .limit(1);
   const orderCurrency = orderRow?.currency ?? 'USD';
+  const supplierRows = await db
+    .select({ id: orderSuppliers.id })
+    .from(orderSuppliers)
+    .where(eq(orderSuppliers.orderId, orderId));
+  const supplierIds = new Set(supplierRows.map((row) => row.id));
+  const defaultOrderSupplierId = supplierRows.length === 1 ? supplierRows[0]!.id : null;
 
   // Insert new items with profit calculation (base currency)
   const values = items.map((item) => {
+    const orderSupplierId = item.orderSupplierId ?? defaultOrderSupplierId;
+    if (orderSupplierId && !supplierIds.has(orderSupplierId)) {
+      throw new Error('Order item supplier must belong to the same order');
+    }
+    if (!orderSupplierId && supplierRows.length > 1) {
+      throw new Error('Each order item must specify a supplier when an order has multiple suppliers');
+    }
+
     const costCurrency = (item.costCurrency ?? orderCurrency).toUpperCase();
     const salesCurrency = (item.salesCurrency ?? orderCurrency).toUpperCase();
     const profit = calculateGrossProfitBase({
@@ -848,6 +1150,7 @@ export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
 
     return {
       orderId,
+      orderSupplierId: orderSupplierId ?? null,
       productType: item.productType as any,
       quantity: item.quantity,
       quantityMin: item.quantityMin ?? null,

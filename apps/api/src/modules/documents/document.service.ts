@@ -139,8 +139,11 @@ function getRevisionAbsolutePath(filePath: string): string {
 function resolveDocumentStreamTarget(params: {
   orderId?: string | null;
   invoiceId?: string | null;
+  streamVariant?: string | null;
 }): string | null {
-  return params.invoiceId ?? params.orderId ?? null;
+  const baseTarget = params.invoiceId ?? params.orderId ?? null;
+  if (!baseTarget) return null;
+  return params.streamVariant ? `${baseTarget}:${params.streamVariant}` : baseTarget;
 }
 
 function buildDocumentStreamKey(documentType: DocumentType, streamTarget: string): string {
@@ -185,12 +188,17 @@ async function persistDocumentRevision(params: {
   tenantId: string;
   orderId?: string | null;
   invoiceId?: string | null;
+  streamVariant?: string | null;
   documentType: DocumentType;
   fileName: string;
   buffer: Buffer;
   generatedBy?: string | null;
 }): Promise<DocumentRevisionInfo> {
-  const streamTarget = params.invoiceId ?? params.orderId;
+  const streamTarget = resolveDocumentStreamTarget({
+    orderId: params.orderId,
+    invoiceId: params.invoiceId,
+    streamVariant: params.streamVariant ?? null,
+  });
   if (!streamTarget) throw new Error('Missing document stream target (orderId/invoiceId)');
 
   const streamKey = buildDocumentStreamKey(params.documentType, streamTarget);
@@ -287,10 +295,12 @@ export async function getLatestDocumentRevisionByStream(params: {
   documentType: DocumentType;
   orderId?: string | null;
   invoiceId?: string | null;
+  streamVariant?: string | null;
 }): Promise<DocumentRevisionInfo | null> {
   const streamTarget = resolveDocumentStreamTarget({
     orderId: params.orderId,
     invoiceId: params.invoiceId,
+    streamVariant: params.streamVariant ?? null,
   });
   if (!streamTarget) return null;
 
@@ -434,6 +444,18 @@ async function fetchOrderForInvoice(orderId: string) {
         customerContact: true,
         supplierContact: true,
         agentContact: true,
+        orderSuppliers: {
+          with: {
+            company: includeCompanyRegistrationNumber
+              ? true
+              : {
+                  columns: {
+                    companyRegistrationNumber: false,
+                  },
+                },
+            contact: true,
+          },
+        },
         items: true,
         invoices: true,
       },
@@ -2094,29 +2116,85 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
  * Generate a supplier-facing nomination PDF for a given order ID.
  * Reuses the confirmation layout and content structure.
  */
-export async function generateNominationPdfBuffer(orderId: string, options?: { responseUrl?: string | null }): Promise<{
+function resolveNominationSupplierContext(
+  order: Awaited<ReturnType<typeof fetchOrderForInvoice>>,
+  orderSupplierId?: string | null,
+) {
+  const supplierLegs = order.orderSuppliers ?? [];
+  if (supplierLegs.length > 0) {
+    const selectedSupplier = orderSupplierId
+      ? supplierLegs.find((supplier) => supplier.id === orderSupplierId) ?? null
+      : supplierLegs.length === 1
+        ? supplierLegs[0]!
+        : supplierLegs.find((supplier) => supplier.isPrimary) ?? supplierLegs[0]!;
+
+    if (!selectedSupplier) {
+      throw new Error('Selected supplier does not belong to this order');
+    }
+
+    const items = supplierLegs.length <= 1
+      ? order.items
+      : order.items.filter((item) => item.orderSupplierId === selectedSupplier.id);
+
+    return {
+      selectedSupplier,
+      supplier: selectedSupplier.company ?? order.supplier,
+      supplierContact: selectedSupplier.contact ?? order.supplierContact,
+      paymentTermType: selectedSupplier.paymentTermType ?? order.supplierPaymentTermType,
+      creditDays: selectedSupplier.creditDays ?? order.supplierCreditDays,
+      items,
+      streamVariant: supplierLegs.length > 1 ? `supplier:${selectedSupplier.id}` : null,
+    };
+  }
+
+  if (!order.supplier) {
+    throw new Error('Select a supplier before generating Nomination PDF');
+  }
+
+  return {
+    selectedSupplier: null,
+    supplier: order.supplier,
+    supplierContact: order.supplierContact,
+    paymentTermType: order.supplierPaymentTermType,
+    creditDays: order.supplierCreditDays,
+    items: order.items,
+    streamVariant: null,
+  };
+}
+
+export async function generateNominationPdfBuffer(orderId: string, options?: {
+  orderSupplierId?: string | null;
+  responseUrl?: string | null;
+}): Promise<{
   buffer: Buffer;
   fileName: string;
   revision: DocumentRevisionInfo;
 }> {
   const order = await fetchOrderForInvoice(orderId);
+  const nominationContext = resolveNominationSupplierContext(order, options?.orderSupplierId ?? null);
+  if (!nominationContext.items.length) {
+    throw new Error('Assign at least one line item to the selected supplier before generating Nomination PDF');
+  }
+
   const existingRevision = await getLatestDocumentRevisionByStream({
     documentType: 'OTHER',
     orderId: order.id,
+    streamVariant: nominationContext.streamVariant,
   });
 
   const nominationSourceUpdatedAtMs = maxMs([
     order.updatedAt,
-    order.supplier?.updatedAt ?? null,
+    nominationContext.selectedSupplier?.updatedAt ?? null,
+    nominationContext.supplier?.updatedAt ?? null,
     order.agent?.updatedAt ?? null,
     order.vessel.updatedAt,
     order.place.updatedAt,
     order.invoicingCompany?.updatedAt ?? null,
     order.salesRep?.updatedAt ?? null,
-    order.supplierContact?.updatedAt ?? null,
+    nominationContext.supplierContact?.updatedAt ?? null,
     order.agentContact?.updatedAt ?? null,
   ]);
-  const nominationItemUpdatedAtMs = maxItemUpdatedAtMs(order.items);
+  const nominationItemUpdatedAtMs = maxItemUpdatedAtMs(nominationContext.items);
   const nominationCombinedUpdatedAtMs = Math.max(nominationSourceUpdatedAtMs, nominationItemUpdatedAtMs);
 
   if (existingRevision && nominationCombinedUpdatedAtMs <= existingRevision.issuedAt.getTime()) {
@@ -2151,13 +2229,13 @@ export async function generateNominationPdfBuffer(orderId: string, options?: { r
 
   const docData = {
     orderNumber: order.orderNumber,
-    clientName: order.supplier?.name ?? 'Supplier',
-    clientCountry: order.supplier?.country ?? null,
-    clientAddress: order.supplier?.headOfficeAddress ?? null,
-    customerContactName: order.supplierContact?.name ?? null,
-    customerContactRole: order.supplierContact?.role ?? null,
-    customerContactPhone: order.supplierContact?.phone ?? null,
-    customerContactEmail: order.supplierContact?.email ?? null,
+    clientName: nominationContext.supplier?.name ?? 'Supplier',
+    clientCountry: nominationContext.supplier?.country ?? null,
+    clientAddress: nominationContext.supplier?.headOfficeAddress ?? null,
+    customerContactName: nominationContext.supplierContact?.name ?? null,
+    customerContactRole: nominationContext.supplierContact?.role ?? null,
+    customerContactPhone: nominationContext.supplierContact?.phone ?? null,
+    customerContactEmail: nominationContext.supplierContact?.email ?? null,
     agentName: order.agent?.name ?? null,
     agentAddress: order.agent?.headOfficeAddress ?? null,
     agentContactName: order.agentContact?.name ?? null,
@@ -2173,7 +2251,7 @@ export async function generateNominationPdfBuffer(orderId: string, options?: { r
     fromName: order.salesRep?.name ?? null,
     fromEmail: order.salesRep?.email ?? null,
     fromPhone: order.salesRep?.phone ?? null,
-    paymentTerms: formatCustomerPaymentTerms(order.supplierPaymentTermType, order.supplierCreditDays),
+    paymentTerms: formatCustomerPaymentTerms(nominationContext.paymentTermType, nominationContext.creditDays),
     customerNote: null,
     termsAndConditions: replaceCompanyNamePlaceholder(
       order.invoicingCompany?.supplierTerms ?? null,
@@ -2191,7 +2269,7 @@ export async function generateNominationPdfBuffer(orderId: string, options?: { r
     companyLogoDataUrl,
     itemNotes: [],
     currency: order.currency ?? 'USD',
-    items: order.items.map((item) => ({
+    items: nominationContext.items.map((item) => ({
       productType: item.productType,
       description: item.description,
       quantity: item.quantity,
@@ -2224,6 +2302,7 @@ export async function generateNominationPdfBuffer(orderId: string, options?: { r
   const revision = await persistDocumentRevision({
     tenantId: order.tenantId,
     orderId: order.id,
+    streamVariant: nominationContext.streamVariant,
     documentType: 'OTHER',
     fileName,
     buffer,

@@ -4,7 +4,7 @@
 
 import { eq, ilike, or, and, sql, asc, desc, inArray, isNull } from 'drizzle-orm';
 import { db } from '../../db';
-import { counterparties, companyAttachments, companyContacts, companyEmails, companyOffices, orders, vessels, places, users, vesselCompanies, customerPayments, creditApplications } from '../../db/schema';
+import { counterparties, companyAttachments, companyContacts, companyEmails, companyOffices, orders, orderSuppliers, vessels, places, users, vesselCompanies, customerPayments, creditApplications } from '../../db/schema';
 import type { CompanyEmailType } from '@fueld/types';
 import { matchLocalVessels } from '../vessels/vessel.service';
 import {
@@ -791,12 +791,14 @@ export async function updateCompanyResponsibleUser(companyId: string, userId: st
 export async function deleteCompany(id: string) {
   // Pre-check: refuse if any orders/inquiries reference this company
   const [linked] = await db
-    .select({ count: sql<number>`count(*)::int` })
+    .select({ count: sql<number>`count(distinct ${orders.id})::int` })
     .from(orders)
+    .leftJoin(orderSuppliers, eq(orderSuppliers.orderId, orders.id))
     .where(
       or(
         eq(orders.clientId, id),
         eq(orders.supplierId, id),
+        eq(orderSuppliers.companyId, id),
         eq(orders.invoicingCompanyId, id),
       ),
     );

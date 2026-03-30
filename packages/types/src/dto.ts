@@ -569,6 +569,44 @@ export interface OrderDto {
   updatedAt: string;
 }
 
+export interface OrderSupplierDto {
+  id: string;
+  orderId: string;
+  companyId: string;
+  contactId: string | null;
+  paymentTermType: PaymentTermType | null;
+  creditDays: number | null;
+  note: string | null;
+  sortOrder: number;
+  isPrimary: boolean;
+  deliveredAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  company: CounterpartyDto | null;
+  contact: CompanyContactDto | null;
+}
+
+export interface CreateOrderSupplierDto {
+  companyId: string;
+  contactId?: string | null;
+  paymentTermType?: PaymentTermType | null;
+  creditDays?: number | null;
+  note?: string | null;
+  deliveredAt?: string | null;
+  isPrimary?: boolean;
+}
+
+export interface UpdateOrderSupplierDto {
+  companyId?: string;
+  contactId?: string | null;
+  paymentTermType?: PaymentTermType | null;
+  creditDays?: number | null;
+  note?: string | null;
+  deliveredAt?: string | null;
+  sortOrder?: number;
+  isPrimary?: boolean;
+}
+
 export interface CreateOrderDto {
   clientId: string;
   vesselId: string;
@@ -640,6 +678,7 @@ export interface OrderDetailDto extends OrderDto {
   brokerContact: CompanyContactDto | null;
   agent: CounterpartyDto | null;
   agentContact: CompanyContactDto | null;
+  orderSuppliers: OrderSupplierDto[];
   items: OrderItemDto[];
   attachments?: OrderAttachmentDto[];
 }
@@ -877,6 +916,7 @@ export interface PlattsSuggestionsResponseDto {
 export interface OrderItemDto {
   id: string;
   orderId: string;
+  orderSupplierId?: string | null;
   productType: ProductType;
   quantity: string;
   unit: string;
@@ -996,6 +1036,9 @@ export interface SubmitSupplierNominationResponseDto {
 
 export interface SupplierNominationSummaryDto {
   id: string;
+  orderSupplierId: string | null;
+  supplierId: string;
+  supplierName: string | null;
   status: string;
   sentAt: string;
   openedAt: string | null;
@@ -1022,6 +1065,7 @@ export interface SubmitSupplierInquiryQuoteDto {
 }
 
 export interface CreateOrderItemDto {
+  orderSupplierId?: string;
   productType: ProductType;
   quantity: string;
   unit?: string;

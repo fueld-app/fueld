@@ -92,6 +92,53 @@ function resolveMigrationsDir(): string {
 
 const MIGRATIONS_DIR = resolveMigrationsDir();
 
+async function assertRequiredSchema() {
+  const requiredTables = ['order_suppliers'];
+  const requiredColumns = [
+    { tableName: 'order_items', columnName: 'order_supplier_id' },
+    { tableName: 'supplier_nominations', columnName: 'order_supplier_id' },
+  ] as const;
+
+  const tableRows = (await db.execute(sql`
+    SELECT table_name
+    FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name IN (${sql.join(requiredTables.map((tableName) => sql`${tableName}`), sql`, `)})
+  `)) as Array<{ table_name: string }>;
+
+  const existingTables = new Set(tableRows.map((row) => row.table_name));
+  const missingTables = requiredTables.filter((tableName) => !existingTables.has(tableName));
+
+  const columnConditions = requiredColumns.map(({ tableName, columnName }) =>
+    sql`(table_name = ${tableName} AND column_name = ${columnName})`
+  );
+
+  const columnRows = (await db.execute(sql`
+    SELECT table_name, column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND (${sql.join(columnConditions, sql` OR `)})
+  `)) as Array<{ table_name: string; column_name: string }>;
+
+  const existingColumns = new Set(columnRows.map((row) => `${row.table_name}.${row.column_name}`));
+  const missingColumns = requiredColumns
+    .map(({ tableName, columnName }) => `${tableName}.${columnName}`)
+    .filter((columnRef) => !existingColumns.has(columnRef));
+
+  if (missingTables.length === 0 && missingColumns.length === 0) {
+    return;
+  }
+
+  const missingParts = [
+    ...missingTables.map((tableName) => `table ${tableName}`),
+    ...missingColumns.map((columnRef) => `column ${columnRef}`),
+  ];
+
+  throw new Error(
+    `Database schema is missing required multi-supplier order objects: ${missingParts.join(', ')}. Run db:migrate against the target DATABASE_URL.`,
+  );
+}
+
 async function runPendingMigrations() {
   // Ensure our tracking table exists
   await db.execute(sql`
@@ -266,6 +313,8 @@ export async function createApp(options: CreateAppOptions = {}) {
   if (options.runMigrations !== false) {
     await runPendingMigrations();
   }
+
+  await assertRequiredSchema();
 
   const buildInfo = getBuildInfo();
 

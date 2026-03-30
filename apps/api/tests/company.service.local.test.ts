@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
-import { companyContacts, companyEmails, counterparties } from '../src/db/schema';
+import { companyContacts, companyEmails, counterparties, orders, orderSuppliers } from '../src/db/schema';
 import { getDb, seedBasics, truncateAll } from './helpers/db';
 
 async function loadCompanyService() {
@@ -77,6 +77,59 @@ describe('company.service local flows', () => {
 
     const missing = await updateCompany('123e4567-e89b-12d3-a456-426614174000', { name: 'X' });
     expect(missing).toBeNull();
+  });
+
+  it('refuses to delete a company referenced as an additional order supplier', async () => {
+    const { tenant, client, vessel, place } = await seedBasics();
+    const db = await getDb();
+    const { createCompany, deleteCompany } = await loadCompanyService();
+
+    const primarySupplier = await createCompany({
+      name: 'Primary Supplier',
+      types: ['SUPPLIER'],
+      country: 'Denmark',
+      countryIso: 'DK',
+    });
+
+    const additionalSupplier = await createCompany({
+      name: 'Additional Supplier',
+      types: ['SUPPLIER'],
+      country: 'Sweden',
+      countryIso: 'SE',
+    });
+
+    const [order] = await db
+      .insert(orders)
+      .values({
+        tenantId: tenant.id,
+        clientId: client.id,
+        vesselId: vessel.id,
+        placeId: place.id,
+        supplierId: primarySupplier.id,
+        status: 'CONFIRMED',
+        currency: 'USD',
+      })
+      .returning();
+
+    await db.insert(orderSuppliers).values([
+      {
+        orderId: order!.id,
+        companyId: primarySupplier.id,
+        sortOrder: 0,
+        isPrimary: true,
+      },
+      {
+        orderId: order!.id,
+        companyId: additionalSupplier.id,
+        sortOrder: 1,
+        isPrimary: false,
+      },
+    ]);
+
+    await expect(deleteCompany(additionalSupplier.id)).rejects.toMatchObject({
+      code: 'HAS_ORDERS',
+      count: 1,
+    });
   });
 
   it('supports contact CRUD and seasearcher contact sync', async () => {

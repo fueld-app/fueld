@@ -52,6 +52,12 @@ export const supplierNominationController = new Elysia({ prefix: '/supplier-nomi
       }
 
       const nomination = await markSupplierNominationOpened(resolved.nomination);
+      const nominationItems = (resolved.order.items ?? []).filter((item) => {
+        if (!nomination.orderSupplierId) return true;
+        const supplierCount = resolved.order.orderSuppliers?.length ?? 0;
+        if (supplierCount <= 1) return true;
+        return item.orderSupplierId === nomination.orderSupplierId;
+      });
       const [attachments, supplier, contact] = await Promise.all([
         listSupplierNominationAttachments(nomination.id),
         db
@@ -90,7 +96,7 @@ export const supplierNominationController = new Elysia({ prefix: '/supplier-nomi
           supplierReference: nomination.supplierReference ?? null,
           supplierComment: nomination.supplierComment ?? null,
           attachments,
-          items: (resolved.order.items ?? []).map((item) => ({
+          items: nominationItems.map((item) => ({
             orderItemId: item.id,
             productType: item.productType as any,
             quantity: item.quantity,

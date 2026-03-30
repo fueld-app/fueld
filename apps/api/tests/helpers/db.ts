@@ -108,9 +108,14 @@ function getTruncateTables() {
     'company_offices',
     'supplier_inquiry_item_quotes',
     'supplier_inquiries',
+    'supplier_nomination_attachments',
+    'supplier_nominations',
     'email_rules',
     'price_references',
+    'document_revisions',
+    'order_attachments',
     'order_items',
+    'order_suppliers',
     'orders',
     'order_number_sequences',
     'counterparties',
@@ -233,6 +238,7 @@ async function _doEnsureTestSchemaCompat(): Promise<void> {
 
   await sql`
     ALTER TABLE order_items
+    ADD COLUMN IF NOT EXISTS order_supplier_id uuid,
     ADD COLUMN IF NOT EXISTS quantity_min numeric(12, 3),
     ADD COLUMN IF NOT EXISTS quantity_max numeric(12, 3),
     ADD COLUMN IF NOT EXISTS description text,
@@ -254,6 +260,34 @@ async function _doEnsureTestSchemaCompat(): Promise<void> {
     ADD COLUMN IF NOT EXISTS sales_credit_days integer,
     ADD COLUMN IF NOT EXISTS sales_price_finalized boolean NOT NULL DEFAULT false,
     ADD COLUMN IF NOT EXISTS unit_conversion_factor numeric(12, 6) NOT NULL DEFAULT '1'
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS order_suppliers (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      order_id uuid NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+      company_id uuid NOT NULL REFERENCES counterparties(id),
+      contact_id uuid REFERENCES company_contacts(id) ON DELETE SET NULL,
+      payment_term_type text,
+      credit_days integer,
+      note text,
+      sort_order integer NOT NULL DEFAULT 0,
+      is_primary boolean NOT NULL DEFAULT false,
+      delivered_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_order_suppliers_order_id
+      ON order_suppliers(order_id)
+  `;
+
+  await sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_order_suppliers_primary_per_order
+      ON order_suppliers(order_id)
+      WHERE is_primary = true
   `;
 
   await sql`
@@ -425,6 +459,82 @@ async function _doEnsureTestSchemaCompat(): Promise<void> {
   await sql`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_supplier_inquiry_item_quotes_unique
       ON supplier_inquiry_item_quotes(supplier_inquiry_id, order_item_id)
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS order_attachments (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      order_id uuid NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+      type text NOT NULL DEFAULT 'OTHER',
+      file_name text NOT NULL,
+      file_path text NOT NULL,
+      mime_type text NOT NULL,
+      file_size integer NOT NULL,
+      uploaded_by uuid REFERENCES users(id),
+      created_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS document_revisions (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      order_id uuid REFERENCES orders(id) ON DELETE CASCADE,
+      invoice_id uuid REFERENCES invoices(id) ON DELETE CASCADE,
+      document_type text NOT NULL,
+      stream_key text NOT NULL,
+      revision_number integer NOT NULL,
+      verification_ref text NOT NULL,
+      verify_token text NOT NULL UNIQUE,
+      sha256_hex text NOT NULL,
+      fingerprint_short text NOT NULL,
+      file_path text NOT NULL,
+      file_name text NOT NULL,
+      mime_type text NOT NULL DEFAULT 'application/pdf',
+      file_size integer NOT NULL,
+      generated_by uuid REFERENCES users(id),
+      issued_at timestamptz NOT NULL DEFAULT now(),
+      created_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+
+  await sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_document_revisions_stream_revision
+      ON document_revisions(stream_key, revision_number)
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS supplier_nominations (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      order_id uuid NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+      order_supplier_id uuid REFERENCES order_suppliers(id) ON DELETE SET NULL,
+      supplier_id uuid NOT NULL REFERENCES counterparties(id) ON DELETE CASCADE,
+      contact_id uuid REFERENCES company_contacts(id) ON DELETE SET NULL,
+      email text NOT NULL,
+      subject text NOT NULL,
+      status text NOT NULL DEFAULT 'SENT',
+      response_token_hash text,
+      response_token_expires_at timestamptz,
+      opened_at timestamptz,
+      responded_at timestamptz,
+      delivery_completed_confirmed boolean NOT NULL DEFAULT false,
+      delivery_completed_at timestamptz,
+      supplier_reference text,
+      supplier_comment text,
+      sent_by_user_id uuid REFERENCES users(id),
+      sent_at timestamptz NOT NULL DEFAULT now(),
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS supplier_nomination_attachments (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      supplier_nomination_id uuid NOT NULL REFERENCES supplier_nominations(id) ON DELETE CASCADE,
+      order_attachment_id uuid NOT NULL REFERENCES order_attachments(id) ON DELETE CASCADE,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )
   `;
 
   // Credit application enums / tables

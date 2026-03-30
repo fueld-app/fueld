@@ -32,6 +32,7 @@ import {
   type CompanyContactDto,
   type BankAccountDto,
   type PlattsSuggestionsResponseDto,
+  type OrderSupplierDto,
   type SupplierNominationSummaryDto,
 } from '@fueld/types';
 
@@ -274,7 +275,7 @@ interface PlattsSuggestionViewModel {
       [vesselName]="vesselName()"
       [placeName]="portName()"
       [clientId]="order()?.clientId ?? ''"
-      [supplierId]="order()?.supplierId ?? ''"
+      [supplierId]="activeSupplierCompanyId()"
       [vesselId]="order()?.vesselId ?? ''"
       [placeId]="order()?.placeId ?? ''"
       [clientOptions]="clientDropdownOptions()"
@@ -300,7 +301,7 @@ interface PlattsSuggestionViewModel {
       (clientSearch)="searchClients($event)"
       (clientChange)="onClientChange($event)"
       (supplierSearch)="searchSuppliers($event)"
-      (supplierChange)="onSupplierChange($event)"
+      (supplierChange)="onActiveSupplierCompanyChange($event)"
       (vesselSearch)="searchVessels($event)"
       (vesselChange)="onVesselChange($event)"
       (placeSearch)="searchPlaces($event)"
@@ -313,13 +314,13 @@ interface PlattsSuggestionViewModel {
       (bankAccountChange)="onBankAccountChange($event)"
       (responsibleChange)="onResponsibleUserChange($event)"
       [customerContactId]="order()?.customerContactId ?? ''"
-      [supplierContactId]="order()?.supplierContactId ?? ''"
+      [supplierContactId]="activeSupplierContactId()"
       [customerContactName]="customerContact()?.name ?? ''"
-      [supplierContactName]="supplierContact()?.name ?? ''"
+      [supplierContactName]="activeSupplierContactName()"
       [customerContactOptions]="customerContactDropdownOptions()"
       [supplierContactOptions]="supplierContactDropdownOptions()"
       (customerContactChange)="onCustomerContactChange($event)"
-      (supplierContactChange)="onSupplierContactChange($event)"
+      (supplierContactChange)="onActiveSupplierContactChange($event)"
       [brokerId]="order()?.brokerId ?? ''"
       [brokerName]="brokerName()"
       [brokerOptions]="brokerDropdownOptions()"
@@ -434,13 +435,38 @@ interface PlattsSuggestionViewModel {
       </div>
       <!-- Supplier Payment (projected into supplier card) -->
       <div supplierPayment>
+        @if (orderSupplierTabs().length > 0) {
+          <div class="mb-3 flex flex-wrap items-center gap-2 border-b border-gray-100 pb-3">
+            @for (supplierTab of orderSupplierTabs(); track supplierTab.id) {
+              <button
+                type="button"
+                (click)="selectOrderSupplierTab(supplierTab.id)"
+                [class]="activeOrderSupplierId() === supplierTab.id ? 'rounded-full bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm' : 'rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 hover:border-brand-300 hover:text-brand-700'"
+              >
+                {{ supplierTab.label }}
+                @if (supplierTab.isPrimary) {
+                  <span class="ml-1 opacity-80">Primary</span>
+                }
+              </button>
+            }
+            @if (!isReadonly() && activeOrderSupplier()) {
+              <button
+                type="button"
+                (click)="addSupplierTab()"
+                class="rounded-full border border-dashed border-brand-300 px-3 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-50"
+              >
+                Add supplier
+              </button>
+            }
+          </div>
+        }
         <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Payment</p>
         @if (isReadonly()) {
           <p class="mt-1 text-sm font-semibold text-gray-900">{{ formatSupplierPaymentTerms() }}</p>
         } @else {
           <div class="flex items-center gap-2">
             <select
-              [ngModel]="order()?.supplierPaymentTermType ?? ''"
+              [ngModel]="activeSupplierPaymentTermType() ?? ''"
               (ngModelChange)="onSupplierPaymentTermChange($event)"
               class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
                      focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
@@ -455,12 +481,12 @@ interface PlattsSuggestionViewModel {
                 </option>
               }
             </select>
-            @if (order()?.supplierPaymentTermType === 'CREDIT') {
+            @if (activeSupplierPaymentTermType() === 'CREDIT') {
               <input
                 type="number"
                 min="0"
                 [attr.max]="supplierCreditSummary()?.maxDays ?? null"
-                [ngModel]="order()?.supplierCreditDays ?? ''"
+                [ngModel]="activeSupplierCreditDays() ?? ''"
                 (ngModelChange)="onSupplierCreditDaysChange($event)"
                 placeholder="Days"
                 class="w-24 rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm
@@ -487,7 +513,7 @@ interface PlattsSuggestionViewModel {
             <div class="mt-2">
               <textarea
                 rows="2"
-                [ngModel]="order()?.supplierNote ?? ''"
+                [ngModel]="activeSupplierNote() ?? ''"
                 (ngModelChange)="onSupplierNoteChange($event)"
                 placeholder="Supplier note"
                 class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
@@ -502,11 +528,11 @@ interface PlattsSuggestionViewModel {
               <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M2 4.75A.75.75 0 0 1 2.75 4h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 4.75Zm0 10.5a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5a.75.75 0 0 1-.75-.75ZM2 10a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 10Z" />
               </svg>
-              {{ order()?.supplierNote ? 'Edit note' : 'Add note' }}
+              {{ activeSupplierNote() ? 'Edit note' : 'Add note' }}
             </button>
           }
-        } @else if (order()?.supplierNote) {
-          <p class="mt-2 text-xs text-gray-500 whitespace-pre-line">{{ order()?.supplierNote }}</p>
+        } @else if (activeSupplierNote()) {
+          <p class="mt-2 text-xs text-gray-500 whitespace-pre-line">{{ activeSupplierNote() }}</p>
         }
       </div>
       <!-- Notes + T&C (projected into invoicing card) -->
@@ -1023,6 +1049,7 @@ interface PlattsSuggestionViewModel {
       [items]="itemRows()"
       [readonly]="isReadonly()"
       [allowDeliveredEdit]="allowDeliveredEdit()"
+      [supplierOptionsInput]="itemSupplierOptions()"
       [financingRateAnnual]="financingRateAnnual()"
       [financingDays]="financingDays()"
       [financingDayCountConvention]="financingDayCountConvention()"
@@ -1172,6 +1199,9 @@ interface PlattsSuggestionViewModel {
             <div class="mt-3">
               <label class="mb-1 block text-xs font-medium text-gray-500">
                 Delivered At
+                @if (hasMultipleOrderSuppliers() && activeOrderSupplier()) {
+                  <span class="text-gray-400">for {{ activeOrderSupplier()!.company?.name ?? 'selected supplier' }}</span>
+                }
                 @if (placeTimezoneAbbr()) {
                   <span class="text-gray-400">({{ placeTimezoneAbbr() }})</span>
                 }
@@ -1202,10 +1232,10 @@ interface PlattsSuggestionViewModel {
                       <div class="mt-1 font-semibold">{{ supplierNomination()!.deliveryCompletedAt | date : 'medium' }}</div>
                     </div>
                   }
-                  @if (order()?.deliveredAt) {
+                  @if (activeSupplierDeliveredAt()) {
                     <div>
                       <div class="text-[11px] font-medium uppercase tracking-[0.14em] text-amber-700/80">Internal delivered date</div>
-                      <div class="mt-1 font-semibold">{{ order()!.deliveredAt | date : 'mediumDate' }}</div>
+                      <div class="mt-1 font-semibold">{{ activeSupplierDeliveredAt() | date : 'mediumDate' }}</div>
                     </div>
                   }
                   @if (supplierNominationDateMismatch()) {
@@ -1616,6 +1646,7 @@ interface PlattsSuggestionViewModel {
       [senderEmail]="auth.userEmail()"
       [pdfFileName]="emailPdfFileName()"
       [orderId]="orderId()"
+      [nominationOrderSupplierId]="nominationOrderSupplierId()"
       [extraAttachments]="invoiceEmailAttachmentOptions()"
       [waLinked]="waLinked()"
       [defaultPhone]="order()?.brokerGetsAll && brokerContact()?.phone ? brokerContact()?.phone ?? null : customerContact()?.phone ?? null"
@@ -1740,6 +1771,8 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly placeSearchLoading = signal(false);
   readonly attachments = signal<OrderAttachmentDto[]>([]);
   readonly supplierNomination = signal<SupplierNominationSummaryDto | null>(null);
+  readonly orderSuppliers = signal<OrderSupplierDto[]>([]);
+  readonly activeOrderSupplierId = signal<string | null>(null);
   readonly uploadingAttachment = signal(false);
   readonly attachmentType = signal('OTHER');
   selectedAttachment: File | null = null;
@@ -1848,11 +1881,36 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   // ─── Computed ────────────────────────────────────────────────────
 
   readonly clientName = computed(() => this.client()?.name ?? '—');
-  readonly supplierName = computed(() => {
-    const id = this.order()?.supplierId;
-    if (!id) return '—';
-    return this.supplier()?.name ?? this.suppliers().find((s) => s.id === id)?.name ?? '—';
+  readonly activeOrderSupplier = computed(() => {
+    const suppliers = this.orderSuppliers();
+    const activeId = this.activeOrderSupplierId();
+    return suppliers.find((supplier) => supplier.id === activeId)
+      ?? suppliers.find((supplier) => supplier.isPrimary)
+      ?? suppliers[0]
+      ?? null;
   });
+  readonly hasMultipleOrderSuppliers = computed(() => this.orderSuppliers().length > 1);
+  readonly supplierName = computed(() => {
+    return this.activeOrderSupplier()?.company?.name
+      ?? this.supplier()?.name
+      ?? '—';
+  });
+  readonly activeSupplierCompanyId = computed(() => this.activeOrderSupplier()?.companyId ?? this.order()?.supplierId ?? '');
+  readonly activeSupplierContactId = computed(() => this.activeOrderSupplier()?.contactId ?? this.order()?.supplierContactId ?? '');
+  readonly activeSupplierContactName = computed(() => this.activeOrderSupplier()?.contact?.name ?? this.supplierContact()?.name ?? '');
+  readonly activeSupplierPaymentTermType = computed(() => this.activeOrderSupplier()?.paymentTermType ?? this.order()?.supplierPaymentTermType ?? null);
+  readonly activeSupplierCreditDays = computed(() => this.activeOrderSupplier()?.creditDays ?? this.order()?.supplierCreditDays ?? null);
+  readonly activeSupplierNote = computed(() => this.activeOrderSupplier()?.note ?? this.order()?.supplierNote ?? null);
+  readonly activeSupplierDeliveredAt = computed(() => this.activeOrderSupplier()?.deliveredAt ?? this.order()?.deliveredAt ?? null);
+  readonly nominationOrderSupplierId = computed(() => {
+    const activeSupplier = this.activeOrderSupplier();
+    return this.emailDocumentType() === 'NOMINATION' ? (activeSupplier ? activeSupplier.id : null) : null;
+  });
+  readonly orderSupplierTabs = computed(() => this.orderSuppliers().map((supplier, index) => ({
+    id: supplier.id,
+    label: supplier.company?.name ?? `Supplier ${index + 1}`,
+    isPrimary: supplier.isPrimary,
+  })));
   readonly brokerName = computed(() => {
     const id = this.order()?.brokerId;
     if (!id) return '—';
@@ -1898,7 +1956,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   });
 
   readonly deliveredAtLocal = computed(() => {
-    const iso = this.order()?.deliveredAt;
+    const iso = this.activeSupplierDeliveredAt();
     if (!iso) return '';
     return this.formatDateForInput(new Date(iso), this.placeTimezone());
   });
@@ -1908,7 +1966,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     && this.itemRows().every((row) => this.getEffectiveDeliveredQuantity(row) !== null),
   );
   readonly supplierNominationDateMismatch = computed(() => {
-    const internalDate = this.order()?.deliveredAt?.slice(0, 10) ?? null;
+    const internalDate = this.activeSupplierDeliveredAt()?.slice(0, 10) ?? null;
     const supplierDate = this.supplierNomination()?.deliveryCompletedAt?.slice(0, 10) ?? null;
     return !!internalDate && !!supplierDate && internalDate !== supplierDate;
   });
@@ -1938,7 +1996,13 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   readonly canEditClient = computed(() => !this.isPaidOrCancelled());
   readonly hasInvoicingCompany = computed(() => !!this.order()?.invoicingCompanyId);
-  readonly hasSupplier = computed(() => !!this.order()?.supplierId);
+  readonly hasSupplier = computed(() => this.orderSuppliers().length > 0 || !!this.order()?.supplierId);
+  readonly itemSupplierOptions = computed<DropdownOption[]>(() =>
+    this.orderSuppliers().map((supplier, index) => ({
+      value: supplier.id,
+      label: supplier.company?.name ?? `Supplier ${index + 1}`,
+    })),
+  );
   readonly hasBankAccount = computed(() => !!this.order()?.bankAccountId);
   readonly hasLineItems = computed(() => this.itemRows().length > 0);
 
@@ -2237,6 +2301,15 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         this.performAutoSave();
       }, 1500);
     });
+
+    effect(() => {
+      const orderId = this.orderId();
+      const activeSupplier = this.activeOrderSupplier();
+      if (!orderId || !activeSupplier) return;
+      void this.loadSupplierCreditLines(activeSupplier.companyId);
+      void this.loadCompanyContacts('supplier', activeSupplier.companyId);
+      void this.loadSupplierNominationSummary();
+    });
   }
 
   ngOnInit(): void {
@@ -2388,6 +2461,12 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         if (d.client) this.clients.set([d.client]);
         this.supplier.set(d.supplier ?? null);
         if (d.supplier) this.suppliers.set([d.supplier]);
+        this.orderSuppliers.set(d.orderSuppliers ?? []);
+        this.activeOrderSupplierId.set(
+          d.orderSuppliers?.find((supplier: OrderSupplierDto) => supplier.isPrimary)?.id
+            ?? d.orderSuppliers?.[0]?.id
+            ?? null,
+        );
         if (d.vessel) {
           this.vessel.set(d.vessel);
           this.vessels.set([d.vessel]);
@@ -2400,6 +2479,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         this.itemRows.set(
           (d.items ?? []).map((item: any) => ({
             id: item.id,
+            orderSupplierId: item.orderSupplierId ?? null,
             productType: item.productType ?? '',
             description: item.description ?? '',
             quantity: parseFloat(item.quantity) || 0,
@@ -2441,11 +2521,13 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         );
 
         await this.loadCustomerCreditLines(d.clientId);
-        await this.loadSupplierCreditLines(d.supplierId);
+        await this.loadSupplierCreditLines(this.activeOrderSupplier()?.companyId ?? d.supplierId);
         await this.loadReferenceData();
         await this.loadPlattsSuggestions();
         await this.loadCompanyContacts('customer', d.clientId);
-        if (d.supplierId) await this.loadCompanyContacts('supplier', d.supplierId);
+        if (this.activeOrderSupplier()?.companyId ?? d.supplierId) {
+          await this.loadCompanyContacts('supplier', this.activeOrderSupplier()?.companyId ?? d.supplierId);
+        }
         if (d.brokerId) await this.loadCompanyContacts('broker', d.brokerId);
         if (d.agentId) await this.loadCompanyContacts('agent', d.agentId);
         await Promise.all([
@@ -2486,9 +2568,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   private async loadSupplierNominationSummary(): Promise<void> {
     const id = this.orderId();
     if (!id) return;
+    const activeSupplierId = this.hasMultipleOrderSuppliers() ? this.activeOrderSupplier()?.id : null;
+    const query = activeSupplierId ? `?orderSupplierId=${encodeURIComponent(activeSupplierId)}` : '';
     try {
       const res = await firstValueFrom(
-        this.http.get<ApiResponse<SupplierNominationSummaryDto | null>>(`${API_URL}/orders/${id}/nomination-response`),
+        this.http.get<ApiResponse<SupplierNominationSummaryDto | null>>(`${API_URL}/orders/${id}/nomination-response${query}`),
       );
       this.supplierNomination.set(res.success ? (res.data ?? null) : null);
     } catch {
@@ -2768,10 +2852,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   formatSupplierPaymentTerms(): string {
-    const type = this.order()?.supplierPaymentTermType;
+    const type = this.activeSupplierPaymentTermType();
     if (!type) return '-';
     if (type === 'CREDIT') {
-      const days = this.order()?.supplierCreditDays ?? 0;
+      const days = this.activeSupplierCreditDays() ?? 0;
       return `Credit ${days} days`;
     }
     if (type === 'COD') return 'Cash on Delivery';
@@ -2848,12 +2932,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       this.showToast('error', 'No supplier credit line is available.');
       return;
     }
-    this.order.update((o) => {
-      if (!o) return o;
-      const next = { ...o, supplierPaymentTermType: value || null };
-      if (value !== 'CREDIT') next.supplierCreditDays = null;
-      return next;
-    });
+    this.updateActiveOrderSupplier((supplier) => ({
+      ...supplier,
+      paymentTermType: value || null,
+      creditDays: value === 'CREDIT' ? supplier.creditDays ?? null : null,
+    }));
     this.triggerAutosave();
   }
 
@@ -2862,16 +2945,16 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     const maxDays = this.supplierCreditSummary()?.maxDays ?? null;
     const nextDays = Number.isFinite(days) ? days : null;
     if (maxDays !== null && nextDays !== null && nextDays > maxDays) {
-      this.order.update((o) => (o ? { ...o, supplierCreditDays: maxDays } : o));
+      this.updateActiveOrderSupplier((supplier) => ({ ...supplier, creditDays: maxDays }));
       this.showToast('error', `Max credit is ${maxDays} days.`);
     } else {
-      this.order.update((o) => (o ? { ...o, supplierCreditDays: nextDays } : o));
+      this.updateActiveOrderSupplier((supplier) => ({ ...supplier, creditDays: nextDays }));
     }
     this.triggerAutosave();
   }
 
   onSupplierNoteChange(value: string): void {
-    this.order.update((o) => (o ? { ...o, supplierNote: value } : o));
+    this.updateActiveOrderSupplier((supplier) => ({ ...supplier, note: value }));
     this.triggerAutosave();
   }
 
@@ -2910,8 +2993,8 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     this.triggerAutosave();
   }
 
-  onSupplierContactChange(contactId: string): void {
-    this.order.update((o) => (o ? { ...o, supplierContactId: contactId || null } : o));
+  onActiveSupplierContactChange(contactId: string): void {
+    this.updateActiveOrderSupplier((supplier) => ({ ...supplier, contactId: contactId || null }));
     const contact = this.supplierContacts().find((c) => c.id === contactId) ?? null;
     this.supplierContact.set(contact);
     this.triggerAutosave();
@@ -3145,6 +3228,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         : this.parseDecimalValue(r.deliveredQuantity);
 
       return {
+        orderSupplierId: r.orderSupplierId ?? null,
         productType: r.productType,
         quantity: String(r.quantity),
         quantityMin: r.quantityMin != null ? String(r.quantityMin) : null,
@@ -3178,6 +3262,35 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         salesCreditDays: r.salesCreditDays ?? null,
       };
     });
+  }
+
+  private async syncOrderSupplierRecords(orderId: string): Promise<void> {
+    const suppliers = this.orderSuppliers();
+    if (suppliers.length === 0) return;
+
+    const updatedSuppliers: OrderSupplierDto[] = [];
+    for (const supplier of suppliers) {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<OrderSupplierDto>>(`${API_URL}/orders/${orderId}/suppliers/${supplier.id}`, {
+          companyId: supplier.companyId,
+          contactId: supplier.contactId ?? null,
+          paymentTermType: supplier.paymentTermType ?? null,
+          creditDays: supplier.creditDays ?? null,
+          note: supplier.note ?? null,
+          deliveredAt: supplier.deliveredAt ?? null,
+          sortOrder: supplier.sortOrder,
+          isPrimary: supplier.isPrimary,
+        }),
+      );
+
+      if (!res.success || !res.data) {
+        throw new Error(res.message ?? 'Failed to save supplier details');
+      }
+
+      updatedSuppliers.push(res.data);
+    }
+
+    this.orderSuppliers.set(updatedSuppliers);
   }
 
   private normalizeTimeZone(timeZone: string): string {
@@ -3436,9 +3549,15 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     this.triggerAutosave();
   }
 
-  onSupplierChange(supplierId: string): void {
+  onActiveSupplierCompanyChange(supplierId: string): void {
     if (!supplierId) return;
-    this.order.update((o) => (o ? { ...o, supplierId, supplierContactId: null } : o));
+    this.updateActiveOrderSupplier((supplier) => ({
+      ...supplier,
+      companyId: supplierId,
+      contactId: null,
+      company: this.suppliers().find((item) => item.id === supplierId) ?? this.supplier() ?? null,
+      contact: null,
+    }));
     const supplierData = this.suppliers().find((supplier) => supplier.id === supplierId)
       ?? (this.supplier()?.id === supplierId ? this.supplier() : null);
     this.supplier.set(supplierData ?? null);
@@ -3449,8 +3568,90 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   applyComparisonSupplier(row: InquirySupplierComparisonRow): void {
-    this.onSupplierChange(row.supplierId);
+    this.onActiveSupplierCompanyChange(row.supplierId);
     this.showToast('success', `Selected ${row.supplierName} as supplier.`);
+  }
+
+  selectOrderSupplierTab(orderSupplierId: string): void {
+    this.activeOrderSupplierId.set(orderSupplierId);
+    const supplier = this.orderSuppliers().find((item) => item.id === orderSupplierId) ?? null;
+    this.supplier.set(supplier?.company ?? null);
+    this.supplierContact.set(supplier?.contact ?? null);
+  }
+
+  async addSupplierTab(): Promise<void> {
+    const id = this.orderId();
+    const activeSupplier = this.activeOrderSupplier();
+    if (!id || !activeSupplier?.companyId) {
+      this.showToast('error', 'Select a supplier before adding another supplier tab.');
+      return;
+    }
+
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<OrderSupplierDto>>(`${API_URL}/orders/${id}/suppliers`, {
+          companyId: activeSupplier.companyId,
+          contactId: activeSupplier.contactId ?? null,
+          paymentTermType: activeSupplier.paymentTermType ?? null,
+          creditDays: activeSupplier.creditDays ?? null,
+          note: activeSupplier.note ?? null,
+          deliveredAt: activeSupplier.deliveredAt ?? null,
+        }),
+      );
+
+      if (!res.success || !res.data) {
+        this.showToast('error', res.message ?? 'Failed to add supplier.');
+        return;
+      }
+
+      this.orderSuppliers.update((suppliers) => [...suppliers, res.data!]);
+      this.selectOrderSupplierTab(res.data.id);
+      this.showToast('success', 'Supplier tab added.');
+    } catch {
+      this.showToast('error', 'Failed to add supplier.');
+    }
+  }
+
+  private updateActiveOrderSupplier(
+    updater: (supplier: OrderSupplierDto) => OrderSupplierDto,
+  ): void {
+    const activeSupplierId = this.activeOrderSupplierId();
+    if (!activeSupplierId) return;
+
+    let nextSupplier: OrderSupplierDto | undefined;
+    this.orderSuppliers.update((suppliers) => suppliers.map((supplier) => {
+      if (supplier.id !== activeSupplierId) return supplier;
+      nextSupplier = updater(supplier);
+      return nextSupplier;
+    }));
+
+    if (!nextSupplier) return;
+    const updatedSupplier = nextSupplier;
+
+    this.supplier.set(updatedSupplier.company ?? null);
+    this.supplierContact.set(updatedSupplier.contact ?? null);
+
+    if (updatedSupplier.isPrimary) {
+      this.order.update((order) => order
+        ? {
+            ...order,
+            supplierId: updatedSupplier.companyId,
+            supplierContactId: updatedSupplier.contactId ?? null,
+            supplierPaymentTermType: updatedSupplier.paymentTermType ?? null,
+            supplierCreditDays: updatedSupplier.creditDays ?? null,
+            supplierNote: updatedSupplier.note ?? null,
+            deliveredAt: updatedSupplier.deliveredAt ?? order.deliveredAt ?? null,
+          }
+        : order);
+    }
+
+    const latestDeliveredAt = this.orderSuppliers()
+      .map((supplier) => supplier.deliveredAt ?? null)
+      .filter((value): value is string => !!value)
+      .sort()
+      .at(-1) ?? null;
+
+    this.order.update((order) => order ? { ...order, deliveredAt: latestDeliveredAt ?? order.deliveredAt ?? null } : order);
   }
 
   openInquiryReplyEditor(row: SupplierInquiryReplyRow): void {
@@ -3775,7 +3976,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   onDeliveredAtChange(value: string): void {
     const iso = value ? `${value}T12:00:00.000Z` : null;
-    this.order.update((o) => (o ? { ...o, deliveredAt: iso } : o));
+    this.updateActiveOrderSupplier((supplier) => ({ ...supplier, deliveredAt: iso }));
     this.triggerAutosave();
   }
 
@@ -3857,8 +4058,9 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       await firstValueFrom(
         this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}/items`, { items: itemPayload }),
       );
+      await this.syncOrderSupplierRecords(id);
       await this.loadCustomerCreditLines(o.clientId);
-      await this.loadSupplierCreditLines(o.supplierId);
+      await this.loadSupplierCreditLines(this.activeOrderSupplier()?.companyId ?? o.supplierId);
       this.lastSaved.set(new Date());
     } catch {
       // Quietly fail - manual save still available
@@ -4151,8 +4353,9 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       await firstValueFrom(
         this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}/items`, { items: itemPayload }),
       );
+      await this.syncOrderSupplierRecords(id);
       await this.loadCustomerCreditLines(o.clientId);
-      await this.loadSupplierCreditLines(o.supplierId);
+      await this.loadSupplierCreditLines(this.activeOrderSupplier()?.companyId ?? o.supplierId);
       this.showToast('success', 'Order saved successfully.');
     } catch {
       this.showToast('error', 'Failed to save order.');
@@ -4250,9 +4453,12 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     const modal = this.pdfModal();
     if (!modal) return;
     modal.showLoading('Nomination');
+    const supplierQuery = this.hasMultipleOrderSuppliers() && this.activeOrderSupplier()?.id
+      ? `?orderSupplierId=${encodeURIComponent(this.activeOrderSupplier()!.id)}`
+      : '';
     try {
       const res = await firstValueFrom(
-        this.http.get(`${API_URL}/orders/${id}/nomination/pdf`, { responseType: 'blob', observe: 'response' }),
+        this.http.get(`${API_URL}/orders/${id}/nomination/pdf${supplierQuery}`, { responseType: 'blob', observe: 'response' }),
       );
       const blob = res.body;
       if (!blob) throw new Error('Missing PDF body');
@@ -4361,6 +4567,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     if (!id) return;
 
     this.emailDocumentType.set(docType);
+    const orderSupplierId = docType === 'NOMINATION' ? this.activeOrderSupplier()?.id ?? null : null;
 
     // Fetch pre-filled email defaults from the API
     this.http
@@ -4375,7 +4582,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         htmlBody: string;
         senderName: string;
         senderEmail: string;
-      }>>(`${API_URL}/orders/${id}/email-defaults`, { documentType: docType })
+      }>>(`${API_URL}/orders/${id}/email-defaults`, { documentType: docType, orderSupplierId })
       .subscribe({
         next: (res) => {
           if (!res.success || !res.data) {
@@ -4411,6 +4618,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         `${API_URL}/orders/${id}/send-email`,
         {
           documentType: payload.documentType,
+          orderSupplierId: payload.orderSupplierId ?? null,
           recipientEmail: payload.recipientEmail,
           ccEmails: payload.ccEmails,
           bccEmails: payload.bccEmails,
@@ -4469,8 +4677,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     };
 
     try {
+      const nominationQuery = payload.documentType === 'NOMINATION' && this.activeOrderSupplier()?.id
+        ? `?orderSupplierId=${encodeURIComponent(this.activeOrderSupplier()!.id)}`
+        : '';
       const blob = await firstValueFrom(
-        this.http.get(`${API_URL}/orders/${id}/${pdfEndpoints[payload.documentType]}/pdf`, { responseType: 'blob' }),
+        this.http.get(`${API_URL}/orders/${id}/${pdfEndpoints[payload.documentType]}/pdf${nominationQuery}`, { responseType: 'blob' }),
       );
       const base64 = await this.blobToBase64(blob);
       const orderNum = this.order()?.orderNumber ?? id;

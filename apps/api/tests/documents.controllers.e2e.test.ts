@@ -1,6 +1,6 @@
 import { beforeEach, afterEach, describe, expect, it, mock } from 'bun:test';
 import { and, eq } from 'drizzle-orm';
-import { bankAccounts, counterparties, documentRevisions, tenants } from '../src/db/schema';
+import { bankAccounts, companyContacts, counterparties, documentRevisions, supplierNominations, tenants } from '../src/db/schema';
 import { getDb, seedAuthBasics, truncateAll } from './helpers/db';
 
 // ── Mock acquireGraphTokenForUser so send-email tests can use the Graph path ──
@@ -49,6 +49,16 @@ async function seedDocumentReadyOrder() {
     })
     .returning();
 
+  const [supplierContact] = await db
+    .insert(companyContacts)
+    .values({
+      counterpartyId: supplier!.id,
+      name: 'Primary Supplier Contact',
+      email: 'primary.supplier@example.com',
+      role: 'Sales',
+    })
+    .returning();
+
   const [bankAccount] = await db
     .insert(bankAccounts)
     .values({
@@ -78,6 +88,7 @@ async function seedDocumentReadyOrder() {
       placeId: seeded.place.id,
       invoicingCompanyId: invoicingCompany!.id,
       supplierId: supplier!.id,
+      supplierContactId: supplierContact!.id,
       bankAccountId: bankAccount!.id,
       customerPaymentTermType: 'CREDIT',
       customerCreditDays: 30,
@@ -111,7 +122,7 @@ async function seedDocumentReadyOrder() {
   expect(saveItems.status).toBe(200);
   expect(saveItems.data?.success).toBe(true);
 
-  return { token, orderId, tenantId: seeded.tenant.id };
+  return { token, orderId, tenantId: seeded.tenant.id, supplierId: supplier!.id, supplierContactId: supplierContact!.id };
 }
 
 describe('documents + verify controller e2e', () => {
@@ -335,6 +346,151 @@ describe('documents + verify controller e2e', () => {
       globalThis.fetch = originalFetch;
       mockGraphToken = null;
     }
+  });
+
+  it('requires a supplier selection for multi-supplier nomination flows and scopes summaries to the selected supplier', async () => {
+    const { token, orderId, tenantId } = await seedDocumentReadyOrder();
+    const db = await getDb();
+
+    const [secondarySupplier] = await db
+      .insert(counterparties)
+      .values({
+        tenantId,
+        name: 'Supplier Co B',
+        type: 'SUPPLIER',
+        types: ['SUPPLIER'],
+        country: 'Sweden',
+      })
+      .returning();
+
+    const [secondaryContact] = await db
+      .insert(companyContacts)
+      .values({
+        counterpartyId: secondarySupplier!.id,
+        name: 'Secondary Supplier Contact',
+        email: 'secondary.supplier@example.com',
+        role: 'Operations',
+      })
+      .returning();
+
+    const addedSupplier = await requestJson(`/orders/${orderId}/suppliers`, {
+      method: 'POST',
+      token,
+      body: {
+        companyId: secondarySupplier!.id,
+        contactId: secondaryContact!.id,
+        paymentTermType: 'COD',
+      },
+    });
+    expect(addedSupplier.status).toBe(200);
+    expect(addedSupplier.data?.success).toBe(true);
+
+    const detail = await requestJson(`/orders/${orderId}`, { token });
+    expect(detail.status).toBe(200);
+
+    const suppliers = detail.data?.data?.orderSuppliers ?? [];
+    const primarySupplier = suppliers.find((supplier: any) => supplier.companyId !== secondarySupplier!.id);
+    const selectedSupplier = suppliers.find((supplier: any) => supplier.companyId === secondarySupplier!.id);
+    expect(primarySupplier?.id).toBeTruthy();
+    expect(selectedSupplier?.id).toBeTruthy();
+
+    const saveItems = await requestJson(`/orders/${orderId}/items`, {
+      method: 'PUT',
+      token,
+      body: {
+        items: [
+          {
+            productType: 'VLSFO',
+            quantity: '60',
+            unit: 'MT',
+            salesPrice: '500',
+            description: 'Primary supplier item',
+            orderSupplierId: primarySupplier.id,
+          },
+          {
+            productType: 'MGO',
+            quantity: '40',
+            unit: 'MT',
+            salesPrice: '520',
+            description: 'Secondary supplier item',
+            orderSupplierId: selectedSupplier.id,
+          },
+        ],
+      },
+    });
+    expect(saveItems.status).toBe(200);
+    expect(saveItems.data?.success).toBe(true);
+
+    const noSelection = await requestRaw(`/orders/${orderId}/nomination/pdf`, { token });
+    expect(noSelection.status).toBe(400);
+    expect(String((noSelection.data as any)?.message ?? '')).toContain('Select which supplier');
+
+    const withSelection = await requestRaw(`/orders/${orderId}/nomination/pdf?orderSupplierId=${selectedSupplier.id}`, { token });
+    expect(withSelection.status).toBe(200);
+    expect(withSelection.headers.get('content-type')).toContain('application/pdf');
+
+    const defaultsWithoutSelection = await requestJson(`/orders/${orderId}/email-defaults`, {
+      method: 'POST',
+      token,
+      body: { documentType: 'NOMINATION' },
+    });
+    expect(defaultsWithoutSelection.status).toBe(400);
+    expect(String(defaultsWithoutSelection.data?.message ?? '')).toContain('Select which supplier');
+
+    const defaultsWithSelection = await requestJson(`/orders/${orderId}/email-defaults`, {
+      method: 'POST',
+      token,
+      body: {
+        documentType: 'NOMINATION',
+        orderSupplierId: selectedSupplier.id,
+      },
+    });
+    expect(defaultsWithSelection.status).toBe(200);
+    expect(defaultsWithSelection.data?.success).toBe(true);
+    expect(defaultsWithSelection.data?.data?.recipientEmail).toBe('secondary.supplier@example.com');
+
+    mockGraphToken = 'graph-multi-nom-token';
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (_url: string | URL | Request, _init?: RequestInit) =>
+      new Response('', { status: 202 })) as typeof fetch;
+
+    try {
+      const sent = await requestJson(`/orders/${orderId}/send-email`, {
+        method: 'POST',
+        token,
+        body: {
+          documentType: 'NOMINATION',
+          orderSupplierId: selectedSupplier.id,
+          recipientEmail: 'secondary.supplier@example.com',
+          subject: 'Nomination B',
+          htmlBody: '<p>Nomination body</p>',
+        },
+      });
+
+      expect(sent.status).toBe(200);
+      expect(sent.data?.success).toBe(true);
+    } finally {
+      globalThis.fetch = originalFetch;
+      mockGraphToken = null;
+    }
+
+    const summary = await requestJson(`/orders/${orderId}/nomination-response?orderSupplierId=${selectedSupplier.id}`, {
+      token,
+    });
+    expect(summary.status).toBe(200);
+    expect(summary.data?.success).toBe(true);
+    expect(summary.data?.data?.orderSupplierId).toBe(selectedSupplier.id);
+    expect(summary.data?.data?.supplierId).toBe(secondarySupplier!.id);
+    expect(summary.data?.data?.supplierName).toBe('Supplier Co B');
+
+    const nominationRows = await db
+      .select()
+      .from(supplierNominations)
+      .where(and(
+        eq(supplierNominations.orderId, orderId),
+        eq(supplierNominations.orderSupplierId, selectedSupplier.id),
+      ));
+    expect(nominationRows.length).toBe(1);
   });
 
   it('sends proforma email via /send-email', async () => {
