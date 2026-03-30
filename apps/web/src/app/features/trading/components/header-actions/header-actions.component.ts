@@ -24,6 +24,7 @@ export type HeaderAction =
   | 'view-proforma'
   | 'convert-to-order'
   | 'cancel-inquiry'
+  | 'cancel-order'
   | 'send-email'
   | 'send-offer'
   | 'send-confirmation'
@@ -75,6 +76,13 @@ const ACTIONS: ActionItem[] = [
     label: 'Cancel Inquiry',
     icon: 'M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z',
     color: 'text-red-500',
+  },
+  {
+    key: 'cancel-order',
+    label: 'Cancel Order',
+    icon: 'M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z',
+    color: 'text-red-500',
+    dividerBefore: true,
   },
   // ─── Send Email actions (one per document type) ──────────────
   {
@@ -242,6 +250,10 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
       || status === OrderStatus.Paid;
     const canMarkDelivered = status === OrderStatus.Confirmed;
     const canMarkPaid = status !== OrderStatus.Paid;
+    const canCancelOrder =
+      status === OrderStatus.Confirmed
+      || status === OrderStatus.Delivered
+      || status === OrderStatus.Invoiced;
 
     const nextActions = isInquiry
       ? (() => {
@@ -284,6 +296,7 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
           .filter((action) =>
             action.key !== 'convert-to-order'
             && action.key !== 'cancel-inquiry'
+            && (action.key !== 'cancel-order' || canCancelOrder)
             && action.key !== 'send-offer'
             && action.key !== 'send-proforma'
             && (action.key !== 'mark-paid' || canMarkPaid),

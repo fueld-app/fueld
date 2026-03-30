@@ -307,4 +307,79 @@ describe('credit.service', () => {
     expect(enrichedA?.availableAmount).toBe('700.00');
     expect(enrichedB?.availableAmount).toBe('750.00');
   });
+
+  it('releases customer and supplier credit usage when an order is cancelled', async () => {
+    const { tenant, client, vessel, place, user } = await seedBasics();
+    const db = await getDb();
+    const { createCreditLine, getCreditLineById } = await loadCreditService();
+    const { createOrder, saveOrderItems, updateOrder, updateOrderStatus } = await loadOrdersService();
+
+    const [supplier] = await db
+      .insert(counterparties)
+      .values({
+        tenantId: tenant.id,
+        name: 'Supplier Cancelled Exposure',
+        type: 'SUPPLIER',
+        types: ['SUPPLIER'],
+      })
+      .returning();
+
+    const customerCredit = await createCreditLine({
+      type: 'CUSTOMER',
+      counterpartyIds: [client.id],
+      creditAmount: '1000.00',
+      currency: 'USD',
+      periodDays: 30,
+    });
+
+    const supplierCredit = await createCreditLine({
+      type: 'SUPPLIER',
+      counterpartyIds: [supplier!.id],
+      creditAmount: '1000.00',
+      currency: 'USD',
+      periodDays: 30,
+    });
+
+    const order = await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+      supplierId: supplier!.id,
+      customerPaymentTermType: 'CREDIT',
+      supplierPaymentTermType: 'CREDIT',
+    });
+
+    await updateOrder(order.id, {
+      customerPaymentTermType: 'CREDIT',
+      supplierId: supplier!.id,
+      supplierPaymentTermType: 'CREDIT',
+    });
+    await updateOrderStatus(order.id, 'CONFIRMED', user.id);
+    await saveOrderItems(order.id, [
+      {
+        productType: 'VLSFO',
+        quantity: '4',
+        costPrice: '100',
+        costCurrency: 'USD',
+        salesPrice: '150',
+        salesCurrency: 'USD',
+      },
+    ]);
+
+    const activeCustomerCredit = await getCreditLineById(customerCredit!.id);
+    const activeSupplierCredit = await getCreditLineById(supplierCredit!.id);
+    expect(activeCustomerCredit?.usedAmount).toBe('600.00');
+    expect(activeSupplierCredit?.usedAmount).toBe('400.00');
+
+    await updateOrderStatus(order.id, 'CANCELLED', user.id, 'Price not competitive');
+
+    const cancelledCustomerCredit = await getCreditLineById(customerCredit!.id);
+    const cancelledSupplierCredit = await getCreditLineById(supplierCredit!.id);
+    expect(cancelledCustomerCredit?.usedAmount).toBe('0.00');
+    expect(cancelledSupplierCredit?.usedAmount).toBe('0.00');
+    expect(cancelledCustomerCredit?.availableAmount).toBe('1000.00');
+    expect(cancelledSupplierCredit?.availableAmount).toBe('1000.00');
+  });
 });

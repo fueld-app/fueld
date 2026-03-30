@@ -344,6 +344,38 @@ interface PlattsSuggestionViewModel {
       (agentChange)="onAgentChange($event)"
       (agentContactChange)="onAgentContactChange($event)"
     >
+      <div supplierHeaderTabs>
+        @if (orderSupplierTabs().length > 0) {
+          <div class="grid min-w-0 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+            <div class="scrollbar-none min-w-0 flex-1 overflow-x-auto">
+              <div class="flex min-w-max items-center gap-1">
+                @for (supplierTab of orderSupplierTabs(); track supplierTab.id) {
+                  <button
+                    type="button"
+                    (click)="selectOrderSupplierTab(supplierTab.id)"
+                    [attr.aria-selected]="activeOrderSupplierId() === supplierTab.id"
+                    class="inline-flex min-w-0 items-center gap-2 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
+                    [class]="activeOrderSupplierId() === supplierTab.id
+                      ? 'bg-brand-50 text-brand-700'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'"
+                  >
+                    <span class="max-w-[9rem] truncate">{{ supplierTab.label }}</span>
+                  </button>
+                }
+              </div>
+            </div>
+            @if (!isReadonly() && activeOrderSupplier()) {
+              <button
+                type="button"
+                (click)="addSupplierTab()"
+                class="inline-flex shrink-0 items-center gap-1 rounded-md bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 transition-colors hover:bg-brand-100"
+              >
+                + Add
+              </button>
+            }
+          </div>
+        }
+      </div>
       <!-- Customer Payment (projected into client card) -->
       <div customerPayment>
         <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Payment</p>
@@ -435,31 +467,6 @@ interface PlattsSuggestionViewModel {
       </div>
       <!-- Supplier Payment (projected into supplier card) -->
       <div supplierPayment>
-        @if (orderSupplierTabs().length > 0) {
-          <div class="mb-3 flex flex-wrap items-center gap-2 border-b border-gray-100 pb-3">
-            @for (supplierTab of orderSupplierTabs(); track supplierTab.id) {
-              <button
-                type="button"
-                (click)="selectOrderSupplierTab(supplierTab.id)"
-                [class]="activeOrderSupplierId() === supplierTab.id ? 'rounded-full bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm' : 'rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 hover:border-brand-300 hover:text-brand-700'"
-              >
-                {{ supplierTab.label }}
-                @if (supplierTab.isPrimary) {
-                  <span class="ml-1 opacity-80">Primary</span>
-                }
-              </button>
-            }
-            @if (!isReadonly() && activeOrderSupplier()) {
-              <button
-                type="button"
-                (click)="addSupplierTab()"
-                class="rounded-full border border-dashed border-brand-300 px-3 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-50"
-              >
-                Add supplier
-              </button>
-            }
-          </div>
-        }
         <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Payment</p>
         @if (isReadonly()) {
           <p class="mt-1 text-sm font-semibold text-gray-900">{{ formatSupplierPaymentTerms() }}</p>
@@ -1536,7 +1543,7 @@ interface PlattsSuggestionViewModel {
       <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
         <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
           <div class="flex items-center justify-between">
-            <h3 class="text-lg font-semibold text-gray-900">Cancel inquiry</h3>
+            <h3 class="text-lg font-semibold text-gray-900">Cancel {{ cancellationTargetLabel() }}</h3>
             <button
               type="button"
               (click)="closeCancelInquiryModal()"
@@ -1546,7 +1553,7 @@ interface PlattsSuggestionViewModel {
             </button>
           </div>
           <p class="mt-3 text-sm text-gray-600">
-            Select a reason for cancelling this inquiry.
+            Select a reason for cancelling this {{ cancellationTargetLabel() }}.
           </p>
           <div class="mt-4">
             <label class="text-xs font-medium text-gray-500">Cancellation reason</label>
@@ -1806,6 +1813,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly availableInquiryCancelReasons = computed(() =>
     this.inquiryCancelReasons().map((reason) => reason.trim()).filter(Boolean),
   );
+  readonly cancellationTargetLabel = computed(() => {
+    const status = this.order()?.status;
+    return status === OrderStatus.Inquiry || status === OrderStatus.Offer ? 'inquiry' : 'order';
+  });
   readonly configuredProducts = signal<DropdownOption[]>([]);
   readonly configuredUnits = signal<DropdownOption[]>([]);
   readonly configuredUnitConversions = signal<{ productType?: string; fromUnit: string; toUnit: string; factor: number }[]>([]);
@@ -4116,6 +4127,9 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       case 'cancel-inquiry':
         this.openCancelInquiryModal();
         break;
+      case 'cancel-order':
+        this.openCancelInquiryModal();
+        break;
       case 'send-email':
         if (!this.isResponsibleUser()) {
           this.showToast('error', 'Only the responsible user can send this email.');
@@ -4164,8 +4178,14 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   openCancelInquiryModal(): void {
     const status = this.order()?.status;
-    if (status !== OrderStatus.Inquiry && status !== OrderStatus.Offer) {
-      this.showToast('error', 'Only inquiries can be cancelled from this action.');
+    const canCancel =
+      status === OrderStatus.Inquiry
+      || status === OrderStatus.Offer
+      || status === OrderStatus.Confirmed
+      || status === OrderStatus.Delivered
+      || status === OrderStatus.Invoiced;
+    if (!canCancel) {
+      this.showToast('error', 'This record cannot be cancelled from this action.');
       return;
     }
 
@@ -4219,8 +4239,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     if (!id) return;
 
     const status = this.order()?.status;
-    if (status !== OrderStatus.Inquiry && status !== OrderStatus.Offer) {
-      this.showToast('error', 'Only inquiries can be cancelled from this action.');
+    const isInquiry = status === OrderStatus.Inquiry || status === OrderStatus.Offer;
+    const canCancel = isInquiry || status === OrderStatus.Confirmed || status === OrderStatus.Delivered || status === OrderStatus.Invoiced;
+    if (!canCancel) {
+      this.showToast('error', 'This record cannot be cancelled from this action.');
       return;
     }
 
@@ -4249,14 +4271,20 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         }),
       );
       if (res.success) {
-        this.order.update((o) => (o ? { ...o, status: OrderStatus.Cancelled } : o));
+        this.order.update((o) => (o ? { ...o, status: OrderStatus.Cancelled, lossReason } : o));
+        const updatedOrder = this.order();
+        if (updatedOrder?.clientId) {
+          await this.loadCustomerCreditLines(updatedOrder.clientId);
+        }
+        await this.loadSupplierCreditLines(this.activeOrderSupplier()?.companyId ?? updatedOrder?.supplierId);
         this.showCancelInquiryModal.set(false);
-        this.showToast('success', 'Inquiry cancelled.');
+        this.showToast('success', `${isInquiry ? 'Inquiry' : 'Order'} cancelled.`);
+        await this.normalizeDetailRoute(OrderStatus.Cancelled, id);
       } else {
-        this.showToast('error', res.message ?? 'Failed to cancel inquiry.');
+        this.showToast('error', res.message ?? `Failed to cancel ${isInquiry ? 'inquiry' : 'order'}.`);
       }
     } catch {
-      this.showToast('error', 'Failed to cancel inquiry.');
+      this.showToast('error', `Failed to cancel ${isInquiry ? 'inquiry' : 'order'}.`);
     } finally {
       this.cancellingInquiry.set(false);
     }

@@ -5,6 +5,7 @@ import {
   inject,
   input,
   output,
+  signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -21,101 +22,112 @@ import {
   template: `
     <div class="mb-4 grid gap-4 grid-cols-1 min-[900px]:grid-cols-2 min-[1600px]:grid-cols-4">
       <!-- Client + Customer Contact + Broker + Agent + Customer Payment -->
-      <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <button
-          type="button"
-          (click)="navigateToClient()"
-          [disabled]="!clientId()"
-          class="text-xs font-medium uppercase tracking-wider mb-1.5"
-          [class.text-gray-500]="!clientId()"
-          [class.text-brand-600]="!!clientId()"
-          [class.hover:underline]="!!clientId()"
-          [class.cursor-pointer]="!!clientId()"
-          [class.cursor-not-allowed]="!clientId()"
-          [class.opacity-50]="!clientId()"
-        >
-          Client
-        </button>
-        @if (canEditClient()) {
-          <app-searchable-dropdown
-            [options]="clientOptions()"
-            [selected]="clientId()"
-            [asyncSearch]="true"
-            [loading]="clientLoading()"
-            placeholder="Search clients..."
-            (searchChange)="clientSearch.emit($event)"
-            (selectionChange)="clientChange.emit($event)"
-          />
-        } @else {
-          <p class="mt-1 text-sm font-semibold text-gray-900">{{ clientName() }}</p>
-        }
-        <!-- Customer Contact (hidden when broker is set) -->
-        @if (!brokerId()) {
-          <div class="mt-3 border-t border-gray-100 pt-3">
-            <label class="text-xs font-medium text-gray-400">Contact Person</label>
-            @if (isReadonly()) {
-              <p class="mt-1 text-sm text-gray-900">{{ customerContactName() || '—' }}</p>
-            } @else {
-              <select
-                [ngModel]="customerContactId()"
-                (ngModelChange)="customerContactChange.emit($event)"
-                class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
-                       focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
-              >
-                <option value="">— None —</option>
-                @for (c of customerContactOptions(); track c.value) {
-                  <option [value]="c.value">{{ c.label }}</option>
-                }
-              </select>
-            }
-          </div>
-        }
-        <!-- Broker section (collapsed to link when no broker) -->
-        <div class="mt-3 border-t border-gray-100 pt-3">
-          @if ((!brokerId() && !brokerExpanded) || (!agentId() && !agentExpanded)) {
-            <div class="flex items-center gap-3">
-              @if (!brokerId() && !isReadonly()) {
-                <button
-                  type="button"
-                  (click)="brokerExpanded = true"
-                  class="text-xs text-brand-600 hover:underline cursor-pointer"
-                  [class.hidden]="brokerExpanded"
-                >+ Add broker</button>
-              }
-              @if (!agentId() && !isReadonly()) {
-                <button
-                  type="button"
-                  (click)="agentExpanded = true"
-                  class="text-xs text-brand-600 hover:underline cursor-pointer"
-                  [class.hidden]="agentExpanded"
-                >+ Add agent</button>
-              }
-            </div>
-          }
-          @if (brokerId() || brokerExpanded) {
-            <div class="flex items-center justify-between mb-1.5">
+      <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+        <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between gap-3">
+          <div class="flex min-w-0 items-center gap-1">
+            <button
+              type="button"
+              class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
+              [class]="activeClientPartyTab() === 'client' ? 'bg-brand-50 text-brand-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'"
+              (click)="clientPartyTab.set('client')"
+            >
+              Client
+            </button>
+            @if (showBrokerTab()) {
               <button
                 type="button"
-                (click)="navigateToBroker()"
-                [disabled]="!brokerId()"
-                class="text-xs font-medium uppercase tracking-wider"
-                [class.text-gray-500]="!brokerId()"
-                [class.text-brand-600]="!!brokerId()"
-                [class.hover:underline]="!!brokerId()"
-                [class.cursor-pointer]="!!brokerId()"
-                [class.cursor-not-allowed]="!brokerId()"
-                [class.opacity-50]="!brokerId()"
+                class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
+                [class]="activeClientPartyTab() === 'broker' ? 'bg-brand-50 text-brand-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'"
+                (click)="clientPartyTab.set('broker')"
               >
                 Broker
               </button>
-              @if (!brokerId() && !isReadonly()) {
+            }
+            @if (showAgentTab()) {
+              <button
+                type="button"
+                class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
+                [class]="activeClientPartyTab() === 'agent' ? 'bg-brand-50 text-brand-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'"
+                (click)="clientPartyTab.set('agent')"
+              >
+                Agent
+              </button>
+            }
+          </div>
+          @if (!isReadonly()) {
+            <div class="flex items-center gap-1">
+              @if (!showBrokerTab()) {
                 <button
                   type="button"
-                  (click)="brokerExpanded = false"
-                  class="text-xs text-gray-400 hover:text-gray-600 cursor-pointer"
-                >Cancel</button>
+                  (click)="openBrokerTab()"
+                  class="inline-flex items-center gap-1 rounded-md bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 transition-colors hover:bg-brand-100"
+                >
+                  + Add broker
+                </button>
+              }
+              @if (!showAgentTab()) {
+                <button
+                  type="button"
+                  (click)="openAgentTab()"
+                  class="inline-flex items-center gap-1 rounded-md bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 transition-colors hover:bg-brand-100"
+                >
+                  + Add agent
+                </button>
               }
             </div>
+          }
+        </div>
+        <div class="px-5 py-4">
+          @if (activeClientPartyTab() === 'client') {
+            @if (canEditClient()) {
+              <app-searchable-dropdown
+                [options]="clientOptions()"
+                [selected]="clientId()"
+                [asyncSearch]="true"
+                [loading]="clientLoading()"
+                placeholder="Search clients..."
+                (searchChange)="clientSearch.emit($event)"
+                (selectionChange)="clientChange.emit($event)"
+              />
+            } @else {
+              <p class="mt-1 text-sm font-semibold text-gray-900">{{ clientName() }}</p>
+            }
+            @if (!brokerId()) {
+              <div class="mt-3 border-t border-gray-100 pt-3">
+                <label class="text-xs font-medium text-gray-400">Contact Person</label>
+                @if (isReadonly()) {
+                  <p class="mt-1 text-sm text-gray-900">{{ customerContactName() || '—' }}</p>
+                } @else {
+                  <select
+                    [ngModel]="customerContactId()"
+                    (ngModelChange)="customerContactChange.emit($event)"
+                    class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                  >
+                    <option value="">— None —</option>
+                    @for (c of customerContactOptions(); track c.value) {
+                      <option [value]="c.value">{{ c.label }}</option>
+                    }
+                  </select>
+                }
+              </div>
+            }
+          }
+          @if (activeClientPartyTab() === 'broker' && showBrokerTab()) {
+            <button
+              type="button"
+              (click)="navigateToBroker()"
+              [disabled]="!brokerId()"
+              class="text-xs font-medium uppercase tracking-wider mb-1.5"
+              [class.text-gray-500]="!brokerId()"
+              [class.text-brand-600]="!!brokerId()"
+              [class.hover:underline]="!!brokerId()"
+              [class.cursor-pointer]="!!brokerId()"
+              [class.cursor-not-allowed]="!brokerId()"
+              [class.opacity-50]="!brokerId()"
+            >
+              Broker
+            </button>
             @if (isReadonly()) {
               <p class="mt-1 text-sm font-semibold text-gray-900">{{ brokerName() }}</p>
             } @else {
@@ -131,7 +143,7 @@ import {
               />
             }
             @if (brokerId()) {
-              <div class="mt-2">
+              <div class="mt-3 border-t border-gray-100 pt-3">
                 <label class="text-xs font-medium text-gray-400">Broker Contact</label>
                 @if (isReadonly()) {
                   <p class="mt-1 text-sm text-gray-900">{{ brokerContactName() || '—' }}</p>
@@ -169,123 +181,121 @@ import {
               </div>
             }
           }
-          @if (agentId() || agentExpanded) {
-            <div class="mt-3 border-t border-gray-100 pt-3">
-              <div class="flex items-center justify-between mb-1.5">
-                <button
-                  type="button"
-                  (click)="navigateToAgent()"
-                  [disabled]="!agentId()"
-                  class="text-xs font-medium uppercase tracking-wider"
-                  [class.text-gray-500]="!agentId()"
-                  [class.text-brand-600]="!!agentId()"
-                  [class.hover:underline]="!!agentId()"
-                  [class.cursor-pointer]="!!agentId()"
-                  [class.cursor-not-allowed]="!agentId()"
-                  [class.opacity-50]="!agentId()"
-                >
-                  Agent
-                </button>
-                @if (!agentId() && !isReadonly()) {
-                  <button
-                    type="button"
-                    (click)="agentExpanded = false"
-                    class="text-xs text-gray-400 hover:text-gray-600 cursor-pointer"
-                  >Cancel</button>
+          @if (activeClientPartyTab() === 'agent' && showAgentTab()) {
+            <button
+              type="button"
+              (click)="navigateToAgent()"
+              [disabled]="!agentId()"
+              class="text-xs font-medium uppercase tracking-wider mb-1.5"
+              [class.text-gray-500]="!agentId()"
+              [class.text-brand-600]="!!agentId()"
+              [class.hover:underline]="!!agentId()"
+              [class.cursor-pointer]="!!agentId()"
+              [class.cursor-not-allowed]="!agentId()"
+              [class.opacity-50]="!agentId()"
+            >
+              Agent
+            </button>
+            @if (isReadonly()) {
+              <p class="mt-1 text-sm font-semibold text-gray-900">{{ agentName() }}</p>
+            } @else {
+              <app-searchable-dropdown
+                [options]="agentOptions()"
+                [selected]="agentId()"
+                [asyncSearch]="true"
+                [loading]="agentLoading()"
+                [clearable]="true"
+                placeholder="Search companies..."
+                (searchChange)="agentSearch.emit($event)"
+                (selectionChange)="agentChange.emit($event)"
+              />
+            }
+            @if (agentId()) {
+              <div class="mt-3 border-t border-gray-100 pt-3">
+                <label class="text-xs font-medium text-gray-400">Agent Contact</label>
+                @if (isReadonly()) {
+                  <p class="mt-1 text-sm text-gray-900">{{ agentContactName() || '—' }}</p>
+                } @else {
+                  <select
+                    [ngModel]="agentContactId()"
+                    (ngModelChange)="agentContactChange.emit($event)"
+                    class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                  >
+                    <option value="">— None —</option>
+                    @for (c of agentContactOptions(); track c.value) {
+                      <option [value]="c.value">{{ c.label }}</option>
+                    }
+                  </select>
                 }
               </div>
-              @if (isReadonly()) {
-                <p class="mt-1 text-sm font-semibold text-gray-900">{{ agentName() }}</p>
-              } @else {
-                <app-searchable-dropdown
-                  [options]="agentOptions()"
-                  [selected]="agentId()"
-                  [asyncSearch]="true"
-                  [loading]="agentLoading()"
-                  [clearable]="true"
-                  placeholder="Search companies..."
-                  (searchChange)="agentSearch.emit($event)"
-                  (selectionChange)="agentChange.emit($event)"
-                />
-              }
-              @if (agentId()) {
-                <div class="mt-2">
-                  <label class="text-xs font-medium text-gray-400">Agent Contact</label>
-                  @if (isReadonly()) {
-                    <p class="mt-1 text-sm text-gray-900">{{ agentContactName() || '—' }}</p>
-                  } @else {
-                    <select
-                      [ngModel]="agentContactId()"
-                      (ngModelChange)="agentContactChange.emit($event)"
-                      class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
-                             focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
-                    >
-                      <option value="">— None —</option>
-                      @for (c of agentContactOptions(); track c.value) {
-                        <option [value]="c.value">{{ c.label }}</option>
-                      }
-                    </select>
-                  }
-                </div>
-              }
-            </div>
+            }
           }
-        </div>
-        <div class="mt-3 border-t border-gray-100 pt-3">
-          <ng-content select="[customerPayment]"></ng-content>
+          <div class="mt-3 border-t border-gray-100 pt-3">
+            <ng-content select="[customerPayment]"></ng-content>
+          </div>
         </div>
       </div>
       <!-- Supplier + Supplier Contact + Supplier Payment -->
-      <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <button
-          type="button"
-          (click)="navigateToSupplier()"
-          [disabled]="!supplierId()"
-          class="text-xs font-medium uppercase tracking-wider mb-1.5"
-          [class.text-gray-500]="!supplierId()"
-          [class.text-brand-600]="!!supplierId()"
-          [class.hover:underline]="!!supplierId()"
-          [class.cursor-pointer]="!!supplierId()"
-          [class.cursor-not-allowed]="!supplierId()"
-          [class.opacity-50]="!supplierId()"
-        >
-          Supplier
-        </button>
-        @if (isReadonly()) {
-          <p class="mt-1 text-sm font-semibold text-gray-900">{{ supplierName() }}</p>
-        } @else {
-          <app-searchable-dropdown
-            [options]="supplierOptions()"
-            [selected]="supplierId()"
-            [asyncSearch]="true"
-            [loading]="supplierLoading()"
-            placeholder="Search suppliers..."
-            (searchChange)="supplierSearch.emit($event)"
-            (selectionChange)="supplierChange.emit($event)"
-          />
-        }
-        <div class="mt-3 border-t border-gray-100 pt-3">
-          <label class="text-xs font-medium text-gray-400">Contact Person</label>
-          @if (isReadonly()) {
-            <p class="mt-1 text-sm text-gray-900">{{ supplierContactName() || '—' }}</p>
-          } @else {
-            <select
-              [ngModel]="supplierContactId()"
-              (ngModelChange)="supplierContactChange.emit($event)"
+      <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+        <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between gap-3">
+          @if (!supplierId()) {
+            <button
+              type="button"
+              (click)="navigateToSupplier()"
               [disabled]="!supplierId()"
-              class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
-                     focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white
-                     disabled:opacity-50 disabled:cursor-not-allowed"
+              class="text-xs font-medium uppercase tracking-wider shrink-0"
+              [class.text-gray-500]="!supplierId()"
+              [class.text-brand-600]="!!supplierId()"
+              [class.hover:underline]="!!supplierId()"
+              [class.cursor-pointer]="!!supplierId()"
+              [class.cursor-not-allowed]="!supplierId()"
+              [class.opacity-50]="!supplierId()"
             >
-              <option value="">— None —</option>
-              @for (c of supplierContactOptions(); track c.value) {
-                <option [value]="c.value">{{ c.label }}</option>
-              }
-            </select>
+              Supplier
+            </button>
           }
+          <div class="min-w-0 flex-1">
+            <ng-content select="[supplierHeaderTabs]"></ng-content>
+          </div>
         </div>
-        <div class="mt-3 border-t border-gray-100 pt-3">
-          <ng-content select="[supplierPayment]"></ng-content>
+        <div class="px-5 py-4">
+          @if (isReadonly()) {
+            <p class="mt-1 text-sm font-semibold text-gray-900">{{ supplierName() }}</p>
+          } @else {
+            <app-searchable-dropdown
+              [options]="supplierOptions()"
+              [selected]="supplierId()"
+              [asyncSearch]="true"
+              [loading]="supplierLoading()"
+              placeholder="Search suppliers..."
+              (searchChange)="supplierSearch.emit($event)"
+              (selectionChange)="supplierChange.emit($event)"
+            />
+          }
+          <div class="mt-3 border-t border-gray-100 pt-3">
+            <label class="text-xs font-medium text-gray-400">Contact Person</label>
+            @if (isReadonly()) {
+              <p class="mt-1 text-sm text-gray-900">{{ supplierContactName() || '—' }}</p>
+            } @else {
+              <select
+                [ngModel]="supplierContactId()"
+                (ngModelChange)="supplierContactChange.emit($event)"
+                [disabled]="!supplierId()"
+                class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                       focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white
+                       disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="">— None —</option>
+                @for (c of supplierContactOptions(); track c.value) {
+                  <option [value]="c.value">{{ c.label }}</option>
+                }
+              </select>
+            }
+          </div>
+          <div class="mt-3 border-t border-gray-100 pt-3">
+            <ng-content select="[supplierPayment]"></ng-content>
+          </div>
         </div>
       </div>
 
@@ -433,6 +443,19 @@ export class TradingDetailMetaCardsComponent {
   private readonly router = inject(Router);
   brokerExpanded = false;
   agentExpanded = false;
+  readonly clientPartyTab = signal<'client' | 'broker' | 'agent'>('client');
+  readonly showBrokerTab = computed(() => this.brokerExpanded || !!this.brokerId());
+  readonly showAgentTab = computed(() => this.agentExpanded || !!this.agentId());
+  readonly activeClientPartyTab = computed<'client' | 'broker' | 'agent'>(() => {
+    const current = this.clientPartyTab();
+    if (current === 'broker' && !this.showBrokerTab()) {
+      return this.showAgentTab() ? 'agent' : 'client';
+    }
+    if (current === 'agent' && !this.showAgentTab()) {
+      return this.showBrokerTab() ? 'broker' : 'client';
+    }
+    return current;
+  });
 
   readonly clientName = input.required<string>();
   readonly supplierName = input<string>('—');
@@ -534,6 +557,16 @@ export class TradingDetailMetaCardsComponent {
   readonly agentSearch = output<string>();
   readonly agentChange = output<string>();
   readonly agentContactChange = output<string>();
+
+  openBrokerTab(): void {
+    this.brokerExpanded = true;
+    this.clientPartyTab.set('broker');
+  }
+
+  openAgentTab(): void {
+    this.agentExpanded = true;
+    this.clientPartyTab.set('agent');
+  }
 
   navigateToClient(): void {
     const id = this.clientId();

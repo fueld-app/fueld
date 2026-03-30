@@ -190,7 +190,7 @@ describe('orders controller branch e2e', () => {
     expect(cancelValidReason.data?.data?.lossReason).toBe('Price not competitive');
   });
 
-  it('allows cancelling non-inquiry orders without cancellation reason', async () => {
+  it('requires configured cancellation reasons for non-inquiry orders too', async () => {
     const seeded = await seedAuthBasics();
     const login = await loginE2E(seeded.user.email, seeded.password);
     const token = login.accessToken;
@@ -231,7 +231,26 @@ describe('orders controller branch e2e', () => {
       body: { status: 'CANCELLED' },
     });
     expect(cancelConfirmedNoReason.status).toBe(200);
-    expect(cancelConfirmedNoReason.data?.success).toBe(true);
-    expect(cancelConfirmedNoReason.data?.data?.status).toBe('CANCELLED');
+    expect(cancelConfirmedNoReason.data?.success).toBe(false);
+    expect(String(cancelConfirmedNoReason.data?.message ?? '')).toContain('Cancellation reason is required');
+
+    const cancelConfirmedInvalidReason = await requestJson(`/orders/${orderId}/status`, {
+      method: 'PUT',
+      token,
+      body: { status: 'CANCELLED', lossReason: 'Not in configured list' },
+    });
+    expect(cancelConfirmedInvalidReason.status).toBe(200);
+    expect(cancelConfirmedInvalidReason.data?.success).toBe(false);
+    expect(String(cancelConfirmedInvalidReason.data?.message ?? '')).toContain('Invalid cancellation reason');
+
+    const cancelConfirmedValidReason = await requestJson(`/orders/${orderId}/status`, {
+      method: 'PUT',
+      token,
+      body: { status: 'CANCELLED', lossReason: 'Price not competitive' },
+    });
+    expect(cancelConfirmedValidReason.status).toBe(200);
+    expect(cancelConfirmedValidReason.data?.success).toBe(true);
+    expect(cancelConfirmedValidReason.data?.data?.status).toBe('CANCELLED');
+    expect(cancelConfirmedValidReason.data?.data?.lossReason).toBe('Price not competitive');
   });
 });

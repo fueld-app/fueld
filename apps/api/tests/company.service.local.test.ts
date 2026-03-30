@@ -132,6 +132,79 @@ describe('company.service local flows', () => {
     });
   });
 
+  it('returns only company groups with actual credit exposure', async () => {
+    const { tenant } = await seedBasics();
+    const db = await getDb();
+    const { getTopCreditGroups } = await loadCompanyService();
+
+    const [parentWithExposure] = await db
+      .insert(counterparties)
+      .values({
+        tenantId: tenant.id,
+        name: 'Exposure Parent',
+        type: 'CLIENT',
+        types: ['CLIENT'],
+        country: 'Denmark',
+        countryIso: 'DK',
+        creditLimit: '1000',
+        creditUsed: '250',
+      })
+      .returning();
+
+    const [childWithExposure] = await db
+      .insert(counterparties)
+      .values({
+        tenantId: tenant.id,
+        name: 'Exposure Child',
+        type: 'CLIENT',
+        types: ['CLIENT'],
+        country: 'Denmark',
+        countryIso: 'DK',
+        parentId: parentWithExposure!.id,
+        creditLimit: '500',
+        creditUsed: '50',
+      })
+      .returning();
+
+    const [parentWithoutExposure] = await db
+      .insert(counterparties)
+      .values({
+        tenantId: tenant.id,
+        name: 'Empty Parent',
+        type: 'CLIENT',
+        types: ['CLIENT'],
+        country: 'Sweden',
+        countryIso: 'SE',
+        creditLimit: '0',
+        creditUsed: '0',
+      })
+      .returning();
+
+    await db.insert(counterparties).values({
+      tenantId: tenant.id,
+      name: 'Empty Child',
+      type: 'CLIENT',
+      types: ['CLIENT'],
+      country: 'Sweden',
+      countryIso: 'SE',
+      parentId: parentWithoutExposure!.id,
+      creditLimit: '0',
+      creditUsed: '0',
+    });
+
+    const groups = await getTopCreditGroups(10);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.id).toBe(parentWithExposure!.id);
+    expect(groups[0]?.name).toBe('Exposure Parent');
+    expect(groups[0]?.childCount).toBe(2);
+    expect(groups[0]?.totalCreditLimit).toBe('1500.00');
+    expect(groups[0]?.totalCreditUsed).toBe('300.00');
+
+    expect(groups.some((group) => group.id === childWithExposure!.id)).toBe(false);
+    expect(groups.some((group) => group.id === parentWithoutExposure!.id)).toBe(false);
+  });
+
   it('supports contact CRUD and seasearcher contact sync', async () => {
     const { tenant } = await seedBasics();
     const db = await getDb();

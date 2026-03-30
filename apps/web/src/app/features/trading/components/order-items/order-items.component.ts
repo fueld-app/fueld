@@ -1288,9 +1288,7 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   );
 
   readonly supplierOptions = computed(() => this.supplierOptionsInput());
-  readonly showSupplierColumn = computed(() =>
-    this.supplierOptions().length > 1 || this.rows().some((row) => !!row.orderSupplierId),
-  );
+  readonly showSupplierColumn = computed(() => this.supplierOptions().length > 1);
 
   readonly plattsSuggestionsByKey = computed(() =>
     new Map(this.plattsSuggestionsInput().map((item) => [item.key, item.matches] as const)),

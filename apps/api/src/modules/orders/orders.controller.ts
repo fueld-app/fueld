@@ -446,7 +446,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
           }
         }
 
-        if (body.status === 'CANCELLED' && (order?.status === 'INQUIRY' || order?.status === 'OFFER')) {
+        if (body.status === 'CANCELLED') {
           const reason = body.lossReason?.trim();
           if (!reason) {
             return { success: false, data: null, message: 'Cancellation reason is required' };

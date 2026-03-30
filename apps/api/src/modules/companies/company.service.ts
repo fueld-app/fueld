@@ -1850,17 +1850,22 @@ export async function getGroupVesselsForCompany(companyId: string) {
 /** Top parent companies by aggregated credit exposure (parent + children). */
 export async function getTopCreditGroups(limit = 10) {
   const rows = await db.execute(sql`
-    SELECT
-      p.id,
-      p.name,
-      p.country,
-      COALESCE(p.credit_limit, 0) + COALESCE(SUM(c.credit_limit), 0) AS "totalCreditLimit",
-      COALESCE(p.credit_used, 0) + COALESCE(SUM(c.credit_used), 0) AS "totalCreditUsed",
-      1 + COUNT(c.id)::int AS "childCount"
-    FROM counterparties p
-    INNER JOIN counterparties c ON c.parent_id = p.id
-    GROUP BY p.id, p.name, p.country, p.credit_limit, p.credit_used
-    ORDER BY COALESCE(p.credit_used, 0) + COALESCE(SUM(c.credit_used), 0) DESC
+    WITH grouped AS (
+      SELECT
+        p.id,
+        p.name,
+        p.country,
+        COALESCE(p.credit_limit, 0) + COALESCE(SUM(c.credit_limit), 0) AS "totalCreditLimit",
+        COALESCE(p.credit_used, 0) + COALESCE(SUM(c.credit_used), 0) AS "totalCreditUsed",
+        1 + COUNT(c.id)::int AS "childCount"
+      FROM counterparties p
+      INNER JOIN counterparties c ON c.parent_id = p.id
+      GROUP BY p.id, p.name, p.country, p.credit_limit, p.credit_used
+    )
+    SELECT *
+    FROM grouped
+    WHERE "totalCreditLimit" > 0 OR "totalCreditUsed" > 0
+    ORDER BY "totalCreditUsed" DESC, "totalCreditLimit" DESC, name ASC
     LIMIT ${limit}
   `);
   return rows as unknown as {
