@@ -714,6 +714,10 @@ export const orders = pgTable('orders', {
   brokerContactId: uuid('broker_contact_id').references(() => companyContacts.id, { onDelete: 'set null' }),
   brokerGetsAll: boolean('broker_gets_all').notNull().default(false),
 
+  // Agent — optional company/contact for operational coordination on nominations
+  agentId: uuid('agent_id').references(() => counterparties.id),
+  agentContactId: uuid('agent_contact_id').references(() => companyContacts.id, { onDelete: 'set null' }),
+
   // Terms & conditions
   termsAndConditions: text('terms_and_conditions'),
 
@@ -1402,9 +1406,11 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
   salesRep: one(users, { fields: [orders.salesRepId], references: [users.id] }),
   supplier: one(counterparties, { fields: [orders.supplierId], references: [counterparties.id] }),
   broker: one(counterparties, { fields: [orders.brokerId], references: [counterparties.id] }),
+  agent: one(counterparties, { fields: [orders.agentId], references: [counterparties.id] }),
   customerContact: one(companyContacts, { fields: [orders.customerContactId], references: [companyContacts.id] }),
   supplierContact: one(companyContacts, { fields: [orders.supplierContactId], references: [companyContacts.id] }),
   brokerContact: one(companyContacts, { fields: [orders.brokerContactId], references: [companyContacts.id] }),
+  agentContact: one(companyContacts, { fields: [orders.agentContactId], references: [companyContacts.id] }),
   invoicingCompany: one(counterparties, {
     fields: [orders.invoicingCompanyId],
     references: [counterparties.id],

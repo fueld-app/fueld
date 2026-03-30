@@ -20,7 +20,7 @@ import {
   imports: [SearchableDropdownComponent, FormsModule],
   template: `
     <div class="mb-4 grid gap-4 grid-cols-1 min-[900px]:grid-cols-2 min-[1600px]:grid-cols-4">
-      <!-- Client + Customer Contact + Broker + Customer Payment -->
+      <!-- Client + Customer Contact + Broker + Agent + Customer Payment -->
       <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <button
           type="button"
@@ -72,13 +72,25 @@ import {
         }
         <!-- Broker section (collapsed to link when no broker) -->
         <div class="mt-3 border-t border-gray-100 pt-3">
-          @if (!brokerId() && !isReadonly()) {
-            <button
-              type="button"
-              (click)="brokerExpanded = true"
-              class="text-xs text-brand-600 hover:underline cursor-pointer"
-              [class.hidden]="brokerExpanded"
-            >+ Add broker</button>
+          @if ((!brokerId() && !brokerExpanded) || (!agentId() && !agentExpanded)) {
+            <div class="flex items-center gap-3">
+              @if (!brokerId() && !isReadonly()) {
+                <button
+                  type="button"
+                  (click)="brokerExpanded = true"
+                  class="text-xs text-brand-600 hover:underline cursor-pointer"
+                  [class.hidden]="brokerExpanded"
+                >+ Add broker</button>
+              }
+              @if (!agentId() && !isReadonly()) {
+                <button
+                  type="button"
+                  (click)="agentExpanded = true"
+                  class="text-xs text-brand-600 hover:underline cursor-pointer"
+                  [class.hidden]="agentExpanded"
+                >+ Add agent</button>
+              }
+            </div>
           }
           @if (brokerId() || brokerExpanded) {
             <div class="flex items-center justify-between mb-1.5">
@@ -156,6 +168,67 @@ import {
                 </label>
               </div>
             }
+          }
+          @if (agentId() || agentExpanded) {
+            <div class="mt-3 border-t border-gray-100 pt-3">
+              <div class="flex items-center justify-between mb-1.5">
+                <button
+                  type="button"
+                  (click)="navigateToAgent()"
+                  [disabled]="!agentId()"
+                  class="text-xs font-medium uppercase tracking-wider"
+                  [class.text-gray-500]="!agentId()"
+                  [class.text-brand-600]="!!agentId()"
+                  [class.hover:underline]="!!agentId()"
+                  [class.cursor-pointer]="!!agentId()"
+                  [class.cursor-not-allowed]="!agentId()"
+                  [class.opacity-50]="!agentId()"
+                >
+                  Agent
+                </button>
+                @if (!agentId() && !isReadonly()) {
+                  <button
+                    type="button"
+                    (click)="agentExpanded = false"
+                    class="text-xs text-gray-400 hover:text-gray-600 cursor-pointer"
+                  >Cancel</button>
+                }
+              </div>
+              @if (isReadonly()) {
+                <p class="mt-1 text-sm font-semibold text-gray-900">{{ agentName() }}</p>
+              } @else {
+                <app-searchable-dropdown
+                  [options]="agentOptions()"
+                  [selected]="agentId()"
+                  [asyncSearch]="true"
+                  [loading]="agentLoading()"
+                  [clearable]="true"
+                  placeholder="Search companies..."
+                  (searchChange)="agentSearch.emit($event)"
+                  (selectionChange)="agentChange.emit($event)"
+                />
+              }
+              @if (agentId()) {
+                <div class="mt-2">
+                  <label class="text-xs font-medium text-gray-400">Agent Contact</label>
+                  @if (isReadonly()) {
+                    <p class="mt-1 text-sm text-gray-900">{{ agentContactName() || '—' }}</p>
+                  } @else {
+                    <select
+                      [ngModel]="agentContactId()"
+                      (ngModelChange)="agentContactChange.emit($event)"
+                      class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                             focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                    >
+                      <option value="">— None —</option>
+                      @for (c of agentContactOptions(); track c.value) {
+                        <option [value]="c.value">{{ c.label }}</option>
+                      }
+                    </select>
+                  }
+                </div>
+              }
+            </div>
           }
         </div>
         <div class="mt-3 border-t border-gray-100 pt-3">
@@ -359,6 +432,7 @@ import {
 export class TradingDetailMetaCardsComponent {
   private readonly router = inject(Router);
   brokerExpanded = false;
+  agentExpanded = false;
 
   readonly clientName = input.required<string>();
   readonly supplierName = input<string>('—');
@@ -429,6 +503,14 @@ export class TradingDetailMetaCardsComponent {
   readonly brokerContactOptions = input<{ value: string; label: string }[]>([]);
   readonly brokerGetsAll = input<boolean>(false);
 
+  readonly agentId = input<string>('');
+  readonly agentName = input<string>('—');
+  readonly agentOptions = input<DropdownOption[]>([]);
+  readonly agentLoading = input<boolean>(false);
+  readonly agentContactId = input<string>('');
+  readonly agentContactName = input<string>('');
+  readonly agentContactOptions = input<{ value: string; label: string }[]>([]);
+
   readonly clientSearch = output<string>();
   readonly supplierSearch = output<string>();
   readonly vesselSearch = output<string>();
@@ -449,6 +531,9 @@ export class TradingDetailMetaCardsComponent {
   readonly brokerChange = output<string>();
   readonly brokerContactChange = output<string>();
   readonly brokerGetsAllChange = output<boolean>();
+  readonly agentSearch = output<string>();
+  readonly agentChange = output<string>();
+  readonly agentContactChange = output<string>();
 
   navigateToClient(): void {
     const id = this.clientId();
@@ -464,6 +549,12 @@ export class TradingDetailMetaCardsComponent {
 
   navigateToBroker(): void {
     const id = this.brokerId();
+    if (!id) return;
+    void this.router.navigate(['/companies', id]);
+  }
+
+  navigateToAgent(): void {
+    const id = this.agentId();
     if (!id) return;
     void this.router.navigate(['/companies', id]);
   }

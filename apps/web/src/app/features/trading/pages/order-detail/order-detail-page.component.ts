@@ -328,10 +328,20 @@ interface PlattsSuggestionViewModel {
       [brokerContactName]="brokerContact()?.name ?? ''"
       [brokerContactOptions]="brokerContactDropdownOptions()"
       [brokerGetsAll]="order()?.brokerGetsAll ?? false"
+      [agentId]="order()?.agentId ?? ''"
+      [agentName]="agentName()"
+      [agentOptions]="agentDropdownOptions()"
+      [agentLoading]="agentSearchLoading()"
+      [agentContactId]="order()?.agentContactId ?? ''"
+      [agentContactName]="agentContact()?.name ?? ''"
+      [agentContactOptions]="agentContactDropdownOptions()"
       (brokerSearch)="searchBrokers($event)"
       (brokerChange)="onBrokerChange($event)"
       (brokerContactChange)="onBrokerContactChange($event)"
       (brokerGetsAllChange)="onBrokerGetsAllChange($event)"
+      (agentSearch)="searchAgents($event)"
+      (agentChange)="onAgentChange($event)"
+      (agentContactChange)="onAgentContactChange($event)"
     >
       <!-- Customer Payment (projected into client card) -->
       <div customerPayment>
@@ -1688,9 +1698,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly order = signal<OrderDto | null>(null);
   readonly client = signal<CounterpartyDto | null>(null);
   readonly supplier = signal<CounterpartyDto | null>(null);
+  readonly agent = signal<CounterpartyDto | null>(null);
   readonly vessel = signal<VesselDto | null>(null);
   readonly port = signal<PlaceDto | null>(null);
   readonly suppliers = signal<CounterpartyDto[]>([]);
+  readonly agents = signal<CounterpartyDto[]>([]);
   readonly clients = signal<CounterpartyDto[]>([]);
   readonly vessels = signal<VesselDto[]>([]);
   readonly places = signal<PlaceDto[]>([]);
@@ -1723,6 +1735,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly teamUsers = signal<TeamUserOption[]>([]);
   readonly clientSearchLoading = signal(false);
   readonly supplierSearchLoading = signal(false);
+  readonly agentSearchLoading = signal(false);
   readonly vesselSearchLoading = signal(false);
   readonly placeSearchLoading = signal(false);
   readonly attachments = signal<OrderAttachmentDto[]>([]);
@@ -1811,9 +1824,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly customerContact = signal<CompanyContactDto | null>(null);
   readonly supplierContact = signal<CompanyContactDto | null>(null);
   readonly brokerContact = signal<CompanyContactDto | null>(null);
+  readonly agentContact = signal<CompanyContactDto | null>(null);
   readonly customerContacts = signal<CompanyContactDto[]>([]);
   readonly supplierContacts = signal<CompanyContactDto[]>([]);
   readonly brokerContacts = signal<CompanyContactDto[]>([]);
+  readonly agentContacts = signal<CompanyContactDto[]>([]);
 
   // ─── Broker search ──────────────────────────────────────────────
 
@@ -1842,6 +1857,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     const id = this.order()?.brokerId;
     if (!id) return '—';
     return this.brokers().find((b) => b.id === id)?.name ?? '—';
+  });
+  readonly agentName = computed(() => {
+    const id = this.order()?.agentId;
+    if (!id) return '—';
+    return this.agent()?.name ?? this.agents().find((a) => a.id === id)?.name ?? '—';
   });
   readonly vesselName = computed(() => this.vessel()?.name ?? '—');
   readonly portName = computed(() => this.port()?.name ?? '—');
@@ -1968,8 +1988,19 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     this.brokers().map((b) => ({ value: b.id, label: b.name })),
   );
 
+  readonly agentDropdownOptions = computed<DropdownOption[]>(() =>
+    this.agents().map((a) => ({ value: a.id, label: a.name })),
+  );
+
   readonly brokerContactDropdownOptions = computed(() =>
     this.brokerContacts().map((c) => ({
+      value: c.id,
+      label: c.name + (c.role ? ` (${c.role})` : ''),
+    })),
+  );
+
+  readonly agentContactDropdownOptions = computed(() =>
+    this.agentContacts().map((c) => ({
       value: c.id,
       label: c.name + (c.role ? ` (${c.role})` : ''),
     })),
@@ -2326,6 +2357,8 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
           brokerId: d.brokerId ?? null,
           brokerContactId: d.brokerContactId ?? null,
           brokerGetsAll: d.brokerGetsAll ?? false,
+          agentId: d.agentId ?? null,
+          agentContactId: d.agentContactId ?? null,
           termsAndConditions: d.termsAndConditions ?? null,
           lossReason: d.lossReason,
           financingRateAnnual: d.financingRateAnnual ?? 0.08,
@@ -2346,7 +2379,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         if (d.customerContact) this.customerContact.set(d.customerContact);
         if (d.supplierContact) this.supplierContact.set(d.supplierContact);
         if (d.brokerContact) this.brokerContact.set(d.brokerContact);
+        if (d.agentContact) this.agentContact.set(d.agentContact);
         if (d.broker) this.brokers.set([d.broker]);
+        this.agent.set(d.agent ?? null);
+        if (d.agent) this.agents.set([d.agent]);
 
         if (d.client) this.client.set(d.client);
         if (d.client) this.clients.set([d.client]);
@@ -2411,6 +2447,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         await this.loadCompanyContacts('customer', d.clientId);
         if (d.supplierId) await this.loadCompanyContacts('supplier', d.supplierId);
         if (d.brokerId) await this.loadCompanyContacts('broker', d.brokerId);
+        if (d.agentId) await this.loadCompanyContacts('agent', d.agentId);
         await Promise.all([
           this.loadInquirySupplierContext(),
           this.loadInquiryReplies(),
@@ -2850,7 +2887,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   // ─── Contact person handlers ─────────────────────────────────────
 
-  async loadCompanyContacts(side: 'customer' | 'supplier' | 'broker', companyId: string): Promise<void> {
+  async loadCompanyContacts(side: 'customer' | 'supplier' | 'broker' | 'agent', companyId: string): Promise<void> {
     try {
       const res = await firstValueFrom(
         this.http.get<ApiResponse<CompanyContactDto[]>>(`${API_URL}/companies/local/${companyId}/contacts`),
@@ -2858,7 +2895,8 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       if (res.success) {
         if (side === 'customer') this.customerContacts.set(res.data ?? []);
         else if (side === 'supplier') this.supplierContacts.set(res.data ?? []);
-        else this.brokerContacts.set(res.data ?? []);
+        else if (side === 'broker') this.brokerContacts.set(res.data ?? []);
+        else this.agentContacts.set(res.data ?? []);
       }
     } catch {
       // silently ignore
@@ -2876,6 +2914,13 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     this.order.update((o) => (o ? { ...o, supplierContactId: contactId || null } : o));
     const contact = this.supplierContacts().find((c) => c.id === contactId) ?? null;
     this.supplierContact.set(contact);
+    this.triggerAutosave();
+  }
+
+  onAgentContactChange(contactId: string): void {
+    this.order.update((o) => (o ? { ...o, agentContactId: contactId || null } : o));
+    const contact = this.agentContacts().find((c) => c.id === contactId) ?? null;
+    this.agentContact.set(contact);
     this.triggerAutosave();
   }
 
@@ -2934,6 +2979,49 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   onBrokerGetsAllChange(value: boolean): void {
     this.order.update((o) => (o ? { ...o, brokerGetsAll: value } : o));
+    this.triggerAutosave();
+  }
+
+  async searchAgents(term: string): Promise<void> {
+    this.agentSearchLoading.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
+          `${API_URL}/companies/local?search=${encodeURIComponent(term)}&limit=20`,
+        ),
+      );
+      const localResults = res.success ? res.data.companies : [];
+      const currentId = this.order()?.agentId ?? '';
+      const currentAgent = currentId
+        ? this.agent() ?? this.agents().find((company) => company.id === currentId) ?? null
+        : null;
+      const mergedLocal = currentId && !localResults.find((company) => company.id === currentId)
+        ? [currentAgent, ...localResults].filter(Boolean)
+        : localResults;
+      this.agents.set(mergedLocal as CounterpartyDto[]);
+    } catch {
+      // silently ignore
+    } finally {
+      this.agentSearchLoading.set(false);
+    }
+  }
+
+  onAgentChange(agentId: string): void {
+    if (!agentId) {
+      this.order.update((o) => (o ? { ...o, agentId: null, agentContactId: null } : o));
+      this.agent.set(null);
+      this.agentContact.set(null);
+      this.agentContacts.set([]);
+      this.triggerAutosave();
+      return;
+    }
+
+    this.order.update((o) => (o ? { ...o, agentId, agentContactId: null } : o));
+    const agentData = this.agents().find((company) => company.id === agentId)
+      ?? (this.agent()?.id === agentId ? this.agent() : null);
+    this.agent.set(agentData ?? null);
+    this.agentContact.set(null);
+    void this.loadCompanyContacts('agent', agentId);
     this.triggerAutosave();
   }
 
@@ -3748,6 +3836,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
           supplierCreditDays: o.supplierCreditDays ?? null,
           supplierNote: o.supplierNote ?? null,
           supplierContactId: o.supplierContactId ?? null,
+          brokerId: o.brokerId ?? null,
+          brokerContactId: o.brokerContactId ?? null,
+          brokerGetsAll: o.brokerGetsAll ?? false,
+          agentId: o.agentId ?? null,
+          agentContactId: o.agentContactId ?? null,
           termsAndConditions: o.termsAndConditions ?? null,
           eta: o.eta,
           etd: o.etd,
@@ -4037,6 +4130,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
           supplierCreditDays: o.supplierCreditDays ?? null,
           supplierNote: o.supplierNote ?? null,
           supplierContactId: o.supplierContactId ?? null,
+          brokerId: o.brokerId ?? null,
+          brokerContactId: o.brokerContactId ?? null,
+          brokerGetsAll: o.brokerGetsAll ?? false,
+          agentId: o.agentId ?? null,
+          agentContactId: o.agentContactId ?? null,
           termsAndConditions: o.termsAndConditions ?? null,
           eta: o.eta,
           etd: o.etd,

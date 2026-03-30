@@ -68,6 +68,8 @@ interface CreateOrderInput {
   brokerId?: string | null;
   brokerContactId?: string | null;
   brokerGetsAll?: boolean;
+  agentId?: string | null;
+  agentContactId?: string | null;
 }
 
 interface UpdateOrderInput {
@@ -97,6 +99,8 @@ interface UpdateOrderInput {
   brokerId?: string | null;
   brokerContactId?: string | null;
   brokerGetsAll?: boolean;
+  agentId?: string | null;
+  agentContactId?: string | null;
 }
 
 interface SaveItemInput {
@@ -499,7 +503,7 @@ export async function getOrderById(idOrNumber: string) {
   if (!row) return null;
 
   // Fetch relations in parallel
-  const [client, supplier, vessel, place, salesRep, invoicingCompany, items, customerContact, supplierContact, broker, brokerContact, tenant] =
+  const [client, supplier, vessel, place, salesRep, invoicingCompany, items, customerContact, supplierContact, broker, brokerContact, agent, agentContact, tenant] =
     await Promise.all([
       getCounterpartyById(row.clientId),
       getCounterpartyById(row.supplierId),
@@ -551,6 +555,17 @@ export async function getOrderById(idOrNumber: string) {
             .select()
             .from(companyContacts)
             .where(eq(companyContacts.id, row.brokerContactId))
+            .limit(1)
+            .then((r) => r[0] ? { ...r[0], createdAt: r[0].createdAt.toISOString(), updatedAt: r[0].updatedAt.toISOString() } : null)
+        : Promise.resolve(null),
+      row.agentId
+        ? getCounterpartyById(row.agentId)
+        : Promise.resolve(null),
+      row.agentContactId
+        ? db
+            .select()
+            .from(companyContacts)
+            .where(eq(companyContacts.id, row.agentContactId))
             .limit(1)
             .then((r) => r[0] ? { ...r[0], createdAt: r[0].createdAt.toISOString(), updatedAt: r[0].updatedAt.toISOString() } : null)
         : Promise.resolve(null),
@@ -608,6 +623,8 @@ export async function getOrderById(idOrNumber: string) {
     brokerId: row.brokerId ?? null,
     brokerContactId: row.brokerContactId ?? null,
     brokerGetsAll: row.brokerGetsAll ?? false,
+    agentId: row.agentId ?? null,
+    agentContactId: row.agentContactId ?? null,
     termsAndConditions: row.termsAndConditions ?? null,
     financingRateAnnual,
     financingDayCountConvention: orderEconomics.dayCountConvention,
@@ -626,6 +643,8 @@ export async function getOrderById(idOrNumber: string) {
     supplierContact,
     broker,
     brokerContact,
+    agent,
+    agentContact,
     items: items.map((i, index) => ({
       id: i.id,
       orderId: i.orderId,
@@ -715,6 +734,8 @@ export async function createOrder(input: CreateOrderInput) {
     brokerId: input.brokerId ?? null,
     brokerContactId: input.brokerContactId ?? null,
     brokerGetsAll: input.brokerGetsAll ?? false,
+    agentId: input.agentId ?? null,
+    agentContactId: input.agentContactId ?? null,
     placeRemark,
   };
 
@@ -765,6 +786,8 @@ export async function updateOrder(id: string, input: UpdateOrderInput) {
   if (input.brokerId !== undefined) setData.brokerId = input.brokerId;
   if (input.brokerContactId !== undefined) setData.brokerContactId = input.brokerContactId;
   if (input.brokerGetsAll !== undefined) setData.brokerGetsAll = input.brokerGetsAll;
+  if (input.agentId !== undefined) setData.agentId = input.agentId;
+  if (input.agentContactId !== undefined) setData.agentContactId = input.agentContactId;
 
   // Auto-set closedAt when status moves to CANCELLED or PAID
   if (input.status === 'CANCELLED' || input.status === 'PAID') {

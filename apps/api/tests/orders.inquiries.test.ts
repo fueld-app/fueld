@@ -1,5 +1,5 @@
 import { describe, it, beforeEach, expect } from 'bun:test';
-import { counterparties, orders, orderItems, invoices, tenants } from '../src/db/schema';
+import { companyContacts, counterparties, orders, orderItems, invoices, tenants } from '../src/db/schema';
 import { eq } from 'drizzle-orm';
 import { getDb, seedBasics, truncateAll } from './helpers/db';
 
@@ -111,6 +111,55 @@ describe('orders: inquiries flow', () => {
     expect(fetched?.supplierId).toBe(supplier.id);
     expect(fetched?.supplier?.id).toBe(supplier.id);
     expect(fetched?.supplier?.name).toBe('Ajax Bunkering');
+  });
+
+  it('returns the selected agent and contact in order detail payload', async () => {
+    const { tenant, client, vessel, place, user } = await seedBasics();
+    const db = await getDb();
+    const { createOrder, updateOrder, getOrderById } = await loadOrdersService();
+
+    const [agent] = await db
+      .insert(counterparties)
+      .values({
+        tenantId: tenant.id,
+        name: 'Harbor Ops Agency',
+        type: 'SUPPLIER',
+        types: ['SUPPLIER'],
+        country: 'Denmark',
+      })
+      .returning();
+
+    const [agentContact] = await db
+      .insert(companyContacts)
+      .values({
+        counterpartyId: agent.id,
+        name: 'Maja Hansen',
+        role: 'Port Agent',
+        phone: '+4511223344',
+        email: 'maja@harborops.example',
+      })
+      .returning();
+
+    const created = await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+    });
+
+    await updateOrder(created.id, {
+      agentId: agent.id,
+      agentContactId: agentContact.id,
+    });
+
+    const fetched = await getOrderById(created.id);
+    expect(fetched?.agentId).toBe(agent.id);
+    expect(fetched?.agent?.id).toBe(agent.id);
+    expect(fetched?.agent?.name).toBe('Harbor Ops Agency');
+    expect(fetched?.agentContactId).toBe(agentContact.id);
+    expect(fetched?.agentContact?.id).toBe(agentContact.id);
+    expect(fetched?.agentContact?.name).toBe('Maja Hansen');
   });
 
   it('lists inquiries by status', async () => {

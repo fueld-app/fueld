@@ -417,6 +417,13 @@ async function fetchOrderForInvoice(orderId: string) {
                 companyRegistrationNumber: false,
               },
             },
+        agent: includeCompanyRegistrationNumber
+          ? true
+          : {
+              columns: {
+                companyRegistrationNumber: false,
+              },
+            },
         invoicingCompany: includeCompanyRegistrationNumber
           ? true
           : {
@@ -426,6 +433,7 @@ async function fetchOrderForInvoice(orderId: string) {
             },
         customerContact: true,
         supplierContact: true,
+        agentContact: true,
         items: true,
         invoices: true,
       },
@@ -1511,6 +1519,12 @@ function buildOfferDocument(data: {
   customerContactRole: string | null;
   customerContactPhone: string | null;
   customerContactEmail: string | null;
+  agentName?: string | null;
+  agentAddress?: string | null;
+  agentContactName?: string | null;
+  agentContactRole?: string | null;
+  agentContactPhone?: string | null;
+  agentContactEmail?: string | null;
   vesselName: string;
   vesselImo: string | null;
   portName: string;
@@ -1810,6 +1824,27 @@ function buildOfferDocument(data: {
       // For account of
       { text: [{ text: 'For account of:  ', bold: true }, { text: forAccountOfText }], margin: [0, 0, 0, 4] } as Content,
 
+      ...(title === 'NOMINATION' && data.agentName?.trim()
+        ? [
+            { text: [{ text: 'Agent:  ', bold: true }, { text: data.agentName.trim() }], margin: [0, 0, 0, 4] } as Content,
+            ...(data.agentAddress?.trim()
+              ? splitAddressLines(data.agentAddress.trim()).map((line) => ({ text: line, margin: [48, 0, 0, 0] } as Content))
+              : []),
+            ...(data.agentContactName?.trim()
+              ? [{ text: [{ text: 'Agent contact:  ', bold: true }, { text: data.agentContactName.trim() }], margin: [0, 0, 0, 2] } as Content]
+              : []),
+            ...(data.agentContactRole?.trim()
+              ? [{ text: [{ text: 'Role:  ', bold: true }, { text: data.agentContactRole.trim() }], margin: [0, 0, 0, 2] } as Content]
+              : []),
+            ...(data.agentContactEmail?.trim()
+              ? [emailTextNode('Email:  ', data.agentContactEmail.trim(), { margin: [0, 0, 0, 2] })]
+              : []),
+            ...(data.agentContactPhone?.trim()
+              ? [phoneTextNode('Phone:  ', data.agentContactPhone.trim(), { margin: [0, 0, 0, 2] })]
+              : []),
+          ]
+        : []),
+
       // Payment terms
       ...(data.paymentTerms
         ? [{ text: [{ text: 'Payment terms:  ', bold: true }, { text: data.paymentTerms }], margin: [0, 0, 0, 6] } as Content]
@@ -2073,11 +2108,13 @@ export async function generateNominationPdfBuffer(orderId: string, options?: { r
   const nominationSourceUpdatedAtMs = maxMs([
     order.updatedAt,
     order.supplier?.updatedAt ?? null,
+    order.agent?.updatedAt ?? null,
     order.vessel.updatedAt,
     order.place.updatedAt,
     order.invoicingCompany?.updatedAt ?? null,
     order.salesRep?.updatedAt ?? null,
     order.supplierContact?.updatedAt ?? null,
+    order.agentContact?.updatedAt ?? null,
   ]);
   const nominationItemUpdatedAtMs = maxItemUpdatedAtMs(order.items);
   const nominationCombinedUpdatedAtMs = Math.max(nominationSourceUpdatedAtMs, nominationItemUpdatedAtMs);
@@ -2121,6 +2158,12 @@ export async function generateNominationPdfBuffer(orderId: string, options?: { r
     customerContactRole: order.supplierContact?.role ?? null,
     customerContactPhone: order.supplierContact?.phone ?? null,
     customerContactEmail: order.supplierContact?.email ?? null,
+    agentName: order.agent?.name ?? null,
+    agentAddress: order.agent?.headOfficeAddress ?? null,
+    agentContactName: order.agentContact?.name ?? null,
+    agentContactRole: order.agentContact?.role ?? null,
+    agentContactPhone: order.agentContact?.phone ?? null,
+    agentContactEmail: order.agentContact?.email ?? null,
     vesselName: order.vessel.name,
     vesselImo: order.vessel.imo,
     portName: order.place.name,

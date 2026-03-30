@@ -552,6 +552,8 @@ export interface OrderDto {
   brokerId?: string | null;
   brokerContactId?: string | null;
   brokerGetsAll?: boolean;
+  agentId?: string | null;
+  agentContactId?: string | null;
   termsAndConditions?: string | null;
   placeRemark?: string | null;
   lossReason: string | null;
@@ -586,6 +588,11 @@ export interface CreateOrderDto {
   supplierCreditDays?: number;
   supplierNote?: string;
   supplierContactId?: string;
+  brokerId?: string;
+  brokerContactId?: string;
+  brokerGetsAll?: boolean;
+  agentId?: string;
+  agentContactId?: string;
   termsAndConditions?: string;
 }
 
@@ -613,6 +620,8 @@ export interface UpdateOrderDto {
   brokerId?: string | null;
   brokerContactId?: string | null;
   brokerGetsAll?: boolean;
+  agentId?: string | null;
+  agentContactId?: string | null;
   termsAndConditions?: string | null;
   placeRemark?: string | null;
   lossReason?: string | null;
@@ -629,6 +638,8 @@ export interface OrderDetailDto extends OrderDto {
   supplierContact: CompanyContactDto | null;
   broker: CounterpartyDto | null;
   brokerContact: CompanyContactDto | null;
+  agent: CounterpartyDto | null;
+  agentContact: CompanyContactDto | null;
   items: OrderItemDto[];
   attachments?: OrderAttachmentDto[];
 }

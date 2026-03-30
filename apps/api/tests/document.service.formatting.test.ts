@@ -340,6 +340,28 @@ describe('document.service formatting helpers', () => {
     expect(text).toContain('Fueld Trading Ltd');
   });
 
+  it('includes agent details on nomination documents when present', () => {
+    const doc = __documentTestUtils.buildOfferDocument({
+      ...commonOfferInput,
+      docTitle: 'NOMINATION',
+      agentName: 'Harbor Ops Agency',
+      agentAddress: 'Pier 7\nRotterdam',
+      agentContactName: 'Maja Hansen',
+      agentContactRole: 'Port Agent',
+      agentContactEmail: 'maja@harborops.example',
+      agentContactPhone: '+4511223344',
+    });
+
+    const text = collectTextValues(doc).join(' | ');
+    expect(text).toContain('Agent:  ');
+    expect(text).toContain('Harbor Ops Agency');
+    expect(text).toContain('Agent contact:  ');
+    expect(text).toContain('Maja Hansen');
+    expect(text).toContain('Port Agent');
+    expect(text).toContain('maja@harborops.example');
+    expect(text).toContain('+4511223344');
+  });
+
   it('builds invoice document with remittance and totals', () => {
     const doc = __documentTestUtils.buildInvoiceDocument({
       invoiceNumber: 'INV-0001',
