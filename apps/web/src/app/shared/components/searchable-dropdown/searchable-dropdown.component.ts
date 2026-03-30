@@ -92,7 +92,7 @@ export interface DropdownOption {
             [class.text-brand-700]="i === highlightIndex()"
             [class.font-semibold]="opt.value === selected()"
             class="cursor-pointer px-3 py-2 transition-colors hover:bg-gray-50"
-            (click)="selectOption(opt)"
+            (mousedown)="onOptionPointerDown($event, opt)"
             (mouseenter)="highlightIndex.set(i)"
           >
             <div class="flex items-center justify-between gap-3">
@@ -230,6 +230,12 @@ export class SearchableDropdownComponent implements OnInit, OnDestroy {
     this.searchText.set(opt.label);
     this.selectionChange.emit(opt.value);
     this.isOpen.set(false);
+  }
+
+  onOptionPointerDown(event: MouseEvent, opt: DropdownOption): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.selectOption(opt);
   }
 
   onArrowDown(event: Event): void {

@@ -441,11 +441,11 @@ import {
 })
 export class TradingDetailMetaCardsComponent {
   private readonly router = inject(Router);
-  brokerExpanded = false;
-  agentExpanded = false;
+  readonly brokerExpanded = signal(false);
+  readonly agentExpanded = signal(false);
   readonly clientPartyTab = signal<'client' | 'broker' | 'agent'>('client');
-  readonly showBrokerTab = computed(() => this.brokerExpanded || !!this.brokerId());
-  readonly showAgentTab = computed(() => this.agentExpanded || !!this.agentId());
+  readonly showBrokerTab = computed(() => this.brokerExpanded() || !!this.brokerId());
+  readonly showAgentTab = computed(() => this.agentExpanded() || !!this.agentId());
   readonly activeClientPartyTab = computed<'client' | 'broker' | 'agent'>(() => {
     const current = this.clientPartyTab();
     if (current === 'broker' && !this.showBrokerTab()) {
@@ -559,12 +559,12 @@ export class TradingDetailMetaCardsComponent {
   readonly agentContactChange = output<string>();
 
   openBrokerTab(): void {
-    this.brokerExpanded = true;
+    this.brokerExpanded.set(true);
     this.clientPartyTab.set('broker');
   }
 
   openAgentTab(): void {
-    this.agentExpanded = true;
+    this.agentExpanded.set(true);
     this.clientPartyTab.set('agent');
   }
 

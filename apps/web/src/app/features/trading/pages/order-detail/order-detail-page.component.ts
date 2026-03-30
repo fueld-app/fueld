@@ -2943,6 +2943,17 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       this.showToast('error', 'No supplier credit line is available.');
       return;
     }
+    if (this.orderSuppliers().length === 0) {
+      this.order.update((order) => order
+        ? {
+            ...order,
+            supplierPaymentTermType: value || null,
+            supplierCreditDays: value === 'CREDIT' ? order.supplierCreditDays ?? null : null,
+          }
+        : order);
+      this.triggerAutosave();
+      return;
+    }
     this.updateActiveOrderSupplier((supplier) => ({
       ...supplier,
       paymentTermType: value || null,
@@ -2955,6 +2966,16 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     const days = typeof value === 'string' ? Number(value) : value;
     const maxDays = this.supplierCreditSummary()?.maxDays ?? null;
     const nextDays = Number.isFinite(days) ? days : null;
+    if (this.orderSuppliers().length === 0) {
+      if (maxDays !== null && nextDays !== null && nextDays > maxDays) {
+        this.order.update((order) => order ? { ...order, supplierCreditDays: maxDays } : order);
+        this.showToast('error', `Max credit is ${maxDays} days.`);
+      } else {
+        this.order.update((order) => order ? { ...order, supplierCreditDays: nextDays } : order);
+      }
+      this.triggerAutosave();
+      return;
+    }
     if (maxDays !== null && nextDays !== null && nextDays > maxDays) {
       this.updateActiveOrderSupplier((supplier) => ({ ...supplier, creditDays: maxDays }));
       this.showToast('error', `Max credit is ${maxDays} days.`);
@@ -2965,6 +2986,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   onSupplierNoteChange(value: string): void {
+    if (this.orderSuppliers().length === 0) {
+      this.order.update((order) => order ? { ...order, supplierNote: value } : order);
+      this.triggerAutosave();
+      return;
+    }
     this.updateActiveOrderSupplier((supplier) => ({ ...supplier, note: value }));
     this.triggerAutosave();
   }
@@ -3005,6 +3031,13 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   onActiveSupplierContactChange(contactId: string): void {
+    if (this.orderSuppliers().length === 0) {
+      this.order.update((order) => order ? { ...order, supplierContactId: contactId || null } : order);
+      const contact = this.supplierContacts().find((c) => c.id === contactId) ?? null;
+      this.supplierContact.set(contact);
+      this.triggerAutosave();
+      return;
+    }
     this.updateActiveOrderSupplier((supplier) => ({ ...supplier, contactId: contactId || null }));
     const contact = this.supplierContacts().find((c) => c.id === contactId) ?? null;
     this.supplierContact.set(contact);
@@ -3277,7 +3310,13 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   private async syncOrderSupplierRecords(orderId: string): Promise<void> {
     const suppliers = this.orderSuppliers();
-    if (suppliers.length === 0) return;
+    if (suppliers.length === 0) {
+      const order = this.order();
+      if (order?.supplierId) {
+        await this.reloadOrderSuppliers(orderId);
+      }
+      return;
+    }
 
     const updatedSuppliers: OrderSupplierDto[] = [];
     for (const supplier of suppliers) {
@@ -3302,6 +3341,21 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     }
 
     this.orderSuppliers.set(updatedSuppliers);
+  }
+
+  private async reloadOrderSuppliers(orderId: string): Promise<void> {
+    const res = await firstValueFrom(
+      this.http.get<ApiResponse<OrderSupplierDto[]>>(`${API_URL}/orders/${orderId}/suppliers`),
+    );
+
+    if (!res.success || !res.data) return;
+
+    this.orderSuppliers.set(res.data);
+    const preferredSupplierId = this.activeOrderSupplierId()
+      ?? res.data.find((supplier) => supplier.isPrimary)?.id
+      ?? res.data[0]?.id
+      ?? null;
+    this.activeOrderSupplierId.set(preferredSupplierId);
   }
 
   private normalizeTimeZone(timeZone: string): string {
@@ -3562,6 +3616,23 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   onActiveSupplierCompanyChange(supplierId: string): void {
     if (!supplierId) return;
+    const supplierData = this.suppliers().find((supplier) => supplier.id === supplierId)
+      ?? (this.supplier()?.id === supplierId ? this.supplier() : null);
+    if (this.orderSuppliers().length === 0) {
+      this.order.update((order) => order
+        ? {
+            ...order,
+            supplierId,
+            supplierContactId: null,
+          }
+        : order);
+      this.supplier.set(supplierData ?? null);
+      this.supplierContact.set(null);
+      void this.loadSupplierCreditLines(supplierId);
+      void this.loadCompanyContacts('supplier', supplierId);
+      this.triggerAutosave();
+      return;
+    }
     this.updateActiveOrderSupplier((supplier) => ({
       ...supplier,
       companyId: supplierId,
@@ -3569,8 +3640,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       company: this.suppliers().find((item) => item.id === supplierId) ?? this.supplier() ?? null,
       contact: null,
     }));
-    const supplierData = this.suppliers().find((supplier) => supplier.id === supplierId)
-      ?? (this.supplier()?.id === supplierId ? this.supplier() : null);
     this.supplier.set(supplierData ?? null);
     this.supplierContact.set(null);
     void this.loadSupplierCreditLines(supplierId);
@@ -3626,8 +3695,12 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   private updateActiveOrderSupplier(
     updater: (supplier: OrderSupplierDto) => OrderSupplierDto,
   ): void {
-    const activeSupplierId = this.activeOrderSupplierId();
+    const resolvedActiveSupplier = this.activeOrderSupplier();
+    const activeSupplierId = this.activeOrderSupplierId() ?? resolvedActiveSupplier?.id ?? null;
     if (!activeSupplierId) return;
+    if (!this.activeOrderSupplierId()) {
+      this.activeOrderSupplierId.set(activeSupplierId);
+    }
 
     let nextSupplier: OrderSupplierDto | undefined;
     this.orderSuppliers.update((suppliers) => suppliers.map((supplier) => {
@@ -3987,6 +4060,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   onDeliveredAtChange(value: string): void {
     const iso = value ? `${value}T12:00:00.000Z` : null;
+    if (this.orderSuppliers().length === 0) {
+      this.order.update((order) => order ? { ...order, deliveredAt: iso } : order);
+      this.triggerAutosave();
+      return;
+    }
     this.updateActiveOrderSupplier((supplier) => ({ ...supplier, deliveredAt: iso }));
     this.triggerAutosave();
   }
