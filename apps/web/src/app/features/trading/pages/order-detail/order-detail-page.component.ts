@@ -1687,6 +1687,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   readonly order = signal<OrderDto | null>(null);
   readonly client = signal<CounterpartyDto | null>(null);
+  readonly supplier = signal<CounterpartyDto | null>(null);
   readonly vessel = signal<VesselDto | null>(null);
   readonly port = signal<PlaceDto | null>(null);
   readonly suppliers = signal<CounterpartyDto[]>([]);
@@ -1835,7 +1836,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly supplierName = computed(() => {
     const id = this.order()?.supplierId;
     if (!id) return '—';
-    return this.suppliers().find((s) => s.id === id)?.name ?? '—';
+    return this.supplier()?.name ?? this.suppliers().find((s) => s.id === id)?.name ?? '—';
   });
   readonly brokerName = computed(() => {
     const id = this.order()?.brokerId;
@@ -2349,6 +2350,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
         if (d.client) this.client.set(d.client);
         if (d.client) this.clients.set([d.client]);
+        this.supplier.set(d.supplier ?? null);
         if (d.supplier) this.suppliers.set([d.supplier]);
         if (d.vessel) {
           this.vessel.set(d.vessel);
@@ -2672,7 +2674,16 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
           this.http.get<ApiResponse<{ references: { id: string; name: string; code: string }[] }>>(`${API_URL}/admin/settings/my-price-references`),
         ),
       ]);
-      if (suppliersRes.success) this.suppliers.set(suppliersRes.data.companies);
+      if (suppliersRes.success) {
+        const currentSupplierId = this.order()?.supplierId ?? '';
+        const currentSupplier = currentSupplierId
+          ? this.supplier() ?? this.suppliers().find((supplier) => supplier.id === currentSupplierId) ?? null
+          : null;
+        const mergedSuppliers = currentSupplier && !suppliersRes.data.companies.find((supplier) => supplier.id === currentSupplierId)
+          ? [currentSupplier, ...suppliersRes.data.companies]
+          : suppliersRes.data.companies;
+        this.suppliers.set(mergedSuppliers);
+      }
       if (usersRes.success) this.teamUsers.set(usersRes.data ?? []);
       if (productsRes.success) this.configuredProducts.set(
         productsRes.data.products.map((p) => ({ value: p, label: p })),
@@ -3270,8 +3281,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         localResults = res.success ? res.data.companies : [];
       }
       const currentId = this.order()?.supplierId ?? '';
+      const currentSupplier = currentId
+        ? this.supplier() ?? this.suppliers().find((supplier) => supplier.id === currentId) ?? null
+        : null;
       const mergedLocal = currentId && !localResults.find((c) => c.id === currentId)
-        ? [this.suppliers().find((s) => s.id === currentId) ?? null, ...localResults].filter(Boolean)
+        ? [currentSupplier, ...localResults].filter(Boolean)
         : localResults;
       this.suppliers.set(mergedLocal as CounterpartyDto[]);
     } catch {
@@ -3337,6 +3351,9 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   onSupplierChange(supplierId: string): void {
     if (!supplierId) return;
     this.order.update((o) => (o ? { ...o, supplierId, supplierContactId: null } : o));
+    const supplierData = this.suppliers().find((supplier) => supplier.id === supplierId)
+      ?? (this.supplier()?.id === supplierId ? this.supplier() : null);
+    this.supplier.set(supplierData ?? null);
     this.supplierContact.set(null);
     void this.loadSupplierCreditLines(supplierId);
     void this.loadCompanyContacts('supplier', supplierId);
