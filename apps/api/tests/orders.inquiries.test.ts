@@ -1,5 +1,5 @@
 import { describe, it, beforeEach, expect } from 'bun:test';
-import { orders, orderItems, invoices, tenants } from '../src/db/schema';
+import { counterparties, orders, orderItems, invoices, tenants } from '../src/db/schema';
 import { eq } from 'drizzle-orm';
 import { getDb, seedBasics, truncateAll } from './helpers/db';
 
@@ -79,6 +79,38 @@ describe('orders: inquiries flow', () => {
     expect(fetched?.items?.length).toBe(1);
     expect(fetched?.items?.[0]?.costCurrency).toBe('USD');
     expect(fetched?.items?.[0]?.salesCurrency).toBe('USD');
+  });
+
+  it('returns the selected supplier in order detail payload', async () => {
+    const { tenant, client, vessel, place, user } = await seedBasics();
+    const db = await getDb();
+    const { createOrder, updateOrder, getOrderById } = await loadOrdersService();
+
+    const [supplier] = await db
+      .insert(counterparties)
+      .values({
+        tenantId: tenant.id,
+        name: 'Ajax Bunkering',
+        type: 'SUPPLIER',
+        types: ['SUPPLIER'],
+        country: 'Greece',
+      })
+      .returning();
+
+    const created = await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+    });
+
+    await updateOrder(created.id, { supplierId: supplier.id });
+
+    const fetched = await getOrderById(created.id);
+    expect(fetched?.supplierId).toBe(supplier.id);
+    expect(fetched?.supplier?.id).toBe(supplier.id);
+    expect(fetched?.supplier?.name).toBe('Ajax Bunkering');
   });
 
   it('lists inquiries by status', async () => {

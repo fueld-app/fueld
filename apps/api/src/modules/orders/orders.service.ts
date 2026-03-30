@@ -499,9 +499,10 @@ export async function getOrderById(idOrNumber: string) {
   if (!row) return null;
 
   // Fetch relations in parallel
-  const [client, vessel, place, salesRep, invoicingCompany, items, customerContact, supplierContact, broker, brokerContact, tenant] =
+  const [client, supplier, vessel, place, salesRep, invoicingCompany, items, customerContact, supplierContact, broker, brokerContact, tenant] =
     await Promise.all([
       getCounterpartyById(row.clientId),
+      getCounterpartyById(row.supplierId),
       db
         .select()
         .from(vessels)
@@ -616,6 +617,7 @@ export async function getOrderById(idOrNumber: string) {
     totalNetProfit: orderEconomics.totalNetProfit.toFixed(4),
     netMarginPct: orderEconomics.netMarginPct != null ? orderEconomics.netMarginPct.toFixed(4) : null,
     client,
+    supplier,
     vessel,
     place,
     salesRep,

@@ -2349,6 +2349,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
         if (d.client) this.client.set(d.client);
         if (d.client) this.clients.set([d.client]);
+        if (d.supplier) this.suppliers.set([d.supplier]);
         if (d.vessel) {
           this.vessel.set(d.vessel);
           this.vessels.set([d.vessel]);
