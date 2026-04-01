@@ -128,6 +128,9 @@ export interface TemplateVariables {
   portName: string;
   orderNumber: string;
   documentLabel: string;
+  eta?: string;
+  etd?: string;
+  deliveryWindow?: string;
   senderName: string;
   companyName: string;
   paymentTerms: string;
@@ -159,6 +162,9 @@ export const TEMPLATE_VARIABLES = [
   { key: 'portName', label: 'Port name', example: 'Rotterdam' },
   { key: 'orderNumber', label: 'Order number', example: '20260209-000001' },
   { key: 'documentLabel', label: 'Document type label', example: 'Offer / Confirmation' },
+  { key: 'eta', label: 'ETA date label', example: '12 Mar 2026' },
+  { key: 'etd', label: 'ETD date label', example: '14 Mar 2026' },
+  { key: 'deliveryWindow', label: 'Delivery window label', example: '12 Mar 2026 to 14 Mar 2026' },
   { key: 'senderName', label: 'Sender name', example: 'John Smith' },
   { key: 'companyName', label: 'Invoicing company name', example: 'Riviera Marine Ltd' },
   { key: 'paymentTerms', label: 'Payment terms', example: 'Credit 30 days' },

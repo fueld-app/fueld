@@ -22,6 +22,9 @@ function buildInquiryTemplateVariables(params: {
   vesselName: string;
   portName: string;
   orderNumber: string;
+  eta?: string | null;
+  etd?: string | null;
+  deliveryWindow?: string | null;
   senderName: string;
   companyName: string;
   supplierName?: string | null;
@@ -35,6 +38,9 @@ function buildInquiryTemplateVariables(params: {
     portName: params.portName,
     orderNumber: params.orderNumber,
     documentLabel: 'Inquiry',
+    eta: params.eta?.trim() || '',
+    etd: params.etd?.trim() || '',
+    deliveryWindow: params.deliveryWindow?.trim() || '',
     senderName: params.senderName,
     companyName: params.companyName,
     paymentTerms: '',
@@ -1242,7 +1248,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
   // Returns pre-filled subject + body for the inquiry email
   .post(
     '/:id/inquiry/defaults',
-    async ({ params, auth, set }) => {
+    async ({ params, auth, body, set }) => {
       const orderId = await resolveOrderId(params.id);
       if (!orderId) { set.status = 404; return { success: false, message: 'Order not found' }; }
 
@@ -1277,12 +1283,22 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         const d = new Date(iso);
         return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
       };
+      const resolvedEta = body?.eta ?? order.eta;
+      const resolvedEtd = body?.etd ?? order.etd;
+      const etaLabel = formatDate(resolvedEta);
+      const etdLabel = formatDate(resolvedEtd);
+      const deliveryWindow = etaLabel && etdLabel
+        ? `${etaLabel} to ${etdLabel}`
+        : etaLabel || etdLabel || '';
 
       // Try admin template first
       const templateVars = buildInquiryTemplateVariables({
         vesselName,
         portName,
         orderNumber,
+        eta: etaLabel,
+        etd: etdLabel,
+        deliveryWindow,
         senderName,
         companyName: companyName ?? '',
         supplierName: '${supplierName}',
@@ -1308,8 +1324,8 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             vesselName,
             vesselImo,
             portName,
-            etaFormatted: formatDate(order.eta),
-            etdFormatted: formatDate(order.etd),
+            etaFormatted: etaLabel,
+            etdFormatted: etdLabel,
             companyName,
             companyLogoUrl,
             brandColor,
@@ -1332,8 +1348,8 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           vesselName,
           vesselImo,
           portName,
-          etaFormatted: formatDate(order.eta),
-          etdFormatted: formatDate(order.etd),
+          etaFormatted: etaLabel,
+          etdFormatted: etdLabel,
           companyName,
           companyLogoUrl,
           brandColor,
@@ -1364,6 +1380,10 @@ export const documentsController = new Elysia({ prefix: '/orders' })
     },
     {
       params: t.Object({ id: t.String() }),
+      body: t.Optional(t.Object({
+        eta: t.Optional(t.Nullable(t.String())),
+        etd: t.Optional(t.Nullable(t.String())),
+      })),
       detail: {
         tags: ['Documents'],
         summary: 'Get pre-filled defaults for supplier inquiry email',
@@ -1392,6 +1412,20 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       const senderName = sender?.name ?? 'Fueld User';
       const senderEmail = auth.email;
       const inquirySettings = await getInquirySettings();
+      const resolvedEta = body.eta ?? order.eta;
+      const resolvedEtd = body.etd ?? order.etd;
+      const formatDate = (iso: string | null) => {
+        if (!iso) return null;
+        const date = new Date(iso);
+        return Number.isNaN(date.getTime())
+          ? null
+          : date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      };
+      const etaLabel = formatDate(resolvedEta);
+      const etdLabel = formatDate(resolvedEtd);
+      const deliveryWindow = etaLabel && etdLabel
+        ? `${etaLabel} to ${etdLabel}`
+        : etaLabel || etdLabel || '';
 
       // Check if this is the first inquiry batch for this order (for WhatsApp notification)
       const existingInquiries = await db
@@ -1460,6 +1494,9 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             vesselName: order.vessel?.name ?? 'Vessel',
             portName: order.place?.name ?? 'Port',
             orderNumber: order.orderNumber ?? orderId.slice(0, 8).toUpperCase(),
+            eta: etaLabel,
+            etd: etdLabel,
+            deliveryWindow,
             senderName,
             companyName: order.invoicingCompany?.name ?? 'Fueld',
             supplierName: target.type === 'supplier' ? target.supplierName : '',
@@ -1614,8 +1651,8 @@ export const documentsController = new Elysia({ prefix: '/orders' })
               ``,
               `*Vessel:* ${vesselName}${vesselImo}`,
               `*Port:* ${portName}`,
-              order.eta ? `*ETA:* ${new Date(order.eta).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}` : null,
-              order.etd ? `*ETD:* ${new Date(order.etd).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}` : null,
+              etaLabel ? `*ETA:* ${etaLabel}` : null,
+              etdLabel ? `*ETD:* ${etdLabel}` : null,
               ``,
               `*Products:*`,
               productLines,
@@ -1654,6 +1691,8 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         recipientEmails: t.Optional(t.Array(t.String({ format: 'email' }))),
         subject: t.String(),
         htmlBody: t.String(),
+        eta: t.Optional(t.Nullable(t.String())),
+        etd: t.Optional(t.Nullable(t.String())),
         responseDeadlineAt: t.Optional(t.Nullable(t.String())),
       }),
       detail: {
@@ -1680,6 +1719,8 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       const [sender] = await db.select({ name: users.name }).from(users).where(eq(users.id, auth.userId)).limit(1);
       const senderName = sender?.name ?? 'Fueld User';
       const inquirySettings = await getInquirySettings();
+      const resolvedEta = body.eta ?? order.eta;
+      const resolvedEtd = body.etd ?? order.etd;
 
       const existingInquiries = await db
         .select({ id: supplierInquiries.id, supplierId: supplierInquiries.supplierId })
@@ -1712,8 +1753,8 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             vesselName: order.vessel?.name ?? 'Vessel',
             vesselImo: order.vessel?.imo ?? null,
             portName: order.place?.name ?? 'Port',
-            etaFormatted: formatDate(order.eta),
-            etdFormatted: formatDate(order.etd),
+            etaFormatted: formatDate(resolvedEta),
+            etdFormatted: formatDate(resolvedEtd),
             responseDeadlineFormatted,
             personalNote: target.personalNote ?? null,
             quoteFormUrl,
@@ -1815,6 +1856,8 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           personalNote: t.Optional(t.String()),
         })),
         subject: t.Optional(t.String()),
+        eta: t.Optional(t.Nullable(t.String())),
+        etd: t.Optional(t.Nullable(t.String())),
         responseDeadlineAt: t.Optional(t.Nullable(t.String())),
       }),
       detail: {

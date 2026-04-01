@@ -4733,6 +4733,8 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
           recipientEmails: payload.recipientEmails,
           subject: payload.subject,
           htmlBody: payload.htmlBody,
+          eta: payload.eta ?? null,
+          etd: payload.etd ?? null,
           responseDeadlineAt: payload.responseDeadlineAt,
         },
       )
@@ -4770,6 +4772,8 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         this.http.post<ApiResponse<Array<{ success: boolean }>>>(`${API_URL}/orders/${id}/inquiry/send-whatsapp`, {
           recipients: payload.recipients,
           subject: payload.subject,
+          eta: payload.eta ?? null,
+          etd: payload.etd ?? null,
           responseDeadlineAt: payload.responseDeadlineAt ?? null,
         }),
       );

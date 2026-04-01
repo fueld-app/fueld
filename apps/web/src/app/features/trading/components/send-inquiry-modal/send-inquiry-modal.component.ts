@@ -84,6 +84,8 @@ export interface SendInquiryPayload {
   recipientEmails: string[];
   subject: string;
   htmlBody: string;
+  eta?: string | null;
+  etd?: string | null;
   responseDeadlineAt?: string | null;
 }
 
@@ -97,6 +99,8 @@ export interface SendInquiryWhatsAppPayload {
     personalNote?: string;
   }>;
   subject: string;
+  eta?: string | null;
+  etd?: string | null;
   responseDeadlineAt?: string | null;
 }
 
@@ -996,7 +1000,10 @@ export class SendInquiryModalComponent {
   }
 
   private loadDefaults(): void {
-    this.http.post<{ success: boolean; data: any }>(`${API_URL}/orders/${this.orderId()}/inquiry/defaults`, {})
+    this.http.post<{ success: boolean; data: any }>(`${API_URL}/orders/${this.orderId()}/inquiry/defaults`, {
+      eta: this.eta(),
+      etd: this.etd(),
+    })
       .subscribe({
         next: (res) => {
           if (res.success && res.data) {
@@ -1212,6 +1219,8 @@ export class SendInquiryModalComponent {
       recipientEmails: this.recipientTags().map((tag) => tag.email),
       subject: this.subject(),
       htmlBody: this.htmlBody(),
+      eta: this.eta(),
+      etd: this.etd(),
       responseDeadlineAt: this.toIsoFromDateTimeLocal(this.responseDeadlineAt()),
     });
   }
@@ -1253,6 +1262,8 @@ export class SendInquiryModalComponent {
     this.sendWhatsAppInquiry.emit({
       recipients,
       subject: this.subject(),
+      eta: this.eta(),
+      etd: this.etd(),
       responseDeadlineAt: this.toIsoFromDateTimeLocal(this.responseDeadlineAt()),
     });
   }
@@ -1605,12 +1616,26 @@ export class SendInquiryModalComponent {
     const supplierName = supplier?.supplierName?.trim() || 'Supplier';
     const contactName = supplier?.contactName?.trim() || supplier?.waContactName?.trim() || '';
     const preferredName = contactName || supplierName || 'there';
+    const formatDate = (value: string | null): string => {
+      if (!value) return '';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '';
+      return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    };
+    const etaLabel = formatDate(this.eta());
+    const etdLabel = formatDate(this.etd());
+    const deliveryWindow = etaLabel && etdLabel
+      ? `${etaLabel} to ${etdLabel}`
+      : etaLabel || etdLabel || '';
 
     return {
       vesselName: this.vesselName().trim() || 'Vessel',
       portName: this.portName().trim() || 'Port',
       orderNumber: this.orderId().slice(0, 8).toUpperCase(),
       documentLabel: 'Inquiry',
+      eta: etaLabel,
+      etd: etdLabel,
+      deliveryWindow,
       senderName: this.senderName().trim() || 'Fueld User',
       companyName: this.companyName().trim() || 'Fueld',
       paymentTerms: '',
