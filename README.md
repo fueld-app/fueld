@@ -347,7 +347,7 @@ On every push to `main`:
 
 - Builds the API as a **standalone Bun binary** (`apps/api/app-release`, target `bun-linux-x64`)
 - Builds the Angular app to `apps/web/dist/web/browser/`
-- Builds happen on the runner and outputs are copied directly to the VPS via `scp` (no GitHub Actions artifacts)
+- On `push` to `main`, the test workflow uploads temporary GitHub Actions artifacts that the deploy workflow downloads, copies to the VPS via `scp`, and deletes after a successful deploy
 - Executes the deploy script on the VPS
 
 ### 3) Blue/green swap logic

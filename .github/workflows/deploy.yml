@@ -15,7 +15,7 @@ env:
 
 permissions:
   contents: read
-  actions: read
+  actions: write
 
 jobs:
   inspect-run:
@@ -280,3 +280,42 @@ jobs:
         if: always()
         run: |
           rm -f ~/.ssh/deploy_key
+
+  cleanup-test-artifacts:
+    name: Cleanup test artifacts
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: ${{ github.event_name == 'workflow_run' && needs.deploy.result == 'success' }}
+    steps:
+      - name: Delete temporary test artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+
+          artifacts_json=$(curl -fsSL \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts")
+
+          artifact_ids=$(printf '%s' "$artifacts_json" | jq -r '.artifacts[] | select(.name == "api-release" or .name == "web-browser" or .name == "build-info") | .id')
+
+          if [ -z "$artifact_ids" ]; then
+            echo "No matching artifacts found for run ${RUN_ID}; nothing to delete."
+            exit 0
+          fi
+
+          for artifact_id in $artifact_ids; do
+            echo "Deleting artifact ${artifact_id} from run ${RUN_ID}"
+            curl -fsSL -X DELETE \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}"
+          done
+
+          {
+            echo "## Artifact Cleanup"
+            echo ""
+            echo "Deleted temporary test artifacts from run ${RUN_ID}."
+          } >> "$GITHUB_STEP_SUMMARY"

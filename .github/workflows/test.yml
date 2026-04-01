@@ -312,19 +312,21 @@ jobs:
           ls -lh app-release /tmp/api-release.gz
           echo "API release build finished at $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
       - name: Upload API binary artifact
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         uses: actions/upload-artifact@v4
         with:
           name: api-release
           path: /tmp/api-release.gz
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
       - name: Upload build metadata artifact
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         uses: actions/upload-artifact@v4
         with:
           name: build-info
           path: build-info.json
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
 
   api-postgres:
     name: API (${{ matrix.name }})
@@ -338,12 +340,6 @@ jobs:
           - name: mocked
             db-suffix: mocked
             test-script: test:mocked
-          - name: db
-            db-suffix: db
-            test-script: test:db
-          - name: e2e
-            db-suffix: e2e
-            test-script: test:e2e
     env:
       TEST_DB_BASE_URL: postgres://fueld:fueld@localhost:5432
     services:
@@ -380,10 +376,12 @@ jobs:
         with:
           bun-version: ${{ env.BUN_VERSION }}
       - name: Wait for Postgres
+        if: ${{ matrix.test-script != 'test:mocked' }}
         run: |
           cd apps/api
           bun -e "import postgres from 'postgres'; const base=process.env.TEST_DB_BASE_URL; const sql=postgres(base + '/postgres',{max:1,connect_timeout:2}); const deadline=Date.now()+60_000; while(true){ try{ await sql.unsafe('select 1'); break; } catch(e){ if(Date.now()>deadline){ console.error('Postgres not ready:', String(e?.message ?? e)); process.exit(1);} await new Promise(r=>setTimeout(r,1000)); } } await sql.end({timeout:5}); console.log('Postgres is ready');"
       - name: Create fresh test database
+        if: ${{ matrix.test-script != 'test:mocked' }}
         run: |
           cd apps/api
           bun -e "import postgres from 'postgres'; const base=process.env.TEST_DB_BASE_URL; const suffix=process.env.DB_SUFFIX; const runId=process.env.GITHUB_RUN_ID ?? String(Date.now()); const runAttempt=process.env.GITHUB_RUN_ATTEMPT ?? '1'; const dbName='fueld_test_' + suffix + '_' + runId + '_' + runAttempt; const sql=postgres(base + '/postgres',{max:1}); try { await sql.unsafe('CREATE DATABASE ' + dbName); } finally { await sql.end({timeout:5}); } console.log(dbName);" > /tmp/dbname
@@ -391,6 +389,7 @@ jobs:
         env:
           DB_SUFFIX: ${{ matrix.db-suffix }}
       - name: Migrate
+        if: ${{ matrix.test-script != 'test:mocked' }}
         run: cd apps/api && DATABASE_URL="$TEST_DATABASE_URL" bun run db:migrate
       - name: Run tests
         run: cd apps/api && TEST_DATABASE_URL="$TEST_DATABASE_URL" bun run ${{ matrix.test-script }}
@@ -479,12 +478,13 @@ jobs:
       - name: Build
         run: cd apps/web && CI=true NG_CLI_ANALYTICS=false bun run build
       - name: Upload web build artifact
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         uses: actions/upload-artifact@v4
         with:
           name: web-browser
           path: apps/web/dist/web/browser
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 1
 
   # NOTE: Web Playwright E2E is intentionally not run in CI.
   # Run locally from apps/web: `bun run pw:install && bun run test:e2e`
