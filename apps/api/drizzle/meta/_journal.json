@@ -470,6 +470,13 @@
       "when": 1775000000000,
       "tag": "0066_company_types_broker_agent",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1775040000000,
+      "tag": "0067_backfill_order_invoicing_defaults",
+      "breakpoints": true
     }
   ]
 }

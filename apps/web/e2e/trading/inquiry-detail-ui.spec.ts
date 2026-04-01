@@ -96,3 +96,31 @@ test('inquiry detail renders resolved customer and supplier terms without placeh
   await expect(notesAndTerms).not.toContainText('{{documentName}}');
   await expect(notesAndTerms).not.toContainText('{{paymentTerms}}');
 });
+
+test('inquiry detail keeps invoicing company and bank account selected when options exist', async ({ page }) => {
+  test.setTimeout(90_000);
+
+  await loginViaUi(page, {
+    email: adminEmail,
+    password: adminPassword,
+  });
+
+  const inquiryId = await createInquiryViaApi(page);
+  await page.goto(`/trading/inquiries/${inquiryId}`);
+  await expect(page.getByRole('heading', { name: 'Inquiry Detail' })).toBeVisible();
+
+  const invoicingCompanySelect = page.getByTestId('order-invoicing-company');
+  const bankAccountSelect = page.getByTestId('order-bank-account');
+
+  await expect(invoicingCompanySelect).toBeVisible();
+  await expect(invoicingCompanySelect).toBeEnabled();
+  await expect(invoicingCompanySelect).toHaveValue(/.+/);
+  await expect(invoicingCompanySelect.locator('option')).not.toHaveCount(0);
+  await expect(invoicingCompanySelect.locator('option[value=""]')).toHaveCount(0);
+
+  await expect(bankAccountSelect).toBeVisible();
+  await expect(bankAccountSelect).toBeEnabled();
+  await expect(bankAccountSelect).toHaveValue(/.+/);
+  await expect(bankAccountSelect.locator('option')).not.toHaveCount(0);
+  await expect(bankAccountSelect.locator('option[value=""]')).toHaveCount(0);
+});

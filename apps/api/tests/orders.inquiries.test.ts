@@ -1,5 +1,5 @@
 import { describe, it, beforeEach, expect } from 'bun:test';
-import { companyContacts, counterparties, orders, orderItems, invoices, tenants } from '../src/db/schema';
+import { bankAccounts, companyContacts, counterparties, orders, orderItems, invoices, tenants } from '../src/db/schema';
 import { eq } from 'drizzle-orm';
 import { getDb, seedBasics, truncateAll } from './helpers/db';
 
@@ -35,6 +35,144 @@ describe('orders: inquiries flow', () => {
     expect(fetched?.client?.id).toBe(client.id);
     expect(fetched?.vessel?.id).toBe(vessel.id);
     expect(fetched?.place?.id).toBe(place.id);
+  });
+
+  it('defaults the invoicing company and bank account on create when omitted', async () => {
+    const { tenant, client, vessel, place, user } = await seedBasics();
+    const db = await getDb();
+    const { createOrder } = await loadOrdersService();
+
+    const [ownCompanyA] = await db
+      .insert(counterparties)
+      .values({
+        tenantId: tenant.id,
+        name: 'Alpha Fuels',
+        type: 'SUPPLIER',
+        types: ['SUPPLIER'],
+        country: 'Denmark',
+        isOwnCompany: true,
+      })
+      .returning();
+
+    await db
+      .insert(counterparties)
+      .values({
+        tenantId: tenant.id,
+        name: 'Zulu Fuels',
+        type: 'SUPPLIER',
+        types: ['SUPPLIER'],
+        country: 'Denmark',
+        isOwnCompany: true,
+      })
+      .returning();
+
+    const [usdBankAccount] = await db
+      .insert(bankAccounts)
+      .values({
+        counterpartyId: ownCompanyA.id,
+        label: 'USD Main',
+        bankName: 'Alpha Bank',
+        currency: 'USD',
+        isDefault: true,
+      })
+      .returning();
+
+    await db
+      .insert(bankAccounts)
+      .values({
+        counterpartyId: ownCompanyA.id,
+        label: 'EUR Main',
+        bankName: 'Alpha Bank',
+        currency: 'EUR',
+        isDefault: false,
+      })
+      .returning();
+
+    const created = await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+    });
+
+    expect(created.invoicingCompanyId).toBe(ownCompanyA.id);
+    expect(created.bankAccountId).toBe(usdBankAccount.id);
+  });
+
+  it('replaces blank invoicing and bank account updates with valid defaults', async () => {
+    const { tenant, client, vessel, place, user } = await seedBasics();
+    const db = await getDb();
+    const { createOrder, updateOrder } = await loadOrdersService();
+
+    const [alphaCompany] = await db
+      .insert(counterparties)
+      .values({
+        tenantId: tenant.id,
+        name: 'Alpha Fuels',
+        type: 'SUPPLIER',
+        types: ['SUPPLIER'],
+        country: 'Denmark',
+        isOwnCompany: true,
+      })
+      .returning();
+
+    const [betaCompany] = await db
+      .insert(counterparties)
+      .values({
+        tenantId: tenant.id,
+        name: 'Beta Fuels',
+        type: 'SUPPLIER',
+        types: ['SUPPLIER'],
+        country: 'Denmark',
+        isOwnCompany: true,
+      })
+      .returning();
+
+    await db
+      .insert(bankAccounts)
+      .values({
+        counterpartyId: alphaCompany.id,
+        label: 'USD Main',
+        bankName: 'Alpha Bank',
+        currency: 'USD',
+        isDefault: true,
+      })
+      .returning();
+
+    const [eurBankAccount] = await db
+      .insert(bankAccounts)
+      .values({
+        counterpartyId: betaCompany.id,
+        label: 'EUR Main',
+        bankName: 'Beta Bank',
+        currency: 'EUR',
+        isDefault: true,
+      })
+      .returning();
+
+    const created = await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+      invoicingCompanyId: betaCompany.id,
+      bankAccountId: eurBankAccount.id,
+      currency: 'EUR',
+    });
+
+    const updated = await updateOrder(created.id, {
+      invoicingCompanyId: null,
+      bankAccountId: null,
+      currency: 'EUR',
+    });
+
+    expect(updated?.invoicingCompanyId).toBe(alphaCompany.id);
+    expect(updated?.bankAccountId).toBeTruthy();
+    const dbRow = await db.select().from(orders).where(eq(orders.id, created.id)).limit(1);
+    expect(dbRow[0]?.invoicingCompanyId).toBe(alphaCompany.id);
+    expect(dbRow[0]?.bankAccountId).toBeTruthy();
   });
 
   it('updates inquiry details and saves items with currencies', async () => {

@@ -11,6 +11,53 @@ interface VesselDto { id: string }
 interface PlaceDto { id: string }
 interface BankAccountDto { id: string }
 
+async function ensureOwnCompanyBankAccount(
+  page: Page,
+  headers: Record<string, string>,
+  invoicingCompanyId: string,
+): Promise<string | null> {
+  const bankAccountsRes = await page.request.get(
+    `http://localhost:3000/admin/settings/companies/${invoicingCompanyId}/bank-accounts`,
+    { headers },
+  );
+  if (!bankAccountsRes.ok()) {
+    throw new Error('Failed to fetch bank accounts for inquiry creation.');
+  }
+
+  const bankAccountsJson = await bankAccountsRes.json() as ApiResponse<BankAccountDto[]>;
+  const existingBankAccountId = bankAccountsJson.data?.[0]?.id ?? null;
+  if (existingBankAccountId) {
+    return existingBankAccountId;
+  }
+
+  const createBankAccountRes = await page.request.post(
+    `http://localhost:3000/admin/settings/companies/${invoicingCompanyId}/bank-accounts`,
+    {
+      headers: {
+        ...headers,
+        'Content-Type': 'application/json',
+      },
+      data: {
+        label: 'E2E Default USD',
+        bankName: 'E2E Bank',
+        accountName: 'E2E Account',
+        accountNumber: '123456789',
+        iban: 'NO9386011117947',
+        swiftBic: 'DNBANOKKXXX',
+        currency: 'USD',
+        isDefault: true,
+      },
+    },
+  );
+
+  if (!createBankAccountRes.ok()) {
+    throw new Error('Failed to create default bank account for inquiry creation.');
+  }
+
+  const createdBankAccountJson = await createBankAccountRes.json() as ApiResponse<BankAccountDto>;
+  return createdBankAccountJson.data?.id ?? null;
+}
+
 export async function createInquiryViaApi(page: Page): Promise<string> {
   const accessToken = await page.evaluate(() => localStorage.getItem('fueld_access_token'));
   if (!accessToken) {
@@ -49,14 +96,7 @@ export async function createInquiryViaApi(page: Page): Promise<string> {
 
   let bankAccountId: string | null = null;
   if (invoicingCompanyId) {
-    const bankAccountsRes = await page.request.get(
-      `http://localhost:3000/admin/settings/companies/${invoicingCompanyId}/bank-accounts`,
-      { headers },
-    );
-    if (bankAccountsRes.ok()) {
-      const bankAccountsJson = await bankAccountsRes.json() as ApiResponse<BankAccountDto[]>;
-      bankAccountId = bankAccountsJson.data?.[0]?.id ?? null;
-    }
+    bankAccountId = await ensureOwnCompanyBankAccount(page, headers, invoicingCompanyId);
   }
 
   if (!clientId || !vesselId || !placeId) {

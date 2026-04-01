@@ -401,12 +401,17 @@ import {
           <p class="mt-1 text-sm font-semibold text-gray-900">{{ invoicingCompanyName() }}</p>
         } @else {
           <select
+            data-testid="order-invoicing-company"
             [ngModel]="invoicingCompanyId()"
             (ngModelChange)="invoicingCompanyChange.emit($event)"
+            [disabled]="ownCompanies().length === 0"
             class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm font-semibold text-gray-900
-                   focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                   focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white
+                   disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <option value="">- Select -</option>
+            @if (ownCompanies().length === 0) {
+              <option value="">- Select -</option>
+            }
             @for (co of ownCompanies(); track co.id) {
               <option [value]="co.id">{{ co.name }}</option>
             }
@@ -419,6 +424,7 @@ import {
             <p class="mt-1 text-sm text-gray-900">{{ bankAccountLabel() }}</p>
           } @else {
             <select
+              data-testid="order-bank-account"
               [ngModel]="bankAccountId()"
               (ngModelChange)="bankAccountChange.emit($event)"
               [disabled]="!invoicingCompanyId() || bankAccountOptions().length === 0"
@@ -426,7 +432,9 @@ import {
                      focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white
                      disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <option value="">— None —</option>
+              @if (bankAccountOptions().length === 0) {
+                <option value="">— None —</option>
+              }
               @for (ba of bankAccountOptions(); track ba.id) {
                 <option [value]="ba.id">{{ ba.label }} ({{ ba.currency }})</option>
               }

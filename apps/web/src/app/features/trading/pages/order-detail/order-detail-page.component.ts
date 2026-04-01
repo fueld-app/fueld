@@ -2570,10 +2570,17 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         ]);
       }
 
-      if (ownRes.success) this.ownCompanies.set(ownRes.data);
+      let invoicingId = this.order()?.invoicingCompanyId ?? null;
+      if (ownRes.success) {
+        this.ownCompanies.set(ownRes.data);
+        invoicingId = this.applyPreferredInvoicingCompanySelection(ownRes.data);
+      }
 
-      const invoicingId = this.order()?.invoicingCompanyId;
-      if (invoicingId) this.loadBankAccounts(invoicingId);
+      if (invoicingId) {
+        await this.loadBankAccounts(invoicingId, { autoSelect: true });
+      } else {
+        this.bankAccounts.set([]);
+      }
 
       if (this.order()?.customerNote) this.showCustomerPaymentNote.set(true);
       if (this.order()?.supplierNote) this.showSupplierPaymentNote.set(true);
@@ -3572,14 +3579,28 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   onInvoicingCompanyChange(companyId: string): void {
-    this.order.update((o) => o ? { ...o, invoicingCompanyId: companyId || null, bankAccountId: null } : o);
+    const nextCompanyId = this.resolveRequestedInvoicingCompanyId(companyId);
+    const currentCompanyId = this.order()?.invoicingCompanyId ?? null;
+
+    if (currentCompanyId === nextCompanyId) {
+      return;
+    }
+
+    this.order.update((o) => o ? { ...o, invoicingCompanyId: nextCompanyId, bankAccountId: null } : o);
     this.bankAccounts.set([]);
-    if (companyId) void this.loadBankAccounts(companyId, { autoSelect: true });
+    if (nextCompanyId) void this.loadBankAccounts(nextCompanyId, { autoSelect: true });
     this.triggerAutosave();
   }
 
   onBankAccountChange(bankAccountId: string): void {
-    this.order.update((o) => o ? { ...o, bankAccountId: bankAccountId || null } : o);
+    const nextBankAccountId = this.resolveRequestedBankAccountId(bankAccountId, this.bankAccounts());
+    const currentBankAccountId = this.order()?.bankAccountId ?? null;
+
+    if (currentBankAccountId === nextBankAccountId) {
+      return;
+    }
+
+    this.order.update((o) => o ? { ...o, bankAccountId: nextBankAccountId } : o);
     this.triggerAutosave();
   }
 
@@ -3599,9 +3620,27 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     } catch { /* silently ignore */ }
   }
 
+  private applyPreferredInvoicingCompanySelection(companies: OwnCompanyDto[]): string | null {
+    const nextCompanyId = this.resolveRequestedInvoicingCompanyId(this.order()?.invoicingCompanyId);
+    const currentCompanyId = this.order()?.invoicingCompanyId ?? null;
+
+    if (currentCompanyId === nextCompanyId) {
+      return nextCompanyId;
+    }
+
+    if (companies.length === 0) {
+      return currentCompanyId;
+    }
+
+    this.order.update((order) => (order
+      ? { ...order, invoicingCompanyId: nextCompanyId, bankAccountId: null }
+      : order));
+    this.triggerAutosave();
+    return nextCompanyId;
+  }
+
   private applyPreferredBankAccountSelection(accounts: BankAccountDto[]): void {
-    const preferredBankAccount = this.getPreferredBankAccount(accounts);
-    const preferredBankAccountId = preferredBankAccount?.id ?? null;
+    const preferredBankAccountId = this.resolveRequestedBankAccountId(this.order()?.bankAccountId, accounts);
 
     if (this.order()?.bankAccountId === preferredBankAccountId) {
       return;
@@ -3623,6 +3662,48 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     }
 
     return accounts.find((account) => account.isDefault) ?? accounts[0] ?? null;
+  }
+
+  private resolveRequestedInvoicingCompanyId(companyId: string | null | undefined): string | null {
+    const normalizedCompanyId = (companyId ?? '').trim();
+    const companies = this.ownCompanies();
+
+    if (normalizedCompanyId && companies.some((company) => company.id === normalizedCompanyId)) {
+      return normalizedCompanyId;
+    }
+
+    if (companies.length === 0) {
+      return normalizedCompanyId || null;
+    }
+
+    const currentCompanyId = this.order()?.invoicingCompanyId ?? null;
+    if (currentCompanyId && companies.some((company) => company.id === currentCompanyId)) {
+      return currentCompanyId;
+    }
+
+    return companies[0]?.id ?? null;
+  }
+
+  private resolveRequestedBankAccountId(
+    bankAccountId: string | null | undefined,
+    accounts: BankAccountDto[],
+  ): string | null {
+    const normalizedBankAccountId = (bankAccountId ?? '').trim();
+
+    if (normalizedBankAccountId && accounts.some((account) => account.id === normalizedBankAccountId)) {
+      return normalizedBankAccountId;
+    }
+
+    if (accounts.length === 0) {
+      return null;
+    }
+
+    const currentBankAccountId = this.order()?.bankAccountId ?? null;
+    if (currentBankAccountId && accounts.some((account) => account.id === currentBankAccountId)) {
+      return currentBankAccountId;
+    }
+
+    return this.getPreferredBankAccount(accounts)?.id ?? null;
   }
 
   private normalizeCurrencyCode(currency: string | null | undefined): string {

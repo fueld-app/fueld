@@ -12,6 +12,7 @@ import {
   orderItems,
   orderAttachments,
   counterparties,
+  bankAccounts,
   vessels,
   places,
   users,
@@ -236,6 +237,75 @@ async function getCompanyContactById(contactId: string | null | undefined) {
   return row
     ? { ...row, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() }
     : null;
+}
+
+async function getPreferredOwnCompanyId(
+  tenantId: string,
+  requestedCompanyId?: string | null,
+): Promise<string | null> {
+  const normalizedCompanyId = requestedCompanyId?.trim() ?? '';
+  if (normalizedCompanyId) {
+    const [requestedCompany] = await db
+      .select({ id: counterparties.id })
+      .from(counterparties)
+      .where(and(
+        eq(counterparties.id, normalizedCompanyId),
+        eq(counterparties.tenantId, tenantId),
+        eq(counterparties.isOwnCompany, true),
+      ))
+      .limit(1);
+
+    if (requestedCompany?.id) return requestedCompany.id;
+  }
+
+  const [fallbackCompany] = await db
+    .select({ id: counterparties.id })
+    .from(counterparties)
+    .where(and(eq(counterparties.tenantId, tenantId), eq(counterparties.isOwnCompany, true)))
+    .orderBy(asc(counterparties.name), asc(counterparties.id))
+    .limit(1);
+
+  return fallbackCompany?.id ?? null;
+}
+
+async function getPreferredBankAccountId(
+  invoicingCompanyId: string | null,
+  currency: string | null | undefined,
+  requestedBankAccountId?: string | null,
+): Promise<string | null> {
+  if (!invoicingCompanyId) return null;
+
+  const normalizedBankAccountId = requestedBankAccountId?.trim() ?? '';
+  if (normalizedBankAccountId) {
+    const [requestedBankAccount] = await db
+      .select({ id: bankAccounts.id })
+      .from(bankAccounts)
+      .where(and(
+        eq(bankAccounts.id, normalizedBankAccountId),
+        eq(bankAccounts.counterpartyId, invoicingCompanyId),
+      ))
+      .limit(1);
+
+    if (requestedBankAccount?.id) return requestedBankAccount.id;
+  }
+
+  const normalizedCurrency = (currency ?? '').trim().toUpperCase();
+  const companyBankAccounts = await db
+    .select({ id: bankAccounts.id, currency: bankAccounts.currency, isDefault: bankAccounts.isDefault })
+    .from(bankAccounts)
+    .where(eq(bankAccounts.counterpartyId, invoicingCompanyId))
+    .orderBy(desc(bankAccounts.isDefault), asc(bankAccounts.label), asc(bankAccounts.id));
+
+  if (companyBankAccounts.length === 0) return null;
+
+  if (normalizedCurrency) {
+    const currencyMatches = companyBankAccounts.filter((account) => (account.currency ?? '').trim().toUpperCase() === normalizedCurrency);
+    if (currencyMatches.length > 0) {
+      return currencyMatches.find((account) => account.isDefault)?.id ?? currencyMatches[0]?.id ?? null;
+    }
+  }
+
+  return companyBankAccounts.find((account) => account.isDefault)?.id ?? companyBankAccounts[0]?.id ?? null;
 }
 
 function normalizeOptionalTimestamp(value: string | Date | null | undefined): Date | null {
@@ -996,6 +1066,9 @@ export async function getOrderById(idOrNumber: string) {
 export async function createOrder(input: CreateOrderInput) {
   // Generate the external order number
   const orderNumber = await generateOrderNumber(input.tenantId);
+  const currency = input.currency ?? 'USD';
+  const invoicingCompanyId = await getPreferredOwnCompanyId(input.tenantId, input.invoicingCompanyId ?? null);
+  const bankAccountId = await getPreferredBankAccountId(invoicingCompanyId, currency, input.bankAccountId ?? null);
 
   // Seed placeRemark from the place's default if not explicitly provided
   let placeRemark = input.placeRemark ?? null;
@@ -1015,9 +1088,9 @@ export async function createOrder(input: CreateOrderInput) {
     vesselId: input.vesselId,
     placeId: input.placeId,
     salesRepId: input.salesRepId ?? null,
-    invoicingCompanyId: input.invoicingCompanyId ?? null,
-    bankAccountId: input.bankAccountId ?? null,
-    currency: input.currency ?? 'USD',
+    invoicingCompanyId,
+    bankAccountId,
+    currency,
     eta: input.eta ? new Date(input.eta) : null,
     etd: input.etd ? new Date(input.etd) : null,
     customerPaymentTermType: input.customerPaymentTermType ?? null,
@@ -1053,12 +1126,42 @@ export async function createOrder(input: CreateOrderInput) {
 export async function updateOrder(id: string, input: UpdateOrderInput) {
   const setData: Record<string, unknown> = { updatedAt: new Date() };
 
+  const [currentOrder] = await db
+    .select({
+      id: orders.id,
+      tenantId: orders.tenantId,
+      invoicingCompanyId: orders.invoicingCompanyId,
+      bankAccountId: orders.bankAccountId,
+      currency: orders.currency,
+    })
+    .from(orders)
+    .where(eq(orders.id, id))
+    .limit(1);
+
+  if (!currentOrder) return null;
+
+  const nextCurrency = input.currency ?? currentOrder.currency;
+  const requestedInvoicingCompanyId = input.invoicingCompanyId !== undefined
+    ? input.invoicingCompanyId
+    : currentOrder.invoicingCompanyId;
+  const resolvedInvoicingCompanyId = await getPreferredOwnCompanyId(
+    currentOrder.tenantId,
+    requestedInvoicingCompanyId,
+  );
+  const shouldRecomputeBankAccount = input.invoicingCompanyId !== undefined || input.bankAccountId !== undefined || input.currency !== undefined;
+  const requestedBankAccountId = shouldRecomputeBankAccount
+    ? (input.bankAccountId !== undefined ? input.bankAccountId : currentOrder.bankAccountId)
+    : currentOrder.bankAccountId;
+  const resolvedBankAccountId = shouldRecomputeBankAccount
+    ? await getPreferredBankAccountId(resolvedInvoicingCompanyId, nextCurrency, requestedBankAccountId)
+    : currentOrder.bankAccountId;
+
   if (input.clientId !== undefined) setData.clientId = input.clientId;
   if (input.vesselId !== undefined) setData.vesselId = input.vesselId;
   if (input.placeId !== undefined) setData.placeId = input.placeId;
   if (input.salesRepId !== undefined) setData.salesRepId = input.salesRepId;
-  if (input.invoicingCompanyId !== undefined) setData.invoicingCompanyId = input.invoicingCompanyId;
-  if (input.bankAccountId !== undefined) setData.bankAccountId = input.bankAccountId;
+  if (input.invoicingCompanyId !== undefined) setData.invoicingCompanyId = resolvedInvoicingCompanyId;
+  if (shouldRecomputeBankAccount) setData.bankAccountId = resolvedBankAccountId;
   if (input.currency !== undefined) setData.currency = input.currency;
   if (input.status !== undefined) setData.status = input.status;
   if (input.eta !== undefined) setData.eta = input.eta ? new Date(input.eta) : null;
