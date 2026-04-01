@@ -146,6 +146,8 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
                 <app-email-tag-input
                   #toInput
                   [orderId]="orderId()"
+                  [recipientScope]="recipientScope()"
+                  [orderSupplierId]="nominationOrderSupplierId() ?? ''"
                   placeholder="Add recipient..."
                 />
               </div>
@@ -171,6 +173,8 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
                 <app-email-tag-input
                   #ccInput
                   [orderId]="orderId()"
+                  [recipientScope]="recipientScope()"
+                  [orderSupplierId]="nominationOrderSupplierId() ?? ''"
                   placeholder="Add CC..."
                 />
               </div>
@@ -195,6 +199,8 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
                   <app-email-tag-input
                     #bccInput
                     [orderId]="orderId()"
+                    [recipientScope]="recipientScope()"
+                    [orderSupplierId]="nominationOrderSupplierId() ?? ''"
                     placeholder="Add BCC..."
                   />
                 </div>
@@ -625,6 +631,9 @@ export class SendEmailModalComponent {
   // Document type -> human-readable label
   readonly docLabel = computed(
     () => DOC_LABELS[this.documentType()] ?? 'Document',
+  );
+  readonly recipientScope = computed<'customer' | 'supplier'>(() =>
+    this.documentType() === 'NOMINATION' ? 'supplier' : 'customer',
   );
   readonly visibleExtraAttachments = computed(() =>
     this.documentType() === 'INVOICE' ? this.extraAttachments() : [],

@@ -1656,7 +1656,7 @@ interface PlattsSuggestionViewModel {
       [nominationOrderSupplierId]="nominationOrderSupplierId()"
       [extraAttachments]="invoiceEmailAttachmentOptions()"
       [waLinked]="waLinked()"
-      [defaultPhone]="order()?.brokerGetsAll && brokerContact()?.phone ? brokerContact()?.phone ?? null : customerContact()?.phone ?? null"
+      [defaultPhone]="emailModalDefaultPhone()"
       (sendEmail)="onSendEmail($event)"
       (sendWhatsApp)="onSendInvoiceWhatsApp($event)"
     />
@@ -1916,6 +1916,19 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly nominationOrderSupplierId = computed(() => {
     const activeSupplier = this.activeOrderSupplier();
     return this.emailDocumentType() === 'NOMINATION' ? (activeSupplier ? activeSupplier.id : null) : null;
+  });
+  readonly emailModalDefaultPhone = computed(() => {
+    if (this.emailDocumentType() === 'NOMINATION') {
+      return this.activeOrderSupplier()?.contact?.phone
+        ?? this.supplierContact()?.phone
+        ?? null;
+    }
+
+    if (this.order()?.brokerGetsAll && this.brokerContact()?.phone) {
+      return this.brokerContact()?.phone ?? null;
+    }
+
+    return this.customerContact()?.phone ?? null;
   });
   readonly orderSupplierTabs = computed(() => this.orderSuppliers().map((supplier, index) => ({
     id: supplier.id,

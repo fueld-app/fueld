@@ -856,10 +856,21 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         return qi === query.length;
       }
 
-      // Gather all counterparty IDs related to this order
+      const recipientScope = query.recipientScope === 'supplier' ? 'supplier' : 'customer';
+
+      // Gather the counterparties relevant to this specific communication flow.
       const companyIds = new Set<string>();
-      if (order.clientId) companyIds.add(order.clientId);
-      if (order.supplierId) companyIds.add(order.supplierId);
+      if (recipientScope === 'supplier') {
+        const nominationSupplier = resolveNominationOrderSupplier(order, query.orderSupplierId ?? null);
+        if (nominationSupplier.supplier?.companyId) {
+          companyIds.add(nominationSupplier.supplier.companyId);
+        } else if (order.supplierId) {
+          companyIds.add(order.supplierId);
+        }
+      } else {
+        if (order.clientId) companyIds.add(order.clientId);
+        if (order.brokerGetsAll && order.brokerId) companyIds.add(order.brokerId);
+      }
 
       if (companyIds.size === 0) {
         return { success: true, data: [] };
@@ -922,7 +933,11 @@ export const documentsController = new Elysia({ prefix: '/orders' })
     },
     {
       params: t.Object({ id: t.String() }),
-      query: t.Object({ q: t.Optional(t.String()) }),
+      query: t.Object({
+        q: t.Optional(t.String()),
+        recipientScope: t.Optional(t.Union([t.Literal('customer'), t.Literal('supplier')])),
+        orderSupplierId: t.Optional(t.String()),
+      }),
       detail: {
         tags: ['Documents'],
         summary: 'Search contacts for email typeahead',

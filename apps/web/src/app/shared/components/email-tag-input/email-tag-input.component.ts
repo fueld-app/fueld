@@ -110,6 +110,10 @@ export class EmailTagInputComponent implements OnInit, OnDestroy {
   // ── Inputs ──
   /** Order ID for contact search context */
   readonly orderId = input<string>('');
+  /** Which side of the order should be suggested */
+  readonly recipientScope = input<'customer' | 'supplier'>('customer');
+  /** Optional order supplier leg for supplier-facing searches */
+  readonly orderSupplierId = input<string>('');
   /** Placeholder text */
   readonly placeholder = input('Add email...');
   /** Read-only mode */
@@ -146,7 +150,13 @@ export class EmailTagInputComponent implements OnInit, OnDestroy {
           if (!oid || q.length < 1) return of([]);
           return this.http.get<{ success: boolean; data: ContactSuggestion[] }>(
             `${API_URL}/orders/${oid}/contacts/search`,
-            { params: { q } },
+            {
+              params: {
+                q,
+                recipientScope: this.recipientScope(),
+                ...(this.orderSupplierId() ? { orderSupplierId: this.orderSupplierId() } : {}),
+              },
+            },
           ).pipe(
             switchMap((res) => of(res.success ? res.data : [])),
             catchError(() => of([] as ContactSuggestion[])),
