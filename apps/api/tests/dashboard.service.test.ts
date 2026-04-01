@@ -514,13 +514,17 @@ describe('dashboard.service', () => {
     }).where(eq(orders.id, lostOrder.id));
 
     // Open inquiry (neither won nor lost)
-    await createOrder({
+    const openInquiry = await createOrder({
       tenantId: tenant.id,
       clientId: client.id,
       vesselId: vessel.id,
       placeId: place.id,
       salesRepId: user.id,
     });
+    await db.update(orders).set({
+      createdAt: new Date('2026-03-05T10:00:00Z'),
+      updatedAt: new Date(),
+    }).where(eq(orders.id, openInquiry.id));
 
     const metrics = await getConversionMetrics(tenant.id, '2026-03-01', '2026-03-31');
     expect(metrics.totalInquiries).toBe(4);
