@@ -7,6 +7,11 @@ import { migrate } from 'drizzle-orm/postgres-js/migrator';
 
 const DEFAULT_DATABASE_URL = 'postgres://fueld:fueld@localhost:5432/fueld_test';
 
+function normalizeDatabaseUrlEnv(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
 function assertSafeTestDatabase(databaseUrl: string): void {
   let parsed: URL;
   try {
@@ -43,8 +48,8 @@ function assertSafeTestDatabase(databaseUrl: string): void {
   }
 }
 
-const ENV_TEST_DATABASE_URL = process.env['TEST_DATABASE_URL'];
-const ENV_DATABASE_URL = process.env['DATABASE_URL'];
+const ENV_TEST_DATABASE_URL = normalizeDatabaseUrlEnv(process.env['TEST_DATABASE_URL']);
+const ENV_DATABASE_URL = normalizeDatabaseUrlEnv(process.env['DATABASE_URL']);
 
 let DATABASE_URL = ENV_TEST_DATABASE_URL ?? ENV_DATABASE_URL ?? DEFAULT_DATABASE_URL;
 try {
