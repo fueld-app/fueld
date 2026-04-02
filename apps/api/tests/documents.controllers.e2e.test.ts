@@ -292,6 +292,7 @@ describe('documents + verify controller e2e', () => {
         token,
         body: {
           documentType: 'INVOICE',
+          orderSupplierId: null,
           recipientEmail: 'finance@example.com',
           subject: 'Invoice Test',
           htmlBody: '<p>Invoice body</p>',
@@ -602,7 +603,7 @@ describe('documents + verify controller e2e', () => {
     const res = await requestJson(`/orders/${orderId}/email-defaults`, {
       method: 'POST',
       token,
-      body: { documentType: 'INVOICE' },
+      body: { documentType: 'INVOICE', orderSupplierId: null },
     });
 
     expect(res.status).toBe(200);
@@ -625,6 +626,21 @@ describe('documents + verify controller e2e', () => {
 
     // CC should include sender email
     expect(d?.ccEmails?.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('returns pre-filled email defaults via /email-defaults for CONFIRMATION', async () => {
+    const { token, orderId } = await seedDocumentReadyOrder();
+
+    const res = await requestJson(`/orders/${orderId}/email-defaults`, {
+      method: 'POST',
+      token,
+      body: { documentType: 'CONFIRMATION', orderSupplierId: null },
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.data?.success).toBe(true);
+    expect(String(res.data?.data?.subject ?? '')).toContain('Confirmation');
+    expect(String(res.data?.data?.htmlBody ?? '')).toContain('Dear Customer');
   });
 
   it('returns pre-filled email defaults via /email-defaults for NOMINATION', async () => {
