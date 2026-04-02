@@ -171,6 +171,7 @@ interface VesselSearchResult {
                 <th app-sort-header field="name" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-5 py-3 text-left font-medium text-gray-500">Vessel</th>
                 <th app-sort-header field="type" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-5 py-3 text-left font-medium text-gray-500">Type</th>
                 <th app-sort-header field="flag" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-5 py-3 text-left font-medium text-gray-500">Flag</th>
+                <th class="px-5 py-3 text-left font-medium text-gray-500">Sanctioned</th>
                 <th app-sort-header field="dwt" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-5 py-3 text-right font-medium text-gray-500">DWT</th>
                 <th app-sort-header field="gt" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-5 py-3 text-right font-medium text-gray-500">GT</th>
                 <th app-sort-header field="buildYear" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-5 py-3 text-left font-medium text-gray-500">Built</th>
@@ -182,12 +183,7 @@ interface VesselSearchResult {
               @for (v of vessels(); track v.id) {
                 <tr class="hover:bg-gray-50/50 transition-colors cursor-pointer" (click)="goToVessel(v.id)">
                   <td class="px-5 py-3">
-                    <div class="flex items-center gap-2">
-                      <span class="font-medium text-gray-900">{{ v.name }}</span>
-                      @if (v.sanctionStatus === 'SANCTIONED') {
-                        <span class="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Sanctioned</span>
-                      }
-                    </div>
+                    <div class="font-medium text-gray-900">{{ v.name }}</div>
                     <div class="text-xs text-gray-400">
                       @if (v.imo) { IMO {{ v.imo }} }
                       @if (v.mmsi) { · MMSI {{ v.mmsi }} }
@@ -195,6 +191,13 @@ interface VesselSearchResult {
                   </td>
                   <td class="px-5 py-3 text-gray-600 capitalize">{{ v.type || '—' }}</td>
                   <td class="px-5 py-3 text-gray-600">{{ flagEmoji(v.flagCode) }} {{ v.flag || '—' }}</td>
+                  <td class="px-5 py-3">
+                    @if (v.sanctionStatus === 'SANCTIONED') {
+                      <span class="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Yes</span>
+                    } @else {
+                      <span class="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">No</span>
+                    }
+                  </td>
                   <td class="px-5 py-3 text-right text-gray-600 font-mono text-xs">{{ v.deadWeightTonnage ? v.deadWeightTonnage.toLocaleString() : '—' }}</td>
                   <td class="px-5 py-3 text-right text-gray-600 font-mono text-xs">{{ v.grossTonnage ? v.grossTonnage.toLocaleString() : '—' }}</td>
                   <td class="px-5 py-3 text-gray-600">{{ v.buildYear ?? '—' }}</td>
@@ -219,7 +222,7 @@ interface VesselSearchResult {
                 </tr>
               } @empty {
                 <tr>
-                  <td colspan="8" class="px-5 py-12 text-center text-gray-400">
+                  <td colspan="9" class="px-5 py-12 text-center text-gray-400">
                     No vessels yet. Use the search bar above to import from Seasearcher or create manually.
                   </td>
                 </tr>
