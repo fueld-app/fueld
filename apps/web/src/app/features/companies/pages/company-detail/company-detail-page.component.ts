@@ -411,6 +411,25 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 ⚠️ Sanctioned
               </span>
             }
+            @if (riskSummary()?.isFrozen) {
+              <button
+                type="button"
+                (click)="sanctionsTab.set('monitoring')"
+                class="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 transition-colors"
+              >
+                <span class="inline-flex h-2 w-2 rounded-full bg-red-500"></span>
+                Credit Frozen
+              </button>
+            } @else if ((riskSummary()?.activeHitCount ?? 0) > 0) {
+              <button
+                type="button"
+                (click)="sanctionsTab.set('monitoring')"
+                class="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-colors"
+              >
+                <span class="inline-flex h-2 w-2 rounded-full bg-amber-500"></span>
+                {{ riskSummary()!.activeHitCount }} Risk Signal{{ riskSummary()!.activeHitCount === 1 ? '' : 's' }}
+              </button>
+            }
             @if (syncing()) {
               <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-600">
                 <svg class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -474,6 +493,26 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
             }
             <app-last-edited-badge entityType="company" [entityId]="company()!.id" />
           </div>
+          @if (riskSummary()?.isFrozen) {
+            <button
+              type="button"
+              (click)="sanctionsTab.set('monitoring')"
+              class="mt-3 flex w-full items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-left shadow-sm transition-colors hover:bg-red-100/70"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="mt-0.5 h-5 w-5 flex-shrink-0 text-red-600" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+              </svg>
+              <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="text-sm font-semibold text-red-800">Credit frozen by monitoring</span>
+                  <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700">
+                    {{ riskSummary()!.activeHitCount }} active hit{{ riskSummary()!.activeHitCount === 1 ? '' : 's' }}
+                  </span>
+                </div>
+                <p class="mt-1 text-sm text-red-700">Open Monitoring to review provider hits, override state, and re-check options.</p>
+              </div>
+            </button>
+          }
         </div>
 
         <!-- Parent breadcrumb (shown when this is a child company) -->
@@ -2633,6 +2672,25 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
                   <h2 class="text-sm font-semibold text-gray-700">Risk & Compliance</h2>
                   <div class="flex gap-1">
+                    <button
+                      type="button"
+                      class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
+                      [class]="sanctionsTab() === 'monitoring'
+                        ? (riskSummary()?.isFrozen ? 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200' : 'bg-brand-50 text-brand-700')
+                        : (riskSummary()?.isFrozen ? 'text-red-600 hover:text-red-700' : 'text-gray-400 hover:text-gray-600')"
+                      (click)="sanctionsTab.set('monitoring'); loadRiskSummary()"
+                    >
+                      Monitoring
+                      @if (riskSummary()?.isFrozen) {
+                        <span class="ml-1 inline-flex items-center rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
+                          {{ riskSummary()!.activeHitCount || 1 }}
+                        </span>
+                      } @else if ((riskSummary()?.activeHitCount ?? 0) > 0) {
+                        <span class="ml-1 inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+                          {{ riskSummary()!.activeHitCount }}
+                        </span>
+                      }
+                    </button>
                     @if (enrichment()!.counterpartyRiskReportMetadata) {
                       <button
                         type="button"
@@ -2658,17 +2716,6 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                       (click)="sanctionsTab.set('seizures')"
                     >
                       Seizures / Arrests
-                    </button>
-                    <button
-                      type="button"
-                      class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
-                      [class]="sanctionsTab() === 'monitoring' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
-                      (click)="sanctionsTab.set('monitoring'); loadRiskSummary()"
-                    >
-                      Monitoring
-                      @if (riskSummary()?.isFrozen) {
-                        <span class="ml-1 inline-block h-2 w-2 rounded-full bg-red-500"></span>
-                      }
                     </button>
                   </div>
                 </div>
@@ -3105,7 +3152,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly sanctions = signal<any[] | null>(null);
   readonly sanctionsLoading = signal(false);
   readonly registrationTab = signal<'registration' | 'ownership'>('ownership');
-  readonly sanctionsTab = signal<'risk' | 'sanctions' | 'seizures' | 'monitoring'>('risk');
+  readonly sanctionsTab = signal<'risk' | 'sanctions' | 'seizures' | 'monitoring'>('monitoring');
   readonly riskMonitoringService = inject(RiskMonitoringService);
   readonly riskSummary = signal<RiskSummaryDto | null>(null);
   readonly riskSummaryLoading = signal(false);
@@ -3369,6 +3416,8 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   // ─── Data Loading ──────────────────────────────────────────────────
   async loadCompany(id: string): Promise<void> {
     this.loading.set(true);
+    this.sanctionsTab.set('monitoring');
+    this.riskSummary.set(null);
     try {
       const res = await firstValueFrom(
         this.http.get<ApiResponse<CounterpartyDto>>(`${API}/companies/local/${id}`),
@@ -3388,6 +3437,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
         this.loadCompanyEmails(id);
         this.loadCompanyOffices(id);
         this.loadParentChildData(id);
+        this.loadRiskSummary();
         if (res.data.seasearcherId) {
           // Show syncing indicator — backend auto-syncs via WS presence
           this.syncing.set(true);

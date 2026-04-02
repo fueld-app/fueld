@@ -9,6 +9,7 @@ import { eq, and, asc, desc, sql, lt, gte, lte, inArray } from 'drizzle-orm';
 import { db } from '../../db';
 import { activityLogs, tenants, users } from '../../db/schema';
 import { lookupIp } from './geoip';
+import { extractClientIp } from '../../utils/client-ip';
 
 // ─── Constants ───────────────────────────────────────────────────────
 
@@ -212,10 +213,7 @@ export async function logFromRequest(request: Request, statusCode: number, reque
   const { action, entityType, entityId } = parseRoute(request.method, path);
   if (!entityType) return; // Skip unmapped routes
 
-  const ip =
-    request.headers.get('x-forwarded-for')?.split(',')[0].trim() ??
-    request.headers.get('x-real-ip') ??
-    null;
+  const ip = extractClientIp(request);
   const userAgent = request.headers.get('user-agent') ?? null;
   const acceptLanguage = request.headers.get('accept-language');
   const language = acceptLanguage?.split(',')[0]?.split(';')[0]?.trim() ?? null;

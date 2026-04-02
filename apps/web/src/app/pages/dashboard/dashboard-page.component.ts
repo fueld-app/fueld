@@ -19,14 +19,17 @@ import type {
   LossReasonDto,
   ConversionMetricsDto,
   ApiResponse,
+  CounterpartyDto,
 } from '@fueld/types';
 import { firstValueFrom } from 'rxjs';
 import { Router } from '@angular/router';
 import { DatePipe } from '@angular/common';
+import { Role } from '@fueld/types';
 
 import { CollectionsWidgetComponent } from '../../features/dashboard/components/collections-widget/collections-widget.component';
 import { AuthService } from '../../core/auth/auth.service';
 import { API } from '@app/core/config/api';
+import { RiskMonitoringService } from '../../core/risk-monitoring/risk-monitoring.service';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Dashboard Page — Manager view with collections and team stats
@@ -189,6 +192,66 @@ import { API } from '@app/core/config/api';
         </div>
       }
 
+      @if (showFrozenCounterpartiesWidget() && (frozenCompaniesLoading() || frozenCompanies().length)) {
+        <div class="mt-8 rounded-xl border border-red-200 bg-white shadow-sm overflow-hidden">
+          <div class="border-b border-red-100 bg-red-50 px-5 py-3 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-600" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+              </svg>
+              <div>
+                <h3 class="text-sm font-semibold text-red-900">{{ frozenCounterpartiesTitle() }}</h3>
+                <p class="text-xs text-red-700">Counterparties with active monitoring hits that currently freeze credit.</p>
+              </div>
+            </div>
+            @if (frozenCompanies().length) {
+              <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">
+                {{ frozenCompanies().length }}
+              </span>
+            }
+          </div>
+          @if (frozenCompaniesLoading()) {
+            <div class="flex items-center justify-center py-6">
+              <svg class="h-5 w-5 animate-spin text-red-400" viewBox="0 0 24 24" fill="none">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+              </svg>
+            </div>
+          } @else {
+            <div class="divide-y divide-red-50">
+              @for (company of frozenCompanies(); track company.id) {
+                <button
+                  type="button"
+                  (click)="goToCompany(company.id)"
+                  class="flex w-full items-center justify-between gap-4 px-5 py-3 text-left transition-colors hover:bg-red-50/60"
+                >
+                  <div class="min-w-0 flex-1">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="truncate text-sm font-semibold text-gray-900">{{ company.name }}</span>
+                      <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">Credit Frozen</span>
+                    </div>
+                    <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
+                      @if (company.country) {
+                        <span>{{ company.country }}</span>
+                      }
+                      @if (company.responsibleUserName && showResponsibleInFrozenCounterparties()) {
+                        <span>Responsible: {{ company.responsibleUserName }}</span>
+                      }
+                      @if (company.creditLimit && +company.creditLimit > 0) {
+                        <span>Limit: {{ formatUsd(parseNumber(company.creditLimit)) }}</span>
+                      }
+                    </div>
+                  </div>
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 flex-shrink-0 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 111.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                  </svg>
+                </button>
+              }
+            </div>
+          }
+        </div>
+      }
+
       <!-- Top Customer Groups by Credit Exposure -->
       @if (topCreditGroups().length) {
         <div class="mt-8 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -324,6 +387,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   readonly auth = inject(AuthService);
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
+  private readonly riskMonitoringService = inject(RiskMonitoringService);
 
   @ViewChild('dateDropdown') dateDropdownRef!: ElementRef;
 
@@ -434,7 +498,14 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   readonly conversionMetrics = signal<ConversionMetricsDto>({ totalInquiries: 0, totalWon: 0, totalLost: 0, winRate: 0, avgDaysToClose: null });
   readonly topCreditGroups = signal<{ id: string; name: string; country: string | null; totalCreditLimit: string; totalCreditUsed: string; childCount: number }[]>([]);
   readonly followUps = signal<{ id: string; entityType: string; entityId: string; entityName: string; content: string; followUpDate: string; userName: string }[]>([]);
+  readonly frozenCompanies = signal<CounterpartyDto[]>([]);
+  readonly frozenCompaniesLoading = signal(false);
   readonly canUseTeamView = computed(() => this.auth.isAdmin() || this.auth.isCreditManager());
+  readonly showFrozenCounterpartiesWidget = computed(() => {
+    const role = this.auth.user()?.role;
+    return role === Role.Admin || role === Role.Teamlead || role === Role.CreditManager || role === Role.Trader;
+  });
+  readonly frozenCounterpartiesTitle = computed(() => this.showResponsibleInFrozenCounterparties() ? 'Frozen Counterparties' : 'My Frozen Counterparties');
 
   constructor() {}
 
@@ -445,6 +516,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     void this.loadDashboardData();
     void this.loadTopCreditGroups();
     void this.loadFollowUps();
+    void this.loadFrozenCompanies();
   }
 
   ngOnDestroy(): void {
@@ -647,6 +719,52 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
 
   goToCompanyGroup(id: string): void {
     void this.router.navigate(['/companies', id]);
+  }
+
+  goToCompany(id: string): void {
+    void this.router.navigate(['/companies', id]);
+  }
+
+  showResponsibleInFrozenCounterparties(): boolean {
+    const role = this.auth.user()?.role;
+    return role === Role.Admin || role === Role.Teamlead || role === Role.CreditManager;
+  }
+
+  private async loadFrozenCompanies(): Promise<void> {
+    if (!this.showFrozenCounterpartiesWidget()) return;
+
+    const params = new URLSearchParams({
+      page: '1',
+      limit: this.showResponsibleInFrozenCounterparties() ? '100' : '25',
+      type: 'CLIENT',
+      sortBy: 'name',
+      sortDir: 'asc',
+    });
+
+    if (!this.showResponsibleInFrozenCounterparties()) {
+      const userId = this.auth.user()?.id;
+      if (!userId) return;
+      params.set('responsibleUserId', userId);
+    }
+
+    this.frozenCompaniesLoading.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(`${API}/companies/local?${params}`),
+      );
+      const companies = res.success && res.data ? res.data.companies : [];
+      if (!companies.length) {
+        this.frozenCompanies.set([]);
+        return;
+      }
+
+      const frozenIds = await this.riskMonitoringService.batchFrozen(companies.map((company) => company.id));
+      this.frozenCompanies.set(companies.filter((company) => frozenIds.has(company.id)).slice(0, 8));
+    } catch {
+      this.frozenCompanies.set([]);
+    } finally {
+      this.frozenCompaniesLoading.set(false);
+    }
   }
 
   // ─── Follow-ups ───────────────────────────────────────────────

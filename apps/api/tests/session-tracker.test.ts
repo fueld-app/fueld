@@ -333,4 +333,25 @@ describe('session-tracker', () => {
     const requestNoIp = new Request('https://api.fueld.test/ws');
     expect(tracker.extractClientIp(requestNoIp)).toBeNull();
   });
+
+  test('extractClientIp prefers an available IPv4 over IPv6 addresses', () => {
+    const request = new Request('https://api.fueld.test/ws', {
+      headers: {
+        'x-forwarded-for': '2001:db8::10, 198.51.100.24',
+        'x-real-ip': '2001:db8::20',
+      },
+    });
+
+    expect(tracker.extractClientIp(request)).toBe('198.51.100.24');
+  });
+
+  test('extractClientIp normalizes IPv4-mapped IPv6 addresses', () => {
+    const request = new Request('https://api.fueld.test/ws', {
+      headers: {
+        'x-forwarded-for': '::ffff:203.0.113.8',
+      },
+    });
+
+    expect(tracker.extractClientIp(request)).toBe('203.0.113.8');
+  });
 });

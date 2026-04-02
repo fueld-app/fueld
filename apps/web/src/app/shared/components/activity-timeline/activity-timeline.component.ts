@@ -14,6 +14,7 @@ import { firstValueFrom } from 'rxjs';
 import type { ApiResponse } from '@fueld/types';
 
 import { API } from '@app/core/config/api';
+import { formatActivityMetadataValue, formatMetadataLabel } from './activity-timeline.formatters';
 
 interface ActivityItem {
   id: string;
@@ -106,9 +107,9 @@ interface ActivityItem {
                   @if (entries.length) {
                     <div class="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-gray-500">
                       @for (entry of entries; track entry.key) {
-                        <span>
+                        <span class="max-w-full min-w-0 break-words whitespace-normal">
                           <span class="font-medium text-gray-600">{{ entry.key }}:</span>
-                          {{ entry.value }}
+                          <span class="break-words whitespace-normal">{{ entry.value }}</span>
                         </span>
                       }
                     </div>
@@ -309,8 +310,8 @@ export class ActivityTimelineComponent implements OnInit, OnDestroy {
     const entries: { key: string; value: string }[] = [];
     for (const [k, v] of Object.entries(metadata as Record<string, unknown>)) {
       if (this.META_SKIP.has(k) || v == null || v === '') continue;
-      const label = this.META_LABELS[k] ?? k.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase());
-      const value = Array.isArray(v) ? v.join(', ') : String(v);
+      const label = this.META_LABELS[k] ?? formatMetadataLabel(k);
+      const value = formatActivityMetadataValue(v);
       if (value) entries.push({ key: label, value });
     }
     return entries;

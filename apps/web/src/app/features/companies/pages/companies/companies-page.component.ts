@@ -16,6 +16,7 @@ import { COUNTRIES, SORTED_COUNTRIES } from '../../../../shared/data/countries';
 import { flagFromIso3 } from '../../../../shared/utils/flags';
 import { PaginationComponent, SortHeaderComponent } from '../../../../shared/components';
 import type { SortChangeEvent } from '../../../../shared/components';
+import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring.service';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Companies Page — Browse, search, import from Seasearcher, create
@@ -225,6 +226,14 @@ interface CompanySearchResult {
                         Child of {{ company.parentName }}
                       </span>
                     }
+                    @if (isCompanyFrozen(company.id)) {
+                      <div class="mt-1">
+                        <span class="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700">
+                          <span class="inline-flex h-1.5 w-1.5 rounded-full bg-red-500"></span>
+                          Credit Frozen
+                        </span>
+                      </div>
+                    }
                     @if (getSegmentBadges(company).length > 0) {
                       <div class="flex flex-wrap gap-1 mt-0.5">
                         @for (badge of getSegmentBadges(company); track badge) {
@@ -410,6 +419,7 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly riskMonitoringService = inject(RiskMonitoringService);
   private readonly destroy$ = new Subject<void>();
   private readonly searchSubject = new Subject<string>();
 
@@ -427,6 +437,7 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
   readonly sortDir = signal<'asc' | 'desc'>('asc');
   readonly users = signal<{ id: string; name: string; email: string }[]>([]);
   readonly segmentCategories = signal<{ key: string; label: string; mode: 'multi' | 'single'; options: { key: string; label: string }[] }[]>([]);
+  readonly frozenCompanyIds = signal<Set<string>>(new Set());
 
   // Search / typeahead
   readonly searchTerm = signal('');
@@ -523,12 +534,33 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
       if (res.success && res.data) {
         this.companies.set(res.data.companies);
         this.total.set(res.data.total);
+        await this.loadFrozenStates(res.data.companies);
       }
     } catch (err) {
       console.error('Failed to load companies:', err);
+      this.frozenCompanyIds.set(new Set());
     } finally {
       this.loading.set(false);
     }
+  }
+
+  private async loadFrozenStates(companies: CounterpartyDto[]): Promise<void> {
+    const ids = companies.map((company) => company.id);
+    if (!ids.length) {
+      this.frozenCompanyIds.set(new Set());
+      return;
+    }
+
+    try {
+      const frozen = await this.riskMonitoringService.batchFrozen(ids);
+      this.frozenCompanyIds.set(new Set(frozen));
+    } catch {
+      this.frozenCompanyIds.set(new Set());
+    }
+  }
+
+  isCompanyFrozen(companyId: string): boolean {
+    return this.frozenCompanyIds().has(companyId);
   }
 
   // ─── Search ────────────────────────────────────────────────────────

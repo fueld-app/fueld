@@ -8,6 +8,7 @@
 
 import { logActivity } from './activity.service';
 import { lookupIp } from './geoip';
+import { extractClientIp as extractRequestClientIp } from '../../utils/client-ip';
 
 // ─── URL → Entity Parsing (Angular frontend routes) ──────────────────
 
@@ -471,9 +472,5 @@ function parsePlatform(ua: string | null): string | null {
 }
 
 export function extractClientIp(request: Request): string | null {
-  const forwarded = request.headers.get('x-forwarded-for');
-  if (forwarded) return forwarded.split(',')[0].trim();
-  const realIp = request.headers.get('x-real-ip');
-  if (realIp) return realIp;
-  return null;
+  return extractRequestClientIp(request);
 }

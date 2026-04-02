@@ -1,6 +1,7 @@
 import { Elysia } from 'elysia';
 import { jwtAccessPlugin, type JwtPayload } from './jwt.setup';
 import { findUserById, getMfaStatus } from './auth.service';
+import { extractClientIp } from '../../utils/client-ip';
 
 // ─── Auth Guard ──────────────────────────────────────────────────────
 // Reusable Elysia plugin that protects routes.
@@ -84,10 +85,7 @@ export const authGuard = new Elysia({ name: 'auth-guard' })
       const { getUserAllowedIps } = await import('../admin/admin.service');
       const allowedIps = await getUserAllowedIps(userId);
       if (allowedIps && allowedIps.length > 0) {
-        const forwarded = request.headers.get('x-forwarded-for');
-        const clientIp = forwarded
-          ? forwarded.split(',')[0]!.trim()
-          : request.headers.get('x-real-ip') ?? null;
+        const clientIp = extractClientIp(request);
 
         if (!clientIp || !isIpAllowed(clientIp, allowedIps)) {
           set.status = 403;
