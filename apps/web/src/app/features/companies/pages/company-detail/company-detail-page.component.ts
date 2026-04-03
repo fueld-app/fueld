@@ -4800,20 +4800,19 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     this.savingSupplyPort.set(true);
     try {
       const editingSupplyPortId = this.editingSupplyPortId();
+      const payload = {
+        contactId: form.contactId ?? null,
+        products: form.products,
+        note: form.note.trim() || undefined,
+      };
       const res = editingSupplyPortId
         ? await firstValueFrom(
-            this.http.put<ApiResponse<unknown>>(`${API}/lloyds/places/suppliers/${editingSupplyPortId}`, {
-              contactId: form.contactId,
-              products: form.products,
-              note: form.note.trim() || undefined,
-            }),
+            this.http.put<ApiResponse<unknown>>(`${API}/lloyds/places/suppliers/${editingSupplyPortId}`, payload),
           )
         : await firstValueFrom(
             this.http.post<ApiResponse<unknown>>(`${API}/lloyds/places/local/${form.placeId}/suppliers`, {
               companyId,
-              contactId: form.contactId,
-              products: form.products,
-              note: form.note.trim() || undefined,
+              ...payload,
             }),
           );
 
@@ -4826,7 +4825,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
         ? `Updated ${selectedPlace.name} supply location.`
         : `Added ${selectedPlace.name} to supply ports.`);
       this.cancelAddSupplyPort();
-      await this.loadSupplyPorts(companyId);
+      void this.loadSupplyPorts(companyId);
     } catch (err) {
       console.error('Failed to save supply port:', err);
       this.showToast('error', 'Failed to save supply port.');
