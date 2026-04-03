@@ -169,7 +169,7 @@ export const riskMonitoringController = new Elysia({ prefix: '/risk-monitoring' 
         auth.tenantId,
         auth.userId,
         body.reason,
-        settings.overrideExpiryDays,
+        settings,
       );
       return { success: true, data: override } satisfies ApiResponse<typeof override>;
     },
@@ -243,6 +243,7 @@ export const riskMonitoringController = new Elysia({ prefix: '/risk-monitoring' 
         companiesHouseApiKey: t.Optional(t.String()),
         seasearcherEnabled: t.Optional(t.Boolean()),
         autoEnforceOnHit: t.Optional(t.Boolean()),
+        overrideRequiredApprovals: t.Optional(t.Number({ minimum: 1, maximum: 10 })),
         overrideExpiryDays: t.Optional(t.Number({ minimum: 1, maximum: 90 })),
         notifyPush: t.Optional(t.Boolean()),
         notifyEmail: t.Optional(t.Boolean()),

@@ -227,6 +227,7 @@ export interface TenantSettings {
     companiesHouseApiKey: string;       // Companies House API key
     seasearcherEnabled: boolean;        // enable SeaSearcher maritime context checks
     autoEnforceOnHit: boolean;          // auto-freeze credit on trusted-source hit
+    overrideRequiredApprovals: number;  // approvals needed before an override becomes active
     overrideExpiryDays: number;         // override window in days (default 7)
     notifyPush: boolean;
     notifyEmail: boolean;

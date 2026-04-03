@@ -17,6 +17,7 @@ import type {
   ApiResponse,
   CounterpartyDto,
   OwnCompanyDto,
+  RiskOverrideDto,
 } from '@fueld/types';
 
 import { API } from '@app/core/config/api';
@@ -63,6 +64,95 @@ interface CompanySearchResultOption {
           Add Credit Line
         </button>
       </div>
+
+      @if (pendingOverrides().length || pendingOverridesLoading() || pendingOverridesError()) {
+        <div class="mb-6 rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 via-white to-sky-50 shadow-sm">
+          <div class="flex flex-col gap-3 border-b border-blue-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 class="text-sm font-semibold text-gray-900">Pending Credit Overrides</h2>
+              <p class="mt-1 text-xs text-gray-600">Approve or reject frozen customer exceptions without leaving the credit queue.</p>
+            </div>
+            <button
+              type="button"
+              class="inline-flex items-center gap-1.5 self-start rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-50 transition-colors disabled:opacity-50"
+              [disabled]="pendingOverridesLoading()"
+              (click)="loadPendingOverrides()"
+            >
+              Refresh Queue
+            </button>
+          </div>
+
+          <div class="px-5 py-4">
+            @if (pendingOverridesLoading()) {
+              <div class="flex items-center gap-2 text-sm text-gray-500">
+                <svg class="h-4 w-4 animate-spin text-blue-600" viewBox="0 0 24 24" fill="none">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                Loading pending overrides...
+              </div>
+            } @else if (pendingOverridesError()) {
+              <div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ pendingOverridesError() }}</div>
+            } @else if (pendingOverrides().length) {
+              <div class="space-y-3">
+                @for (override of pendingOverrides(); track override.id) {
+                  <div class="rounded-xl border border-blue-100 bg-white/80 px-4 py-4">
+                    <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <a [routerLink]="['/companies', override.counterpartyId]" class="text-sm font-semibold text-blue-700 hover:text-blue-900 hover:underline">
+                            {{ override.counterpartyName }}
+                          </a>
+                          <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700 uppercase">
+                            Pending
+                          </span>
+                        </div>
+                        <p class="mt-1 text-xs text-gray-500">
+                          Requested by {{ override.requestedByUserName }} on {{ formatDateTime(override.createdAt) }}
+                        </p>
+                        <p class="mt-2 text-sm text-gray-800">{{ override.reason }}</p>
+
+                        @if (override.approvals.length) {
+                          <div class="mt-3 flex flex-wrap gap-2">
+                            @for (approval of override.approvals; track approval.id) {
+                              <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium"
+                                [class]="approval.decision === 'APPROVED' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'">
+                                {{ approval.userName }}
+                                <span>{{ approval.decision }}</span>
+                              </span>
+                            }
+                          </div>
+                        }
+                      </div>
+
+                      <div class="flex items-center gap-2">
+                        <button
+                          type="button"
+                          class="inline-flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs font-medium text-green-700 hover:bg-green-100 transition-colors disabled:opacity-50"
+                          [disabled]="pendingDecisionId() === override.id"
+                          (click)="decidePendingOverride(override, 'APPROVED')"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          type="button"
+                          class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-100 transition-colors disabled:opacity-50"
+                          [disabled]="pendingDecisionId() === override.id"
+                          (click)="decidePendingOverride(override, 'REJECTED')"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                }
+              </div>
+            } @else {
+              <p class="text-sm text-gray-500">No overrides are waiting for approval.</p>
+            }
+          </div>
+        </div>
+      }
 
       <!-- Table -->
       @if (loading()) {
@@ -417,6 +507,10 @@ export class CustomerCreditPageComponent implements OnInit {
 
   // Frozen state
   readonly frozenCounterpartyIds = signal<Set<string>>(new Set());
+  readonly pendingOverrides = signal<RiskOverrideDto[]>([]);
+  readonly pendingOverridesLoading = signal(false);
+  readonly pendingOverridesError = signal('');
+  readonly pendingDecisionId = signal<string | null>(null);
 
   // Delete
   readonly deleteTarget = signal<CreditLineDto | null>(null);
@@ -441,7 +535,7 @@ export class CustomerCreditPageComponent implements OnInit {
         limit: String(this.pageSize),
       });
       if (this.sortBy()) { params.set('sortBy', this.sortBy()); params.set('sortDir', this.sortDir()); }
-      const [res, ownRes, currenciesRes] = await Promise.all([
+      const [res, ownRes, currenciesRes, pendingOverridesResult] = await Promise.all([
         firstValueFrom(
           this.http.get<ApiResponse<{ items: CreditLineDto[]; total: number }>>(`${API}/credit/lines?${params}`),
         ),
@@ -451,6 +545,7 @@ export class CustomerCreditPageComponent implements OnInit {
         firstValueFrom(
           this.http.get<ApiResponse<{ currencies: string[] }>>(`${API}/admin/settings/my-currencies`),
         ),
+        this.riskService.getPendingOverrides().catch(() => null),
       ]);
       if (res.success && res.data) {
         this.creditLines.set(res.data.items);
@@ -461,10 +556,57 @@ export class CustomerCreditPageComponent implements OnInit {
       if (currenciesRes.success && currenciesRes.data.currencies.length) {
         this.configuredCurrencies.set(currenciesRes.data.currencies);
       }
+      this.pendingOverrides.set(resolvedPendingOverrides(pendingOverridesResult));
+      this.pendingOverridesError.set('');
     } catch (err) {
       console.error('Failed to load credit lines:', err);
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  async loadPendingOverrides(): Promise<void> {
+    this.pendingOverridesLoading.set(true);
+    this.pendingOverridesError.set('');
+    try {
+      const overrides = await this.riskService.getPendingOverrides();
+      this.pendingOverrides.set(overrides);
+    } catch (err) {
+      console.error('Failed to load pending overrides:', err);
+      this.pendingOverridesError.set('Failed to load pending overrides.');
+    } finally {
+      this.pendingOverridesLoading.set(false);
+    }
+  }
+
+  async decidePendingOverride(override: RiskOverrideDto, decision: 'APPROVED' | 'REJECTED'): Promise<void> {
+    if (this.pendingDecisionId()) return;
+
+    const promptMessage = decision === 'REJECTED'
+      ? 'Reason for rejecting this override:'
+      : 'Optional comment for approving this override:';
+    const comment = prompt(promptMessage) ?? undefined;
+    if (decision === 'REJECTED' && !comment?.trim()) return;
+
+    this.pendingDecisionId.set(override.id);
+    this.pendingOverridesError.set('');
+    try {
+      const result = await this.riskService.decideOverride(
+        override.id,
+        decision,
+        comment?.trim() || undefined,
+      );
+      if (!result) {
+        this.pendingOverridesError.set('The override could not be updated. It may already have been decided.');
+        return;
+      }
+
+      await this.loadData();
+    } catch (err) {
+      console.error('Failed to decide pending override:', err);
+      this.pendingOverridesError.set('Failed to record override decision.');
+    } finally {
+      this.pendingDecisionId.set(null);
     }
   }
 
@@ -763,6 +905,18 @@ export class CustomerCreditPageComponent implements OnInit {
     return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
   }
 
+  formatDateTime(dateStr: string): string {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    return d.toLocaleString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
   formatAmount(amount: string, currency: string): string {
     const num = parseFloat(amount);
     if (isNaN(num)) return `${currency} 0.00`;
@@ -775,7 +929,10 @@ export class CustomerCreditPageComponent implements OnInit {
 
   private async loadFrozenState(lines: CreditLineDto[]): Promise<void> {
     const ids = [...new Set(lines.flatMap((l) => l.counterpartyIds))];
-    if (!ids.length) return;
+    if (!ids.length) {
+      this.frozenCounterpartyIds.set(new Set());
+      return;
+    }
     try {
       const frozen = await this.riskService.batchFrozen(ids);
       this.frozenCounterpartyIds.set(new Set(frozen));
@@ -783,4 +940,8 @@ export class CustomerCreditPageComponent implements OnInit {
       // Non-critical — leave empty
     }
   }
+}
+
+function resolvedPendingOverrides(result: RiskOverrideDto[] | null): RiskOverrideDto[] {
+  return Array.isArray(result) ? result : [];
 }

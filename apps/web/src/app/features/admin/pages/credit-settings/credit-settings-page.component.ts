@@ -342,6 +342,19 @@ import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring
                   <p class="mt-1 text-xs text-gray-500">How many days an approved override remains valid before it expires.</p>
                 </div>
 
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Override Required Approvals</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    [ngModel]="riskOverrideRequiredApprovals()"
+                    (ngModelChange)="riskOverrideRequiredApprovals.set($event)"
+                    class="app-input w-24"
+                  />
+                  <p class="mt-1 text-xs text-gray-500">How many approval votes are needed before a requested override becomes active.</p>
+                </div>
+
                 <!-- Provider: OpenSanctions -->
                 <div class="rounded-lg border border-gray-200 p-4 space-y-3">
                   <div class="flex items-start gap-3">
@@ -486,6 +499,7 @@ export class CreditSettingsPageComponent implements OnInit {
   // Risk monitoring
   readonly riskEnabled = signal(false);
   readonly riskCheckIntervalHours = signal(24);
+  readonly riskOverrideRequiredApprovals = signal(1);
   readonly riskOverrideExpiryDays = signal(7);
   readonly riskOpenSanctionsEnabled = signal(false);
   readonly riskOpenSanctionsBaseUrl = signal('http://yente:8000');
@@ -538,6 +552,7 @@ export class CreditSettingsPageComponent implements OnInit {
       if (riskRes) {
         this.riskEnabled.set(riskRes.enabled);
         this.riskCheckIntervalHours.set(riskRes.checkIntervalHours);
+        this.riskOverrideRequiredApprovals.set(riskRes.overrideRequiredApprovals ?? 1);
         this.riskOverrideExpiryDays.set(riskRes.overrideExpiryDays);
         this.riskOpenSanctionsEnabled.set(riskRes.openSanctionsEnabled);
         this.riskOpenSanctionsBaseUrl.set(riskRes.openSanctionsBaseUrl ?? 'http://yente:8000');
@@ -620,6 +635,7 @@ export class CreditSettingsPageComponent implements OnInit {
       await this.riskService.updateSettings({
         enabled: this.riskEnabled(),
         checkIntervalHours: this.riskCheckIntervalHours(),
+        overrideRequiredApprovals: this.riskOverrideRequiredApprovals(),
         overrideExpiryDays: this.riskOverrideExpiryDays(),
         openSanctionsEnabled: this.riskOpenSanctionsEnabled(),
         openSanctionsBaseUrl: this.riskOpenSanctionsBaseUrl() || 'http://localhost:8000',

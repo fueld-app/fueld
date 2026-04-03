@@ -54,6 +54,7 @@ const DEFAULT_SETTINGS: RiskMonitoringSettingsDto = {
   companiesHouseApiKey: '',
   seasearcherEnabled: true,
   autoEnforceOnHit: true,
+  overrideRequiredApprovals: 1,
   overrideExpiryDays: 7,
   notifyPush: true,
   notifyEmail: true,
@@ -364,9 +365,10 @@ export async function createOverride(
   tenantId: string,
   userId: string,
   reason: string,
-  expiryDays: number,
+  settings: RiskMonitoringSettingsDto,
 ): Promise<RiskOverrideDto> {
-  const expiresAt = new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000);
+  const expiresAt = new Date(Date.now() + settings.overrideExpiryDays * 24 * 60 * 60 * 1000);
+  const autoApprove = settings.overrideRequiredApprovals <= 1;
 
   const [row] = await db
     .insert(riskOverrides)
@@ -376,11 +378,22 @@ export async function createOverride(
       reason,
       expiresAt,
       requestedByUserId: userId,
-      status: 'PENDING',
+      status: autoApprove ? 'APPROVED' : 'PENDING',
     })
     .returning();
 
-  return overrideToDto(row, [], '');
+  if (autoApprove) {
+    await db.insert(riskOverrideApprovals).values({
+      overrideId: row.id,
+      userId,
+      decision: 'APPROVED',
+      comment: 'Approved on request',
+    });
+  }
+
+  const override = await getOverrideById(row.id);
+  if (!override) throw new Error('Failed to load newly created override');
+  return override;
 }
 
 export async function approveOrRejectOverride(
@@ -393,6 +406,8 @@ export async function approveOrRejectOverride(
     where: eq(riskOverrides.id, overrideId),
   });
   if (!override || override.status !== 'PENDING') return null;
+
+  const settings = await getRiskMonitoringSettings(override.tenantId);
 
   // Check user hasn't already voted
   const existing = await db.query.riskOverrideApprovals.findFirst({
@@ -419,11 +434,15 @@ export async function approveOrRejectOverride(
 
   const approvedCount = allApprovals.filter((a) => a.decision === 'APPROVED').length;
   const rejectedCount = allApprovals.filter((a) => a.decision === 'REJECTED').length;
+  const requiredApprovals = Math.max(
+    settings.overrideRequiredApprovals ?? DEFAULT_SETTINGS.overrideRequiredApprovals,
+    1,
+  );
 
   let newStatus: string = override.status;
   if (rejectedCount > 0) {
     newStatus = 'REVOKED';
-  } else if (approvedCount >= 2) {
+  } else if (approvedCount >= requiredApprovals) {
     newStatus = 'APPROVED';
   }
 

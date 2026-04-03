@@ -17,7 +17,7 @@ import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subscription, skip } from 'rxjs';
 import { Title } from '@angular/platform-browser';
 import * as L from 'leaflet/dist/leaflet-src.esm.js';
-import type { ApiResponse, CompanyAttachmentDto, CompanyContactDto, CompanyEmailDto, CompanyEmailType, CompanyChildSummaryDto, CompanyParentSummaryDto, CompanyGroupAggregateDto, CounterpartyDto, SupplyPortDto, VesselCompanyDto, VesselCompanyRole, VesselCompanyRoleOption, VesselDto } from '@fueld/types';
+import type { ApiResponse, CompanyAttachmentDto, CompanyContactDto, CompanyEmailDto, CompanyEmailType, CompanyChildSummaryDto, CompanyParentSummaryDto, CompanyGroupAggregateDto, CounterpartyDto, RiskOverrideDto, SupplyPortDto, VesselCompanyDto, VesselCompanyRole, VesselCompanyRoleOption, VesselDto } from '@fueld/types';
 import { flagFromIso3 } from '../../../../shared/utils/flags';
 
 interface CompanyOfficeDto {
@@ -2862,6 +2862,63 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                           </div>
                         }
 
+                        @if (pendingRiskOverride(); as pendingOverride) {
+                          <div class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 space-y-3">
+                            <div>
+                              <p class="text-sm font-medium text-blue-900">Override Pending Approval</p>
+                              <p class="text-xs text-blue-700">
+                                Requested by {{ pendingOverride.requestedByUserName }} on {{ pendingOverride.createdAt | date:'medium' }}.
+                              </p>
+                              <p class="mt-1 text-sm text-blue-900">{{ pendingOverride.reason }}</p>
+                            </div>
+
+                            @if (pendingOverride.approvals.length) {
+                              <div class="space-y-1">
+                                <p class="text-[11px] font-semibold uppercase tracking-wide text-blue-700">Recorded Decisions</p>
+                                @for (approval of pendingOverride.approvals; track approval.id) {
+                                  <div class="flex items-center justify-between gap-3 rounded-md border border-blue-100 bg-white/70 px-3 py-2">
+                                    <div>
+                                      <p class="text-xs font-medium text-gray-900">{{ approval.userName }}</p>
+                                      @if (approval.comment) {
+                                        <p class="text-xs text-gray-500">{{ approval.comment }}</p>
+                                      }
+                                    </div>
+                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold"
+                                      [class]="approval.decision === 'APPROVED' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'">
+                                      {{ approval.decision }}
+                                    </span>
+                                  </div>
+                                }
+                              </div>
+                            }
+
+                            @if (canManageRiskOverrides()) {
+                              <div class="flex items-center gap-2 pt-1">
+                                @if (!hasVotedOnOverride(pendingOverride)) {
+                                  <button
+                                    type="button"
+                                    class="inline-flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs font-medium text-green-700 hover:bg-green-100 transition-colors disabled:opacity-50"
+                                    [disabled]="overrideDecisionLoadingId() === pendingOverride.id"
+                                    (click)="decideOverride(pendingOverride, 'APPROVED')"
+                                  >
+                                    Approve Override
+                                  </button>
+                                  <button
+                                    type="button"
+                                    class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-100 transition-colors disabled:opacity-50"
+                                    [disabled]="overrideDecisionLoadingId() === pendingOverride.id"
+                                    (click)="decideOverride(pendingOverride, 'REJECTED')"
+                                  >
+                                    Reject Override
+                                  </button>
+                                } @else {
+                                  <p class="text-xs text-blue-700">You have already recorded a decision for this override.</p>
+                                }
+                              </div>
+                            }
+                          </div>
+                        }
+
                         <!-- Provider statuses -->
                         <div class="space-y-2">
                           <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Provider Checks</h4>
@@ -2932,7 +2989,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                               Re-check Now
                             }
                           </button>
-                          @if (riskSummary()!.isFrozen && canDeleteEntity()) {
+                          @if (riskSummary()!.isFrozen && canManageRiskOverrides()) {
                             <button
                               type="button"
                               class="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700 hover:bg-amber-100 transition-colors disabled:opacity-50"
@@ -3051,6 +3108,9 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly canDeleteEntity = computed(() =>
     this.authService.isAdmin() || this.authService.isCreditManager() || this.authService.isTeamLead(),
   );
+  readonly canManageRiskOverrides = computed(() =>
+    this.authService.isAdmin() || this.authService.isCreditManager(),
+  );
   readonly company = signal<CounterpartyDto | null>(null);
   readonly enrichment = signal<CompanyEnrichment | null>(null);
   readonly enrichmentLoading = signal(false);
@@ -3155,10 +3215,13 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly sanctionsTab = signal<'risk' | 'sanctions' | 'seizures' | 'monitoring'>('monitoring');
   readonly riskMonitoringService = inject(RiskMonitoringService);
   readonly riskSummary = signal<RiskSummaryDto | null>(null);
+  readonly riskOverrides = signal<RiskOverrideDto[]>([]);
   readonly riskSummaryLoading = signal(false);
   readonly riskCheckRunning = signal(false);
   readonly overrideReason = signal('');
   readonly overrideRequesting = signal(false);
+  readonly overrideDecisionLoadingId = signal<string | null>(null);
+  readonly pendingRiskOverride = computed(() => this.riskOverrides().find((override) => override.status === 'PENDING') ?? null);
   readonly companyInfoTab = signal<'info' | 'headOffice' | 'offices' | 'emails' | 'fleet' | 'roles'>('info');
   readonly fleetRolesTab = signal<'fleet' | 'roles'>('fleet');
 
@@ -5193,8 +5256,12 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     if (!c || this.riskSummaryLoading()) return;
     this.riskSummaryLoading.set(true);
     try {
-      const summary = await this.riskMonitoringService.getSummary(c.id);
+      const [summary, overrides] = await Promise.all([
+        this.riskMonitoringService.getSummary(c.id),
+        this.riskMonitoringService.getOverrides(c.id),
+      ]);
       this.riskSummary.set(summary);
+      this.riskOverrides.set(overrides);
     } catch (err) {
       console.error('Failed to load risk summary:', err);
     } finally {
@@ -5227,14 +5294,58 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     if (!reason?.trim()) return;
     this.overrideRequesting.set(true);
     try {
-      await this.riskMonitoringService.requestOverride(c.id, reason.trim());
-      this.showToast('success', 'Override requested — awaiting approval');
+      const override = await this.riskMonitoringService.requestOverride(c.id, reason.trim());
+      this.showToast('success', override?.status === 'APPROVED' ? 'Override activated' : 'Override requested — awaiting approval');
       await this.loadRiskSummary();
     } catch (err) {
       console.error('Failed to request override:', err);
       this.showToast('error', 'Failed to request override');
     } finally {
       this.overrideRequesting.set(false);
+    }
+  }
+
+  hasVotedOnOverride(override: RiskOverrideDto): boolean {
+    const userId = this.authService.user()?.id;
+    if (!userId) return false;
+    return override.approvals.some((approval) => approval.userId === userId);
+  }
+
+  async decideOverride(override: RiskOverrideDto, decision: 'APPROVED' | 'REJECTED'): Promise<void> {
+    if (this.overrideDecisionLoadingId() || this.hasVotedOnOverride(override)) return;
+
+    const promptMessage = decision === 'REJECTED'
+      ? 'Reason for rejecting this override:'
+      : 'Optional comment for approving this override:';
+    const comment = prompt(promptMessage) ?? undefined;
+    if (decision === 'REJECTED' && !comment?.trim()) return;
+
+    this.overrideDecisionLoadingId.set(override.id);
+    try {
+      const result = await this.riskMonitoringService.decideOverride(
+        override.id,
+        decision,
+        comment?.trim() || undefined,
+      );
+      if (!result) {
+        this.showToast('error', 'Override decision could not be recorded');
+        return;
+      }
+
+      this.showToast(
+        'success',
+        result.status === 'APPROVED'
+          ? 'Override approved and activated'
+          : decision === 'REJECTED'
+            ? 'Override rejected'
+            : 'Override approval recorded',
+      );
+      await this.loadRiskSummary();
+    } catch (err) {
+      console.error('Failed to decide override:', err);
+      this.showToast('error', 'Failed to record override decision');
+    } finally {
+      this.overrideDecisionLoadingId.set(null);
     }
   }
 

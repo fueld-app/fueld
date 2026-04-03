@@ -2216,6 +2216,7 @@ export interface RiskMonitoringSettingsDto {
   companiesHouseApiKey: string;
   seasearcherEnabled: boolean;
   autoEnforceOnHit: boolean;
+  overrideRequiredApprovals: number;
   overrideExpiryDays: number;
   notifyPush: boolean;
   notifyEmail: boolean;
