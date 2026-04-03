@@ -14,10 +14,10 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { firstValueFrom, Subscription, skip } from 'rxjs';
+import { firstValueFrom, Subscription, skip, timeout } from 'rxjs';
 import { Title } from '@angular/platform-browser';
 import * as L from 'leaflet/dist/leaflet-src.esm.js';
-import type { ApiResponse, CompanyAttachmentDto, CompanyContactDto, CompanyEmailDto, CompanyEmailType, CompanyChildSummaryDto, CompanyParentSummaryDto, CompanyGroupAggregateDto, CounterpartyDto, RiskOverrideDto, SupplyPortDto, VesselCompanyDto, VesselCompanyRole, VesselCompanyRoleOption, VesselDto } from '@fueld/types';
+import type { ApiResponse, CompanyAttachmentDto, CompanyContactDto, CompanyEmailDto, CompanyEmailType, CompanyChildSummaryDto, CompanyParentSummaryDto, CompanyGroupAggregateDto, CounterpartyDto, PortSupplierDto, RiskOverrideDto, SupplyPortDto, VesselCompanyDto, VesselCompanyRole, VesselCompanyRoleOption, VesselDto } from '@fueld/types';
 import { flagFromIso3 } from '../../../../shared/utils/flags';
 
 interface CompanyOfficeDto {
@@ -4668,11 +4668,15 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   }
 
   // ─── Supply Ports ─────────────────────────────────────────────────
-  private async loadSupplyPorts(companyId: string): Promise<void> {
-    this.supplyPortsLoading.set(true);
+  private async loadSupplyPorts(companyId: string, options: { silent?: boolean } = {}): Promise<void> {
+    if (!options.silent) {
+      this.supplyPortsLoading.set(true);
+    }
     try {
       const res = await firstValueFrom(
-        this.http.get<ApiResponse<SupplyPortDto[]>>(`${API}/companies/local/${companyId}/supply-ports`),
+        this.http
+          .get<ApiResponse<SupplyPortDto[]>>(`${API}/companies/local/${companyId}/supply-ports`)
+          .pipe(timeout(8000)),
       );
       if (res.success && res.data) {
         this.supplyPorts.set(res.data);
@@ -4680,8 +4684,31 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     } catch (err) {
       console.error('Failed to load supply ports:', err);
     } finally {
-      this.supplyPortsLoading.set(false);
+      if (!options.silent) {
+        this.supplyPortsLoading.set(false);
+      }
     }
+  }
+
+  private mergeSavedSupplyPort(selectedPlace: LocalPlaceOption, saved: PortSupplierDto, form: { contactId: string | null; products: string[]; note: string }): void {
+    const nextSupplyPort: SupplyPortDto = {
+      id: saved.id,
+      placeId: saved.placeId,
+      placeName: selectedPlace.name,
+      placeCode: selectedPlace.unlocode ?? selectedPlace.parentPlaceUnlocode ?? null,
+      placeCountry: selectedPlace.country ?? null,
+      contactId: saved.contactId ?? form.contactId,
+      contactName: saved.contactName ?? this.contacts().find((contact) => contact.id === (saved.contactId ?? form.contactId))?.name ?? null,
+      products: saved.products ?? [...form.products],
+      note: saved.note ?? (form.note.trim() || null),
+      createdAt: saved.createdAt,
+      updatedAt: saved.updatedAt,
+    };
+
+    this.supplyPorts.update((current) => {
+      const remaining = current.filter((port) => port.id !== nextSupplyPort.id);
+      return [...remaining, nextSupplyPort].sort((left, right) => left.placeName.localeCompare(right.placeName));
+    });
   }
 
   openAddSupplyPort(): void {
@@ -4870,10 +4897,10 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
       };
       const res = editingSupplyPortId
         ? await firstValueFrom(
-            this.http.put<ApiResponse<unknown>>(`${API}/lloyds/places/suppliers/${editingSupplyPortId}`, payload),
+            this.http.put<ApiResponse<PortSupplierDto>>(`${API}/lloyds/places/suppliers/${editingSupplyPortId}`, payload),
           )
         : await firstValueFrom(
-            this.http.post<ApiResponse<unknown>>(`${API}/lloyds/places/local/${form.placeId}/suppliers`, {
+            this.http.post<ApiResponse<PortSupplierDto>>(`${API}/lloyds/places/local/${form.placeId}/suppliers`, {
               companyId,
               ...payload,
             }),
@@ -4887,8 +4914,11 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
       this.showToast('success', editingSupplyPortId
         ? `Updated ${selectedPlace.name} supply location.`
         : `Added ${selectedPlace.name} to supply ports.`);
+      if (res.data) {
+        this.mergeSavedSupplyPort(selectedPlace, res.data, form);
+      }
       this.cancelAddSupplyPort();
-      void this.loadSupplyPorts(companyId);
+      void this.loadSupplyPorts(companyId, { silent: true });
     } catch (err) {
       console.error('Failed to save supply port:', err);
       this.showToast('error', 'Failed to save supply port.');
