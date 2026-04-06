@@ -10,9 +10,9 @@ import {
   seasearcherCompanySeizures,
   isLLIConfigured,
 } from '../../lloyds/lli.client';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { db } from '../../../db';
-import { vesselCompanies, vessels } from '../../../db/schema';
+import { vessels } from '../../../db/schema';
 
 interface SeasearcherSanction {
   sanctionType?: string;
@@ -78,17 +78,11 @@ function matchesIgnoredVessel(
   });
 }
 
-async function getIgnoredVesselsForCompany(counterpartyId: string): Promise<IgnoredVesselIdentifier[]> {
+async function getIgnoredVessels(): Promise<IgnoredVesselIdentifier[]> {
   const rows = await db
     .select({ name: vessels.name, imo: vessels.imo })
-    .from(vesselCompanies)
-    .innerJoin(vessels, eq(vesselCompanies.vesselId, vessels.id))
-    .where(
-      and(
-        eq(vesselCompanies.companyId, counterpartyId),
-        eq(vessels.ignoreForCreditEnforcement, true),
-      ),
-    );
+    .from(vessels)
+    .where(eq(vessels.ignoreForCreditEnforcement, true));
 
   return rows.map((row) => ({
     name: row.name,
@@ -120,7 +114,7 @@ export const seasearcherProvider: RiskProvider = {
         seasearcherCompanySanctions<SeasearcherSanction[]>(company.seasearcherId),
         seasearcherCompanySeizures<{ results: SeasearcherSeizure[]; totalMatches: number }>(company.seasearcherId),
       ]);
-      const ignoredVessels = await getIgnoredVesselsForCompany(company.id);
+      const ignoredVessels = await getIgnoredVessels();
 
       const hits: ProviderHit[] = [];
 
