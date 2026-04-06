@@ -17,7 +17,7 @@ import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subscription, skip, timeout } from 'rxjs';
 import { Title } from '@angular/platform-browser';
 import * as L from 'leaflet/dist/leaflet-src.esm.js';
-import type { ApiResponse, CompanyAttachmentDto, CompanyContactDto, CompanyEmailDto, CompanyEmailType, CompanyChildSummaryDto, CompanyParentSummaryDto, CompanyGroupAggregateDto, CounterpartyDto, PortSupplierDto, RiskOverrideDto, SupplyPortDto, VesselCompanyDto, VesselCompanyRole, VesselCompanyRoleOption, VesselDto } from '@fueld/types';
+import type { ApiResponse, CompanyAttachmentDto, CompanyContactDto, CompanyEmailDto, CompanyEmailType, CompanyChildSummaryDto, CompanyParentSummaryDto, CompanyGroupAggregateDto, CounterpartyDto, PortSupplierDto, RiskHitDto, RiskOverrideDto, SupplyPortDto, VesselCompanyDto, VesselCompanyRole, VesselCompanyRoleOption, VesselDto } from '@fueld/types';
 import { flagFromIso3 } from '../../../../shared/utils/flags';
 
 interface CompanyOfficeDto {
@@ -2979,7 +2979,22 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                                   </span>
                                   <span class="text-xs font-medium text-gray-500">{{ hit.signalType }}</span>
                                 </div>
-                                <p class="mt-1 text-sm font-medium text-gray-900">{{ hit.title }}</p>
+                                @if (canNavigateToRiskHitVessel(hit)) {
+                                  <button
+                                    type="button"
+                                    class="mt-1 text-left text-sm font-medium text-brand-700 hover:text-brand-900 hover:underline disabled:opacity-60"
+                                    [disabled]="navigatingRiskHitId() === hit.id"
+                                    (click)="openRiskHitVessel(hit)"
+                                  >
+                                    @if (navigatingRiskHitId() === hit.id) {
+                                      Opening vessel...
+                                    } @else {
+                                      {{ hit.title }}
+                                    }
+                                  </button>
+                                } @else {
+                                  <p class="mt-1 text-sm font-medium text-gray-900">{{ hit.title }}</p>
+                                }
                                 @if (hit.detail) {
                                   <p class="mt-0.5 text-xs text-gray-600">{{ hit.detail }}</p>
                                 }
@@ -3344,6 +3359,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   // Navigation
   readonly navigatingCompanyId = signal<string | null>(null);
   readonly navigatingVesselId = signal<string | null>(null);
+  readonly navigatingRiskHitId = signal<string | null>(null);
 
   readonly activeFleetData = computed(() => {
     if (this.groupFleetMode() === 'group' && this.isParent()) {
@@ -4539,6 +4555,84 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     } finally {
       this.navigatingVesselId.set(null);
     }
+  }
+
+  canNavigateToRiskHitVessel(hit: RiskHitDto): boolean {
+    return !!this.extractVesselNameFromRiskHit(hit);
+  }
+
+  async openRiskHitVessel(hit: RiskHitDto): Promise<void> {
+    const vesselName = this.extractVesselNameFromRiskHit(hit);
+    if (!vesselName) return;
+
+    this.navigatingRiskHitId.set(hit.id);
+    try {
+      const linkedVessel = this.findLinkedVesselByName(vesselName);
+      if (linkedVessel?.vesselId) {
+        await this.router.navigate(['/vessels', linkedVessel.vesselId]);
+        return;
+      }
+
+      const searchResults = await firstValueFrom(
+        this.http.get<ApiResponse<VesselSearchResult[]>>(`${API}/vessels/search`, { params: { term: vesselName } }),
+      );
+      const match = searchResults.success ? this.pickBestRiskHitVesselMatch(vesselName, searchResults.data ?? []) : null;
+
+      if (!match) {
+        this.showToast('error', `Could not find a vessel match for ${vesselName}.`);
+        return;
+      }
+
+      if (match.source === 'local' && match.localId) {
+        await this.router.navigate(['/vessels', match.localId]);
+        return;
+      }
+
+      if (match.source === 'seasearcher' && match.seasearcherId) {
+        await this.navigateToVessel(match.seasearcherId);
+        return;
+      }
+
+      this.showToast('error', `Could not open a vessel record for ${vesselName}.`);
+    } catch (err) {
+      console.error('Failed to open vessel from risk hit:', err);
+      this.showToast('error', 'Failed to open vessel details.');
+    } finally {
+      this.navigatingRiskHitId.set(null);
+    }
+  }
+
+  private extractVesselNameFromRiskHit(hit: RiskHitDto): string | null {
+    if (hit.signalType !== 'SEIZURE') return null;
+    const prefix = 'Vessel seizure:';
+    if (!hit.title.startsWith(prefix)) return null;
+    const vesselName = hit.title.slice(prefix.length).trim();
+    return vesselName || null;
+  }
+
+  private findLinkedVesselByName(vesselName: string): VesselCompanyDto | undefined {
+    const normalizedTarget = vesselName.trim().toLowerCase();
+    return this.companyVessels().find((vessel) => {
+      const byName = vessel.vesselName?.trim().toLowerCase() === normalizedTarget;
+      const byImo = vessel.vesselImo?.trim() === vesselName.trim();
+      return byName || byImo;
+    });
+  }
+
+  private pickBestRiskHitVesselMatch(vesselName: string, results: VesselSearchResult[]): VesselSearchResult | null {
+    if (!results.length) return null;
+
+    const normalizedTarget = vesselName.trim().toLowerCase();
+    const exactLocal = results.find((result) => result.source === 'local' && result.name.trim().toLowerCase() === normalizedTarget);
+    if (exactLocal) return exactLocal;
+
+    const exactSeasearcher = results.find((result) => result.source === 'seasearcher' && result.name.trim().toLowerCase() === normalizedTarget);
+    if (exactSeasearcher) return exactSeasearcher;
+
+    const local = results.find((result) => result.source === 'local');
+    if (local) return local;
+
+    return results.find((result) => result.source === 'seasearcher') ?? null;
   }
 
   readonly flatHierarchy = computed(() => {
