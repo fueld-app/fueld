@@ -206,7 +206,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
         <app-last-edited-badge entityType="vessel" [entityId]="vessel()!.id" />
       </div>
 
-      @if (showCreditEnforcementException()) {
+      @if (canManageCreditEnforcementException()) {
         <div class="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4">
           <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
@@ -217,7 +217,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 </p>
               } @else {
                 <p class="mt-1 text-sm text-amber-800">
-                  Keep this vessel visible as sanctioned, but exclude vessel-related maritime risk hits from company credit enforcement.
+                  Exclude vessel-related maritime risk hits from company credit enforcement without removing the vessel from the system.
                 </p>
               }
               <p class="mt-1 text-xs text-amber-700">
@@ -1398,14 +1398,9 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
     if (!v) return '';
     return flagFromIso3(v.flagCode ?? null);
   });
-  readonly showCreditEnforcementException = computed(() => {
-    const vessel = this.vessel();
-    if (!vessel) return false;
-    return vessel.ignoreForCreditEnforcement
-      || vessel.sanctionStatus === 'SANCTIONED'
-      || this.enrichment()?.isSanctioned === true
-      || this.vesselCompanies().length > 0;
-  });
+  readonly canManageCreditEnforcementException = computed(() =>
+    this.authService.isAdmin() || this.authService.isCreditManager(),
+  );
 
   // Position timestamp
   readonly positionTimestamp = computed<string>(() => {
