@@ -2993,22 +2993,24 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
 
                         <!-- Actions -->
                         <div class="flex items-center gap-2 pt-2 border-t border-gray-100">
-                          <button
-                            type="button"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
-                            [disabled]="riskCheckRunning()"
-                            (click)="runManualCheck()"
-                          >
-                            @if (riskCheckRunning()) {
-                              <svg class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                              </svg>
-                              Checking…
-                            } @else {
-                              Re-check Now
-                            }
-                          </button>
+                          @if (canManageRiskOverrides()) {
+                            <button
+                              type="button"
+                              class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                              [disabled]="riskCheckRunning()"
+                              (click)="runManualCheck()"
+                            >
+                              @if (riskCheckRunning()) {
+                                <svg class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                </svg>
+                                Checking…
+                              } @else {
+                                Re-check Now
+                              }
+                            </button>
+                          }
                           @if (riskSummary()!.isFrozen && canManageRiskOverrides()) {
                             <button
                               type="button"
@@ -5325,6 +5327,10 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   async runManualCheck(): Promise<void> {
     const c = this.company();
     if (!c || this.riskCheckRunning()) return;
+    if (!this.canManageRiskOverrides()) {
+      this.showToast('error', 'Only admins and credit managers can run monitoring actions.');
+      return;
+    }
     this.riskCheckRunning.set(true);
     try {
       const summary = await this.riskMonitoringService.triggerCheck(c.id);
@@ -5343,6 +5349,10 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   async requestOverride(): Promise<void> {
     const c = this.company();
     if (!c) return;
+    if (!this.canManageRiskOverrides()) {
+      this.showToast('error', 'Only admins and credit managers can request credit overrides.');
+      return;
+    }
     const reason = prompt('Reason for requesting a credit override:');
     if (!reason?.trim()) return;
     this.overrideRequesting.set(true);
@@ -5366,6 +5376,10 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
 
   async decideOverride(override: RiskOverrideDto, decision: 'APPROVED' | 'REJECTED'): Promise<void> {
     if (this.overrideDecisionLoadingId() || this.hasVotedOnOverride(override)) return;
+    if (!this.canManageRiskOverrides()) {
+      this.showToast('error', 'Only admins and credit managers can decide credit overrides.');
+      return;
+    }
 
     const promptMessage = decision === 'REJECTED'
       ? 'Reason for rejecting this override:'

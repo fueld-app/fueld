@@ -18,9 +18,11 @@ import type {
   CounterpartyDto,
   OwnCompanyDto,
   RiskOverrideDto,
+  VesselCompanyDto,
 } from '@fueld/types';
 
 import { API } from '@app/core/config/api';
+import { AuthService } from '@app/core/auth/auth.service';
 import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring.service';
 
 interface CompanySearchResult {
@@ -65,7 +67,7 @@ interface CompanySearchResultOption {
         </button>
       </div>
 
-      @if (pendingOverrides().length || pendingOverridesLoading() || pendingOverridesError()) {
+      @if (canManageCreditOverrides() && (pendingOverrides().length || pendingOverridesLoading() || pendingOverridesError())) {
         <div class="mb-6 rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 via-white to-sky-50 shadow-sm">
           <div class="flex flex-col gap-3 border-b border-blue-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -112,6 +114,25 @@ interface CompanySearchResultOption {
                         </p>
                         <p class="mt-2 text-sm text-gray-800">{{ override.reason }}</p>
 
+                        @if (ignoredCreditEnforcementVesselsFor(override.counterpartyId).length) {
+                          <div class="mt-3 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-sky-800">Ignored Vessel Credit Exceptions</p>
+                            <p class="mt-1 text-xs text-sky-700">
+                              Maritime-context hits tied to these linked vessels are excluded from credit enforcement for this customer.
+                            </p>
+                            <div class="mt-2 flex flex-wrap gap-2">
+                              @for (vessel of ignoredCreditEnforcementVesselsFor(override.counterpartyId); track vessel.id) {
+                                <span class="inline-flex items-center rounded-full border border-sky-200 bg-white px-2.5 py-1 text-[11px] font-medium text-sky-800">
+                                  {{ vessel.vesselName || vessel.vesselImo || 'Unknown vessel' }}
+                                  @if (vessel.vesselImo) {
+                                    <span class="ml-1 text-sky-600">IMO {{ vessel.vesselImo }}</span>
+                                  }
+                                </span>
+                              }
+                            </div>
+                          </div>
+                        }
+
                         @if (override.approvals.length) {
                           <div class="mt-3 flex flex-wrap gap-2">
                             @for (approval of override.approvals; track approval.id) {
@@ -125,24 +146,26 @@ interface CompanySearchResultOption {
                         }
                       </div>
 
-                      <div class="flex items-center gap-2">
-                        <button
-                          type="button"
-                          class="inline-flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs font-medium text-green-700 hover:bg-green-100 transition-colors disabled:opacity-50"
-                          [disabled]="pendingDecisionId() === override.id"
-                          (click)="decidePendingOverride(override, 'APPROVED')"
-                        >
-                          Approve
-                        </button>
-                        <button
-                          type="button"
-                          class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-100 transition-colors disabled:opacity-50"
-                          [disabled]="pendingDecisionId() === override.id"
-                          (click)="decidePendingOverride(override, 'REJECTED')"
-                        >
-                          Reject
-                        </button>
-                      </div>
+                      @if (canManageCreditOverrides()) {
+                        <div class="flex items-center gap-2">
+                          <button
+                            type="button"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs font-medium text-green-700 hover:bg-green-100 transition-colors disabled:opacity-50"
+                            [disabled]="pendingDecisionId() === override.id"
+                            (click)="decidePendingOverride(override, 'APPROVED')"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            type="button"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-100 transition-colors disabled:opacity-50"
+                            [disabled]="pendingDecisionId() === override.id"
+                            (click)="decidePendingOverride(override, 'REJECTED')"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      }
                     </div>
                   </div>
                 }
@@ -465,9 +488,11 @@ export class CustomerCreditPageComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly authService = inject(AuthService);
   private readonly riskService = inject(RiskMonitoringService);
   readonly parseFloat = parseFloat;
   readonly pageSize = 25;
+  readonly canManageCreditOverrides = this.authService.canAccessCredit;
 
   // State
   readonly creditLines = signal<CreditLineDto[]>([]);
@@ -511,6 +536,7 @@ export class CustomerCreditPageComponent implements OnInit {
   readonly pendingOverridesLoading = signal(false);
   readonly pendingOverridesError = signal('');
   readonly pendingDecisionId = signal<string | null>(null);
+  readonly pendingOverrideCompanyVessels = signal<Record<string, VesselCompanyDto[]>>({});
 
   // Delete
   readonly deleteTarget = signal<CreditLineDto | null>(null);
@@ -545,7 +571,7 @@ export class CustomerCreditPageComponent implements OnInit {
         firstValueFrom(
           this.http.get<ApiResponse<{ currencies: string[] }>>(`${API}/admin/settings/my-currencies`),
         ),
-        this.riskService.getPendingOverrides().catch(() => null),
+        this.canManageCreditOverrides() ? this.riskService.getPendingOverrides().catch(() => null) : Promise.resolve(null),
       ]);
       if (res.success && res.data) {
         this.creditLines.set(res.data.items);
@@ -556,7 +582,9 @@ export class CustomerCreditPageComponent implements OnInit {
       if (currenciesRes.success && currenciesRes.data.currencies.length) {
         this.configuredCurrencies.set(currenciesRes.data.currencies);
       }
-      this.pendingOverrides.set(resolvedPendingOverrides(pendingOverridesResult));
+      const pendingOverrides = resolvedPendingOverrides(pendingOverridesResult);
+      this.pendingOverrides.set(pendingOverrides);
+      await this.loadPendingOverrideCompanyVessels(pendingOverrides);
       this.pendingOverridesError.set('');
     } catch (err) {
       console.error('Failed to load credit lines:', err);
@@ -566,11 +594,17 @@ export class CustomerCreditPageComponent implements OnInit {
   }
 
   async loadPendingOverrides(): Promise<void> {
+    if (!this.canManageCreditOverrides()) {
+      this.pendingOverrides.set([]);
+      this.pendingOverridesError.set('Only admins and credit managers can view pending overrides.');
+      return;
+    }
     this.pendingOverridesLoading.set(true);
     this.pendingOverridesError.set('');
     try {
       const overrides = await this.riskService.getPendingOverrides();
       this.pendingOverrides.set(overrides);
+      await this.loadPendingOverrideCompanyVessels(overrides);
     } catch (err) {
       console.error('Failed to load pending overrides:', err);
       this.pendingOverridesError.set('Failed to load pending overrides.');
@@ -581,6 +615,10 @@ export class CustomerCreditPageComponent implements OnInit {
 
   async decidePendingOverride(override: RiskOverrideDto, decision: 'APPROVED' | 'REJECTED'): Promise<void> {
     if (this.pendingDecisionId()) return;
+    if (!this.canManageCreditOverrides()) {
+      this.pendingOverridesError.set('Only admins and credit managers can decide overrides.');
+      return;
+    }
 
     const promptMessage = decision === 'REJECTED'
       ? 'Reason for rejecting this override:'
@@ -917,6 +955,11 @@ export class CustomerCreditPageComponent implements OnInit {
     });
   }
 
+  ignoredCreditEnforcementVesselsFor(counterpartyId: string): VesselCompanyDto[] {
+    return (this.pendingOverrideCompanyVessels()[counterpartyId] ?? [])
+      .filter((vesselCompany) => vesselCompany.ignoreForCreditEnforcement === true);
+  }
+
   formatAmount(amount: string, currency: string): string {
     const num = parseFloat(amount);
     if (isNaN(num)) return `${currency} 0.00`;
@@ -939,6 +982,29 @@ export class CustomerCreditPageComponent implements OnInit {
     } catch {
       // Non-critical — leave empty
     }
+  }
+
+  private async loadPendingOverrideCompanyVessels(overrides: RiskOverrideDto[]): Promise<void> {
+    const counterpartyIds = [...new Set(overrides.map((override) => override.counterpartyId).filter(Boolean))];
+    if (!counterpartyIds.length) {
+      this.pendingOverrideCompanyVessels.set({});
+      return;
+    }
+
+    const results = await Promise.all(
+      counterpartyIds.map(async (counterpartyId) => {
+        try {
+          const response = await firstValueFrom(
+            this.http.get<ApiResponse<VesselCompanyDto[]>>(`${API}/companies/local/${counterpartyId}/vessels`),
+          );
+          return [counterpartyId, response.success && response.data ? response.data : []] as const;
+        } catch {
+          return [counterpartyId, []] as const;
+        }
+      }),
+    );
+
+    this.pendingOverrideCompanyVessels.set(Object.fromEntries(results));
   }
 }
 
