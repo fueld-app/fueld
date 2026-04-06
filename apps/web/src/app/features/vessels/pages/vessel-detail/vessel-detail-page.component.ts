@@ -153,6 +153,11 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
               Sanctioned
             </span>
           }
+          @if (hasActiveSeizureImpact()) {
+            <span class="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-1 text-xs font-semibold text-orange-700">
+              Seized / Arrested
+            </span>
+          }
           @if (vessel()!.status) {
             <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium"
               [class]="vessel()!.status === 'Live' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'">
@@ -271,6 +276,36 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
               }
               {{ vessel()!.ignoreForCreditEnforcement ? 'Ignored For Credit Enforcement' : 'Ignore For Credit Enforcement' }}
             </button>
+          </div>
+        </div>
+      }
+
+      @if (hasActiveSeizureImpact()) {
+        <div class="mb-6 rounded-xl border border-orange-200 bg-orange-50 px-4 py-4">
+          <p class="text-sm font-semibold text-orange-900">Active Seizure / Arrest Impact</p>
+          <p class="mt-1 text-sm text-orange-800">
+            This vessel is currently referenced by one or more active maritime seizure or arrest hits that can freeze linked company credit.
+          </p>
+          <div class="mt-3 space-y-2">
+            @for (impact of linkedCreditImpacts(); track impact.companyId) {
+              @if (seizureHitsForImpact(impact).length) {
+                <div class="rounded-lg border border-orange-200 bg-white/70 px-3 py-2">
+                  <a [routerLink]="['/companies', impact.companyId]" class="text-xs font-semibold text-orange-900 hover:underline">
+                    {{ impact.companyName }}
+                  </a>
+                  <div class="mt-1 space-y-1">
+                    @for (hit of seizureHitsForImpact(impact); track hit.id) {
+                      <p class="text-xs text-orange-800">
+                        <span class="font-semibold">{{ hit.title }}</span>
+                        @if (hit.detail) {
+                          <span class="ml-1">{{ hit.detail }}</span>
+                        }
+                      </p>
+                    }
+                  </div>
+                </div>
+              }
+            }
           </div>
         </div>
       }
@@ -1416,6 +1451,9 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
     if (!vessel) return false;
     return vessel.sanctionStatus === 'SANCTIONED' || this.enrichment()?.isSanctioned === true;
   });
+  readonly hasActiveSeizureImpact = computed(() =>
+    this.linkedCreditImpacts().some((impact) => impact.hits.some((hit) => hit.signalType === 'SEIZURE')),
+  );
   readonly showCreditEnforcementException = computed(() => {
     const vessel = this.vessel();
     if (!vessel) return false;
@@ -2210,6 +2248,10 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
     return title.includes(normalizedName)
       || detail.includes(normalizedName)
       || (!!imo && (title.includes(imo) || detail.includes(imo)));
+  }
+
+  seizureHitsForImpact(impact: VesselCreditImpact): RiskHitDto[] {
+    return impact.hits.filter((hit) => hit.signalType === 'SEIZURE');
   }
 
   openAddCompany(): void {
