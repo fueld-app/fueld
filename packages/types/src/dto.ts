@@ -395,6 +395,7 @@ export interface VesselCompanyDto {
   vesselId: string;
   vesselName?: string | null;
   vesselImo?: string | null;
+  ignoreForCreditEnforcement?: boolean;
   companyId: string;
   companyName: string;
   companyCountryIso?: string | null;
@@ -500,6 +501,7 @@ export interface VesselDto {
   classificationSociety: string | null;
   lastSynced: string | null;
   sanctionStatus: string | null;
+  ignoreForCreditEnforcement: boolean;
   lastSanctionCheck: string | null;
 }
 

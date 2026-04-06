@@ -75,7 +75,69 @@ const placeName = process.env['E2E_PLACE_NAME'] ?? 'E2E Port';
 const sql = postgres(DATABASE_URL, { max: 1 });
 const db = drizzle(sql, { schema });
 
+async function ensureCompanyOfficesCompat(): Promise<void> {
+  await sql`
+    CREATE TABLE IF NOT EXISTS company_offices (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      counterparty_id uuid NOT NULL REFERENCES counterparties(id) ON DELETE CASCADE,
+      city text NOT NULL DEFAULT '',
+      country text,
+      country_code text,
+      address text,
+      phone text,
+      email text,
+      source text NOT NULL DEFAULT 'manual',
+      seasearcher_office_id integer,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+
+  await sql`
+    ALTER TABLE company_offices
+    ADD COLUMN IF NOT EXISTS city text,
+    ADD COLUMN IF NOT EXISTS country text,
+    ADD COLUMN IF NOT EXISTS country_code text,
+    ADD COLUMN IF NOT EXISTS address text,
+    ADD COLUMN IF NOT EXISTS phone text,
+    ADD COLUMN IF NOT EXISTS email text,
+    ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'manual',
+    ADD COLUMN IF NOT EXISTS seasearcher_office_id integer
+  `;
+
+  await sql`
+    ALTER TABLE company_offices
+    ALTER COLUMN city SET DEFAULT ''
+  `;
+
+  await sql`
+    UPDATE company_offices
+    SET city = ''
+    WHERE city IS NULL
+  `;
+
+  await sql`
+    ALTER TABLE company_offices
+    ALTER COLUMN city SET NOT NULL
+  `;
+
+  await sql`
+    ALTER TABLE company_offices
+    ALTER COLUMN label DROP NOT NULL
+  `;
+}
+
+async function ensureVesselsCompat(): Promise<void> {
+  await sql`
+    ALTER TABLE vessels
+    ADD COLUMN IF NOT EXISTS ignore_for_credit_enforcement boolean NOT NULL DEFAULT false
+  `;
+}
+
 async function main(): Promise<void> {
+  await ensureCompanyOfficesCompat();
+  await ensureVesselsCompat();
+
   // Ensure we have a tenant, but prefer using the first tenant so Admin pages
   // (which assume single-tenant) see the seeded data.
   let tenant = await db.query.tenants.findFirst();

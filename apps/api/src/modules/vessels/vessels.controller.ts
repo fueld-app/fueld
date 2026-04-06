@@ -365,6 +365,7 @@ export const vesselsController = new Elysia({ prefix: '/vessels' })
         buildYear: t.Optional(t.Number()),
         builder: t.Optional(t.String()),
         classificationSociety: t.Optional(t.String()),
+        ignoreForCreditEnforcement: t.Optional(t.Boolean()),
       }),
       detail: {
         tags: ['Vessels'],

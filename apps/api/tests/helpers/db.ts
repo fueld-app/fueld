@@ -613,7 +613,8 @@ async function _doEnsureTestSchemaCompat(): Promise<void> {
   await sql`
     ALTER TABLE vessels
     ADD COLUMN IF NOT EXISTS sanction_status text DEFAULT 'UNCHECKED',
-    ADD COLUMN IF NOT EXISTS last_sanction_check timestamptz
+    ADD COLUMN IF NOT EXISTS last_sanction_check timestamptz,
+    ADD COLUMN IF NOT EXISTS ignore_for_credit_enforcement boolean NOT NULL DEFAULT false
   `;
 
   await sql`

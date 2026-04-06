@@ -986,6 +986,7 @@ export async function getVesselsForCompany(companyId: string) {
       vesselId: vesselCompanies.vesselId,
       vesselName: vessels.name,
       vesselImo: vessels.imo,
+      ignoreForCreditEnforcement: vessels.ignoreForCreditEnforcement,
       companyId: vesselCompanies.companyId,
       companyName: counterparties.name,
       role: vesselCompanies.role,

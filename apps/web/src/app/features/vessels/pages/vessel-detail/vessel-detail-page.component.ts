@@ -200,6 +200,37 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
         <app-last-edited-badge entityType="vessel" [entityId]="vessel()!.id" />
       </div>
 
+      @if (isSanctionedVessel()) {
+        <div class="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4">
+          <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p class="text-sm font-semibold text-amber-900">Credit Enforcement Exception</p>
+              <p class="mt-1 text-sm text-amber-800">
+                Keep this vessel visible as sanctioned, but exclude vessel-related maritime risk hits from company credit enforcement.
+              </p>
+              <p class="mt-1 text-xs text-amber-700">
+                After enabling this, open each linked company and run Monitoring → Re-check Now to clear any existing freeze caused by this vessel.
+              </p>
+            </div>
+            <button
+              type="button"
+              [disabled]="creditEnforcementSaving() || !canDeleteEntity()"
+              (click)="setIgnoreForCreditEnforcement(!vessel()!.ignoreForCreditEnforcement)"
+              class="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50"
+              [class]="vessel()!.ignoreForCreditEnforcement ? 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100' : 'border-amber-300 bg-white text-amber-800 hover:bg-amber-100'"
+            >
+              @if (creditEnforcementSaving()) {
+                <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+              }
+              {{ vessel()!.ignoreForCreditEnforcement ? 'Ignored For Credit Enforcement' : 'Ignore For Credit Enforcement' }}
+            </button>
+          </div>
+        </div>
+      }
+
       <div class="vessel-card-grid grid grid-cols-1 gap-6 min-[900px]:grid-cols-2 min-[1600px]:grid-cols-3 min-[2000px]:grid-cols-4">
 
         <!-- ═══ Left group: own data ═══ -->
@@ -1206,6 +1237,7 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
   readonly canDeleteEntity = computed(() => this.authService.isAdmin());
   readonly vessel = signal<VesselDto | null>(null);
   readonly syncing = signal(false);
+  readonly creditEnforcementSaving = signal(false);
 
   // Enrichment
   readonly enrichment = signal<any>(null);
@@ -1329,6 +1361,11 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
     const v = this.vessel();
     if (!v) return '';
     return flagFromIso3(v.flagCode ?? null);
+  });
+  readonly isSanctionedVessel = computed(() => {
+    const vessel = this.vessel();
+    if (!vessel) return false;
+    return vessel.sanctionStatus === 'SANCTIONED' || this.enrichment()?.isSanctioned === true;
   });
 
   // Position timestamp
@@ -1908,6 +1945,37 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
       console.error('Save failed:', err);
     } finally {
       this.editSaving.set(false);
+    }
+  }
+
+  async setIgnoreForCreditEnforcement(value: boolean): Promise<void> {
+    const vessel = this.vessel();
+    if (!vessel || this.creditEnforcementSaving()) return;
+
+    this.creditEnforcementSaving.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.patch<ApiResponse<VesselDto>>(`${API}/vessels/local/${vessel.id}`, {
+          ignoreForCreditEnforcement: value,
+        }),
+      );
+      if (res.success && res.data) {
+        this.vessel.set(res.data);
+        this.showToast(
+          'success',
+          value
+            ? 'Vessel will be ignored for company credit enforcement after the next monitoring re-check.'
+            : 'Vessel credit enforcement exception removed.',
+        );
+        return;
+      }
+
+      this.showToast('error', res.message ?? 'Failed to update vessel credit enforcement exception.');
+    } catch (err) {
+      console.error('Failed to update vessel credit enforcement exception:', err);
+      this.showToast('error', 'Failed to update vessel credit enforcement exception.');
+    } finally {
+      this.creditEnforcementSaving.set(false);
     }
   }
 

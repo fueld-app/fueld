@@ -654,6 +654,7 @@ export const vessels = pgTable('vessels', {
   builder: text('builder'),
   classificationSociety: text('classification_society'),
   sanctionStatus: text('sanction_status').default('UNCHECKED'),
+  ignoreForCreditEnforcement: boolean('ignore_for_credit_enforcement').notNull().default(false),
   lastSanctionCheck: timestamp('last_sanction_check', { withTimezone: true }),
   lastSynced: timestamp('last_synced', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

@@ -477,6 +477,13 @@
       "when": 1775040000000,
       "tag": "0067_backfill_order_invoicing_defaults",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1775200000000,
+      "tag": "0068_vessel_credit_enforcement_exceptions",
+      "breakpoints": true
     }
   ]
 }

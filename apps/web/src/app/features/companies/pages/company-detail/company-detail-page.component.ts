@@ -2862,6 +2862,26 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                           </div>
                         }
 
+                        @if (ignoredCreditEnforcementVessels().length) {
+                          <div class="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3">
+                            <p class="text-sm font-medium text-sky-900">Ignored Vessel Credit Exceptions</p>
+                            <p class="mt-1 text-xs text-sky-700">
+                              The following linked vessel{{ ignoredCreditEnforcementVessels().length === 1 ? '' : 's are' }} excluded from maritime credit enforcement.
+                              Re-check monitoring after changing these exceptions so provider hits and freeze state can refresh.
+                            </p>
+                            <div class="mt-2 flex flex-wrap gap-2">
+                              @for (vessel of ignoredCreditEnforcementVessels(); track vessel.id) {
+                                <span class="inline-flex items-center rounded-full border border-sky-200 bg-white px-2.5 py-1 text-xs font-medium text-sky-800">
+                                  {{ vessel.vesselName || vessel.vesselImo || 'Unknown vessel' }}
+                                  @if (vessel.vesselImo) {
+                                    <span class="ml-1 text-sky-600">IMO {{ vessel.vesselImo }}</span>
+                                  }
+                                </span>
+                              }
+                            </div>
+                          </div>
+                        }
+
                         @if (pendingRiskOverride(); as pendingOverride) {
                           <div class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 space-y-3">
                             <div>
@@ -3168,6 +3188,9 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
 
   readonly allTypes = signal<string[]>(['CLIENT', 'SUPPLIER', 'BROKER', 'AGENT']);
 
+  readonly ignoredCreditEnforcementVessels = computed(() =>
+    this.companyVessels().filter((vesselCompany) => vesselCompany.ignoreForCreditEnforcement === true),
+  );
   // Inline editing state
   readonly editing = signal(false);
   readonly editSaving = signal(false);
