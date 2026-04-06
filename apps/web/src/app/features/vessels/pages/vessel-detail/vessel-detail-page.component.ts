@@ -116,6 +116,18 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
   });
 }
 
+function normalizeVesselText(value: string | null | undefined): string {
+  return (value ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeVesselImo(value: string | number | null | undefined): string {
+  return String(value ?? '').replace(/\D/g, '');
+}
+
 @Component({
   selector: 'app-vessel-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -2225,8 +2237,8 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
         }),
       );
 
-      const normalizedName = vessel.name.trim().toLowerCase();
-      const normalizedImo = (vessel.imo ?? '').trim();
+      const normalizedName = normalizeVesselText(vessel.name);
+      const normalizedImo = normalizeVesselImo(vessel.imo);
       const impacts = summaries
         .filter((summary): summary is RiskSummaryDto => !!summary)
         .map((summary) => ({
@@ -2243,11 +2255,18 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
   }
 
   private riskHitMatchesVessel(hit: RiskHitDto, normalizedName: string, imo: string): boolean {
-    const title = hit.title.toLowerCase();
-    const detail = (hit.detail ?? '').toLowerCase();
-    return title.includes(normalizedName)
-      || detail.includes(normalizedName)
-      || (!!imo && (title.includes(imo) || detail.includes(imo)));
+    const normalizedTitle = normalizeVesselText(hit.title);
+    const normalizedDetail = normalizeVesselText(hit.detail ?? '');
+    const titleDigits = normalizeVesselImo(hit.title);
+    const detailDigits = normalizeVesselImo(hit.detail ?? '');
+    return (!!normalizedName && (
+      normalizedTitle.includes(normalizedName)
+      || normalizedDetail.includes(normalizedName)
+    ))
+      || (!!imo && (
+        titleDigits.includes(imo)
+        || detailDigits.includes(imo)
+      ));
   }
 
   seizureHitsForImpact(impact: VesselCreditImpact): RiskHitDto[] {
