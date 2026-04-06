@@ -248,7 +248,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
             </div>
             <button
               type="button"
-              [disabled]="creditEnforcementSaving() || !canDeleteEntity()"
+              [disabled]="creditEnforcementSaving() || !canManageCreditEnforcementException()"
               (click)="setIgnoreForCreditEnforcement(!vessel()!.ignoreForCreditEnforcement)"
               class="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50"
               [class]="vessel()!.ignoreForCreditEnforcement ? 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100' : 'border-amber-300 bg-white text-amber-800 hover:bg-amber-100'"
@@ -1986,6 +1986,10 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
   async setIgnoreForCreditEnforcement(value: boolean): Promise<void> {
     const vessel = this.vessel();
     if (!vessel || this.creditEnforcementSaving()) return;
+    if (!this.canManageCreditEnforcementException()) {
+      this.showToast('error', 'Only admins and credit managers can change credit enforcement exceptions.');
+      return;
+    }
 
     this.creditEnforcementSaving.set(true);
     try {
