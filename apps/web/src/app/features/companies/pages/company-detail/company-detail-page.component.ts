@@ -1515,7 +1515,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                                 <button
                                   type="button"
                                   (click)="selectSupplyPlace(place)"
-                                  [disabled]="importingSupplyPlaceId() === place.lliPlaceId"
+                                  [disabled]="isImportingSupplyPlace(place)"
                                   class="w-full px-3 py-2 text-left text-sm hover:bg-brand-50 transition-colors flex items-center justify-between disabled:cursor-wait disabled:opacity-60"
                                 >
                                   <div class="min-w-0">
@@ -1536,7 +1536,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                                     @if (place.country) {
                                       <span class="text-xs text-gray-400">{{ place.country }}</span>
                                     }
-                                    @if (importingSupplyPlaceId() === place.lliPlaceId) {
+                                    @if (isImportingSupplyPlace(place)) {
                                       <svg class="h-3.5 w-3.5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
                                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
@@ -4998,6 +4998,12 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
       ? current.filter((value) => value !== product)
       : [...current, product];
     this.supplyPortForm.set({ ...this.supplyPortForm(), products: next });
+  }
+
+  isImportingSupplyPlace(place: LocalPlaceOption): boolean {
+    return place.source === 'lloyds'
+      && Boolean(place.lliPlaceId)
+      && this.importingSupplyPlaceId() === place.lliPlaceId;
   }
 
   async saveSupplyPort(): Promise<void> {
