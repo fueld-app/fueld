@@ -148,6 +148,11 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
         <div class="flex items-center gap-3 mb-1">
           @if (vesselFlag()) { <span class="text-2xl">{{ vesselFlag() }}</span> }
           <h1 class="text-2xl font-bold text-gray-900">{{ vessel()!.name }}</h1>
+          @if (isSanctionedVessel()) {
+            <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">
+              Sanctioned
+            </span>
+          }
           @if (vessel()!.status) {
             <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium"
               [class]="vessel()!.status === 'Live' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'">
@@ -211,6 +216,11 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
           <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p class="text-sm font-semibold text-amber-900">Credit Enforcement Exception</p>
+              @if (isSanctionedVessel()) {
+                <p class="mt-1 text-xs font-semibold uppercase tracking-wide text-red-700">
+                  This vessel is currently marked sanctioned.
+                </p>
+              }
               @if (linkedCreditImpacts().length) {
                 <p class="mt-1 text-sm text-amber-800">
                   This vessel is currently referenced by active company monitoring hits. You can exclude those vessel-related maritime hits from credit enforcement without hiding the vessel.
@@ -1401,6 +1411,11 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
   readonly canManageCreditEnforcementException = computed(() =>
     this.authService.isAdmin() || this.authService.isCreditManager(),
   );
+  readonly isSanctionedVessel = computed(() => {
+    const vessel = this.vessel();
+    if (!vessel) return false;
+    return vessel.sanctionStatus === 'SANCTIONED' || this.enrichment()?.isSanctioned === true;
+  });
 
   // Position timestamp
   readonly positionTimestamp = computed<string>(() => {
