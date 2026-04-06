@@ -200,7 +200,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
         <app-last-edited-badge entityType="vessel" [entityId]="vessel()!.id" />
       </div>
 
-      @if (isSanctionedVessel()) {
+      @if (showCreditEnforcementException()) {
         <div class="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4">
           <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
@@ -1362,10 +1362,13 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
     if (!v) return '';
     return flagFromIso3(v.flagCode ?? null);
   });
-  readonly isSanctionedVessel = computed(() => {
+  readonly showCreditEnforcementException = computed(() => {
     const vessel = this.vessel();
     if (!vessel) return false;
-    return vessel.sanctionStatus === 'SANCTIONED' || this.enrichment()?.isSanctioned === true;
+    return vessel.ignoreForCreditEnforcement
+      || vessel.sanctionStatus === 'SANCTIONED'
+      || this.enrichment()?.isSanctioned === true
+      || this.vesselCompanies().length > 0;
   });
 
   // Position timestamp
