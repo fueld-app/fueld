@@ -17,7 +17,7 @@ import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subscription, skip } from 'rxjs';
 import { Title } from '@angular/platform-browser';
-import type { VesselDto, CounterpartyDto, ApiResponse, VesselCompanyDto, VesselCompanyRole, CompanyContactDto, VesselCompanyRoleOption } from '@fueld/types';
+import type { VesselDto, CounterpartyDto, ApiResponse, VesselCompanyDto, VesselCompanyRole, CompanyContactDto, VesselCompanyRoleOption, RiskHitDto, RiskSummaryDto } from '@fueld/types';
 import * as L from 'leaflet/dist/leaflet-src.esm.js';
 import { flagFromIso3 } from '../../../../shared/utils/flags';
 import { WebSocketService } from '../../../../core/websocket/websocket.service';
@@ -35,6 +35,12 @@ interface OwnershipEntry {
   to: string | null;
   currentIndicator: boolean;
   country: { code: string | null; name: string | null };
+}
+
+interface VesselCreditImpact {
+  companyId: string;
+  companyName: string;
+  hits: RiskHitDto[];
 }
 
 const ROLE_ORDER: Record<string, number> = {
@@ -205,12 +211,40 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
           <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p class="text-sm font-semibold text-amber-900">Credit Enforcement Exception</p>
-              <p class="mt-1 text-sm text-amber-800">
-                Keep this vessel visible as sanctioned, but exclude vessel-related maritime risk hits from company credit enforcement.
-              </p>
+              @if (linkedCreditImpacts().length) {
+                <p class="mt-1 text-sm text-amber-800">
+                  This vessel is currently referenced by active company monitoring hits. You can exclude those vessel-related maritime hits from credit enforcement without hiding the vessel.
+                </p>
+              } @else {
+                <p class="mt-1 text-sm text-amber-800">
+                  Keep this vessel visible as sanctioned, but exclude vessel-related maritime risk hits from company credit enforcement.
+                </p>
+              }
               <p class="mt-1 text-xs text-amber-700">
                 After enabling this, open each linked company and run Monitoring → Re-check Now to clear any existing freeze caused by this vessel.
               </p>
+
+              @if (creditImpactLoading()) {
+                <p class="mt-2 text-xs text-amber-700">Checking linked company monitoring hits...</p>
+              } @else if (linkedCreditImpacts().length) {
+                <div class="mt-3 space-y-2">
+                  @for (impact of linkedCreditImpacts(); track impact.companyId) {
+                    <div class="rounded-lg border border-amber-200 bg-white/70 px-3 py-2">
+                      <a [routerLink]="['/companies', impact.companyId]" class="text-xs font-semibold text-amber-900 hover:underline">
+                        {{ impact.companyName }}
+                      </a>
+                      <div class="mt-1 space-y-1">
+                        @for (hit of impact.hits; track hit.id) {
+                          <p class="text-xs text-amber-800">
+                            <span class="font-semibold">{{ hit.signalType }}</span>
+                            <span class="ml-1">{{ hit.title }}</span>
+                          </p>
+                        }
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
             </div>
             <button
               type="button"
@@ -1238,6 +1272,7 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
   readonly vessel = signal<VesselDto | null>(null);
   readonly syncing = signal(false);
   readonly creditEnforcementSaving = signal(false);
+  readonly creditImpactLoading = signal(false);
 
   // Enrichment
   readonly enrichment = signal<any>(null);
@@ -1314,6 +1349,7 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
 
   // Vessel Companies
   readonly vesselCompanies = signal<VesselCompanyDto[]>([]);
+  readonly linkedCreditImpacts = signal<VesselCreditImpact[]>([]);
   readonly companiesLoading = signal(false);
   readonly showAddCompany = signal(false);
   readonly companyForm = signal<{ companyId: string; role: VesselCompanyRole; contactId: string | null; note: string }>({ companyId: '', role: 'REGISTERED_OWNER', contactId: null, note: '' });
@@ -1518,6 +1554,7 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
     this.vessel.set(null);
     this.enrichment.set(null);
     this.loading.set(true);
+    this.linkedCreditImpacts.set([]);
     this.vesselOrders.set([]);
     this.movements.set([]);
     this.editing.set(false);
@@ -2098,12 +2135,61 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
       );
       if (res.success && res.data) {
         this.vesselCompanies.set(res.data);
+        await this.loadLinkedCreditImpacts(res.data);
       }
     } catch (err) {
       console.error('Failed to load vessel companies:', err);
     } finally {
       this.companiesLoading.set(false);
     }
+  }
+
+  private async loadLinkedCreditImpacts(vesselCompanies: VesselCompanyDto[]): Promise<void> {
+    const vessel = this.vessel();
+    const companyIds = [...new Set(vesselCompanies.map((company) => company.companyId).filter(Boolean))];
+    if (!vessel || !companyIds.length) {
+      this.linkedCreditImpacts.set([]);
+      return;
+    }
+
+    this.creditImpactLoading.set(true);
+    try {
+      const summaries = await Promise.all(
+        companyIds.map(async (companyId) => {
+          try {
+            const response = await firstValueFrom(
+              this.http.get<ApiResponse<RiskSummaryDto>>(`${API}/risk-monitoring/summary/${companyId}`),
+            );
+            return response.success ? response.data : null;
+          } catch {
+            return null;
+          }
+        }),
+      );
+
+      const normalizedName = vessel.name.trim().toLowerCase();
+      const normalizedImo = (vessel.imo ?? '').trim();
+      const impacts = summaries
+        .filter((summary): summary is RiskSummaryDto => !!summary)
+        .map((summary) => ({
+          companyId: summary.counterpartyId,
+          companyName: summary.counterpartyName,
+          hits: summary.activeHits.filter((hit) => this.riskHitMatchesVessel(hit, normalizedName, normalizedImo)),
+        }))
+        .filter((impact) => impact.hits.length > 0);
+
+      this.linkedCreditImpacts.set(impacts);
+    } finally {
+      this.creditImpactLoading.set(false);
+    }
+  }
+
+  private riskHitMatchesVessel(hit: RiskHitDto, normalizedName: string, imo: string): boolean {
+    const title = hit.title.toLowerCase();
+    const detail = (hit.detail ?? '').toLowerCase();
+    return title.includes(normalizedName)
+      || detail.includes(normalizedName)
+      || (!!imo && (title.includes(imo) || detail.includes(imo)));
   }
 
   openAddCompany(): void {
