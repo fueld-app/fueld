@@ -1605,11 +1605,38 @@ function buildOfferDocument(data: {
   const createdDate = `${dd}-${mm}-${yyyy}`;
   const title = data.docTitle ?? 'OFFER';
   const openingTopMargin = title === 'NOMINATION' ? 8 : 18;
+  const showAgentBlock = (title === 'CONFIRMATION' || title === 'NOMINATION')
+    && (
+      !!data.agentName?.trim()
+      || !!data.agentContactName?.trim()
+      || !!data.agentContactEmail?.trim()
+      || !!data.agentContactPhone?.trim()
+    );
   const openingSentence = title === 'NOMINATION'
     ? 'With reference to our correspondence, we are pleased to nominate to you the following:'
     : title === 'CONFIRMATION'
       ? 'With reference to our correspondence, we are pleased to confirm to you the following:'
       : 'With reference to our correspondence, we are pleased to offer to you the following:';
+
+  const agentContactDetailsLine: Content | null = (() => {
+    const parts: Array<string | { text: string; link?: string; color?: string }> = [];
+    const email = data.agentContactEmail?.trim();
+    const phone = data.agentContactPhone?.trim();
+    if (email) {
+      parts.push({ text: email, link: `mailto:${email}`, color: '#1a56db' });
+    }
+    if (email && phone) {
+      parts.push('  |  ');
+    }
+    if (phone) {
+      parts.push({ text: formatPhoneDisplay(phone) ?? phone, link: phoneToTelUri(phone), color: '#1a56db' });
+    }
+    if (!parts.length) return null;
+    return {
+      text: [{ text: 'Contact details:  ', bold: true }, ...parts],
+      margin: [0, 0, 0, 4],
+    } as Content;
+  })();
 
   // Customer address block (top-left)
   const customerBlock: Content[] = [
@@ -1843,29 +1870,21 @@ function buildOfferDocument(data: {
       } as Content,
       { text: '', margin: [0, 10, 0, 0] } as Content,
 
-      // For account of
-      { text: [{ text: 'For account of:  ', bold: true }, { text: forAccountOfText }], margin: [0, 0, 0, 4] } as Content,
-
-      ...(title === 'NOMINATION' && data.agentName?.trim()
+      ...(showAgentBlock
         ? [
-            { text: [{ text: 'Agent:  ', bold: true }, { text: data.agentName.trim() }], margin: [0, 0, 0, 4] } as Content,
-            ...(data.agentAddress?.trim()
-              ? splitAddressLines(data.agentAddress.trim()).map((line) => ({ text: line, margin: [48, 0, 0, 0] } as Content))
+            ...(data.agentName?.trim()
+              ? [{ text: [{ text: 'Agent:  ', bold: true }, { text: data.agentName.trim() }], margin: [0, 0, 0, 2] } as Content]
               : []),
             ...(data.agentContactName?.trim()
-              ? [{ text: [{ text: 'Agent contact:  ', bold: true }, { text: data.agentContactName.trim() }], margin: [0, 0, 0, 2] } as Content]
+              ? [{ text: [{ text: 'Contact person:  ', bold: true }, { text: data.agentContactName.trim() }], margin: [0, 0, 0, 2] } as Content]
               : []),
-            ...(data.agentContactRole?.trim()
-              ? [{ text: [{ text: 'Role:  ', bold: true }, { text: data.agentContactRole.trim() }], margin: [0, 0, 0, 2] } as Content]
-              : []),
-            ...(data.agentContactEmail?.trim()
-              ? [emailTextNode('Email:  ', data.agentContactEmail.trim(), { margin: [0, 0, 0, 2] })]
-              : []),
-            ...(data.agentContactPhone?.trim()
-              ? [phoneTextNode('Phone:  ', data.agentContactPhone.trim(), { margin: [0, 0, 0, 2] })]
-              : []),
+            ...(agentContactDetailsLine ? [agentContactDetailsLine] : []),
+            { text: '', margin: [0, 0, 0, 2] } as Content,
           ]
         : []),
+
+      // For account of
+      { text: [{ text: 'For account of:  ', bold: true }, { text: forAccountOfText }], margin: [0, 0, 0, 4] } as Content,
 
       // Payment terms
       ...(data.paymentTerms
@@ -2025,6 +2044,10 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
     customerContactRole: order.customerContact?.role ?? null,
     customerContactPhone: order.customerContact?.phone ?? null,
     customerContactEmail: order.customerContact?.email ?? null,
+    agentName: order.agent?.name ?? null,
+    agentContactName: order.agentContact?.name ?? null,
+    agentContactPhone: order.agentContact?.phone ?? null,
+    agentContactEmail: order.agentContact?.email ?? null,
     vesselName: order.vessel.name,
     vesselImo: order.vessel.imo,
     portName: order.place.name,
@@ -2237,9 +2260,7 @@ export async function generateNominationPdfBuffer(orderId: string, options?: {
     customerContactPhone: nominationContext.supplierContact?.phone ?? null,
     customerContactEmail: nominationContext.supplierContact?.email ?? null,
     agentName: order.agent?.name ?? null,
-    agentAddress: order.agent?.headOfficeAddress ?? null,
     agentContactName: order.agentContact?.name ?? null,
-    agentContactRole: order.agentContact?.role ?? null,
     agentContactPhone: order.agentContact?.phone ?? null,
     agentContactEmail: order.agentContact?.email ?? null,
     vesselName: order.vessel.name,

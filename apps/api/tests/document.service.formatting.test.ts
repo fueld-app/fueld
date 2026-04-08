@@ -340,27 +340,32 @@ describe('document.service formatting helpers', () => {
     expect(text).toContain('Fueld Trading Ltd');
   });
 
-  it('includes agent details on nomination documents when present', () => {
-    const doc = __documentTestUtils.buildOfferDocument({
-      ...commonOfferInput,
-      docTitle: 'NOMINATION',
-      agentName: 'Harbor Ops Agency',
-      agentAddress: 'Pier 7\nRotterdam',
-      agentContactName: 'Maja Hansen',
-      agentContactRole: 'Port Agent',
-      agentContactEmail: 'maja@harborops.example',
-      agentContactPhone: '+4511223344',
-    });
+  for (const docTitle of ['CONFIRMATION', 'NOMINATION'] as const) {
+    it(`includes compact agent details before the account block on ${docTitle.toLowerCase()} documents`, () => {
+      const doc = __documentTestUtils.buildOfferDocument({
+        ...commonOfferInput,
+        docTitle,
+        agentName: 'Harbor Ops Agency',
+        agentAddress: 'Pier 7\nRotterdam',
+        agentContactName: 'Maja Hansen',
+        agentContactRole: 'Port Agent',
+        agentContactEmail: 'maja@harborops.example',
+        agentContactPhone: '+4511223344',
+      });
 
-    const text = collectTextValues(doc).join(' | ');
-    expect(text).toContain('Agent:  ');
-    expect(text).toContain('Harbor Ops Agency');
-    expect(text).toContain('Agent contact:  ');
-    expect(text).toContain('Maja Hansen');
-    expect(text).toContain('Port Agent');
-    expect(text).toContain('maja@harborops.example');
-    expect(text).toContain('+4511223344');
-  });
+      const text = collectTextValues(doc).join(' | ');
+      expect(text).toContain('Agent:  ');
+      expect(text).toContain('Harbor Ops Agency');
+      expect(text).toContain('Contact person:  ');
+      expect(text).toContain('Maja Hansen');
+      expect(text).toContain('Contact details:  ');
+      expect(text).toContain('maja@harborops.example');
+      expect(text).toContain('+45 11 22 33 44');
+      expect(text).not.toContain('Pier 7');
+      expect(text).not.toContain('Port Agent');
+      expect(text.indexOf('Agent:  ')).toBeLessThan(text.indexOf('For account of:  '));
+    });
+  }
 
   it('builds invoice document with remittance and totals', () => {
     const doc = __documentTestUtils.buildInvoiceDocument({
