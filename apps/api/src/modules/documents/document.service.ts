@@ -46,7 +46,8 @@ interface BankDetails {
 }
 
 type DocumentType = 'OFFER' | 'PROFORMA_INVOICE' | 'INVOICE' | 'OTHER';
-const DOCUMENT_TEMPLATE_VERSION = '2026-03-13f';
+// Bump this whenever document output changes so cached revisions regenerate.
+const DOCUMENT_TEMPLATE_VERSION = '2026-04-10a';
 
 export interface DocumentRevisionInfo {
   id: string;
