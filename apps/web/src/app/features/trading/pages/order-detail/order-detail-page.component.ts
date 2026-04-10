@@ -1242,7 +1242,7 @@ interface PlattsSuggestionViewModel {
                   @if (activeSupplierDeliveredAt()) {
                     <div>
                       <div class="text-[11px] font-medium uppercase tracking-[0.14em] text-amber-700/80">Internal delivered date</div>
-                      <div class="mt-1 font-semibold">{{ activeSupplierDeliveredAt() | date : 'mediumDate' }}</div>
+                      <div class="mt-1 font-semibold">{{ formatStoredDateOnlyLabel(activeSupplierDeliveredAt()) }}</div>
                     </div>
                   }
                   @if (supplierNominationDateMismatch()) {
@@ -1982,7 +1982,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly deliveredAtLocal = computed(() => {
     const iso = this.activeSupplierDeliveredAt();
     if (!iso) return '';
-    return this.formatDateForInput(new Date(iso), this.placeTimezone());
+    return this.formatStoredDateOnlyForInput(iso);
   });
 
   readonly deliveredQtyComplete = computed(() =>
@@ -2120,7 +2120,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly etaMinDateTime = computed(() => {
     const eta = this.order()?.eta;
     if (!eta) return '';
-    return this.formatDateForInput(new Date(eta), this.placeTimezone());
+    return this.formatStoredDateOnlyForInput(eta);
   });
 
   readonly paymentsTotal = computed(() =>
@@ -2320,6 +2320,28 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   formatDateForInput(date: Date, timeZone: string): string {
     return this.formatDateTimeForInput(date, timeZone).split('T')[0] ?? '';
+  }
+
+  formatStoredDateOnlyLabel(iso: string | null): string {
+    if (!iso) return '-';
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return '-';
+    return new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'UTC',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }).format(date);
+  }
+
+  private formatStoredDateOnlyForInput(iso: string | null): string {
+    if (!iso) return '';
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return '';
+    const year = String(date.getUTCFullYear()).padStart(4, '0');
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   constructor() {

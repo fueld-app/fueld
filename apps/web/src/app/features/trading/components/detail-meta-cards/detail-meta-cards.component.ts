@@ -466,10 +466,10 @@ export class TradingDetailMetaCardsComponent {
     return current;
   });
 
-  readonly clientName = input.required<string>();
+  readonly clientName = input<string>('');
   readonly supplierName = input<string>('—');
-  readonly vesselName = input.required<string>();
-  readonly placeName = input.required<string>();
+  readonly vesselName = input<string>('');
+  readonly placeName = input<string>('');
 
   readonly clientId = input<string>('');
   readonly supplierId = input<string>('');
@@ -640,53 +640,27 @@ export class TradingDetailMetaCardsComponent {
   formatDateForInput(dateStr: string | null | undefined): string {
     if (!dateStr) return '';
     const date = new Date(dateStr);
-    const tz = this.timezone();
-    const safeTimezone = this.normalizeTimeZone(tz);
-    const parts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: safeTimezone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).formatToParts(date);
-    const map = new Map(parts.map((p) => [p.type, p.value]));
-    return `${map.get('year') ?? '0000'}-${map.get('month') ?? '01'}-${map.get('day') ?? '01'}`;
+    if (Number.isNaN(date.getTime())) return '';
+    return this.formatUtcDateOnly(date);
   }
 
   formatDateLabel(dateStr: string | null | undefined): string {
     if (!dateStr) return '-';
     const date = new Date(dateStr);
-    const tz = this.timezone();
-
-    const safeTimezone = this.normalizeTimeZone(tz);
-    if (safeTimezone !== 'UTC' || tz === 'UTC') {
-      try {
-        Intl.DateTimeFormat(undefined, { timeZone: tz });
-        return new Intl.DateTimeFormat('en-GB', {
-          timeZone: tz,
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-        }).format(date);
-      } catch { /* fall through to legacy path */ }
-    }
-
-    // Legacy fixed-offset path
-    const fixedOffset = this.parseFixedOffsetMinutes(tz);
-    if (fixedOffset !== null) {
-      const shifted = new Date(date.getTime() + fixedOffset * 60_000);
-      const day = String(shifted.getUTCDate()).padStart(2, '0');
-      const month = shifted.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' });
-      const year = shifted.getUTCFullYear();
-      return `${day} ${month} ${year}`;
-    }
-
-    // Fallback: UTC
+    if (Number.isNaN(date.getTime())) return '-';
     return new Intl.DateTimeFormat('en-GB', {
       timeZone: 'UTC',
       day: '2-digit',
       month: 'short',
       year: 'numeric',
     }).format(date);
+  }
+
+  private formatUtcDateOnly(date: Date): string {
+    const year = String(date.getUTCFullYear()).padStart(4, '0');
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   private normalizeTimeZone(timeZone: string): string {

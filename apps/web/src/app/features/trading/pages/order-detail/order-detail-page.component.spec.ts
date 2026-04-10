@@ -1,12 +1,23 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
+import { BrowserTestingModule, platformBrowserTesting } from '@angular/platform-browser/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import type { BankAccountDto, OwnCompanyDto } from '@fueld/types';
 import { OrderDetailPageComponent } from './order-detail-page.component';
 import { AuthService } from '../../../../core/auth/auth.service';
-import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring.service';
+import { RiskMonitoringService } from '../../../../core/risk-monitoring/risk-monitoring.service';
+
+try {
+  TestBed.initTestEnvironment(BrowserTestingModule, platformBrowserTesting());
+} catch {
+  // Ignore when another test runner has already initialized the Angular test platform.
+}
+
+afterEach(() => {
+  TestBed.resetTestingModule();
+});
 
 function buildOwnCompany(id: string, name: string): OwnCompanyDto {
   return {
@@ -164,5 +175,24 @@ describe('OrderDetailPageComponent', () => {
     (component as any).applyPreferredBankAccountSelection(accounts);
 
     expect(component.order()?.bankAccountId).toBe('bank-2');
+  });
+
+  it('keeps ETA min date aligned with the stored calendar day for positive-offset ports', async () => {
+    const component = await createComponent();
+
+    component.port.set({ timezone: 'Pacific/Fiji' } as any);
+    component.order.set({ eta: '2026-04-11T12:00:00.000Z' } as any);
+
+    expect(component.etaMinDateTime()).toBe('2026-04-11');
+  });
+
+  it('keeps delivered-at input aligned with the stored calendar day for positive-offset ports', async () => {
+    const component = await createComponent();
+
+    component.port.set({ timezone: 'Pacific/Fiji' } as any);
+    component.order.set({ deliveredAt: '2026-04-11T12:00:00.000Z' } as any);
+
+    expect(component.deliveredAtLocal()).toBe('2026-04-11');
+    expect(component.formatStoredDateOnlyLabel('2026-04-11T12:00:00.000Z')).toBe('11 Apr 2026');
   });
 });
