@@ -16,6 +16,8 @@ import {
   EmailTagInputComponent,
   type EmailTag,
 } from '../../../../shared/components/email-tag-input/email-tag-input.component';
+import { PdfPreviewModalComponent } from '../../../../shared/components/pdf-preview-modal/pdf-preview-modal.component';
+import { isMobilePdfPreviewUserAgent } from '../../../../shared/components/pdf-preview-modal/pdf-preview-modal.utils';
 import { API_URL } from '@app/core/config/api';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -67,7 +69,7 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
 @Component({
   selector: 'app-send-email-modal',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, EmailTagInputComponent],
+  imports: [FormsModule, EmailTagInputComponent, PdfPreviewModalComponent],
   template: `
     @if (open()) {
       <!-- Backdrop -->
@@ -422,7 +424,7 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
             }
 
             <!-- PDF Preview iframe -->
-            @if (pdfPreviewUrl()) {
+            @if (!isMobilePreview && pdfPreviewUrl()) {
               <div class="rounded-lg border border-gray-200 overflow-hidden">
                 <div
                   class="flex items-center justify-between bg-gray-50 px-4 py-2 border-b border-gray-200"
@@ -581,6 +583,8 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
             </button>
           </div>
         </div>
+
+        <app-pdf-preview-modal [showWhatsAppActions]="false" />
       </div>
     }
   `,
@@ -610,6 +614,7 @@ export class SendEmailModalComponent {
   private readonly toInput = viewChild<EmailTagInputComponent>('toInput');
   private readonly ccInput = viewChild<EmailTagInputComponent>('ccInput');
   private readonly bccInput = viewChild<EmailTagInputComponent>('bccInput');
+  private readonly pdfModal = viewChild(PdfPreviewModalComponent);
   private readonly bodyEditor =
     viewChild<ElementRef<HTMLDivElement>>('bodyEditor');
 
@@ -621,6 +626,7 @@ export class SendEmailModalComponent {
   readonly loadingPreview = signal(false);
   readonly pdfPreviewUrl = signal<SafeResourceUrl | null>(null);
   readonly selectedAttachmentIds = signal<string[]>([]);
+  readonly isMobilePreview = isMobilePdfPreviewUserAgent(navigator.userAgent);
 
   subject = '';
   waPhoneNumber = '';
@@ -734,6 +740,7 @@ export class SendEmailModalComponent {
 
   close(): void {
     this.open.set(false);
+    this.pdfModal()?.close();
     this.pdfPreviewUrl.set(null);
     if (this._pdfBlobUrl) {
       URL.revokeObjectURL(this._pdfBlobUrl);
@@ -783,6 +790,12 @@ export class SendEmailModalComponent {
     const query = docType === 'NOMINATION' && this.nominationOrderSupplierId()
       ? `?orderSupplierId=${encodeURIComponent(this.nominationOrderSupplierId()!)}`
       : '';
+    const fileName = this.pdfFileName() || `${DOC_LABELS[docType]}.pdf`;
+
+    if (this.isMobilePreview) {
+      this.closePdfPreview();
+      this.pdfModal()?.showLoading(this.docLabel());
+    }
 
     this.http
       .get(`${API_URL}/orders/${oid}/${pdfEndpoints[docType]}/pdf${query}`, {
@@ -790,6 +803,13 @@ export class SendEmailModalComponent {
       })
       .subscribe({
         next: (blob) => {
+          this.loadingPreview.set(false);
+
+          if (this.isMobilePreview) {
+            this.pdfModal()?.setBlob(blob, fileName);
+            return;
+          }
+
           if (this._pdfBlobUrl) {
             URL.revokeObjectURL(this._pdfBlobUrl);
           }
@@ -797,10 +817,12 @@ export class SendEmailModalComponent {
           this.pdfPreviewUrl.set(
             this.sanitizer.bypassSecurityTrustResourceUrl(this._pdfBlobUrl),
           );
-          this.loadingPreview.set(false);
         },
         error: () => {
           this.loadingPreview.set(false);
+          if (this.isMobilePreview) {
+            this.pdfModal()?.showError();
+          }
         },
       });
   }
@@ -866,6 +888,7 @@ export class SendEmailModalComponent {
   done(): void {
     this.sending.set(false);
     this.open.set(false);
+    this.pdfModal()?.close();
     this.pdfPreviewUrl.set(null);
     if (this._pdfBlobUrl) {
       URL.revokeObjectURL(this._pdfBlobUrl);

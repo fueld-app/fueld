@@ -11,11 +11,15 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
+import {
+  isMobilePdfPreviewUserAgent,
+  resolvePdfWorkerUrl,
+} from './pdf-preview-modal.utils';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  PDF Preview Modal
 //
-//  Shows a PDF in an iframe overlay with a download button.
+//  Shows a PDF in an iframe overlay on desktop and renders pages with PDF.js on mobile.
 //  Usage:
 //    @ViewChild(PdfPreviewModalComponent) pdfModal!: PdfPreviewModalComponent;
 //    pdfModal.show(blobUrl, title, fileName);
@@ -72,7 +76,7 @@ import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
               }
 
               <!-- WhatsApp send button -->
-              @if (!loading()) {
+              @if (showWhatsAppActions() && !loading()) {
                 @if (!waLinked()) {
                   <!-- Not linked – show WA button that reveals a helpful message -->
                   @if (waNotLinkedMsg()) {
@@ -174,18 +178,33 @@ import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
                 </div>
               </div>
             } @else if (isMobile) {
-              <div #pdfContainer class="flex h-full flex-col items-center gap-2 overflow-y-auto bg-gray-200 p-2">
-                @if (renderingPages()) {
-                  <div class="flex h-full items-center justify-center">
-                    <div class="flex flex-col items-center gap-3">
-                      <svg class="h-8 w-8 animate-spin text-brand-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                      </svg>
-                      <span class="text-sm text-gray-500">Rendering PDF…</span>
+              <div class="flex h-full flex-col gap-3 bg-gray-200 p-2">
+                <div class="flex items-center justify-between gap-3 rounded-lg bg-white/90 px-3 py-2 text-xs text-gray-600 shadow-sm">
+                  <span>{{ renderError() || 'If the preview stays blank, open the PDF in your device viewer.' }}</span>
+                  <button
+                    type="button"
+                    (click)="openPdf()"
+                    class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
+                  >
+                    Open PDF
+                  </button>
+                </div>
+
+                <div class="relative flex-1 overflow-y-auto rounded-lg bg-gray-200">
+                  @if (renderingPages()) {
+                    <div class="absolute inset-0 z-10 flex items-center justify-center bg-gray-200/85 backdrop-blur-[1px]">
+                      <div class="flex flex-col items-center gap-3">
+                        <svg class="h-8 w-8 animate-spin text-brand-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                        <span class="text-sm text-gray-500">Rendering PDF…</span>
+                      </div>
                     </div>
-                  </div>
-                }
+                  }
+
+                  <div #pdfCanvasHost class="flex min-h-full flex-col items-center gap-2 p-2"></div>
+                </div>
               </div>
             } @else {
               <iframe
@@ -202,11 +221,13 @@ import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
 })
 export class PdfPreviewModalComponent {
   private readonly sanitizer = inject(DomSanitizer);
+  private readonly pdfWorkerUrl = resolvePdfWorkerUrl(document.baseURI);
 
   /** Whether the current user has linked WhatsApp in Settings */
   readonly waLinked = input(false);
   /** Pre-fill phone number from the contact person */
   readonly defaultPhone = input<string | null>(null);
+  readonly showWhatsAppActions = input(true);
 
   readonly visible = signal(false);
   readonly loading = signal(false);
@@ -216,13 +237,14 @@ export class PdfPreviewModalComponent {
     return url ? this.sanitizer.bypassSecurityTrustResourceUrl(url) : '';
   });
   readonly downloadUrl = signal<string>('');
-  readonly isMobile = /android|iphone|ipad/i.test(navigator.userAgent);
+  readonly isMobile = isMobilePdfPreviewUserAgent(navigator.userAgent);
   readonly title = signal('');
   readonly fileName = signal('');
   readonly verifyUrl = signal('');
   readonly verifyCopied = signal(false);
   readonly renderingPages = signal(false);
-  readonly pdfContainer = viewChild<ElementRef<HTMLDivElement>>('pdfContainer');
+  readonly renderError = signal('');
+  readonly pdfCanvasHost = viewChild<ElementRef<HTMLDivElement>>('pdfCanvasHost');
 
   // WhatsApp send
   readonly sendWhatsApp = output<{ phone: string; blob: Blob; fileName: string }>();
@@ -233,9 +255,11 @@ export class PdfPreviewModalComponent {
 
   private currentBlobUrl: string | null = null;
   private currentBlob: Blob | null = null;
+  private renderSessionId = 0;
 
   /** Open the modal in loading state while fetching the PDF */
   showLoading(title: string): void {
+    this.resetRenderedPreview();
     this.revokePreviousUrl();
     this.title.set(title);
     this.fileName.set('');
@@ -249,6 +273,7 @@ export class PdfPreviewModalComponent {
 
   /** Set the loaded PDF blob and display it */
   setBlob(blob: Blob, fileName: string, verifyUrl?: string | null): void {
+    const renderSessionId = this.resetRenderedPreview();
     this.currentBlob = blob;
     this.fileName.set(fileName);
     this.verifyUrl.set((verifyUrl ?? '').trim());
@@ -262,7 +287,7 @@ export class PdfPreviewModalComponent {
 
     // On mobile, render PDF pages as canvas images since WebView lacks a PDF renderer
     if (this.isMobile) {
-      this.renderPdfPages(blob);
+      void this.renderPdfPages(blob, renderSessionId);
     }
   }
 
@@ -292,6 +317,7 @@ export class PdfPreviewModalComponent {
   showError(): void {
     this.visible.set(false);
     this.loading.set(false);
+    this.resetRenderedPreview();
     this.revokePreviousUrl();
   }
 
@@ -305,7 +331,7 @@ export class PdfPreviewModalComponent {
   close(): void {
     this.visible.set(false);
     this.loading.set(false);
-    this.renderingPages.set(false);
+    this.resetRenderedPreview();
     this.waFormOpen.set(false);
     this.waSending.set(false);
     this.waNotLinkedMsg.set(false);
@@ -313,6 +339,16 @@ export class PdfPreviewModalComponent {
     this.verifyCopied.set(false);
     this.waPhone = '';
     this.revokePreviousUrl();
+  }
+
+  openPdf(): void {
+    const url = this.downloadUrl();
+    if (!url) return;
+
+    const opened = window.open(url, '_blank', 'noopener,noreferrer');
+    if (opened) return;
+
+    window.location.assign(url);
   }
 
   /** Emit WhatsApp send with the current blob */
@@ -333,57 +369,97 @@ export class PdfPreviewModalComponent {
     this.waPhone = '';
   }
 
-  private async renderPdfPages(blob: Blob): Promise<void> {
+  private async renderPdfPages(blob: Blob, renderSessionId: number): Promise<void> {
     this.renderingPages.set(true);
     try {
-      const { getDocument, GlobalWorkerOptions } = await import('pdfjs-dist');
-      GlobalWorkerOptions.workerSrc = 'pdf.worker.min.mjs';
+      const { getDocument, GlobalWorkerOptions } = await import('pdfjs-dist/legacy/build/pdf.mjs');
+      if (renderSessionId !== this.renderSessionId) return;
+
+      GlobalWorkerOptions.workerSrc = this.pdfWorkerUrl;
 
       const data = new Uint8Array(await blob.arrayBuffer());
       const pdf = await getDocument({ data }).promise;
 
       // Wait a tick for Angular to render the container after loading state change
       await new Promise(resolve => setTimeout(resolve, 0));
+      if (renderSessionId !== this.renderSessionId) {
+        pdf.destroy();
+        return;
+      }
 
-      const container = this.pdfContainer()?.nativeElement;
-      if (!container) return;
+      const container = this.pdfCanvasHost()?.nativeElement;
+      if (!container) {
+        pdf.destroy();
+        return;
+      }
 
-      this.renderingPages.set(false);
+      this.clearRenderedPages();
 
-      const containerWidth = container.clientWidth - 16; // account for padding
+      const containerWidth = Math.max(container.clientWidth - 16, 280);
 
       for (let i = 1; i <= pdf.numPages; i++) {
+        if (renderSessionId !== this.renderSessionId) {
+          pdf.destroy();
+          return;
+        }
+
         const page = await pdf.getPage(i);
         const unscaledViewport = page.getViewport({ scale: 1 });
         const scale = containerWidth / unscaledViewport.width;
         const viewport = page.getViewport({ scale: scale * (window.devicePixelRatio || 1) });
 
         const canvas = document.createElement('canvas');
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
+        const context = canvas.getContext('2d');
+        if (!context) {
+          page.cleanup();
+          throw new Error('Canvas 2D context unavailable');
+        }
+
+        canvas.width = Math.ceil(viewport.width);
+        canvas.height = Math.ceil(viewport.height);
         canvas.style.width = `${containerWidth}px`;
         canvas.style.height = `${(containerWidth * viewport.height) / viewport.width}px`;
-        canvas.classList.add('rounded-lg', 'shadow-sm');
+        canvas.classList.add('rounded-lg', 'bg-white', 'shadow-sm');
 
         container.appendChild(canvas);
 
-        await page.render({ canvas, viewport }).promise;
+        await page.render({ canvas, canvasContext: context, viewport }).promise;
+        page.cleanup();
       }
+      pdf.destroy();
     } catch {
-      // Fallback: trigger download if rendering fails
-      this.renderingPages.set(false);
-      const a = document.createElement('a');
-      a.href = this.downloadUrl();
-      a.download = this.fileName();
-      a.click();
+      if (renderSessionId === this.renderSessionId) {
+        this.renderError.set(
+          'Preview unavailable on this device. Use Open PDF to open the file in your browser.',
+        );
+      }
+    } finally {
+      if (renderSessionId === this.renderSessionId) {
+        this.renderingPages.set(false);
+      }
     }
+  }
+
+  private resetRenderedPreview(): number {
+    this.renderSessionId += 1;
+    this.renderingPages.set(false);
+    this.renderError.set('');
+    this.clearRenderedPages();
+    return this.renderSessionId;
+  }
+
+  private clearRenderedPages(): void {
+    this.pdfCanvasHost()?.nativeElement.replaceChildren();
   }
 
   private revokePreviousUrl(): void {
     if (this.currentBlobUrl) {
       URL.revokeObjectURL(this.currentBlobUrl);
       this.currentBlobUrl = null;
-      this.currentBlob = null;
     }
+
+    this.currentBlob = null;
+    this.rawBlobUrl.set('');
+    this.downloadUrl.set('');
   }
 }
