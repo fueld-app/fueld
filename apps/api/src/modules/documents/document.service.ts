@@ -667,6 +667,17 @@ export function splitAddressLines(address: string): string[] {
   return trimmed.split(/,\s*/).map(l => l.trim()).filter(Boolean);
 }
 
+function formatStoredDateOnlyForDisplay(value: string | Date | null | undefined): string | null {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const year = String(date.getUTCFullYear()).padStart(4, '0');
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${day}-${month}-${year}`;
+}
+
 function parseTimezoneOffset(tz: string | null | undefined): number | null {
   if (!tz) return null;
   const match = tz.match(/([+-])\s*(\d{1,2})(?::(\d{2}))?/);
@@ -678,17 +689,6 @@ function parseTimezoneOffset(tz: string | null | undefined): number | null {
   const hours = parseInt(match[2], 10);
   const minutes = match[3] ? parseInt(match[3], 10) : 0;
   return sign * (hours * 60 + minutes);
-}
-
-/** Check if a string is a valid IANA timezone identifier. */
-function isIanaTimezone(tz: string | null | undefined): boolean {
-  if (!tz) return false;
-  try {
-    Intl.DateTimeFormat(undefined, { timeZone: tz });
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 /** Compute invoice due date from payment terms.
@@ -714,33 +714,8 @@ function computeDueDate(
   return new Date(baseDate.getTime() + 30 * 86_400_000).toISOString().split('T')[0]!;
 }
 
-function formatDateTimeForDisplay(value: string | null, tz: string | null | undefined, _omitTz = false): string | null {
-  if (!value) return null;
-  const date = new Date(value);
-  if (isNaN(date.getTime())) return null;
-
-  // ── IANA timezone path (preferred) ──────────────────────────────
-  if (tz && isIanaTimezone(tz)) {
-    const parts = new Intl.DateTimeFormat('en-GB', {
-      timeZone: tz,
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    }).formatToParts(date);
-    const map = new Map(parts.map((p) => [p.type, p.value]));
-    const day = map.get('day') ?? '01';
-    const month = map.get('month') ?? '01';
-    const year = map.get('year') ?? '0000';
-    return `${day}-${month}-${year}`;
-  }
-
-  // ── Legacy fixed-offset path (fallback for old "GMT +04H" style) ─
-  const offset = parseTimezoneOffset(tz ?? null);
-  const local = offset === null ? date : new Date(date.getTime() + offset * 60_000);
-  const year = String(local.getUTCFullYear()).padStart(4, '0');
-  const month = String(local.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(local.getUTCDate()).padStart(2, '0');
-  return `${day}-${month}-${year}`;
+function formatDateTimeForDisplay(value: string | null, _tz: string | null | undefined, _omitTz = false): string | null {
+  return formatStoredDateOnlyForDisplay(value);
 }
 
 function replaceCompanyNamePlaceholder(

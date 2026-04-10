@@ -145,7 +145,7 @@ describe('document.service formatting helpers', () => {
     }
   });
 
-  it('parses timezone offsets and formats date-time output', () => {
+  it('parses timezone offsets and keeps date-only output stable across timezones', () => {
     expect(__documentTestUtils.parseTimezoneOffset('UTC')).toBe(0);
     expect(__documentTestUtils.parseTimezoneOffset('GMT')).toBe(0);
     expect(__documentTestUtils.parseTimezoneOffset('UTC+2')).toBe(120);
@@ -153,6 +153,7 @@ describe('document.service formatting helpers', () => {
     expect(__documentTestUtils.parseTimezoneOffset('Europe/Copenhagen')).toBeNull();
 
     expect(__documentTestUtils.formatDateTimeForDisplay('2026-03-01T10:00:00.000Z', 'UTC+2')).toBe('01-03-2026');
+    expect(__documentTestUtils.formatDateTimeForDisplay('2026-04-11T12:00:00.000Z', 'Pacific/Fiji')).toBe('11-04-2026');
     expect(__documentTestUtils.formatDateTimeForDisplay('2026-03-01T10:00:00.000Z', null)).toBe('01-03-2026');
     expect(__documentTestUtils.formatDateTimeForDisplay(null, 'UTC+2')).toBeNull();
   });

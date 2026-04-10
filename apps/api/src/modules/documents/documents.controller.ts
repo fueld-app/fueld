@@ -54,6 +54,20 @@ function buildInquiryTemplateVariables(params: {
   };
 }
 
+const storedDateOnlyLabelFormatter = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'UTC',
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
+});
+
+function formatStoredDateOnlyLabel(value: string | Date | null | undefined): string | null {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return storedDateOnlyLabelFormatter.format(date);
+}
+
 function buildNominationResponseLinkCardHtml(responseUrl: string): string {
   return `
     <div style="margin-top: 24px; border: 1px solid #dbeafe; border-radius: 12px; background: #f8fbff; padding: 18px;">
@@ -1278,15 +1292,10 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         supplierTerms = ownCo?.supplierTerms ?? null;
       }
 
-      const formatDate = (iso: string | null) => {
-        if (!iso) return null;
-        const d = new Date(iso);
-        return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-      };
       const resolvedEta = body?.eta ?? order.eta;
       const resolvedEtd = body?.etd ?? order.etd;
-      const etaLabel = formatDate(resolvedEta);
-      const etdLabel = formatDate(resolvedEtd);
+      const etaLabel = formatStoredDateOnlyLabel(resolvedEta);
+      const etdLabel = formatStoredDateOnlyLabel(resolvedEtd);
       const deliveryWindow = etaLabel && etdLabel
         ? `${etaLabel} to ${etdLabel}`
         : etaLabel || etdLabel || '';
@@ -1414,15 +1423,8 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       const inquirySettings = await getInquirySettings();
       const resolvedEta = body.eta ?? order.eta;
       const resolvedEtd = body.etd ?? order.etd;
-      const formatDate = (iso: string | null) => {
-        if (!iso) return null;
-        const date = new Date(iso);
-        return Number.isNaN(date.getTime())
-          ? null
-          : date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-      };
-      const etaLabel = formatDate(resolvedEta);
-      const etdLabel = formatDate(resolvedEtd);
+      const etaLabel = formatStoredDateOnlyLabel(resolvedEta);
+      const etdLabel = formatStoredDateOnlyLabel(resolvedEtd);
       const deliveryWindow = etaLabel && etdLabel
         ? `${etaLabel} to ${etdLabel}`
         : etaLabel || etdLabel || '';
@@ -1728,14 +1730,6 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         .where(eq(supplierInquiries.orderId, orderId));
       const existingInquiryBySupplierId = new Map(existingInquiries.map((inquiry) => [inquiry.supplierId, inquiry]));
 
-      const formatDate = (iso: string | null) => {
-        if (!iso) return null;
-        const date = new Date(iso);
-        return Number.isNaN(date.getTime())
-          ? null
-          : date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-      };
-
       const responseDeadlineAt = body.responseDeadlineAt ?? getDefaultInquiryResponseDeadline(inquirySettings.defaultResponseDeadlineHours);
       const responseDeadlineFormatted = formatDeadlineHumanDuration(responseDeadlineAt);
       const results: Array<{ recipientId: string; recipientName: string; phone: string; success: boolean; error?: string }> = [];
@@ -1753,8 +1747,8 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             vesselName: order.vessel?.name ?? 'Vessel',
             vesselImo: order.vessel?.imo ?? null,
             portName: order.place?.name ?? 'Port',
-            etaFormatted: formatDate(resolvedEta),
-            etdFormatted: formatDate(resolvedEtd),
+            etaFormatted: formatStoredDateOnlyLabel(resolvedEta),
+            etdFormatted: formatStoredDateOnlyLabel(resolvedEtd),
             responseDeadlineFormatted,
             personalNote: target.personalNote ?? null,
             quoteFormUrl,
