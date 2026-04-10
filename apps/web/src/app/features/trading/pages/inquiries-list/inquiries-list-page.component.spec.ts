@@ -7,9 +7,15 @@ import { InquiriesListPageComponent } from './inquiries-list-page.component';
 import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.service';
 
 describe('InquiriesListPageComponent', () => {
+  let requestedUrls: string[];
+
   beforeEach(async () => {
+    requestedUrls = [];
+
     const http = {
       get: (url: string) => {
+        requestedUrls.push(url);
+
         if (url.includes('/orders?')) {
           return of({
             success: true,
@@ -38,6 +44,10 @@ describe('InquiriesListPageComponent', () => {
           });
         }
 
+        if (url.includes('/lloyds/users')) {
+          return of({ success: true, data: [] });
+        }
+
         return of({ success: true, data: { items: [], total: 0 } });
       },
     };
@@ -51,6 +61,39 @@ describe('InquiriesListPageComponent', () => {
         { provide: NewInquiryModalService, useValue: { requestId: signal(0) } },
       ],
     }).compileComponents();
+  });
+
+  function latestOrdersRequest(): string {
+    const request = [...requestedUrls].reverse().find((url) => url.includes('/orders?'));
+    expect(request).toBeDefined();
+    return request!;
+  }
+
+  it('defaults inquiry requests to ETA ascending', async () => {
+    const fixture = TestBed.createComponent(InquiriesListPageComponent);
+    const component = fixture.componentInstance;
+
+    await component.loadInquiries();
+
+    expect(component.activeSortBy()).toBe('eta');
+    expect(component.activeSortDir()).toBe('asc');
+    expect(latestOrdersRequest()).toContain('sortBy=eta');
+    expect(latestOrdersRequest()).toContain('sortDir=asc');
+  });
+
+  it('defaults active order requests to ETA ascending', async () => {
+    const fixture = TestBed.createComponent(InquiriesListPageComponent);
+    fixture.componentRef.setInput('mode', 'active-orders');
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const component = fixture.componentInstance;
+
+    expect(component.activeSortBy()).toBe('eta');
+    expect(component.activeSortDir()).toBe('asc');
+    expect(latestOrdersRequest()).toContain('statuses=CONFIRMED%2CDELIVERED%2CINVOICED');
+    expect(latestOrdersRequest()).toContain('sortBy=eta');
+    expect(latestOrdersRequest()).toContain('sortDir=asc');
   });
 
   it('shows gross, financing, and net metrics on order lists', async () => {

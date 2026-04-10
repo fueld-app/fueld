@@ -121,20 +121,20 @@ interface LliSearchResult {
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-gray-200 bg-gray-50/80">
-                <th app-sort-header field="orderNumber" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">No.</th>
-                <th app-sort-header field="client" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Client</th>
-                <th app-sort-header field="vessel" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Vessel</th>
-                <th app-sort-header field="port" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Port</th>
-                <th app-sort-header field="status" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Status</th>
-                <th app-sort-header field="responsible" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Responsible</th>
-                <th app-sort-header field="eta" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">ETA</th>
+                <th app-sort-header field="orderNumber" [sortBy]="activeSortBy()" [sortDir]="activeSortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">No.</th>
+                <th app-sort-header field="client" [sortBy]="activeSortBy()" [sortDir]="activeSortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Client</th>
+                <th app-sort-header field="vessel" [sortBy]="activeSortBy()" [sortDir]="activeSortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Vessel</th>
+                <th app-sort-header field="port" [sortBy]="activeSortBy()" [sortDir]="activeSortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Port</th>
+                <th app-sort-header field="status" [sortBy]="activeSortBy()" [sortDir]="activeSortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Status</th>
+                <th app-sort-header field="responsible" [sortBy]="activeSortBy()" [sortDir]="activeSortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Responsible</th>
+                <th app-sort-header field="eta" [sortBy]="activeSortBy()" [sortDir]="activeSortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">ETA</th>
                 <th class="px-4 py-3 text-right font-medium text-gray-600">Value</th>
                 @if (isOrders()) {
                   <th class="px-4 py-3 text-right font-medium text-gray-600">Gross</th>
                   <th class="px-4 py-3 text-right font-medium text-gray-600">Financing</th>
                   <th class="px-4 py-3 text-right font-medium text-gray-600">Net</th>
                 }
-                <th app-sort-header field="createdAt" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Created</th>
+                <th app-sort-header field="createdAt" [sortBy]="activeSortBy()" [sortDir]="activeSortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Created</th>
                 <th class="px-4 py-3 w-12"></th>
               </tr>
             </thead>
@@ -489,6 +489,10 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   readonly searchTerm = signal('');
   readonly sortBy = signal('');
   readonly sortDir = signal<'asc' | 'desc'>('asc');
+  readonly defaultSortBy = computed(() => 'eta');
+  readonly defaultSortDir = computed<'asc' | 'desc'>(() => 'asc');
+  readonly activeSortBy = computed(() => this.sortBy() || this.defaultSortBy());
+  readonly activeSortDir = computed<'asc' | 'desc'>(() => this.sortBy() ? this.sortDir() : this.defaultSortDir());
   readonly toast = signal<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // ─── Broker filter ────────────────────────────────────────────────
@@ -603,8 +607,8 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
       if (this.searchTerm()) params.set('search', this.searchTerm());
       if (this.filterBrokerId()) params.set('brokerId', this.filterBrokerId());
       if (this.filterResponsibleId()) params.set('salesRepId', this.filterResponsibleId());
-      if (this.sortBy()) params.set('sortBy', this.sortBy());
-      if (this.sortBy()) params.set('sortDir', this.sortDir());
+      if (this.activeSortBy()) params.set('sortBy', this.activeSortBy());
+      if (this.activeSortBy()) params.set('sortDir', this.activeSortDir());
 
       const res = await firstValueFrom(
         this.http.get<ApiResponse<{ items: OrderListRowDto[]; total: number }>>(
