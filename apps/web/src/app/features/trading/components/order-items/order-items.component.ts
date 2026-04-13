@@ -745,6 +745,15 @@ export interface OrderItemsEconomics {
                 </span>
               } @else {
                 <div class="space-y-1">
+                  @if (spreadEnabled().has(row.id)) {
+                    <input type="number" step="0.001" min="0"
+                      [ngModel]="row.quantityMin ?? row.quantity"
+                      (ngModelChange)="updateQuantityMin(i, $event)"
+                      placeholder="Min qty"
+                      class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
+                             focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                    />
+                  }
                   <div class="flex items-center gap-2">
                     <input type="number" step="0.001" min="0"
                       [ngModel]="row.quantity"
@@ -765,15 +774,6 @@ export interface OrderItemsEconomics {
                       ±
                     </button>
                   </div>
-                  @if (spreadEnabled().has(row.id)) {
-                    <input type="number" step="0.001" min="0"
-                      [ngModel]="row.quantityMin ?? row.quantity"
-                      (ngModelChange)="updateQuantityMin(i, $event)"
-                      placeholder="Min qty"
-                      class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
-                             focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                    />
-                  }
                 </div>
               }
             </div>
