@@ -177,6 +177,55 @@ describe('OrderDetailPageComponent', () => {
     expect(component.order()?.bankAccountId).toBe('bank-2');
   });
 
+  it('builds item payload quantityMax from the current quantity instead of a stale stored quantityMax', async () => {
+    const component = await createComponent();
+
+    const payload = (component as any).buildItemPayload([
+      {
+        id: 'item-1',
+        orderSupplierId: null,
+        productType: 'VLSFO',
+        description: 'RMG380',
+        quantity: 300,
+        quantityMin: 265,
+        quantityMax: 265,
+        unit: 'MT',
+        costUnit: 'MT',
+        salesUnit: 'MT',
+        costConversionFactor: 1,
+        unitConversionFactor: 1,
+        costPrice: 0,
+        costCurrency: 'USD',
+        salesPrice: 0,
+        salesCurrency: 'USD',
+        profit: 0,
+        paymentTerms: '',
+        customerNote: null,
+        deliveredQuantity: null,
+        costPricingModel: 'FIXED',
+        costReferenceId: null,
+        costPlattsEntryId: null,
+        costPremium: null,
+        costBarging: null,
+        costBargingUnit: null,
+        costCreditDays: null,
+        costPriceFinalized: false,
+        salesPricingModel: 'FIXED',
+        salesReferenceId: null,
+        salesPlattsEntryId: null,
+        salesPremium: null,
+        salesBarging: null,
+        salesBargingUnit: null,
+        salesCreditDays: null,
+        salesPriceFinalized: false,
+      },
+    ]);
+
+    expect(payload[0]?.quantity).toBe('300');
+    expect(payload[0]?.quantityMin).toBe('265');
+    expect(payload[0]?.quantityMax).toBe('300');
+  });
+
   it('keeps ETA min date aligned with the stored calendar day for positive-offset ports', async () => {
     const component = await createComponent();
 

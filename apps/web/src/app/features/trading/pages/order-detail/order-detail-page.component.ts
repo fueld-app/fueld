@@ -3331,7 +3331,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         productType: r.productType,
         quantity: String(r.quantity),
         quantityMin: r.quantityMin != null ? String(r.quantityMin) : null,
-        quantityMax: String(r.quantityMax ?? r.quantity),
+        quantityMax: String(r.quantity),
         unit: r.unit,
         costUnit: r.costUnit,
         salesUnit: r.salesUnit,
