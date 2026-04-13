@@ -206,7 +206,7 @@ export interface OrderItemsEconomics {
                     @if (spreadEnabled().has(row.id)) {
                       <input
                         type="number" step="0.001" min="0"
-                        [ngModel]="row.quantityMin ?? row.quantity"
+                        [ngModel]="row.quantityMin"
                         (ngModelChange)="updateQuantityMin(i, $event)"
                         placeholder="Min"
                         class="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm tabular-nums
@@ -747,7 +747,7 @@ export interface OrderItemsEconomics {
                 <div class="space-y-1">
                   @if (spreadEnabled().has(row.id)) {
                     <input type="number" step="0.001" min="0"
-                      [ngModel]="row.quantityMin ?? row.quantity"
+                      [ngModel]="row.quantityMin"
                       (ngModelChange)="updateQuantityMin(i, $event)"
                       placeholder="Min qty"
                       class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
@@ -1441,13 +1441,13 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
     this.emitChange();
   }
 
-  updateQuantityMin(index: number, value: number): void {
+  updateQuantityMin(index: number, value: number | null): void {
     this.rows.update((prev) => {
       const updated = [...prev];
       const row = { ...updated[index]! };
       row.quantityMin = value;
       // If min exceeds qty, bump qty up
-      if (value > row.quantity) {
+      if (value !== null && value > row.quantity) {
         row.quantity = value;
       }
       // Profit always uses main qty
@@ -1475,6 +1475,13 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
       this.rows.update((rows) => {
         const updated = [...rows];
         updated[index] = { ...updated[index]!, quantityMin: null };
+        return updated;
+      });
+    } else {
+      this.rows.update((rows) => {
+        const updated = [...rows];
+        const row = { ...updated[index]! };
+        updated[index] = { ...row, quantityMin: row.quantityMin ?? row.quantity };
         return updated;
       });
     }
