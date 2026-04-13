@@ -218,6 +218,7 @@ export interface OrderItemsEconomics {
                       type="number" step="0.001" min="0"
                       [ngModel]="row.quantity"
                       (ngModelChange)="updateQuantity(i, $event)"
+                      [attr.min]="spreadEnabled().has(row.id) && row.quantityMin !== null ? row.quantityMin : 0"
                       placeholder="Qty"
                       class="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm tabular-nums
                              focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
@@ -758,6 +759,7 @@ export interface OrderItemsEconomics {
                     <input type="number" step="0.001" min="0"
                       [ngModel]="row.quantity"
                       (ngModelChange)="updateQuantity(i, $event)"
+                      [attr.min]="spreadEnabled().has(row.id) && row.quantityMin !== null ? row.quantityMin : 0"
                       placeholder="Qty"
                       class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
                              focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
@@ -1428,11 +1430,9 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
     this.rows.update((prev) => {
       const updated = [...prev];
       const row = { ...updated[index]! };
-      row.quantity = value;
-      // If spread is active, ensure min doesn't exceed qty
-      if (row.quantityMin !== null && row.quantityMin > value) {
-        row.quantityMin = value;
-      }
+      row.quantity = row.quantityMin !== null && value < row.quantityMin
+        ? row.quantityMin
+        : value;
       // Auto-recalculate economics using delivered quantity when available.
       row.profit = this.profitForRow(row);
       updated[index] = row;
