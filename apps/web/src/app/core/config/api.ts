@@ -20,6 +20,17 @@ function getWsUrl(): string {
   return 'ws://localhost:3000/ws';
 }
 
+function getBrowserOrigin(): string {
+  if (typeof window === 'undefined') return 'http://localhost:4200';
+  return window.location.origin;
+}
+
+export function toAbsoluteUrl(url: string, origin = getBrowserOrigin()): string {
+  const value = url.trim();
+  if (!value) return value;
+  return new URL(value, origin).toString();
+}
+
 /** Base URL for all API calls. Dev: http://localhost:3000, Prod: /api */
 export const API = getApiUrl();
 

@@ -64,7 +64,7 @@ import { CreditApplicationModalComponent } from '../../../credit/components/cred
 //  Order Detail Page — Full order view with editable items grid
 // ═══════════════════════════════════════════════════════════════════════
 
-import { API_URL } from '@app/core/config/api';
+import { API_URL, toAbsoluteUrl } from '@app/core/config/api';
 import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring.service';
 
 interface TeamUserOption {
@@ -4811,7 +4811,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   private buildVerifyUrlFromResponse(res: HttpResponse<Blob>): string | null {
     const token = res.headers.get('X-Document-Verify-Token')?.trim();
-    return token ? `${API_URL}/verify/token/${token}` : null;
+    return token ? toAbsoluteUrl(`${API_URL}/verify/token/${token}`) : null;
   }
 
   // ── Open compose modal for any document type ───────────────────
