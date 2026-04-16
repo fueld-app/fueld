@@ -444,7 +444,7 @@ async function findAdminConnection(): Promise<UserConnection | null> {
  * Always uses the Admin's connected WhatsApp session.
  */
 export async function sendWhatsAppGroupMessage(
-  _userId: string,
+  _userId: string | null | undefined,
   groupJid: string,
   text: string,
 ): Promise<{ success: boolean; message: string }> {
