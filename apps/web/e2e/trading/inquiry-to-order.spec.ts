@@ -17,17 +17,20 @@ test('create inquiry, view offer PDF, convert to order, and verify order page', 
   await page.goto(`/trading/inquiries/${inquiryId}`);
   await expect(page.getByRole('button', { name: 'Actions' })).toBeVisible();
 
-  const sidebar = page.locator('aside');
-  const inquiriesNavLink = sidebar.getByRole('link', { name: /^Inquiries$/ });
-  const activeOrdersNavLink = sidebar.getByRole('link', { name: /^Active Orders$/ });
+  const menuButton = page.getByRole('button', { name: /open menu|close menu/i });
+  if (!(await menuButton.isVisible().catch(() => false))) {
+    const nav = page.getByRole('navigation', { name: 'Main navigation' });
+    const inquiriesNavLink = nav.getByRole('link', { name: /^Inquiries$/ });
+    const activeOrdersNavLink = nav.getByRole('link', { name: /^Active Orders$/ });
 
-  if (await inquiriesNavLink.count() === 0) {
-    await sidebar.getByRole('button', { name: /^Trading$/ }).click();
+    if (!(await inquiriesNavLink.isVisible().catch(() => false))) {
+      await nav.getByRole('button', { name: /^Trading$/ }).click();
+    }
+
+    await expect(inquiriesNavLink).toBeVisible();
+    await expect(inquiriesNavLink).toHaveClass(/bg-sidebar-active/);
+    await expect(activeOrdersNavLink).not.toHaveClass(/bg-sidebar-active/);
   }
-
-  await expect(inquiriesNavLink).toBeVisible();
-  await expect(inquiriesNavLink).toHaveClass(/bg-sidebar-active/);
-  await expect(activeOrdersNavLink).not.toHaveClass(/bg-sidebar-active/);
 
   // View Offer PDF (Inquiry page actions)
   {
@@ -45,7 +48,7 @@ test('create inquiry, view offer PDF, convert to order, and verify order page', 
   await page.waitForURL(/\/trading\/orders\//, { timeout: 15_000 });
 
   // The inquiry is seeded with a valid line item via API helper.
-  await expect(page.locator('app-order-items tbody tr').first()).toBeVisible();
+  await expect(page.locator('app-order-items')).toContainText('MGO');
 
 });
 
@@ -95,8 +98,8 @@ test('cancel inquiry shows all configured reasons and sends selected reason', as
   await cancelReasonsLoaded;
 
   await expect(page.getByRole('heading', { name: 'Inquiry Detail' })).toBeVisible();
-  await expect(page.getByText('INQUIRY', { exact: true })).toBeVisible();
-  await expect(page.locator('app-order-items tbody tr').first()).toBeVisible();
+  await expect(page.locator('app-status-badge').getByText('INQUIRY', { exact: true })).toBeVisible();
+  await expect(page.locator('app-order-items')).toContainText('MGO');
 
   const actionsButton = page.getByRole('button', { name: 'Actions' });
   const cancelInquiryMenuItem = page.getByRole('menuitem', { name: 'Cancel Inquiry' });
@@ -116,6 +119,6 @@ test('cancel inquiry shows all configured reasons and sends selected reason', as
 
   await page.getByRole('button', { name: 'Confirm Cancel' }).click();
 
-  await expect(page.getByText('Inquiry cancelled.')).toBeVisible();
+  await page.waitForURL(/\/trading\/cancelled-orders\//, { timeout: 15_000 });
   expect(capturedLossReason).toBe('No supplier availability');
 });

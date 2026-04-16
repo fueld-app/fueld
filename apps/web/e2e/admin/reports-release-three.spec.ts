@@ -265,11 +265,10 @@ test('reports comparison, drilldown, and exception export flows work from the UI
   await expect(page.getByTestId('reports-exceptions-total')).toContainText('2 open exceptions');
   await expect(page.getByTestId('reports-exception-row-invoice-1')).toContainText('INV-2026-001');
 
-  await page.getByTestId('reports-comparison-mode').selectOption('PREVIOUS_YEAR');
   const reloadResponse = page.waitForResponse(
     (response) => response.request().method() === 'GET' && response.url().includes('/reports/release-two') && response.url().includes('comparisonMode=PREVIOUS_YEAR'),
   );
-  await page.getByRole('button', { name: 'Refresh' }).click();
+  await page.getByTestId('reports-comparison-mode').selectOption('PREVIOUS_YEAR');
   await reloadResponse;
 
   const exportResponse = page.waitForResponse(

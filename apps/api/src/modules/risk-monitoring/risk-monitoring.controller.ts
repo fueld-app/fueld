@@ -20,6 +20,7 @@ import { authGuard } from '../auth/auth.guard';
 import type { ApiResponse } from '@fueld/types';
 import {
   getRiskSummary,
+  getActiveVesselRiskImpacts,
   getChecksForCompany,
   getHitsForCompany,
   triggerManualCheck,
@@ -35,6 +36,18 @@ import {
 
 export const riskMonitoringController = new Elysia({ prefix: '/risk-monitoring' })
   .use(authGuard)
+
+  .get(
+    '/vessel/:vesselId/impacts',
+    async ({ params, auth }) => {
+      const impacts = await getActiveVesselRiskImpacts(params.vesselId, auth.tenantId);
+      return { success: true, data: impacts } satisfies ApiResponse<typeof impacts>;
+    },
+    {
+      params: t.Object({ vesselId: t.String() }),
+      detail: { tags: ['Risk Monitoring'], summary: 'Get active sanction and seizure hits for a vessel' },
+    },
+  )
 
   // ─── Risk Summary ───────────────────────────────────────────────
   .get(

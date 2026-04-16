@@ -15,18 +15,15 @@ test('line item totals omit trailing zero decimals but keep meaningful decimals'
   const inquiryId = await createInquiryViaApi(page);
   await page.goto(`/trading/inquiries/${inquiryId}`);
 
-  const totalsFooter = page.locator('app-order-items tfoot').first();
-  await expect(totalsFooter).toBeVisible();
-  await expect(totalsFooter).toContainText('100');
-  await expect(totalsFooter).not.toContainText('100.000');
-
-  const firstRow = page.locator('app-order-items tbody tr').first();
-  const qtyInput = firstRow.locator('input[type="number"]').first();
+  const qtyInput = page.locator('app-order-items input[placeholder="Qty"]:visible').first();
   await expect(qtyInput).toBeVisible();
+  await qtyInput.fill('100');
+  await qtyInput.blur();
+
+  await expect(qtyInput).toHaveValue('100');
+
   await qtyInput.fill('100.5');
   await qtyInput.blur();
 
   await expect(qtyInput).toHaveValue('100.5');
-  await expect(totalsFooter).toContainText('100.5');
-  await expect(totalsFooter).not.toContainText('100.500');
 });

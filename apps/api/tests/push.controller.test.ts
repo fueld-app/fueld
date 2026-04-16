@@ -1,11 +1,9 @@
-import { beforeAll, beforeEach, describe, expect, it, mock } from 'bun:test';
+import { beforeEach, describe, expect, it } from 'bun:test';
 import { Elysia } from 'elysia';
 import { eq } from 'drizzle-orm';
 import { places, users } from '../src/db/schema';
+import { createPushController } from '../src/modules/push/push.controller';
 import { getDb, seedBasics, truncateAll } from './helpers/db';
-
-type PushControllerModule = typeof import('../src/modules/push/push.controller');
-let pushControllerModule: PushControllerModule;
 
 let currentAuth = {
   sub: '',
@@ -44,12 +42,9 @@ async function requestJson(
   };
 }
 
-beforeAll(async () => {
-  mock.module('../src/modules/auth/auth.guard', () => ({
-    authGuard: new Elysia({ name: 'test-auth-guard' }).derive({ as: 'scoped' }, () => ({ auth: currentAuth })),
-  }));
-
-  mock.module('../src/modules/push/push.service', () => ({
+function createTestApp() {
+  return new Elysia().use(createPushController({
+    authPlugin: new Elysia({ name: 'test-auth-guard' }).derive({ as: 'scoped' }, () => ({ auth: currentAuth })),
     getVapidPublicKey: async () => publicKeyResult,
     upsertSubscription: async (tenantId: string, userId: string, body: unknown) => {
       if (upsertShouldThrow) throw new Error('boom-upsert');
@@ -64,10 +59,7 @@ beforeAll(async () => {
       return sendCount;
     },
   }));
-
-  pushControllerModule = await import('../src/modules/push/push.controller');
-  mock.restore();
-});
+}
 
 beforeEach(async () => {
   await truncateAll();
@@ -89,7 +81,7 @@ beforeEach(async () => {
 
 describe('push.controller', () => {
   it('returns configured public key or a not-configured payload', async () => {
-    const app = new Elysia().use(pushControllerModule.pushController);
+    const app = createTestApp();
 
     const missing = await requestJson(app, '/push/public-key');
     expect(missing.status).toBe(200);
@@ -105,7 +97,7 @@ describe('push.controller', () => {
   it('subscribes for existing users and returns a failure payload when the user is missing or save fails', async () => {
     const seeded = await seedBasics();
     const db = await getDb();
-    const app = new Elysia().use(pushControllerModule.pushController);
+    const app = createTestApp();
 
     currentAuth = {
       sub: seeded.user.id,
@@ -174,7 +166,7 @@ describe('push.controller', () => {
 
   it('unsubscribes successfully and returns a failure payload when removal throws', async () => {
     const seeded = await seedBasics();
-    const app = new Elysia().use(pushControllerModule.pushController);
+    const app = createTestApp();
 
     currentAuth = {
       sub: seeded.user.id,
@@ -206,7 +198,7 @@ describe('push.controller', () => {
   it('returns sent counts for test notifications and handles missing users or send failures', async () => {
     const seeded = await seedBasics();
     const db = await getDb();
-    const app = new Elysia().use(pushControllerModule.pushController);
+    const app = createTestApp();
 
     currentAuth = {
       sub: seeded.user.id,

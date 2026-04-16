@@ -11,92 +11,112 @@ import {
   upsertSubscription,
 } from './push.service';
 
-export const pushController = new Elysia({ prefix: '/push' })
-  .get(
-    '/public-key',
-    async () => {
-      const publicKey = await getVapidPublicKey();
-      if (!publicKey) {
-        return { success: false, data: null, message: 'VAPID public key not configured' };
-      }
-      return { success: true, data: { publicKey } } satisfies ApiResponse<{ publicKey: string }>;
-    },
-    {
-      detail: { tags: ['Push'], summary: 'Get VAPID public key' },
-    },
-  )
-  .use(authGuard)
-  .post(
-    '/subscribe',
-    async ({ body, auth }) => {
-      try {
-        const user = await db.query.users.findFirst({
-          where: eq(users.id, auth.sub),
-          columns: { tenantId: true },
-        });
+interface PushControllerDeps {
+  authPlugin?: typeof authGuard;
+  getVapidPublicKey?: typeof getVapidPublicKey;
+  upsertSubscription?: typeof upsertSubscription;
+  removeSubscription?: typeof removeSubscription;
+  sendTestNotification?: typeof sendTestNotification;
+}
 
-        if (!user?.tenantId) {
-          return { success: false, data: null, message: 'User tenant not found' };
+export function createPushController(deps: PushControllerDeps = {}) {
+  const {
+    authPlugin = authGuard,
+    getVapidPublicKey: getVapidPublicKeyFn = getVapidPublicKey,
+    upsertSubscription: upsertSubscriptionFn = upsertSubscription,
+    removeSubscription: removeSubscriptionFn = removeSubscription,
+    sendTestNotification: sendTestNotificationFn = sendTestNotification,
+  } = deps;
+
+  return new Elysia({ prefix: '/push' })
+    .get(
+      '/public-key',
+      async () => {
+        const publicKey = await getVapidPublicKeyFn();
+        if (!publicKey) {
+          return { success: false, data: null, message: 'VAPID public key not configured' };
         }
+        return { success: true, data: { publicKey } } satisfies ApiResponse<{ publicKey: string }>;
+      },
+      {
+        detail: { tags: ['Push'], summary: 'Get VAPID public key' },
+      },
+    )
+    .use(authPlugin)
+    .post(
+      '/subscribe',
+      async ({ body, auth }) => {
+        try {
+          const user = await db.query.users.findFirst({
+            where: eq(users.id, auth.sub),
+            columns: { tenantId: true },
+          });
 
-        await upsertSubscription(user.tenantId, auth.sub, body);
-        return { success: true, data: null } satisfies ApiResponse<null>;
-      } catch (err) {
-        console.error('[Push] Subscribe failed:', err);
-        return { success: false, data: null, message: 'Failed to save push subscription' } satisfies ApiResponse<null>;
-      }
-    },
-    {
-      body: t.Object({
-        endpoint: t.String(),
-        expirationTime: t.Optional(t.Nullable(t.Number())),
-        keys: t.Object({
-          p256dh: t.String(),
-          auth: t.String(),
+          if (!user?.tenantId) {
+            return { success: false, data: null, message: 'User tenant not found' };
+          }
+
+          await upsertSubscriptionFn(user.tenantId, auth.sub, body);
+          return { success: true, data: null } satisfies ApiResponse<null>;
+        } catch (err) {
+          console.error('[Push] Subscribe failed:', err);
+          return { success: false, data: null, message: 'Failed to save push subscription' } satisfies ApiResponse<null>;
+        }
+      },
+      {
+        body: t.Object({
+          endpoint: t.String(),
+          expirationTime: t.Optional(t.Nullable(t.Number())),
+          keys: t.Object({
+            p256dh: t.String(),
+            auth: t.String(),
+          }),
         }),
-      }),
-      detail: { tags: ['Push'], summary: 'Save or update a push subscription' },
-    },
-  )
-  .post(
-    '/unsubscribe',
-    async ({ body, auth }) => {
-      try {
-        await removeSubscription(auth.sub, body.endpoint);
-        return { success: true, data: null } satisfies ApiResponse<null>;
-      } catch (err) {
-        console.error('[Push] Unsubscribe failed:', err);
-        return { success: false, data: null, message: 'Failed to remove push subscription' } satisfies ApiResponse<null>;
-      }
-    },
-    {
-      body: t.Object({
-        endpoint: t.String(),
-      }),
-      detail: { tags: ['Push'], summary: 'Remove a push subscription' },
-    },
-  )
-  .post(
-    '/test',
-    async ({ auth }) => {
-      try {
-        const user = await db.query.users.findFirst({
-          where: eq(users.id, auth.sub),
-          columns: { tenantId: true },
-        });
-
-        if (!user?.tenantId) {
-          return { success: false, data: { sent: 0 }, message: 'User tenant not found' };
+        detail: { tags: ['Push'], summary: 'Save or update a push subscription' },
+      },
+    )
+    .post(
+      '/unsubscribe',
+      async ({ body, auth }) => {
+        try {
+          await removeSubscriptionFn(auth.sub, body.endpoint);
+          return { success: true, data: null } satisfies ApiResponse<null>;
+        } catch (err) {
+          console.error('[Push] Unsubscribe failed:', err);
+          return { success: false, data: null, message: 'Failed to remove push subscription' } satisfies ApiResponse<null>;
         }
+      },
+      {
+        body: t.Object({
+          endpoint: t.String(),
+        }),
+        detail: { tags: ['Push'], summary: 'Remove a push subscription' },
+      },
+    )
+    .post(
+      '/test',
+      async ({ auth }) => {
+        try {
+          const user = await db.query.users.findFirst({
+            where: eq(users.id, auth.sub),
+            columns: { tenantId: true },
+          });
 
-        const sent = await sendTestNotification(auth.sub, user.tenantId);
-        return { success: true, data: { sent } } satisfies ApiResponse<{ sent: number }>;
-      } catch (err) {
-        console.error('[Push] Test notification failed:', err);
-        return { success: false, data: { sent: 0 }, message: 'Failed to send push test notification' } satisfies ApiResponse<{ sent: number }>;
-      }
-    },
-    {
-      detail: { tags: ['Push'], summary: 'Send a test push notification to current user' },
-    },
-  );
+          if (!user?.tenantId) {
+            return { success: false, data: { sent: 0 }, message: 'User tenant not found' };
+          }
+
+          const sent = await sendTestNotificationFn(auth.sub, user.tenantId);
+          return { success: true, data: { sent } } satisfies ApiResponse<{ sent: number }>;
+        } catch (err) {
+          console.error('[Push] Test notification failed:', err);
+          return { success: false, data: { sent: 0 }, message: 'Failed to send push test notification' } satisfies ApiResponse<{ sent: number }>;
+        }
+      },
+      {
+        detail: { tags: ['Push'], summary: 'Send a test push notification to current user' },
+      },
+    );
+}
+
+export const pushController = createPushController();

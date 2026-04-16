@@ -33,8 +33,23 @@ import { users } from '../../db/schema';
 import { eq } from 'drizzle-orm';
 import type { ApiResponse } from '@fueld/types';
 
-export const creditApplicationsController = new Elysia({ prefix: '/credit/applications' })
-  .use(authGuard)
+interface CreditApplicationsControllerDeps {
+  authPlugin?: typeof authGuard;
+  sendNotificationToUsers?: typeof sendNotificationToUsers;
+  sendNotificationEmail?: typeof sendNotificationEmail;
+  notifyCreditApplicationWhatsApp?: typeof notifyCreditApplicationWhatsApp;
+}
+
+export function createCreditApplicationsController(deps: CreditApplicationsControllerDeps = {}) {
+  const {
+    authPlugin = authGuard,
+    sendNotificationToUsers: sendNotificationToUsersFn = sendNotificationToUsers,
+    sendNotificationEmail: sendNotificationEmailFn = sendNotificationEmail,
+    notifyCreditApplicationWhatsApp: notifyCreditApplicationWhatsAppFn = notifyCreditApplicationWhatsApp,
+  } = deps;
+
+  return new Elysia({ prefix: '/credit/applications' })
+    .use(authPlugin)
 
   // ─── List Applications ──────────────────────────────────────────
   // Any authenticated user can list (traders see their own, credit managers see all)
@@ -167,7 +182,7 @@ export const creditApplicationsController = new Elysia({ prefix: '/credit/applic
           if (settings.notifyPush) {
             const cmUserIds = await getCreditManagerUserIds();
             if (cmUserIds.length > 0) {
-              await sendNotificationToUsers(cmUserIds, {
+              await sendNotificationToUsersFn(cmUserIds, {
                 title: 'New Credit Application',
                 body: notificationBody,
                 url: `/credit/applications`,
@@ -179,7 +194,7 @@ export const creditApplicationsController = new Elysia({ prefix: '/credit/applic
           if (settings.notifyEmail) {
             const emails = await getCreditManagerEmails();
             if (emails.length > 0) {
-              await sendNotificationEmail(
+              await sendNotificationEmailFn(
                 emails,
                 'New Credit Application',
                 `<div style="font-family: Arial, sans-serif; line-height: 1.5; color: #1f2937;">
@@ -193,7 +208,7 @@ export const creditApplicationsController = new Elysia({ prefix: '/credit/applic
 
           // WhatsApp notification
           if (settings.notifyWhatsApp) {
-            await notifyCreditApplicationWhatsApp(notificationBody);
+            await notifyCreditApplicationWhatsAppFn(notificationBody);
           }
         } catch (e) {
           console.error('[CreditApplications] Notification failed:', e);
@@ -253,7 +268,7 @@ export const creditApplicationsController = new Elysia({ prefix: '/credit/applic
             const notificationBody = `Your credit application for ${app.counterpartyName} (${app.requestedCurrency} ${Number(app.requestedAmount).toLocaleString()}) has been ${statusLabel}.`;
 
             if (settings.notifyTraderPush) {
-              await sendNotificationToUsers([app.requestedByUserId], {
+              await sendNotificationToUsersFn([app.requestedByUserId], {
                 title: `Credit Application ${app.status === 'APPROVED' ? 'Approved' : 'Rejected'}`,
                 body: notificationBody,
                 url: `/credit/applications`,
@@ -264,7 +279,7 @@ export const creditApplicationsController = new Elysia({ prefix: '/credit/applic
               // Look up trader email
               const [traderRow] = await db.select({ email: users.email }).from(users).where(eq(users.id, app.requestedByUserId)).limit(1);
               if (traderRow?.email) {
-                await sendNotificationEmail(
+                await sendNotificationEmailFn(
                   traderRow.email,
                   `Credit Application ${app.status === 'APPROVED' ? 'Approved' : 'Rejected'}`,
                   `<div style="font-family: Arial, sans-serif; line-height: 1.5; color: #1f2937;">
@@ -277,7 +292,7 @@ export const creditApplicationsController = new Elysia({ prefix: '/credit/applic
             }
             if (settings.notifyTraderWhatsApp) {
               const waBody = `Credit application for ${app.counterpartyName} (${app.requestedCurrency} ${Number(app.requestedAmount).toLocaleString()}) has been ${statusLabel}.`;
-              await notifyCreditApplicationWhatsApp(waBody);
+              await notifyCreditApplicationWhatsAppFn(waBody);
             }
           } catch (e) {
             console.error('[CreditApplications] Trader notification failed:', e);
@@ -321,3 +336,6 @@ export const creditApplicationsController = new Elysia({ prefix: '/credit/applic
       },
     },
   );
+}
+
+export const creditApplicationsController = createCreditApplicationsController();

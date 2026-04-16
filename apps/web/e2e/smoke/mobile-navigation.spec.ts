@@ -21,11 +21,16 @@ test.describe('mobile navigation', () => {
 
     await hamburger.click();
 
-    const nav = page.getByRole('navigation');
+    const nav = page.getByRole('navigation', { name: 'Main navigation' });
     await expect(nav).toBeVisible();
 
-    // Navigate to Orders
-    await nav.getByRole('link', { name: 'Orders' }).click();
+    const activeOrdersLink = nav.getByRole('link', { name: 'Active Orders' });
+    if (!(await activeOrdersLink.isVisible().catch(() => false))) {
+      await nav.getByRole('button', { name: /^Trading$/ }).click();
+    }
+
+    // Navigate to Active Orders
+    await activeOrdersLink.click();
     await expect(page).toHaveURL(/\/trading\/orders/);
     await expect(page.getByRole('heading', { name: 'Orders' })).toBeVisible();
   });

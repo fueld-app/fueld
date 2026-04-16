@@ -1,23 +1,21 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it, mock } from 'bun:test';
+import { beforeEach, describe, expect, it } from 'bun:test';
 import { Elysia } from 'elysia';
+import { authController } from '../src/modules/auth';
+import { createCreditApplicationsController } from '../src/modules/credit/credit-applications.controller';
 import { getDb, seedAuthBasics, truncateAll } from './helpers/db';
 import { users } from '../src/db/schema';
-
-type AuthModule = typeof import('../src/modules/auth');
-type CreditApplicationsControllerModule = typeof import('../src/modules/credit/credit-applications.controller');
-
-let authModule: AuthModule;
-let creditApplicationsControllerModule: CreditApplicationsControllerModule;
 
 const notificationCalls: Array<{ userIds: string[]; notification: { title: string; body: string; url?: string } }> = [];
 let shouldThrowPush = false;
 
-beforeAll(async () => {
-  mock.module('../src/modules/push/push.service', () => ({
-    getVapidPublicKey: async () => null,
-    upsertSubscription: async () => undefined,
-    removeSubscription: async () => undefined,
-    sendTestNotification: async () => 0,
+beforeEach(async () => {
+  await truncateAll();
+  notificationCalls.length = 0;
+  shouldThrowPush = false;
+});
+
+function createTestApp() {
+  return new Elysia().use(authController).use(createCreditApplicationsController({
     sendNotificationToUsers: async (
       userIds: string[],
       notification: { title: string; body: string; url?: string },
@@ -27,23 +25,6 @@ beforeAll(async () => {
       return userIds.length;
     },
   }));
-
-  authModule = await import('../src/modules/auth');
-  creditApplicationsControllerModule = await import('../src/modules/credit/credit-applications.controller');
-});
-
-afterAll(() => {
-  mock.restore();
-});
-
-beforeEach(async () => {
-  await truncateAll();
-  notificationCalls.length = 0;
-  shouldThrowPush = false;
-});
-
-function createTestApp() {
-  return new Elysia().use(authModule.authController).use(creditApplicationsControllerModule.creditApplicationsController);
 }
 
 type TestAppHandle = {

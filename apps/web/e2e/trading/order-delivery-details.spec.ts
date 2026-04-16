@@ -48,9 +48,25 @@ test('delivered flow saves custom delivered quantities and marks the order deliv
   await deliveredDateSaveRequest;
   await expect(deliveredAtInput).toHaveValue('2026-01-09');
 
-  const lineRows = page.locator('app-order-items tbody tr');
-  await expect(lineRows).toHaveCount(1);
-  await lineRows.nth(0).locator('input[step="0.001"][min="0"]').nth(1).fill('330.146');
+  const orderItems = page.locator('app-order-items');
+  await expect(orderItems).toContainText('MGO');
+
+  const mobileDeliveredQtyInput = orderItems
+    .locator('label')
+    .filter({ hasText: 'Delivered Qty' })
+    .locator('..')
+    .locator('input')
+    .first();
+  const desktopDeliveredQtyInput = orderItems
+    .locator('tbody tr')
+    .first()
+    .locator('input[step="0.001"][min="0"]')
+    .nth(1);
+  const deliveredQtyInput = await mobileDeliveredQtyInput.isVisible().catch(() => false)
+    ? mobileDeliveredQtyInput
+    : desktopDeliveredQtyInput;
+  await expect(deliveredQtyInput).toBeVisible();
+  await deliveredQtyInput.fill('330.146');
 
   const attachmentsHeading = page.getByRole('heading', { name: 'Attachments' });
   const attachmentsCard = attachmentsHeading.locator('..').locator('..');

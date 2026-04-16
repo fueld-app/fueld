@@ -5,7 +5,7 @@
 //  risk summaries, and determines credit-frozen status.
 // ═══════════════════════════════════════════════════════════════════════
 
-import { eq, and, sql, desc, inArray } from 'drizzle-orm';
+import { eq, and, sql, desc, inArray, or, ilike } from 'drizzle-orm';
 import { db } from '../../db';
 import {
   counterparties,
@@ -17,6 +17,7 @@ import {
   riskOverrideApprovals,
   tenants,
   users,
+  vessels,
 } from '../../db/schema';
 import type {
   RiskCheckDto,
@@ -244,6 +245,103 @@ export async function getRiskSummary(counterpartyId: string, tenantId: string): 
     providerStatuses,
     activeHits: activeHitRows.map((h) => hitToDto(h)),
   };
+}
+
+function normalizeVesselText(value: string | null | undefined): string {
+  return (value ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeVesselImo(value: string | number | null | undefined): string {
+  return String(value ?? '').replace(/\D/g, '');
+}
+
+function riskHitMatchesVessel(
+  hit: typeof riskHits.$inferSelect,
+  normalizedName: string,
+  normalizedImo: string,
+): boolean {
+  const normalizedTitle = normalizeVesselText(hit.title);
+  const normalizedDetail = normalizeVesselText(hit.detail ?? '');
+  const titleDigits = normalizeVesselImo(hit.title);
+  const detailDigits = normalizeVesselImo(hit.detail ?? '');
+
+  return (!!normalizedName && (
+    normalizedTitle.includes(normalizedName)
+    || normalizedDetail.includes(normalizedName)
+  ))
+    || (!!normalizedImo && (
+      titleDigits.includes(normalizedImo)
+      || detailDigits.includes(normalizedImo)
+    ));
+}
+
+export async function getActiveVesselRiskImpacts(vesselId: string, tenantId: string): Promise<Array<{
+  companyId: string;
+  companyName: string;
+  hits: RiskHitDto[];
+}>> {
+  const vessel = await db.query.vessels.findFirst({
+    where: eq(vessels.id, vesselId),
+    columns: { id: true, name: true, imo: true },
+  });
+
+  if (!vessel) return [];
+
+  const name = vessel.name.trim();
+  const imo = (vessel.imo ?? '').trim();
+  const searchClauses = [];
+  if (name) {
+    searchClauses.push(ilike(riskHits.title, `%${name}%`));
+    searchClauses.push(ilike(riskHits.detail, `%${name}%`));
+  }
+  if (imo) {
+    searchClauses.push(ilike(riskHits.title, `%${imo}%`));
+    searchClauses.push(ilike(riskHits.detail, `%${imo}%`));
+  }
+  if (!searchClauses.length) return [];
+
+  const rows = await db
+    .select({
+      hit: riskHits,
+      companyId: counterparties.id,
+      companyName: counterparties.name,
+    })
+    .from(riskHits)
+    .innerJoin(counterparties, eq(counterparties.id, riskHits.counterpartyId))
+    .where(and(
+      eq(riskHits.tenantId, tenantId),
+      eq(riskHits.isActive, true),
+      inArray(riskHits.signalType, ['SANCTION', 'SEIZURE']),
+      or(...searchClauses),
+    ))
+    .orderBy(desc(riskHits.createdAt));
+
+  const normalizedName = normalizeVesselText(name);
+  const normalizedImo = normalizeVesselImo(imo);
+  const grouped = new Map<string, { companyId: string; companyName: string; hits: RiskHitDto[] }>();
+
+  for (const row of rows) {
+    if (!riskHitMatchesVessel(row.hit, normalizedName, normalizedImo)) continue;
+
+    const existing = grouped.get(row.companyId);
+    const hitDto = hitToDto(row.hit);
+    if (existing) {
+      existing.hits.push(hitDto);
+      continue;
+    }
+
+    grouped.set(row.companyId, {
+      companyId: row.companyId,
+      companyName: row.companyName,
+      hits: [hitDto],
+    });
+  }
+
+  return Array.from(grouped.values());
 }
 
 /**

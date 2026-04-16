@@ -1243,9 +1243,9 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     const base =
       'app-sidebar fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-sidebar transition-transform duration-300 ease-in-out';
     const mobileVisibility = this.sidebarOpen()
-      ? 'translate-x-0'
-      : '-translate-x-full';
-    return `${base} ${mobileVisibility} lg:translate-x-0`;
+      ? 'translate-x-0 visible pointer-events-auto'
+      : '-translate-x-full invisible pointer-events-none';
+    return `${base} ${mobileVisibility} lg:translate-x-0 lg:visible lg:pointer-events-auto`;
   });
 
   toggleSidebar(): void {

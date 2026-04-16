@@ -17,7 +17,7 @@ import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subscription, skip } from 'rxjs';
 import { Title } from '@angular/platform-browser';
-import type { VesselDto, CounterpartyDto, ApiResponse, VesselCompanyDto, VesselCompanyRole, CompanyContactDto, VesselCompanyRoleOption, RiskHitDto, RiskSummaryDto } from '@fueld/types';
+import type { VesselDto, CounterpartyDto, ApiResponse, VesselCompanyDto, VesselCompanyRole, CompanyContactDto, VesselCompanyRoleOption, RiskHitDto } from '@fueld/types';
 import * as L from 'leaflet/dist/leaflet-src.esm.js';
 import { flagFromIso3 } from '../../../../shared/utils/flags';
 import { WebSocketService } from '../../../../core/websocket/websocket.service';
@@ -114,18 +114,6 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
     iconSize: [w, h],
     iconAnchor: [w / 2, h / 2],
   });
-}
-
-function normalizeVesselText(value: string | null | undefined): string {
-  return (value ?? '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function normalizeVesselImo(value: string | number | null | undefined): string {
-  return String(value ?? '').replace(/\D/g, '');
 }
 
 @Component({
@@ -1660,6 +1648,7 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
         this.loadOrders(id);
         this.loadMovements(res.data.seasearcherId);
         this.loadVesselCompanies(id);
+        this.loadVesselRiskImpacts(id);
       }
     } catch (err) {
       console.error('Failed to load vessel:', err);
@@ -2205,7 +2194,6 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
       );
       if (res.success && res.data) {
         this.vesselCompanies.set(res.data);
-        await this.loadLinkedCreditImpacts(res.data);
       }
     } catch (err) {
       console.error('Failed to load vessel companies:', err);
@@ -2214,59 +2202,22 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  private async loadLinkedCreditImpacts(vesselCompanies: VesselCompanyDto[]): Promise<void> {
-    const vessel = this.vessel();
-    const companyIds = [...new Set(vesselCompanies.map((company) => company.companyId).filter(Boolean))];
-    if (!vessel || !companyIds.length) {
+  private async loadVesselRiskImpacts(vesselId: string): Promise<void> {
+    if (!vesselId) {
       this.linkedCreditImpacts.set([]);
       return;
     }
 
     this.creditImpactLoading.set(true);
     try {
-      const summaries = await Promise.all(
-        companyIds.map(async (companyId) => {
-          try {
-            const response = await firstValueFrom(
-              this.http.get<ApiResponse<RiskSummaryDto>>(`${API}/risk-monitoring/summary/${companyId}`),
-            );
-            return response.success ? response.data : null;
-          } catch {
-            return null;
-          }
-        }),
+      const response = await firstValueFrom(
+        this.http.get<ApiResponse<VesselCreditImpact[]>>(`${API}/risk-monitoring/vessel/${vesselId}/impacts`),
       );
 
-      const normalizedName = normalizeVesselText(vessel.name);
-      const normalizedImo = normalizeVesselImo(vessel.imo);
-      const impacts = summaries
-        .filter((summary): summary is RiskSummaryDto => !!summary)
-        .map((summary) => ({
-          companyId: summary.counterpartyId,
-          companyName: summary.counterpartyName,
-          hits: summary.activeHits.filter((hit) => this.riskHitMatchesVessel(hit, normalizedName, normalizedImo)),
-        }))
-        .filter((impact) => impact.hits.length > 0);
-
-      this.linkedCreditImpacts.set(impacts);
+      this.linkedCreditImpacts.set(response.success && response.data ? response.data : []);
     } finally {
       this.creditImpactLoading.set(false);
     }
-  }
-
-  private riskHitMatchesVessel(hit: RiskHitDto, normalizedName: string, imo: string): boolean {
-    const normalizedTitle = normalizeVesselText(hit.title);
-    const normalizedDetail = normalizeVesselText(hit.detail ?? '');
-    const titleDigits = normalizeVesselImo(hit.title);
-    const detailDigits = normalizeVesselImo(hit.detail ?? '');
-    return (!!normalizedName && (
-      normalizedTitle.includes(normalizedName)
-      || normalizedDetail.includes(normalizedName)
-    ))
-      || (!!imo && (
-        titleDigits.includes(imo)
-        || detailDigits.includes(imo)
-      ));
   }
 
   seizureHitsForImpact(impact: VesselCreditImpact): RiskHitDto[] {

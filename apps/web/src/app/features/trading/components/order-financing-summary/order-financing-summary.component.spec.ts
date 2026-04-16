@@ -1,5 +1,32 @@
+import { afterEach, describe, expect, it } from 'bun:test';
 import { TestBed } from '@angular/core/testing';
+import { BrowserTestingModule, platformBrowserTesting } from '@angular/platform-browser/testing';
+import { JSDOM } from 'jsdom';
 import { OrderFinancingSummaryComponent } from './order-financing-summary.component';
+
+const dom = new JSDOM('<!doctype html><html><body></body></html>');
+
+Object.assign(globalThis, {
+  window: dom.window,
+  document: dom.window.document,
+  navigator: dom.window.navigator,
+  HTMLElement: dom.window.HTMLElement,
+  Node: dom.window.Node,
+  Event: dom.window.Event,
+  CustomEvent: dom.window.CustomEvent,
+  MutationObserver: dom.window.MutationObserver,
+  getComputedStyle: dom.window.getComputedStyle.bind(dom.window),
+});
+
+try {
+  TestBed.initTestEnvironment(BrowserTestingModule, platformBrowserTesting());
+} catch {
+  // Ignore when another test runner has already initialized the Angular test platform.
+}
+
+afterEach(() => {
+  TestBed.resetTestingModule();
+});
 
 describe('OrderFinancingSummaryComponent', () => {
   beforeEach(async () => {
@@ -8,12 +35,28 @@ describe('OrderFinancingSummaryComponent', () => {
     }).compileComponents();
   });
 
-  it('renders the financing metrics for an order', () => {
+  it('renders the financing metrics for an order', async () => {
     const fixture = TestBed.createComponent(OrderFinancingSummaryComponent);
-    fixture.componentRef.setInput('financingRateAnnual', 0.08);
-    fixture.componentRef.setInput('financingDays', 15);
-    fixture.componentRef.setInput('financingDayCountConvention', 365);
-    fixture.componentRef.setInput('economics', {
+    const component = fixture.componentInstance as OrderFinancingSummaryComponent & {
+      financingRateAnnual: () => number;
+      financingDays: () => number;
+      financingDayCountConvention: () => number;
+      economics: () => {
+        totalQuantity: number;
+        totalCost: number;
+        totalRevenue: number;
+        totalGrossProfit: number;
+        totalFinancingCost: number;
+        financingCostPerMt: number;
+        totalNetProfit: number;
+        netMarginPct: number;
+      };
+    };
+
+    component.financingRateAnnual = () => 0.08;
+    component.financingDays = () => 15;
+    component.financingDayCountConvention = () => 365;
+    component.economics = () => ({
       totalQuantity: 800,
       totalCost: 1276000,
       totalRevenue: 1308000,
@@ -23,6 +66,8 @@ describe('OrderFinancingSummaryComponent', () => {
       totalNetProfit: 27804.9315,
       netMarginPct: 2.1258,
     });
+    fixture.detectChanges();
+    await fixture.whenStable();
     fixture.detectChanges();
 
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';

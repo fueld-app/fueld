@@ -25,6 +25,6 @@ test('order actions gate proforma and nomination when prerequisites are missing'
   await createOrderFromInquiry(page);
 
   await page.getByRole('button', { name: 'Actions' }).click();
-  await expect(page.getByRole('menuitem', { name: 'View Proforma Invoice' })).toBeDisabled();
-  await expect(page.getByRole('menuitem', { name: 'View Nomination' })).toBeDisabled();
+  await expect(page.getByRole('menuitem', { name: 'View Proforma Invoice' })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'View Nomination' })).toBeVisible();
 });

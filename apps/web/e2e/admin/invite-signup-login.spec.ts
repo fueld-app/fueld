@@ -9,7 +9,7 @@ async function createInviteLink(adminPage: Page, invitedName: string, invitedEma
   await adminPage.goto('/admin/users');
   await expect(adminPage.getByRole('heading', { name: 'Users' })).toBeVisible();
 
-  await adminPage.getByRole('button', { name: 'Invite User' }).click();
+  await adminPage.getByRole('button', { name: 'Invite User', exact: true }).click();
   await expect(adminPage.getByRole('heading', { name: 'Invite New User' })).toBeVisible();
 
   await adminPage.getByPlaceholder('e.g. Jane Smith').fill(invitedName);

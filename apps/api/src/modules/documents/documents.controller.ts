@@ -561,7 +561,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         bccEmails: t.Optional(t.Array(t.String({ format: 'email' }), { description: 'BCC email addresses' })),
         subject: t.String({ description: 'Email subject line' }),
         htmlBody: t.String({ description: 'HTML email body' }),
-        orderSupplierId: t.Optional(t.Nullable(t.String({ description: 'Supplier leg to target for nomination emails' }))),
+        orderSupplierId: t.Optional(t.String({ description: 'Supplier leg to target for nomination emails' })),
         attachmentIds: t.Optional(t.Array(t.String(), { description: 'Order attachment ids to include with the email' })),
       }),
       detail: {
@@ -787,7 +787,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           t.Literal('PROFORMA'),
           t.Literal('INVOICE'),
         ]),
-        orderSupplierId: t.Optional(t.Nullable(t.String())),
+        orderSupplierId: t.Optional(t.String()),
       }),
       detail: {
         tags: ['Documents'],

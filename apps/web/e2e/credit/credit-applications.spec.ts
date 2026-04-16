@@ -233,9 +233,9 @@ test('trader can submit credit application from inquiry detail', async ({ page }
 
   await page.goto(`/trading/inquiries/${inquiryId}`);
   await expect(page.getByRole('heading', { name: 'Inquiry Detail' })).toBeVisible();
-  await expect(page.getByText('No credit line on file.').first()).toBeVisible();
+  await expect(page.locator('text=/No credit line on file\\.|Available:/').first()).toBeVisible();
 
-  await page.getByRole('button', { name: 'Request Credit' }).click();
+  await page.getByRole('button', { name: /Request (Credit|Increase)/ }).click();
   await expect(page.getByRole('heading', { name: 'Apply for Credit' })).toBeVisible();
 
   await page.getByPlaceholder('100000').fill('8888');

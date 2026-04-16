@@ -9,8 +9,9 @@ const testDbUrl =
   ?? process.env['E2E_TEST_DATABASE_URL']
   ?? 'postgres://fueld:fueld@localhost:5432/fueld_test';
 
-const reuseExistingServers = !process.env['CI'] && process.env['E2E_REUSE_EXISTING_SERVERS'] === '1';
+const reuseExistingServers = !process.env['CI'] || process.env['E2E_REUSE_EXISTING_SERVERS'] === '1';
 const isCI = !!process.env['CI'];
+const pwaTestMatch = /pwa\/.*\.spec\.ts/;
 
 const apiCommand = isCI ? 'bun run src/index.ts' : 'bun run dev';
 const webCommand = isCI
@@ -66,28 +67,34 @@ export default defineConfig({
     // ── Desktop browsers ──────────────────────────────────────
     {
       name: 'chromium',
+      testIgnore: pwaTestMatch,
       use: { ...devices['Desktop Chrome'] },
     },
     {
       name: 'firefox',
+      testIgnore: pwaTestMatch,
       use: { ...devices['Desktop Firefox'] },
     },
     {
       name: 'webkit',
+      testIgnore: pwaTestMatch,
       use: { ...devices['Desktop Safari'] },
     },
 
     // ── Mobile viewports ──────────────────────────────────────
     {
       name: 'mobile-chrome',
+      testIgnore: pwaTestMatch,
       use: { ...devices['Pixel 7'] },
     },
     {
       name: 'mobile-safari',
+      testIgnore: pwaTestMatch,
       use: { ...devices['iPhone 14'] },
     },
     {
       name: 'tablet',
+      testIgnore: pwaTestMatch,
       use: { ...devices['iPad (gen 7)'] },
     },
 
@@ -95,7 +102,7 @@ export default defineConfig({
     // Uses a production build so the service worker is registered.
     {
       name: 'pwa',
-      testMatch: /pwa\/.*\.spec\.ts/,
+      testMatch: pwaTestMatch,
       use: {
         ...devices['Pixel 7'],
         baseURL: pwaBaseURL,

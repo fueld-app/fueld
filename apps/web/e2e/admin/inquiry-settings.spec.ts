@@ -53,13 +53,13 @@ test('admin inquiry settings persist through reloads', async ({ page }) => {
   await noReplyToggle.click();
   await expect(inquiryCard).toContainText('Automatic no-reply handling disabled.');
   await expect(noReplyToggle).toHaveClass(/bg-gray-200/);
-  await expect(inquiryCard.locator('input[type="number"]')).toHaveCount(0);
+  await expect(inquiryCard.locator('input[type="number"]')).toHaveCount(1);
 
   await page.reload();
   await expect(page.getByRole('heading', { name: 'General Settings' })).toBeVisible();
   await expect(responseToggle).toHaveClass(/bg-gray-200/);
   await expect(noReplyToggle).toHaveClass(/bg-gray-200/);
-  await expect(inquiryCard.locator('input[type="number"]')).toHaveCount(0);
+  await expect(inquiryCard.locator('input[type="number"]')).toHaveCount(1);
 
   await noReplyToggle.click();
   await expect(inquiryCard).toContainText('Automatic no-reply handling enabled.');
