@@ -12,11 +12,19 @@ import {
 } from './push.service';
 
 interface PushControllerDeps {
-  authPlugin?: typeof authGuard;
+  authPlugin?: Elysia<any, any, any, any, any, any, any>;
   getVapidPublicKey?: typeof getVapidPublicKey;
   upsertSubscription?: typeof upsertSubscription;
   removeSubscription?: typeof removeSubscription;
   sendTestNotification?: typeof sendTestNotification;
+}
+
+interface PushAuthContext {
+  sub: string;
+  userId: string;
+  tenantId: string;
+  email: string;
+  role: string;
 }
 
 export function createPushController(deps: PushControllerDeps = {}) {
@@ -45,7 +53,10 @@ export function createPushController(deps: PushControllerDeps = {}) {
     .use(authPlugin)
     .post(
       '/subscribe',
-      async ({ body, auth }) => {
+      async (context) => {
+        const { body } = context;
+        const auth = (context as typeof context & { auth: PushAuthContext }).auth;
+
         try {
           const user = await db.query.users.findFirst({
             where: eq(users.id, auth.sub),
@@ -77,7 +88,10 @@ export function createPushController(deps: PushControllerDeps = {}) {
     )
     .post(
       '/unsubscribe',
-      async ({ body, auth }) => {
+      async (context) => {
+        const { body } = context;
+        const auth = (context as typeof context & { auth: PushAuthContext }).auth;
+
         try {
           await removeSubscriptionFn(auth.sub, body.endpoint);
           return { success: true, data: null } satisfies ApiResponse<null>;
@@ -95,7 +109,9 @@ export function createPushController(deps: PushControllerDeps = {}) {
     )
     .post(
       '/test',
-      async ({ auth }) => {
+      async (context) => {
+        const auth = (context as typeof context & { auth: PushAuthContext }).auth;
+
         try {
           const user = await db.query.users.findFirst({
             where: eq(users.id, auth.sub),
