@@ -245,6 +245,43 @@ describe('SendInquiryModalComponent', () => {
     expect(editor?.innerHTML).toContain('Delivery:');
   });
 
+  it('preserves the delivery row when show() is called without options but backend returns eta', async () => {
+    // Simulates old cached frontend: show() without eta option,
+    // but backend response includes the eta from the database.
+    const { component, fixture } = await createComponent({
+      defaults: {
+        subject: 'Inquiry Recife - Hesperides',
+        htmlBody: `
+          <table>
+            <tr><td>Vessel:</td><td>Hesperides (navy)</td></tr>
+            <tr><td>Place:</td><td>Recife</td></tr>
+            <tr><td>Delivery:</td><td>15 Apr 2026</td></tr>
+            <tr><td>Reply within:</td><td>6 hours</td></tr>
+            <tr><td>Account:</td><td>Riviera Marine S.A.M.</td></tr>
+          </table>
+        `,
+        eta: '2026-04-15T12:00:00.000Z',
+        etd: null,
+        responseDeadlineAt: '2026-04-17T12:00:00.000Z',
+      },
+    });
+
+    // Inputs are blank (simulating inputs not propagated yet)
+    fixture.componentRef.setInput('eta', '');
+    fixture.componentRef.setInput('etd', '');
+    fixture.detectChanges();
+
+    // Call show() without options (old code path)
+    component.show();
+    fixture.detectChanges();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // The Delivery row from the backend should be preserved because
+    // loadDefaults() now uses the response eta directly
+    expect(component.htmlBody()).toContain('Delivery:');
+    expect(component.htmlBody()).toContain('15 Apr 2026');
+  });
+
   it('can disable the response deadline per inquiry and emits a null deadline', async () => {
     const { component, fixture } = await createComponent();
 

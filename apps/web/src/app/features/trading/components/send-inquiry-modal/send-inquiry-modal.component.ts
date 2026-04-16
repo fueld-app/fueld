@@ -1051,14 +1051,25 @@ export class SendInquiryModalComponent {
         next: (res) => {
           if (res.success && res.data) {
             this.subject.set(res.data.subject ?? '');
-            this.inquiryEta.set(this.normalizeInquiryDate(res.data.eta) ?? this.resolvedInquiryEta());
-            this.inquiryEtd.set(this.normalizeInquiryDate(res.data.etd) ?? this.resolvedInquiryEtd());
+            const responseEta = this.normalizeInquiryDate(res.data.eta);
+            const responseEtd = this.normalizeInquiryDate(res.data.etd);
+            this.inquiryEta.set(responseEta ?? this.resolvedInquiryEta());
+            this.inquiryEtd.set(responseEtd ?? this.resolvedInquiryEtd());
             const deadlineLocal = this.toDateTimeLocal(res.data.responseDeadlineAt ?? '');
             this.responseDeadlineAt.set(deadlineLocal);
             if (deadlineLocal) {
               this.lastResponseDeadlineAt.set(deadlineLocal);
             }
-            const syncedHtml = this.syncInquiryBodyMetadataHtml(res.data.htmlBody ?? '');
+            // Build the delivery label directly from the resolved eta/etd
+            // instead of reading through the signal chain, to avoid any
+            // timing issues where the signal hasn't propagated yet.
+            const resolvedEta = responseEta ?? this.resolvedInquiryEta();
+            const resolvedEtd = responseEtd ?? this.resolvedInquiryEtd();
+            const deliveryLabel = buildInquiryDeliveryWindowLabel(resolvedEta, resolvedEtd);
+            const syncedHtml = syncInquiryMetadataTable(res.data.htmlBody ?? '', {
+              deliveryLabel,
+              responseDeadlineLabel: this.responseDeadlineLabel(),
+            });
             this.htmlBody.set(syncedHtml);
             // Set the body editor content
             setTimeout(() => {
