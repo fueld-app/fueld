@@ -210,9 +210,15 @@ export function syncInquiryMetadataTable(
 ): string {
   if (!html.trim()) return html;
 
+  // When a value is explicitly undefined, skip the sync for that row
+  // so we never strip a backend-provided row by accident.
+  const syncDelivery = options.deliveryLabel !== undefined;
+  const syncDeadline = options.responseDeadlineLabel !== undefined;
+
   if (typeof document === 'undefined') {
-    let nextHtml = upsertMetadataRowInHtml(html, 'Delivery:', options.deliveryLabel ?? null, ['Reply within:', 'Account:']);
-    nextHtml = upsertMetadataRowInHtml(nextHtml, 'Reply within:', options.responseDeadlineLabel ?? null, ['Account:']);
+    let nextHtml = html;
+    if (syncDelivery) nextHtml = upsertMetadataRowInHtml(nextHtml, 'Delivery:', options.deliveryLabel ?? null, ['Reply within:', 'Account:']);
+    if (syncDeadline) nextHtml = upsertMetadataRowInHtml(nextHtml, 'Reply within:', options.responseDeadlineLabel ?? null, ['Account:']);
     return nextHtml;
   }
 
@@ -220,13 +226,15 @@ export function syncInquiryMetadataTable(
   container.innerHTML = html;
   const table = findMetadataTable(container);
   if (table) {
-    upsertMetadataRow(table, 'Delivery:', options.deliveryLabel ?? null, ['Place:', 'Account:'], ['Reply within:', 'Account:']);
-    upsertMetadataRow(table, 'Reply within:', options.responseDeadlineLabel ?? null, ['Delivery:', 'Place:', 'Account:'], ['Account:']);
+    if (syncDelivery) upsertMetadataRow(table, 'Delivery:', options.deliveryLabel ?? null, ['Place:', 'Account:'], ['Reply within:', 'Account:']);
+    if (syncDeadline) upsertMetadataRow(table, 'Reply within:', options.responseDeadlineLabel ?? null, ['Delivery:', 'Place:', 'Account:'], ['Account:']);
   }
 
-  const containsDeliveryLabel = /(^|\s)Delivery:/i.test(container.textContent ?? '');
-  if (!containsDeliveryLabel || findFallbackMetadataElement(container, 'delivery')) {
-    syncFallbackMetadataBlock(container, 'delivery', 'Delivery:', options.deliveryLabel ?? null);
+  if (syncDelivery) {
+    const containsDeliveryLabel = /(^|\s)Delivery:/i.test(container.textContent ?? '');
+    if (!containsDeliveryLabel || findFallbackMetadataElement(container, 'delivery')) {
+      syncFallbackMetadataBlock(container, 'delivery', 'Delivery:', options.deliveryLabel ?? null);
+    }
   }
 
   return container.innerHTML;

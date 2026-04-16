@@ -1067,8 +1067,12 @@ export class SendInquiryModalComponent {
             const resolvedEtd = responseEtd ?? this.resolvedInquiryEtd();
             const deliveryLabel = buildInquiryDeliveryWindowLabel(resolvedEta, resolvedEtd);
             const deadlineLabel = this.responseDeadlineLabel();
+            // Pass deliveryLabel only when non-empty. Passing undefined
+            // tells syncInquiryMetadataTable to leave any existing
+            // backend-provided Delivery row untouched instead of
+            // stripping it when the frontend has no computed value.
             const syncedHtml = syncInquiryMetadataTable(res.data.htmlBody ?? '', {
-              deliveryLabel,
+              deliveryLabel: deliveryLabel || undefined,
               responseDeadlineLabel: deadlineLabel,
             });
             this.htmlBody.set(syncedHtml);

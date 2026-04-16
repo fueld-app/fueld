@@ -282,6 +282,41 @@ describe('SendInquiryModalComponent', () => {
     expect(component.htmlBody()).toContain('15 Apr 2026');
   });
 
+  it('never strips a backend-provided Delivery row when frontend eta is empty', async () => {
+    // The backend HTML includes a Delivery row (built from order.eta in the DB),
+    // but the backend returns eta: null in the response data (edge case).
+    // The frontend should NEVER strip a row the backend explicitly included.
+    const { component, fixture } = await createComponent({
+      defaults: {
+        subject: 'Inquiry Recife - Hesperides',
+        htmlBody: `
+          <table>
+            <tr><td>Vessel:</td><td>Hesperides (navy)</td></tr>
+            <tr><td>Place:</td><td>Recife</td></tr>
+            <tr><td>Delivery:</td><td>15 Apr 2026</td></tr>
+            <tr><td>Reply within:</td><td>6 hours</td></tr>
+            <tr><td>Account:</td><td>Riviera Marine S.A.M.</td></tr>
+          </table>
+        `,
+        eta: null,
+        etd: null,
+        responseDeadlineAt: '2026-04-17T12:00:00.000Z',
+      },
+    });
+
+    fixture.componentRef.setInput('eta', '');
+    fixture.componentRef.setInput('etd', '');
+    fixture.detectChanges();
+
+    component.show();
+    fixture.detectChanges();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Backend included the Delivery row — frontend must not strip it
+    expect(component.htmlBody()).toContain('Delivery:');
+    expect(component.htmlBody()).toContain('15 Apr 2026');
+  });
+
   it('can disable the response deadline per inquiry and emits a null deadline', async () => {
     const { component, fixture } = await createComponent();
 
