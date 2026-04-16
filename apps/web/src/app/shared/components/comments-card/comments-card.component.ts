@@ -69,7 +69,7 @@ interface Comment {
             <div class="mt-1.5 flex items-center gap-3 flex-wrap">
               @if (enableFollowUp()) {
                 <!-- Follow-up date row -->
-                <label class="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer select-none">
+                <label class="inline-flex h-8 items-center gap-1.5 text-xs text-gray-500 cursor-pointer select-none">
                   <input
                     type="checkbox"
                     [checked]="showFollowUpInput()"
@@ -79,13 +79,13 @@ interface Comment {
                   Follow-up
                 </label>
                 @if (showFollowUpInput()) {
-                  <div class="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-600">
+                  <div class="inline-flex h-8 items-center gap-1 rounded-md border border-gray-200 bg-white px-2 text-xs text-gray-600">
                     <span>in</span>
                     <input
                       type="number"
                       [ngModel]="newFollowUpDays"
                       (ngModelChange)="onFollowUpDaysChange($event)"
-                      class="w-16 border-0 bg-transparent p-0 text-right text-xs font-medium text-gray-700 outline-none focus:ring-0"
+                      class="h-full w-16 border-0 bg-transparent p-0 text-right text-xs font-medium leading-none text-gray-700 outline-none focus:ring-0"
                     />
                     <span>days</span>
                   </div>
@@ -93,7 +93,7 @@ interface Comment {
                     type="date"
                     [ngModel]="newFollowUpDate"
                     (ngModelChange)="onFollowUpDateChange($event)"
-                    class="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
+                    class="h-8 rounded-md border border-gray-200 px-2 text-xs leading-none text-gray-700 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
                   />
                 }
               }
@@ -101,7 +101,7 @@ interface Comment {
                 <button
                   (click)="addComment()"
                   [disabled]="!newContent.trim() || saving()"
-                  class="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  class="inline-flex h-8 items-center rounded-lg bg-brand-600 px-3 text-xs font-medium text-white hover:bg-brand-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   @if (saving()) {
                     <svg class="inline h-3.5 w-3.5 animate-spin mr-1" viewBox="0 0 24 24" fill="none">
