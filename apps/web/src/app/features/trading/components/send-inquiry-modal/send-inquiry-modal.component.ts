@@ -984,13 +984,13 @@ export class SendInquiryModalComponent {
   readonly someSelected = computed(() => this.suppliers().some(s => s.selected));
 
   /** Open the modal and load suppliers + email defaults */
-  show(): void {
+  show(options?: { eta?: string | null; etd?: string | null }): void {
     this.open.set(true);
     this.recipientTags.set([]);
     this.responseDeadlineAt.set('');
     this.lastResponseDeadlineAt.set('');
-    this.inquiryEta.set(this.normalizeInquiryDate(this.eta()));
-    this.inquiryEtd.set(this.normalizeInquiryDate(this.etd()));
+    this.inquiryEta.set(this.normalizeInquiryDate(options?.eta ?? this.eta()));
+    this.inquiryEtd.set(this.normalizeInquiryDate(options?.etd ?? this.etd()));
     this.previewRecipientId.set('');
     this.previewTab.set('email');
     this.showAddSupplier.set(false);

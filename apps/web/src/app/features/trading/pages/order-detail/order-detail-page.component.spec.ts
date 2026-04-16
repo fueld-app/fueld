@@ -383,4 +383,88 @@ describe('OrderDetailPageComponent', () => {
     });
     expect(component.inquiryModal()?.htmlBody()).toContain('Delivery:');
   });
+
+  it('uses the latest parent order eta even if the modal child inputs have not refreshed yet', async () => {
+    const capturedPosts: Array<{ url: string; body: unknown }> = [];
+    const { component, fixture } = await createComponent({
+      onPost: (url, body) => {
+        capturedPosts.push({ url, body });
+      },
+    });
+
+    component.port.set({ id: 'place-1', name: 'Recife', timezone: 'UTC' } as any);
+    component.vessel.set({ id: 'vessel-1', name: 'Hesperides (navy)', imo: null } as any);
+    component.ownCompanies.set([buildOwnCompany('company-1', 'Riviera Marine S.A.M.')]);
+    component.itemRows.set([
+      {
+        id: 'item-1',
+        orderSupplierId: null,
+        productType: 'LSMGO',
+        description: 'DMA',
+        quantity: 210,
+        quantityMin: null,
+        quantityMax: 210,
+        unit: 'CBM',
+        costUnit: 'CBM',
+        salesUnit: 'CBM',
+        costConversionFactor: 1,
+        unitConversionFactor: 1,
+        costPrice: 0,
+        costCurrency: 'USD',
+        salesPrice: 0,
+        salesCurrency: 'USD',
+        profit: 0,
+        paymentTerms: '',
+        customerNote: null,
+        deliveredQuantity: null,
+        costPricingModel: 'FIXED',
+        costReferenceId: null,
+        costPlattsEntryId: null,
+        costPremium: null,
+        costBarging: null,
+        costBargingUnit: null,
+        costCreditDays: null,
+        costPriceFinalized: false,
+        salesPricingModel: 'FIXED',
+        salesReferenceId: null,
+        salesPlattsEntryId: null,
+        salesPremium: null,
+        salesBarging: null,
+        salesBargingUnit: null,
+        salesCreditDays: null,
+        salesPriceFinalized: false,
+      },
+    ] as any);
+
+    fixture.detectChanges();
+
+    component.order.set({
+      id: 'order-1',
+      orderNumber: '20260415-000179',
+      placeId: 'place-1',
+      vesselId: 'vessel-1',
+      clientId: 'client-1',
+      tenantId: 'tenant-1',
+      status: 'INQUIRY',
+      invoicingCompanyId: 'company-1',
+      bankAccountId: null,
+      currency: 'USD',
+      eta: '2026-04-15T12:00:00.000Z',
+      etd: null,
+    } as any);
+
+    expect(component.inquiryModal()?.eta()).toBeNull();
+
+    component.openSendInquiryModal();
+    fixture.detectChanges();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const defaultsCall = capturedPosts.find((entry) => entry.url.includes('/inquiry/defaults'));
+
+    expect(defaultsCall?.body).toEqual({
+      eta: '2026-04-15T12:00:00.000Z',
+      etd: null,
+    });
+    expect(component.inquiryModal()?.htmlBody()).toContain('Delivery:');
+  });
 });
