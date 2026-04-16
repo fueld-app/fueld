@@ -967,6 +967,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
         const userId = this.auth.user()?.id;
         if (userId) params.set('userId', userId);
       }
+      params.set('to', this.offsetIsoDate(this.upcomingFollowUpWindowDays));
       const suffix = params.size > 0 ? `?${params.toString()}` : '';
       const res = await firstValueFrom(
         this.http.get<ApiResponse<{ items: DashboardFollowUpItem[] }>>(`${API}/dashboard/follow-ups${suffix}`),

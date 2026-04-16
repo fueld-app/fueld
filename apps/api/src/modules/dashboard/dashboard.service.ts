@@ -445,19 +445,21 @@ export interface FollowUpItem {
 }
 
 /**
- * Returns all incomplete follow-ups, optionally filtered by user.
- * Results are ordered by follow-up date ascending and include future dates
- * so the dashboard can show overdue, due today, and upcoming items.
+ * Returns incomplete follow-ups, optionally filtered by user and a max date.
+ * Results are ordered by follow-up date ascending so the dashboard can group
+ * overdue, due today, and upcoming items.
  */
 export async function getFollowUps(
   tenantId: string,
   userId?: string,
+  to?: string,
 ): Promise<FollowUpItem[]> {
   const conditions = [
     isNotNull(entityComments.followUpDate),
     eq(entityComments.followUpCompleted, false),
   ];
   if (userId) conditions.push(eq(entityComments.userId, userId));
+  if (to) conditions.push(lte(entityComments.followUpDate, to));
 
   const rows = await db
     .select()

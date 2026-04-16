@@ -104,15 +104,15 @@ export const dashboardController = new Elysia({ prefix: '/dashboard' })
   .get(
     '/follow-ups',
     async ({ auth, query }) => {
-      const params = query as { userId?: string };
-      const items = await getFollowUps(auth.tenantId, params.userId);
+      const params = query as { userId?: string; to?: string };
+      const items = await getFollowUps(auth.tenantId, params.userId, params.to);
       return { items };
     },
     {
       detail: {
         tags: ['Dashboard'],
         summary: 'Get incomplete follow-ups',
-        description: 'Returns all incomplete comment follow-ups, including overdue, due today, and upcoming items.',
+        description: 'Returns incomplete comment follow-ups, optionally limited to a maximum follow-up date.',
         security: [{ bearerAuth: [] }],
       },
     },

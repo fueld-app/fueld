@@ -1021,6 +1021,15 @@ describe('dashboard.service', () => {
         followUpDate: isoDate(4),
       });
 
+      await createComment({
+        entityType: 'vessel',
+        entityId: vessel.id,
+        userId: user.id,
+        userName: user.name,
+        content: 'Far future vessel follow-up',
+        followUpDate: isoDate(30),
+      });
+
       const completed = await createComment({
         entityType: 'place',
         entityId: place.id,
@@ -1042,7 +1051,7 @@ describe('dashboard.service', () => {
         content: 'No follow-up date',
       });
 
-      const items = await getFollowUps(tenant.id);
+      const items = await getFollowUps(tenant.id, undefined, isoDate(14));
 
       expect(items.map((item) => item.content)).toEqual([
         'Overdue company follow-up',
