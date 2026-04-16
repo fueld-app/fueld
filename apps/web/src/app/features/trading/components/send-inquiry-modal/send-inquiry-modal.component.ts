@@ -1066,20 +1066,20 @@ export class SendInquiryModalComponent {
             const resolvedEta = responseEta ?? this.resolvedInquiryEta();
             const resolvedEtd = responseEtd ?? this.resolvedInquiryEtd();
             const deliveryLabel = buildInquiryDeliveryWindowLabel(resolvedEta, resolvedEtd);
+            const deadlineLabel = this.responseDeadlineLabel();
             const syncedHtml = syncInquiryMetadataTable(res.data.htmlBody ?? '', {
               deliveryLabel,
-              responseDeadlineLabel: this.responseDeadlineLabel(),
+              responseDeadlineLabel: deadlineLabel,
             });
             this.htmlBody.set(syncedHtml);
-            // Set the body editor content
+            // Set the body editor content.
+            // Use the already-synced HTML directly — do NOT re-sync through the
+            // signal-based deliveryWindowLabel() as the computed may still return
+            // stale values before Angular flushes the effect graph.
             setTimeout(() => {
               const editor = this.bodyEditor()?.nativeElement;
               if (editor) {
-                const latestHtml = this.syncInquiryBodyMetadataHtml(this.htmlBody() || syncedHtml);
-                if (latestHtml !== this.htmlBody()) {
-                  this.htmlBody.set(latestHtml);
-                }
-                editor.innerHTML = latestHtml;
+                editor.innerHTML = this.htmlBody() || syncedHtml;
               }
             });
           }
@@ -1699,7 +1699,18 @@ export class SendInquiryModalComponent {
     const editor = this.bodyEditor()?.nativeElement;
     const editorHtml = editor?.innerHTML ?? '';
     const currentHtml = editorHtml.trim() ? editorHtml : this.htmlBody();
-    const syncedHtml = this.syncInquiryBodyMetadataHtml(currentHtml);
+    const deliveryLabel = this.deliveryWindowLabel();
+    const deadlineLabel = this.responseDeadlineLabel();
+
+    // Guard: if the signal chain resolves to an empty delivery label
+    // but the HTML already contains a Delivery row, skip the sync to
+    // avoid stripping a backend-provided row during a timing gap.
+    if (!deliveryLabel && /Delivery:/i.test(currentHtml)) return;
+
+    const syncedHtml = syncInquiryMetadataTable(currentHtml, {
+      deliveryLabel,
+      responseDeadlineLabel: deadlineLabel,
+    });
     if (syncedHtml === currentHtml) return;
 
     this.htmlBody.set(syncedHtml);
