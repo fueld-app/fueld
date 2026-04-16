@@ -16,6 +16,12 @@ import { AuthService } from '../../../core/auth/auth.service';
 import type { ApiResponse } from '@fueld/types';
 
 import { API } from '@app/core/config/api';
+import {
+  followUpDateFromDays,
+  followUpDaysFromDate,
+  normalizeFollowUpDays,
+  todayDateString,
+} from './comments-card.follow-up';
 
 interface Comment {
   id: string;
@@ -73,9 +79,20 @@ interface Comment {
                   Follow-up
                 </label>
                 @if (showFollowUpInput()) {
+                  <div class="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-600">
+                    <span>in</span>
+                    <input
+                      type="number"
+                      [ngModel]="newFollowUpDays"
+                      (ngModelChange)="onFollowUpDaysChange($event)"
+                      class="w-16 border-0 bg-transparent p-0 text-right text-xs font-medium text-gray-700 outline-none focus:ring-0"
+                    />
+                    <span>days</span>
+                  </div>
                   <input
                     type="date"
-                    [(ngModel)]="newFollowUpDate"
+                    [ngModel]="newFollowUpDate"
+                    (ngModelChange)="onFollowUpDateChange($event)"
                     class="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
                   />
                 }
@@ -241,9 +258,8 @@ export class CommentsCardComponent implements OnDestroy {
 
   newContent = '';
   editContent = '';
+  newFollowUpDays = 0;
   newFollowUpDate = '';
-
-  private defaultFollowUpDays = 90;
 
   readonly currentUserId = computed(() => this.auth.user()?.id ?? '');
   readonly currentUserInitials = computed(() => {
@@ -258,8 +274,6 @@ export class CommentsCardComponent implements OnDestroy {
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
-    this.loadDefaultFollowUpDays();
-
     effect(() => {
       const id = this.entityId();
       const type = this.entityType();
@@ -276,34 +290,40 @@ export class CommentsCardComponent implements OnDestroy {
     }
   }
 
-  private async loadDefaultFollowUpDays(): Promise<void> {
-    try {
-      const res = await firstValueFrom(
-        this.http.get<ApiResponse<{ defaultFollowUpDays: number }>>(`${API}/admin/settings/my-follow-up-settings`),
-      );
-      if (res.success && res.data) {
-        this.defaultFollowUpDays = res.data.defaultFollowUpDays;
-      }
-    } catch {
-      // use default
-    }
-  }
-
   toggleFollowUpInput(): void {
     const show = !this.showFollowUpInput();
     this.showFollowUpInput.set(show);
     if (show && !this.newFollowUpDate) {
-      const d = new Date();
-      d.setDate(d.getDate() + this.defaultFollowUpDays);
-      this.newFollowUpDate = d.toISOString().slice(0, 10);
+      this.initializeFollowUpInputs();
     }
   }
 
+  onFollowUpDaysChange(value: unknown): void {
+    const days = normalizeFollowUpDays(value);
+    this.newFollowUpDays = days;
+    this.newFollowUpDate = followUpDateFromDays(days);
+  }
+
+  onFollowUpDateChange(value: string): void {
+    this.newFollowUpDate = value;
+    this.newFollowUpDays = followUpDaysFromDate(value);
+  }
+
   followUpBadgeClass(dateStr: string): string {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayDateString();
     if (dateStr < today) return 'bg-red-50 border-red-200 text-red-700';
     if (dateStr === today) return 'bg-amber-50 border-amber-200 text-amber-700';
     return 'bg-gray-50 border-gray-200 text-gray-600';
+  }
+
+  private initializeFollowUpInputs(): void {
+    this.newFollowUpDays = 0;
+    this.newFollowUpDate = todayDateString();
+  }
+
+  private clearFollowUpInputs(): void {
+    this.newFollowUpDays = 0;
+    this.newFollowUpDate = '';
   }
 
   async markFollowUpDone(commentId: string): Promise<void> {
@@ -379,7 +399,7 @@ export class CommentsCardComponent implements OnDestroy {
       if (res.success && res.data) {
         this.comments.update((list) => [res.data!, ...list]);
         this.newContent = '';
-        this.newFollowUpDate = '';
+        this.clearFollowUpInputs();
         this.showFollowUpInput.set(false);
       }
     } catch {
