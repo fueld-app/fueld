@@ -1245,19 +1245,6 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         ? `${etaLabel} to ${etdLabel}`
         : etaLabel || etdLabel || '';
 
-      // DEBUG: trace Delivery row generation
-      console.log('[inquiry/defaults] ETA trace:', {
-        bodyEta: body?.eta ?? '(undefined)',
-        bodyEtd: body?.etd ?? '(undefined)',
-        orderEta: order.eta,
-        orderEtd: order.etd,
-        resolvedEta,
-        resolvedEtd,
-        etaLabel,
-        etdLabel,
-        deliveryWindow,
-      });
-
       const defaultResponseDeadlineAt = getDefaultInquiryResponseDeadline(inquirySettings.defaultResponseDeadlineHours);
       const defaultResponseDeadlineFormatted = formatDeadlineHumanDuration(defaultResponseDeadlineAt);
 
@@ -1282,11 +1269,6 @@ export const documentsController = new Elysia({ prefix: '/orders' })
 
       try {
         const template = await getEmailTemplate(auth.tenantId, 'INQUIRY');
-        console.log('[inquiry/defaults] Template:', {
-          hasTemplate: !!template,
-          hasBody: !!template?.bodyTemplate,
-          hasSubject: !!template?.subjectTemplate,
-        });
         if (template?.subjectTemplate) {
           subject = renderTemplate(template.subjectTemplate, templateVars);
         } else {
@@ -1342,12 +1324,6 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         });
       }
 
-      console.log('[inquiry/defaults] Result:', {
-        htmlHasDelivery: /Delivery:/i.test(htmlBody),
-        returnedEta: resolvedEta ?? null,
-        returnedEtd: resolvedEtd ?? null,
-      });
-
       return {
         success: true,
         data: {
@@ -1359,19 +1335,6 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           eta: resolvedEta ?? null,
           etd: resolvedEtd ?? null,
           responseDeadlineAt: defaultResponseDeadlineAt,
-          _debug: {
-            bodyEta: body?.eta ?? null,
-            bodyEtd: body?.etd ?? null,
-            orderEta: order.eta,
-            orderEtd: order.etd,
-            resolvedEta: resolvedEta ?? null,
-            resolvedEtd: resolvedEtd ?? null,
-            etaLabel,
-            etdLabel,
-            deliveryWindow,
-            htmlHasDelivery: /Delivery:/i.test(htmlBody),
-            usedCustomTemplate: !!(await getEmailTemplate(auth.tenantId, 'INQUIRY'))?.bodyTemplate,
-          },
         },
       };
     },
