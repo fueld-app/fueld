@@ -33,4 +33,23 @@ describe('send-inquiry-modal.utils', () => {
     expect(synced).toContain('15 Apr 2026');
     expect(synced).not.toContain('Reply within:');
   });
+
+  it('inserts delivery rows for templates that render label and value in a single table cell', () => {
+    const html = `
+      <table>
+        <tr><td>Vessel: Hesperides (navy)</td></tr>
+        <tr><td>Place: Recife</td></tr>
+        <tr><td>Reply within: 6 hours</td></tr>
+        <tr><td>Account: Riviera Marine S.A.M.</td></tr>
+      </table>
+    `;
+
+    const synced = syncInquiryMetadataTable(html, {
+      deliveryLabel: '15 Apr 2026',
+      responseDeadlineLabel: '6 hours',
+    });
+
+    expect(synced).toContain('Delivery:');
+    expect(synced).toContain('15 Apr 2026');
+  });
 });

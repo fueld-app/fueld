@@ -178,6 +178,38 @@ describe('SendInquiryModalComponent', () => {
     expect(editor?.innerHTML).toContain('15 Apr 2026');
   });
 
+  it('adds the delivery row for custom templates that put label and value in one cell', async () => {
+    const { component, fixture } = await createComponent({
+      defaults: {
+        subject: 'Inquiry Recife - Hesperides',
+        htmlBody: `
+          <table>
+            <tr><td>Vessel: Hesperides (navy)</td></tr>
+            <tr><td>Place: Recife</td></tr>
+            <tr><td>Reply within: 6 hours</td></tr>
+            <tr><td>Account: Riviera Marine S.A.M.</td></tr>
+          </table>
+        `,
+        eta: null,
+        etd: null,
+        responseDeadlineAt: '2026-04-17T12:00:00.000Z',
+      },
+    });
+
+    fixture.componentRef.setInput('eta', '2026-04-15T12:00:00.000Z');
+    fixture.detectChanges();
+
+    component.show();
+    fixture.detectChanges();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const editor = fixture.nativeElement.querySelector('[contenteditable="true"]') as HTMLDivElement | null;
+
+    expect(component.htmlBody()).toContain('Delivery:');
+    expect(component.htmlBody()).toContain('15 Apr 2026');
+    expect(editor?.innerHTML).toContain('Delivery:');
+  });
+
   it('can disable the response deadline per inquiry and emits a null deadline', async () => {
     const { component, fixture } = await createComponent();
 

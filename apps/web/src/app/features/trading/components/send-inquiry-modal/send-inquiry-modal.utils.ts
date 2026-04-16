@@ -51,14 +51,26 @@ function upsertMetadataRowInHtml(
 function findMetadataTable(root: ParentNode): HTMLTableElement | null {
   const tables = Array.from(root.querySelectorAll('table'));
   return tables.find((table) => {
-    const labels = Array.from(table.rows)
-      .map((row) => normalizeCellLabel(row.cells[0]?.textContent));
-    return labels.includes('Vessel:') && labels.includes('Place:');
+    const rows = Array.from(table.rows);
+    return rows.some((row) => rowHasLabel(row, 'Vessel:'))
+      && rows.some((row) => rowHasLabel(row, 'Place:'));
   }) ?? null;
 }
 
+function normalizedRowText(row: HTMLTableRowElement): string {
+  return normalizeCellLabel(row.textContent);
+}
+
+function rowHasLabel(row: HTMLTableRowElement, label: string): boolean {
+  const firstCellLabel = normalizeCellLabel(row.cells[0]?.textContent);
+  if (firstCellLabel === label) return true;
+
+  const rowText = normalizedRowText(row);
+  return rowText.startsWith(label);
+}
+
 function findRowByLabel(table: HTMLTableElement, label: string): HTMLTableRowElement | null {
-  return Array.from(table.rows).find((row) => normalizeCellLabel(row.cells[0]?.textContent) === label) ?? null;
+  return Array.from(table.rows).find((row) => rowHasLabel(row, label)) ?? null;
 }
 
 function setRowValue(row: HTMLTableRowElement, label: string, value: string): void {
