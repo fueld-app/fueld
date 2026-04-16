@@ -964,11 +964,9 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
       params.set('to', this.offsetIsoDate(this.upcomingFollowUpWindowDays));
       const suffix = params.size > 0 ? `?${params.toString()}` : '';
       const res = await firstValueFrom(
-        this.http.get<ApiResponse<{ items: DashboardFollowUpItem[] }>>(`${API}/dashboard/follow-ups${suffix}`),
+        this.http.get<{ items: DashboardFollowUpItem[] }>(`${API}/dashboard/follow-ups${suffix}`),
       );
-      if (res.success && res.data) {
-        this.followUps.set(res.data.items);
-      }
+      this.followUps.set(res.items ?? []);
     } catch {
       // non-critical
     }
