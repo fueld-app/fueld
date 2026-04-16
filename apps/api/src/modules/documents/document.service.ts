@@ -2249,7 +2249,7 @@ export async function generateNominationPdfBuffer(orderId: string, options?: {
     fromEmail: order.salesRep?.email ?? null,
     fromPhone: order.salesRep?.phone ?? null,
     paymentTerms: formatCustomerPaymentTerms(nominationContext.paymentTermType, nominationContext.creditDays),
-    customerNote: null,
+    customerNote: nominationContext.selectedSupplier?.note ?? order.supplierNote ?? null,
     termsAndConditions: replaceCompanyNamePlaceholder(
       order.invoicingCompany?.supplierTerms ?? null,
       order.invoicingCompany?.name ?? null,

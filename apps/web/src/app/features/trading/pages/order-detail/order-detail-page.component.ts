@@ -2028,6 +2028,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     })),
   );
   readonly hasBankAccount = computed(() => !!this.order()?.bankAccountId);
+  readonly hasEta = computed(() => !!this.order()?.eta);
   readonly hasLineItems = computed(() => this.itemRows().length > 0);
 
   readonly isResponsibleUser = computed(() => {
@@ -4416,6 +4417,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
           this.showToast('error', 'Select an invoicing company before generating Confirmation PDF.');
           break;
         }
+        if (!this.hasEta()) {
+          this.showToast('error', 'Set an ETA before generating Confirmation PDF.');
+          break;
+        }
         this.viewOfferPdf();
         break;
       case 'view-proforma':
@@ -4429,6 +4434,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         }
         if (!this.hasInvoicingCompany()) {
           this.showToast('error', 'Select an invoicing company before generating Nomination PDF.');
+          break;
+        }
+        if (!this.hasEta()) {
+          this.showToast('error', 'Set an ETA before generating Nomination PDF.');
           break;
         }
         this.viewProformaPdf();
@@ -4450,15 +4459,19 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         this.openSendEmailModal('INVOICE');
         break;
       case 'send-offer':
+        if (!this.hasEta()) { this.showToast('error', 'Set an ETA before sending.'); break; }
         this.openSendEmailModal('OFFER');
         break;
       case 'send-confirmation':
+        if (!this.hasEta()) { this.showToast('error', 'Set an ETA before sending.'); break; }
         this.openSendEmailModal('CONFIRMATION');
         break;
       case 'send-nomination':
+        if (!this.hasEta()) { this.showToast('error', 'Set an ETA before sending.'); break; }
         this.openSendEmailModal('NOMINATION');
         break;
       case 'send-proforma':
+        if (!this.hasEta()) { this.showToast('error', 'Set an ETA before sending.'); break; }
         this.openSendEmailModal('PROFORMA');
         break;
       case 'send-invoice':
@@ -4819,6 +4832,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   openSendInquiryModal(): void {
     if (!this.hasLineItems()) {
       this.showToast('error', 'Add at least one line item before sending inquiries.');
+      return;
+    }
+    if (!this.hasEta()) {
+      this.showToast('error', 'Set an ETA before sending inquiries.');
       return;
     }
     this.inquiryModal()?.show();
