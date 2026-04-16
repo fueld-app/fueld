@@ -489,8 +489,8 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   readonly searchTerm = signal('');
   readonly sortBy = signal('');
   readonly sortDir = signal<'asc' | 'desc'>('asc');
-  readonly defaultSortBy = computed(() => 'eta');
-  readonly defaultSortDir = computed<'asc' | 'desc'>(() => 'asc');
+  readonly defaultSortBy = computed(() => this.isOrders() ? 'eta' : 'createdAt');
+  readonly defaultSortDir = computed<'asc' | 'desc'>(() => this.isOrders() ? 'asc' : 'desc');
   readonly activeSortBy = computed(() => this.sortBy() || this.defaultSortBy());
   readonly activeSortDir = computed<'asc' | 'desc'>(() => this.sortBy() ? this.sortDir() : this.defaultSortDir());
   readonly toast = signal<{ type: 'success' | 'error'; message: string } | null>(null);

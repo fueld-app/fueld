@@ -69,16 +69,16 @@ describe('InquiriesListPageComponent', () => {
     return request!;
   }
 
-  it('defaults inquiry requests to ETA ascending', async () => {
+  it('defaults inquiry requests to newest first', async () => {
     const fixture = TestBed.createComponent(InquiriesListPageComponent);
     const component = fixture.componentInstance;
 
     await component.loadInquiries();
 
-    expect(component.activeSortBy()).toBe('eta');
-    expect(component.activeSortDir()).toBe('asc');
-    expect(latestOrdersRequest()).toContain('sortBy=eta');
-    expect(latestOrdersRequest()).toContain('sortDir=asc');
+    expect(component.activeSortBy()).toBe('createdAt');
+    expect(component.activeSortDir()).toBe('desc');
+    expect(latestOrdersRequest()).toContain('sortBy=createdAt');
+    expect(latestOrdersRequest()).toContain('sortDir=desc');
   });
 
   it('defaults active order requests to ETA ascending', async () => {
