@@ -1050,6 +1050,17 @@ export class SendInquiryModalComponent {
       .subscribe({
         next: (res) => {
           if (res.success && res.data) {
+            // DEBUG: log the raw response to browser console
+            console.log('[SendInquiry] defaults response:', {
+              eta: res.data.eta,
+              etd: res.data.etd,
+              htmlHasDelivery: /Delivery:/i.test(res.data.htmlBody ?? ''),
+              _debug: res.data._debug,
+              inputEta: this.eta(),
+              inputEtd: this.etd(),
+              inquiryEta: this.inquiryEta(),
+              resolvedInquiryEta: this.resolvedInquiryEta(),
+            });
             this.subject.set(res.data.subject ?? '');
             const responseEta = this.normalizeInquiryDate(res.data.eta);
             const responseEtd = this.normalizeInquiryDate(res.data.etd);
