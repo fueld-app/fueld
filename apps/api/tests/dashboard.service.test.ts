@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
-import { invoices, orderItems, orders, users } from '../src/db/schema';
+import { entityComments, invoices, orderItems, orders, users } from '../src/db/schema';
 import { getDb, seedBasics, truncateAll } from './helpers/db';
 
 async function loadDashboardService() {
@@ -9,6 +9,10 @@ async function loadDashboardService() {
 
 async function loadOrdersService() {
   return import('../src/modules/orders/orders.service');
+}
+
+async function loadCommentsService() {
+  return import('../src/modules/comments/comments.service');
 }
 
 function isoDate(offsetDays: number): string {
@@ -973,6 +977,119 @@ describe('dashboard.service', () => {
       // --- Collections (no overdue invoices created) ---
       const collections = await getCollections(tenant.id);
       expect(collections.length).toBe(0);
+    });
+
+    it('returns overdue, today, and upcoming follow-ups ordered by date', async () => {
+      const { tenant, client, vessel, place, user } = await seedBasics();
+      const db = await getDb();
+      const { createOrder } = await loadOrdersService();
+      const { createComment } = await loadCommentsService();
+      const { getFollowUps } = await loadDashboardService();
+
+      const order = await createOrder({
+        tenantId: tenant.id,
+        clientId: client.id,
+        vesselId: vessel.id,
+        placeId: place.id,
+        salesRepId: user.id,
+      });
+
+      await createComment({
+        entityType: 'company',
+        entityId: client.id,
+        userId: user.id,
+        userName: user.name,
+        content: 'Overdue company follow-up',
+        followUpDate: isoDate(-2),
+      });
+
+      await createComment({
+        entityType: 'order',
+        entityId: order.id,
+        userId: user.id,
+        userName: user.name,
+        content: 'Due today order follow-up',
+        followUpDate: isoDate(0),
+      });
+
+      await createComment({
+        entityType: 'vessel',
+        entityId: vessel.id,
+        userId: user.id,
+        userName: user.name,
+        content: 'Upcoming vessel follow-up',
+        followUpDate: isoDate(4),
+      });
+
+      const completed = await createComment({
+        entityType: 'place',
+        entityId: place.id,
+        userId: user.id,
+        userName: user.name,
+        content: 'Completed follow-up',
+        followUpDate: isoDate(1),
+      });
+      await db
+        .update(entityComments)
+        .set({ followUpCompleted: true, updatedAt: new Date() })
+        .where(eq(entityComments.id, completed.id));
+
+      await createComment({
+        entityType: 'company',
+        entityId: client.id,
+        userId: user.id,
+        userName: user.name,
+        content: 'No follow-up date',
+      });
+
+      const items = await getFollowUps(tenant.id);
+
+      expect(items.map((item) => item.content)).toEqual([
+        'Overdue company follow-up',
+        'Due today order follow-up',
+        'Upcoming vessel follow-up',
+      ]);
+      expect(items[0]?.entityName).toBe(client.name);
+      expect(items[1]?.entityName).toBe(order.orderNumber ?? order.id);
+      expect(items[2]?.entityName).toBe(vessel.name);
+    });
+
+    it('filters follow-ups by user id when provided', async () => {
+      const { tenant, client, user } = await seedBasics();
+      const db = await getDb();
+      const { createComment } = await loadCommentsService();
+      const { getFollowUps } = await loadDashboardService();
+
+      const [otherUser] = await db.insert(users).values({
+        tenantId: tenant.id,
+        email: 'followups-other@test.local',
+        name: 'Other User',
+        role: 'TRADER',
+      }).returning();
+
+      await createComment({
+        entityType: 'company',
+        entityId: client.id,
+        userId: user.id,
+        userName: user.name,
+        content: 'Mine',
+        followUpDate: isoDate(2),
+      });
+
+      await createComment({
+        entityType: 'company',
+        entityId: client.id,
+        userId: otherUser.id,
+        userName: otherUser.name,
+        content: 'Theirs',
+        followUpDate: isoDate(1),
+      });
+
+      const items = await getFollowUps(tenant.id, user.id);
+
+      expect(items).toHaveLength(1);
+      expect(items[0]?.content).toBe('Mine');
+      expect(items[0]?.userId).toBe(user.id);
     });
   });
 });

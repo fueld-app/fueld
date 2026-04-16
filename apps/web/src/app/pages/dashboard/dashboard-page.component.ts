@@ -31,6 +31,18 @@ import { AuthService } from '../../core/auth/auth.service';
 import { API } from '@app/core/config/api';
 import { RiskMonitoringService } from '../../core/risk-monitoring/risk-monitoring.service';
 
+type DashboardFollowUpItem = {
+  id: string;
+  entityType: string;
+  entityId: string;
+  entityName: string | null;
+  content: string;
+  followUpDate: string;
+  userName: string;
+};
+
+const UPCOMING_FOLLOW_UP_WINDOW_DAYS = 14;
+
 // ═══════════════════════════════════════════════════════════════════════
 //  Dashboard Page — Manager view with collections and team stats
 // ═══════════════════════════════════════════════════════════════════════
@@ -151,41 +163,162 @@ import { RiskMonitoringService } from '../../core/risk-monitoring/risk-monitorin
       </div>
 
       <!-- Follow-Ups Widget -->
-      @if (followUps().length) {
+      @if (followUpGroups().total) {
         <div class="mt-8 rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
           <div class="border-b border-gray-100 px-5 py-3 flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-500" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z" clip-rule="evenodd" />
             </svg>
-            <h3 class="text-sm font-semibold text-gray-900">Follow-Ups Due</h3>
+            <h3 class="text-sm font-semibold text-gray-900">Follow-Ups</h3>
             <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
-              {{ followUps().length }}
+              {{ followUpGroups().total }}
             </span>
           </div>
-          <div class="divide-y divide-gray-50">
-            @for (f of followUps(); track f.id) {
-              <div class="px-5 py-3 flex items-center gap-4 hover:bg-gray-50/50 transition-colors">
-                <div class="min-w-0 flex-1">
-                  <div class="flex items-center gap-2">
-                    <span
-                      class="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium"
-                      [class]="followUpDateClass(f.followUpDate)"
-                    >{{ f.followUpDate | date:'mediumDate' }}</span>
-                    <span class="text-xs text-gray-400">{{ f.entityType }}</span>
-                    <span class="text-sm font-medium text-gray-900 truncate">{{ f.entityName || f.entityId }}</span>
-                  </div>
-                  <p class="mt-0.5 text-xs text-gray-500 line-clamp-1">{{ f.content }}</p>
-                  <span class="text-[10px] text-gray-400">{{ f.userName }}</span>
+          <div class="border-b border-gray-100 px-5 py-3 flex flex-wrap gap-2 bg-gray-50/70">
+            @if (followUpGroups().overdue.length) {
+              <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">
+                Overdue {{ followUpGroups().overdue.length }}
+              </span>
+            }
+            @if (followUpGroups().dueToday.length) {
+              <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                Due Today {{ followUpGroups().dueToday.length }}
+              </span>
+            }
+            @if (followUpGroups().upcoming.length) {
+              <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">
+                Next {{ upcomingFollowUpWindowDays }} Days {{ followUpGroups().upcoming.length }}
+              </span>
+            }
+          </div>
+          <div class="divide-y divide-gray-100">
+            @if (followUpGroups().overdue.length) {
+              <div class="px-5 py-4">
+                <div class="mb-3 flex items-center justify-between gap-3">
+                  <h4 class="text-xs font-semibold uppercase tracking-[0.12em] text-red-700">Overdue</h4>
+                  <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">
+                    {{ followUpGroups().overdue.length }}
+                  </span>
                 </div>
-                <button
-                  (click)="completeFollowUp(f.id)"
-                  class="shrink-0 rounded-full p-1.5 text-gray-400 hover:bg-green-50 hover:text-green-600 transition-colors"
-                  title="Mark done"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
-                  </svg>
-                </button>
+                <div class="space-y-2">
+                  @for (f of followUpGroups().overdue; track f.id) {
+                    <div class="flex items-center gap-4 rounded-lg border border-red-100 bg-red-50/40 px-4 py-3">
+                      <button
+                        type="button"
+                        (click)="openFollowUp(f)"
+                        class="min-w-0 flex-1 rounded-md text-left transition-colors hover:text-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
+                        title="Open related record"
+                      >
+                        <div class="flex items-center gap-2">
+                          <span
+                            class="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium"
+                            [class]="followUpDateClass(f.followUpDate)"
+                          >{{ f.followUpDate | date:'mediumDate' }}</span>
+                          <span class="text-xs uppercase tracking-wide text-gray-400">{{ f.entityType }}</span>
+                          <span class="text-sm font-medium text-gray-900 truncate">{{ f.entityName || f.entityId }}</span>
+                        </div>
+                        <p class="mt-0.5 text-xs text-gray-500 line-clamp-1">{{ f.content }}</p>
+                        <span class="text-[10px] text-gray-400">{{ f.userName }}</span>
+                      </button>
+                      <button
+                        type="button"
+                        (click)="completeFollowUp(f.id)"
+                        class="shrink-0 rounded-full p-1.5 text-gray-400 hover:bg-green-50 hover:text-green-600 transition-colors"
+                        title="Mark done"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                        </svg>
+                      </button>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+            @if (followUpGroups().dueToday.length) {
+              <div class="px-5 py-4">
+                <div class="mb-3 flex items-center justify-between gap-3">
+                  <h4 class="text-xs font-semibold uppercase tracking-[0.12em] text-amber-700">Due Today</h4>
+                  <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                    {{ followUpGroups().dueToday.length }}
+                  </span>
+                </div>
+                <div class="space-y-2">
+                  @for (f of followUpGroups().dueToday; track f.id) {
+                    <div class="flex items-center gap-4 rounded-lg border border-amber-100 bg-amber-50/40 px-4 py-3">
+                      <button
+                        type="button"
+                        (click)="openFollowUp(f)"
+                        class="min-w-0 flex-1 rounded-md text-left transition-colors hover:text-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
+                        title="Open related record"
+                      >
+                        <div class="flex items-center gap-2">
+                          <span
+                            class="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium"
+                            [class]="followUpDateClass(f.followUpDate)"
+                          >{{ f.followUpDate | date:'mediumDate' }}</span>
+                          <span class="text-xs uppercase tracking-wide text-gray-400">{{ f.entityType }}</span>
+                          <span class="text-sm font-medium text-gray-900 truncate">{{ f.entityName || f.entityId }}</span>
+                        </div>
+                        <p class="mt-0.5 text-xs text-gray-500 line-clamp-1">{{ f.content }}</p>
+                        <span class="text-[10px] text-gray-400">{{ f.userName }}</span>
+                      </button>
+                      <button
+                        type="button"
+                        (click)="completeFollowUp(f.id)"
+                        class="shrink-0 rounded-full p-1.5 text-gray-400 hover:bg-green-50 hover:text-green-600 transition-colors"
+                        title="Mark done"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                        </svg>
+                      </button>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+            @if (followUpGroups().upcoming.length) {
+              <div class="px-5 py-4">
+                <div class="mb-3 flex items-center justify-between gap-3">
+                  <h4 class="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">Upcoming (Next {{ upcomingFollowUpWindowDays }} Days)</h4>
+                  <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">
+                    {{ followUpGroups().upcoming.length }}
+                  </span>
+                </div>
+                <div class="space-y-2">
+                  @for (f of followUpGroups().upcoming; track f.id) {
+                    <div class="flex items-center gap-4 rounded-lg border border-blue-100 bg-blue-50/40 px-4 py-3">
+                      <button
+                        type="button"
+                        (click)="openFollowUp(f)"
+                        class="min-w-0 flex-1 rounded-md text-left transition-colors hover:text-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
+                        title="Open related record"
+                      >
+                        <div class="flex items-center gap-2">
+                          <span
+                            class="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium"
+                            [class]="followUpDateClass(f.followUpDate)"
+                          >{{ f.followUpDate | date:'mediumDate' }}</span>
+                          <span class="text-xs uppercase tracking-wide text-gray-400">{{ f.entityType }}</span>
+                          <span class="text-sm font-medium text-gray-900 truncate">{{ f.entityName || f.entityId }}</span>
+                        </div>
+                        <p class="mt-0.5 text-xs text-gray-500 line-clamp-1">{{ f.content }}</p>
+                        <span class="text-[10px] text-gray-400">{{ f.userName }}</span>
+                      </button>
+                      <button
+                        type="button"
+                        (click)="completeFollowUp(f.id)"
+                        class="shrink-0 rounded-full p-1.5 text-gray-400 hover:bg-green-50 hover:text-green-600 transition-colors"
+                        title="Mark done"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                        </svg>
+                      </button>
+                    </div>
+                  }
+                </div>
               </div>
             }
           </div>
@@ -497,15 +630,40 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   readonly lossAnalysis = signal<{ reasons: LossReasonDto[]; totalCancelled: number }>({ reasons: [], totalCancelled: 0 });
   readonly conversionMetrics = signal<ConversionMetricsDto>({ totalInquiries: 0, totalWon: 0, totalLost: 0, winRate: 0, avgDaysToClose: null });
   readonly topCreditGroups = signal<{ id: string; name: string; country: string | null; totalCreditLimit: string; totalCreditUsed: string; childCount: number }[]>([]);
-  readonly followUps = signal<{ id: string; entityType: string; entityId: string; entityName: string; content: string; followUpDate: string; userName: string }[]>([]);
+  readonly followUps = signal<DashboardFollowUpItem[]>([]);
   readonly frozenCompanies = signal<CounterpartyDto[]>([]);
   readonly frozenCompaniesLoading = signal(false);
+  readonly upcomingFollowUpWindowDays = UPCOMING_FOLLOW_UP_WINDOW_DAYS;
   readonly canUseTeamView = computed(() => this.auth.isAdmin() || this.auth.isCreditManager());
   readonly showFrozenCounterpartiesWidget = computed(() => {
     const role = this.auth.user()?.role;
     return role === Role.Admin || role === Role.Teamlead || role === Role.CreditManager || role === Role.Trader;
   });
   readonly frozenCounterpartiesTitle = computed(() => this.showResponsibleInFrozenCounterparties() ? 'Frozen Counterparties' : 'My Frozen Counterparties');
+  readonly followUpGroups = computed(() => {
+    const today = this.todayIsoDate();
+    const upcomingCutoff = this.offsetIsoDate(this.upcomingFollowUpWindowDays);
+    const overdue: DashboardFollowUpItem[] = [];
+    const dueToday: DashboardFollowUpItem[] = [];
+    const upcoming: DashboardFollowUpItem[] = [];
+
+    for (const item of this.followUps()) {
+      if (item.followUpDate < today) {
+        overdue.push(item);
+      } else if (item.followUpDate === today) {
+        dueToday.push(item);
+      } else if (item.followUpDate <= upcomingCutoff) {
+        upcoming.push(item);
+      }
+    }
+
+    return {
+      overdue,
+      dueToday,
+      upcoming,
+      total: overdue.length + dueToday.length + upcoming.length,
+    };
+  });
 
   constructor() {}
 
@@ -539,6 +697,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   toggleTeamView(): void {
     this.teamView.update((current) => !current);
     void this.loadDashboardData();
+    void this.loadFollowUps();
   }
 
   selectDatePreset(key: string): void {
@@ -564,6 +723,16 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  }
+
+  private todayIsoDate(): string {
+    return this.formatDateForQuery(new Date());
+  }
+
+  private offsetIsoDate(days: number): string {
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    return this.formatDateForQuery(date);
   }
 
   private buildDateQuery(): string {
@@ -725,6 +894,27 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     void this.router.navigate(['/companies', id]);
   }
 
+  openFollowUp(item: DashboardFollowUpItem): void {
+    const route = this.followUpRoute(item);
+    if (!route) return;
+    void this.router.navigate(route);
+  }
+
+  private followUpRoute(item: DashboardFollowUpItem): string[] | null {
+    switch (item.entityType) {
+      case 'company':
+        return ['/companies', item.entityId];
+      case 'order':
+        return ['/trading/orders', item.entityId];
+      case 'place':
+        return ['/places', item.entityId];
+      case 'vessel':
+        return ['/vessels', item.entityId];
+      default:
+        return null;
+    }
+  }
+
   showResponsibleInFrozenCounterparties(): boolean {
     const role = this.auth.user()?.role;
     return role === Role.Admin || role === Role.Teamlead || role === Role.CreditManager;
@@ -771,8 +961,15 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
 
   private async loadFollowUps(): Promise<void> {
     try {
+      const params = new URLSearchParams();
+      const isMyView = this.canUseTeamView() ? !this.teamView() : true;
+      if (isMyView) {
+        const userId = this.auth.user()?.id;
+        if (userId) params.set('userId', userId);
+      }
+      const suffix = params.size > 0 ? `?${params.toString()}` : '';
       const res = await firstValueFrom(
-        this.http.get<ApiResponse<{ items: { id: string; entityType: string; entityId: string; entityName: string; content: string; followUpDate: string; userName: string }[] }>>(`${API}/dashboard/follow-ups`),
+        this.http.get<ApiResponse<{ items: DashboardFollowUpItem[] }>>(`${API}/dashboard/follow-ups${suffix}`),
       );
       if (res.success && res.data) {
         this.followUps.set(res.data.items);
@@ -783,10 +980,10 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   }
 
   followUpDateClass(dateStr: string): string {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = this.todayIsoDate();
     if (dateStr < today) return 'bg-red-100 border-red-200 text-red-700';
     if (dateStr === today) return 'bg-amber-100 border-amber-200 text-amber-700';
-    return 'bg-gray-100 border-gray-200 text-gray-600';
+    return 'bg-blue-100 border-blue-200 text-blue-700';
   }
 
   async completeFollowUp(commentId: string): Promise<void> {

@@ -111,8 +111,8 @@ export const dashboardController = new Elysia({ prefix: '/dashboard' })
     {
       detail: {
         tags: ['Dashboard'],
-        summary: 'Get due/overdue follow-ups',
-        description: 'Returns all comment follow-ups that are due today or overdue and not yet completed.',
+        summary: 'Get incomplete follow-ups',
+        description: 'Returns all incomplete comment follow-ups, including overdue, due today, and upcoming items.',
         security: [{ bearerAuth: [] }],
       },
     },

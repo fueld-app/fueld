@@ -430,7 +430,7 @@ export async function getConversionMetrics(
   };
 }
 
-// ─── Follow-Ups (due/overdue comment follow-ups) ─────────────────────
+// ─── Follow-Ups (all incomplete comment follow-ups) ──────────────────
 
 export interface FollowUpItem {
   id: string;
@@ -445,18 +445,16 @@ export interface FollowUpItem {
 }
 
 /**
- * Returns all incomplete follow-ups that are due today or overdue,
- * optionally filtered by user. Resolves entity names for display.
+ * Returns all incomplete follow-ups, optionally filtered by user.
+ * Results are ordered by follow-up date ascending and include future dates
+ * so the dashboard can show overdue, due today, and upcoming items.
  */
 export async function getFollowUps(
   tenantId: string,
   userId?: string,
 ): Promise<FollowUpItem[]> {
-  const today = new Date().toISOString().split('T')[0]!;
-
   const conditions = [
     isNotNull(entityComments.followUpDate),
-    lte(entityComments.followUpDate, today),
     eq(entityComments.followUpCompleted, false),
   ];
   if (userId) conditions.push(eq(entityComments.userId, userId));
