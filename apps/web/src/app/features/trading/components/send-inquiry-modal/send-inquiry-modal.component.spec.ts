@@ -114,6 +114,38 @@ describe('SendInquiryModalComponent', () => {
     expect(component.htmlBody()).toContain('15 Apr 2026');
   });
 
+  it('resyncs the inquiry body when eta arrives after the modal is opened', async () => {
+    const { component, fixture } = await createComponent({
+      defaults: {
+        subject: 'Inquiry Recife - Hesperides',
+        htmlBody: `
+          <table>
+            <tr><td>Vessel:</td><td>Hesperides (navy)</td></tr>
+            <tr><td>Place:</td><td>Recife</td></tr>
+            <tr><td>Reply within:</td><td>6 hours</td></tr>
+            <tr><td>Account:</td><td>Riviera Marine S.A.M.</td></tr>
+          </table>
+        `,
+        eta: null,
+        etd: null,
+        responseDeadlineAt: '2026-04-17T12:00:00.000Z',
+      },
+    });
+
+    component.show();
+    fixture.detectChanges();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(component.htmlBody()).not.toContain('Delivery:');
+
+    fixture.componentRef.setInput('eta', '2026-04-15T12:00:00.000Z');
+    fixture.detectChanges();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(component.htmlBody()).toContain('Delivery:');
+    expect(component.htmlBody()).toContain('15 Apr 2026');
+  });
+
   it('can disable the response deadline per inquiry and emits a null deadline', async () => {
     const { component, fixture } = await createComponent();
 

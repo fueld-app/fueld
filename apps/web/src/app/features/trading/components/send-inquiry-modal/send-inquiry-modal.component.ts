@@ -1,11 +1,13 @@
 import {
   Component,
   ChangeDetectionStrategy,
+  effect,
   input,
   output,
   signal,
   computed,
   inject,
+  untracked,
   viewChild,
   ElementRef,
 } from '@angular/core';
@@ -861,6 +863,8 @@ export class SendInquiryModalComponent {
   readonly lastResponseDeadlineAt = signal('');
   readonly previewRecipientId = signal('');
   readonly previewTab = signal<'email' | 'whatsapp'>('email');
+  readonly resolvedInquiryEta = computed(() => this.inquiryEta() ?? this.normalizeInquiryDate(this.eta()));
+  readonly resolvedInquiryEtd = computed(() => this.inquiryEtd() ?? this.normalizeInquiryDate(this.etd()));
   readonly responseDeadlineEnabled = computed(() => !!this.responseDeadlineAt());
   readonly previewCandidates = computed(() =>
     this.suppliers().filter((supplier) => supplier.selected && (!!this.resolvedRecipientEmail(supplier) || !!this.resolvedWhatsAppPhone(supplier))),
@@ -892,6 +896,16 @@ export class SendInquiryModalComponent {
   readonly previewEmailHtml = computed<SafeHtml>(() => {
     const supplier = this.previewRecipient();
     return this.sanitizer.bypassSecurityTrustHtml(this.renderEmailPreview(this.htmlBody(), supplier));
+  });
+  private readonly inheritedInquiryDateSync = effect(() => {
+    if (!this.open()) return;
+
+    this.resolvedInquiryEta();
+    this.resolvedInquiryEtd();
+
+    untracked(() => {
+      this.syncInquiryBodyMetadata();
+    });
   });
   readonly whatsappPreviewText = computed(() => {
     const supplier = this.previewRecipient();
@@ -1030,15 +1044,15 @@ export class SendInquiryModalComponent {
 
   private loadDefaults(): void {
     this.http.post<{ success: boolean; data: any }>(`${API_URL}/orders/${this.orderId()}/inquiry/defaults`, {
-      eta: this.inquiryEta(),
-      etd: this.inquiryEtd(),
+      eta: this.resolvedInquiryEta(),
+      etd: this.resolvedInquiryEtd(),
     })
       .subscribe({
         next: (res) => {
           if (res.success && res.data) {
             this.subject.set(res.data.subject ?? '');
-            this.inquiryEta.set(this.normalizeInquiryDate(res.data.eta) ?? this.inquiryEta());
-            this.inquiryEtd.set(this.normalizeInquiryDate(res.data.etd) ?? this.inquiryEtd());
+            this.inquiryEta.set(this.normalizeInquiryDate(res.data.eta) ?? this.resolvedInquiryEta());
+            this.inquiryEtd.set(this.normalizeInquiryDate(res.data.etd) ?? this.resolvedInquiryEtd());
             const deadlineLocal = this.toDateTimeLocal(res.data.responseDeadlineAt ?? '');
             this.responseDeadlineAt.set(deadlineLocal);
             if (deadlineLocal) {
@@ -1217,12 +1231,12 @@ export class SendInquiryModalComponent {
       const qty = min && min !== max ? `${min} - ${max}` : max;
       lines.push(`${item.productType} ${qty} ${item.unit}`);
     }
-    const eta = this.inquiryEta();
+    const eta = this.resolvedInquiryEta();
     if (eta) {
       const d = new Date(eta);
       lines.push(`ETA ${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`);
     }
-    const etd = this.inquiryEtd();
+    const etd = this.resolvedInquiryEtd();
     if (etd) {
       const d = new Date(etd);
       lines.push(`ETD ${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`);
@@ -1253,8 +1267,8 @@ export class SendInquiryModalComponent {
       recipientEmails: this.recipientTags().map((tag) => tag.email),
       subject: this.subject(),
       htmlBody: this.htmlBody(),
-      eta: this.inquiryEta(),
-      etd: this.inquiryEtd(),
+      eta: this.resolvedInquiryEta(),
+      etd: this.resolvedInquiryEtd(),
       responseDeadlineAt: this.toIsoFromDateTimeLocal(this.responseDeadlineAt()),
     });
   }
@@ -1297,8 +1311,8 @@ export class SendInquiryModalComponent {
     this.sendWhatsAppInquiry.emit({
       recipients,
       subject: this.subject(),
-      eta: this.inquiryEta(),
-      etd: this.inquiryEtd(),
+      eta: this.resolvedInquiryEta(),
+      etd: this.resolvedInquiryEtd(),
       responseDeadlineAt: this.toIsoFromDateTimeLocal(this.responseDeadlineAt()),
     });
   }
@@ -1606,7 +1620,7 @@ export class SendInquiryModalComponent {
   }
 
   private deliveryWindowLabel(): string {
-    return buildInquiryDeliveryWindowLabel(this.inquiryEta(), this.inquiryEtd());
+    return buildInquiryDeliveryWindowLabel(this.resolvedInquiryEta(), this.resolvedInquiryEtd());
   }
 
   private responseDeadlineLabel(): string {
@@ -1640,8 +1654,8 @@ export class SendInquiryModalComponent {
     const supplierName = supplier?.supplierName?.trim() || 'Supplier';
     const contactName = supplier?.contactName?.trim() || supplier?.waContactName?.trim() || '';
     const preferredName = contactName || supplierName || 'there';
-    const etaLabel = formatInquiryStoredDateLabel(this.inquiryEta()) ?? '';
-    const etdLabel = formatInquiryStoredDateLabel(this.inquiryEtd()) ?? '';
+    const etaLabel = formatInquiryStoredDateLabel(this.resolvedInquiryEta()) ?? '';
+    const etdLabel = formatInquiryStoredDateLabel(this.resolvedInquiryEtd()) ?? '';
     const deliveryWindow = this.deliveryWindowLabel();
 
     return {
