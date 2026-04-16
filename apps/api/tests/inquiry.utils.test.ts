@@ -4,6 +4,7 @@ import {
   formatDeadlineHumanDuration,
   formatStoredDateOnlyLabel,
   getDefaultInquiryResponseDeadline,
+  normalizeInquiryDateInput,
 } from '../src/modules/documents/inquiry.utils';
 
 describe('inquiry utils', () => {
@@ -11,6 +12,12 @@ describe('inquiry utils', () => {
     expect(formatStoredDateOnlyLabel('2026-04-15T12:00:00.000Z')).toBe('15 Apr 2026');
     expect(formatStoredDateOnlyLabel(null)).toBeNull();
     expect(formatStoredDateOnlyLabel('not-a-date')).toBeNull();
+  });
+
+  it('normalizes blank inquiry date inputs to null', () => {
+    expect(normalizeInquiryDateInput('')).toBeNull();
+    expect(normalizeInquiryDateInput('   ')).toBeNull();
+    expect(normalizeInquiryDateInput('2026-04-15T12:00:00.000Z')).toBe('2026-04-15T12:00:00.000Z');
   });
 
   it('builds inquiry template variables with placeholders and response deadline labels', () => {

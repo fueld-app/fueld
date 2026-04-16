@@ -542,15 +542,31 @@ export interface SendInquiryWhatsAppPayload {
             </div>
 
             <div>
-              <label for="inquiry-deadline" class="block text-sm font-medium text-gray-700">Response deadline</label>
+              <div class="flex items-center justify-between gap-3">
+                <label for="inquiry-deadline" class="block text-sm font-medium text-gray-700">Response deadline</label>
+                <label class="inline-flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                    [ngModel]="responseDeadlineEnabled()"
+                    (ngModelChange)="onResponseDeadlineToggle($event)"
+                  />
+                  Enable deadline
+                </label>
+              </div>
               <input
                 id="inquiry-deadline"
                 type="datetime-local"
-                class="mt-1 block w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                class="mt-1 block w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
                 [ngModel]="responseDeadlineAt()"
                 (ngModelChange)="onDeadlineChange($event)"
+                [disabled]="!responseDeadlineEnabled()"
               />
-              <p class="mt-2 text-xs leading-5 text-gray-500">A reminder will be sent automatically before this deadline if the supplier has not replied.</p>
+              @if (responseDeadlineEnabled()) {
+                <p class="mt-2 text-xs leading-5 text-gray-500">A reminder will be sent automatically before this deadline if the supplier has not replied.</p>
+              } @else {
+                <p class="mt-2 text-xs leading-5 text-gray-500">No response deadline or automatic reminder will be sent for this inquiry.</p>
+              }
             </div>
 
             <!-- Additional recipients -->
@@ -811,6 +827,7 @@ export interface SendInquiryWhatsAppPayload {
 export class SendInquiryModalComponent {
   private readonly http = inject(HttpClient);
   private readonly sanitizer = inject(DomSanitizer);
+  private readonly defaultResponseDeadlineHours = 48;
 
   readonly orderId = input.required<string>();
   readonly senderName = input<string>('Fueld User');
@@ -839,8 +856,12 @@ export class SendInquiryModalComponent {
   readonly htmlBody = signal('');
   readonly recipientTags = signal<EmailTag[]>([]);
   readonly responseDeadlineAt = signal('');
+  readonly inquiryEta = signal<string | null>(null);
+  readonly inquiryEtd = signal<string | null>(null);
+  readonly lastResponseDeadlineAt = signal('');
   readonly previewRecipientId = signal('');
   readonly previewTab = signal<'email' | 'whatsapp'>('email');
+  readonly responseDeadlineEnabled = computed(() => !!this.responseDeadlineAt());
   readonly previewCandidates = computed(() =>
     this.suppliers().filter((supplier) => supplier.selected && (!!this.resolvedRecipientEmail(supplier) || !!this.resolvedWhatsAppPhone(supplier))),
   );
@@ -953,6 +974,9 @@ export class SendInquiryModalComponent {
     this.open.set(true);
     this.recipientTags.set([]);
     this.responseDeadlineAt.set('');
+    this.lastResponseDeadlineAt.set('');
+    this.inquiryEta.set(this.normalizeInquiryDate(this.eta()));
+    this.inquiryEtd.set(this.normalizeInquiryDate(this.etd()));
     this.previewRecipientId.set('');
     this.previewTab.set('email');
     this.showAddSupplier.set(false);
@@ -1006,14 +1030,20 @@ export class SendInquiryModalComponent {
 
   private loadDefaults(): void {
     this.http.post<{ success: boolean; data: any }>(`${API_URL}/orders/${this.orderId()}/inquiry/defaults`, {
-      eta: this.eta(),
-      etd: this.etd(),
+      eta: this.inquiryEta(),
+      etd: this.inquiryEtd(),
     })
       .subscribe({
         next: (res) => {
           if (res.success && res.data) {
             this.subject.set(res.data.subject ?? '');
-            this.responseDeadlineAt.set(this.toDateTimeLocal(res.data.responseDeadlineAt ?? ''));
+            this.inquiryEta.set(this.normalizeInquiryDate(res.data.eta) ?? this.inquiryEta());
+            this.inquiryEtd.set(this.normalizeInquiryDate(res.data.etd) ?? this.inquiryEtd());
+            const deadlineLocal = this.toDateTimeLocal(res.data.responseDeadlineAt ?? '');
+            this.responseDeadlineAt.set(deadlineLocal);
+            if (deadlineLocal) {
+              this.lastResponseDeadlineAt.set(deadlineLocal);
+            }
             const syncedHtml = this.syncInquiryBodyMetadataHtml(res.data.htmlBody ?? '');
             this.htmlBody.set(syncedHtml);
             // Set the body editor content
@@ -1142,7 +1172,28 @@ export class SendInquiryModalComponent {
   }
 
   onDeadlineChange(value: string): void {
+    if (value) {
+      this.lastResponseDeadlineAt.set(value);
+    }
     this.responseDeadlineAt.set(value);
+    this.syncInquiryBodyMetadata();
+  }
+
+  onResponseDeadlineToggle(enabled: boolean): void {
+    if (enabled) {
+      const restored = this.lastResponseDeadlineAt() || this.buildFallbackResponseDeadlineLocal();
+      this.responseDeadlineAt.set(restored);
+      if (restored) {
+        this.lastResponseDeadlineAt.set(restored);
+      }
+    } else {
+      const current = this.responseDeadlineAt();
+      if (current) {
+        this.lastResponseDeadlineAt.set(current);
+      }
+      this.responseDeadlineAt.set('');
+    }
+
     this.syncInquiryBodyMetadata();
   }
 
@@ -1166,12 +1217,12 @@ export class SendInquiryModalComponent {
       const qty = min && min !== max ? `${min} - ${max}` : max;
       lines.push(`${item.productType} ${qty} ${item.unit}`);
     }
-    const eta = this.eta();
+    const eta = this.inquiryEta();
     if (eta) {
       const d = new Date(eta);
       lines.push(`ETA ${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`);
     }
-    const etd = this.etd();
+    const etd = this.inquiryEtd();
     if (etd) {
       const d = new Date(etd);
       lines.push(`ETD ${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`);
@@ -1202,8 +1253,8 @@ export class SendInquiryModalComponent {
       recipientEmails: this.recipientTags().map((tag) => tag.email),
       subject: this.subject(),
       htmlBody: this.htmlBody(),
-      eta: this.eta(),
-      etd: this.etd(),
+      eta: this.inquiryEta(),
+      etd: this.inquiryEtd(),
       responseDeadlineAt: this.toIsoFromDateTimeLocal(this.responseDeadlineAt()),
     });
   }
@@ -1246,8 +1297,8 @@ export class SendInquiryModalComponent {
     this.sendWhatsAppInquiry.emit({
       recipients,
       subject: this.subject(),
-      eta: this.eta(),
-      etd: this.etd(),
+      eta: this.inquiryEta(),
+      etd: this.inquiryEtd(),
       responseDeadlineAt: this.toIsoFromDateTimeLocal(this.responseDeadlineAt()),
     });
   }
@@ -1555,7 +1606,7 @@ export class SendInquiryModalComponent {
   }
 
   private deliveryWindowLabel(): string {
-    return buildInquiryDeliveryWindowLabel(this.eta(), this.etd());
+    return buildInquiryDeliveryWindowLabel(this.inquiryEta(), this.inquiryEtd());
   }
 
   private responseDeadlineLabel(): string {
@@ -1589,8 +1640,8 @@ export class SendInquiryModalComponent {
     const supplierName = supplier?.supplierName?.trim() || 'Supplier';
     const contactName = supplier?.contactName?.trim() || supplier?.waContactName?.trim() || '';
     const preferredName = contactName || supplierName || 'there';
-    const etaLabel = formatInquiryStoredDateLabel(this.eta()) ?? '';
-    const etdLabel = formatInquiryStoredDateLabel(this.etd()) ?? '';
+    const etaLabel = formatInquiryStoredDateLabel(this.inquiryEta()) ?? '';
+    const etdLabel = formatInquiryStoredDateLabel(this.inquiryEtd()) ?? '';
     const deliveryWindow = this.deliveryWindowLabel();
 
     return {
@@ -1617,7 +1668,8 @@ export class SendInquiryModalComponent {
 
   private syncInquiryBodyMetadata(): void {
     const editor = this.bodyEditor()?.nativeElement;
-    const currentHtml = editor?.innerHTML ?? this.htmlBody();
+    const editorHtml = editor?.innerHTML ?? '';
+    const currentHtml = editorHtml.trim() ? editorHtml : this.htmlBody();
     const syncedHtml = this.syncInquiryBodyMetadataHtml(currentHtml);
     if (syncedHtml === currentHtml) return;
 
@@ -1641,6 +1693,17 @@ export class SendInquiryModalComponent {
         .replaceAll(`\$\{${key}\}`, normalizedValue)
         .replaceAll(`{{${key}}}`, normalizedValue);
     }, template);
+  }
+
+  private normalizeInquiryDate(value: string | null | undefined): string | null {
+    const normalized = value?.trim() ?? '';
+    return normalized ? normalized : null;
+  }
+
+  private buildFallbackResponseDeadlineLocal(): string {
+    const deadline = new Date(Date.now() + this.defaultResponseDeadlineHours * 3_600_000);
+    deadline.setSeconds(0, 0);
+    return this.toDateTimeLocal(deadline.toISOString());
   }
 
   private escapeHtml(value: string): string {

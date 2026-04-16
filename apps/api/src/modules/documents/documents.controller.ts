@@ -18,6 +18,7 @@ import {
   formatDeadlineHumanDuration,
   formatStoredDateOnlyLabel,
   getDefaultInquiryResponseDeadline,
+  normalizeInquiryDateInput,
 } from './inquiry.utils';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1236,8 +1237,8 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         supplierTerms = ownCo?.supplierTerms ?? null;
       }
 
-      const resolvedEta = body?.eta ?? order.eta;
-      const resolvedEtd = body?.etd ?? order.etd;
+      const resolvedEta = normalizeInquiryDateInput(body?.eta) ?? order.eta;
+      const resolvedEtd = normalizeInquiryDateInput(body?.etd) ?? order.etd;
       const etaLabel = formatStoredDateOnlyLabel(resolvedEta);
       const etdLabel = formatStoredDateOnlyLabel(resolvedEtd);
       const deliveryWindow = etaLabel && etdLabel
@@ -1330,6 +1331,8 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           senderName,
           senderEmail: auth.email,
           supplierTerms,
+          eta: resolvedEta ?? null,
+          etd: resolvedEtd ?? null,
           responseDeadlineAt: defaultResponseDeadlineAt,
         },
       };
@@ -1368,14 +1371,15 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       const senderName = sender?.name ?? 'Fueld User';
       const senderEmail = auth.email;
       const inquirySettings = await getInquirySettings();
-      const resolvedEta = body.eta ?? order.eta;
-      const resolvedEtd = body.etd ?? order.etd;
+      const resolvedEta = normalizeInquiryDateInput(body.eta) ?? order.eta;
+      const resolvedEtd = normalizeInquiryDateInput(body.etd) ?? order.etd;
       const etaLabel = formatStoredDateOnlyLabel(resolvedEta);
       const etdLabel = formatStoredDateOnlyLabel(resolvedEtd);
       const deliveryWindow = etaLabel && etdLabel
         ? `${etaLabel} to ${etdLabel}`
         : etaLabel || etdLabel || '';
-      const responseDeadlineAt = body.responseDeadlineAt ?? getDefaultInquiryResponseDeadline(inquirySettings.defaultResponseDeadlineHours);
+      const responseDeadlineAt = normalizeInquiryDateInput(body.responseDeadlineAt)
+        ?? getDefaultInquiryResponseDeadline(inquirySettings.defaultResponseDeadlineHours);
       const responseDeadlineFormatted = formatDeadlineHumanDuration(responseDeadlineAt);
 
       // Check if this is the first inquiry batch for this order (for WhatsApp notification)
@@ -1671,8 +1675,8 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       const [sender] = await db.select({ name: users.name }).from(users).where(eq(users.id, auth.userId)).limit(1);
       const senderName = sender?.name ?? 'Fueld User';
       const inquirySettings = await getInquirySettings();
-      const resolvedEta = body.eta ?? order.eta;
-      const resolvedEtd = body.etd ?? order.etd;
+      const resolvedEta = normalizeInquiryDateInput(body.eta) ?? order.eta;
+      const resolvedEtd = normalizeInquiryDateInput(body.etd) ?? order.etd;
 
       const existingInquiries = await db
         .select({ id: supplierInquiries.id, supplierId: supplierInquiries.supplierId })
@@ -1680,7 +1684,8 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         .where(eq(supplierInquiries.orderId, orderId));
       const existingInquiryBySupplierId = new Map(existingInquiries.map((inquiry) => [inquiry.supplierId, inquiry]));
 
-      const responseDeadlineAt = body.responseDeadlineAt ?? getDefaultInquiryResponseDeadline(inquirySettings.defaultResponseDeadlineHours);
+      const responseDeadlineAt = normalizeInquiryDateInput(body.responseDeadlineAt)
+        ?? getDefaultInquiryResponseDeadline(inquirySettings.defaultResponseDeadlineHours);
       const responseDeadlineFormatted = formatDeadlineHumanDuration(responseDeadlineAt);
       const results: Array<{ recipientId: string; recipientName: string; phone: string; success: boolean; error?: string }> = [];
 

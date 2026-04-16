@@ -53,6 +53,11 @@ export function formatStoredDateOnlyLabel(value: string | Date | null | undefine
   return storedDateOnlyLabelFormatter.format(date);
 }
 
+export function normalizeInquiryDateInput(value: string | null | undefined): string | null {
+  const normalized = value?.trim() ?? '';
+  return normalized ? normalized : null;
+}
+
 export function getDefaultInquiryResponseDeadline(hours: number | null | undefined = 48): string | null {
   if (typeof hours !== 'number' || hours < 1) return null;
   return new Date(Date.now() + (hours * 3_600_000)).toISOString();
