@@ -15,6 +15,34 @@ try {
   // Ignore when another test runner has already initialized the Angular test platform.
 }
 
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  class ResizeObserverStub {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  }
+
+  Object.assign(globalThis, {
+    ResizeObserver: ResizeObserverStub,
+  });
+}
+
+if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: (query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener(): void {},
+      removeListener(): void {},
+      addEventListener(): void {},
+      removeEventListener(): void {},
+      dispatchEvent(): boolean { return false; },
+    }),
+  });
+}
+
 afterEach(() => {
   TestBed.resetTestingModule();
 });
@@ -59,7 +87,12 @@ function buildBankAccount(id: string, currency: string, isDefault = false): Bank
 }
 
 describe('OrderDetailPageComponent', () => {
-  async function createComponent(): Promise<OrderDetailPageComponent> {
+  async function createComponent(options?: {
+    onPost?: (url: string, body: unknown) => void;
+  }): Promise<{
+    component: OrderDetailPageComponent;
+    fixture: ReturnType<typeof TestBed.createComponent<OrderDetailPageComponent>>;
+  }> {
     await TestBed.configureTestingModule({
       imports: [OrderDetailPageComponent],
       providers: [
@@ -74,7 +107,29 @@ describe('OrderDetailPageComponent', () => {
           provide: HttpClient,
           useValue: {
             get: () => of({ success: true, data: [] }),
-            post: () => of({ success: true, data: [] }),
+            post: (url: string, body: unknown) => {
+              options?.onPost?.(url, body);
+              if (String(url).includes('/inquiry/defaults')) {
+                return of({
+                  success: true,
+                  data: {
+                    subject: 'Inquiry Recife - Hesperides (navy)',
+                    htmlBody: `
+                      <table>
+                        <tr><td>Vessel:</td><td>Hesperides (navy)</td></tr>
+                        <tr><td>Place:</td><td>Recife</td></tr>
+                        <tr><td>Reply within:</td><td>6 hours</td></tr>
+                        <tr><td>Account:</td><td>Riviera Marine S.A.M.</td></tr>
+                      </table>
+                    `,
+                    eta: null,
+                    etd: null,
+                    responseDeadlineAt: '2026-04-17T12:00:00.000Z',
+                  },
+                });
+              }
+              return of({ success: true, data: [] });
+            },
             put: () => of({ success: true, data: [] }),
             patch: () => of({ success: true, data: [] }),
             delete: () => of({ success: true, data: [] }),
@@ -98,11 +153,12 @@ describe('OrderDetailPageComponent', () => {
     }).compileComponents();
 
     const fixture = TestBed.createComponent(OrderDetailPageComponent);
-    return fixture.componentInstance;
+    fixture.detectChanges();
+    return { component: fixture.componentInstance, fixture };
   }
 
   it('falls back to the first invoicing company when the current selection is empty', async () => {
-    const component = await createComponent();
+    const { component } = await createComponent();
 
     component.order.set({
       invoicingCompanyId: null,
@@ -123,7 +179,7 @@ describe('OrderDetailPageComponent', () => {
   });
 
   it('does not clear the current invoicing company when a blank selection is emitted', async () => {
-    const component = await createComponent();
+    const { component } = await createComponent();
 
     component.order.set({
       invoicingCompanyId: 'company-2',
@@ -142,7 +198,7 @@ describe('OrderDetailPageComponent', () => {
   });
 
   it('does not clear the current bank account when a blank selection is emitted', async () => {
-    const component = await createComponent();
+    const { component } = await createComponent();
 
     component.order.set({
       invoicingCompanyId: 'company-1',
@@ -160,7 +216,7 @@ describe('OrderDetailPageComponent', () => {
   });
 
   it('selects a preferred bank account when accounts exist and the current selection is empty', async () => {
-    const component = await createComponent();
+    const { component } = await createComponent();
 
     component.order.set({
       invoicingCompanyId: 'company-1',
@@ -178,7 +234,7 @@ describe('OrderDetailPageComponent', () => {
   });
 
   it('builds item payload quantityMax from the current quantity instead of a stale stored quantityMax', async () => {
-    const component = await createComponent();
+    const { component } = await createComponent();
 
     const payload = (component as any).buildItemPayload([
       {
@@ -227,7 +283,7 @@ describe('OrderDetailPageComponent', () => {
   });
 
   it('keeps ETA min date aligned with the stored calendar day for positive-offset ports', async () => {
-    const component = await createComponent();
+    const { component } = await createComponent();
 
     component.port.set({ timezone: 'Pacific/Fiji' } as any);
     component.order.set({ eta: '2026-04-11T12:00:00.000Z' } as any);
@@ -236,12 +292,95 @@ describe('OrderDetailPageComponent', () => {
   });
 
   it('keeps delivered-at input aligned with the stored calendar day for positive-offset ports', async () => {
-    const component = await createComponent();
+    const { component } = await createComponent();
 
     component.port.set({ timezone: 'Pacific/Fiji' } as any);
     component.order.set({ deliveredAt: '2026-04-11T12:00:00.000Z' } as any);
 
     expect(component.deliveredAtLocal()).toBe('2026-04-11');
     expect(component.formatStoredDateOnlyLabel('2026-04-11T12:00:00.000Z')).toBe('11 Apr 2026');
+  });
+
+  it('passes the current order eta into the send inquiry modal defaults request', async () => {
+    const capturedPosts: Array<{ url: string; body: unknown }> = [];
+    const { component, fixture } = await createComponent({
+      onPost: (url, body) => {
+        capturedPosts.push({ url, body });
+      },
+    });
+
+    component.order.set({
+      id: 'order-1',
+      orderNumber: '20260415-000179',
+      placeId: 'place-1',
+      vesselId: 'vessel-1',
+      clientId: 'client-1',
+      tenantId: 'tenant-1',
+      status: 'INQUIRY',
+      invoicingCompanyId: 'company-1',
+      bankAccountId: null,
+      currency: 'USD',
+      eta: '2026-04-15T12:00:00.000Z',
+      etd: null,
+    } as any);
+    component.port.set({ id: 'place-1', name: 'Recife', timezone: 'UTC' } as any);
+    component.vessel.set({ id: 'vessel-1', name: 'Hesperides (navy)', imo: null } as any);
+    component.ownCompanies.set([buildOwnCompany('company-1', 'Riviera Marine S.A.M.')]);
+    component.itemRows.set([
+      {
+        id: 'item-1',
+        orderSupplierId: null,
+        productType: 'LSMGO',
+        description: 'DMA',
+        quantity: 210,
+        quantityMin: null,
+        quantityMax: 210,
+        unit: 'CBM',
+        costUnit: 'CBM',
+        salesUnit: 'CBM',
+        costConversionFactor: 1,
+        unitConversionFactor: 1,
+        costPrice: 0,
+        costCurrency: 'USD',
+        salesPrice: 0,
+        salesCurrency: 'USD',
+        profit: 0,
+        paymentTerms: '',
+        customerNote: null,
+        deliveredQuantity: null,
+        costPricingModel: 'FIXED',
+        costReferenceId: null,
+        costPlattsEntryId: null,
+        costPremium: null,
+        costBarging: null,
+        costBargingUnit: null,
+        costCreditDays: null,
+        costPriceFinalized: false,
+        salesPricingModel: 'FIXED',
+        salesReferenceId: null,
+        salesPlattsEntryId: null,
+        salesPremium: null,
+        salesBarging: null,
+        salesBargingUnit: null,
+        salesCreditDays: null,
+        salesPriceFinalized: false,
+      },
+    ] as any);
+
+    fixture.detectChanges();
+
+    expect(component.inquiryModal()?.eta()).toBe('2026-04-15T12:00:00.000Z');
+
+    component.openSendInquiryModal();
+    fixture.detectChanges();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const defaultsCall = capturedPosts.find((entry) => entry.url.includes('/inquiry/defaults'));
+
+    expect(defaultsCall?.body).toEqual({
+      eta: '2026-04-15T12:00:00.000Z',
+      etd: null,
+    });
+    expect(component.inquiryModal()?.htmlBody()).toContain('Delivery:');
   });
 });

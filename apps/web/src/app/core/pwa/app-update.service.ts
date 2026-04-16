@@ -18,8 +18,14 @@ export class AppUpdateService implements OnDestroy {
 
   private initialized = false;
   private wasConnected = false;
+  private activationInFlight = false;
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private routerSub: Subscription | null = null;
+  private readonly visibilityChangeHandler = () => {
+    if (typeof document !== 'undefined' && document.hidden && this.updateAvailable()) {
+      void this.activatePendingUpdate();
+    }
+  };
 
   private readonly wsReconnectEffect = effect(() => {
     if (!this.initialized) return;
@@ -41,14 +47,27 @@ export class AppUpdateService implements OnDestroy {
           void this.activateUpdateAndReload();
           return;
         }
+
         this.updateAvailable.set(true);
+        this.bindVisibilityListener();
+
+        if (typeof document !== 'undefined' && document.hidden) {
+          void this.activatePendingUpdate();
+        }
       }
     });
 
     // Check on every route navigation
     this.routerSub = this.router.events
       .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
-      .subscribe(() => this.checkForUpdate());
+      .subscribe(() => {
+        if (this.updateAvailable()) {
+          void this.activatePendingUpdate();
+          return;
+        }
+
+        this.checkForUpdate();
+      });
 
     // Periodic check every 60s
     this.intervalId = setInterval(() => this.checkForUpdate(), CHECK_INTERVAL_MS);
@@ -60,6 +79,7 @@ export class AppUpdateService implements OnDestroy {
   ngOnDestroy(): void {
     if (this.intervalId) clearInterval(this.intervalId);
     this.routerSub?.unsubscribe();
+    this.unbindVisibilityListener();
   }
 
   async checkForUpdate(): Promise<void> {
@@ -71,13 +91,39 @@ export class AppUpdateService implements OnDestroy {
     }
   }
 
-  async activateUpdateAndReload(): Promise<void> {
-    if (isDevMode() || !this.swUpdate.isEnabled) return;
+  async activateUpdateAndReload(): Promise<boolean> {
+    if (isDevMode() || !this.swUpdate.isEnabled) return false;
     try {
       await this.swUpdate.activateUpdate();
       window.location.reload();
+      return true;
     } catch (err) {
       console.warn('[PWA] Update activate failed:', err);
+      return false;
+    }
+  }
+
+  private bindVisibilityListener(): void {
+    if (typeof document === 'undefined') return;
+    document.removeEventListener('visibilitychange', this.visibilityChangeHandler);
+    document.addEventListener('visibilitychange', this.visibilityChangeHandler);
+  }
+
+  private unbindVisibilityListener(): void {
+    if (typeof document === 'undefined') return;
+    document.removeEventListener('visibilitychange', this.visibilityChangeHandler);
+  }
+
+  private async activatePendingUpdate(): Promise<void> {
+    if (this.activationInFlight || !this.updateAvailable()) return;
+
+    this.activationInFlight = true;
+    const activated = await this.activateUpdateAndReload();
+    this.activationInFlight = false;
+
+    if (activated) {
+      this.updateAvailable.set(false);
+      this.unbindVisibilityListener();
     }
   }
 }
