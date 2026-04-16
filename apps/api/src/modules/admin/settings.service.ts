@@ -1072,11 +1072,17 @@ export async function updateInquiryCancelReasonSettings(reasons: string[]): Prom
 export const DEFAULT_SUPPLIER_RESPONSE_URL_ENABLED = true;
 export const DEFAULT_AUTO_MARK_NO_REPLY_AFTER_HOURS = 168;
 export const DEFAULT_RESPONSE_DEADLINE_HOURS = 48;
+export const DEFAULT_NOTIFY_QUOTE_SUBMIT_EMAIL = false;
+export const DEFAULT_NOTIFY_QUOTE_SUBMIT_PUSH = false;
+export const DEFAULT_NOTIFY_QUOTE_SUBMIT_WHATSAPP = false;
 
 export interface InquirySettings {
   supplierResponseUrlEnabled: boolean;
   autoMarkNoReplyAfterHours: number | null;
   defaultResponseDeadlineHours: number | null;
+  notifyQuoteSubmitEmail: boolean;
+  notifyQuoteSubmitPush: boolean;
+  notifyQuoteSubmitWhatsApp: boolean;
 }
 
 export async function getInquirySettings(): Promise<InquirySettings> {
@@ -1101,6 +1107,9 @@ export async function getInquirySettings(): Promise<InquirySettings> {
         : typeof inquirySettings.defaultResponseDeadlineHours === 'number' && inquirySettings.defaultResponseDeadlineHours > 0
         ? inquirySettings.defaultResponseDeadlineHours
         : DEFAULT_RESPONSE_DEADLINE_HOURS,
+    notifyQuoteSubmitEmail: inquirySettings.notifyQuoteSubmitEmail ?? DEFAULT_NOTIFY_QUOTE_SUBMIT_EMAIL,
+    notifyQuoteSubmitPush: inquirySettings.notifyQuoteSubmitPush ?? DEFAULT_NOTIFY_QUOTE_SUBMIT_PUSH,
+    notifyQuoteSubmitWhatsApp: inquirySettings.notifyQuoteSubmitWhatsApp ?? DEFAULT_NOTIFY_QUOTE_SUBMIT_WHATSAPP,
   };
 }
 
@@ -1108,6 +1117,9 @@ export async function updateInquirySettings(data: {
   supplierResponseUrlEnabled?: boolean;
   autoMarkNoReplyAfterHours?: number | null;
   defaultResponseDeadlineHours?: number | null;
+  notifyQuoteSubmitEmail?: boolean;
+  notifyQuoteSubmitPush?: boolean;
+  notifyQuoteSubmitWhatsApp?: boolean;
 }): Promise<InquirySettings> {
   const tenant = await db.query.tenants.findFirst();
   if (!tenant) throw new Error('No tenant found');
@@ -1117,6 +1129,18 @@ export async function updateInquirySettings(data: {
 
   if (data.supplierResponseUrlEnabled !== undefined) {
     inquirySettings.supplierResponseUrlEnabled = data.supplierResponseUrlEnabled;
+  }
+
+  if (data.notifyQuoteSubmitEmail !== undefined) {
+    inquirySettings.notifyQuoteSubmitEmail = data.notifyQuoteSubmitEmail;
+  }
+
+  if (data.notifyQuoteSubmitPush !== undefined) {
+    inquirySettings.notifyQuoteSubmitPush = data.notifyQuoteSubmitPush;
+  }
+
+  if (data.notifyQuoteSubmitWhatsApp !== undefined) {
+    inquirySettings.notifyQuoteSubmitWhatsApp = data.notifyQuoteSubmitWhatsApp;
   }
 
   if (data.autoMarkNoReplyAfterHours !== undefined) {

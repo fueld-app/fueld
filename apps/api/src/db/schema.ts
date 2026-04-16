@@ -193,6 +193,9 @@ export interface TenantSettings {
     supplierResponseUrlEnabled?: boolean;
     autoMarkNoReplyAfterHours?: number | null;
     defaultResponseDeadlineHours?: number | null;
+    notifyQuoteSubmitEmail?: boolean;
+    notifyQuoteSubmitPush?: boolean;
+    notifyQuoteSubmitWhatsApp?: boolean;
   };
   // Configurable attachment types for order/inquiry attachments
   attachmentTypes?: string[];

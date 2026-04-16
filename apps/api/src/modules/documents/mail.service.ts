@@ -555,3 +555,63 @@ export function buildInquiryReminderEmailHtml(params: {
     </div>
   `;
 }
+
+export function buildInquiryResponseAlertEmailHtml(params: {
+  recipientName?: string | null;
+  supplierName: string;
+  contactName?: string | null;
+  vesselName: string;
+  portName: string;
+  orderNumber: string;
+  responseStatus: 'QUOTED' | 'DECLINED';
+  quoteLineCount?: number;
+  supplierComment?: string | null;
+  declineReason?: string | null;
+  orderUrl?: string | null;
+}): string {
+  const recipientName = params.recipientName?.trim() || 'there';
+  const responseLabel = params.responseStatus === 'QUOTED' ? 'submitted a quote' : 'declined the inquiry';
+  const responseBadgeBg = params.responseStatus === 'QUOTED' ? '#dcfce7' : '#fee2e2';
+  const responseBadgeColor = params.responseStatus === 'QUOTED' ? '#166534' : '#991b1b';
+  const summaryText = params.responseStatus === 'QUOTED'
+    ? params.quoteLineCount && params.quoteLineCount > 0
+      ? `The supplier quoted ${params.quoteLineCount} line item${params.quoteLineCount === 1 ? '' : 's'}.`
+      : 'A supplier quote is ready for review.'
+    : params.declineReason?.trim()
+      ? `Decline reason: ${params.declineReason.trim()}`
+      : 'The supplier indicated they cannot deliver this inquiry.';
+  const supplierComment = params.supplierComment?.trim()
+    ? `<div style="margin-top: 18px; border: 1px solid #e5e7eb; border-radius: 12px; background: #f8fafc; padding: 16px;"><p style="margin: 0 0 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b;">Supplier comment</p><p style="margin: 0; line-height: 1.65; color: #111827; white-space: pre-line;">${params.supplierComment.trim()}</p></div>`
+    : '';
+  const orderLink = params.orderUrl?.trim()
+    ? `<div style="margin-top: 22px;"><a href="${params.orderUrl.trim()}" style="display: inline-block; border-radius: 999px; background: #1e3a5f; color: #ffffff; font-weight: 700; text-decoration: none; padding: 10px 16px;">Open order in Fueld</a><p style="margin: 10px 0 0; font-size: 12px; line-height: 1.5; color: #6b7280;">If the button does not open, copy this URL into your browser: ${params.orderUrl.trim()}</p></div>`
+    : '';
+
+  return `
+    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+      <div style="height: 4px; background: #1e3a5f;"></div>
+      <div style="background: #ffffff; padding: 32px;">
+        <p style="margin: 0 0 18px; line-height: 1.65; color: #111827;">Good day ${recipientName},</p>
+        <p style="margin: 0 0 18px; line-height: 1.65; color: #111827;"><strong>${params.supplierName}</strong>${params.contactName?.trim() ? ` (${params.contactName.trim()})` : ''} ${responseLabel} via Fueld.</p>
+        <div style="display: inline-flex; align-items: center; border-radius: 999px; background: ${responseBadgeBg}; color: ${responseBadgeColor}; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 6px 10px;">${params.responseStatus}</div>
+        <table style="margin: 18px 0 0; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Order:</td>
+            <td style="padding: 4px 0; font-weight: 600; color: #111827;">${params.orderNumber}</td>
+          </tr>
+          <tr>
+            <td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Vessel:</td>
+            <td style="padding: 4px 0; font-weight: 600; color: #111827;">${params.vesselName}</td>
+          </tr>
+          <tr>
+            <td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Place:</td>
+            <td style="padding: 4px 0; font-weight: 600; color: #111827;">${params.portName}</td>
+          </tr>
+        </table>
+        <p style="margin: 18px 0 0; line-height: 1.65; color: #111827;">${summaryText}</p>
+        ${supplierComment}
+        ${orderLink}
+      </div>
+    </div>
+  `;
+}

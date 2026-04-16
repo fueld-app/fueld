@@ -3,10 +3,13 @@ import { and, eq, gt, inArray, isNull, lte } from 'drizzle-orm';
 import type { SubmitSupplierInquiryQuoteDto, SupplierInquiryItemQuoteDto } from '@fueld/types';
 import { db } from '../../db';
 import { companyContacts, counterparties, plattsReportEntries, supplierInquiries, supplierInquiryItemQuotes, type SupplierInquiry, users } from '../../db/schema';
+import { sendNotificationEmail } from '../../lib/email';
 import { getOrderById } from '../orders/orders.service';
-import { getInquirySettings } from '../admin/settings.service';
+import { getInquirySettings, getWhatsAppSettings } from '../admin/settings.service';
 import { logActivity } from '../activity/activity.service';
-import { buildInquiryReminderEmailHtml, sendDocumentEmail } from './mail.service';
+import { sendNotificationToUsers } from '../push/push.service';
+import { sendWhatsAppGroupMessage } from '../whatsapp/whatsapp.service';
+import { buildInquiryReminderEmailHtml, buildInquiryResponseAlertEmailHtml, sendDocumentEmail } from './mail.service';
 
 const DEFAULT_SUPPLIER_QUOTE_EXPIRY_DAYS = 30;
 const INQUIRY_REMINDER_INTERVAL_MS = 10 * 60 * 1000;
@@ -38,6 +41,196 @@ export function getSupplierQuoteExpiryDate(): Date {
 export function getSupplierQuoteFormUrl(rawToken: string): string {
   const baseUrl = trimTrailingSlash(process.env['APP_URL']?.trim() || 'http://localhost:4200');
   return `${baseUrl}/supplier-quote/${rawToken}`;
+}
+
+function getAppBaseUrl(): string {
+  return trimTrailingSlash(process.env['APP_URL']?.trim() || 'http://localhost:4200');
+}
+
+function getOrderDetailUrl(orderId: string): string {
+  return `${getAppBaseUrl()}/trading/orders/${orderId}`;
+}
+
+function getOrderDetailPath(orderId: string): string {
+  return `/trading/orders/${orderId}`;
+}
+
+type OrderDetails = NonNullable<Awaited<ReturnType<typeof getOrderById>>>;
+
+function buildInquiryResponseAlertSubject(params: {
+  responseStatus: 'QUOTED' | 'DECLINED';
+  supplierName: string;
+  orderNumber: string;
+}): string {
+  return params.responseStatus === 'QUOTED'
+    ? `Supplier quote received - ${params.orderNumber} - ${params.supplierName}`
+    : `Supplier declined inquiry - ${params.orderNumber} - ${params.supplierName}`;
+}
+
+function buildInquiryResponseAlertWhatsAppText(params: {
+  supplierName: string;
+  contactName?: string | null;
+  vesselName: string;
+  portName: string;
+  orderNumber: string;
+  responseStatus: 'QUOTED' | 'DECLINED';
+  quoteLineCount?: number;
+  supplierComment?: string | null;
+  declineReason?: string | null;
+  orderUrl: string;
+}): string {
+  const detailLine = params.responseStatus === 'QUOTED'
+    ? `*Quoted lines:* ${params.quoteLineCount ?? 0}`
+    : params.declineReason?.trim()
+      ? `*Decline reason:* ${params.declineReason.trim()}`
+      : '*Status:* Declined';
+
+  return [
+    '📩 *Supplier Response Received*',
+    '',
+    `*Status:* ${params.responseStatus}`,
+    `*Supplier:* ${params.supplierName}${params.contactName?.trim() ? ` (${params.contactName.trim()})` : ''}`,
+    `*Order:* ${params.orderNumber}`,
+    `*Vessel:* ${params.vesselName}`,
+    `*Place:* ${params.portName}`,
+    detailLine,
+    params.supplierComment?.trim() ? `*Comment:* ${params.supplierComment.trim()}` : null,
+    '',
+    `Open in Fueld: ${params.orderUrl}`,
+  ].filter(Boolean).join('\n');
+}
+
+async function getInquiryAlertRecipient(order: OrderDetails, inquiry: SupplierInquiry) {
+  const preferredUserId = order.salesRepId ?? inquiry.sentByUserId ?? null;
+  if (!preferredUserId) return null;
+
+  if (order.salesRep?.id === preferredUserId) {
+    return order.salesRep;
+  }
+
+  const [user] = await db
+    .select({ id: users.id, name: users.name, email: users.email })
+    .from(users)
+    .where(eq(users.id, preferredUserId))
+    .limit(1);
+
+  return user ?? null;
+}
+
+async function notifySupplierInquiryResponse(params: {
+  inquiry: SupplierInquiry;
+  order: OrderDetails;
+  responseStatus: 'QUOTED' | 'DECLINED';
+  quoteLineCount?: number;
+  supplierComment?: string | null;
+  declineReason?: string | null;
+}): Promise<void> {
+  const inquirySettings = await getInquirySettings();
+  if (!inquirySettings.notifyQuoteSubmitEmail && !inquirySettings.notifyQuoteSubmitPush && !inquirySettings.notifyQuoteSubmitWhatsApp) {
+    return;
+  }
+
+  const [recipient, supplier, contact] = await Promise.all([
+    getInquiryAlertRecipient(params.order, params.inquiry),
+    db.select({ name: counterparties.name }).from(counterparties).where(eq(counterparties.id, params.inquiry.supplierId)).limit(1).then((rows) => rows[0] ?? null),
+    params.inquiry.contactId
+      ? db.select({ name: companyContacts.name }).from(companyContacts).where(eq(companyContacts.id, params.inquiry.contactId)).limit(1).then((rows) => rows[0] ?? null)
+      : Promise.resolve(null),
+  ]);
+
+  const supplierName = supplier?.name ?? 'Supplier';
+  const contactName = contact?.name ?? null;
+  const vesselName = params.order.vessel?.name ?? 'Vessel';
+  const portName = params.order.place?.name ?? 'Port';
+  const orderNumber = params.order.orderNumber ?? params.order.id.slice(0, 8).toUpperCase();
+  const orderUrl = getOrderDetailUrl(params.order.id);
+  const orderPath = getOrderDetailPath(params.order.id);
+  const subject = buildInquiryResponseAlertSubject({
+    responseStatus: params.responseStatus,
+    supplierName,
+    orderNumber,
+  });
+
+  const tasks: Promise<unknown>[] = [];
+
+  if (inquirySettings.notifyQuoteSubmitEmail && recipient?.email) {
+    const htmlBody = buildInquiryResponseAlertEmailHtml({
+      recipientName: recipient.name,
+      supplierName,
+      contactName,
+      vesselName,
+      portName,
+      orderNumber,
+      responseStatus: params.responseStatus,
+      quoteLineCount: params.quoteLineCount,
+      supplierComment: params.supplierComment,
+      declineReason: params.declineReason,
+      orderUrl,
+    });
+
+    tasks.push((async () => {
+      try {
+        await sendNotificationEmail(recipient.email!, subject, htmlBody);
+      } catch (error) {
+        console.error('[SupplierInquiry] Failed to send quote alert email:', error);
+      }
+    })());
+  }
+
+  if (inquirySettings.notifyQuoteSubmitPush && recipient?.id) {
+    const body = params.responseStatus === 'QUOTED'
+      ? `${supplierName} submitted a quote for ${vesselName} at ${portName}.`
+      : `${supplierName} declined the inquiry for ${vesselName} at ${portName}.`;
+
+    tasks.push((async () => {
+      try {
+        await sendNotificationToUsers(
+          [recipient.id],
+          {
+            title: 'Supplier response received',
+            body,
+            url: orderPath,
+          },
+          params.order.tenantId,
+        );
+      } catch (error) {
+        console.error('[SupplierInquiry] Failed to send quote alert push notification:', error);
+      }
+    })());
+  }
+
+  if (inquirySettings.notifyQuoteSubmitWhatsApp) {
+    tasks.push((async () => {
+      try {
+        const waSettings = await getWhatsAppSettings();
+        if (!waSettings.enabled || !waSettings.defaultGroupJid) return;
+
+        const message = buildInquiryResponseAlertWhatsAppText({
+          supplierName,
+          contactName,
+          vesselName,
+          portName,
+          orderNumber,
+          responseStatus: params.responseStatus,
+          quoteLineCount: params.quoteLineCount,
+          supplierComment: params.supplierComment,
+          declineReason: params.declineReason,
+          orderUrl,
+        });
+
+        const result = await sendWhatsAppGroupMessage(params.inquiry.sentByUserId, waSettings.defaultGroupJid, message);
+        if (!result.success) {
+          console.warn('[SupplierInquiry] Quote alert WhatsApp message skipped:', result.message);
+        }
+      } catch (error) {
+        console.error('[SupplierInquiry] Failed to send quote alert WhatsApp notification:', error);
+      }
+    })());
+  }
+
+  if (tasks.length > 0) {
+    await Promise.all(tasks);
+  }
 }
 
 export async function applyStaleSupplierInquiryStatuses(filters?: { orderId?: string; inquiryId?: string }): Promise<number> {
@@ -88,6 +281,7 @@ export interface SaveSupplierInquiryResponseInput {
   supplierPaymentTerms?: string | null;
   supplierComment?: string | null;
   items?: SubmitSupplierInquiryQuoteDto['items'];
+  submissionSource?: 'PUBLIC_FORM' | 'INTERNAL';
 }
 
 export interface SupplierInquiryResponseOrderContext {
@@ -279,8 +473,11 @@ export function startInquiryReminderJob(): void {
 }
 
 export async function saveSupplierInquiryResponse(input: SaveSupplierInquiryResponseInput): Promise<{ success: true } | { success: false; message: string }> {
-  const orderContext = await getSupplierInquiryOrderContext(input.inquiry.orderId);
-  if (!orderContext) {
+  const [order, orderContext] = await Promise.all([
+    getOrderById(input.inquiry.orderId),
+    getSupplierInquiryOrderContext(input.inquiry.orderId),
+  ]);
+  if (!order || !orderContext) {
     return { success: false, message: 'Order not found' };
   }
 
@@ -318,6 +515,16 @@ export async function saveSupplierInquiryResponse(input: SaveSupplierInquiryResp
         updatedAt: now,
       })
       .where(eq(supplierInquiries.id, input.inquiry.id));
+
+    if (input.submissionSource === 'PUBLIC_FORM') {
+      await notifySupplierInquiryResponse({
+        inquiry: input.inquiry,
+        order,
+        responseStatus: 'DECLINED',
+        supplierComment,
+        declineReason,
+      });
+    }
 
     return { success: true };
   }
@@ -395,6 +602,16 @@ export async function saveSupplierInquiryResponse(input: SaveSupplierInquiryResp
       updatedAt: now,
     })
     .where(eq(supplierInquiries.id, input.inquiry.id));
+
+  if (input.submissionSource === 'PUBLIC_FORM') {
+    await notifySupplierInquiryResponse({
+      inquiry: input.inquiry,
+      order,
+      responseStatus: 'QUOTED',
+      quoteLineCount: pricedLineCount,
+      supplierComment,
+    });
+  }
 
   return { success: true };
 }

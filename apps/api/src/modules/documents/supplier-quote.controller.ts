@@ -122,6 +122,7 @@ export const supplierQuoteController = new Elysia({ prefix: '/supplier-inquiries
         supplierPaymentTerms: body.supplierPaymentTerms ?? null,
         supplierComment: body.supplierComment ?? null,
         items: body.items ?? [],
+        submissionSource: 'PUBLIC_FORM',
       });
       if (!result.success) {
         set.status = 400;

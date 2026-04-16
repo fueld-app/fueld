@@ -1327,6 +1327,9 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       supplierResponseUrlEnabled: t.Optional(t.Boolean()),
       autoMarkNoReplyAfterHours: t.Optional(t.Nullable(t.Number())),
       defaultResponseDeadlineHours: t.Optional(t.Nullable(t.Number({ minimum: 1 }))),
+      notifyQuoteSubmitEmail: t.Optional(t.Boolean()),
+      notifyQuoteSubmitPush: t.Optional(t.Boolean()),
+      notifyQuoteSubmitWhatsApp: t.Optional(t.Boolean()),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update inquiry settings' },
   })

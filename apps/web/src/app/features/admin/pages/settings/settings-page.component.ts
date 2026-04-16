@@ -17,6 +17,9 @@ interface InquirySettingsDto {
   supplierResponseUrlEnabled: boolean;
   autoMarkNoReplyAfterHours: number | null;
   defaultResponseDeadlineHours: number | null;
+  notifyQuoteSubmitEmail: boolean;
+  notifyQuoteSubmitPush: boolean;
+  notifyQuoteSubmitWhatsApp: boolean;
 }
 
 @Component({
@@ -699,7 +702,7 @@ interface InquirySettingsDto {
               </div>
               <div class="flex-1 min-w-0">
                 <h3 class="text-sm font-semibold text-gray-900">Supplier Inquiry Settings</h3>
-                <p class="text-xs text-gray-500">Control supplier response links and automatic no-reply handling for inquiries.</p>
+                <p class="text-xs text-gray-500">Control supplier response links, quote alerts, and automatic no-reply handling for inquiries.</p>
               </div>
             </div>
 
@@ -811,6 +814,75 @@ interface InquirySettingsDto {
                   >
                     Save deadline
                   </button>
+                </div>
+              </div>
+
+              <div class="mt-5 border-t border-gray-100 pt-5">
+                <div>
+                  <p class="text-sm font-medium text-gray-900">Supplier quote alerts</p>
+                  <p class="text-xs text-gray-500">Alert the responsible trader when a supplier submits a quote or decline through the public Fueld response form.</p>
+                </div>
+
+                <div class="mt-4 space-y-4">
+                  <div class="flex items-center justify-between gap-4">
+                    <div>
+                      <p class="text-sm font-medium text-gray-900">Email alert</p>
+                      <p class="text-xs text-gray-500">Send an internal notification email with a link to the order.</p>
+                    </div>
+                    <button
+                      (click)="toggleInquiryQuoteAlertEmail()"
+                      [disabled]="inquirySaving()"
+                      [class]="inquiryQuoteAlertEmailEnabled()
+                        ? 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-sky-500 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:opacity-50'
+                        : 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:opacity-50'"
+                    >
+                      <span
+                        [class]="inquiryQuoteAlertEmailEnabled()
+                          ? 'pointer-events-none inline-block h-5 w-5 translate-x-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'
+                          : 'pointer-events-none inline-block h-5 w-5 translate-x-0 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'"
+                      ></span>
+                    </button>
+                  </div>
+
+                  <div class="flex items-center justify-between gap-4">
+                    <div>
+                      <p class="text-sm font-medium text-gray-900">Push alert</p>
+                      <p class="text-xs text-gray-500">Send a browser push notification that opens the order detail page.</p>
+                    </div>
+                    <button
+                      (click)="toggleInquiryQuoteAlertPush()"
+                      [disabled]="inquirySaving()"
+                      [class]="inquiryQuoteAlertPushEnabled()
+                        ? 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-sky-500 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:opacity-50'
+                        : 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:opacity-50'"
+                    >
+                      <span
+                        [class]="inquiryQuoteAlertPushEnabled()
+                          ? 'pointer-events-none inline-block h-5 w-5 translate-x-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'
+                          : 'pointer-events-none inline-block h-5 w-5 translate-x-0 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'"
+                      ></span>
+                    </button>
+                  </div>
+
+                  <div class="flex items-center justify-between gap-4">
+                    <div>
+                      <p class="text-sm font-medium text-gray-900">WhatsApp group alert</p>
+                      <p class="text-xs text-gray-500">Post the supplier response to the default WhatsApp group when WhatsApp is configured.</p>
+                    </div>
+                    <button
+                      (click)="toggleInquiryQuoteAlertWhatsApp()"
+                      [disabled]="inquirySaving()"
+                      [class]="inquiryQuoteAlertWhatsAppEnabled()
+                        ? 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-sky-500 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:opacity-50'
+                        : 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:opacity-50'"
+                    >
+                      <span
+                        [class]="inquiryQuoteAlertWhatsAppEnabled()
+                          ? 'pointer-events-none inline-block h-5 w-5 translate-x-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'
+                          : 'pointer-events-none inline-block h-5 w-5 translate-x-0 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'"
+                      ></span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1284,6 +1356,9 @@ export class SettingsPageComponent implements OnInit {
   readonly inquiryAutoNoReplyEnabled = signal(true);
   readonly inquiryAutoNoReplyHours = signal('168');
   readonly inquiryDeadlineHours = signal('48');
+  readonly inquiryQuoteAlertEmailEnabled = signal(false);
+  readonly inquiryQuoteAlertPushEnabled = signal(false);
+  readonly inquiryQuoteAlertWhatsAppEnabled = signal(false);
   readonly inquirySaving = signal(false);
   readonly inquirySaveSuccess = signal('');
   readonly inquirySaveError = signal('');
@@ -2012,6 +2087,9 @@ export class SettingsPageComponent implements OnInit {
     this.inquiryAutoNoReplyEnabled.set(autoMarkNoReplyAfterHours !== null && autoMarkNoReplyAfterHours > 0);
     this.inquiryAutoNoReplyHours.set(String(autoMarkNoReplyAfterHours ?? 168));
     this.inquiryDeadlineHours.set(settings.defaultResponseDeadlineHours == null ? '' : String(settings.defaultResponseDeadlineHours));
+    this.inquiryQuoteAlertEmailEnabled.set(settings.notifyQuoteSubmitEmail === true);
+    this.inquiryQuoteAlertPushEnabled.set(settings.notifyQuoteSubmitPush === true);
+    this.inquiryQuoteAlertWhatsAppEnabled.set(settings.notifyQuoteSubmitWhatsApp === true);
   }
 
   private async updateInquirySettings(payload: Partial<InquirySettingsDto>, successMessage: string): Promise<void> {
@@ -2095,6 +2173,27 @@ export class SettingsPageComponent implements OnInit {
 
   setInquiryDeadlineHours(value: unknown): void {
     this.inquiryDeadlineHours.set(String(value ?? ''));
+  }
+
+  async toggleInquiryQuoteAlertEmail(): Promise<void> {
+    await this.updateInquirySettings(
+      { notifyQuoteSubmitEmail: !this.inquiryQuoteAlertEmailEnabled() },
+      !this.inquiryQuoteAlertEmailEnabled() ? 'Supplier quote email alerts enabled.' : 'Supplier quote email alerts disabled.',
+    );
+  }
+
+  async toggleInquiryQuoteAlertPush(): Promise<void> {
+    await this.updateInquirySettings(
+      { notifyQuoteSubmitPush: !this.inquiryQuoteAlertPushEnabled() },
+      !this.inquiryQuoteAlertPushEnabled() ? 'Supplier quote push alerts enabled.' : 'Supplier quote push alerts disabled.',
+    );
+  }
+
+  async toggleInquiryQuoteAlertWhatsApp(): Promise<void> {
+    await this.updateInquirySettings(
+      { notifyQuoteSubmitWhatsApp: !this.inquiryQuoteAlertWhatsAppEnabled() },
+      !this.inquiryQuoteAlertWhatsAppEnabled() ? 'Supplier quote WhatsApp alerts enabled.' : 'Supplier quote WhatsApp alerts disabled.',
+    );
   }
 
   // ─── Inquiry cancellation reasons ────────────────────────────────
