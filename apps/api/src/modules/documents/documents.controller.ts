@@ -1244,7 +1244,6 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       const deliveryWindow = etaLabel && etdLabel
         ? `${etaLabel} to ${etdLabel}`
         : etaLabel || etdLabel || '';
-
       const defaultResponseDeadlineAt = getDefaultInquiryResponseDeadline(inquirySettings.defaultResponseDeadlineHours);
       const defaultResponseDeadlineFormatted = formatDeadlineHumanDuration(defaultResponseDeadlineAt);
 

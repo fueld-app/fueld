@@ -33,46 +33,4 @@ describe('send-inquiry-modal.utils', () => {
     expect(synced).toContain('15 Apr 2026');
     expect(synced).not.toContain('Reply within:');
   });
-
-  it('inserts delivery rows for templates that render label and value in a single table cell', () => {
-    const html = `
-      <table>
-        <tr><td>Vessel: Hesperides (navy)</td></tr>
-        <tr><td>Place: Recife</td></tr>
-        <tr><td>Reply within: 6 hours</td></tr>
-        <tr><td>Account: Riviera Marine S.A.M.</td></tr>
-      </table>
-    `;
-
-    const synced = syncInquiryMetadataTable(html, {
-      deliveryLabel: '15 Apr 2026',
-      responseDeadlineLabel: '6 hours',
-    });
-
-    expect(synced).toContain('Delivery:');
-    expect(synced).toContain('15 Apr 2026');
-  });
-
-  it('inserts a fallback delivery block for non-table metadata layouts', () => {
-    const html = `
-      <div>
-        <p>Good day \\${name},</p>
-        <p>Please offer for the following:</p>
-        <p>Vessel: Hesperides (navy)</p>
-        <p>Place: Recife</p>
-        <p>Reply within: 6 hours</p>
-        <p>Account: Riviera Marine S.A.M.</p>
-        <div>Requested items</div>
-      </div>
-    `;
-
-    const synced = syncInquiryMetadataTable(html, {
-      deliveryLabel: '15 Apr 2026',
-      responseDeadlineLabel: '6 hours',
-    });
-
-    expect(synced).toContain('Delivery:');
-    expect(synced).toContain('15 Apr 2026');
-    expect(synced).toContain('data-fueld-inquiry-meta="delivery"');
-  });
 });

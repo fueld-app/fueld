@@ -984,13 +984,13 @@ export class SendInquiryModalComponent {
   readonly someSelected = computed(() => this.suppliers().some(s => s.selected));
 
   /** Open the modal and load suppliers + email defaults */
-  show(options?: { eta?: string | null; etd?: string | null }): void {
+  show(): void {
     this.open.set(true);
     this.recipientTags.set([]);
     this.responseDeadlineAt.set('');
     this.lastResponseDeadlineAt.set('');
-    this.inquiryEta.set(this.normalizeInquiryDate(options?.eta ?? this.eta()));
-    this.inquiryEtd.set(this.normalizeInquiryDate(options?.etd ?? this.etd()));
+    this.inquiryEta.set(this.normalizeInquiryDate(this.eta()));
+    this.inquiryEtd.set(this.normalizeInquiryDate(this.etd()));
     this.previewRecipientId.set('');
     this.previewTab.set('email');
     this.showAddSupplier.set(false);
@@ -1051,39 +1051,20 @@ export class SendInquiryModalComponent {
         next: (res) => {
           if (res.success && res.data) {
             this.subject.set(res.data.subject ?? '');
-            const responseEta = this.normalizeInquiryDate(res.data.eta);
-            const responseEtd = this.normalizeInquiryDate(res.data.etd);
-            this.inquiryEta.set(responseEta ?? this.resolvedInquiryEta());
-            this.inquiryEtd.set(responseEtd ?? this.resolvedInquiryEtd());
+            this.inquiryEta.set(this.normalizeInquiryDate(res.data.eta) ?? this.resolvedInquiryEta());
+            this.inquiryEtd.set(this.normalizeInquiryDate(res.data.etd) ?? this.resolvedInquiryEtd());
             const deadlineLocal = this.toDateTimeLocal(res.data.responseDeadlineAt ?? '');
             this.responseDeadlineAt.set(deadlineLocal);
             if (deadlineLocal) {
               this.lastResponseDeadlineAt.set(deadlineLocal);
             }
-            // Build the delivery label directly from the resolved eta/etd
-            // instead of reading through the signal chain, to avoid any
-            // timing issues where the signal hasn't propagated yet.
-            const resolvedEta = responseEta ?? this.resolvedInquiryEta();
-            const resolvedEtd = responseEtd ?? this.resolvedInquiryEtd();
-            const deliveryLabel = buildInquiryDeliveryWindowLabel(resolvedEta, resolvedEtd);
-            const deadlineLabel = this.responseDeadlineLabel();
-            // Pass deliveryLabel only when non-empty. Passing undefined
-            // tells syncInquiryMetadataTable to leave any existing
-            // backend-provided Delivery row untouched instead of
-            // stripping it when the frontend has no computed value.
-            const syncedHtml = syncInquiryMetadataTable(res.data.htmlBody ?? '', {
-              deliveryLabel: deliveryLabel || undefined,
-              responseDeadlineLabel: deadlineLabel,
-            });
+            const syncedHtml = this.syncInquiryBodyMetadataHtml(res.data.htmlBody ?? '');
             this.htmlBody.set(syncedHtml);
-            // Set the body editor content.
-            // Use the already-synced HTML directly — do NOT re-sync through the
-            // signal-based deliveryWindowLabel() as the computed may still return
-            // stale values before Angular flushes the effect graph.
+            // Set the body editor content
             setTimeout(() => {
               const editor = this.bodyEditor()?.nativeElement;
               if (editor) {
-                editor.innerHTML = this.htmlBody() || syncedHtml;
+                editor.innerHTML = syncedHtml;
               }
             });
           }
@@ -1703,18 +1684,7 @@ export class SendInquiryModalComponent {
     const editor = this.bodyEditor()?.nativeElement;
     const editorHtml = editor?.innerHTML ?? '';
     const currentHtml = editorHtml.trim() ? editorHtml : this.htmlBody();
-    const deliveryLabel = this.deliveryWindowLabel();
-    const deadlineLabel = this.responseDeadlineLabel();
-
-    // Guard: if the signal chain resolves to an empty delivery label
-    // but the HTML already contains a Delivery row, skip the sync to
-    // avoid stripping a backend-provided row during a timing gap.
-    if (!deliveryLabel && /Delivery:/i.test(currentHtml)) return;
-
-    const syncedHtml = syncInquiryMetadataTable(currentHtml, {
-      deliveryLabel,
-      responseDeadlineLabel: deadlineLabel,
-    });
+    const syncedHtml = this.syncInquiryBodyMetadataHtml(currentHtml);
     if (syncedHtml === currentHtml) return;
 
     this.htmlBody.set(syncedHtml);

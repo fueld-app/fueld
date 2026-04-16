@@ -4821,10 +4821,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       this.showToast('error', 'Add at least one line item before sending inquiries.');
       return;
     }
-    this.inquiryModal()?.show({
-      eta: this.order()?.eta ?? null,
-      etd: this.order()?.etd ?? null,
-    });
+    this.inquiryModal()?.show();
   }
 
   onSendInquiry(payload: SendInquiryPayload): void {
