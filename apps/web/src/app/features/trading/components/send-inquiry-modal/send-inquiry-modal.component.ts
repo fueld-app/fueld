@@ -1064,7 +1064,11 @@ export class SendInquiryModalComponent {
             setTimeout(() => {
               const editor = this.bodyEditor()?.nativeElement;
               if (editor) {
-                editor.innerHTML = syncedHtml;
+                const latestHtml = this.syncInquiryBodyMetadataHtml(this.htmlBody() || syncedHtml);
+                if (latestHtml !== this.htmlBody()) {
+                  this.htmlBody.set(latestHtml);
+                }
+                editor.innerHTML = latestHtml;
               }
             });
           }
