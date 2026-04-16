@@ -210,6 +210,41 @@ describe('SendInquiryModalComponent', () => {
     expect(editor?.innerHTML).toContain('Delivery:');
   });
 
+  it('adds a fallback delivery block for non-table metadata layouts', async () => {
+    const { component, fixture } = await createComponent({
+      defaults: {
+        subject: 'Inquiry Recife - Hesperides',
+        htmlBody: `
+          <div>
+            <p>Good day \\${name},</p>
+            <p>Please offer for the following:</p>
+            <p>Vessel: Hesperides (navy)</p>
+            <p>Place: Recife</p>
+            <p>Reply within: 6 hours</p>
+            <p>Account: Riviera Marine S.A.M.</p>
+            <div>Requested items</div>
+          </div>
+        `,
+        eta: null,
+        etd: null,
+        responseDeadlineAt: '2026-04-17T12:00:00.000Z',
+      },
+    });
+
+    fixture.componentRef.setInput('eta', '2026-04-15T12:00:00.000Z');
+    fixture.detectChanges();
+
+    component.show();
+    fixture.detectChanges();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const editor = fixture.nativeElement.querySelector('[contenteditable="true"]') as HTMLDivElement | null;
+
+    expect(component.htmlBody()).toContain('Delivery:');
+    expect(component.htmlBody()).toContain('15 Apr 2026');
+    expect(editor?.innerHTML).toContain('Delivery:');
+  });
+
   it('can disable the response deadline per inquiry and emits a null deadline', async () => {
     const { component, fixture } = await createComponent();
 

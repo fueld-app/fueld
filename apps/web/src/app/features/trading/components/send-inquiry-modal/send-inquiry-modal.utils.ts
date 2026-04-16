@@ -73,6 +73,72 @@ function findRowByLabel(table: HTMLTableElement, label: string): HTMLTableRowEle
   return Array.from(table.rows).find((row) => rowHasLabel(row, label)) ?? null;
 }
 
+function findFallbackMetadataElement(root: ParentNode, kind: string): HTMLElement | null {
+  return root.querySelector(`[data-fueld-inquiry-meta="${kind}"]`);
+}
+
+function buildFallbackMetadataElement(kind: string, label: string, value: string): HTMLParagraphElement {
+  const element = document.createElement('p');
+  element.setAttribute('data-fueld-inquiry-meta', kind);
+  element.style.margin = '0 0 16px';
+  element.style.lineHeight = '1.65';
+  element.style.color = '#111827';
+
+  const strong = document.createElement('strong');
+  strong.textContent = label;
+  element.appendChild(strong);
+  element.append(` ${value}`);
+  return element;
+}
+
+function findFallbackInsertionAnchor(root: ParentNode): Element | null {
+  const requestedItemsAnchor = Array.from(root.querySelectorAll('p, div, h1, h2, h3, h4, h5, h6'))
+    .find((element) => normalizeCellLabel(element.textContent).startsWith('Requested items'));
+  if (requestedItemsAnchor) return requestedItemsAnchor;
+
+  const freeformMetadataAnchor = Array.from(root.querySelectorAll('p, div'))
+    .find((element) => {
+      if (element.closest('table')) return false;
+      const text = normalizeCellLabel(element.textContent);
+      return text.startsWith('Reply within:') || text.startsWith('Account:');
+    });
+  if (freeformMetadataAnchor) return freeformMetadataAnchor;
+
+  const tables = Array.from(root.querySelectorAll('table'));
+  return tables[1] ?? null;
+}
+
+function syncFallbackMetadataBlock(
+  root: ParentNode,
+  kind: string,
+  label: string,
+  value: string | null,
+): void {
+  const trimmedValue = value?.trim() ?? '';
+  const existing = findFallbackMetadataElement(root, kind);
+
+  if (!trimmedValue) {
+    existing?.remove();
+    return;
+  }
+
+  const nextElement = buildFallbackMetadataElement(kind, label, trimmedValue);
+  if (existing) {
+    existing.replaceWith(nextElement);
+    return;
+  }
+
+  const anchor = findFallbackInsertionAnchor(root);
+  if (anchor?.parentNode) {
+    anchor.parentNode.insertBefore(nextElement, anchor);
+    return;
+  }
+
+  if (root instanceof HTMLElement) {
+    root.appendChild(nextElement);
+  }
+}
+
 function setRowValue(row: HTMLTableRowElement, label: string, value: string): void {
   while (row.cells.length < 2) row.insertCell();
   row.cells[0]!.textContent = label;
@@ -153,10 +219,15 @@ export function syncInquiryMetadataTable(
   const container = document.createElement('div');
   container.innerHTML = html;
   const table = findMetadataTable(container);
-  if (!table) return html;
+  if (table) {
+    upsertMetadataRow(table, 'Delivery:', options.deliveryLabel ?? null, ['Place:', 'Account:'], ['Reply within:', 'Account:']);
+    upsertMetadataRow(table, 'Reply within:', options.responseDeadlineLabel ?? null, ['Delivery:', 'Place:', 'Account:'], ['Account:']);
+  }
 
-  upsertMetadataRow(table, 'Delivery:', options.deliveryLabel ?? null, ['Place:', 'Account:'], ['Reply within:', 'Account:']);
-  upsertMetadataRow(table, 'Reply within:', options.responseDeadlineLabel ?? null, ['Delivery:', 'Place:', 'Account:'], ['Account:']);
+  const containsDeliveryLabel = /(^|\s)Delivery:/i.test(container.textContent ?? '');
+  if (!containsDeliveryLabel || findFallbackMetadataElement(container, 'delivery')) {
+    syncFallbackMetadataBlock(container, 'delivery', 'Delivery:', options.deliveryLabel ?? null);
+  }
 
   return container.innerHTML;
 }
