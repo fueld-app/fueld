@@ -697,7 +697,6 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   toggleTeamView(): void {
     this.teamView.update((current) => !current);
     void this.loadDashboardData();
-    void this.loadFollowUps();
   }
 
   selectDatePreset(key: string): void {
@@ -962,11 +961,6 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   private async loadFollowUps(): Promise<void> {
     try {
       const params = new URLSearchParams();
-      const isMyView = this.canUseTeamView() ? !this.teamView() : true;
-      if (isMyView) {
-        const userId = this.auth.user()?.id;
-        if (userId) params.set('userId', userId);
-      }
       params.set('to', this.offsetIsoDate(this.upcomingFollowUpWindowDays));
       const suffix = params.size > 0 ? `?${params.toString()}` : '';
       const res = await firstValueFrom(
