@@ -13,60 +13,16 @@ import { getEmailTemplate, getApplicableEmailRules, renderTemplate, type Templat
 import { getInquirySettings } from '../admin/settings.service';
 import { applyStaleSupplierInquiryStatuses, createSupplierQuoteToken, getSupplierQuoteExpiryDate, getSupplierQuoteFormUrl, getSupplierInquiryOrderContext, saveSupplierInquiryResponse } from './supplier-inquiry.service';
 import { createSupplierNominationLink, getSupplierNominationFormUrl, getSupplierNominationSummary } from './supplier-nomination.service';
+import {
+  buildInquiryTemplateVariables,
+  formatDeadlineHumanDuration,
+  formatStoredDateOnlyLabel,
+  getDefaultInquiryResponseDeadline,
+} from './inquiry.utils';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Documents Controller
 // ═══════════════════════════════════════════════════════════════════════
-
-function buildInquiryTemplateVariables(params: {
-  vesselName: string;
-  portName: string;
-  orderNumber: string;
-  eta?: string | null;
-  etd?: string | null;
-  deliveryWindow?: string | null;
-  senderName: string;
-  companyName: string;
-  supplierName?: string | null;
-  contactName?: string | null;
-  quoteFormUrl?: string | null;
-}): TemplateVariables {
-  const preferredName = params.contactName?.trim() || params.supplierName?.trim() || 'there';
-  const quoteFormUrl = params.quoteFormUrl == null ? '${quoteFormUrl}' : params.quoteFormUrl.trim();
-  return {
-    vesselName: params.vesselName,
-    portName: params.portName,
-    orderNumber: params.orderNumber,
-    documentLabel: 'Inquiry',
-    eta: params.eta?.trim() || '',
-    etd: params.etd?.trim() || '',
-    deliveryWindow: params.deliveryWindow?.trim() || '',
-    senderName: params.senderName,
-    companyName: params.companyName,
-    paymentTerms: '',
-    customerNote: '',
-    supplierNote: '',
-    invoiceNumber: '',
-    supplierName: params.supplierName?.trim() || '${supplierName}',
-    contactName: params.contactName?.trim() || '${contactName}',
-    name: preferredName,
-    quoteFormUrl,
-  };
-}
-
-const storedDateOnlyLabelFormatter = new Intl.DateTimeFormat('en-GB', {
-  timeZone: 'UTC',
-  day: '2-digit',
-  month: 'short',
-  year: 'numeric',
-});
-
-function formatStoredDateOnlyLabel(value: string | Date | null | undefined): string | null {
-  if (!value) return null;
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return storedDateOnlyLabelFormatter.format(date);
-}
 
 function buildNominationResponseLinkCardHtml(responseUrl: string): string {
   return `
@@ -180,18 +136,6 @@ function calculateInquiryResponseHours(sentAt: Date | null, respondedAt: Date | 
   const diffMs = respondedAt.getTime() - sentAt.getTime();
   if (!Number.isFinite(diffMs) || diffMs < 0) return null;
   return Number((diffMs / 3_600_000).toFixed(2));
-}
-
-function getDefaultInquiryResponseDeadline(hours = 48): string {
-  return new Date(Date.now() + (hours * 3_600_000)).toISOString();
-}
-
-function formatDeadlineHumanDuration(deadlineIso: string): string {
-  const hours = Math.round((new Date(deadlineIso).getTime() - Date.now()) / 3_600_000);
-  if (hours < 1) return '1 hour';
-  if (hours < 24) return `${hours} hours`;
-  const days = Math.round(hours / 24);
-  return days === 1 ? '1 day' : `${days} days`;
 }
 
 function formatInquiryQuantity(value: string | null | undefined): string {
@@ -1299,6 +1243,8 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       const deliveryWindow = etaLabel && etdLabel
         ? `${etaLabel} to ${etdLabel}`
         : etaLabel || etdLabel || '';
+      const defaultResponseDeadlineAt = getDefaultInquiryResponseDeadline(inquirySettings.defaultResponseDeadlineHours);
+      const defaultResponseDeadlineFormatted = formatDeadlineHumanDuration(defaultResponseDeadlineAt);
 
       // Try admin template first
       const templateVars = buildInquiryTemplateVariables({
@@ -1308,6 +1254,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         eta: etaLabel,
         etd: etdLabel,
         deliveryWindow,
+        responseDeadlineFormatted: defaultResponseDeadlineFormatted,
         senderName,
         companyName: companyName ?? '',
         supplierName: '${supplierName}',
@@ -1340,7 +1287,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             brandColor,
             supplierTerms,
             includeSupplierQuoteLink: inquirySettings.supplierResponseUrlEnabled,
-            responseDeadlineFormatted: formatDeadlineHumanDuration(getDefaultInquiryResponseDeadline(inquirySettings.defaultResponseDeadlineHours)),
+            responseDeadlineFormatted: defaultResponseDeadlineFormatted,
             items: order.items.map((i: any) => ({
               quantity: i.quantity,
               quantityMin: i.quantityMin,
@@ -1364,7 +1311,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           brandColor,
           supplierTerms,
           includeSupplierQuoteLink: inquirySettings.supplierResponseUrlEnabled,
-          responseDeadlineFormatted: formatDeadlineHumanDuration(getDefaultInquiryResponseDeadline(inquirySettings.defaultResponseDeadlineHours)),
+          responseDeadlineFormatted: defaultResponseDeadlineFormatted,
           items: order.items.map((i: any) => ({
             quantity: i.quantity,
             quantityMin: i.quantityMin,
@@ -1383,7 +1330,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           senderName,
           senderEmail: auth.email,
           supplierTerms,
-          responseDeadlineAt: getDefaultInquiryResponseDeadline(inquirySettings.defaultResponseDeadlineHours),
+          responseDeadlineAt: defaultResponseDeadlineAt,
         },
       };
     },
@@ -1428,6 +1375,8 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       const deliveryWindow = etaLabel && etdLabel
         ? `${etaLabel} to ${etdLabel}`
         : etaLabel || etdLabel || '';
+      const responseDeadlineAt = body.responseDeadlineAt ?? getDefaultInquiryResponseDeadline(inquirySettings.defaultResponseDeadlineHours);
+      const responseDeadlineFormatted = formatDeadlineHumanDuration(responseDeadlineAt);
 
       // Check if this is the first inquiry batch for this order (for WhatsApp notification)
       const existingInquiries = await db
@@ -1499,6 +1448,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             eta: etaLabel,
             etd: etdLabel,
             deliveryWindow,
+            responseDeadlineFormatted,
             senderName,
             companyName: order.invoicingCompany?.name ?? 'Fueld',
             supplierName: target.type === 'supplier' ? target.supplierName : '',
@@ -1553,7 +1503,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
                   status: 'SENT',
                   quoteTokenHash: quoteToken?.tokenHash ?? null,
                   quoteTokenExpiresAt: quoteTokenExpiresAt,
-                  responseDeadlineAt: body.responseDeadlineAt ? new Date(body.responseDeadlineAt) : null,
+                  responseDeadlineAt: responseDeadlineAt ? new Date(responseDeadlineAt) : null,
                   reminderSentAt: null,
                   reminderCount: 0,
                   respondedAt: null,
@@ -1579,7 +1529,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
                 status: 'SENT',
                 quoteTokenHash: quoteToken?.tokenHash ?? null,
                 quoteTokenExpiresAt: quoteTokenExpiresAt,
-                responseDeadlineAt: body.responseDeadlineAt ? new Date(body.responseDeadlineAt) : null,
+                responseDeadlineAt: responseDeadlineAt ? new Date(responseDeadlineAt) : null,
                 reminderSentAt: null,
                 reminderCount: 0,
                 sentByUserId: auth.userId,

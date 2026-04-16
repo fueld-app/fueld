@@ -16,7 +16,7 @@ import { API } from '@app/core/config/api';
 interface InquirySettingsDto {
   supplierResponseUrlEnabled: boolean;
   autoMarkNoReplyAfterHours: number | null;
-  defaultResponseDeadlineHours: number;
+  defaultResponseDeadlineHours: number | null;
 }
 
 @Component({
@@ -789,7 +789,7 @@ interface InquirySettingsDto {
               <div class="mt-5 border-t border-gray-100 pt-5">
                 <div>
                   <p class="text-sm font-medium text-gray-900">Default response deadline</p>
-                  <p class="text-xs text-gray-500">Number of hours from when an inquiry is sent until the response deadline shown to suppliers.</p>
+                  <p class="text-xs text-gray-500">Number of hours from when an inquiry is sent until the response deadline shown to suppliers. Leave blank to disable the deadline feature.</p>
                 </div>
                 <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
                   <div class="w-full sm:w-40">
@@ -797,6 +797,7 @@ interface InquirySettingsDto {
                     <input
                       type="number"
                       min="1"
+                      placeholder="Disabled"
                       [ngModel]="inquiryDeadlineHours()"
                       (ngModelChange)="setInquiryDeadlineHours($event)"
                       class="app-input mt-1 w-full"
@@ -2010,7 +2011,7 @@ export class SettingsPageComponent implements OnInit {
     const autoMarkNoReplyAfterHours = settings.autoMarkNoReplyAfterHours;
     this.inquiryAutoNoReplyEnabled.set(autoMarkNoReplyAfterHours !== null && autoMarkNoReplyAfterHours > 0);
     this.inquiryAutoNoReplyHours.set(String(autoMarkNoReplyAfterHours ?? 168));
-    this.inquiryDeadlineHours.set(String(settings.defaultResponseDeadlineHours ?? 48));
+    this.inquiryDeadlineHours.set(settings.defaultResponseDeadlineHours == null ? '' : String(settings.defaultResponseDeadlineHours));
   }
 
   private async updateInquirySettings(payload: Partial<InquirySettingsDto>, successMessage: string): Promise<void> {
@@ -2070,7 +2071,16 @@ export class SettingsPageComponent implements OnInit {
   }
 
   async saveInquiryDeadlineHours(): Promise<void> {
-    const parsedHours = Number(String(this.inquiryDeadlineHours()).trim());
+    const rawHours = String(this.inquiryDeadlineHours()).trim();
+    if (!rawHours) {
+      await this.updateInquirySettings(
+        { defaultResponseDeadlineHours: null },
+        'Response deadline disabled.',
+      );
+      return;
+    }
+
+    const parsedHours = Number(rawHours);
     if (!Number.isFinite(parsedHours) || parsedHours < 1) {
       this.inquirySaveSuccess.set('');
       this.inquirySaveError.set('Response deadline must be at least 1 hour.');

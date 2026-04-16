@@ -1601,6 +1601,53 @@ describe('email tracking, inquiry send & WhatsApp group notifications', () => {
       expect(body).toContain('Good day');
     });
 
+    it('keeps delivery dates in the default inquiry body and omits reply timing when deadline is disabled', async () => {
+      const { token, orderId } = await seedDocumentReadyOrder();
+      const db = await getDb();
+
+      await db
+        .update(orders)
+        .set({
+          eta: new Date('2026-04-15T12:00:00.000Z'),
+          etd: new Date('2026-04-16T12:00:00.000Z'),
+          updatedAt: new Date(),
+        })
+        .where(eq(orders.id, orderId));
+
+      const [tenant] = await db
+        .select({ id: tenants.id, settings: tenants.settings })
+        .from(tenants)
+        .limit(1);
+
+      await db
+        .update(tenants)
+        .set({
+          settings: {
+            ...((tenant?.settings as Record<string, unknown> | null) ?? {}),
+            inquirySettings: {
+              ...((((tenant?.settings as Record<string, any> | null) ?? {}).inquirySettings as Record<string, unknown> | undefined) ?? {}),
+              defaultResponseDeadlineHours: null,
+            },
+          },
+          updatedAt: new Date(),
+        })
+        .where(eq(tenants.id, tenant!.id));
+
+      const res = await requestJson(`/orders/${orderId}/inquiry/defaults`, {
+        method: 'POST',
+        token,
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.data?.success).toBe(true);
+      expect(res.data?.data?.responseDeadlineAt).toBeNull();
+
+      const body = String(res.data?.data?.htmlBody ?? '');
+      expect(body).toContain('Delivery:');
+      expect(body).toContain('15 Apr 2026 to 16 Apr 2026');
+      expect(body).not.toContain('Reply within:');
+    });
+
     it('returns 404 for non-existent order', async () => {
       const seeded = await seedAuthBasics();
       const login = await loginE2E(seeded.user.email, seeded.password);

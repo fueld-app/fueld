@@ -17,6 +17,11 @@ import {
   type EmailTag,
 } from '../../../../shared/components/email-tag-input/email-tag-input.component';
 import { API_URL } from '@app/core/config/api';
+import {
+  buildInquiryDeliveryWindowLabel,
+  formatInquiryStoredDateLabel,
+  syncInquiryMetadataTable,
+} from './send-inquiry-modal.utils';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Send Inquiry Modal — Send RFQ emails to multiple port suppliers
@@ -1008,13 +1013,14 @@ export class SendInquiryModalComponent {
         next: (res) => {
           if (res.success && res.data) {
             this.subject.set(res.data.subject ?? '');
-            this.htmlBody.set(res.data.htmlBody ?? '');
             this.responseDeadlineAt.set(this.toDateTimeLocal(res.data.responseDeadlineAt ?? ''));
+            const syncedHtml = this.syncInquiryBodyMetadataHtml(res.data.htmlBody ?? '');
+            this.htmlBody.set(syncedHtml);
             // Set the body editor content
             setTimeout(() => {
               const editor = this.bodyEditor()?.nativeElement;
               if (editor) {
-                editor.innerHTML = res.data.htmlBody ?? '';
+                editor.innerHTML = syncedHtml;
               }
             });
           }
@@ -1137,31 +1143,7 @@ export class SendInquiryModalComponent {
 
   onDeadlineChange(value: string): void {
     this.responseDeadlineAt.set(value);
-    if (!value) return;
-    const deadline = new Date(value);
-    if (Number.isNaN(deadline.getTime())) return;
-    const hours = Math.round((deadline.getTime() - Date.now()) / 3_600_000);
-    let label: string;
-    if (hours < 1) label = '1 hour';
-    else if (hours < 24) label = `${hours} hour${hours === 1 ? '' : 's'}`;
-    else {
-      const days = Math.round(hours / 24);
-      label = days === 1 ? '1 day' : `${days} days`;
-    }
-    // Update the "Reply within" value in the body editor
-    const editor = this.bodyEditor()?.nativeElement;
-    if (!editor) return;
-    const cells = editor.querySelectorAll('td');
-    for (let i = 0; i < cells.length; i++) {
-      if (cells[i].textContent?.trim().startsWith('Reply within')) {
-        const valueCell = cells[i + 1];
-        if (valueCell) {
-          valueCell.textContent = label;
-          this.htmlBody.set(editor.innerHTML);
-        }
-        break;
-      }
-    }
+    this.syncInquiryBodyMetadata();
   }
 
   execCommand(command: string): void {
@@ -1205,6 +1187,7 @@ export class SendInquiryModalComponent {
     const selected = this.suppliers().filter(s => s.selected);
     if (selected.length === 0 && this.recipientTags().length === 0) return;
 
+    this.syncInquiryBodyMetadata();
     this.sending.set(true);
     this.sendInquiry.emit({
       suppliers: selected.map(s => ({
@@ -1258,6 +1241,7 @@ export class SendInquiryModalComponent {
 
     if (recipients.length === 0) return;
 
+    this.syncInquiryBodyMetadata();
     this.waSending.set(true);
     this.sendWhatsAppInquiry.emit({
       recipients,
@@ -1571,18 +1555,7 @@ export class SendInquiryModalComponent {
   }
 
   private deliveryWindowLabel(): string {
-    const eta = this.eta();
-    const etd = this.etd();
-    const formatDate = (value: string | null): string | null => {
-      if (!value) return null;
-      const date = new Date(value);
-      if (Number.isNaN(date.getTime())) return null;
-      return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-    };
-    const etaLabel = formatDate(eta);
-    const etdLabel = formatDate(etd);
-    if (etaLabel && etdLabel) return `${etaLabel} to ${etdLabel}`;
-    return etaLabel || etdLabel || '';
+    return buildInquiryDeliveryWindowLabel(this.eta(), this.etd());
   }
 
   private responseDeadlineLabel(): string {
@@ -1616,17 +1589,9 @@ export class SendInquiryModalComponent {
     const supplierName = supplier?.supplierName?.trim() || 'Supplier';
     const contactName = supplier?.contactName?.trim() || supplier?.waContactName?.trim() || '';
     const preferredName = contactName || supplierName || 'there';
-    const formatDate = (value: string | null): string => {
-      if (!value) return '';
-      const date = new Date(value);
-      if (Number.isNaN(date.getTime())) return '';
-      return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-    };
-    const etaLabel = formatDate(this.eta());
-    const etdLabel = formatDate(this.etd());
-    const deliveryWindow = etaLabel && etdLabel
-      ? `${etaLabel} to ${etdLabel}`
-      : etaLabel || etdLabel || '';
+    const etaLabel = formatInquiryStoredDateLabel(this.eta()) ?? '';
+    const etdLabel = formatInquiryStoredDateLabel(this.etd()) ?? '';
+    const deliveryWindow = this.deliveryWindowLabel();
 
     return {
       vesselName: this.vesselName().trim() || 'Vessel',
@@ -1636,6 +1601,7 @@ export class SendInquiryModalComponent {
       eta: etaLabel,
       etd: etdLabel,
       deliveryWindow,
+      responseDeadlineFormatted: this.responseDeadlineLabel(),
       senderName: this.senderName().trim() || 'Fueld User',
       companyName: this.companyName().trim() || 'Fueld',
       paymentTerms: '',
@@ -1647,6 +1613,25 @@ export class SendInquiryModalComponent {
       name: preferredName,
       quoteFormUrl: '#quote-form-generated-on-send',
     };
+  }
+
+  private syncInquiryBodyMetadata(): void {
+    const editor = this.bodyEditor()?.nativeElement;
+    const currentHtml = editor?.innerHTML ?? this.htmlBody();
+    const syncedHtml = this.syncInquiryBodyMetadataHtml(currentHtml);
+    if (syncedHtml === currentHtml) return;
+
+    this.htmlBody.set(syncedHtml);
+    if (editor && editor.innerHTML !== syncedHtml) {
+      editor.innerHTML = syncedHtml;
+    }
+  }
+
+  private syncInquiryBodyMetadataHtml(html: string): string {
+    return syncInquiryMetadataTable(html, {
+      deliveryLabel: this.deliveryWindowLabel(),
+      responseDeadlineLabel: this.responseDeadlineLabel(),
+    });
   }
 
   private renderTemplateVariables(template: string, variables: Record<string, string>): string {

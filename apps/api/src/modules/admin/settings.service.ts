@@ -1076,7 +1076,7 @@ export const DEFAULT_RESPONSE_DEADLINE_HOURS = 48;
 export interface InquirySettings {
   supplierResponseUrlEnabled: boolean;
   autoMarkNoReplyAfterHours: number | null;
-  defaultResponseDeadlineHours: number;
+  defaultResponseDeadlineHours: number | null;
 }
 
 export async function getInquirySettings(): Promise<InquirySettings> {
@@ -1096,7 +1096,9 @@ export async function getInquirySettings(): Promise<InquirySettings> {
           ? autoMarkNoReplyAfterHours
           : DEFAULT_AUTO_MARK_NO_REPLY_AFTER_HOURS,
     defaultResponseDeadlineHours:
-      typeof inquirySettings.defaultResponseDeadlineHours === 'number' && inquirySettings.defaultResponseDeadlineHours > 0
+      inquirySettings.defaultResponseDeadlineHours === null
+        ? null
+        : typeof inquirySettings.defaultResponseDeadlineHours === 'number' && inquirySettings.defaultResponseDeadlineHours > 0
         ? inquirySettings.defaultResponseDeadlineHours
         : DEFAULT_RESPONSE_DEADLINE_HOURS,
   };
@@ -1105,7 +1107,7 @@ export async function getInquirySettings(): Promise<InquirySettings> {
 export async function updateInquirySettings(data: {
   supplierResponseUrlEnabled?: boolean;
   autoMarkNoReplyAfterHours?: number | null;
-  defaultResponseDeadlineHours?: number;
+  defaultResponseDeadlineHours?: number | null;
 }): Promise<InquirySettings> {
   const tenant = await db.query.tenants.findFirst();
   if (!tenant) throw new Error('No tenant found');
@@ -1130,6 +1132,18 @@ export async function updateInquirySettings(data: {
   }
 
   if (data.defaultResponseDeadlineHours !== undefined) {
+    if (data.defaultResponseDeadlineHours === null) {
+      inquirySettings.defaultResponseDeadlineHours = null;
+      settings.inquirySettings = inquirySettings;
+
+      await db
+        .update(tenants)
+        .set({ settings, updatedAt: new Date() })
+        .where(eq(tenants.id, tenant.id));
+
+      return getInquirySettings();
+    }
+
     const normalized = Number(data.defaultResponseDeadlineHours);
     if (!Number.isFinite(normalized) || normalized < 1) {
       throw new Error('Response deadline must be at least 1 hour');

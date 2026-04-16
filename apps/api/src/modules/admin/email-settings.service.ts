@@ -131,6 +131,7 @@ export interface TemplateVariables {
   eta?: string;
   etd?: string;
   deliveryWindow?: string;
+  responseDeadlineFormatted?: string;
   senderName: string;
   companyName: string;
   paymentTerms: string;
@@ -165,6 +166,7 @@ export const TEMPLATE_VARIABLES = [
   { key: 'eta', label: 'ETA date label', example: '12 Mar 2026' },
   { key: 'etd', label: 'ETD date label', example: '14 Mar 2026' },
   { key: 'deliveryWindow', label: 'Delivery window label', example: '12 Mar 2026 to 14 Mar 2026' },
+  { key: 'responseDeadlineFormatted', label: 'Response deadline label', example: '2 days' },
   { key: 'senderName', label: 'Sender name', example: 'John Smith' },
   { key: 'companyName', label: 'Invoicing company name', example: 'Riviera Marine Ltd' },
   { key: 'paymentTerms', label: 'Payment terms', example: 'Credit 30 days' },

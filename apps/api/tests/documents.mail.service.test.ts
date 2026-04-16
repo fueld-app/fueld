@@ -345,4 +345,35 @@ describe('documents mail service', () => {
     expect(html).not.toContain('Submit quote online');
     expect(html).not.toContain('${quoteFormUrl}');
   });
+
+  test('buildInquiryEmailHtml renders delivery and reply timing rows only when provided', () => {
+    const withRows = buildInquiryEmailHtml({
+      senderName: 'Trader',
+      vesselName: 'MV TEST',
+      vesselImo: '1234567',
+      portName: 'Singapore',
+      companyName: 'Fueld Trading Ltd',
+      etaFormatted: '15 Apr 2026',
+      etdFormatted: '16 Apr 2026',
+      responseDeadlineFormatted: '2 days',
+      items: [{ quantity: '100', unit: 'MT', productType: 'VLSFO' }],
+    });
+
+    expect(withRows).toContain('Delivery:');
+    expect(withRows).toContain('15 Apr 2026 to 16 Apr 2026');
+    expect(withRows).toContain('Reply within:');
+    expect(withRows).toContain('2 days');
+
+    const withoutRows = buildInquiryEmailHtml({
+      senderName: 'Trader',
+      vesselName: 'MV TEST',
+      vesselImo: '1234567',
+      portName: 'Singapore',
+      companyName: 'Fueld Trading Ltd',
+      items: [{ quantity: '100', unit: 'MT', productType: 'VLSFO' }],
+    });
+
+    expect(withoutRows).not.toContain('Delivery:');
+    expect(withoutRows).not.toContain('Reply within:');
+  });
 });

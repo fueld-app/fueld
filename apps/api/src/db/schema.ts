@@ -192,7 +192,7 @@ export interface TenantSettings {
   inquirySettings?: {
     supplierResponseUrlEnabled?: boolean;
     autoMarkNoReplyAfterHours?: number | null;
-    defaultResponseDeadlineHours?: number;
+    defaultResponseDeadlineHours?: number | null;
   };
   // Configurable attachment types for order/inquiry attachments
   attachmentTypes?: string[];
