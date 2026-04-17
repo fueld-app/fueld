@@ -4343,7 +4343,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
     this.autoSaving.set(true);
     try {
-      await firstValueFrom(
+      const orderRes = await firstValueFrom(
         this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}`, {
           clientId: o.clientId,
           vesselId: o.vesselId,
@@ -4372,6 +4372,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
           deliveredAt: o.deliveredAt ?? null,
         }),
       );
+      this.requireApiSuccess(orderRes, 'Failed to save order.');
 
       const itemPayload = this.buildItemPayload(this.itemRows()).map((item) => ({
         ...item,
@@ -4379,9 +4380,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         salesCurrency: item.salesCurrency ?? o.currency,
       }));
 
-      await firstValueFrom(
+      const itemsRes = await firstValueFrom(
         this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}/items`, { items: itemPayload }),
       );
+      this.requireApiSuccess(itemsRes, 'Failed to save items.');
       await this.syncOrderSupplierRecords(id);
       await this.loadCustomerCreditLines(o.clientId);
       await this.loadSupplierCreditLines(this.activeOrderSupplier()?.companyId ?? o.supplierId);
@@ -4646,11 +4648,12 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     }));
 
     try {
-      await firstValueFrom(
+      const itemsRes = await firstValueFrom(
         this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}/items`, {
           items: this.buildItemPayload(normalizedRows, { fillMissingDeliveredQuantity: true }),
         }),
       );
+      this.requireApiSuccess(itemsRes, 'Failed to save delivered quantities.');
       this.itemRows.set(normalizedRows);
     } catch {
       this.showToast('error', 'Failed to save delivered quantities.');
@@ -4667,7 +4670,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
     this.saving.set(true);
     try {
-      await firstValueFrom(
+      const orderRes = await firstValueFrom(
         this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}`, {
           clientId: o.clientId,
           vesselId: o.vesselId,
@@ -4696,6 +4699,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
           deliveredAt: o.deliveredAt ?? null,
         }),
       );
+      this.requireApiSuccess(orderRes, 'Failed to save order.');
 
       const itemPayload = this.buildItemPayload(this.itemRows()).map((item) => ({
         ...item,
@@ -4703,9 +4707,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         salesCurrency: item.salesCurrency ?? o.currency,
       }));
 
-      await firstValueFrom(
+      const itemsRes = await firstValueFrom(
         this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}/items`, { items: itemPayload }),
       );
+      this.requireApiSuccess(itemsRes, 'Failed to save items.');
       await this.syncOrderSupplierRecords(id);
       await this.loadCustomerCreditLines(o.clientId);
       await this.loadSupplierCreditLines(this.activeOrderSupplier()?.companyId ?? o.supplierId);
@@ -5118,6 +5123,13 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   onCreditApplicationSubmitted(): void {
     // Reload credit lines after application is submitted
     this.loadCustomerCreditLines(this.order()?.clientId);
+  }
+
+  private requireApiSuccess<T>(response: ApiResponse<T>, fallbackMessage: string): T {
+    if (!response.success) {
+      throw new Error(response.message ?? fallbackMessage);
+    }
+    return response.data;
   }
 
   // ─── Toast ───────────────────────────────────────────────────────

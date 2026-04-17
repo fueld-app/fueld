@@ -89,6 +89,7 @@ function buildBankAccount(id: string, currency: string, isDefault = false): Bank
 describe('OrderDetailPageComponent', () => {
   async function createComponent(options?: {
     onPost?: (url: string, body: unknown) => void;
+    onPut?: (url: string, body: unknown) => { success: boolean; data?: unknown; message?: string } | void;
   }): Promise<{
     component: OrderDetailPageComponent;
     fixture: ReturnType<typeof TestBed.createComponent<OrderDetailPageComponent>>;
@@ -130,7 +131,7 @@ describe('OrderDetailPageComponent', () => {
               }
               return of({ success: true, data: [] });
             },
-            put: () => of({ success: true, data: [] }),
+            put: (url: string, body: unknown) => of(options?.onPut?.(url, body) ?? { success: true, data: [] }),
             patch: () => of({ success: true, data: [] }),
             delete: () => of({ success: true, data: [] }),
           },
@@ -382,5 +383,93 @@ describe('OrderDetailPageComponent', () => {
       etd: null,
     });
     expect(component.inquiryModal()?.htmlBody()).toContain('Delivery:');
+  });
+
+  it('shows an error when saving order items fails', async () => {
+    const putCalls: Array<{ url: string; body: unknown }> = [];
+    const { component } = await createComponent({
+      onPut: (url, body) => {
+        putCalls.push({ url, body });
+        if (String(url).includes('/orders/order-1/items')) {
+          return { success: false, data: [], message: 'Failed to save items' };
+        }
+        return { success: true, data: {} };
+      },
+    });
+
+    component.order.set({
+      id: 'order-1',
+      clientId: 'client-1',
+      vesselId: 'vessel-1',
+      placeId: 'place-1',
+      salesRepId: 'user-1',
+      invoicingCompanyId: 'company-1',
+      bankAccountId: 'bank-1',
+      currency: 'USD',
+      status: 'CONFIRMED',
+      eta: '2026-04-15T12:00:00.000Z',
+      etd: null,
+      customerPaymentTermType: null,
+      customerCreditDays: null,
+      customerNote: null,
+      customerContactId: null,
+      supplierId: null,
+      supplierPaymentTermType: null,
+      supplierCreditDays: null,
+      supplierNote: null,
+      supplierContactId: null,
+      brokerId: null,
+      brokerContactId: null,
+      brokerGetsAll: false,
+      agentId: null,
+      agentContactId: null,
+      termsAndConditions: null,
+      deliveredAt: null,
+    } as any);
+    component.itemRows.set([
+      {
+        id: 'item-1',
+        orderSupplierId: null,
+        productType: 'DMA',
+        description: 'DMA 2017',
+        quantity: 500,
+        quantityMin: null,
+        quantityMax: 500,
+        unit: 'MT',
+        costUnit: 'MT',
+        salesUnit: 'MT',
+        costConversionFactor: 1,
+        unitConversionFactor: 1,
+        costPrice: 2662,
+        costCurrency: 'USD',
+        salesPrice: 2662,
+        salesCurrency: 'USD',
+        profit: 0,
+        paymentTerms: '',
+        customerNote: null,
+        deliveredQuantity: 500,
+        costPricingModel: 'FIXED',
+        costReferenceId: null,
+        costPlattsEntryId: null,
+        costPremium: null,
+        costBarging: null,
+        costBargingUnit: null,
+        costCreditDays: null,
+        costPriceFinalized: false,
+        salesPricingModel: 'FIXED',
+        salesReferenceId: null,
+        salesPlattsEntryId: null,
+        salesPremium: null,
+        salesBarging: null,
+        salesBargingUnit: null,
+        salesCreditDays: null,
+        salesPriceFinalized: false,
+      },
+    ] as any);
+
+    await component.saveOrder();
+
+    expect(putCalls.some((call) => call.url.includes('/orders/order-1/items'))).toBe(true);
+    expect(component.toast()).toEqual({ type: 'error', message: 'Failed to save order.' });
   });
 });

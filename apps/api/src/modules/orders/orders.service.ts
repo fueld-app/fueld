@@ -1227,11 +1227,6 @@ export async function deleteOrder(id: string) {
 // Replaces all items for an order: delete existing, insert new batch.
 
 export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
-  // Delete existing items
-  await db.delete(orderItems).where(eq(orderItems.orderId, orderId));
-
-  if (items.length === 0) return [];
-
   // Look up order currency for defaults
   const [orderRow] = await db
     .select({ currency: orders.currency })
@@ -1310,8 +1305,13 @@ export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
     };
   });
 
-  const inserted = await db.insert(orderItems).values(values).returning();
-  return inserted;
+  return db.transaction(async (tx) => {
+    await tx.delete(orderItems).where(eq(orderItems.orderId, orderId));
+
+    if (values.length === 0) return [];
+
+    return tx.insert(orderItems).values(values).returning();
+  });
 }
 
 // ─── Finalize Formula Price ────────────────────────────────────────

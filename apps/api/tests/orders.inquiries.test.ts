@@ -632,4 +632,81 @@ describe('orders: attachments, payments, and lookups', () => {
     const rows = await db.select().from(orderItems).where(eq(orderItems.orderId, created.id));
     expect(rows.length).toBe(0);
   });
+
+  it('keeps existing items when replacement payload is invalid', async () => {
+    const { tenant, client, vessel, place, user } = await seedBasics();
+    const db = await getDb();
+    const { addOrderSupplier, createOrder, getOrderById, saveOrderItems } = await loadOrdersService();
+
+    const [supplierA] = await db
+      .insert(counterparties)
+      .values({
+        tenantId: tenant.id,
+        name: 'Preserve Supplier A',
+        type: 'SUPPLIER',
+        types: ['SUPPLIER'],
+      })
+      .returning();
+
+    const [supplierB] = await db
+      .insert(counterparties)
+      .values({
+        tenantId: tenant.id,
+        name: 'Preserve Supplier B',
+        type: 'SUPPLIER',
+        types: ['SUPPLIER'],
+      })
+      .returning();
+
+    const created = await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+      supplierId: supplierA.id,
+    });
+
+    const detail = await getOrderById(created.id);
+    const primarySupplier = detail?.orderSuppliers?.find((supplier) => supplier.companyId === supplierA.id);
+    expect(primarySupplier?.id).toBeTruthy();
+
+    await addOrderSupplier(created.id, { companyId: supplierB.id });
+
+    await saveOrderItems(created.id, [
+      {
+        productType: 'VLSFO',
+        quantity: '10',
+        unit: 'MT',
+        orderSupplierId: primarySupplier!.id,
+        costPrice: '100',
+        salesPrice: '120',
+      },
+    ]);
+
+    await expect(saveOrderItems(created.id, [
+      {
+        productType: 'MGO',
+        quantity: '5',
+        unit: 'MT',
+        orderSupplierId: 'not-a-real-supplier-id',
+        costPrice: '90',
+        salesPrice: '110',
+      },
+    ])).rejects.toThrow('Order item supplier must belong to the same order');
+
+    const rows = await db
+      .select({
+        productType: orderItems.productType,
+        quantity: orderItems.quantity,
+        orderSupplierId: orderItems.orderSupplierId,
+      })
+      .from(orderItems)
+      .where(eq(orderItems.orderId, created.id));
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.productType).toBe('VLSFO');
+    expect(Number(rows[0]?.quantity)).toBe(10);
+    expect(rows[0]?.orderSupplierId).toBe(primarySupplier!.id);
+  });
 });
