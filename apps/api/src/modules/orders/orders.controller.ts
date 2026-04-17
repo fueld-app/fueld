@@ -370,18 +370,10 @@ export const ordersController = new Elysia({ prefix: '/orders' })
       try {
         const orderId = await resolveOrderId(params.id);
         if (!orderId) return { success: false, data: null, message: 'Order not found' };
-        const updated = await updateOrder(orderId, body);
+        const updated = await updateOrder(orderId, body, auth.sub);
         if (!updated) {
           return { success: false, data: null, message: 'Order not found' };
         }
-
-        await logActivity({
-          userId: auth.sub,
-          action: 'UPDATE',
-          entityType: 'order',
-          entityId: orderId,
-          metadata: body,
-        });
 
         return { success: true, data: updated } satisfies ApiResponse<typeof updated>;
       } catch (err) {

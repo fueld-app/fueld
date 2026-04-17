@@ -17,6 +17,8 @@ import { eq } from 'drizzle-orm';
 import { db } from '../../db';
 import { users } from '../../db/schema';
 import { authGuard } from '../auth/auth.guard';
+import { buildStructuredActivityDiff } from '../activity/activity-diff';
+import { logActivity } from '../activity/activity.service';
 import {
   listCompanies,
   getCompanyById,
@@ -373,11 +375,39 @@ export const companiesController = new Elysia({ prefix: '/companies' })
   // ─── Update Company Types ─────────────────────────────────────────
   .patch(
     '/local/:id/types',
-    async ({ params, body }) => {
+    async ({ params, body, auth }) => {
+      const before = await getCompanyById(params.id);
+      if (!before) {
+        return { success: false, data: null, message: 'Company not found' };
+      }
+
       const updated = await updateCompanyTypes(params.id, body.types);
       if (!updated) {
         return { success: false, data: null, message: 'Company not found' };
       }
+
+      const after = await getCompanyById(params.id);
+      if (after) {
+        const metadata = buildStructuredActivityDiff({
+          action: 'update_company_types',
+          before,
+          after,
+          fields: [
+            { field: 'types', value: (company) => company.types ?? [] },
+          ],
+        });
+
+        if (metadata) {
+          await logActivity({
+            userId: auth.sub,
+            action: 'UPDATE',
+            entityType: 'company',
+            entityId: params.id,
+            metadata,
+          });
+        }
+      }
+
       return { success: true, data: updated } satisfies ApiResponse<typeof updated>;
     },
     {
@@ -403,11 +433,39 @@ export const companiesController = new Elysia({ prefix: '/companies' })
   // ─── Update Company Segments ──────────────────────────────────────
   .patch(
     '/local/:id/segments',
-    async ({ params, body }) => {
+    async ({ params, body, auth }) => {
+      const before = await getCompanyById(params.id);
+      if (!before) {
+        return { success: false, data: null, message: 'Company not found' };
+      }
+
       const updated = await updateCompanySegments(params.id, body.segments);
       if (!updated) {
         return { success: false, data: null, message: 'Company not found' };
       }
+
+      const after = await getCompanyById(params.id);
+      if (after) {
+        const metadata = buildStructuredActivityDiff({
+          action: 'update_company_segments',
+          before,
+          after,
+          fields: [
+            { field: 'segments', value: (company) => company.segments ?? {} },
+          ],
+        });
+
+        if (metadata) {
+          await logActivity({
+            userId: auth.sub,
+            action: 'UPDATE',
+            entityType: 'company',
+            entityId: params.id,
+            metadata,
+          });
+        }
+      }
+
       return { success: true, data: updated } satisfies ApiResponse<typeof updated>;
     },
     {
@@ -486,11 +544,50 @@ export const companiesController = new Elysia({ prefix: '/companies' })
   // ─── Update Company (manual fields) ────────────────────────────────
   .patch(
     '/local/:id',
-    async ({ params, body }) => {
+    async ({ params, body, auth }) => {
+      const before = await getCompanyById(params.id);
+      if (!before) {
+        return { success: false, data: null, message: 'Company not found' };
+      }
+
       const updated = await updateCompany(params.id, body);
       if (!updated) {
         return { success: false, data: null, message: 'Company not found' };
       }
+
+      const after = await getCompanyById(params.id);
+      if (after) {
+        const metadata = buildStructuredActivityDiff({
+          action: 'update_company_fields',
+          before,
+          after,
+          fields: [
+            { field: 'name', value: (company) => company.name },
+            { field: 'country', value: (company) => company.country ?? null },
+            { field: 'countryIso', value: (company) => company.countryIso ?? null },
+            { field: 'creditLimit', value: (company) => company.creditLimit ?? null },
+            { field: 'yearFormed', value: (company) => company.yearFormed ?? null },
+            { field: 'fleetSize', value: (company) => company.fleetSize ?? null },
+            { field: 'headOfficeAddress', value: (company) => company.headOfficeAddress ?? null },
+            { field: 'headOfficePhone', value: (company) => company.headOfficePhone ?? null },
+            { field: 'headOfficeEmail', value: (company) => company.headOfficeEmail ?? null },
+            { field: 'website', value: (company) => company.website ?? null },
+            { field: 'companyImo', value: (company) => company.companyImo ?? null },
+            { field: 'companyRoles', value: (company) => company.companyRoles ?? [] },
+          ],
+        });
+
+        if (metadata) {
+          await logActivity({
+            userId: auth.sub,
+            action: 'UPDATE',
+            entityType: 'company',
+            entityId: params.id,
+            metadata,
+          });
+        }
+      }
+
       return { success: true, data: updated } satisfies ApiResponse<typeof updated>;
     },
     {
@@ -570,11 +667,43 @@ export const companiesController = new Elysia({ prefix: '/companies' })
   // ─── Update Company Responsible User ─────────────────────────────
   .patch(
     '/local/:id/responsible-user',
-    async ({ params, body }) => {
+    async ({ params, body, auth }) => {
+      const before = await getCompanyById(params.id);
+      if (!before) {
+        return { success: false, data: null, message: 'Company not found' };
+      }
+
       const updated = await updateCompanyResponsibleUser(params.id, body.userId ?? null);
       if (!updated) {
         return { success: false, data: null, message: 'Company not found' };
       }
+
+      const after = await getCompanyById(params.id);
+      if (after) {
+        const metadata = buildStructuredActivityDiff({
+          action: 'update_company_responsible_user',
+          before,
+          after,
+          fields: [
+            {
+              field: 'responsibleUserId',
+              value: (company) => company.responsibleUserId ?? null,
+              displayValue: (company) => company.responsibleUserName ?? null,
+            },
+          ],
+        });
+
+        if (metadata) {
+          await logActivity({
+            userId: auth.sub,
+            action: 'UPDATE',
+            entityType: 'company',
+            entityId: params.id,
+            metadata,
+          });
+        }
+      }
+
       return { success: true, data: updated } satisfies ApiResponse<typeof updated>;
     },
     {

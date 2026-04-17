@@ -54,6 +54,20 @@ const SKIP_PATHS = new Set([
   '/admin/sessions',
 ]);
 
+const AUTO_LOG_SKIP_PATTERNS: Array<{ method: string; pattern: RegExp }> = [
+  { method: 'PUT', pattern: /^\/orders\/[^/]+$/ },
+  { method: 'PUT', pattern: /^\/orders\/[^/]+\/items$/ },
+  { method: 'PUT', pattern: /^\/trading\/orders\/[^/]+$/ },
+  { method: 'PUT', pattern: /^\/trading\/orders\/[^/]+\/items$/ },
+  { method: 'PATCH', pattern: /^\/companies\/local\/[^/]+$/ },
+  { method: 'PATCH', pattern: /^\/companies\/local\/[^/]+\/types$/ },
+  { method: 'PATCH', pattern: /^\/companies\/local\/[^/]+\/segments$/ },
+  { method: 'PATCH', pattern: /^\/companies\/local\/[^/]+\/responsible-user$/ },
+  { method: 'PATCH', pattern: /^\/vessels\/local\/[^/]+$/ },
+  { method: 'PUT', pattern: /^\/lloyds\/places\/local\/[^/]+$/ },
+  { method: 'PUT', pattern: /^\/lloyds\/places\/local\/[^/]+\/order-remark$/ },
+];
+
 function shouldSkip(path: string): boolean {
   if (SKIP_PATHS.has(path)) return true;
   if (path.startsWith('/swagger')) return true;
@@ -63,6 +77,12 @@ function shouldSkip(path: string): boolean {
   if (path.includes('/suppliers')) return true; // Manually logged in controller
   if (path === '/ws') return true;
   return false;
+}
+
+function shouldSkipAutoLog(method: string, path: string): boolean {
+  if (shouldSkip(path)) return true;
+
+  return AUTO_LOG_SKIP_PATTERNS.some((entry) => entry.method === method && entry.pattern.test(path));
 }
 
 function parseRoute(
@@ -200,7 +220,7 @@ export async function logFromRequest(request: Request, statusCode: number, reque
   const path = url.pathname;
 
   // Skip non-interesting paths
-  if (shouldSkip(path)) return;
+  if (shouldSkipAutoLog(request.method, path)) return;
 
   // Extract user from JWT
   const authHeader = request.headers.get('authorization');

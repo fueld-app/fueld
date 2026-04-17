@@ -23,7 +23,7 @@ import {
   companyContacts,
   priceReferences,
 } from '../../db/schema';
-import type { TenantSettings } from '../../db/schema';
+import type { Order, TenantSettings } from '../../db/schema';
 import { logActivity } from '../activity/activity.service';
 import {
   calculateGrossProfitBase,
@@ -306,6 +306,148 @@ async function getPreferredBankAccountId(
   }
 
   return companyBankAccounts.find((account) => account.isDefault)?.id ?? companyBankAccounts[0]?.id ?? null;
+}
+
+type OrderActivityValueResolver =
+  | 'counterparty'
+  | 'contact'
+  | 'vessel'
+  | 'place'
+  | 'user'
+  | 'bankAccount';
+
+interface OrderActivityChange {
+  field: string;
+  from: string | number | boolean | null;
+  to: string | number | boolean | null;
+}
+
+interface OrderUpdateActivityMetadata {
+  action: 'update_order_fields';
+  changes: OrderActivityChange[];
+}
+
+const ORDER_UPDATE_ACTIVITY_FIELDS: Array<{
+  key: keyof Order;
+  resolver?: OrderActivityValueResolver;
+}> = [
+  { key: 'clientId', resolver: 'counterparty' },
+  { key: 'vesselId', resolver: 'vessel' },
+  { key: 'placeId', resolver: 'place' },
+  { key: 'salesRepId', resolver: 'user' },
+  { key: 'status' },
+  { key: 'invoicingCompanyId', resolver: 'counterparty' },
+  { key: 'bankAccountId', resolver: 'bankAccount' },
+  { key: 'currency' },
+  { key: 'eta' },
+  { key: 'etd' },
+  { key: 'customerPaymentTermType' },
+  { key: 'customerCreditDays' },
+  { key: 'customerNote' },
+  { key: 'customerContactId', resolver: 'contact' },
+  { key: 'supplierId', resolver: 'counterparty' },
+  { key: 'supplierPaymentTermType' },
+  { key: 'supplierCreditDays' },
+  { key: 'supplierNote' },
+  { key: 'supplierContactId', resolver: 'contact' },
+  { key: 'brokerId', resolver: 'counterparty' },
+  { key: 'brokerContactId', resolver: 'contact' },
+  { key: 'brokerGetsAll' },
+  { key: 'agentId', resolver: 'counterparty' },
+  { key: 'agentContactId', resolver: 'contact' },
+  { key: 'termsAndConditions' },
+  { key: 'placeRemark' },
+  { key: 'lossReason' },
+  { key: 'deliveredAt' },
+];
+
+function normalizeOrderActivityValue(value: unknown): string | number | boolean | null {
+  if (value == null) return null;
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return value;
+  }
+  return String(value);
+}
+
+function areOrderActivityValuesEqual(left: unknown, right: unknown): boolean {
+  return normalizeOrderActivityValue(left) === normalizeOrderActivityValue(right);
+}
+
+async function resolveOrderActivityValue(
+  resolver: OrderActivityValueResolver | undefined,
+  value: unknown,
+): Promise<string | number | boolean | null> {
+  const normalized = normalizeOrderActivityValue(value);
+  if (normalized == null || !resolver) return normalized;
+
+  switch (resolver) {
+    case 'counterparty':
+      return (await getCounterpartyById(String(normalized)))?.name ?? String(normalized);
+    case 'contact':
+      return (await getCompanyContactById(String(normalized)))?.name ?? String(normalized);
+    case 'vessel': {
+      const [row] = await db
+        .select({ name: vessels.name })
+        .from(vessels)
+        .where(eq(vessels.id, String(normalized)))
+        .limit(1);
+      return row?.name ?? String(normalized);
+    }
+    case 'place': {
+      const [row] = await db
+        .select({ name: places.name })
+        .from(places)
+        .where(eq(places.id, String(normalized)))
+        .limit(1);
+      return row?.name ?? String(normalized);
+    }
+    case 'user': {
+      const [row] = await db
+        .select({ name: users.name, email: users.email })
+        .from(users)
+        .where(eq(users.id, String(normalized)))
+        .limit(1);
+      return row?.name ?? row?.email ?? String(normalized);
+    }
+    case 'bankAccount': {
+      const [row] = await db
+        .select({ label: bankAccounts.label, currency: bankAccounts.currency })
+        .from(bankAccounts)
+        .where(eq(bankAccounts.id, String(normalized)))
+        .limit(1);
+      if (!row) return String(normalized);
+      return row.currency ? `${row.label} (${row.currency})` : row.label;
+    }
+    default:
+      return normalized;
+  }
+}
+
+async function buildOrderUpdateActivityMetadata(
+  previousOrder: Order,
+  nextOrder: Order,
+): Promise<OrderUpdateActivityMetadata | null> {
+  const changes: OrderActivityChange[] = [];
+
+  for (const field of ORDER_UPDATE_ACTIVITY_FIELDS) {
+    const previousValue = previousOrder[field.key];
+    const nextValue = nextOrder[field.key];
+    if (areOrderActivityValuesEqual(previousValue, nextValue)) continue;
+
+    changes.push({
+      field: String(field.key),
+      from: await resolveOrderActivityValue(field.resolver, previousValue),
+      to: await resolveOrderActivityValue(field.resolver, nextValue),
+    });
+  }
+
+  return changes.length > 0
+    ? {
+        action: 'update_order_fields',
+        changes,
+      }
+    : null;
 }
 
 function normalizeOptionalTimestamp(value: string | Date | null | undefined): Date | null {
@@ -1123,17 +1265,11 @@ export async function createOrder(input: CreateOrderInput) {
 
 // ─── Update Order ───────────────────────────────────────────────────
 
-export async function updateOrder(id: string, input: UpdateOrderInput) {
+export async function updateOrder(id: string, input: UpdateOrderInput, activityUserId?: string | null) {
   const setData: Record<string, unknown> = { updatedAt: new Date() };
 
   const [currentOrder] = await db
-    .select({
-      id: orders.id,
-      tenantId: orders.tenantId,
-      invoicingCompanyId: orders.invoicingCompanyId,
-      bankAccountId: orders.bankAccountId,
-      currency: orders.currency,
-    })
+    .select()
     .from(orders)
     .where(eq(orders.id, id))
     .limit(1);
@@ -1206,6 +1342,19 @@ export async function updateOrder(id: string, input: UpdateOrderInput) {
 
   if (updated) {
     await syncPrimaryOrderSupplierFromLegacy(updated);
+
+    if (activityUserId) {
+      const metadata = await buildOrderUpdateActivityMetadata(currentOrder, updated);
+      if (metadata) {
+        await logActivity({
+          userId: activityUserId,
+          action: 'UPDATE',
+          entityType: 'order',
+          entityId: id,
+          metadata,
+        });
+      }
+    }
   }
 
   return updated ?? null;

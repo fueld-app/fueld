@@ -135,4 +135,98 @@ describe('orders advanced e2e', () => {
     expect(attachments.data?.success).toBe(true);
     expect(attachments.data?.data?.length).toBe(1);
   });
+
+  it('stores compact activity for order updates and item saves without duplicate auto-logged bodies', async () => {
+    const seeded = await seedAuthBasics();
+    const login = await loginE2E(seeded.user.email, seeded.password);
+    const token = login.accessToken;
+
+    const createdOrder = await requestJson('/orders', {
+      method: 'POST',
+      token,
+      body: {
+        clientId: seeded.client.id,
+        vesselId: seeded.vessel.id,
+        placeId: seeded.place.id,
+      },
+    });
+
+    expect(createdOrder.status).toBe(200);
+    expect(createdOrder.data?.success).toBe(true);
+
+    const orderId = createdOrder.data?.data?.id as string;
+    expect(orderId).toBeTruthy();
+
+    const updateOrderRes = await requestJson(`/orders/${orderId}`, {
+      method: 'PUT',
+      token,
+      body: {
+        eta: '2030-05-02T12:00:00.000Z',
+        customerCreditDays: 21,
+      },
+    });
+
+    expect(updateOrderRes.status).toBe(200);
+    expect(updateOrderRes.data?.success).toBe(true);
+
+    const saveItemsRes = await requestJson(`/orders/${orderId}/items`, {
+      method: 'PUT',
+      token,
+      body: {
+        items: [
+          {
+            productType: 'MGO',
+            quantity: '500',
+            quantityMax: '500',
+            unit: 'MT',
+            costUnit: 'MT',
+            salesUnit: 'MT',
+            costConversionFactor: '1',
+            unitConversionFactor: '1',
+            costPrice: '400',
+            costCurrency: 'USD',
+            salesPrice: '450',
+            salesCurrency: 'USD',
+          },
+        ],
+      },
+    });
+
+    expect(saveItemsRes.status).toBe(200);
+    expect(saveItemsRes.data?.success).toBe(true);
+
+    let activity: Awaited<ReturnType<typeof requestJson>> | null = null;
+    const start = Date.now();
+    while (Date.now() - start < 1500) {
+      activity = await requestJson(`/activity/order/${orderId}?limit=20&offset=0`, { token });
+      const items = Array.isArray(activity.data?.data?.items) ? activity.data?.data?.items : [];
+      const hasDiffEntry = items.some((item: any) => item.metadata?.action === 'update_order_fields');
+      const hasItemSaveEntry = items.some((item: any) => item.metadata?.action === 'save_items');
+      if (hasDiffEntry && hasItemSaveEntry) break;
+      await new Promise((r) => setTimeout(r, 25));
+    }
+
+    expect(activity?.status).toBe(200);
+    expect(activity?.data?.success).toBe(true);
+
+    const items = Array.isArray(activity?.data?.data?.items) ? activity?.data?.data?.items : [];
+    const diffEntry = items.find((item: any) => item.metadata?.action === 'update_order_fields');
+    const saveItemsEntry = items.find((item: any) => item.metadata?.action === 'save_items');
+
+    expect(diffEntry).toBeTruthy();
+    expect(diffEntry?.httpPath).toBeNull();
+    expect(diffEntry?.metadata?.changes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ field: 'eta', from: null, to: '2030-05-02T12:00:00.000Z' }),
+        expect.objectContaining({ field: 'customerCreditDays', from: null, to: 21 }),
+      ]),
+    );
+
+    expect(saveItemsEntry).toBeTruthy();
+    expect(saveItemsEntry?.httpPath).toBeNull();
+    expect(saveItemsEntry?.metadata?.itemCount).toBe(1);
+
+    expect(items.some((item: any) => item.httpPath === `/orders/${orderId}`)).toBe(false);
+    expect(items.some((item: any) => item.httpPath === `/orders/${orderId}/items`)).toBe(false);
+  });
 });

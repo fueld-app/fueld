@@ -14,7 +14,12 @@ import { firstValueFrom } from 'rxjs';
 import type { ApiResponse } from '@fueld/types';
 
 import { API } from '@app/core/config/api';
-import { formatActivityMetadataValue, formatMetadataLabel } from './activity-timeline.formatters';
+import {
+  extractActivityChangeRows,
+  formatActivityMetadataValue,
+  formatMetadataLabel,
+  getActivityMetadataAction,
+} from './activity-timeline.formatters';
 
 interface ActivityItem {
   id: string;
@@ -101,9 +106,21 @@ interface ActivityItem {
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-2 text-sm">
                   <span class="font-medium text-gray-900">{{ item.userName ?? item.userEmail ?? 'System' }}</span>
-                  <span class="text-gray-400">{{ actionLabel(item.action, item.httpPath) }}</span>
+                  <span class="text-gray-400">{{ actionLabel(item.action, item.httpPath, item.metadata) }}</span>
                 </div>
-                @if (metadataEntries(item.metadata); as entries) {
+                @if (changeRows(item.metadata); as changes) {
+                  <div class="mt-2 space-y-1 text-[11px] text-gray-600">
+                    @for (change of changes; track change.field) {
+                      <div class="flex flex-wrap items-start gap-x-2 gap-y-1 rounded-lg border border-gray-100 bg-gray-50 px-2.5 py-1.5">
+                        <span class="font-medium text-gray-700">{{ change.field }}</span>
+                        <span class="text-gray-400">from</span>
+                        <span class="break-words whitespace-normal text-gray-500">{{ change.from }}</span>
+                        <span class="text-gray-400">to</span>
+                        <span class="break-words whitespace-normal font-medium text-gray-700">{{ change.to }}</span>
+                      </div>
+                    }
+                  </div>
+                } @else if (metadataEntries(item.metadata); as entries) {
                   @if (entries.length) {
                     <div class="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-gray-500">
                       @for (entry of entries; track entry.key) {
@@ -261,7 +278,18 @@ export class ActivityTimelineComponent implements OnInit, OnDestroy {
     }
   }
 
-  actionLabel(action: string, httpPath?: string | null): string {
+  actionLabel(action: string, httpPath?: string | null, metadata?: unknown): string {
+    const metadataAction = getActivityMetadataAction(metadata);
+
+    if (metadataAction?.startsWith('update_') && Array.isArray((metadata as Record<string, unknown> | null)?.['changes'])) {
+      return 'updated fields';
+    }
+    if (metadataAction === 'save_items') return 'saved items';
+    if (metadataAction === 'add_supplier_leg') return 'added a supplier';
+    if (metadataAction === 'update_supplier_leg') return 'updated a supplier';
+    if (metadataAction === 'delete_supplier_leg') return 'removed a supplier';
+    if (metadataAction === 'finalize_price') return 'finalized item pricing';
+
     if (httpPath) {
       if (httpPath.includes('/suppliers') && action === 'CREATE') return 'added a supplier';
       if (httpPath.includes('/suppliers') && action === 'DELETE') return 'removed a supplier';
@@ -293,6 +321,70 @@ export class ActivityTimelineComponent implements OnInit, OnDestroy {
     products: 'Products',
     note: 'Note',
     field: 'Field',
+    name: 'Name',
+    clientId: 'Client',
+    country: 'Country',
+    countryIso: 'Country ISO',
+    creditLimit: 'Credit limit',
+    yearFormed: 'Year formed',
+    fleetSize: 'Fleet size',
+    headOfficeAddress: 'Head office address',
+    headOfficePhone: 'Head office phone',
+    headOfficeEmail: 'Head office email',
+    website: 'Website',
+    companyImo: 'Company IMO',
+    companyRoles: 'Company roles',
+    types: 'Types',
+    segments: 'Segments',
+    vesselId: 'Vessel',
+    imo: 'IMO',
+    mmsi: 'MMSI',
+    flag: 'Flag',
+    type: 'Type',
+    status: 'Status',
+    loa: 'LOA',
+    breadth: 'Breadth',
+    depth: 'Depth',
+    draught: 'Draught',
+    deadWeightTonnage: 'Deadweight tonnage',
+    grossTonnage: 'Gross tonnage',
+    buildYear: 'Build year',
+    builder: 'Builder',
+    classificationSociety: 'Classification society',
+    ignoreForCreditEnforcement: 'Ignore for credit enforcement',
+    placeId: 'Place',
+    area: 'Area',
+    subRegion: 'Sub-region',
+    placeType: 'Place type',
+    timezone: 'Timezone',
+    lat: 'Latitude',
+    long: 'Longitude',
+    unlocode: 'UN/LOCODE',
+    admiraltyChart: 'Admiralty chart',
+    parentPlaceId: 'Parent place',
+    salesRepId: 'Sales rep',
+    invoicingCompanyId: 'Invoicing company',
+    bankAccountId: 'Bank account',
+    eta: 'ETA',
+    etd: 'ETD',
+    deliveredAt: 'Delivered at',
+    customerPaymentTermType: 'Customer payment term',
+    customerCreditDays: 'Customer credit days',
+    customerNote: 'Customer note',
+    customerContactId: 'Customer contact',
+    supplierId: 'Supplier',
+    supplierPaymentTermType: 'Supplier payment term',
+    supplierCreditDays: 'Supplier credit days',
+    supplierNote: 'Supplier note',
+    supplierContactId: 'Supplier contact',
+    brokerId: 'Broker',
+    brokerContactId: 'Broker contact',
+    brokerGetsAll: 'Broker gets all',
+    agentId: 'Agent',
+    agentContactId: 'Agent contact',
+    termsAndConditions: 'Terms and conditions',
+    placeRemark: 'Place remark',
+    lossReason: 'Loss reason',
     responsibleUserId: 'User',
     contactId: 'Contact',
     documentType: 'Type',
@@ -303,7 +395,11 @@ export class ActivityTimelineComponent implements OnInit, OnDestroy {
     count: 'Count',
   };
 
-  private readonly META_SKIP = new Set(['httpMethod', 'httpPath', 'userAgent', 'clientIp']);
+  private readonly META_SKIP = new Set(['httpMethod', 'httpPath', 'userAgent', 'clientIp', 'action', 'changes']);
+
+  changeRows(metadata: unknown): Array<{ field: string; from: string; to: string }> | null {
+    return extractActivityChangeRows(metadata, this.META_LABELS);
+  }
 
   metadataEntries(metadata: unknown): { key: string; value: string }[] | null {
     if (!metadata || typeof metadata !== 'object') return null;

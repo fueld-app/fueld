@@ -22,6 +22,8 @@ import { eq } from 'drizzle-orm';
 import { db } from '../../db';
 import { users, vessels as vesselsTable } from '../../db/schema';
 import { authGuard } from '../auth/auth.guard';
+import { buildStructuredActivityDiff } from '../activity/activity-diff';
+import { logActivity } from '../activity/activity.service';
 import {
   listVessels,
   getVesselById,
@@ -335,12 +337,58 @@ export const vesselsController = new Elysia({ prefix: '/vessels' })
   // ─── Update Vessel ─────────────────────────────────────────────────
   .patch(
     '/local/:id',
-    async ({ params, body }) => {
+    async ({ params, body, auth }) => {
       try {
+        const before = await getVesselById(params.id);
+        if (!before) {
+          return { success: false, data: null, message: 'Vessel not found' };
+        }
+
         const updated = await updateVessel(params.id, body);
         if (!updated) {
           return { success: false, data: null, message: 'Vessel not found' };
         }
+
+        const after = await getVesselById(params.id);
+        if (after) {
+          const metadata = buildStructuredActivityDiff({
+            action: 'update_vessel_fields',
+            before,
+            after,
+            fields: [
+              { field: 'name', value: (vessel) => vessel.name },
+              { field: 'imo', value: (vessel) => vessel.imo ?? null },
+              { field: 'mmsi', value: (vessel) => vessel.mmsi ?? null },
+              { field: 'flag', value: (vessel) => vessel.flag ?? null },
+              { field: 'type', value: (vessel) => vessel.type ?? null },
+              { field: 'status', value: (vessel) => vessel.status ?? null },
+              { field: 'loa', value: (vessel) => vessel.loa ?? null },
+              { field: 'breadth', value: (vessel) => vessel.breadth ?? null },
+              { field: 'depth', value: (vessel) => vessel.depth ?? null },
+              { field: 'draught', value: (vessel) => vessel.draught ?? null },
+              { field: 'deadWeightTonnage', value: (vessel) => vessel.deadWeightTonnage ?? null },
+              { field: 'grossTonnage', value: (vessel) => vessel.grossTonnage ?? null },
+              { field: 'buildYear', value: (vessel) => vessel.buildYear ?? null },
+              { field: 'builder', value: (vessel) => vessel.builder ?? null },
+              { field: 'classificationSociety', value: (vessel) => vessel.classificationSociety ?? null },
+              {
+                field: 'ignoreForCreditEnforcement',
+                value: (vessel) => vessel.ignoreForCreditEnforcement ?? false,
+              },
+            ],
+          });
+
+          if (metadata) {
+            await logActivity({
+              userId: auth.sub,
+              action: 'UPDATE',
+              entityType: 'vessel',
+              entityId: params.id,
+              metadata,
+            });
+          }
+        }
+
         return { success: true, data: updated } satisfies ApiResponse<typeof updated>;
       } catch (err: any) {
         console.error('[Vessels] Update failed:', err);
