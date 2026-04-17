@@ -81,7 +81,7 @@ describe('InquiriesListPageComponent', () => {
     expect(latestOrdersRequest()).toContain('sortDir=desc');
   });
 
-  it('defaults active order requests to ETA ascending', async () => {
+  it('defaults active order requests to newest ETA first', async () => {
     const fixture = TestBed.createComponent(InquiriesListPageComponent);
     fixture.componentRef.setInput('mode', 'active-orders');
     fixture.detectChanges();
@@ -90,10 +90,10 @@ describe('InquiriesListPageComponent', () => {
     const component = fixture.componentInstance;
 
     expect(component.activeSortBy()).toBe('eta');
-    expect(component.activeSortDir()).toBe('asc');
+    expect(component.activeSortDir()).toBe('desc');
     expect(latestOrdersRequest()).toContain('statuses=CONFIRMED%2CDELIVERED%2CINVOICED');
     expect(latestOrdersRequest()).toContain('sortBy=eta');
-    expect(latestOrdersRequest()).toContain('sortDir=asc');
+    expect(latestOrdersRequest()).toContain('sortDir=desc');
   });
 
   it('shows gross, financing, and net metrics on order lists', async () => {
