@@ -88,6 +88,7 @@ function buildBankAccount(id: string, currency: string, isDefault = false): Bank
 
 describe('OrderDetailPageComponent', () => {
   async function createComponent(options?: {
+    onGet?: (url: string) => { success: boolean; data?: unknown; message?: string } | void;
     onPost?: (url: string, body: unknown) => void;
     onPut?: (url: string, body: unknown) => { success: boolean; data?: unknown; message?: string } | void;
   }): Promise<{
@@ -107,7 +108,7 @@ describe('OrderDetailPageComponent', () => {
         {
           provide: HttpClient,
           useValue: {
-            get: () => of({ success: true, data: [] }),
+            get: (url: string) => of(options?.onGet?.(url) ?? { success: true, data: [] }),
             post: (url: string, body: unknown) => {
               options?.onPost?.(url, body);
               if (String(url).includes('/inquiry/defaults')) {
@@ -471,5 +472,233 @@ describe('OrderDetailPageComponent', () => {
 
     expect(putCalls.some((call) => call.url.includes('/orders/order-1/items'))).toBe(true);
     expect(component.toast()).toEqual({ type: 'error', message: 'Failed to save order.' });
+  });
+
+  it('defaults new rows to the active supplier and skips incomplete drafts during autosave', async () => {
+    const putCalls: Array<{ url: string; body: any }> = [];
+    const supplierOne = {
+      id: 'supplier-record-1',
+      orderId: 'order-1',
+      companyId: 'company-a',
+      contactId: null,
+      paymentTermType: null,
+      creditDays: null,
+      note: null,
+      sortOrder: 0,
+      isPrimary: true,
+      deliveredAt: null,
+      createdAt: '2026-04-01T00:00:00.000Z',
+      updatedAt: '2026-04-01T00:00:00.000Z',
+      company: { id: 'company-a', name: 'Supplier A' },
+      contact: null,
+    } as any;
+    const supplierTwo = {
+      id: 'supplier-record-2',
+      orderId: 'order-1',
+      companyId: 'company-b',
+      contactId: null,
+      paymentTermType: null,
+      creditDays: null,
+      note: null,
+      sortOrder: 1,
+      isPrimary: false,
+      deliveredAt: null,
+      createdAt: '2026-04-01T00:00:00.000Z',
+      updatedAt: '2026-04-01T00:00:00.000Z',
+      company: { id: 'company-b', name: 'Supplier B' },
+      contact: null,
+    } as any;
+    const { component } = await createComponent({
+      onGet: (url) => {
+        if (String(url).includes('/orders/order-1/suppliers')) {
+          return { success: true, data: [supplierOne, supplierTwo] };
+        }
+        return { success: true, data: [] };
+      },
+      onPut: (url, body) => {
+        putCalls.push({ url, body });
+        return { success: true, data: {} };
+      },
+    });
+
+    component.order.set({
+      id: 'order-1',
+      clientId: 'client-1',
+      vesselId: 'vessel-1',
+      placeId: 'place-1',
+      salesRepId: 'user-1',
+      invoicingCompanyId: 'company-1',
+      bankAccountId: 'bank-1',
+      currency: 'USD',
+      status: 'CONFIRMED',
+      eta: '2026-04-15T12:00:00.000Z',
+      etd: null,
+      customerPaymentTermType: null,
+      customerCreditDays: null,
+      customerNote: null,
+      customerContactId: null,
+      supplierId: null,
+      supplierPaymentTermType: null,
+      supplierCreditDays: null,
+      supplierNote: null,
+      supplierContactId: null,
+      brokerId: null,
+      brokerContactId: null,
+      brokerGetsAll: false,
+      agentId: null,
+      agentContactId: null,
+      termsAndConditions: null,
+      deliveredAt: null,
+    } as any);
+    component.orderSuppliers.set([supplierOne, supplierTwo]);
+    component.activeOrderSupplierId.set('supplier-record-2');
+
+    const existingRow = {
+      id: 'item-1',
+      orderSupplierId: 'supplier-record-1',
+      productType: 'DMA',
+      description: 'Existing item',
+      quantity: 500,
+      quantityMin: null,
+      quantityMax: 500,
+      unit: 'MT',
+      costUnit: 'MT',
+      salesUnit: 'MT',
+      costConversionFactor: 1,
+      unitConversionFactor: 1,
+      costPrice: 2662,
+      costCurrency: 'USD',
+      salesPrice: 2662,
+      salesCurrency: 'USD',
+      profit: 0,
+      paymentTerms: '',
+      customerNote: null,
+      deliveredQuantity: 500,
+      costPricingModel: 'FIXED',
+      costReferenceId: null,
+      costPlattsEntryId: null,
+      costPremium: null,
+      costBarging: null,
+      costBargingUnit: null,
+      costCreditDays: null,
+      costPriceFinalized: false,
+      salesPricingModel: 'FIXED',
+      salesReferenceId: null,
+      salesPlattsEntryId: null,
+      salesPremium: null,
+      salesBarging: null,
+      salesBargingUnit: null,
+      salesCreditDays: null,
+      salesPriceFinalized: false,
+    } as any;
+    const draftRow = {
+      ...existingRow,
+      id: 'draft-item',
+      orderSupplierId: null,
+      productType: '',
+      description: '',
+      quantity: 0,
+      quantityMax: null,
+      costPrice: 0,
+      salesPrice: 0,
+      deliveredQuantity: null,
+    } as any;
+
+    component.itemRows.set([existingRow]);
+    component.onItemsChange([existingRow, draftRow]);
+
+    expect(component.itemRows()[1]?.orderSupplierId).toBe('supplier-record-2');
+
+    await (component as any).performAutoSave();
+
+    const itemsCall = putCalls.find((call) => call.url.includes('/orders/order-1/items'));
+    expect(itemsCall?.body.items).toHaveLength(1);
+    expect(itemsCall?.body.items[0]?.productType).toBe('DMA');
+  });
+
+  it('rebinds temporary supplier ids on item rows after supplier sync', async () => {
+    const { component } = await createComponent();
+
+    component.itemRows.set([
+      {
+        id: 'item-1',
+        orderSupplierId: 'temp:supplier-2',
+        productType: 'DMA',
+        description: 'Draft item',
+        quantity: 500,
+        quantityMin: null,
+        quantityMax: 500,
+        unit: 'MT',
+        costUnit: 'MT',
+        salesUnit: 'MT',
+        costConversionFactor: 1,
+        unitConversionFactor: 1,
+        costPrice: 2662,
+        costCurrency: 'USD',
+        salesPrice: 2662,
+        salesCurrency: 'USD',
+        profit: 0,
+        paymentTerms: '',
+        customerNote: null,
+        deliveredQuantity: 500,
+        costPricingModel: 'FIXED',
+        costReferenceId: null,
+        costPlattsEntryId: null,
+        costPremium: null,
+        costBarging: null,
+        costBargingUnit: null,
+        costCreditDays: null,
+        costPriceFinalized: false,
+        salesPricingModel: 'FIXED',
+        salesReferenceId: null,
+        salesPlattsEntryId: null,
+        salesPremium: null,
+        salesBarging: null,
+        salesBargingUnit: null,
+        salesCreditDays: null,
+        salesPriceFinalized: false,
+      },
+    ] as any);
+
+    (component as any).rebindTemporaryItemSupplierIds(
+      [
+        {
+          id: 'temp:supplier-2',
+          orderId: 'order-1',
+          companyId: 'company-b',
+          contactId: null,
+          paymentTermType: null,
+          creditDays: null,
+          note: null,
+          sortOrder: 1,
+          isPrimary: false,
+          deliveredAt: null,
+          createdAt: '2026-04-01T00:00:00.000Z',
+          updatedAt: '2026-04-01T00:00:00.000Z',
+          company: { id: 'company-b', name: 'Supplier B' },
+          contact: null,
+        },
+      ],
+      [
+        {
+          id: 'supplier-record-2',
+          orderId: 'order-1',
+          companyId: 'company-b',
+          contactId: null,
+          paymentTermType: null,
+          creditDays: null,
+          note: null,
+          sortOrder: 1,
+          isPrimary: false,
+          deliveredAt: null,
+          createdAt: '2026-04-01T00:00:00.000Z',
+          updatedAt: '2026-04-01T00:00:00.000Z',
+          company: { id: 'company-b', name: 'Supplier B' },
+          contact: null,
+        },
+      ],
+    );
+
+    expect(component.itemRows()[0]?.orderSupplierId).toBe('supplier-record-2');
   });
 });

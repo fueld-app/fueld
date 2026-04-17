@@ -1883,6 +1883,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   readonly autoSaving = signal(false);
   readonly lastSaved = signal<Date | null>(null);
+  private readonly draftItemIds = signal<Set<string>>(new Set());
   private autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
   private plattsSuggestionTimer: ReturnType<typeof setTimeout> | null = null;
   private financingSummaryResizeObserver: ResizeObserver | null = null;
@@ -2576,6 +2577,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
             salesPriceFinalized: item.salesPriceFinalized ?? false,
           })),
         );
+        this.draftItemIds.set(new Set());
 
         await this.loadCustomerCreditLines(d.clientId);
         await this.loadSupplierCreditLines(this.activeOrderSupplier()?.companyId ?? d.supplierId);
@@ -3364,6 +3366,110 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     });
   }
 
+  private normalizeIncomingItemRows(items: OrderItemRow[]): OrderItemRow[] {
+    const previousRows = this.itemRows();
+    const previousIds = new Set(previousRows.map((row) => row.id));
+    const nextIds = new Set(items.map((row) => row.id));
+    const activeSupplier = this.activeOrderSupplier();
+    const defaultSupplierId = this.hasMultipleOrderSuppliers() && activeSupplier?.companyId
+      ? activeSupplier.id
+      : null;
+
+    const normalizedItems = items.map((item) => {
+      if (!defaultSupplierId || item.orderSupplierId || previousIds.has(item.id)) {
+        return item;
+      }
+
+      return {
+        ...item,
+        orderSupplierId: defaultSupplierId,
+      };
+    });
+
+    this.draftItemIds.update((current) => {
+      const next = new Set([...current].filter((id) => nextIds.has(id)));
+      for (const item of normalizedItems) {
+        if (!previousIds.has(item.id)) {
+          next.add(item.id);
+        }
+      }
+      return next;
+    });
+
+    return normalizedItems;
+  }
+
+  private hasResolvedItemSupplierSelection(row: OrderItemRow): boolean {
+    if (!this.hasMultipleOrderSuppliers()) return true;
+    if (!row.orderSupplierId) return false;
+    if (!this.isTemporaryOrderSupplierId(row.orderSupplierId)) return true;
+
+    const supplier = this.orderSuppliers().find((candidate) => candidate.id === row.orderSupplierId);
+    return !!supplier?.companyId;
+  }
+
+  private isIncompleteDraftItem(row: OrderItemRow): boolean {
+    if (!this.draftItemIds().has(row.id)) return false;
+    if (!row.productType?.trim()) return true;
+    return !this.hasResolvedItemSupplierSelection(row);
+  }
+
+  private getAutoSaveRows(rows: OrderItemRow[]): OrderItemRow[] {
+    return rows.filter((row) => !this.isIncompleteDraftItem(row));
+  }
+
+  private hasIncompleteDraftItems(rows: OrderItemRow[]): boolean {
+    return rows.some((row) => this.isIncompleteDraftItem(row));
+  }
+
+  private clearSavedDraftItemIds(rows: OrderItemRow[]): void {
+    if (rows.length === 0) return;
+
+    const savedIds = new Set(rows.map((row) => row.id));
+    this.draftItemIds.update((current) => {
+      if (current.size === 0) return current;
+
+      const next = new Set(current);
+      let changed = false;
+      for (const id of savedIds) {
+        if (next.delete(id)) changed = true;
+      }
+
+      return changed ? next : current;
+    });
+  }
+
+  private rebindTemporaryItemSupplierIds(previousSuppliers: OrderSupplierDto[], nextSuppliers: OrderSupplierDto[]): void {
+    const companyIdByTempSupplierId = new Map(
+      previousSuppliers
+        .filter((supplier) => this.isTemporaryOrderSupplierId(supplier.id) && !!supplier.companyId)
+        .map((supplier) => [supplier.id, supplier.companyId] as const),
+    );
+
+    if (companyIdByTempSupplierId.size === 0) return;
+
+    const supplierIdByCompanyId = new Map(
+      nextSuppliers
+        .filter((supplier) => !!supplier.companyId)
+        .map((supplier) => [supplier.companyId, supplier.id] as const),
+    );
+
+    this.itemRows.update((rows) => rows.map((row) => {
+      if (!row.orderSupplierId) return row;
+
+      const companyId = companyIdByTempSupplierId.get(row.orderSupplierId);
+      if (!companyId) return row;
+
+      const persistedSupplierId = supplierIdByCompanyId.get(companyId);
+      if (!persistedSupplierId || persistedSupplierId === row.orderSupplierId) return row;
+
+      return {
+        ...row,
+        orderSupplierId: persistedSupplierId,
+      };
+    }));
+  }
+
   private async syncOrderSupplierRecords(orderId: string): Promise<void> {
     const suppliers = this.orderSuppliers();
     if (suppliers.length === 0) {
@@ -3409,7 +3515,9 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       }
     }
 
+    const previousSuppliers = suppliers;
     await this.reloadOrderSuppliers(orderId, preferredCompanyId);
+    this.rebindTemporaryItemSupplierIds(previousSuppliers, this.orderSuppliers());
   }
 
   private async reloadOrderSuppliers(orderId: string, preferredCompanyId?: string | null): Promise<void> {
@@ -3543,7 +3651,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   // ─── Item grid events ────────────────────────────────────────────
 
   onItemsChange(items: OrderItemRow[]): void {
-    this.itemRows.set(items);
+    this.itemRows.set(this.normalizeIncomingItemRows(items));
     this.queuePlattsSuggestionsLoad();
     this.triggerAutosave();
   }
@@ -4374,7 +4482,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       );
       this.requireApiSuccess(orderRes, 'Failed to save order.');
 
-      const itemPayload = this.buildItemPayload(this.itemRows()).map((item) => ({
+      await this.syncOrderSupplierRecords(id);
+
+      const autoSaveRows = this.getAutoSaveRows(this.itemRows());
+
+      const itemPayload = this.buildItemPayload(autoSaveRows).map((item) => ({
         ...item,
         costCurrency: item.costCurrency ?? o.currency,
         salesCurrency: item.salesCurrency ?? o.currency,
@@ -4384,7 +4496,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}/items`, { items: itemPayload }),
       );
       this.requireApiSuccess(itemsRes, 'Failed to save items.');
-      await this.syncOrderSupplierRecords(id);
+      this.clearSavedDraftItemIds(autoSaveRows);
       await this.loadCustomerCreditLines(o.clientId);
       await this.loadSupplierCreditLines(this.activeOrderSupplier()?.companyId ?? o.supplierId);
       this.lastSaved.set(new Date());
@@ -4667,6 +4779,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     const id = this.orderId();
     const o = this.order();
     if (!id || !o) return;
+    if (this.hasIncompleteDraftItems(this.itemRows())) {
+      this.showToast('error', 'Complete supplier and product on new line items before saving.');
+      return;
+    }
 
     this.saving.set(true);
     try {
@@ -4701,7 +4817,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       );
       this.requireApiSuccess(orderRes, 'Failed to save order.');
 
-      const itemPayload = this.buildItemPayload(this.itemRows()).map((item) => ({
+      await this.syncOrderSupplierRecords(id);
+
+      const itemRows = this.itemRows();
+
+      const itemPayload = this.buildItemPayload(itemRows).map((item) => ({
         ...item,
         costCurrency: item.costCurrency ?? o.currency,
         salesCurrency: item.salesCurrency ?? o.currency,
@@ -4711,7 +4831,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}/items`, { items: itemPayload }),
       );
       this.requireApiSuccess(itemsRes, 'Failed to save items.');
-      await this.syncOrderSupplierRecords(id);
+      this.clearSavedDraftItemIds(itemRows);
       await this.loadCustomerCreditLines(o.clientId);
       await this.loadSupplierCreditLines(this.activeOrderSupplier()?.companyId ?? o.supplierId);
       this.showToast('success', 'Order saved successfully.');
