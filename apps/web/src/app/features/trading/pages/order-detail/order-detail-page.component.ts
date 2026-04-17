@@ -2051,6 +2051,20 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       .map((supplier) => ({ value: supplier.id, label: supplier.name }));
   });
 
+  private mergeKnownSuppliers(additionalSuppliers: Array<CounterpartyDto | null | undefined>): void {
+    const merged = new Map<string, CounterpartyDto>();
+
+    for (const supplier of this.suppliers()) {
+      if (supplier?.id) merged.set(supplier.id, supplier);
+    }
+
+    for (const supplier of additionalSuppliers) {
+      if (supplier?.id) merged.set(supplier.id, supplier);
+    }
+
+    this.suppliers.set([...merged.values()]);
+  }
+
   readonly clientDropdownOptions = computed<DropdownOption[]>(() =>
     this.clients().map((c) => ({ value: c.id, label: c.name })),
   );
@@ -2518,7 +2532,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         if (d.client) this.client.set(d.client);
         if (d.client) this.clients.set([d.client]);
         this.supplier.set(d.supplier ?? null);
-        if (d.supplier) this.suppliers.set([d.supplier]);
+        this.mergeKnownSuppliers([
+          d.supplier ?? null,
+          ...(d.orderSuppliers?.map((supplier: OrderSupplierDto) => supplier.company) ?? []),
+        ]);
         this.orderSuppliers.set(d.orderSuppliers ?? []);
         this.activeOrderSupplierId.set(
           d.orderSuppliers?.find((supplier: OrderSupplierDto) => supplier.isPrimary)?.id
@@ -3527,6 +3544,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
     if (!res.success || !res.data) return;
 
+    this.mergeKnownSuppliers(res.data.map((supplier) => supplier.company));
     this.orderSuppliers.set(res.data);
     const currentActiveSupplierId = this.activeOrderSupplierId();
     const preferredSupplierId = (currentActiveSupplierId && res.data.some((supplier) => supplier.id === currentActiveSupplierId)
@@ -3889,9 +3907,12 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         );
         localResults = res.success ? res.data.companies : [];
       }
-      const currentId = this.order()?.supplierId ?? '';
+      const currentId = this.activeSupplierCompanyId();
       const currentSupplier = currentId
-        ? this.supplier() ?? this.suppliers().find((supplier) => supplier.id === currentId) ?? null
+        ? this.activeOrderSupplier()?.company
+          ?? this.supplier()
+          ?? this.suppliers().find((supplier) => supplier.id === currentId)
+          ?? null
         : null;
       const mergedLocal = currentId && !localResults.find((c) => c.id === currentId)
         ? [currentSupplier, ...localResults].filter(Boolean)

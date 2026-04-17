@@ -701,4 +701,122 @@ describe('OrderDetailPageComponent', () => {
 
     expect(component.itemRows()[0]?.orderSupplierId).toBe('supplier-record-2');
   });
+
+  it('includes all loaded order supplier companies in the supplier dropdown options', async () => {
+    const { component } = await createComponent();
+
+    component.orderSuppliers.set([
+      {
+        id: 'supplier-record-1',
+        orderId: 'order-1',
+        companyId: 'company-a',
+        contactId: null,
+        paymentTermType: null,
+        creditDays: null,
+        note: null,
+        sortOrder: 0,
+        isPrimary: true,
+        deliveredAt: null,
+        createdAt: '2026-04-01T00:00:00.000Z',
+        updatedAt: '2026-04-01T00:00:00.000Z',
+        company: { id: 'company-a', name: 'TotalEnergies Marine Fuels Private Limited' },
+        contact: null,
+      },
+      {
+        id: 'supplier-record-2',
+        orderId: 'order-1',
+        companyId: 'company-b',
+        contactId: null,
+        paymentTermType: null,
+        creditDays: null,
+        note: null,
+        sortOrder: 1,
+        isPrimary: false,
+        deliveredAt: null,
+        createdAt: '2026-04-01T00:00:00.000Z',
+        updatedAt: '2026-04-01T00:00:00.000Z',
+        company: { id: 'company-b', name: 'Black Bull Logistics SL' },
+        contact: null,
+      },
+      {
+        id: 'supplier-record-3',
+        orderId: 'order-1',
+        companyId: 'company-c',
+        contactId: null,
+        paymentTermType: null,
+        creditDays: null,
+        note: null,
+        sortOrder: 2,
+        isPrimary: false,
+        deliveredAt: null,
+        createdAt: '2026-04-01T00:00:00.000Z',
+        updatedAt: '2026-04-01T00:00:00.000Z',
+        company: { id: 'company-c', name: 'Riviera Marine' },
+        contact: null,
+      },
+    ] as any);
+    component.activeOrderSupplierId.set('supplier-record-2');
+    (component as any).mergeKnownSuppliers(component.orderSuppliers().map((supplier: any) => supplier.company));
+
+    expect(component.supplierDropdownOptions()).toEqual([
+      { value: 'company-b', label: 'Black Bull Logistics SL' },
+    ]);
+  });
+
+  it('preserves the active supplier company in search results for non-primary tabs', async () => {
+    const { component } = await createComponent({
+      onGet: (url) => {
+        if (String(url).includes('/companies/local?type=SUPPLIER')) {
+          return { success: true, data: { companies: [], total: 0 } };
+        }
+        if (String(url).includes('/companies/local?search=')) {
+          return { success: true, data: { companies: [], total: 0 } };
+        }
+        return { success: true, data: [] };
+      },
+    });
+
+    component.orderSuppliers.set([
+      {
+        id: 'supplier-record-1',
+        orderId: 'order-1',
+        companyId: 'company-a',
+        contactId: null,
+        paymentTermType: null,
+        creditDays: null,
+        note: null,
+        sortOrder: 0,
+        isPrimary: true,
+        deliveredAt: null,
+        createdAt: '2026-04-01T00:00:00.000Z',
+        updatedAt: '2026-04-01T00:00:00.000Z',
+        company: { id: 'company-a', name: 'TotalEnergies Marine Fuels Private Limited' },
+        contact: null,
+      },
+      {
+        id: 'supplier-record-2',
+        orderId: 'order-1',
+        companyId: 'company-b',
+        contactId: null,
+        paymentTermType: null,
+        creditDays: null,
+        note: null,
+        sortOrder: 1,
+        isPrimary: false,
+        deliveredAt: null,
+        createdAt: '2026-04-01T00:00:00.000Z',
+        updatedAt: '2026-04-01T00:00:00.000Z',
+        company: { id: 'company-b', name: 'Black Bull Logistics SL' },
+        contact: null,
+      },
+    ] as any);
+    component.activeOrderSupplierId.set('supplier-record-2');
+    component.supplier.set({ id: 'company-a', name: 'TotalEnergies Marine Fuels Private Limited' } as any);
+    (component as any).mergeKnownSuppliers([{ id: 'company-a', name: 'TotalEnergies Marine Fuels Private Limited' } as any]);
+
+    await component.searchSuppliers('black');
+
+    expect(component.suppliers().map((supplier) => supplier.id)).toEqual(['company-b']);
+    expect(component.suppliers()[0]?.name).toBe('Black Bull Logistics SL');
+  });
 });
