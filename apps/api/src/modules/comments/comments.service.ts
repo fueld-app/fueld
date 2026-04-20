@@ -79,11 +79,18 @@ export async function updateComment(
   content: string,
   followUpDate?: string | null,
 ): Promise<CommentRow | null> {
+  const existing = await getComment(commentId);
+  if (!existing) return null;
+
   const updates: Record<string, unknown> = { content, updatedAt: new Date() };
   if (followUpDate !== undefined) {
     updates.followUpDate = followUpDate;
-    // Reset completion when date changes
-    if (followUpDate) updates.followUpCompleted = false;
+    if (!followUpDate) {
+      updates.followUpCompleted = false;
+    } else if (followUpDate !== existing.followUpDate) {
+      // Re-open the follow-up only when the selected date actually changed.
+      updates.followUpCompleted = false;
+    }
   }
 
   const [row] = await db

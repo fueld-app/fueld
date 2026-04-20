@@ -152,7 +152,36 @@ interface Comment {
                       rows="2"
                       class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none resize-none"
                     ></textarea>
-                    <div class="mt-1.5 flex items-center gap-2">
+                    <div class="mt-1.5 flex items-center gap-3 flex-wrap">
+                      @if (enableFollowUp()) {
+                        <label class="inline-flex h-8 items-center gap-1.5 text-xs text-gray-500 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            [checked]="editShowFollowUpInput()"
+                            (change)="toggleEditFollowUpInput()"
+                            class="h-3.5 w-3.5 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                          />
+                          Follow-up
+                        </label>
+                        @if (editShowFollowUpInput()) {
+                          <div class="inline-flex h-8 items-center gap-1 rounded-md border border-gray-200 bg-white px-2 text-xs text-gray-600">
+                            <span>in</span>
+                            <input
+                              type="number"
+                              [ngModel]="editFollowUpDays"
+                              (ngModelChange)="onEditFollowUpDaysChange($event)"
+                              class="h-full w-16 border-0 bg-transparent p-0 text-right text-xs font-medium leading-none text-gray-700 outline-none focus:ring-0"
+                            />
+                            <span>days</span>
+                          </div>
+                          <input
+                            type="date"
+                            [ngModel]="editFollowUpDate"
+                            (ngModelChange)="onEditFollowUpDateChange($event)"
+                            class="h-8 rounded-md border border-gray-200 px-2 text-xs leading-none text-gray-700 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
+                          />
+                        }
+                      }
                       <button
                         (click)="saveEdit(c.id)"
                         [disabled]="!editContent.trim() || saving()"
@@ -255,11 +284,14 @@ export class CommentsCardComponent implements OnDestroy {
   readonly saving = signal(false);
   readonly editingId = signal<string | null>(null);
   readonly showFollowUpInput = signal(false);
+  readonly editShowFollowUpInput = signal(false);
 
   newContent = '';
   editContent = '';
   newFollowUpDays = 0;
   newFollowUpDate = '';
+  editFollowUpDays = 0;
+  editFollowUpDate = '';
 
   readonly currentUserId = computed(() => this.auth.user()?.id ?? '');
   readonly currentUserInitials = computed(() => {
@@ -309,6 +341,27 @@ export class CommentsCardComponent implements OnDestroy {
     this.newFollowUpDays = followUpDaysFromDate(value);
   }
 
+  toggleEditFollowUpInput(): void {
+    const show = !this.editShowFollowUpInput();
+    this.editShowFollowUpInput.set(show);
+    if (show) {
+      this.initializeEditFollowUpInputs(this.editFollowUpDate || null);
+    } else {
+      this.clearEditFollowUpInputs();
+    }
+  }
+
+  onEditFollowUpDaysChange(value: unknown): void {
+    const days = normalizeFollowUpDays(value);
+    this.editFollowUpDays = days;
+    this.editFollowUpDate = followUpDateFromDays(days);
+  }
+
+  onEditFollowUpDateChange(value: string): void {
+    this.editFollowUpDate = value;
+    this.editFollowUpDays = followUpDaysFromDate(value);
+  }
+
   followUpBadgeClass(dateStr: string): string {
     const today = todayDateString();
     if (dateStr < today) return 'bg-red-50 border-red-200 text-red-700';
@@ -324,6 +377,17 @@ export class CommentsCardComponent implements OnDestroy {
   private clearFollowUpInputs(): void {
     this.newFollowUpDays = 0;
     this.newFollowUpDate = '';
+  }
+
+  private initializeEditFollowUpInputs(dateStr: string | null): void {
+    const effectiveDate = dateStr || todayDateString();
+    this.editFollowUpDate = effectiveDate;
+    this.editFollowUpDays = followUpDaysFromDate(effectiveDate);
+  }
+
+  private clearEditFollowUpInputs(): void {
+    this.editFollowUpDays = 0;
+    this.editFollowUpDate = '';
   }
 
   async markFollowUpDone(commentId: string): Promise<void> {
@@ -412,23 +476,35 @@ export class CommentsCardComponent implements OnDestroy {
   startEdit(c: Comment): void {
     this.editingId.set(c.id);
     this.editContent = c.content;
+    this.editShowFollowUpInput.set(!!c.followUpDate);
+    if (c.followUpDate) {
+      this.initializeEditFollowUpInputs(c.followUpDate);
+    } else {
+      this.clearEditFollowUpInputs();
+    }
   }
 
   cancelEdit(): void {
     this.editingId.set(null);
     this.editContent = '';
+    this.editShowFollowUpInput.set(false);
+    this.clearEditFollowUpInputs();
   }
 
   async saveEdit(commentId: string): Promise<void> {
     const content = this.editContent.trim();
     if (!content) return;
 
+    const followUpDate = this.editShowFollowUpInput() && this.editFollowUpDate
+      ? this.editFollowUpDate
+      : null;
+
     this.saving.set(true);
     try {
       const res = await firstValueFrom(
         this.http.put<ApiResponse<Comment>>(
           `${API}/comments/${encodeURIComponent(commentId)}`,
-          { content },
+          { content, followUpDate },
         ),
       );
       if (res.success && res.data) {
@@ -437,6 +513,8 @@ export class CommentsCardComponent implements OnDestroy {
         );
         this.editingId.set(null);
         this.editContent = '';
+        this.editShowFollowUpInput.set(false);
+        this.clearEditFollowUpInputs();
       }
     } catch {
       // silent
