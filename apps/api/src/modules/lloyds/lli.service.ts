@@ -8,6 +8,7 @@ import { db } from '../../db';
 import { vessels, places, counterparties, orders, portSuppliers, users, companyContacts } from '../../db/schema';
 import { lliGet, seasearcherPlaceSearch, seasearcherPlaceDetail, seasearcherNearbyVessels, seasearcherNearbyVesselsSpatial, seasearcherPortFacilities, seasearcherExpectedArrivals } from './lli.client';
 import { resolveIanaTimezone } from '../../utils/timezone';
+import { applyMatchingCompanyPlaceSupplyRulesForPlace } from '../companies/company.service';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Response types for LLI API
@@ -472,6 +473,8 @@ export async function importPlaceFromLli(lliPlaceId: string): Promise<{ id: stri
     })
     .returning({ id: places.id, name: places.name });
 
+  await applyMatchingCompanyPlaceSupplyRulesForPlace(inserted.id);
+
   return inserted;
 }
 
@@ -816,6 +819,8 @@ export async function createPlace(data: {
       parentPlaceName: data.parentPlaceName ?? null,
     })
     .returning();
+
+  await applyMatchingCompanyPlaceSupplyRulesForPlace(created.id);
 
   return created;
 }
@@ -1244,6 +1249,16 @@ export async function getPortSuppliers(placeId: string) {
 }
 
 export async function addPortSupplier(placeId: string, data: { companyId: string; contactId?: string | null; products?: string[]; note?: string }, userId: string, userName: string) {
+  const [existing] = await db
+    .select({ id: portSuppliers.id })
+    .from(portSuppliers)
+    .where(and(eq(portSuppliers.placeId, placeId), eq(portSuppliers.companyId, data.companyId)))
+    .limit(1);
+
+  if (existing) {
+    throw Object.assign(new Error('Supplier already exists for this place.'), { code: 'SUPPLIER_EXISTS' });
+  }
+
   const [created] = await db
     .insert(portSuppliers)
     .values({

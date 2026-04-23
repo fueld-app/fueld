@@ -105,6 +105,7 @@ function getTruncateTables() {
     'teams',
     'company_emails',
     'company_contacts',
+    'company_place_supply_rules',
     'credit_application_reviews',
     'credit_applications',
     'credit_line_companies',

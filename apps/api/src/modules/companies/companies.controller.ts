@@ -66,6 +66,11 @@ import {
   getGroupVesselsForCompany,
   getTopCreditGroups,
   updateCompanySegments,
+  listCompanyPlaceSupplyRules,
+  createCompanyPlaceSupplyRule,
+  updateCompanyPlaceSupplyRule,
+  deleteCompanyPlaceSupplyRule,
+  reapplyCompanyPlaceSupplyRule,
 } from './company.service';
 import { getSupplyPortsForCompany } from '../lloyds/lli.service';
 import { getUserCompanyAccess } from '../admin/settings.service';
@@ -854,6 +859,195 @@ export const companiesController = new Elysia({ prefix: '/companies' })
       detail: {
         tags: ['Companies'],
         summary: 'Get ports/places where this company is a supplier',
+      },
+    },
+  )
+
+  .get(
+    '/local/:id/place-supply-rules',
+    async ({ params }) => {
+      try {
+        const data = await listCompanyPlaceSupplyRules(params.id);
+        return { success: true, data } satisfies ApiResponse<typeof data>;
+      } catch (err) {
+        console.error('[Companies] Place supply rules failed:', err);
+        return { success: false, data: [], message: 'Failed to load place supply rules' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: {
+        tags: ['Companies'],
+        summary: 'List company place supply rules',
+      },
+    },
+  )
+  .post(
+    '/local/:id/place-supply-rules',
+    async ({ params, body, auth }) => {
+      try {
+        const [userRow] = await db
+          .select({ name: users.name })
+          .from(users)
+          .where(eq(users.id, auth.sub))
+          .limit(1);
+
+        const data = await createCompanyPlaceSupplyRule(params.id, body, auth.sub, userRow?.name ?? auth.email);
+
+        logActivity({
+          userId: auth.sub,
+          action: 'CREATE',
+          entityType: 'company',
+          entityId: params.id,
+          httpMethod: 'POST',
+          httpPath: `/companies/local/${params.id}/place-supply-rules`,
+          metadata: {
+            countryIso: data.rule.countryIso,
+            placeTypes: data.rule.placeTypes,
+            created: data.created,
+            skipped: data.skipped,
+          },
+        }).catch(() => {});
+
+        return { success: true, data } satisfies ApiResponse<typeof data>;
+      } catch (err: any) {
+        console.error('[Companies] Create place supply rule failed:', err);
+        return { success: false, data: null, message: err?.message ?? 'Failed to create place supply rule' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({
+        countryIso: t.String({ minLength: 3, maxLength: 3 }),
+        placeTypes: t.Array(t.String({ minLength: 3, maxLength: 3 }), { minItems: 1 }),
+        contactId: t.Optional(t.Union([t.String(), t.Null()])),
+        products: t.Optional(t.Array(t.String())),
+        note: t.Optional(t.Union([t.String(), t.Null()])),
+        isActive: t.Optional(t.Boolean()),
+      }),
+      detail: {
+        tags: ['Companies'],
+        summary: 'Create a company place supply rule and apply it to existing places',
+      },
+    },
+  )
+  .put(
+    '/local/:id/place-supply-rules/:ruleId',
+    async ({ params, body, auth }) => {
+      try {
+        const data = await updateCompanyPlaceSupplyRule(params.id, params.ruleId, body);
+        if (!data) {
+          return { success: false, data: null, message: 'Place supply rule not found' };
+        }
+
+        logActivity({
+          userId: auth.sub,
+          action: 'UPDATE',
+          entityType: 'company',
+          entityId: params.id,
+          httpMethod: 'PUT',
+          httpPath: `/companies/local/${params.id}/place-supply-rules/${params.ruleId}`,
+          metadata: {
+            ruleId: params.ruleId,
+            countryIso: data.countryIso,
+            placeTypes: data.placeTypes,
+          },
+        }).catch(() => {});
+
+        return { success: true, data } satisfies ApiResponse<typeof data>;
+      } catch (err: any) {
+        console.error('[Companies] Update place supply rule failed:', err);
+        return { success: false, data: null, message: err?.message ?? 'Failed to update place supply rule' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String(), ruleId: t.String() }),
+      body: t.Object({
+        countryIso: t.Optional(t.String({ minLength: 3, maxLength: 3 })),
+        placeTypes: t.Optional(t.Array(t.String({ minLength: 3, maxLength: 3 }), { minItems: 1 })),
+        contactId: t.Optional(t.Union([t.String(), t.Null()])),
+        products: t.Optional(t.Array(t.String())),
+        note: t.Optional(t.Union([t.String(), t.Null()])),
+        isActive: t.Optional(t.Boolean()),
+      }),
+      detail: {
+        tags: ['Companies'],
+        summary: 'Update a company place supply rule',
+      },
+    },
+  )
+  .delete(
+    '/local/:id/place-supply-rules/:ruleId',
+    async ({ params, auth }) => {
+      try {
+        const data = await deleteCompanyPlaceSupplyRule(params.id, params.ruleId);
+        if (!data) {
+          return { success: false, data: null, message: 'Place supply rule not found' };
+        }
+
+        logActivity({
+          userId: auth.sub,
+          action: 'DELETE',
+          entityType: 'company',
+          entityId: params.id,
+          httpMethod: 'DELETE',
+          httpPath: `/companies/local/${params.id}/place-supply-rules/${params.ruleId}`,
+          metadata: {
+            ruleId: params.ruleId,
+            countryIso: data.countryIso,
+            placeTypes: data.placeTypes,
+          },
+        }).catch(() => {});
+
+        return { success: true, data } satisfies ApiResponse<typeof data>;
+      } catch (err: any) {
+        console.error('[Companies] Delete place supply rule failed:', err);
+        return { success: false, data: null, message: err?.message ?? 'Failed to delete place supply rule' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String(), ruleId: t.String() }),
+      detail: {
+        tags: ['Companies'],
+        summary: 'Delete a company place supply rule',
+      },
+    },
+  )
+  .post(
+    '/local/:id/place-supply-rules/:ruleId/reapply',
+    async ({ params, auth }) => {
+      try {
+        const data = await reapplyCompanyPlaceSupplyRule(params.id, params.ruleId);
+        if (!data) {
+          return { success: false, data: null, message: 'Place supply rule not found' };
+        }
+
+        logActivity({
+          userId: auth.sub,
+          action: 'UPDATE',
+          entityType: 'company',
+          entityId: params.id,
+          httpMethod: 'POST',
+          httpPath: `/companies/local/${params.id}/place-supply-rules/${params.ruleId}/reapply`,
+          metadata: {
+            ruleId: params.ruleId,
+            created: data.created,
+            updated: data.updated,
+            skipped: data.skipped,
+          },
+        }).catch(() => {});
+
+        return { success: true, data } satisfies ApiResponse<typeof data>;
+      } catch (err: any) {
+        console.error('[Companies] Reapply place supply rule failed:', err);
+        return { success: false, data: null, message: err?.message ?? 'Failed to reapply place supply rule' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String(), ruleId: t.String() }),
+      detail: {
+        tags: ['Companies'],
+        summary: 'Reapply a company place supply rule to existing matching places',
       },
     },
   )

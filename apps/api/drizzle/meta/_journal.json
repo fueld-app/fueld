@@ -484,6 +484,13 @@
       "when": 1775200000000,
       "tag": "0068_vessel_credit_enforcement_exceptions",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1775300000000,
+      "tag": "0069_company_place_supply_rules",
+      "breakpoints": true
     }
   ]
 }

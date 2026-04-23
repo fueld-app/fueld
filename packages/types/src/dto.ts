@@ -370,6 +370,50 @@ export interface SupplyPortDto {
   updatedAt: string;
 }
 
+export type CompanyPlaceSupplyRulePlaceType = 'POR' | 'PSP' | 'ANC' | 'TER' | 'FIL';
+
+export interface CompanyPlaceSupplyRuleDto {
+  id: string;
+  companyId: string;
+  countryIso: string;
+  placeTypes: CompanyPlaceSupplyRulePlaceType[];
+  contactId: string | null;
+  contactName: string | null;
+  products: string[];
+  note: string | null;
+  isActive: boolean;
+  addedById: string | null;
+  addedByName: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateCompanyPlaceSupplyRuleDto {
+  countryIso: string;
+  placeTypes: CompanyPlaceSupplyRulePlaceType[];
+  contactId?: string | null;
+  products?: string[];
+  note?: string | null;
+  isActive?: boolean;
+}
+
+export interface UpdateCompanyPlaceSupplyRuleDto {
+  countryIso?: string;
+  placeTypes?: CompanyPlaceSupplyRulePlaceType[];
+  contactId?: string | null;
+  products?: string[];
+  note?: string | null;
+  isActive?: boolean;
+}
+
+export interface CompanyPlaceSupplyRuleApplySummaryDto {
+  rule: CompanyPlaceSupplyRuleDto;
+  created: number;
+  updated: number;
+  skipped: number;
+  matchedPlaceCount: number;
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  VESSEL COMPANIES (associations between vessels and companies)
 // ═══════════════════════════════════════════════════════════════════════

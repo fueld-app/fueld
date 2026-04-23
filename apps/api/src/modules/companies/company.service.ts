@@ -2,9 +2,9 @@
 //  Company Service — CRUD + Seasearcher sync for counterparties
 // ═══════════════════════════════════════════════════════════════════════
 
-import { eq, ilike, or, and, sql, asc, desc, inArray, isNull } from 'drizzle-orm';
+import { eq, ilike, or, and, sql, asc, desc, inArray, isNull, ne } from 'drizzle-orm';
 import { db } from '../../db';
-import { counterparties, companyAttachments, companyContacts, companyEmails, companyOffices, orders, orderSuppliers, vessels, places, users, vesselCompanies, customerPayments, creditApplications } from '../../db/schema';
+import { counterparties, companyAttachments, companyContacts, companyEmails, companyOffices, orders, orderSuppliers, vessels, places, users, vesselCompanies, customerPayments, creditApplications, portSuppliers, companyPlaceSupplyRules } from '../../db/schema';
 import type { CompanyEmailType } from '@fueld/types';
 import { matchLocalVessels } from '../vessels/vessel.service';
 import {
@@ -29,6 +29,256 @@ function buildSeasearcherContactFingerprint(contact: {
   return [contact.name, contact.role, contact.email]
     .map((value) => (value ?? '').trim().toLowerCase())
     .join('|');
+}
+
+const COMPANY_PLACE_SUPPLY_RULE_TYPES = ['POR', 'PSP', 'ANC', 'TER', 'FIL'] as const;
+const COMPANY_PLACE_SUPPLY_RULE_SOURCE = 'company_place_supply_rule';
+
+type CompanyPlaceSupplyRulePlaceType = (typeof COMPANY_PLACE_SUPPLY_RULE_TYPES)[number];
+
+type CompanyPlaceSupplyRuleRow = {
+  id: string;
+  companyId: string;
+  countryIso: string;
+  placeTypes: string[];
+  contactId: string | null;
+  contactName: string | null;
+  products: string[];
+  note: string | null;
+  isActive: boolean;
+  addedById: string | null;
+  addedByName: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+function uniqueNonEmptyStrings(values: Array<string | null | undefined>): string[] {
+  return Array.from(new Set(
+    values
+      .map((value) => value?.trim())
+      .filter((value): value is string => Boolean(value)),
+  ));
+}
+
+function normalizeCountryIso(value: string): string {
+  const normalized = value.trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(normalized)) {
+    throw Object.assign(new Error('Country code must be a 3-letter ISO code.'), { code: 'INVALID_COUNTRY_ISO' });
+  }
+  return normalized;
+}
+
+function normalizeRulePlaceTypes(values: string[]): CompanyPlaceSupplyRulePlaceType[] {
+  const normalized = uniqueNonEmptyStrings(values.map((value) => value.toUpperCase()))
+    .filter((value): value is CompanyPlaceSupplyRulePlaceType => COMPANY_PLACE_SUPPLY_RULE_TYPES.includes(value as CompanyPlaceSupplyRulePlaceType))
+    .sort((left, right) => COMPANY_PLACE_SUPPLY_RULE_TYPES.indexOf(left) - COMPANY_PLACE_SUPPLY_RULE_TYPES.indexOf(right));
+
+  if (!normalized.length) {
+    throw Object.assign(new Error('Select at least one place type.'), { code: 'INVALID_PLACE_TYPES' });
+  }
+
+  return normalized;
+}
+
+function normalizeRuleProducts(values?: string[] | null): string[] {
+  return uniqueNonEmptyStrings(values ?? []);
+}
+
+function normalizeRuleNote(value?: string | null): string | null {
+  const normalized = value?.trim();
+  return normalized ? normalized : null;
+}
+
+function isIso3CountryCode(value: string | null | undefined): value is string {
+  return /^[A-Z]{3}$/.test((value ?? '').trim().toUpperCase());
+}
+
+function getPlaceCountryIsoCandidates(place: { countryIso: string | null; country: string | null }): string[] {
+  const fallback = isIso3CountryCode(place.country) ? place.country.trim().toUpperCase() : null;
+  return uniqueNonEmptyStrings([place.countryIso?.trim().toUpperCase() ?? null, fallback]);
+}
+
+function hasRulePlaceTypeOverlap(left: string[], right: string[]): boolean {
+  const rightSet = new Set(right);
+  return left.some((value) => rightSet.has(value));
+}
+
+function serializeCompanyPlaceSupplyRule(row: CompanyPlaceSupplyRuleRow) {
+  return {
+    id: row.id,
+    companyId: row.companyId,
+    countryIso: row.countryIso,
+    placeTypes: row.placeTypes,
+    contactId: row.contactId,
+    contactName: row.contactName,
+    products: row.products,
+    note: row.note,
+    isActive: row.isActive,
+    addedById: row.addedById,
+    addedByName: row.addedByName,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+function buildCompanyPlaceSupplyRuleSelection() {
+  return {
+    id: companyPlaceSupplyRules.id,
+    companyId: companyPlaceSupplyRules.companyId,
+    countryIso: companyPlaceSupplyRules.countryIso,
+    placeTypes: companyPlaceSupplyRules.placeTypes,
+    contactId: companyPlaceSupplyRules.contactId,
+    contactName: companyContacts.name,
+    products: companyPlaceSupplyRules.products,
+    note: companyPlaceSupplyRules.note,
+    isActive: companyPlaceSupplyRules.isActive,
+    addedById: companyPlaceSupplyRules.addedById,
+    addedByName: companyPlaceSupplyRules.addedByName,
+    createdAt: companyPlaceSupplyRules.createdAt,
+    updatedAt: companyPlaceSupplyRules.updatedAt,
+  };
+}
+
+async function getCompanyPlaceSupplyRuleRowById(ruleId: string): Promise<CompanyPlaceSupplyRuleRow | null> {
+  const [row] = await db
+    .select(buildCompanyPlaceSupplyRuleSelection())
+    .from(companyPlaceSupplyRules)
+    .leftJoin(companyContacts, eq(companyPlaceSupplyRules.contactId, companyContacts.id))
+    .where(eq(companyPlaceSupplyRules.id, ruleId))
+    .limit(1);
+
+  return row ?? null;
+}
+
+async function assertRuleContactBelongsToCompany(companyId: string, contactId?: string | null): Promise<void> {
+  if (!contactId) return;
+
+  const [contact] = await db
+    .select({ id: companyContacts.id })
+    .from(companyContacts)
+    .where(and(eq(companyContacts.id, contactId), eq(companyContacts.counterpartyId, companyId)))
+    .limit(1);
+
+  if (!contact) {
+    throw Object.assign(new Error('Selected contact does not belong to this company.'), { code: 'INVALID_CONTACT' });
+  }
+}
+
+async function assertNoOverlappingCompanyPlaceSupplyRules(
+  companyId: string,
+  countryIso: string,
+  placeTypes: string[],
+  excludeRuleId?: string,
+): Promise<void> {
+  const conditions = [
+    eq(companyPlaceSupplyRules.companyId, companyId),
+    eq(companyPlaceSupplyRules.countryIso, countryIso),
+    eq(companyPlaceSupplyRules.isActive, true),
+  ];
+
+  if (excludeRuleId) {
+    conditions.push(ne(companyPlaceSupplyRules.id, excludeRuleId));
+  }
+
+  const existingRules = await db
+    .select({
+      id: companyPlaceSupplyRules.id,
+      placeTypes: companyPlaceSupplyRules.placeTypes,
+    })
+    .from(companyPlaceSupplyRules)
+    .where(and(...conditions));
+
+  const overlappingRule = existingRules.find((rule) => hasRulePlaceTypeOverlap(rule.placeTypes, placeTypes));
+  if (overlappingRule) {
+    throw Object.assign(new Error('An active rule for this country already covers one or more of the selected place types.'), {
+      code: 'OVERLAPPING_RULE',
+      ruleId: overlappingRule.id,
+    });
+  }
+}
+
+async function getMatchingPlacesForCompanyPlaceSupplyRule(rule: CompanyPlaceSupplyRuleRow) {
+  if (!rule.placeTypes.length) return [];
+
+  return db
+    .select({
+      id: places.id,
+      placeType: places.placeType,
+      countryIso: places.countryIso,
+      country: places.country,
+    })
+    .from(places)
+    .where(and(
+      or(
+        eq(places.countryIso, rule.countryIso),
+        sql`upper(${places.country}) = ${rule.countryIso}`,
+      )!,
+      inArray(places.placeType, rule.placeTypes as CompanyPlaceSupplyRulePlaceType[]),
+    ));
+}
+
+async function ensurePortSupplierFromCoverageRule(placeId: string, rule: CompanyPlaceSupplyRuleRow): Promise<'created' | 'updated' | 'skipped'> {
+  const [existing] = await db
+    .select({
+      id: portSuppliers.id,
+      coverageRuleId: portSuppliers.coverageRuleId,
+      coverageSource: portSuppliers.coverageSource,
+    })
+    .from(portSuppliers)
+    .where(and(eq(portSuppliers.placeId, placeId), eq(portSuppliers.companyId, rule.companyId)))
+    .limit(1);
+
+  if (!existing) {
+    await db.insert(portSuppliers).values({
+      placeId,
+      companyId: rule.companyId,
+      contactId: rule.contactId ?? null,
+      products: rule.products,
+      note: rule.note,
+      coverageRuleId: rule.id,
+      coverageSource: COMPANY_PLACE_SUPPLY_RULE_SOURCE,
+      addedById: rule.addedById ?? null,
+      addedByName: rule.addedByName ?? null,
+    });
+    return 'created';
+  }
+
+  if (existing.coverageRuleId === rule.id) {
+    await db
+      .update(portSuppliers)
+      .set({
+        contactId: rule.contactId ?? null,
+        products: rule.products,
+        note: rule.note,
+        coverageSource: COMPANY_PLACE_SUPPLY_RULE_SOURCE,
+        updatedAt: new Date(),
+      })
+      .where(eq(portSuppliers.id, existing.id));
+    return 'updated';
+  }
+
+  return 'skipped';
+}
+
+async function applyCompanyPlaceSupplyRuleRow(rule: CompanyPlaceSupplyRuleRow) {
+  const matches = await getMatchingPlacesForCompanyPlaceSupplyRule(rule);
+  let created = 0;
+  let updated = 0;
+  let skipped = 0;
+
+  for (const place of matches) {
+    const result = await ensurePortSupplierFromCoverageRule(place.id, rule);
+    if (result === 'created') created += 1;
+    else if (result === 'updated') updated += 1;
+    else skipped += 1;
+  }
+
+  return {
+    created,
+    updated,
+    skipped,
+    matchedPlaceCount: matches.length,
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1877,4 +2127,196 @@ export async function getTopCreditGroups(limit = 10) {
     totalCreditUsed: string;
     childCount: number;
   }[];
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  COMPANY PLACE SUPPLY RULES
+// ═══════════════════════════════════════════════════════════════════════
+
+export async function listCompanyPlaceSupplyRules(companyId: string) {
+  const rows = await db
+    .select(buildCompanyPlaceSupplyRuleSelection())
+    .from(companyPlaceSupplyRules)
+    .leftJoin(companyContacts, eq(companyPlaceSupplyRules.contactId, companyContacts.id))
+    .where(eq(companyPlaceSupplyRules.companyId, companyId))
+    .orderBy(asc(companyPlaceSupplyRules.countryIso), asc(companyPlaceSupplyRules.createdAt));
+
+  return rows.map((row) => serializeCompanyPlaceSupplyRule(row));
+}
+
+export async function createCompanyPlaceSupplyRule(
+  companyId: string,
+  data: {
+    countryIso: string;
+    placeTypes: string[];
+    contactId?: string | null;
+    products?: string[];
+    note?: string | null;
+    isActive?: boolean;
+  },
+  userId: string,
+  userName: string,
+) {
+  const countryIso = normalizeCountryIso(data.countryIso);
+  const placeTypes = normalizeRulePlaceTypes(data.placeTypes);
+  const contactId = data.contactId ?? null;
+  const products = normalizeRuleProducts(data.products);
+  const note = normalizeRuleNote(data.note);
+  const isActive = data.isActive ?? true;
+
+  await assertRuleContactBelongsToCompany(companyId, contactId);
+  if (isActive) {
+    await assertNoOverlappingCompanyPlaceSupplyRules(companyId, countryIso, placeTypes);
+  }
+
+  const [created] = await db
+    .insert(companyPlaceSupplyRules)
+    .values({
+      companyId,
+      countryIso,
+      placeTypes,
+      contactId,
+      products,
+      note,
+      isActive,
+      addedById: userId,
+      addedByName: userName,
+    })
+    .returning({ id: companyPlaceSupplyRules.id });
+
+  const rule = created ? await getCompanyPlaceSupplyRuleRowById(created.id) : null;
+  if (!rule) {
+    throw new Error('Failed to create place supply rule.');
+  }
+
+  const applySummary = rule.isActive
+    ? await applyCompanyPlaceSupplyRuleRow(rule)
+    : { created: 0, updated: 0, skipped: 0, matchedPlaceCount: 0 };
+
+  return {
+    rule: serializeCompanyPlaceSupplyRule(rule),
+    ...applySummary,
+  };
+}
+
+export async function updateCompanyPlaceSupplyRule(
+  companyId: string,
+  ruleId: string,
+  data: {
+    countryIso?: string;
+    placeTypes?: string[];
+    contactId?: string | null;
+    products?: string[];
+    note?: string | null;
+    isActive?: boolean;
+  },
+) {
+  const existing = await getCompanyPlaceSupplyRuleRowById(ruleId);
+  if (!existing || existing.companyId !== companyId) return null;
+
+  const nextCountryIso = data.countryIso !== undefined ? normalizeCountryIso(data.countryIso) : existing.countryIso;
+  const nextPlaceTypes = data.placeTypes !== undefined ? normalizeRulePlaceTypes(data.placeTypes) : existing.placeTypes as CompanyPlaceSupplyRulePlaceType[];
+  const nextContactId = data.contactId !== undefined ? data.contactId ?? null : existing.contactId;
+  const nextProducts = data.products !== undefined ? normalizeRuleProducts(data.products) : existing.products;
+  const nextNote = data.note !== undefined ? normalizeRuleNote(data.note) : existing.note;
+  const nextIsActive = data.isActive ?? existing.isActive;
+
+  await assertRuleContactBelongsToCompany(existing.companyId, nextContactId);
+  if (nextIsActive) {
+    await assertNoOverlappingCompanyPlaceSupplyRules(existing.companyId, nextCountryIso, nextPlaceTypes, ruleId);
+  }
+
+  await db
+    .update(companyPlaceSupplyRules)
+    .set({
+      countryIso: nextCountryIso,
+      placeTypes: nextPlaceTypes,
+      contactId: nextContactId,
+      products: nextProducts,
+      note: nextNote,
+      isActive: nextIsActive,
+      updatedAt: new Date(),
+    })
+    .where(eq(companyPlaceSupplyRules.id, ruleId));
+
+  const updated = await getCompanyPlaceSupplyRuleRowById(ruleId);
+  return updated ? serializeCompanyPlaceSupplyRule(updated) : null;
+}
+
+export async function deleteCompanyPlaceSupplyRule(companyId: string, ruleId: string) {
+  const [deleted] = await db
+    .delete(companyPlaceSupplyRules)
+    .where(and(eq(companyPlaceSupplyRules.id, ruleId), eq(companyPlaceSupplyRules.companyId, companyId)))
+    .returning({
+      id: companyPlaceSupplyRules.id,
+      companyId: companyPlaceSupplyRules.companyId,
+      countryIso: companyPlaceSupplyRules.countryIso,
+      placeTypes: companyPlaceSupplyRules.placeTypes,
+    });
+
+  return deleted ?? null;
+}
+
+export async function reapplyCompanyPlaceSupplyRule(companyId: string, ruleId: string) {
+  const rule = await getCompanyPlaceSupplyRuleRowById(ruleId);
+  if (!rule || rule.companyId !== companyId) return null;
+
+  const summary = rule.isActive
+    ? await applyCompanyPlaceSupplyRuleRow(rule)
+    : { created: 0, updated: 0, skipped: 0, matchedPlaceCount: 0 };
+
+  return {
+    rule: serializeCompanyPlaceSupplyRule(rule),
+    ...summary,
+  };
+}
+
+export async function applyMatchingCompanyPlaceSupplyRulesForPlace(placeId: string) {
+  const [place] = await db
+    .select({
+      id: places.id,
+      countryIso: places.countryIso,
+      country: places.country,
+      placeType: places.placeType,
+    })
+    .from(places)
+    .where(eq(places.id, placeId))
+    .limit(1);
+
+  if (!place || !place.placeType) {
+    return { created: 0, updated: 0, skipped: 0, matchedRuleCount: 0 };
+  }
+
+  const countryCandidates = getPlaceCountryIsoCandidates(place);
+  if (!countryCandidates.length) {
+    return { created: 0, updated: 0, skipped: 0, matchedRuleCount: 0 };
+  }
+
+  const rules = await db
+    .select(buildCompanyPlaceSupplyRuleSelection())
+    .from(companyPlaceSupplyRules)
+    .leftJoin(companyContacts, eq(companyPlaceSupplyRules.contactId, companyContacts.id))
+    .where(and(
+      eq(companyPlaceSupplyRules.isActive, true),
+      inArray(companyPlaceSupplyRules.countryIso, countryCandidates),
+    ));
+
+  let created = 0;
+  let updated = 0;
+  let skipped = 0;
+  let matchedRuleCount = 0;
+
+  for (const rule of rules) {
+    if (!rule.placeTypes.includes(place.placeType)) {
+      continue;
+    }
+
+    matchedRuleCount += 1;
+    const result = await ensurePortSupplierFromCoverageRule(place.id, rule);
+    if (result === 'created') created += 1;
+    else if (result === 'updated') updated += 1;
+    else skipped += 1;
+  }
+
+  return { created, updated, skipped, matchedRuleCount };
 }

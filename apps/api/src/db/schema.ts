@@ -10,6 +10,8 @@ import {
   jsonb,
   date,
   doublePrecision,
+  index,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
@@ -585,7 +587,29 @@ export const places = pgTable('places', {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-//  8b. PORT SUPPLIERS  (user-managed supplier list per place)
+//  8b. COMPANY PLACE SUPPLY RULES
+// ═══════════════════════════════════════════════════════════════════════
+
+export const companyPlaceSupplyRules = pgTable('company_place_supply_rules', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  companyId: uuid('company_id').notNull().references(() => counterparties.id, { onDelete: 'cascade' }),
+  countryIso: text('country_iso').notNull(),
+  placeTypes: jsonb('place_types').$type<string[]>().notNull().default([]),
+  contactId: uuid('contact_id').references(() => companyContacts.id, { onDelete: 'set null' }),
+  products: jsonb('products').$type<string[]>().notNull().default([]),
+  note: text('note'),
+  isActive: boolean('is_active').notNull().default(true),
+  addedById: uuid('added_by_id').references(() => users.id),
+  addedByName: text('added_by_name'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  companyCountryActiveIdx: index('company_place_supply_rules_company_country_active_idx').on(table.companyId, table.countryIso, table.isActive),
+  countryActiveIdx: index('company_place_supply_rules_country_active_idx').on(table.countryIso, table.isActive),
+}));
+
+// ═══════════════════════════════════════════════════════════════════════
+//  8c. PORT SUPPLIERS  (user-managed supplier list per place)
 // ═══════════════════════════════════════════════════════════════════════
 
 export const portSuppliers = pgTable('port_suppliers', {
@@ -595,14 +619,19 @@ export const portSuppliers = pgTable('port_suppliers', {
   contactId: uuid('contact_id').references(() => companyContacts.id, { onDelete: 'set null' }),
   products: jsonb('products').$type<string[]>().default([]),  // product type tags
   note: text('note'),
+  coverageRuleId: uuid('coverage_rule_id').references(() => companyPlaceSupplyRules.id, { onDelete: 'set null' }),
+  coverageSource: text('coverage_source').notNull().default('manual'),
   addedById: uuid('added_by_id').references(() => users.id),
   addedByName: text('added_by_name'),    // cached user name
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  placeCompanyUniqueIdx: uniqueIndex('port_suppliers_place_company_unique_idx').on(table.placeId, table.companyId),
+  coverageRuleIdx: index('port_suppliers_coverage_rule_id_idx').on(table.coverageRuleId),
+}));
 
 // ═══════════════════════════════════════════════════════════════════════
-//  8c. VESSEL COMPANIES (user-managed company associations per vessel)
+//  8d. VESSEL COMPANIES (user-managed company associations per vessel)
 // ═══════════════════════════════════════════════════════════════════════
 
 export const vesselCompanyRoleEnum = pgEnum('vessel_company_role', [
@@ -1365,6 +1394,7 @@ export const counterpartiesRelations = relations(counterparties, ({ one, many })
   contacts: many(companyContacts),
   emails: many(companyEmails),
   offices: many(companyOffices),
+  supplyCoverageRules: many(companyPlaceSupplyRules),
   vesselAssociations: many(vesselCompanies),
 }));
 
@@ -1406,10 +1436,18 @@ export const placesRelations = relations(places, ({ one, many }) => ({
   }),
 }));
 
+export const companyPlaceSupplyRulesRelations = relations(companyPlaceSupplyRules, ({ one, many }) => ({
+  company: one(counterparties, { fields: [companyPlaceSupplyRules.companyId], references: [counterparties.id] }),
+  contact: one(companyContacts, { fields: [companyPlaceSupplyRules.contactId], references: [companyContacts.id] }),
+  addedBy: one(users, { fields: [companyPlaceSupplyRules.addedById], references: [users.id] }),
+  supplyLinks: many(portSuppliers),
+}));
+
 export const portSuppliersRelations = relations(portSuppliers, ({ one }) => ({
   place: one(places, { fields: [portSuppliers.placeId], references: [places.id] }),
   company: one(counterparties, { fields: [portSuppliers.companyId], references: [counterparties.id] }),
   contact: one(companyContacts, { fields: [portSuppliers.contactId], references: [companyContacts.id] }),
+  coverageRule: one(companyPlaceSupplyRules, { fields: [portSuppliers.coverageRuleId], references: [companyPlaceSupplyRules.id] }),
   addedBy: one(users, { fields: [portSuppliers.addedById], references: [users.id] }),
 }));
 

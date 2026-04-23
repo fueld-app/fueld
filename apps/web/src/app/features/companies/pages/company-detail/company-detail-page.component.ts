@@ -17,7 +17,7 @@ import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subscription, skip, timeout } from 'rxjs';
 import { Title } from '@angular/platform-browser';
 import * as L from 'leaflet/dist/leaflet-src.esm.js';
-import type { ApiResponse, CompanyAttachmentDto, CompanyContactDto, CompanyEmailDto, CompanyEmailType, CompanyChildSummaryDto, CompanyParentSummaryDto, CompanyGroupAggregateDto, CounterpartyDto, PortSupplierDto, RiskHitDto, RiskOverrideDto, SupplyPortDto, VesselCompanyDto, VesselCompanyRole, VesselCompanyRoleOption, VesselDto } from '@fueld/types';
+import type { ApiResponse, CompanyAttachmentDto, CompanyContactDto, CompanyEmailDto, CompanyEmailType, CompanyChildSummaryDto, CompanyParentSummaryDto, CompanyGroupAggregateDto, CompanyPlaceSupplyRuleApplySummaryDto, CompanyPlaceSupplyRuleDto, CompanyPlaceSupplyRulePlaceType, CounterpartyDto, PortSupplierDto, RiskHitDto, RiskOverrideDto, SupplyPortDto, VesselCompanyDto, VesselCompanyRole, VesselCompanyRoleOption, VesselDto } from '@fueld/types';
 import { flagFromIso3 } from '../../../../shared/utils/flags';
 
 interface CompanyOfficeDto {
@@ -201,6 +201,22 @@ interface SupplyPlaceSearchResult {
 }
 
 const SUPPLY_PORT_PRODUCT_OPTIONS = ['VLSFO', 'LSMGO', 'IFO380CST', 'MGO', 'LUBE'] as const;
+
+interface PlaceSupplyRuleForm {
+  countryIso: string;
+  placeTypes: CompanyPlaceSupplyRulePlaceType[];
+  contactId: string | null;
+  products: string[];
+  note: string;
+}
+
+const PLACE_SUPPLY_RULE_TYPE_OPTIONS: Array<{ value: CompanyPlaceSupplyRulePlaceType; label: string }> = [
+  { value: 'POR', label: 'Port' },
+  { value: 'PSP', label: 'Sub Port' },
+  { value: 'ANC', label: 'Anchorage' },
+  { value: 'TER', label: 'Terminal' },
+  { value: 'FIL', label: 'Hydrocarbon Field' },
+];
 
 interface FleetVessel {
   id: string;
@@ -1464,13 +1480,22 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                       </span>
                     }
                   </h2>
-                  <button
-                    type="button"
-                    (click)="openAddSupplyPort()"
-                    class="rounded-md bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 hover:bg-brand-100 transition-colors"
-                  >
-                    + Add place
-                  </button>
+                  <div class="flex items-center gap-2">
+                    <button
+                      type="button"
+                      (click)="openPlaceSupplyRulesModal()"
+                      class="rounded-md border border-gray-200 px-2 py-1 text-[11px] font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                    >
+                      Coverage rules
+                    </button>
+                    <button
+                      type="button"
+                      (click)="openAddSupplyPort()"
+                      class="rounded-md bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 hover:bg-brand-100 transition-colors"
+                    >
+                      + Add place
+                    </button>
+                  </div>
                 </div>
                 @if (showAddSupplyPort()) {
                   <div class="border-b border-gray-100 px-5 py-4 bg-gray-50/50">
@@ -1690,6 +1715,227 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                       class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
                     <button (click)="executeDeleteSupplyPort()"
                       class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">Delete</button>
+                  </div>
+                </div>
+              </div>
+            }
+
+            @if (showPlaceSupplyRulesModal()) {
+              <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" (click)="closePlaceSupplyRulesModal()">
+                <div class="mx-4 flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" (click)="$event.stopPropagation()">
+                  <div class="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-4">
+                    <div>
+                      <h3 class="text-lg font-semibold text-gray-900">Place Coverage Rules</h3>
+                      <p class="mt-1 text-sm text-gray-500">Create country and place-type rules that automatically add this supplier to existing and newly created local places.</p>
+                    </div>
+                    <button
+                      type="button"
+                      (click)="closePlaceSupplyRulesModal()"
+                      class="rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <div class="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1.3fr)_360px]">
+                    <div class="min-h-0 overflow-y-auto border-b border-gray-100 lg:border-b-0 lg:border-r lg:border-gray-100">
+                      @if (placeSupplyRulesLoading()) {
+                        <div class="flex h-full min-h-[260px] items-center justify-center">
+                          <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                          </svg>
+                        </div>
+                      } @else if (!placeSupplyRules().length) {
+                        <div class="flex h-full min-h-[260px] items-center justify-center px-6 text-center text-sm text-gray-400">
+                          No coverage rules yet. Create one to auto-add this supplier to matching places.
+                        </div>
+                      } @else {
+                        <div class="divide-y divide-gray-100">
+                          @for (rule of placeSupplyRules(); track rule.id) {
+                            <div class="px-6 py-4">
+                              <div class="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                                <div class="min-w-0">
+                                  <div class="flex flex-wrap items-center gap-2">
+                                    @if (countryFlag(rule.countryIso)) {
+                                      <span class="text-base">{{ countryFlag(rule.countryIso) }}</span>
+                                    }
+                                    <span class="font-medium text-gray-900">{{ placeCountryLabel(rule.countryIso) }}</span>
+                                    <span class="text-[11px] font-medium uppercase tracking-[0.12em] text-gray-400">{{ rule.countryIso }}</span>
+                                  </div>
+
+                                  <div class="mt-2 flex flex-wrap gap-1.5">
+                                    @for (placeType of rule.placeTypes; track placeType) {
+                                      <span class="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-blue-200">{{ placeSupplyRulePlaceTypeLabel(placeType) }}</span>
+                                    }
+                                  </div>
+
+                                  @if (rule.contactName) {
+                                    <div class="mt-2 text-xs text-gray-500">Contact: {{ rule.contactName }}</div>
+                                  }
+
+                                  @if (rule.products.length) {
+                                    <div class="mt-2 flex flex-wrap gap-1.5">
+                                      @for (product of rule.products; track product) {
+                                        <span class="inline-flex items-center rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-medium text-brand-700 ring-1 ring-brand-200">{{ product }}</span>
+                                      }
+                                    </div>
+                                  }
+
+                                  @if (rule.note) {
+                                    <p class="mt-2 text-xs italic text-gray-400">{{ rule.note }}</p>
+                                  }
+                                </div>
+
+                                <div class="flex shrink-0 flex-wrap items-center gap-2 xl:justify-end">
+                                  <button
+                                    type="button"
+                                    (click)="openEditPlaceSupplyRule(rule)"
+                                    class="rounded-md border border-gray-200 px-2.5 py-1 text-[11px] font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    (click)="reapplyPlaceSupplyRule(rule)"
+                                    [disabled]="reapplyingPlaceSupplyRuleId() === rule.id"
+                                    class="rounded-md border border-brand-200 bg-brand-50 px-2.5 py-1 text-[11px] font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50 transition-colors"
+                                  >
+                                    {{ reapplyingPlaceSupplyRuleId() === rule.id ? 'Applying...' : 'Reapply' }}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    (click)="deletePlaceSupplyRule(rule)"
+                                    class="rounded-md border border-red-200 px-2.5 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 transition-colors"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          }
+                        </div>
+                      }
+                    </div>
+
+                    <div class="min-h-0 overflow-y-auto bg-gray-50/70 px-6 py-5">
+                      <div class="flex items-start justify-between gap-3">
+                        <div>
+                          <h4 class="text-sm font-semibold text-gray-800">{{ editingPlaceSupplyRuleId() ? 'Edit Rule' : 'New Rule' }}</h4>
+                          <p class="mt-1 text-xs text-gray-500">Create applies immediately. Editing only affects future matches until you reapply.</p>
+                        </div>
+                        @if (editingPlaceSupplyRuleId()) {
+                          <button
+                            type="button"
+                            (click)="resetPlaceSupplyRuleForm()"
+                            class="rounded-md border border-gray-200 px-2 py-1 text-[11px] font-medium text-gray-600 hover:bg-white transition-colors"
+                          >
+                            Clear
+                          </button>
+                        }
+                      </div>
+
+                      <div class="mt-4 space-y-4">
+                        <div>
+                          <label class="block text-xs font-medium text-gray-500 mb-1">Country</label>
+                          <select
+                            [ngModel]="placeSupplyRuleForm().countryIso"
+                            (ngModelChange)="placeSupplyRuleForm.set({ ...placeSupplyRuleForm(), countryIso: $event })"
+                            class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                          >
+                            <option value="">Select country…</option>
+                            @for (country of countries; track country.code) {
+                              <option [value]="country.code">{{ country.name }} ({{ country.code }})</option>
+                            }
+                          </select>
+                        </div>
+
+                        <div>
+                          <label class="block text-xs font-medium text-gray-500 mb-1">Place Types</label>
+                          <div class="flex flex-wrap gap-1.5">
+                            @for (option of placeSupplyRulePlaceTypeOptions; track option.value) {
+                              <button
+                                type="button"
+                                (click)="togglePlaceSupplyRulePlaceType(option.value)"
+                                [class]="placeSupplyRuleForm().placeTypes.includes(option.value)
+                                  ? 'rounded-full px-2.5 py-1 text-xs font-medium bg-brand-600 text-white ring-1 ring-brand-600 transition-colors'
+                                  : 'rounded-full px-2.5 py-1 text-xs font-medium bg-white text-gray-600 ring-1 ring-gray-300 hover:ring-brand-400 hover:text-brand-700 transition-colors'"
+                              >
+                                {{ option.label }}
+                              </button>
+                            }
+                          </div>
+                        </div>
+
+                        <div>
+                          <label class="block text-xs font-medium text-gray-500 mb-1">Contact Person</label>
+                          @if (contactsLoading()) {
+                            <div class="text-xs text-gray-400 py-1">Loading contacts...</div>
+                          } @else if (contacts().length) {
+                            <select
+                              [ngModel]="placeSupplyRuleForm().contactId"
+                              (ngModelChange)="placeSupplyRuleForm.set({ ...placeSupplyRuleForm(), contactId: $event || null })"
+                              class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                            >
+                              <option [ngValue]="null">— None —</option>
+                              @for (contact of contacts(); track contact.id) {
+                                <option [ngValue]="contact.id">{{ contact.name }}@if (contact.role) { ({{ contact.role }}) }</option>
+                              }
+                            </select>
+                          } @else {
+                            <div class="text-xs text-gray-400 py-1">No contacts on file</div>
+                          }
+                        </div>
+
+                        <div>
+                          <label class="block text-xs font-medium text-gray-500 mb-1">Products</label>
+                          <div class="flex flex-wrap gap-1.5">
+                            @for (product of supplyPortProductOptions; track product) {
+                              <button
+                                type="button"
+                                (click)="togglePlaceSupplyRuleProduct(product)"
+                                [class]="placeSupplyRuleForm().products.includes(product)
+                                  ? 'rounded-full px-2.5 py-1 text-xs font-medium bg-brand-600 text-white ring-1 ring-brand-600 transition-colors'
+                                  : 'rounded-full px-2.5 py-1 text-xs font-medium bg-white text-gray-600 ring-1 ring-gray-300 hover:ring-brand-400 hover:text-brand-700 transition-colors'"
+                              >
+                                {{ product }}
+                              </button>
+                            }
+                          </div>
+                        </div>
+
+                        <div>
+                          <label class="block text-xs font-medium text-gray-500 mb-1">Note</label>
+                          <textarea
+                            [ngModel]="placeSupplyRuleForm().note"
+                            (ngModelChange)="placeSupplyRuleForm.set({ ...placeSupplyRuleForm(), note: $event })"
+                            rows="3"
+                            placeholder="Notes"
+                            class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                          ></textarea>
+                        </div>
+
+                        <div class="flex justify-end gap-2 pt-2">
+                          <button
+                            type="button"
+                            (click)="closePlaceSupplyRulesModal()"
+                            class="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-white transition-colors"
+                          >
+                            Close
+                          </button>
+                          <button
+                            type="button"
+                            (click)="savePlaceSupplyRule()"
+                            [disabled]="savingPlaceSupplyRule() || !placeSupplyRuleForm().countryIso || !placeSupplyRuleForm().placeTypes.length"
+                            class="rounded-md bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                          >
+                            {{ savingPlaceSupplyRule() ? 'Saving...' : (editingPlaceSupplyRuleId() ? 'Save Rule' : 'Create Rule') }}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -3274,6 +3520,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly contactSaving = signal(false);
   readonly contactError = signal('');
   readonly deleteContactTarget = signal<CompanyContactDto | null>(null);
+  readonly countries = COUNTRIES;
 
   // Supply ports
   readonly supplyPorts = signal<SupplyPortDto[]>([]);
@@ -3293,6 +3540,14 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly savingSupplyPort = signal(false);
   readonly importingSupplyPlaceId = signal<string | null>(null);
   readonly supplyPortProductOptions = SUPPLY_PORT_PRODUCT_OPTIONS;
+  readonly placeSupplyRules = signal<CompanyPlaceSupplyRuleDto[]>([]);
+  readonly placeSupplyRulesLoading = signal(false);
+  readonly showPlaceSupplyRulesModal = signal(false);
+  readonly editingPlaceSupplyRuleId = signal<string | null>(null);
+  readonly savingPlaceSupplyRule = signal(false);
+  readonly reapplyingPlaceSupplyRuleId = signal<string | null>(null);
+  readonly placeSupplyRulePlaceTypeOptions = PLACE_SUPPLY_RULE_TYPE_OPTIONS;
+  readonly placeSupplyRuleForm = signal<PlaceSupplyRuleForm>(this.emptyPlaceSupplyRuleForm());
   private supplyPlaceSearchTimeout: ReturnType<typeof setTimeout> | null = null;
 
   // Company Attachments
@@ -3537,6 +3792,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
         this.loadCompanyVessels(id);
         this.loadContacts(id);
         this.loadSupplyPorts(id);
+        this.loadCompanyPlaceSupplyRules(id);
         this.loadCompanyAttachments(id);
         this.loadCompanyEmails(id);
         this.loadCompanyOffices(id);
@@ -4806,6 +5062,192 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
       if (!options.silent) {
         this.supplyPortsLoading.set(false);
       }
+    }
+  }
+
+  private emptyPlaceSupplyRuleForm(): PlaceSupplyRuleForm {
+    return {
+      countryIso: '',
+      placeTypes: this.placeSupplyRulePlaceTypeOptions.map((option) => option.value),
+      contactId: null,
+      products: [],
+      note: '',
+    };
+  }
+
+  resetPlaceSupplyRuleForm(): void {
+    this.editingPlaceSupplyRuleId.set(null);
+    this.placeSupplyRuleForm.set(this.emptyPlaceSupplyRuleForm());
+  }
+
+  private async loadCompanyPlaceSupplyRules(companyId: string): Promise<void> {
+    this.placeSupplyRulesLoading.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<CompanyPlaceSupplyRuleDto[]>>(`${API}/companies/local/${companyId}/place-supply-rules`),
+      );
+      if (res.success) {
+        this.placeSupplyRules.set(res.data ?? []);
+      } else {
+        this.placeSupplyRules.set([]);
+      }
+    } catch (err) {
+      console.error('Failed to load place supply rules:', err);
+      this.placeSupplyRules.set([]);
+    } finally {
+      this.placeSupplyRulesLoading.set(false);
+    }
+  }
+
+  openPlaceSupplyRulesModal(): void {
+    this.showPlaceSupplyRulesModal.set(true);
+    this.resetPlaceSupplyRuleForm();
+  }
+
+  closePlaceSupplyRulesModal(): void {
+    this.showPlaceSupplyRulesModal.set(false);
+    this.resetPlaceSupplyRuleForm();
+  }
+
+  openEditPlaceSupplyRule(rule: CompanyPlaceSupplyRuleDto): void {
+    this.showPlaceSupplyRulesModal.set(true);
+    this.editingPlaceSupplyRuleId.set(rule.id);
+    this.placeSupplyRuleForm.set({
+      countryIso: rule.countryIso,
+      placeTypes: [...rule.placeTypes],
+      contactId: rule.contactId,
+      products: [...rule.products],
+      note: rule.note ?? '',
+    });
+  }
+
+  togglePlaceSupplyRulePlaceType(type: CompanyPlaceSupplyRulePlaceType): void {
+    const current = this.placeSupplyRuleForm().placeTypes;
+    const next = current.includes(type)
+      ? current.filter((value) => value !== type)
+      : [...current, type];
+    this.placeSupplyRuleForm.set({ ...this.placeSupplyRuleForm(), placeTypes: next });
+  }
+
+  togglePlaceSupplyRuleProduct(product: string): void {
+    const current = this.placeSupplyRuleForm().products;
+    const next = current.includes(product)
+      ? current.filter((value) => value !== product)
+      : [...current, product];
+    this.placeSupplyRuleForm.set({ ...this.placeSupplyRuleForm(), products: next });
+  }
+
+  placeSupplyRulePlaceTypeLabel(type: CompanyPlaceSupplyRulePlaceType): string {
+    return this.placeSupplyRulePlaceTypeOptions.find((option) => option.value === type)?.label ?? type;
+  }
+
+  async savePlaceSupplyRule(): Promise<void> {
+    const companyId = this.company()?.id;
+    const form = this.placeSupplyRuleForm();
+    if (!companyId) return;
+
+    if (!form.countryIso.trim() || !form.placeTypes.length) {
+      this.showToast('error', 'Country and at least one place type are required.');
+      return;
+    }
+
+    this.savingPlaceSupplyRule.set(true);
+    try {
+      const payload = {
+        countryIso: form.countryIso.trim().toUpperCase(),
+        placeTypes: form.placeTypes,
+        contactId: form.contactId ?? null,
+        products: form.products,
+        note: form.note.trim() || null,
+      };
+      const editingRuleId = this.editingPlaceSupplyRuleId();
+
+      if (editingRuleId) {
+        const res = await firstValueFrom(
+          this.http.put<ApiResponse<CompanyPlaceSupplyRuleDto>>(`${API}/companies/local/${companyId}/place-supply-rules/${editingRuleId}`, payload),
+        );
+
+        if (!res.success) {
+          this.showToast('error', res.message ?? 'Failed to update place supply rule.');
+          return;
+        }
+
+        this.showToast('success', 'Updated coverage rule.');
+      } else {
+        const res = await firstValueFrom(
+          this.http.post<ApiResponse<CompanyPlaceSupplyRuleApplySummaryDto>>(`${API}/companies/local/${companyId}/place-supply-rules`, payload),
+        );
+
+        if (!res.success || !res.data) {
+          this.showToast('error', res.message ?? 'Failed to create place supply rule.');
+          return;
+        }
+
+        const placeLabel = res.data.matchedPlaceCount === 1 ? 'place' : 'places';
+        this.showToast('success', `Rule applied to ${res.data.matchedPlaceCount} ${placeLabel}; created ${res.data.created}.`);
+      }
+
+      this.resetPlaceSupplyRuleForm();
+      void this.loadCompanyPlaceSupplyRules(companyId);
+    } catch (err) {
+      console.error('Failed to save place supply rule:', err);
+      this.showToast('error', 'Failed to save place supply rule.');
+    } finally {
+      this.savingPlaceSupplyRule.set(false);
+    }
+  }
+
+  async reapplyPlaceSupplyRule(rule: CompanyPlaceSupplyRuleDto): Promise<void> {
+    const companyId = this.company()?.id;
+    if (!companyId) return;
+
+    this.reapplyingPlaceSupplyRuleId.set(rule.id);
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<CompanyPlaceSupplyRuleApplySummaryDto>>(`${API}/companies/local/${companyId}/place-supply-rules/${rule.id}/reapply`, {}),
+      );
+
+      if (!res.success || !res.data) {
+        this.showToast('error', res.message ?? 'Failed to reapply place supply rule.');
+        return;
+      }
+
+      this.showToast('success', `Reapplied rule: ${res.data.created} created, ${res.data.updated} updated, ${res.data.skipped} skipped.`);
+      void this.loadCompanyPlaceSupplyRules(companyId);
+    } catch (err) {
+      console.error('Failed to reapply place supply rule:', err);
+      this.showToast('error', 'Failed to reapply place supply rule.');
+    } finally {
+      this.reapplyingPlaceSupplyRuleId.set(null);
+    }
+  }
+
+  async deletePlaceSupplyRule(rule: CompanyPlaceSupplyRuleDto): Promise<void> {
+    const companyId = this.company()?.id;
+    if (!companyId) return;
+
+    if (!confirm(`Delete the coverage rule for ${this.placeCountryLabel(rule.countryIso)}?`)) {
+      return;
+    }
+
+    try {
+      const res = await firstValueFrom(
+        this.http.delete<ApiResponse<{ id: string } | CompanyPlaceSupplyRuleDto>>(`${API}/companies/local/${companyId}/place-supply-rules/${rule.id}`),
+      );
+
+      if (!res.success) {
+        this.showToast('error', res.message ?? 'Failed to delete place supply rule.');
+        return;
+      }
+
+      if (this.editingPlaceSupplyRuleId() === rule.id) {
+        this.resetPlaceSupplyRuleForm();
+      }
+      this.showToast('success', 'Deleted coverage rule.');
+      void this.loadCompanyPlaceSupplyRules(companyId);
+    } catch (err) {
+      console.error('Failed to delete place supply rule:', err);
+      this.showToast('error', 'Failed to delete place supply rule.');
     }
   }
 
