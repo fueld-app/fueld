@@ -94,6 +94,7 @@ export interface SendInquiryPayload {
   eta?: string | null;
   etd?: string | null;
   responseDeadlineAt?: string | null;
+  reminderEnabled?: boolean;
 }
 
 export interface SendInquiryWhatsAppPayload {
@@ -109,6 +110,7 @@ export interface SendInquiryWhatsAppPayload {
   eta?: string | null;
   etd?: string | null;
   responseDeadlineAt?: string | null;
+  reminderEnabled?: boolean;
 }
 
 @Component({
@@ -564,8 +566,26 @@ export interface SendInquiryWhatsAppPayload {
                 (ngModelChange)="onDeadlineChange($event)"
                 [disabled]="!responseDeadlineEnabled()"
               />
-              @if (responseDeadlineEnabled()) {
-                <p class="mt-2 text-xs leading-5 text-gray-500">A reminder will be sent automatically before this deadline if the supplier has not replied.</p>
+              <div class="mt-3 flex items-start justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-3">
+                <div>
+                  <p class="text-sm font-medium text-gray-700">Automatic reminder</p>
+                  <p class="mt-1 text-xs leading-5 text-gray-500">Send one reminder before the deadline if the supplier has not replied.</p>
+                </div>
+                <label class="inline-flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 disabled:cursor-not-allowed"
+                    [ngModel]="reminderEnabled()"
+                    (ngModelChange)="onReminderToggle($event)"
+                    [disabled]="!responseDeadlineEnabled()"
+                  />
+                  Opt in
+                </label>
+              </div>
+              @if (responseDeadlineEnabled() && reminderEnabled()) {
+                <p class="mt-2 text-xs leading-5 text-gray-500">One reminder will be sent automatically before this deadline if the supplier has not replied.</p>
+              } @else if (responseDeadlineEnabled()) {
+                <p class="mt-2 text-xs leading-5 text-gray-500">No automatic reminder will be sent unless you opt in for this inquiry.</p>
               } @else {
                 <p class="mt-2 text-xs leading-5 text-gray-500">No response deadline or automatic reminder will be sent for this inquiry.</p>
               }
@@ -858,6 +878,7 @@ export class SendInquiryModalComponent {
   readonly htmlBody = signal('');
   readonly recipientTags = signal<EmailTag[]>([]);
   readonly responseDeadlineAt = signal('');
+  readonly reminderEnabled = signal(false);
   readonly inquiryEta = signal<string | null>(null);
   readonly inquiryEtd = signal<string | null>(null);
   readonly lastResponseDeadlineAt = signal('');
@@ -988,6 +1009,7 @@ export class SendInquiryModalComponent {
     this.open.set(true);
     this.recipientTags.set([]);
     this.responseDeadlineAt.set('');
+    this.reminderEnabled.set(false);
     this.lastResponseDeadlineAt.set('');
     this.inquiryEta.set(this.normalizeInquiryDate(this.eta()));
     this.inquiryEtd.set(this.normalizeInquiryDate(this.etd()));
@@ -1188,6 +1210,8 @@ export class SendInquiryModalComponent {
   onDeadlineChange(value: string): void {
     if (value) {
       this.lastResponseDeadlineAt.set(value);
+    } else {
+      this.reminderEnabled.set(false);
     }
     this.responseDeadlineAt.set(value);
     this.syncInquiryBodyMetadata();
@@ -1206,9 +1230,14 @@ export class SendInquiryModalComponent {
         this.lastResponseDeadlineAt.set(current);
       }
       this.responseDeadlineAt.set('');
+      this.reminderEnabled.set(false);
     }
 
     this.syncInquiryBodyMetadata();
+  }
+
+  onReminderToggle(enabled: boolean): void {
+    this.reminderEnabled.set(Boolean(enabled && this.responseDeadlineEnabled()));
   }
 
   execCommand(command: string): void {
@@ -1270,6 +1299,7 @@ export class SendInquiryModalComponent {
       eta: this.resolvedInquiryEta(),
       etd: this.resolvedInquiryEtd(),
       responseDeadlineAt: this.toIsoFromDateTimeLocal(this.responseDeadlineAt()),
+      reminderEnabled: this.reminderEnabled() && this.responseDeadlineEnabled(),
     });
   }
 
@@ -1314,6 +1344,7 @@ export class SendInquiryModalComponent {
       eta: this.resolvedInquiryEta(),
       etd: this.resolvedInquiryEtd(),
       responseDeadlineAt: this.toIsoFromDateTimeLocal(this.responseDeadlineAt()),
+      reminderEnabled: this.reminderEnabled() && this.responseDeadlineEnabled(),
     });
   }
 

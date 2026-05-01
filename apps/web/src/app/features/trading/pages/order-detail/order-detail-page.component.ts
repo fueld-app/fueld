@@ -5002,6 +5002,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
           eta: payload.eta ?? null,
           etd: payload.etd ?? null,
           responseDeadlineAt: payload.responseDeadlineAt,
+          reminderEnabled: payload.reminderEnabled ?? false,
         },
       )
       .subscribe({
@@ -5041,6 +5042,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
           eta: payload.eta ?? null,
           etd: payload.etd ?? null,
           responseDeadlineAt: payload.responseDeadlineAt ?? null,
+          reminderEnabled: payload.reminderEnabled ?? false,
         }),
       );
       this.inquiryModal()?.waDone();

@@ -1828,6 +1828,7 @@ export const supplierInquiries = pgTable('supplier_inquiries', {
   quoteTokenHash: text('quote_token_hash'),
   quoteTokenExpiresAt: timestamp('quote_token_expires_at', { withTimezone: true }),
   responseDeadlineAt: timestamp('response_deadline_at', { withTimezone: true }),
+  reminderEnabled: boolean('reminder_enabled').notNull().default(false),
   reminderSentAt: timestamp('reminder_sent_at', { withTimezone: true }),
   reminderCount: integer('reminder_count').notNull().default(0),
   respondedAt: timestamp('responded_at', { withTimezone: true }),

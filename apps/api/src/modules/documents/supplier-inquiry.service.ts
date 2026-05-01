@@ -384,6 +384,7 @@ export async function processPendingInquiryReminders(): Promise<number> {
     .where(
       and(
         eq(supplierInquiries.status, 'SENT'),
+        eq(supplierInquiries.reminderEnabled, true),
         isNull(supplierInquiries.reminderSentAt),
         gt(supplierInquiries.responseDeadlineAt, now),
       ),

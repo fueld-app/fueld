@@ -579,6 +579,7 @@ describe('email tracking, inquiry send & WhatsApp group notifications', () => {
           .where(eq(supplierInquiries.orderId, orderId));
 
         expect(rows[0]!.responseDeadlineAt?.toISOString()).toBe('2026-03-12T10:00:00.000Z');
+        expect(rows[0]!.reminderEnabled).toBe(false);
       } finally {
         stub.restore();
         mockGraphToken = null;
@@ -713,7 +714,7 @@ describe('email tracking, inquiry send & WhatsApp group notifications', () => {
       }
     });
 
-    it('sends one automatic reminder before the response deadline', async () => {
+    it('does not send an automatic reminder unless the inquiry opted in', async () => {
       const { token, orderId, supplier } = await seedDocumentReadyOrder();
       const { processPendingInquiryReminders } = await import('../src/modules/documents/supplier-inquiry.service');
       mockGraphToken = 'graph-token';
@@ -745,6 +746,55 @@ describe('email tracking, inquiry send & WhatsApp group notifications', () => {
           .where(eq(supplierInquiries.id, inquiry!.id));
 
         const sentCount = await processPendingInquiryReminders();
+        expect(sentCount).toBe(0);
+        expect(stub.calls).toHaveLength(1);
+
+        const refreshed = await db
+          .select()
+          .from(supplierInquiries)
+          .where(eq(supplierInquiries.id, inquiry!.id));
+        expect(refreshed[0]!.reminderEnabled).toBe(false);
+        expect(refreshed[0]!.reminderSentAt).toBeNull();
+        expect(refreshed[0]!.reminderCount).toBe(0);
+      } finally {
+        stub.restore();
+        mockGraphToken = null;
+      }
+    });
+
+    it('sends one automatic reminder before the response deadline', async () => {
+      const { token, orderId, supplier } = await seedDocumentReadyOrder();
+      const { processPendingInquiryReminders } = await import('../src/modules/documents/supplier-inquiry.service');
+      mockGraphToken = 'graph-token';
+      const stub = stubGraphFetch();
+
+      try {
+        await requestJson(`/orders/${orderId}/inquiry/send`, {
+          method: 'POST',
+          token,
+          body: {
+            suppliers: [
+              { supplierId: supplier.id, supplierName: 'Supplier Co', email: 'supplier@example.com' },
+            ],
+            subject: 'Reminder RFQ',
+            htmlBody: '<p>body</p>',
+            responseDeadlineAt: new Date(Date.now() + (2 * 3_600_000)).toISOString(),
+            reminderEnabled: true,
+          },
+        });
+
+        const db = await getDb();
+        const [inquiry] = await db
+          .select()
+          .from(supplierInquiries)
+          .where(eq(supplierInquiries.orderId, orderId));
+
+        await db
+          .update(supplierInquiries)
+          .set({ sentAt: new Date(Date.now() - (2 * 3_600_000)) })
+          .where(eq(supplierInquiries.id, inquiry!.id));
+
+        const sentCount = await processPendingInquiryReminders();
         expect(sentCount).toBe(1);
         expect(stub.calls).toHaveLength(2);
 
@@ -752,6 +802,7 @@ describe('email tracking, inquiry send & WhatsApp group notifications', () => {
           .select()
           .from(supplierInquiries)
           .where(eq(supplierInquiries.id, inquiry!.id));
+        expect(refreshed[0]!.reminderEnabled).toBe(true);
         expect(refreshed[0]!.reminderSentAt).toBeTruthy();
         expect(refreshed[0]!.reminderCount).toBe(1);
 

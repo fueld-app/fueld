@@ -406,6 +406,7 @@ async function _doEnsureTestSchemaCompat(): Promise<void> {
       quote_token_hash text,
       quote_token_expires_at timestamptz,
       response_deadline_at timestamptz,
+      reminder_enabled boolean NOT NULL DEFAULT false,
       reminder_sent_at timestamptz,
       reminder_count integer NOT NULL DEFAULT 0,
       responded_at timestamptz,

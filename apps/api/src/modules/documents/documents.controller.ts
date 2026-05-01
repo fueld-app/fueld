@@ -1380,6 +1380,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         : etaLabel || etdLabel || '';
       const responseDeadlineAt = normalizeInquiryDateInput(body.responseDeadlineAt)
         ?? getDefaultInquiryResponseDeadline(inquirySettings.defaultResponseDeadlineHours);
+      const reminderEnabled = Boolean(body.reminderEnabled && responseDeadlineAt);
       const responseDeadlineFormatted = formatDeadlineHumanDuration(responseDeadlineAt);
 
       // Check if this is the first inquiry batch for this order (for WhatsApp notification)
@@ -1508,6 +1509,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
                   quoteTokenHash: quoteToken?.tokenHash ?? null,
                   quoteTokenExpiresAt: quoteTokenExpiresAt,
                   responseDeadlineAt: responseDeadlineAt ? new Date(responseDeadlineAt) : null,
+                  reminderEnabled,
                   reminderSentAt: null,
                   reminderCount: 0,
                   respondedAt: null,
@@ -1534,6 +1536,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
                 quoteTokenHash: quoteToken?.tokenHash ?? null,
                 quoteTokenExpiresAt: quoteTokenExpiresAt,
                 responseDeadlineAt: responseDeadlineAt ? new Date(responseDeadlineAt) : null,
+                reminderEnabled,
                 reminderSentAt: null,
                 reminderCount: 0,
                 sentByUserId: auth.userId,
@@ -1650,6 +1653,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         eta: t.Optional(t.Nullable(t.String())),
         etd: t.Optional(t.Nullable(t.String())),
         responseDeadlineAt: t.Optional(t.Nullable(t.String())),
+        reminderEnabled: t.Optional(t.Boolean()),
       }),
       detail: {
         tags: ['Documents'],
@@ -1686,6 +1690,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
 
       const responseDeadlineAt = normalizeInquiryDateInput(body.responseDeadlineAt)
         ?? getDefaultInquiryResponseDeadline(inquirySettings.defaultResponseDeadlineHours);
+      const reminderEnabled = Boolean(body.reminderEnabled && responseDeadlineAt);
       const responseDeadlineFormatted = formatDeadlineHumanDuration(responseDeadlineAt);
       const results: Array<{ recipientId: string; recipientName: string; phone: string; success: boolean; error?: string }> = [];
 
@@ -1734,6 +1739,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
                 quoteTokenHash: quoteToken?.tokenHash ?? null,
                 quoteTokenExpiresAt,
                 responseDeadlineAt: responseDeadlineAt ? new Date(responseDeadlineAt) : null,
+                reminderEnabled,
                 reminderSentAt: null,
                 reminderCount: 0,
                 respondedAt: null,
@@ -1760,6 +1766,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
               quoteTokenHash: quoteToken?.tokenHash ?? null,
               quoteTokenExpiresAt,
               responseDeadlineAt: responseDeadlineAt ? new Date(responseDeadlineAt) : null,
+              reminderEnabled,
               reminderSentAt: null,
               reminderCount: 0,
               sentByUserId: auth.userId,
@@ -1808,6 +1815,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         eta: t.Optional(t.Nullable(t.String())),
         etd: t.Optional(t.Nullable(t.String())),
         responseDeadlineAt: t.Optional(t.Nullable(t.String())),
+        reminderEnabled: t.Optional(t.Boolean()),
       }),
       detail: {
         tags: ['Documents'],
@@ -1839,6 +1847,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           status: supplierInquiries.status,
           sentAt: supplierInquiries.sentAt,
           responseDeadlineAt: supplierInquiries.responseDeadlineAt,
+          reminderEnabled: supplierInquiries.reminderEnabled,
           reminderSentAt: supplierInquiries.reminderSentAt,
           reminderCount: supplierInquiries.reminderCount,
           respondedAt: supplierInquiries.respondedAt,

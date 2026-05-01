@@ -166,5 +166,28 @@ describe('SendInquiryModalComponent', () => {
     expect(component.responseDeadlineAt()).toBe('');
     expect(component.htmlBody()).not.toContain('Reply within:');
     expect(emittedPayload?.responseDeadlineAt).toBeNull();
+    expect(emittedPayload?.reminderEnabled).toBe(false);
+  });
+
+  it('keeps automatic reminders opt-in and emits the enabled flag when selected', async () => {
+    const { component, fixture } = await createComponent();
+
+    component.show();
+    fixture.detectChanges();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    component.suppliers.set([buildSupplierRow()]);
+
+    let emittedPayload: any = null;
+    component.sendInquiry.subscribe((payload) => {
+      emittedPayload = payload;
+    });
+
+    component.send();
+    expect(emittedPayload?.reminderEnabled).toBe(false);
+
+    component.onReminderToggle(true);
+    component.send();
+    expect(emittedPayload?.reminderEnabled).toBe(true);
   });
 });
