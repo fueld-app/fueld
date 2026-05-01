@@ -1,6 +1,7 @@
 node_modules
 dist
 .angular
+.astro
 .bun
 *.tsbuildinfo
 bun.lock

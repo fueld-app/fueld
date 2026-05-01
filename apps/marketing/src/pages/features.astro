@@ -1,0 +1,121 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const featureGroups = [
+  {
+    title: 'Trading workflow continuity',
+    body:
+      'Keep inquiry intake, quote handling, commercial confirmation, and order progression inside one operating thread instead of stitching activity together across inboxes and spreadsheets.',
+  },
+  {
+    title: 'Global supplier directory',
+    body:
+      'A searchable counterparty network covering ports worldwide. Find suppliers by port, product, grade, and historical performance — without leaving the platform or chasing brokers for contacts.',
+  },
+  {
+    title: 'Supplier portal for quotations',
+    body:
+      'Suppliers respond to RFQs, submit quotes, confirm nominations, and upload BDNs through a secure self-service portal. No mailbox triage, no manual re-keying on your side.',
+  },
+  {
+    title: 'Inventory & stock for physical operations',
+    body:
+      'Track product, grade, density, and volume across tanks, barges, trucks, and terminals. Reconcile to liftings and dips so stem planning is grounded in what you actually have on hand.',
+  },
+  {
+    title: 'Pricing engine & margin builder',
+    body:
+      'Compose prices from index, differential, and premiums; simulate margin live; and lock the formula onto the confirmation so finance and ops see exactly the same number.',
+  },
+  {
+    title: 'Document control with full versioning',
+    body:
+      'Generate operational and commercial documents from the same workflow record. Every nomination, confirmation, BDN, and invoice is versioned with diff, author, and timestamp — no parallel "_final_v3" files in inboxes.',
+  },
+  {
+    title: 'Supplier inquiry intelligence',
+    body:
+      'Score and rank suppliers from your own historical inquiry data — responsiveness, win rate, pricing behaviour, and reliability — and surface the right counterparties at the moment of RFQ.',
+  },
+  {
+    title: 'Approach system for new business',
+    body:
+      'Structured outreach playbooks for new counterparties: sequenced touches, owners, follow-ups, and outcomes captured on the deal record. Pipeline that does not live in a separate CRM tab.',
+  },
+  {
+    title: 'Configurable without consultants',
+    body:
+      'Workflows, fields, document templates, approval rules, pricing logic, and roles are all configurable in-app by your own admins. No statement-of-work, no consultancy days for routine changes.',
+  },
+  {
+    title: 'Credit and risk closer to execution',
+    body:
+      'Bring counterparty controls, credit status, exception handling, and approval discipline closer to the actual trade workflow.',
+  },
+  {
+    title: 'Supplier collaboration without friction',
+    body:
+      'Use secure public response flows for supplier quotes and nominations without forcing every counterpart into a heavyweight portal onboarding path.',
+  },
+  {
+    title: 'Analytics with operational context',
+    body:
+      'Surface reporting, performance, and supplier insights inside the same environment your teams already use to run the work.',
+  },
+  {
+    title: 'Mobile-aware execution',
+    body:
+      'Support teams working from phones, tablets, and smaller laptop viewports when decisions, documents, and follow-up cannot wait for a desktop session.',
+  },
+];
+
+const schemas = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: 'Fueld features',
+    description:
+      'Feature overview for Fueld across workflow, documents, credit, risk, supplier collaboration, analytics, and mobile-ready operations.',
+  },
+];
+---
+
+<BaseLayout
+  title="Features"
+  description="Explore how Fueld supports bunker workflow execution across inquiries, documents, credit, risk, analytics, and mobile-ready operations."
+  path="/features/"
+  schemas={schemas}
+>
+  <section class="content-band page-hero">
+    <div class="section-heading narrow">
+      <p class="eyebrow">Features</p>
+      <h1>Feature coverage that maps to real bunker operating pressure.</h1>
+      <p>
+        This page exists so the public site is not only a landing page. It gives search engines,
+        public retrieval systems, and human buyers a dedicated summary of what Fueld actually helps teams do.
+      </p>
+    </div>
+    <div class="card-grid">
+      {featureGroups.map((group) => (
+        <article class="info-card">
+          <h2>{group.title}</h2>
+          <p>{group.body}</p>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="content-band">
+    <div class="section-heading narrow">
+      <p class="eyebrow">Commercial angle</p>
+      <h2>Capability matters more when the deployment model is also under control.</h2>
+      <p>
+        The product story is stronger because the feature set is paired with dedicated deployment,
+        regional hosting choice, and a clear position on customer data boundaries.
+      </p>
+      <p>
+        <a class="button button-primary" href="/deployment/">Review deployment options</a>
+      </p>
+    </div>
+  </section>
+</BaseLayout>

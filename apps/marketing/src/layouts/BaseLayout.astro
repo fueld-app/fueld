@@ -1,0 +1,126 @@
+---
+import SeoSchema from '../components/SeoSchema.astro';
+import { siteConfig } from '../config/site';
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  description?: string;
+  path?: string;
+  image?: string;
+  schemas?: Record<string, unknown>[];
+  noindex?: boolean;
+}
+
+const {
+  title,
+  description = siteConfig.description,
+  path = '/',
+  image = siteConfig.socialImage,
+  schemas = [],
+  noindex = false,
+} = Astro.props;
+
+const site = Astro.site ?? new URL(siteConfig.siteUrl);
+const canonical = new URL(path, site).toString();
+const imageUrl = new URL(image, site).toString();
+const pageTitle = `${title} | ${siteConfig.name}`;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+    <meta name="robots" content={noindex ? 'noindex, nofollow' : 'index, follow'} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={siteConfig.name} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={imageUrl} />
+    <meta property="og:image:alt" content="Fueld marketing site preview" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={pageTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={imageUrl} />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f6f7fb" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#06080d" />
+    <script is:inline>
+      // Apply saved theme before paint to avoid FOUC.
+      try {
+        var t = localStorage.getItem('fueld-theme');
+        if (t === 'light' || t === 'dark') {
+          document.documentElement.setAttribute('data-theme', t);
+        }
+      } catch (_) {}
+    </script>
+    {schemas.length > 0 && <SeoSchema schemas={schemas} />}
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <div class="site-shell">
+      <header class="site-header">
+        <div class="brand-row">
+          <a class="brand-mark" href="/" aria-label="Fueld home">
+            <span class="brand-mark__glyph">F</span>
+            <span class="brand-mark__name">Fueld</span>
+          </a>
+          <div class="header-actions">
+            <nav aria-label="Primary">
+              <ul class="nav-list">
+                {siteConfig.nav.map((item) => (
+                  <li><a href={item.href}>{item.label}</a></li>
+                ))}
+              </ul>
+            </nav>
+            <button
+              type="button"
+              class="theme-toggle"
+              aria-label="Toggle color theme"
+              data-theme-toggle
+            >
+              <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+              <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+            </button>
+          </div>
+        </div>
+      </header>
+      <script is:inline>
+        (function () {
+          var btn = document.querySelector('[data-theme-toggle]');
+          if (!btn) return;
+          btn.addEventListener('click', function () {
+            var current = document.documentElement.getAttribute('data-theme');
+            if (!current) {
+              current = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+            }
+            var next = current === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            try { localStorage.setItem('fueld-theme', next); } catch (_) {}
+          });
+        })();
+      </script>
+      <main id="main-content">
+        <slot />
+      </main>
+      <footer class="site-footer">
+        <div>
+          <p class="footer-brand">{siteConfig.name}</p>
+          <p>{siteConfig.titleSuffix}. Dedicated deployment. Clear control.</p>
+        </div>
+        <div class="footer-links">
+          <a href="/features/">Features</a>
+          <a href="/deployment/">Deployment</a>
+          <a href="/privacy/">Privacy</a>
+          <a href="/llms.txt">llms.txt</a>
+        </div>
+      </footer>
+    </div>
+  </body>
+</html>

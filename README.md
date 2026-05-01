@@ -4,6 +4,7 @@ Bunker trading SaaS built as a Bun + TypeScript monorepo:
 
 - **API**: Bun runtime, Elysia, Drizzle ORM, PostgreSQL
 - **Web**: Angular (standalone components, zoneless change detection), Tailwind v4
+- **Marketing**: Astro static site for the public root domain, designed for Netlify deployment
 - **Shared types**: `@fueld/types` workspace package
 - **Prod deploy**: GitHub Actions → VPS (Ubuntu) using a **blue/green** systemd + nginx swap
 
@@ -19,6 +20,8 @@ Bunker trading SaaS built as a Bun + TypeScript monorepo:
   - `tests/` — Bun tests (unit/service/e2e)
 - `apps/web/` — Angular app
   - `src/app/` — features, pages, core services
+- `apps/marketing/` — Astro static marketing site
+  - `src/pages/` — public pages, sitemap, robots, llms routes
 - `packages/types/` — shared DTOs/enums used by both API and web
 - `deploy/` — VPS bootstrap + blue/green deploy script
 - `.github/workflows/deploy.yml` — CI build + deploy pipeline
@@ -75,14 +78,18 @@ From repo root:
 ```bash
 bun run dev:api
 bun run dev:web
+bun run dev:marketing
 ```
 
 - Web: `http://localhost:4200`
 - API: `http://localhost:3000`
+- Marketing: `http://localhost:4321`
 - Swagger: `http://localhost:3000/swagger`
 
 In production, nginx serves the web app at `/` and proxies the API under `/api/`.
 So `https://<domain>/api/health` maps to `http://127.0.0.1:<slotPort>/health`.
+
+The marketing site is intended to be deployed separately to Netlify (or a similar static host), with the public root domain pointing at the Astro build and the authenticated product UI moving to an app subdomain.
 
 ---
 

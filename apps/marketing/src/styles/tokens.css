@@ -1,0 +1,295 @@
+/*
+ * Fueld design tokens.
+ *
+ * Single source of truth for colors, surfaces, typography, radii, and shadows.
+ * Imported by the marketing site today; safe to drop into the Angular platform
+ * (e.g. via styles.css / @import) so both surfaces share one visual system.
+ *
+ * Themes:
+ *   - Default (no data-theme attr) follows the OS color scheme.
+ *   - data-theme="dark"  forces dark.
+ *   - data-theme="light" forces light.
+ */
+
+:root {
+  /* ---------- Brand / accent (theme-agnostic) ---------- */
+  --accent:        #f59e0b;
+  --accent-2:      #fbbf24;
+  --accent-deep:   #b45309;
+  --cyan:          #22d3ee;
+  --emerald:       #34d399;
+  --on-accent:     #1a1208;
+
+  --gradient-accent: linear-gradient(135deg, #f59e0b 0%, #fb923c 60%, #f97316 100%);
+  --gradient-accent-hover: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+
+  /* ---------- Radii / typography ---------- */
+  --radius-xl: 24px;
+  --radius-lg: 16px;
+  --radius-md: 10px;
+  --radius-sm: 8px;
+
+  --font-display: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  --font-body:    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  --font-mono:    ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+}
+
+/* ============================================================
+   DARK THEME (default)
+   ============================================================ */
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --bg:          #06080d;
+  --bg-2:        #0a0e16;
+  --surface:     #0f1421;
+  --surface-2:   #141a2b;
+  --surface-3:   #1a2236;
+  --surface-inset: rgba(0, 0, 0, 0.30);
+  --surface-inset-strong: rgba(0, 0, 0, 0.45);
+  --surface-tint: rgba(255, 255, 255, 0.025);
+  --surface-tint-strong: rgba(255, 255, 255, 0.05);
+
+  /* Lines */
+  --line:        rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.16);
+  --line-hover:  rgba(255, 255, 255, 0.25);
+
+  /* Ink */
+  --ink:         #f3f5fa;
+  --ink-dim:     #c7cdda;
+  --muted:       #8a93a6;
+
+  /* Heading gradient */
+  --heading-from: #ffffff;
+  --heading-to:   #c9d2e3;
+
+  /* Header pill */
+  --header-bg:     rgba(10, 14, 22, 0.72);
+  --header-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.6);
+
+  /* Hero */
+  --gradient-hero:
+    radial-gradient(1100px 600px at 85% -10%, rgba(245, 158, 11, 0.18), transparent 60%),
+    radial-gradient(900px 500px at 0% 10%,    rgba(34, 211, 238, 0.10), transparent 60%),
+    linear-gradient(180deg, #06080d 0%, #0a0e16 100%);
+  --gradient-hero-band:
+    radial-gradient(700px 380px at 90% 10%, rgba(245, 158, 11, 0.16), transparent 60%),
+    radial-gradient(500px 280px at 0% 100%, rgba(34, 211, 238, 0.08), transparent 60%),
+    var(--surface);
+  --gradient-card: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%);
+  --hero-grid:     rgba(255, 255, 255, 0.025);
+
+  /* Contrast band */
+  --contrast-bg:
+    radial-gradient(800px 400px at 100% 0%, rgba(34, 211, 238, 0.10), transparent 55%),
+    linear-gradient(180deg, #0c1220 0%, #0a0e1a 100%);
+
+  /* Code */
+  --code-bg:   #050810;
+  --code-kw:   #c084fc;
+  --code-fn:   var(--cyan);
+  --code-str:  #fbbf24;
+  --code-cm:   var(--muted);
+
+  /* Phones */
+  --phone-frame: linear-gradient(180deg, #1a2236, #0c1220);
+  --phone-inner: linear-gradient(180deg, #0c1220, #0a0e1a);
+  --phone-screen-bg:
+    radial-gradient(circle at 30% 0%, rgba(245, 158, 11, 0.08), transparent 50%),
+    linear-gradient(180deg, #0a0e16 0%, #0f1421 100%);
+
+  /* Pills (status) */
+  --pill-emerald-bg:   rgba(52, 211, 153, 0.12);
+  --pill-emerald-fg:   var(--emerald);
+  --pill-emerald-line: rgba(52, 211, 153, 0.30);
+  --pill-amber-bg:     rgba(245, 158, 11, 0.12);
+  --pill-amber-fg:     var(--accent-2);
+  --pill-amber-line:   rgba(245, 158, 11, 0.30);
+
+  /* Eyebrow chip */
+  --chip-bg: rgba(245, 158, 11, 0.08);
+  --chip-fg: var(--accent-2);
+
+  /* Selection */
+  --selection-bg: rgba(245, 158, 11, 0.35);
+  --selection-fg: #fff;
+
+  /* Shadows */
+  --shadow-soft: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 30px 80px -20px rgba(0, 0, 0, 0.6);
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 18px 40px -20px rgba(0, 0, 0, 0.55);
+  --shadow-phone: 0 30px 60px -20px rgba(0, 0, 0, 0.7);
+  --shadow-accent: 0 10px 24px -10px rgba(245, 158, 11, 0.55);
+  --shadow-accent-hover: 0 14px 30px -10px rgba(245, 158, 11, 0.7);
+}
+
+/* ============================================================
+   LIGHT THEME
+   ============================================================ */
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  /* Surfaces */
+  --bg:          #f6f7fb;
+  --bg-2:        #eef1f7;
+  --surface:     #ffffff;
+  --surface-2:   #fafbfd;
+  --surface-3:   #f1f3f8;
+  --surface-inset: rgba(15, 20, 35, 0.04);
+  --surface-inset-strong: rgba(15, 20, 35, 0.08);
+  --surface-tint: rgba(15, 20, 35, 0.03);
+  --surface-tint-strong: rgba(15, 20, 35, 0.05);
+
+  /* Lines */
+  --line:        rgba(15, 20, 35, 0.08);
+  --line-strong: rgba(15, 20, 35, 0.16);
+  --line-hover:  rgba(15, 20, 35, 0.28);
+
+  /* Ink */
+  --ink:         #0f1421;
+  --ink-dim:     #3f4658;
+  --muted:       #6b7385;
+
+  /* Heading gradient */
+  --heading-from: #0f1421;
+  --heading-to:   #3f4658;
+
+  /* Header pill */
+  --header-bg:     rgba(255, 255, 255, 0.78);
+  --header-shadow: 0 10px 30px -12px rgba(15, 20, 35, 0.18);
+
+  /* Hero */
+  --gradient-hero:
+    radial-gradient(1100px 600px at 85% -10%, rgba(245, 158, 11, 0.16), transparent 60%),
+    radial-gradient(900px 500px at 0% 10%,    rgba(34, 211, 238, 0.12), transparent 60%),
+    linear-gradient(180deg, #f6f7fb 0%, #eef1f7 100%);
+  --gradient-hero-band:
+    radial-gradient(700px 380px at 90% 10%, rgba(245, 158, 11, 0.14), transparent 60%),
+    radial-gradient(500px 280px at 0% 100%, rgba(34, 211, 238, 0.10), transparent 60%),
+    var(--surface);
+  --gradient-card: linear-gradient(180deg, rgba(15, 20, 35, 0.015) 0%, rgba(15, 20, 35, 0) 100%);
+  --hero-grid:     rgba(15, 20, 35, 0.05);
+
+  /* Contrast band — keep dark for visual rhythm in light mode too */
+  --contrast-bg:
+    radial-gradient(800px 400px at 100% 0%, rgba(34, 211, 238, 0.12), transparent 55%),
+    linear-gradient(180deg, #0c1220 0%, #0a0e1a 100%);
+
+  /* Code (light syntax) */
+  --code-bg:  #f3f5fa;
+  --code-kw:  #7c3aed;
+  --code-fn:  #0e7490;
+  --code-str: #b45309;
+  --code-cm:  #6b7385;
+
+  /* Phones */
+  --phone-frame: linear-gradient(180deg, #d7dbe5, #b8bdcc);
+  --phone-inner: linear-gradient(180deg, #ffffff, #f3f5fa);
+  --phone-screen-bg:
+    radial-gradient(circle at 30% 0%, rgba(245, 158, 11, 0.10), transparent 50%),
+    linear-gradient(180deg, #ffffff 0%, #f3f5fa 100%);
+
+  /* Pills */
+  --pill-emerald-bg:   rgba(5, 150, 105, 0.10);
+  --pill-emerald-fg:   #047857;
+  --pill-emerald-line: rgba(5, 150, 105, 0.30);
+  --pill-amber-bg:     rgba(245, 158, 11, 0.12);
+  --pill-amber-fg:     #b45309;
+  --pill-amber-line:   rgba(245, 158, 11, 0.35);
+
+  /* Eyebrow chip */
+  --chip-bg: rgba(245, 158, 11, 0.12);
+  --chip-fg: #b45309;
+
+  /* Selection */
+  --selection-bg: rgba(245, 158, 11, 0.30);
+  --selection-fg: #1a1208;
+
+  /* Shadows */
+  --shadow-soft:  0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 24px 60px -28px rgba(15, 20, 35, 0.25);
+  --shadow-card:  0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 14px 32px -22px rgba(15, 20, 35, 0.22);
+  --shadow-phone: 0 28px 60px -28px rgba(15, 20, 35, 0.35);
+  --shadow-accent:       0 10px 24px -10px rgba(245, 158, 11, 0.45);
+  --shadow-accent-hover: 0 14px 30px -10px rgba(245, 158, 11, 0.6);
+}
+
+/* ============================================================
+   System preference (only when user hasn't picked)
+   ============================================================ */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    color-scheme: light;
+
+    --bg:          #f6f7fb;
+    --bg-2:        #eef1f7;
+    --surface:     #ffffff;
+    --surface-2:   #fafbfd;
+    --surface-3:   #f1f3f8;
+    --surface-inset: rgba(15, 20, 35, 0.04);
+    --surface-inset-strong: rgba(15, 20, 35, 0.08);
+    --surface-tint: rgba(15, 20, 35, 0.03);
+    --surface-tint-strong: rgba(15, 20, 35, 0.05);
+
+    --line:        rgba(15, 20, 35, 0.08);
+    --line-strong: rgba(15, 20, 35, 0.16);
+    --line-hover:  rgba(15, 20, 35, 0.28);
+
+    --ink:         #0f1421;
+    --ink-dim:     #3f4658;
+    --muted:       #6b7385;
+
+    --heading-from: #0f1421;
+    --heading-to:   #3f4658;
+
+    --header-bg:     rgba(255, 255, 255, 0.78);
+    --header-shadow: 0 10px 30px -12px rgba(15, 20, 35, 0.18);
+
+    --gradient-hero:
+      radial-gradient(1100px 600px at 85% -10%, rgba(245, 158, 11, 0.16), transparent 60%),
+      radial-gradient(900px 500px at 0% 10%,    rgba(34, 211, 238, 0.12), transparent 60%),
+      linear-gradient(180deg, #f6f7fb 0%, #eef1f7 100%);
+    --gradient-hero-band:
+      radial-gradient(700px 380px at 90% 10%, rgba(245, 158, 11, 0.14), transparent 60%),
+      radial-gradient(500px 280px at 0% 100%, rgba(34, 211, 238, 0.10), transparent 60%),
+      var(--surface);
+    --gradient-card: linear-gradient(180deg, rgba(15, 20, 35, 0.015) 0%, rgba(15, 20, 35, 0) 100%);
+    --hero-grid:     rgba(15, 20, 35, 0.05);
+
+    --contrast-bg:
+      radial-gradient(800px 400px at 100% 0%, rgba(34, 211, 238, 0.12), transparent 55%),
+      linear-gradient(180deg, #0c1220 0%, #0a0e1a 100%);
+
+    --code-bg:  #f3f5fa;
+    --code-kw:  #7c3aed;
+    --code-fn:  #0e7490;
+    --code-str: #b45309;
+    --code-cm:  #6b7385;
+
+    --phone-frame: linear-gradient(180deg, #d7dbe5, #b8bdcc);
+    --phone-inner: linear-gradient(180deg, #ffffff, #f3f5fa);
+    --phone-screen-bg:
+      radial-gradient(circle at 30% 0%, rgba(245, 158, 11, 0.10), transparent 50%),
+      linear-gradient(180deg, #ffffff 0%, #f3f5fa 100%);
+
+    --pill-emerald-bg:   rgba(5, 150, 105, 0.10);
+    --pill-emerald-fg:   #047857;
+    --pill-emerald-line: rgba(5, 150, 105, 0.30);
+    --pill-amber-bg:     rgba(245, 158, 11, 0.12);
+    --pill-amber-fg:     #b45309;
+    --pill-amber-line:   rgba(245, 158, 11, 0.35);
+
+    --chip-bg: rgba(245, 158, 11, 0.12);
+    --chip-fg: #b45309;
+
+    --selection-bg: rgba(245, 158, 11, 0.30);
+    --selection-fg: #1a1208;
+
+    --shadow-soft:  0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 24px 60px -28px rgba(15, 20, 35, 0.25);
+    --shadow-card:  0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 14px 32px -22px rgba(15, 20, 35, 0.22);
+    --shadow-phone: 0 28px 60px -28px rgba(15, 20, 35, 0.35);
+    --shadow-accent:       0 10px 24px -10px rgba(245, 158, 11, 0.45);
+    --shadow-accent-hover: 0 14px 30px -10px rgba(245, 158, 11, 0.6);
+  }
+}

@@ -1,0 +1,59 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const schemas = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    name: 'Fueld deployment options',
+    description: 'Deployment models for running Fueld in a dedicated environment.',
+  },
+];
+---
+
+<BaseLayout
+  title="Deployment options"
+  description="Choose whether Fueld runs in your own environment or on dedicated managed infrastructure in your preferred region."
+  path="/deployment/"
+  schemas={schemas}
+>
+  <section class="content-band page-hero">
+    <div class="section-heading narrow">
+      <p class="eyebrow">Deployment</p>
+      <h1>Choose the operating model that fits your control boundary.</h1>
+      <p>
+        Fueld is positioned for teams that need a dedicated environment. That means you choose how
+        the platform is run, where it is hosted, and who is responsible for day-to-day operations.
+      </p>
+    </div>
+    <div class="card-grid">
+      <article class="info-card">
+        <h2>Customer-managed deployment</h2>
+        <p>
+          Run Fueld in your own cloud account or on premises, aligned to your internal controls,
+          security policy, and data handling standards.
+        </p>
+      </article>
+      <article class="info-card">
+        <h2>Dedicated managed infrastructure</h2>
+        <p>
+          Ask for help with the operational side while keeping the deployment dedicated to your business,
+          not merged into a multi-tenant environment.
+        </p>
+      </article>
+      <article class="info-card">
+        <h2>Region-aware hosting</h2>
+        <p>
+          Select a preferred geography to match customer requirements, jurisdictional expectations,
+          or internal policy decisions.
+        </p>
+      </article>
+      <article class="info-card">
+        <h2>Clear access boundary</h2>
+        <p>
+          The public commercial stance is simple: no shared customer data loop, and no platform access beyond the support and licensing model you explicitly approve.
+        </p>
+      </article>
+    </div>
+  </section>
+</BaseLayout>

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="Fueld dedicated bunker trading software">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0d1f1d" />
+      <stop offset="100%" stop-color="#244441" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" rx="36" fill="url(#bg)" />
+  <circle cx="960" cy="120" r="180" fill="rgba(200,114,69,0.14)" />
+  <circle cx="190" cy="560" r="220" fill="rgba(153,217,201,0.12)" />
+  <text x="84" y="152" fill="#c87245" font-family="Avenir Next, Segoe UI, sans-serif" font-size="30" letter-spacing="6">DEDICATED BUNKER TRADING SOFTWARE</text>
+  <text x="84" y="286" fill="#f5f2e8" font-family="Palatino Linotype, Book Antiqua, serif" font-size="84" font-weight="700">Your data should not</text>
+  <text x="84" y="374" fill="#f5f2e8" font-family="Palatino Linotype, Book Antiqua, serif" font-size="84" font-weight="700">be trapped in pooled SaaS.</text>
+  <text x="84" y="470" fill="#d8e8e0" font-family="Avenir Next, Segoe UI, sans-serif" font-size="32">Dedicated deployment. Regional hosting control. Mobile-ready workflows.</text>
+  <rect x="84" y="518" width="232" height="58" rx="29" fill="#c87245" />
+  <text x="126" y="556" fill="#ffffff" font-family="Avenir Next, Segoe UI, sans-serif" font-size="28" font-weight="700">Book a meeting</text>
+</svg>

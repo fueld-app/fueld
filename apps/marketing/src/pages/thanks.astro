@@ -1,0 +1,25 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { siteConfig } from '../config/site';
+---
+
+<BaseLayout
+  title="Thanks"
+  description="Your request has been received."
+  path="/thanks/"
+  noindex={true}
+>
+  <section class="content-band page-hero thanks-shell">
+    <div class="section-heading narrow">
+      <p class="eyebrow">Thanks</p>
+      <h1>Your request has been sent.</h1>
+      <p>
+        We will follow up using the details you shared. If the request is urgent,
+        you can also email <a href={`mailto:${siteConfig.contactEmail}`}>{siteConfig.contactEmail}</a>.
+      </p>
+      <p>
+        <a class="button button-primary" href="/">Return to homepage</a>
+      </p>
+    </div>
+  </section>
+</BaseLayout>

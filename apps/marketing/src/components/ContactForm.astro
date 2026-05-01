@@ -1,0 +1,98 @@
+---
+import { regionOptions, siteConfig } from '../config/site';
+
+interface Props {
+  id?: string;
+}
+
+const { id = 'contact' } = Astro.props;
+---
+
+<section id={id} class="contact-shell" aria-labelledby="contact-title">
+  <div class="contact-copy">
+    <p class="eyebrow">Book an intro call</p>
+    <h2 id="contact-title">Tell us how you want to run Fueld.</h2>
+    <p>
+      Use the form to request an intro meeting. We will follow up on your preferred operating
+      model, hosting region, and the workflows you want to improve first.
+    </p>
+    <ul class="contact-points" role="list">
+      <li>Dedicated deployment, not a shared tenant pool.</li>
+      <li>Self-hosted, customer-managed, or Fueld-managed infrastructure.</li>
+      <li>Mobile-ready workflows for traders, operators, and management.</li>
+    </ul>
+    <p class="contact-fallback">
+      Prefer email? Write to <a href={`mailto:${siteConfig.contactEmail}`}>{siteConfig.contactEmail}</a>.
+    </p>
+  </div>
+
+  <form
+    class="contact-form"
+    name="marketing-contact"
+    method="POST"
+    action="/thanks/"
+    data-netlify="true"
+    netlify-honeypot="company-website"
+  >
+    <input type="hidden" name="form-name" value="marketing-contact" />
+    <p class="sr-only">
+      <label>
+        Leave this field empty if you are human
+        <input name="company-website" autocomplete="off" tabindex="-1" />
+      </label>
+    </p>
+
+    <div class="field-grid two-up">
+      <label>
+        <span>Name</span>
+        <input name="name" type="text" autocomplete="name" required />
+      </label>
+      <label>
+        <span>Work email</span>
+        <input name="email" type="email" autocomplete="email" required />
+      </label>
+    </div>
+
+    <div class="field-grid two-up">
+      <label>
+        <span>Company</span>
+        <input name="company" type="text" autocomplete="organization" required />
+      </label>
+      <label>
+        <span>Role</span>
+        <input name="role" type="text" autocomplete="organization-title" placeholder="Broker, trader, ops, finance..." required />
+      </label>
+    </div>
+
+    <div class="field-grid two-up">
+      <label>
+        <span>Deployment preference</span>
+        <select name="deploymentPreference" required>
+          <option value="">Select an option</option>
+          <option>Self-hosted or on premises</option>
+          <option>Managed by our team on dedicated infrastructure</option>
+          <option>We are deciding</option>
+        </select>
+      </label>
+      <label>
+        <span>Preferred hosting region</span>
+        <select name="preferredRegion" required>
+          <option value="">Select a region</option>
+          {regionOptions.map((option) => <option value={option}>{option}</option>)}
+        </select>
+      </label>
+    </div>
+
+    <label>
+      <span>What needs to improve first?</span>
+      <textarea
+        name="message"
+        rows="5"
+        required
+        placeholder="Examples: faster RFQ handling, document automation, credit controls, supplier communication, mobile usability..."
+      ></textarea>
+    </label>
+
+    <button type="submit">Request a meeting</button>
+  </form>
+</section>
