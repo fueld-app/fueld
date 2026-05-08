@@ -323,14 +323,14 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             ${{ steps.target.outputs.vps_user }}@${{ steps.target.outputs.vps_host }} \
-            "APP_DIR='${{ steps.target.outputs.app_dir }}'; chmod +x \"$APP_DIR/staging/deploy.sh\" && APP_DIR=\"$APP_DIR\" bash \"$APP_DIR/staging/deploy.sh\""
+            "APP_DIR='${{ steps.target.outputs.app_dir }}'; chmod +x \"\$APP_DIR/staging/deploy.sh\" && APP_DIR=\"\$APP_DIR\" bash \"\$APP_DIR/staging/deploy.sh\""
 
       - name: Verify deployment
         run: |
           sleep 3
           STATUS=$(ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             ${{ steps.target.outputs.vps_user }}@${{ steps.target.outputs.vps_host }} \
-            "APP_DIR='${{ steps.target.outputs.app_dir }}'; curl -sf http://127.0.0.1:\$(cat \"$APP_DIR/active-slot\" | xargs -I{} sh -c 'if [ {} = blue ]; then echo 3000; else echo 3001; fi')/health | jq -r '.data.status'" 2>/dev/null || echo "failed")
+            "APP_DIR='${{ steps.target.outputs.app_dir }}'; curl -sf http://127.0.0.1:\$(cat \"\$APP_DIR/active-slot\" | xargs -I{} sh -c 'if [ {} = blue ]; then echo 3000; else echo 3001; fi')/health | jq -r '.data.status'" 2>/dev/null || echo "failed")
           if [ "$STATUS" = "ok" ]; then
             echo "✅ Deployment verified — API health check passed"
           else
