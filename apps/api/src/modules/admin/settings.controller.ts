@@ -9,6 +9,7 @@ import { authGuard } from '../auth/auth.guard';
 import {
   listOwnCompanies,
   setOwnCompany,
+  setCompanyPhysicalOpsEnabled,
   listTeams,
   createTeam,
   updateTeam,
@@ -169,6 +170,21 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   }, {
     params: t.Object({ id: t.String() }),
     detail: { tags: ['Admin Settings'], summary: 'Unmark a company as own' },
+  })
+
+  .put('/own-companies/:id/physical-ops', async ({ auth, params, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await setCompanyPhysicalOpsEnabled(params.id, body.enabled);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    params: t.Object({ id: t.String() }),
+    body: t.Object({ enabled: t.Boolean() }),
+    detail: { tags: ['Admin Settings'], summary: 'Toggle physical-ops eligibility' },
   })
 
   .put('/own-companies/:id/terms', async ({ auth, params, body }) => {

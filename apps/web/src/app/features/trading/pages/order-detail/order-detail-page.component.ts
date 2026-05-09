@@ -34,12 +34,17 @@ import {
   type PlattsSuggestionsResponseDto,
   type OrderSupplierDto,
   type SupplierNominationSummaryDto,
+  type WarehouseDto,
+  type InventorySkuDto,
+  type InventoryAvailabilityResultDto,
+  type OrderTransferDto,
 } from '@fueld/types';
 
 import {
   OrderItemsComponent,
   type OrderItemRow,
   type OrderItemsEconomics,
+  type OrderItemAvailability,
 } from '../../components/order-items/order-items.component';
 import { OrderFinancingSummaryComponent } from '../../components/order-financing-summary/order-financing-summary.component';
 import {
@@ -57,6 +62,8 @@ import { ActivityTimelineComponent } from '../../../../shared/components/activit
 import { EmailHistoryCardComponent } from '../../../../shared/components/email-history-card/email-history-card.component';
 import { TradingDetailHeaderComponent } from '../../components/detail-header/detail-header.component';
 import { TradingDetailMetaCardsComponent } from '../../components/detail-meta-cards/detail-meta-cards.component';
+import { InternalTransferSummaryComponent } from '../../components/internal-transfer-summary/internal-transfer-summary.component';
+import { InternalTransferSidesComponent } from '../../components/internal-transfer-sides/internal-transfer-sides.component';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { CreditApplicationModalComponent } from '../../../credit/components/credit-application-modal.component';
 
@@ -194,6 +201,8 @@ interface PlattsSuggestionViewModel {
     PdfPreviewModalComponent,
     TradingDetailHeaderComponent,
     TradingDetailMetaCardsComponent,
+    InternalTransferSummaryComponent,
+    InternalTransferSidesComponent,
     CreditApplicationModalComponent,
   ],
   template: `
@@ -268,6 +277,12 @@ interface PlattsSuggestionViewModel {
         </div>
       </div>
     </app-trading-detail-header>
+
+    @if (isInternalTransfer()) {
+      <div class="mt-4">
+        <app-internal-transfer-summary [transfer]="transfer()" />
+      </div>
+    }
 
     <app-trading-detail-meta-cards
       [clientName]="clientName()"
@@ -345,7 +360,7 @@ interface PlattsSuggestionViewModel {
       (agentContactChange)="onAgentContactChange($event)"
     >
       <div supplierHeaderTabs>
-        @if (orderSupplierTabs().length > 0) {
+        @if (orderSupplierTabs().length > 0 && !isInternalTransfer()) {
           <div class="grid min-w-0 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
             <div class="scrollbar-none min-w-0 flex-1 overflow-x-auto">
               <div class="flex min-w-max items-center gap-1">
@@ -603,7 +618,7 @@ interface PlattsSuggestionViewModel {
       </div>
     </app-trading-detail-meta-cards>
 
-    @if (isInquiryContext()) {
+    @if (isInquiryContext() && !isInternalTransfer()) {
       <div class="mt-4 grid gap-4 lg:grid-cols-2 lg:items-stretch">
         <div class="flex h-full flex-col overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-emerald-50 shadow-sm lg:order-1">
         <div class="border-b border-slate-200/70 px-5 py-4">
@@ -1066,10 +1081,22 @@ interface PlattsSuggestionViewModel {
       [currencyOptionsInput]="configuredCurrencies()"
       [priceReferencesInput]="configuredPriceReferences()"
       [plattsSuggestionsInput]="plattsSuggestionItems()"
+      [warehouseOptionsInput]="warehouseDropdownOptions()"
+      [inventorySkuOptionsInput]="inventorySkuDropdownOptions()"
+      [availabilityByRowId]="availabilityByRowId()"
       (itemsChange)="onItemsChange($event)"
       (economicsChange)="onItemEconomicsChange($event)"
       (displayCurrencyChange)="itemDisplayCurrency.set($event)"
     />
+
+    @if (isInternalTransfer()) {
+      <div class="mt-4">
+        <app-internal-transfer-sides
+          [orderId]="orderId()"
+          [readonly]="isReadonly()"
+        />
+      </div>
+    }
 
     <!-- ═════════════════════════════════════════════════════════════ -->
     <!--  Financing Summary + Platts Signals (side-by-side on desktop) -->
@@ -1748,6 +1775,57 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly inquiryItems = computed(() =>
     this.itemRows().map((r) => ({ productType: r.productType, quantity: r.quantity, quantityMin: r.quantityMin, unit: r.costUnit ?? r.unit })),
   );
+
+  // ─── Inventory (physical-ops) state ─────────────────────────────────
+  /** All warehouses (loaded once on init); filtered to relevant ones via `availableWarehouses`. */
+  readonly allWarehouses = signal<WarehouseDto[]>([]);
+  /** Inventory SKUs (loaded once). */
+  readonly inventorySkus = signal<InventorySkuDto[]>([]);
+  /** Live availability check results keyed by item row id. */
+  readonly availabilityByRowId = signal<Record<string, OrderItemAvailability>>({});
+  /** Debounce timers per row id for availability checks. */
+  private readonly availabilityTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  /** Warehouses tied to the current order's client or supplier (so inventory pickers show useful options only). */
+  readonly availableWarehouses = computed<WarehouseDto[]>(() => {
+    const order = this.order();
+    if (!order) return [];
+    const relevantCompanyIds = new Set<string>();
+    if (order.clientId) relevantCompanyIds.add(order.clientId);
+    if (order.supplierId) relevantCompanyIds.add(order.supplierId);
+    for (const supplier of this.orderSuppliers()) {
+      if (supplier.companyId) relevantCompanyIds.add(supplier.companyId);
+    }
+    return this.allWarehouses().filter((w) =>
+      w.active && w.inventoryEnabled && relevantCompanyIds.has(w.ownerCompanyId),
+    );
+  });
+
+  readonly warehouseDropdownOptions = computed<DropdownOption[]>(() =>
+    this.availableWarehouses().map((w) => ({
+      value: w.id,
+      label: w.vesselName ? `${w.name} · ${w.vesselName}` : w.name,
+    })),
+  );
+
+  readonly inventorySkuDropdownOptions = computed<DropdownOption[]>(() =>
+    this.inventorySkus()
+      .filter((s) => s.active && s.inventoryTracked)
+      .map((s) => ({
+        value: s.id,
+        label: s.grade ? `${s.displayName} (${s.grade})` : s.displayName,
+      })),
+  );
+
+  /** True when any tracked line currently fails the availability check. */
+  readonly hasInventoryShortage = computed(() => {
+    const map = this.availabilityByRowId();
+    return Object.values(map).some((a) => a && !a.ok);
+  });
+
+  // ─── Internal transfer state ────────────────────────────────────────
+  readonly transfer = signal<OrderTransferDto | null>(null);
+  readonly isInternalTransfer = computed(() => this.order()?.orderKind === 'INTERNAL_TRANSFER');
   readonly itemEconomics = signal<OrderItemsEconomics>({
     totalQuantity: 0,
     totalCost: 0,
@@ -2592,6 +2670,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
             salesBargingUnit: item.salesBargingUnit ?? null,
             salesCreditDays: item.salesCreditDays ?? null,
             salesPriceFinalized: item.salesPriceFinalized ?? false,
+            // Inventory linkage (optional, only present when admin enabled inventory for this order's warehouse)
+            inventorySkuId: item.inventorySkuId ?? null,
+            warehouseId: item.warehouseId ?? null,
+            plannedInventoryAt: item.plannedInventoryAt ?? null,
           })),
         );
         this.draftItemIds.set(new Set());
@@ -2600,6 +2682,14 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         await this.loadSupplierCreditLines(this.activeOrderSupplier()?.companyId ?? d.supplierId);
         await this.loadReferenceData();
         await this.loadPlattsSuggestions();
+        // Reference data (incl. warehouses + SKUs) is now loaded; run an initial
+        // availability check for any tracked lines that came back from the server.
+        this.scheduleAvailabilityChecks();
+        if (d.orderKind === 'INTERNAL_TRANSFER') {
+          await this.loadInternalTransfer();
+        } else {
+          this.transfer.set(null);
+        }
         await this.loadCompanyContacts('customer', d.clientId);
         if (this.activeOrderSupplier()?.companyId ?? d.supplierId) {
           await this.loadCompanyContacts('supplier', this.activeOrderSupplier()?.companyId ?? d.supplierId);
@@ -2850,7 +2940,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   private async loadReferenceData(): Promise<void> {
     try {
-      const [suppliersRes, usersRes, productsRes, unitsRes, unitConversionsRes, currenciesRes, attachmentTypesRes, cancelReasonsRes, priceRefsRes] = await Promise.all([
+      const [suppliersRes, usersRes, productsRes, unitsRes, unitConversionsRes, currenciesRes, attachmentTypesRes, cancelReasonsRes, priceRefsRes, warehousesRes, skusRes] = await Promise.all([
         firstValueFrom(
           this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
             `${API_URL}/companies/local?type=SUPPLIER&limit=100`,
@@ -2879,6 +2969,12 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         ),
         firstValueFrom(
           this.http.get<ApiResponse<{ references: { id: string; name: string; code: string }[] }>>(`${API_URL}/admin/settings/my-price-references`),
+        ),
+        firstValueFrom(
+          this.http.get<ApiResponse<WarehouseDto[]>>(`${API_URL}/inventory/warehouses?activeOnly=true&inventoryEnabledOnly=true`),
+        ),
+        firstValueFrom(
+          this.http.get<ApiResponse<InventorySkuDto[]>>(`${API_URL}/inventory/skus`),
         ),
       ]);
       if (suppliersRes.success) {
@@ -2913,6 +3009,12 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       }
       if (priceRefsRes.success) {
         this.configuredPriceReferences.set(priceRefsRes.data.references ?? []);
+      }
+      if (warehousesRes.success) {
+        this.allWarehouses.set(warehousesRes.data ?? []);
+      }
+      if (skusRes.success) {
+        this.inventorySkus.set(skusRes.data ?? []);
       }
     } catch {
       // silently ignore
@@ -3379,6 +3481,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         salesBarging: r.salesBarging != null ? String(r.salesBarging) : null,
         salesBargingUnit: r.salesBargingUnit ?? null,
         salesCreditDays: r.salesCreditDays ?? null,
+        // Inventory linkage — only persisted when the line is tracked.
+        inventorySkuId: r.inventorySkuId ?? null,
+        warehouseId: r.warehouseId ?? null,
+        plannedInventoryAt: r.plannedInventoryAt ?? null,
       };
     });
   }
@@ -3671,7 +3777,93 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   onItemsChange(items: OrderItemRow[]): void {
     this.itemRows.set(this.normalizeIncomingItemRows(items));
     this.queuePlattsSuggestionsLoad();
+    this.scheduleAvailabilityChecks();
     this.triggerAutosave();
+  }
+
+  // ─── Inventory availability ──────────────────────────────────────
+  /** Schedule an availability check for each tracked line; debounced per row. */
+  private scheduleAvailabilityChecks(): void {
+    const rows = this.itemRows();
+    const trackedIds = new Set<string>();
+    for (const row of rows) {
+      if (!row.warehouseId || !row.inventorySkuId) continue;
+      trackedIds.add(row.id);
+
+      // Debounce 300ms per row to avoid hammering the API while editing quantity.
+      const existing = this.availabilityTimers.get(row.id);
+      if (existing) clearTimeout(existing);
+      this.availabilityTimers.set(row.id, setTimeout(() => {
+        this.availabilityTimers.delete(row.id);
+        void this.runAvailabilityCheck(row.id);
+      }, 300));
+    }
+
+    // Drop stale entries for rows that are no longer tracked or were removed.
+    this.availabilityByRowId.update((current) => {
+      const next: Record<string, OrderItemAvailability> = {};
+      for (const [rowId, value] of Object.entries(current)) {
+        if (trackedIds.has(rowId)) next[rowId] = value;
+      }
+      return next;
+    });
+  }
+
+  /** Load the internal-transfer extension (source/destination companies + warehouses). */
+  private async loadInternalTransfer(): Promise<void> {
+    const id = this.orderId();
+    if (!id) return;
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ transfer: OrderTransferDto; sides: unknown[] }>>(
+          `${API_URL}/transfers/${id}`,
+        ),
+      );
+      if (res.success && res.data?.transfer) {
+        this.transfer.set(res.data.transfer);
+      }
+    } catch {
+      // non-fatal: a missing transfer extension just hides the summary card.
+    }
+  }
+
+  private async runAvailabilityCheck(rowId: string): Promise<void> {
+    const row = this.itemRows().find((r) => r.id === rowId);
+    if (!row || !row.warehouseId || !row.inventorySkuId) return;
+    const quantity = row.quantity > 0 ? row.quantity : 0;
+    if (quantity <= 0) {
+      this.availabilityByRowId.update((m) => {
+        const next = { ...m };
+        delete next[rowId];
+        return next;
+      });
+      return;
+    }
+
+    // Resolve the planned date — explicit field wins; otherwise fall back to ETA, then now.
+    const neededAt = row.plannedInventoryAt
+      ?? this.order()?.eta
+      ?? new Date().toISOString();
+
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<InventoryAvailabilityResultDto>>(
+          `${API_URL}/inventory/check-availability`,
+          {
+            warehouseId: row.warehouseId,
+            skuId: row.inventorySkuId,
+            quantity: String(quantity),
+            unit: row.unit,
+            neededAt,
+          },
+        ),
+      );
+      if (res.success) {
+        this.availabilityByRowId.update((m) => ({ ...m, [rowId]: res.data }));
+      }
+    } catch {
+      // Silent — availability is advisory; backend still enforces at confirmation.
+    }
   }
 
   async loadPlattsSuggestions(): Promise<void> {
@@ -4671,6 +4863,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     if (!id) return;
     if (!this.hasLineItems()) {
       this.showToast('error', 'Add at least one line item before converting to order.');
+      return;
+    }
+    // Block confirmation when any inventory-tracked line currently fails availability.
+    if (this.hasInventoryShortage()) {
+      this.showToast('error', 'One or more tracked line items are short on inventory. Adjust quantity, warehouse, or planned date before confirming.');
       return;
     }
 

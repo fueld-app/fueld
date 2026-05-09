@@ -25,6 +25,7 @@ export const roleEnum = pgEnum('role', [
   'FINANCE',
   'TEAMLEAD',
   'CREDITMANAGER',
+  'OPERATIONSMANAGER',
 ]);
 
 export const orderStatusEnum = pgEnum('order_status', [
@@ -152,6 +153,45 @@ export const plattsSectionTypeEnum = pgEnum('platts_section_type', [
   'WITHDRAWALS',
   'COMMENTARY',
   'OTHER',
+]);
+
+// ── Inventory / Physical Ops ──
+export const orderKindEnum = pgEnum('order_kind', [
+  'EXTERNAL',          // standard external trade (default)
+  'INTERNAL_TRANSFER', // own-company-to-own-company stock move
+]);
+
+export const warehouseTypeEnum = pgEnum('warehouse_type', [
+  'VESSEL',
+  'TERMINAL',
+  'SHORE_TANK',
+  'OTHER',
+]);
+
+export const inventoryMovementTypeEnum = pgEnum('inventory_movement_type', [
+  'INBOUND_DELIVERY',     // confirmed inbound delivery applied to stock
+  'OUTBOUND_DELIVERY',    // confirmed outbound delivery applied to stock
+  'TRANSFER_OUT',         // internal transfer leaving source warehouse
+  'TRANSFER_IN',          // internal transfer arriving at destination warehouse
+  'ADJUSTMENT',           // manual stock adjustment
+  'OPENING_BALANCE',      // initial stock seed
+]);
+
+export const replenishmentStatusEnum = pgEnum('replenishment_status', [
+  'PLANNED',     // operations-planned, not yet linked to an order
+  'LINKED',      // linked to an inbound order/transfer but not yet completed
+  'COMPLETED',   // converted to an actual movement
+  'CANCELLED',
+]);
+
+export const transferSideStatusEnum = pgEnum('transfer_side_status', [
+  'DRAFT',
+  'FINALIZED',
+]);
+
+export const transferSideKindEnum = pgEnum('transfer_side_kind', [
+  'SOURCE_SELL',
+  'DESTINATION_BUY',
 ]);
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -492,6 +532,11 @@ export const counterparties = pgTable('counterparties', {
   // Single-level only: a parent cannot be a child, a child cannot be a parent.
   parentId: uuid('parent_id'),
 
+  // ── Physical Operations / Inventory ────────────────────────────────
+  // Marks this company as eligible to own inventory-managed warehouses.
+  // Inventory rules only apply to companies with this flag set.
+  physicalOpsEnabled: boolean('physical_ops_enabled').notNull().default(false),
+
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -714,6 +759,10 @@ export const orders = pgTable('orders', {
   // External order number (e.g. 20260209-000001) — unique, human-readable
   orderNumber: text('order_number').unique(),
 
+  // Order kind — distinguishes external trades from internal transfers between
+  // our own companies. Internal transfers carry a 1:1 row in `orderTransfers`.
+  orderKind: orderKindEnum('order_kind').notNull().default('EXTERNAL'),
+
   clientId: uuid('client_id').notNull().references(() => counterparties.id),
   vesselId: uuid('vessel_id').notNull().references(() => vessels.id),
   placeId: uuid('place_id').notNull().references(() => places.id),
@@ -857,6 +906,14 @@ export const orderItems = pgTable('order_items', {
   paymentTerms: paymentTermsEnum('payment_terms'),
 
   customerNote: text('customer_note'),
+
+  // ── Inventory linkage (optional; only set for tracked SKUs) ───────
+  // When set, this line participates in inventory rules: stock checks at
+  // confirmation, reservation creation, and movement on delivery.
+  inventorySkuId: uuid('inventory_sku_id'),
+  warehouseId: uuid('warehouse_id'),
+  // Optional explicit physical date (overrides ETA/ETD for stock timing).
+  plannedInventoryAt: timestamp('planned_inventory_at', { withTimezone: true }),
 
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -2038,3 +2095,223 @@ export const vesselSanctionChecksRelations = relations(vesselSanctionChecks, ({ 
 
 export type VesselSanctionCheck = typeof vesselSanctionChecks.$inferSelect;
 export type NewVesselSanctionCheck = typeof vesselSanctionChecks.$inferInsert;
+
+// ═══════════════════════════════════════════════════════════════════════
+//  INVENTORY / PHYSICAL OPS
+// ═══════════════════════════════════════════════════════════════════════
+
+// ── Inventory SKUs (tenant-level master list of tracked product+grade) ──
+export const inventorySkus = pgTable('inventory_skus', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  productType: productTypeEnum('product_type').notNull(),
+  grade: text('grade'),                                  // optional sub-grade label, free-text
+  displayName: text('display_name').notNull(),
+  baseUnit: text('base_unit').notNull().default('MT'),
+  inventoryTracked: boolean('inventory_tracked').notNull().default(true),
+  allowedUnits: jsonb('allowed_units').$type<string[]>().notNull().default([]),
+  active: boolean('active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  tenantProductGradeIdx: uniqueIndex('inventory_skus_tenant_product_grade_idx')
+    .on(table.tenantId, table.productType, table.grade),
+}));
+
+// ── Warehouses (operational locations owned by a company) ──
+export const warehouses = pgTable('warehouses', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  ownerCompanyId: uuid('owner_company_id').notNull().references(() => counterparties.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  type: warehouseTypeEnum('type').notNull().default('VESSEL'),
+  vesselId: uuid('vessel_id').references(() => vessels.id, { onDelete: 'set null' }),
+  placeId: uuid('place_id').references(() => places.id, { onDelete: 'set null' }),
+  inventoryEnabled: boolean('inventory_enabled').notNull().default(false),
+  allowManualReplenishment: boolean('allow_manual_replenishment').notNull().default(true),
+  active: boolean('active').notNull().default(true),
+  notes: text('notes'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  ownerActiveIdx: index('warehouses_owner_active_idx').on(table.ownerCompanyId, table.active),
+  vesselIdx: index('warehouses_vessel_idx').on(table.vesselId),
+}));
+
+// ── Movements (immutable stock ledger) ──
+export const inventoryMovements = pgTable('inventory_movements', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  warehouseId: uuid('warehouse_id').notNull().references(() => warehouses.id, { onDelete: 'cascade' }),
+  skuId: uuid('sku_id').notNull().references(() => inventorySkus.id, { onDelete: 'restrict' }),
+  // signed quantity in the SKU's base unit: positive for inbound, negative for outbound.
+  quantity: numeric('quantity', { precision: 14, scale: 3 }).notNull(),
+  unit: text('unit').notNull().default('MT'),
+  movementType: inventoryMovementTypeEnum('movement_type').notNull(),
+  occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+  // Source linkage (optional — manual movements may have none).
+  orderId: uuid('order_id').references(() => orders.id, { onDelete: 'set null' }),
+  orderItemId: uuid('order_item_id').references(() => orderItems.id, { onDelete: 'set null' }),
+  replenishmentPlanId: uuid('replenishment_plan_id'),
+  note: text('note'),
+  createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  warehouseSkuOccurredIdx: index('inventory_movements_warehouse_sku_occurred_idx')
+    .on(table.warehouseId, table.skuId, table.occurredAt),
+  orderItemIdx: index('inventory_movements_order_item_idx').on(table.orderItemId),
+}));
+
+// ── Reservations (confirmed but not yet delivered outbound commitments) ──
+export const inventoryReservations = pgTable('inventory_reservations', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  warehouseId: uuid('warehouse_id').notNull().references(() => warehouses.id, { onDelete: 'cascade' }),
+  skuId: uuid('sku_id').notNull().references(() => inventorySkus.id, { onDelete: 'restrict' }),
+  // unsigned reserved quantity in the SKU's base unit.
+  quantity: numeric('quantity', { precision: 14, scale: 3 }).notNull(),
+  unit: text('unit').notNull().default('MT'),
+  reservedFor: timestamp('reserved_for', { withTimezone: true }).notNull(),
+  orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
+  orderItemId: uuid('order_item_id').notNull().references(() => orderItems.id, { onDelete: 'cascade' }),
+  // direction: 'OUTBOUND' (deplete on confirmation) | 'TRANSFER_OUT' for source side of transfers.
+  direction: text('direction').notNull().default('OUTBOUND'),
+  releasedAt: timestamp('released_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  orderItemIdx: uniqueIndex('inventory_reservations_order_item_idx').on(table.orderItemId),
+  warehouseSkuIdx: index('inventory_reservations_warehouse_sku_idx').on(table.warehouseId, table.skuId),
+}));
+
+// ── Replenishment plans (future inbound stock, optionally linked to an order) ──
+export const inventoryReplenishmentPlans = pgTable('inventory_replenishment_plans', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  warehouseId: uuid('warehouse_id').notNull().references(() => warehouses.id, { onDelete: 'cascade' }),
+  skuId: uuid('sku_id').notNull().references(() => inventorySkus.id, { onDelete: 'restrict' }),
+  quantity: numeric('quantity', { precision: 14, scale: 3 }).notNull(),
+  unit: text('unit').notNull().default('MT'),
+  expectedAt: timestamp('expected_at', { withTimezone: true }).notNull(),
+  status: replenishmentStatusEnum('status').notNull().default('PLANNED'),
+  // Optional linkage to a real inbound order or transfer order.
+  orderId: uuid('order_id').references(() => orders.id, { onDelete: 'set null' }),
+  note: text('note'),
+  createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  warehouseSkuStatusIdx: index('inventory_replenishment_warehouse_sku_status_idx')
+    .on(table.warehouseId, table.skuId, table.status),
+}));
+
+// ── Internal transfer order extension (1:1 with orders where orderKind = 'INTERNAL_TRANSFER') ──
+export const orderTransfers = pgTable('order_transfers', {
+  orderId: uuid('order_id').primaryKey().references(() => orders.id, { onDelete: 'cascade' }),
+  sourceCompanyId: uuid('source_company_id').notNull().references(() => counterparties.id),
+  destinationCompanyId: uuid('destination_company_id').notNull().references(() => counterparties.id),
+  sourceWarehouseId: uuid('source_warehouse_id').notNull().references(() => warehouses.id),
+  destinationWarehouseId: uuid('destination_warehouse_id').notNull().references(() => warehouses.id),
+  // Optional planned arrival at the destination; falls back to the order ETA.
+  plannedArrivalAt: timestamp('planned_arrival_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ── Transfer financial sides (one per transfer order, both optional/draft until finalized) ──
+export const orderTransferSides = pgTable('order_transfer_sides', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
+  kind: transferSideKindEnum('kind').notNull(),
+  status: transferSideStatusEnum('status').notNull().default('DRAFT'),
+  companyId: uuid('company_id').notNull().references(() => counterparties.id),
+  invoicingCompanyId: uuid('invoicing_company_id').references(() => counterparties.id),
+  bankAccountId: uuid('bank_account_id').references(() => bankAccounts.id, { onDelete: 'set null' }),
+  paymentTermType: paymentTermTypeEnum('payment_term_type'),
+  creditDays: integer('credit_days'),
+  currency: text('currency').notNull().default('USD'),
+  invoiceId: uuid('invoice_id').references(() => invoices.id, { onDelete: 'set null' }),
+  finalizedAt: timestamp('finalized_at', { withTimezone: true }),
+  finalizedBy: uuid('finalized_by').references(() => users.id, { onDelete: 'set null' }),
+  note: text('note'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  orderKindIdx: uniqueIndex('order_transfer_sides_order_kind_idx').on(table.orderId, table.kind),
+}));
+
+// ── Relations ──
+export const inventorySkusRelations = relations(inventorySkus, ({ one, many }) => ({
+  tenant: one(tenants, { fields: [inventorySkus.tenantId], references: [tenants.id] }),
+  movements: many(inventoryMovements),
+  reservations: many(inventoryReservations),
+  replenishmentPlans: many(inventoryReplenishmentPlans),
+}));
+
+export const warehousesRelations = relations(warehouses, ({ one, many }) => ({
+  tenant: one(tenants, { fields: [warehouses.tenantId], references: [tenants.id] }),
+  ownerCompany: one(counterparties, { fields: [warehouses.ownerCompanyId], references: [counterparties.id] }),
+  vessel: one(vessels, { fields: [warehouses.vesselId], references: [vessels.id] }),
+  place: one(places, { fields: [warehouses.placeId], references: [places.id] }),
+  movements: many(inventoryMovements),
+  reservations: many(inventoryReservations),
+  replenishmentPlans: many(inventoryReplenishmentPlans),
+}));
+
+export const inventoryMovementsRelations = relations(inventoryMovements, ({ one }) => ({
+  tenant: one(tenants, { fields: [inventoryMovements.tenantId], references: [tenants.id] }),
+  warehouse: one(warehouses, { fields: [inventoryMovements.warehouseId], references: [warehouses.id] }),
+  sku: one(inventorySkus, { fields: [inventoryMovements.skuId], references: [inventorySkus.id] }),
+  order: one(orders, { fields: [inventoryMovements.orderId], references: [orders.id] }),
+  orderItem: one(orderItems, { fields: [inventoryMovements.orderItemId], references: [orderItems.id] }),
+  createdByUser: one(users, { fields: [inventoryMovements.createdBy], references: [users.id] }),
+}));
+
+export const inventoryReservationsRelations = relations(inventoryReservations, ({ one }) => ({
+  tenant: one(tenants, { fields: [inventoryReservations.tenantId], references: [tenants.id] }),
+  warehouse: one(warehouses, { fields: [inventoryReservations.warehouseId], references: [warehouses.id] }),
+  sku: one(inventorySkus, { fields: [inventoryReservations.skuId], references: [inventorySkus.id] }),
+  order: one(orders, { fields: [inventoryReservations.orderId], references: [orders.id] }),
+  orderItem: one(orderItems, { fields: [inventoryReservations.orderItemId], references: [orderItems.id] }),
+}));
+
+export const inventoryReplenishmentPlansRelations = relations(inventoryReplenishmentPlans, ({ one }) => ({
+  tenant: one(tenants, { fields: [inventoryReplenishmentPlans.tenantId], references: [tenants.id] }),
+  warehouse: one(warehouses, { fields: [inventoryReplenishmentPlans.warehouseId], references: [warehouses.id] }),
+  sku: one(inventorySkus, { fields: [inventoryReplenishmentPlans.skuId], references: [inventorySkus.id] }),
+  order: one(orders, { fields: [inventoryReplenishmentPlans.orderId], references: [orders.id] }),
+  createdByUser: one(users, { fields: [inventoryReplenishmentPlans.createdBy], references: [users.id] }),
+}));
+
+export const orderTransfersRelations = relations(orderTransfers, ({ one }) => ({
+  order: one(orders, { fields: [orderTransfers.orderId], references: [orders.id] }),
+  sourceCompany: one(counterparties, { fields: [orderTransfers.sourceCompanyId], references: [counterparties.id] }),
+  destinationCompany: one(counterparties, { fields: [orderTransfers.destinationCompanyId], references: [counterparties.id] }),
+  sourceWarehouse: one(warehouses, { fields: [orderTransfers.sourceWarehouseId], references: [warehouses.id] }),
+  destinationWarehouse: one(warehouses, { fields: [orderTransfers.destinationWarehouseId], references: [warehouses.id] }),
+}));
+
+export const orderTransferSidesRelations = relations(orderTransferSides, ({ one }) => ({
+  order: one(orders, { fields: [orderTransferSides.orderId], references: [orders.id] }),
+  company: one(counterparties, { fields: [orderTransferSides.companyId], references: [counterparties.id] }),
+  invoicingCompany: one(counterparties, { fields: [orderTransferSides.invoicingCompanyId], references: [counterparties.id] }),
+  bankAccount: one(bankAccounts, { fields: [orderTransferSides.bankAccountId], references: [bankAccounts.id] }),
+  invoice: one(invoices, { fields: [orderTransferSides.invoiceId], references: [invoices.id] }),
+  finalizedByUser: one(users, { fields: [orderTransferSides.finalizedBy], references: [users.id] }),
+}));
+
+// ── Inferred types ──
+export type InventorySku = typeof inventorySkus.$inferSelect;
+export type NewInventorySku = typeof inventorySkus.$inferInsert;
+export type Warehouse = typeof warehouses.$inferSelect;
+export type NewWarehouse = typeof warehouses.$inferInsert;
+export type InventoryMovement = typeof inventoryMovements.$inferSelect;
+export type NewInventoryMovement = typeof inventoryMovements.$inferInsert;
+export type InventoryReservation = typeof inventoryReservations.$inferSelect;
+export type NewInventoryReservation = typeof inventoryReservations.$inferInsert;
+export type InventoryReplenishmentPlan = typeof inventoryReplenishmentPlans.$inferSelect;
+export type NewInventoryReplenishmentPlan = typeof inventoryReplenishmentPlans.$inferInsert;
+export type OrderTransfer = typeof orderTransfers.$inferSelect;
+export type NewOrderTransfer = typeof orderTransfers.$inferInsert;
+export type OrderTransferSide = typeof orderTransferSides.$inferSelect;
+export type NewOrderTransferSide = typeof orderTransferSides.$inferInsert;

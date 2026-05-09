@@ -498,6 +498,13 @@
       "when": 1775400000000,
       "tag": "0070_supplier_inquiry_reminder_opt_in",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1778328000000,
+      "tag": "0071_inventory_physical_ops",
+      "breakpoints": true
     }
   ]
 }

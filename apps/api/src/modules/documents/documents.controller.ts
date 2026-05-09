@@ -8,7 +8,7 @@ import { getPortSuppliers } from '../lloyds/lli.service';
 import { logActivity } from '../activity/activity.service';
 import { sendWhatsAppGroupMessage, sendWhatsAppMessage } from '../whatsapp/whatsapp.service';
 import { db } from '../../db';
-import { users, counterparties, invoices as invoicesTable, companyContacts, companyEmails, supplierInquiries, supplierInquiryItemQuotes, portSuppliers, emailLog, tenants, orders, orderAttachments, orderSuppliers } from '../../db/schema';
+import { users, counterparties, invoices as invoicesTable, companyContacts, companyEmails, supplierInquiries, supplierInquiryItemQuotes, portSuppliers, emailLog, tenants, orders, orderAttachments, orderSuppliers, orderTransferSides } from '../../db/schema';
 import { getEmailTemplate, getApplicableEmailRules, renderTemplate, type TemplateVariables } from '../admin/email-settings.service';
 import { getInquirySettings } from '../admin/settings.service';
 import { applyStaleSupplierInquiryStatuses, createSupplierQuoteToken, getSupplierQuoteExpiryDate, getSupplierQuoteFormUrl, getSupplierInquiryOrderContext, saveSupplierInquiryResponse } from './supplier-inquiry.service';
@@ -41,6 +41,32 @@ function injectNominationResponseLink(htmlBody: string, responseUrl: string): st
     return replaced;
   }
   return `${replaced}${buildNominationResponseLinkCardHtml(responseUrl)}`;
+}
+
+/**
+ * For internal-transfer orders, finance documents (proforma/invoice) must not be
+ * generated until the relevant transfer side is finalized. Returns null when the
+ * order is not a transfer; otherwise returns an error message when blocked, or
+ * the empty string when the requested side is finalized.
+ */
+async function getTransferDocumentBlockReason(
+  order: Awaited<ReturnType<typeof getOrderById>>,
+  side: 'SOURCE_SELL' | 'DESTINATION_BUY' = 'SOURCE_SELL',
+): Promise<string | null> {
+  if (!order || (order as { orderKind?: string }).orderKind !== 'INTERNAL_TRANSFER') return null;
+  const [row] = await db
+    .select({ status: orderTransferSides.status })
+    .from(orderTransferSides)
+    .where(and(
+      eq(orderTransferSides.orderId, order.id),
+      eq(orderTransferSides.kind, side),
+    ))
+    .limit(1);
+  if (!row) return 'Transfer side not configured';
+  if (row.status !== 'FINALIZED') {
+    return `${side === 'SOURCE_SELL' ? 'Source' : 'Destination'} side is still in DRAFT — finalize it before generating documents`;
+  }
+  return '';
 }
 
 function resolveNominationOrderSupplier(
@@ -326,7 +352,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
   // ── GET /orders/:id/proforma/pdf ───────────────────────────────────
   .get(
     '/:id/proforma/pdf',
-    async ({ params, set }) => {
+    async ({ params, query, set }) => {
       const orderId = await resolveOrderId(params.id);
       if (!orderId) { set.status = 404; return { success: false, message: 'Order not found' }; }
       const order = await getOrderById(orderId);
@@ -337,6 +363,12 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       if (!order?.bankAccountId) {
         set.status = 400;
         return { success: false, message: 'Select a bank account before generating Proforma Invoice' };
+      }
+      const requestedSide = (query.side === 'DESTINATION_BUY' ? 'DESTINATION_BUY' : 'SOURCE_SELL') as 'SOURCE_SELL' | 'DESTINATION_BUY';
+      const transferBlock = await getTransferDocumentBlockReason(order, requestedSide);
+      if (transferBlock) {
+        set.status = 400;
+        return { success: false, message: transferBlock };
       }
       const { buffer, fileName, revision } = await generateProformaInvoicePdfBuffer(orderId);
 
@@ -352,9 +384,10 @@ export const documentsController = new Elysia({ prefix: '/orders' })
     },
     {
       params: t.Object({ id: t.String() }),
+      query: t.Object({ side: t.Optional(t.String()) }),
       detail: {
         tags: ['Documents'],
-        summary: 'Generate proforma invoice PDF for an order/inquiry',
+        summary: 'Generate proforma invoice PDF for an order/inquiry. For internal-transfer orders, optional `side=SOURCE_SELL|DESTINATION_BUY` selects which transfer side must be FINALIZED.',
         security: [{ bearerAuth: [] }],
       },
     },
@@ -363,7 +396,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
   // ── GET /orders/:id/invoice/pdf ────────────────────────────────────
   .get(
     '/:id/invoice/pdf',
-    async ({ params, set }) => {
+    async ({ params, query, set }) => {
       const orderId = await resolveOrderId(params.id);
       if (!orderId) { set.status = 404; return { success: false, message: 'Order not found' }; }
       const order = await getOrderById(orderId);
@@ -374,6 +407,12 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       if (!order?.bankAccountId) {
         set.status = 400;
         return { success: false, message: 'Select a bank account before generating Invoice/Proforma' };
+      }
+      const requestedSide = (query.side === 'DESTINATION_BUY' ? 'DESTINATION_BUY' : 'SOURCE_SELL') as 'SOURCE_SELL' | 'DESTINATION_BUY';
+      const transferBlock = await getTransferDocumentBlockReason(order, requestedSide);
+      if (transferBlock) {
+        set.status = 400;
+        return { success: false, message: transferBlock };
       }
       const { buffer, fileName, revision } = await generateOrderInvoicePdfBuffer(orderId);
 
@@ -389,9 +428,10 @@ export const documentsController = new Elysia({ prefix: '/orders' })
     },
     {
       params: t.Object({ id: t.String() }),
+      query: t.Object({ side: t.Optional(t.String()) }),
       detail: {
         tags: ['Documents'],
-        summary: 'Generate invoice PDF for an order',
+        summary: 'Generate invoice PDF for an order. For internal-transfer orders, optional `side=SOURCE_SELL|DESTINATION_BUY` selects which transfer side must be FINALIZED.',
         description: 'Fetches order, client, items and generates a professional invoice PDF.',
         security: [{ bearerAuth: [] }],
       },

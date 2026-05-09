@@ -12,7 +12,7 @@ import {
   effect,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { DecimalPipe } from '@angular/common';
+import { DecimalPipe, SlicePipe } from '@angular/common';
 import { ProductType, PricingModel, type PlattsSuggestionsResponseDto } from '@fueld/types';
 import { Subscription } from 'rxjs';
 import {
@@ -69,6 +69,18 @@ export interface OrderItemRow {
   salesBargingUnit?: string | null;
   salesCreditDays?: number | null;
   salesPriceFinalized?: boolean;
+  // Inventory linkage (optional; only relevant when an inventory-enabled warehouse applies)
+  inventorySkuId?: string | null;
+  warehouseId?: string | null;
+  plannedInventoryAt?: string | null;
+}
+
+/** Availability status for a given order item, keyed by row id. */
+export interface OrderItemAvailability {
+  ok: boolean;
+  earliestAvailableAt: string | null;
+  shortageQuantity: string | null;
+  reason: string | null;
 }
 
 export interface OrderItemsEconomics {
@@ -85,7 +97,7 @@ export interface OrderItemsEconomics {
 @Component({
   selector: 'app-order-items',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, DecimalPipe, SearchableDropdownComponent],
+  imports: [FormsModule, DecimalPipe, SlicePipe, SearchableDropdownComponent],
   template: `
     <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
       <!-- ═══════════════════════════════════════════════════════════ -->
@@ -603,6 +615,72 @@ export interface OrderItemsEconomics {
                 </td>
               }
             </tr>
+
+            <!-- Inventory band — only when warehouses exist for this order (e.g. own-company supplier with enabled warehouse). -->
+            @if (warehouseOptionsInput().length > 0) {
+              <tr class="border-b border-gray-100 bg-emerald-50/30">
+                <td [attr.colspan]="(readonly() ? 9 : 10) + (allowDeliveredEdit() ? 1 : 0)" class="px-4 py-2">
+                  <div class="flex flex-wrap items-end gap-3 text-xs">
+                    <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-700">
+                      Inventory
+                    </span>
+                    <label class="flex flex-col gap-0.5">
+                      <span class="text-[10px] font-medium uppercase tracking-wider text-gray-500">Warehouse</span>
+                      <select
+                        [ngModel]="row.warehouseId ?? ''"
+                        (ngModelChange)="updateField(i, 'warehouseId', $event || null)"
+                        [disabled]="readonly()"
+                        class="rounded-md border border-gray-300 px-2 py-1 text-xs disabled:opacity-60"
+                      >
+                        <option value="">— Not tracked —</option>
+                        @for (w of warehouseOptionsInput(); track w.value) {
+                          <option [value]="w.value">{{ w.label }}</option>
+                        }
+                      </select>
+                    </label>
+                    <label class="flex flex-col gap-0.5">
+                      <span class="text-[10px] font-medium uppercase tracking-wider text-gray-500">SKU</span>
+                      <select
+                        [ngModel]="row.inventorySkuId ?? ''"
+                        (ngModelChange)="updateField(i, 'inventorySkuId', $event || null)"
+                        [disabled]="readonly() || !row.warehouseId"
+                        class="rounded-md border border-gray-300 px-2 py-1 text-xs disabled:opacity-60"
+                      >
+                        <option value="">—</option>
+                        @for (s of inventorySkuOptionsInput(); track s.value) {
+                          <option [value]="s.value">{{ s.label }}</option>
+                        }
+                      </select>
+                    </label>
+                    <label class="flex flex-col gap-0.5">
+                      <span class="text-[10px] font-medium uppercase tracking-wider text-gray-500">Planned date</span>
+                      <input
+                        type="date"
+                        [ngModel]="formatDateInput(row.plannedInventoryAt)"
+                        (ngModelChange)="updateField(i, 'plannedInventoryAt', parseDateInput($event))"
+                        [disabled]="readonly() || !row.warehouseId"
+                        class="rounded-md border border-gray-300 px-2 py-1 text-xs disabled:opacity-60"
+                      />
+                    </label>
+                    @if (availabilityByRowId()[row.id]; as a) {
+                      @if (!a.ok) {
+                        <span class="ml-auto inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700"
+                          [title]="a.reason ?? 'Insufficient stock'">
+                          Short {{ a.shortageQuantity }}
+                          @if (a.earliestAvailableAt) {
+                            · earliest {{ a.earliestAvailableAt | slice:0:10 }}
+                          }
+                        </span>
+                      } @else if (row.warehouseId && row.inventorySkuId) {
+                        <span class="ml-auto inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                          Available
+                        </span>
+                      }
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
           } @empty {
             <tr>
               <td [attr.colspan]="(readonly() ? 9 : 10) + (allowDeliveredEdit() ? 1 : 0)" class="px-4 py-12 text-center">
@@ -1150,6 +1228,11 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   readonly supplierOptionsInput = input<DropdownOption[]>([]);
   readonly priceReferencesInput = input<{ id: string; name: string; code: string }[]>([]);
   readonly plattsSuggestionsInput = input<PlattsSuggestionsResponseDto['items']>([]);
+  // Inventory pickers (optional; only rendered when warehouseOptionsInput is non-empty).
+  readonly warehouseOptionsInput = input<DropdownOption[]>([]);
+  readonly inventorySkuOptionsInput = input<DropdownOption[]>([]);
+  /** Map of order-item row id → availability check result (controlled by parent). */
+  readonly availabilityByRowId = input<Record<string, OrderItemAvailability>>({});
   readonly itemsChange = output<OrderItemRow[]>();
   readonly economicsChange = output<OrderItemsEconomics>();
   readonly displayCurrencyChange = output<string>();
@@ -1417,6 +1500,22 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
 
     const parsed = Number(normalized);
     return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  /** Format an ISO timestamp to a `YYYY-MM-DD` string (UTC day, matches the rest of the app). */
+  formatDateInput(value: string | null | undefined): string {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toISOString().slice(0, 10);
+  }
+
+  /** Convert a date input value to an ISO timestamp pinned to UTC noon (matches order ETA convention). */
+  parseDateInput(value: string | null | undefined): string | null {
+    if (!value) return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    return new Date(`${trimmed}T12:00:00Z`).toISOString();
   }
 
   supplierLabel(orderSupplierId: string | null | undefined): string {

@@ -144,6 +144,21 @@ export async function setOwnCompany(companyId: string, isOwn: boolean) {
   return updated;
 }
 
+/** Toggle physical-ops eligibility for a company (warehouses + inventory rules). */
+export async function setCompanyPhysicalOpsEnabled(companyId: string, enabled: boolean) {
+  const [updated] = await db
+    .update(counterparties)
+    .set({ physicalOpsEnabled: enabled, updatedAt: new Date() })
+    .where(eq(counterparties.id, companyId))
+    .returning({
+      id: counterparties.id,
+      name: counterparties.name,
+      physicalOpsEnabled: counterparties.physicalOpsEnabled,
+    });
+  if (!updated) throw new Error('Company not found');
+  return updated;
+}
+
 export async function updateOwnCompanyTerms(companyId: string, data: {
   customerTerms?: string | null;
   supplierTerms?: string | null;

@@ -143,6 +143,10 @@ interface SaveItemInput {
   salesBargingUnit?: string | null;
   salesCreditDays?: number | null;
   salesPriceFinalized?: boolean | null;
+  // Inventory linkage (optional)
+  inventorySkuId?: string | null;
+  warehouseId?: string | null;
+  plannedInventoryAt?: string | null;
 }
 
 interface FinalizeItemPriceInput {
@@ -1199,6 +1203,11 @@ export async function getOrderById(idOrNumber: string) {
       salesBargingUnit: i.salesBargingUnit ?? null,
       salesCreditDays: i.salesCreditDays ?? null,
       salesPriceFinalized: i.salesPriceFinalized ?? false,
+      // Inventory linkage (read-side; the order-detail UI uses these to render
+      // pickers and run the availability check while editing).
+      inventorySkuId: i.inventorySkuId ?? null,
+      warehouseId: i.warehouseId ?? null,
+      plannedInventoryAt: i.plannedInventoryAt ? i.plannedInventoryAt.toISOString() : null,
     })),
   };
 }
@@ -1451,11 +1460,19 @@ export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
       salesBargingUnit: item.salesBargingUnit ?? null,
       salesCreditDays: item.salesCreditDays ?? null,
       salesPriceFinalized: item.salesPriceFinalized ?? false,
+      // Inventory linkage
+      inventorySkuId: item.inventorySkuId ?? null,
+      warehouseId: item.warehouseId ?? null,
+      plannedInventoryAt: item.plannedInventoryAt ? new Date(item.plannedInventoryAt) : null,
     };
   });
 
   return db.transaction(async (tx) => {
-    await tx.delete(orderItems).where(eq(orderItems.orderId, orderId));
+    // Drop reservations for items that no longer exist on the order before
+    // delete-cascade kicks in; this keeps inventory release atomic with item save.
+    await tx
+      .delete(orderItems)
+      .where(eq(orderItems.orderId, orderId));
 
     if (values.length === 0) return [];
 
@@ -1670,11 +1687,33 @@ export async function updateOrderStatus(
     setData.closedAt = new Date();
   }
 
+  // Capture pre-update status to know what transition we are doing.
+  const [previous] = await db
+    .select({ status: orders.status, orderKind: orders.orderKind })
+    .from(orders)
+    .where(eq(orders.id, id))
+    .limit(1);
+
   const [updated] = await db
     .update(orders)
     .set(setData)
     .where(eq(orders.id, id))
     .returning();
+
+  if (updated && previous) {
+    try {
+      await applyInventoryEffectsForStatusChange({
+        orderId: id,
+        fromStatus: previous.status,
+        toStatus: newStatus,
+        userId: userId ?? null,
+      });
+    } catch (err) {
+      console.error('[orders] Inventory effect failed on status change:', err);
+      // Inventory failures must not silently revert the status change, but they
+      // do warrant a log entry — the operations view will surface the mismatch.
+    }
+  }
 
   if (updated && userId) {
     await logActivity({
@@ -1687,6 +1726,177 @@ export async function updateOrderStatus(
   }
 
   return updated ?? null;
+}
+
+// ─── Inventory hook ────────────────────────────────────────────────
+// Applied on each transition. The full set of rules:
+//   * → CONFIRMED: create outbound reservations for tracked external sell lines;
+//                  for INTERNAL_TRANSFER orders, create both source-out reservation
+//                  and destination-side replenishment plan.
+//   * → DELIVERED: convert reservations into movements; for transfer orders also
+//                  realize the inbound movement at the destination warehouse.
+//   * → CANCELLED: release reservations and cancel any plan we created.
+async function applyInventoryEffectsForStatusChange(args: {
+  orderId: string;
+  fromStatus: string;
+  toStatus: string;
+  userId: string | null;
+}) {
+  const { orderId, toStatus, userId } = args;
+  // Lazy-import to avoid a circular dependency between orders and inventory
+  // services at module load time.
+  const inv = await import('../inventory/inventory.service');
+  const { orderTransfers } = await import('../../db/schema');
+
+  const [order] = await db
+    .select({
+      id: orders.id,
+      tenantId: orders.tenantId,
+      orderKind: orders.orderKind,
+      eta: orders.eta,
+      etd: orders.etd,
+      deliveredAt: orders.deliveredAt,
+    })
+    .from(orders)
+    .where(eq(orders.id, orderId))
+    .limit(1);
+  if (!order) return;
+
+  const items = await db
+    .select({
+      id: orderItems.id,
+      orderId: orderItems.orderId,
+      quantity: orderItems.quantity,
+      unit: orderItems.unit,
+      inventorySkuId: orderItems.inventorySkuId,
+      warehouseId: orderItems.warehouseId,
+      plannedInventoryAt: orderItems.plannedInventoryAt,
+    })
+    .from(orderItems)
+    .where(eq(orderItems.orderId, orderId));
+
+  // Resolve transfer extension when relevant.
+  const [transfer] = order.orderKind === 'INTERNAL_TRANSFER'
+    ? await db
+        .select()
+        .from(orderTransfers)
+        .where(eq(orderTransfers.orderId, orderId))
+        .limit(1)
+    : [];
+
+  // Helper: pick the timestamp for the inventory event.
+  const eventTime = (item: { plannedInventoryAt: Date | null }, fallback: Date | null): Date => {
+    if (item.plannedInventoryAt) return item.plannedInventoryAt;
+    if (fallback) return fallback;
+    return new Date();
+  };
+
+  if (toStatus === 'CONFIRMED') {
+    for (const item of items) {
+      if (!item.inventorySkuId || !item.warehouseId) continue;
+
+      const qty = Number(item.quantity);
+      if (!Number.isFinite(qty) || qty <= 0) continue;
+
+      // External order: outbound reservation at the chosen warehouse.
+      if (order.orderKind === 'EXTERNAL') {
+        await inv.upsertReservation({
+          warehouseId: item.warehouseId,
+          skuId: item.inventorySkuId,
+          quantity: qty,
+          unit: item.unit,
+          reservedFor: eventTime(item, order.eta ?? order.etd ?? null),
+          orderId,
+          orderItemId: item.id,
+          direction: 'OUTBOUND',
+        });
+      } else if (order.orderKind === 'INTERNAL_TRANSFER' && transfer) {
+        // Source: outbound transfer reservation.
+        await inv.upsertReservation({
+          warehouseId: transfer.sourceWarehouseId,
+          skuId: item.inventorySkuId,
+          quantity: qty,
+          unit: item.unit,
+          reservedFor: eventTime(item, order.etd ?? order.eta ?? null),
+          orderId,
+          orderItemId: item.id,
+          direction: 'TRANSFER_OUT',
+        });
+        // Destination: register a LINKED replenishment plan so future stock
+        // becomes visible to operations and feeds availability.
+        await inv.createReplenishmentPlan({
+          warehouseId: transfer.destinationWarehouseId,
+          skuId: item.inventorySkuId,
+          quantity: qty.toFixed(3),
+          unit: item.unit,
+          expectedAt: (transfer.plannedArrivalAt ?? order.eta ?? eventTime(item, null)).toISOString(),
+          orderId,
+        }, userId);
+      }
+    }
+  }
+
+  if (toStatus === 'DELIVERED') {
+    for (const item of items) {
+      if (!item.inventorySkuId || !item.warehouseId) continue;
+      const qty = Number(item.quantity);
+      if (!Number.isFinite(qty) || qty <= 0) continue;
+
+      const occurredAt = order.deliveredAt ?? eventTime(item, new Date());
+
+      if (order.orderKind === 'EXTERNAL') {
+        // Decrement stock at the warehouse (outbound delivery) and release reservation.
+        await inv.recordMovement({
+          warehouseId: item.warehouseId,
+          skuId: item.inventorySkuId,
+          quantity: -qty,
+          unit: item.unit,
+          movementType: 'OUTBOUND_DELIVERY',
+          occurredAt,
+          orderId,
+          orderItemId: item.id,
+          createdBy: userId,
+        });
+        await inv.releaseReservationByOrderItem(item.id);
+      } else if (order.orderKind === 'INTERNAL_TRANSFER' && transfer) {
+        // Source: decrement.
+        await inv.recordMovement({
+          warehouseId: transfer.sourceWarehouseId,
+          skuId: item.inventorySkuId,
+          quantity: -qty,
+          unit: item.unit,
+          movementType: 'TRANSFER_OUT',
+          occurredAt,
+          orderId,
+          orderItemId: item.id,
+          createdBy: userId,
+        });
+        // Destination: increment immediately at the same delivered time.
+        await inv.recordMovement({
+          warehouseId: transfer.destinationWarehouseId,
+          skuId: item.inventorySkuId,
+          quantity: qty,
+          unit: item.unit,
+          movementType: 'TRANSFER_IN',
+          occurredAt,
+          orderId,
+          orderItemId: item.id,
+          createdBy: userId,
+        });
+        await inv.releaseReservationByOrderItem(item.id);
+      }
+    }
+  }
+
+  if (toStatus === 'CANCELLED') {
+    await inv.releaseReservationsByOrder(orderId);
+    // Cancel any LINKED replenishment plans we created for this order.
+    const { inventoryReplenishmentPlans: plans } = await import('../../db/schema');
+    await db
+      .update(plans)
+      .set({ status: 'CANCELLED', updatedAt: new Date() })
+      .where(eq(plans.orderId, orderId));
+  }
 }
 
 // ─── Get Activity for an Order ──────────────────────────────────────
