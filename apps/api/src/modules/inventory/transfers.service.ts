@@ -328,6 +328,17 @@ export async function updateTransferSide(
     note?: string | null;
   },
 ) {
+  // Guard: a FINALIZED side is locked. Callers must reopen it first to edit.
+  // The UI also disables fields when finalized, but the API must enforce this
+  // independently to avoid a stale-tab edit slipping past.
+  const [existing] = await db
+    .select({ id: orderTransferSides.id, status: orderTransferSides.status })
+    .from(orderTransferSides)
+    .where(eq(orderTransferSides.id, sideId))
+    .limit(1);
+  if (!existing) return null;
+  if (existing.status === 'FINALIZED') return existing;
+
   const setData: Record<string, unknown> = { updatedAt: new Date() };
   if (input.invoicingCompanyId !== undefined) setData.invoicingCompanyId = input.invoicingCompanyId;
   if (input.bankAccountId !== undefined) setData.bankAccountId = input.bankAccountId;
