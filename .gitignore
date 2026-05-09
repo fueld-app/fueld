@@ -33,3 +33,9 @@ scripts/llm/bin/
 scripts/llm/models/
 scripts/llm/runtime-config.json
 scripts/llm/llama.log
+# Local CLI state
+.netlify/
+apps/*/.netlify/
+
+# Local doc-generation scratch artifacts (e.g. exported PDFs from manual runs)
+tmp/*.pdf

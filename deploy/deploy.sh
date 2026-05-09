@@ -5,7 +5,9 @@
 # ═══════════════════════════════════════════════════════════════════════
 set -euo pipefail
 
-APP_DIR="/opt/fueld"
+APP_DIR="${APP_DIR:-/opt/fueld}"
+APP_LLM_DIR="${APP_DIR}/llm"
+APP_PROMPTS_DIR="${APP_DIR}/prompts"
 HEALTH_TIMEOUT=15   # seconds to wait for health check
 HEALTH_RETRIES=5
 
@@ -116,15 +118,15 @@ fi
 UNIT_FILE="/etc/systemd/system/fueld-api@.service"
 NEED_RELOAD=false
 if [ -f "$UNIT_FILE" ]; then
-  if ! grep -q '/opt/fueld/llm' "$UNIT_FILE"; then
-    log "Patching systemd unit to add /opt/fueld/llm to ReadWritePaths..."
-    PATCHED=$(sed 's|ReadWritePaths=\(.*\)/tmp|ReadWritePaths=\1/opt/fueld/llm /tmp|' "$UNIT_FILE")
+  if ! grep -q "$APP_LLM_DIR" "$UNIT_FILE"; then
+    log "Patching systemd unit to add ${APP_LLM_DIR} to ReadWritePaths..."
+    PATCHED=$(sed "s|ReadWritePaths=\\(.*\\)/tmp|ReadWritePaths=\\1${APP_LLM_DIR} /tmp|" "$UNIT_FILE")
     echo "$PATCHED" | sudo tee "$UNIT_FILE" > /dev/null
     NEED_RELOAD=true
   fi
-  if ! grep -q '/opt/fueld/prompts' "$UNIT_FILE"; then
-    log "Patching systemd unit to add /opt/fueld/prompts to ReadWritePaths..."
-    PATCHED=$(sed 's|ReadWritePaths=\(.*\)/tmp|ReadWritePaths=\1/opt/fueld/prompts /tmp|' "$UNIT_FILE")
+  if ! grep -q "$APP_PROMPTS_DIR" "$UNIT_FILE"; then
+    log "Patching systemd unit to add ${APP_PROMPTS_DIR} to ReadWritePaths..."
+    PATCHED=$(sed "s|ReadWritePaths=\\(.*\\)/tmp|ReadWritePaths=\\1${APP_PROMPTS_DIR} /tmp|" "$UNIT_FILE")
     echo "$PATCHED" | sudo tee "$UNIT_FILE" > /dev/null
     NEED_RELOAD=true
   fi

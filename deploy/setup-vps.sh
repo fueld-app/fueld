@@ -5,18 +5,47 @@
 # ═══════════════════════════════════════════════════════════════════════
 set -euo pipefail
 
-DOMAIN="riviera-marine.fueld.app"
-BASE_DOMAIN="fueld.app"
-WILDCARD_DOMAIN="*.fueld.app"
-DEPLOY_USER="deploy"
-DB_NAME="fueld"
-DB_USER="fueld"
+APP_DIR="${APP_DIR:-/opt/fueld}"
+DOMAIN="${DOMAIN:-riviera-marine.fueld.app}"
+TLS_MODE="${TLS_MODE:-cloudflare-wildcard}"
+DEPLOY_USER="${DEPLOY_USER:-deploy}"
+DB_NAME="${DB_NAME:-fueld}"
+DB_USER="${DB_USER:-fueld}"
 DB_PASSWORD="${DB_PASSWORD:-$(openssl rand -base64 24)}"
 ADMIN_PASSWORD="$(openssl rand -base64 16 | tr -dc 'A-Za-z0-9' | head -c 20)"
 CF_API_TOKEN="${CF_API_TOKEN:-}"
 
+case "$TLS_MODE" in
+  cloudflare-wildcard|letsencrypt-nginx)
+    ;;
+  *)
+    echo "Unsupported TLS_MODE: $TLS_MODE" >&2
+    exit 1
+    ;;
+esac
+
+if [ "$TLS_MODE" = "cloudflare-wildcard" ]; then
+  BASE_DOMAIN="${BASE_DOMAIN:-${DOMAIN#*.}}"
+  CERT_NAME="${CERT_NAME:-$BASE_DOMAIN}"
+else
+  BASE_DOMAIN="${BASE_DOMAIN:-$DOMAIN}"
+  CERT_NAME="${CERT_NAME:-$DOMAIN}"
+fi
+
+WILDCARD_DOMAIN="${WILDCARD_DOMAIN:-*.${BASE_DOMAIN}}"
+CERTBOT_EMAIL="${CERTBOT_EMAIL:-admin@${BASE_DOMAIN}}"
+ADMIN_EMAIL="${ADMIN_EMAIL:-admin@${DOMAIN}}"
+
+APP_ENV_FILE="${APP_DIR}/.env"
+APP_DRIZZLE_DIR="${APP_DIR}/drizzle"
+APP_GEOIP_DIR="${APP_DIR}/geoip-data"
+APP_UPLOADS_DIR="${APP_DIR}/uploads"
+APP_LLM_DIR="${APP_DIR}/llm"
+APP_PROMPTS_DIR="${APP_DIR}/prompts"
+APP_WEB_DIR="${APP_DIR}/web/browser"
+
 echo "═══════════════════════════════════════════════════════════"
-echo "  Fueld VPS Setup — $DOMAIN ($WILDCARD_DOMAIN)"
+echo "  Fueld VPS Setup — $DOMAIN ($TLS_MODE)"
 echo "═══════════════════════════════════════════════════════════"
 
 # ─── 1. System updates ───────────────────────────────────────────────
@@ -101,14 +130,14 @@ fi
 
 # ─── 8. Create application directories ───────────────────────────────
 echo "▶ Creating application directories..."
-mkdir -p /opt/fueld/{blue,green,web,drizzle,geoip-data,uploads/avatars,uploads/logos,llm/bin,llm/models,llm/scripts}
-chown -R $DEPLOY_USER:$DEPLOY_USER /opt/fueld
+mkdir -p "$APP_DIR"/{blue,green,web,drizzle,geoip-data,uploads/avatars,uploads/logos,llm/bin,llm/models,llm/scripts,prompts}
+chown -R $DEPLOY_USER:$DEPLOY_USER "$APP_DIR"
 
 # Write active slot
-echo "blue" > /opt/fueld/active-slot
-chown $DEPLOY_USER:$DEPLOY_USER /opt/fueld/active-slot
+echo "blue" > "$APP_DIR/active-slot"
+chown $DEPLOY_USER:$DEPLOY_USER "$APP_DIR/active-slot"
 
-echo "  ✓ /opt/fueld directory structure created"
+echo "  ✓ $APP_DIR directory structure created"
 
 # ─── 9. Generate JWT secrets ─────────────────────────────────────────
 echo "▶ Generating application secrets..."
@@ -116,7 +145,7 @@ JWT_ACCESS=$(openssl rand -base64 48)
 JWT_REFRESH=$(openssl rand -base64 48)
 CREDENTIALS_ENCRYPTION_KEY=$(openssl rand -hex 32)
 
-cat > /opt/fueld/.env <<EOF
+cat > "$APP_ENV_FILE" <<EOF
 # ═══════════════════════════════════════════════════════════════
 #  Fueld Production Environment — generated $(date -Iseconds)
 # ═══════════════════════════════════════════════════════════════
@@ -145,14 +174,14 @@ WEBAUTHN_ORIGIN=https://$DOMAIN
 ADMIN_PASSWORD=$ADMIN_PASSWORD
 
 # Drizzle migrations directory
-MIGRATIONS_DIR=/opt/fueld/drizzle
+MIGRATIONS_DIR=$APP_DRIZZLE_DIR
 
 # GeoIP data directory (geoip-lite)
-GEODATADIR=/opt/fueld/geoip-data
+GEODATADIR=$APP_GEOIP_DIR
 
 # Local LLM (llama-server)
 LLM_BASE_URL=http://127.0.0.1:8081
-LLM_SCRIPT_DIR=/opt/fueld/llm
+LLM_SCRIPT_DIR=$APP_LLM_DIR
 
 # Lloyd's List Intelligence (optional)
 # LLI_USERNAME=
@@ -165,13 +194,13 @@ LLM_SCRIPT_DIR=/opt/fueld/llm
 # QB_ENVIRONMENT=production
 EOF
 
-chown $DEPLOY_USER:$DEPLOY_USER /opt/fueld/.env
-chmod 600 /opt/fueld/.env
-echo "  ✓ Environment file created at /opt/fueld/.env"
+chown $DEPLOY_USER:$DEPLOY_USER "$APP_ENV_FILE"
+chmod 600 "$APP_ENV_FILE"
+echo "  ✓ Environment file created at $APP_ENV_FILE"
 
 # ─── 10. Systemd services (blue-green) ───────────────────────────────
 echo "▶ Installing systemd services..."
-cat > /etc/systemd/system/fueld-api@.service <<'UNIT'
+cat > /etc/systemd/system/fueld-api@.service <<UNIT
 [Unit]
 Description=Fueld API (%i)
 After=network.target postgresql.service
@@ -181,13 +210,13 @@ Wants=postgresql.service
 Type=simple
 User=deploy
 Group=deploy
-WorkingDirectory=/opt/fueld
-EnvironmentFile=/opt/fueld/.env
+WorkingDirectory=${APP_DIR}
+EnvironmentFile=${APP_ENV_FILE}
 Environment=SLOT=%i
 
 # Port: blue=3000, green=3001
 ExecStartPre=/bin/bash -c 'if [ "%i" = "green" ]; then echo PORT=3001 > /tmp/fueld-%i-port; else echo PORT=3000 > /tmp/fueld-%i-port; fi'
-ExecStart=/bin/bash -c 'source /tmp/fueld-%i-port && export PORT && exec /opt/fueld/%i/app-release'
+ExecStart=/bin/bash -c 'source /tmp/fueld-%i-port && export PORT && exec ${APP_DIR}/%i/app-release'
 
 # Robustness
 Restart=always
@@ -203,7 +232,7 @@ MemoryMax=1G
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/fueld/uploads /opt/fueld/.env /opt/fueld/llm /opt/fueld/prompts /tmp
+ReadWritePaths=${APP_UPLOADS_DIR} ${APP_ENV_FILE} ${APP_LLM_DIR} ${APP_PROMPTS_DIR} /tmp
 PrivateTmp=true
 
 # Graceful shutdown
@@ -216,7 +245,7 @@ WantedBy=multi-user.target
 UNIT
 
 # ─── LLM service (llama-server) ───────────────────────────────────────
-cat > /etc/systemd/system/fueld-llm.service <<'UNIT'
+cat > /etc/systemd/system/fueld-llm.service <<UNIT
 [Unit]
 Description=Fueld LLM (llama-server)
 After=network.target
@@ -225,11 +254,11 @@ After=network.target
 Type=simple
 User=deploy
 Group=deploy
-WorkingDirectory=/opt/fueld/llm
-Environment=LD_LIBRARY_PATH=/opt/fueld/llm/bin
+WorkingDirectory=${APP_LLM_DIR}
+Environment=LD_LIBRARY_PATH=${APP_LLM_DIR}/bin
 
-ExecStart=/opt/fueld/llm/bin/llama-server \
-  --model /opt/fueld/llm/models/Qwen3.5-0.8B-Q4_K_M.gguf \
+ExecStart=${APP_LLM_DIR}/bin/llama-server \
+  --model ${APP_LLM_DIR}/models/Qwen3.5-0.8B-Q4_K_M.gguf \
   --host 127.0.0.1 \
   --port 8081 \
   --ctx-size 2048 \
@@ -268,12 +297,13 @@ upstream fueld_api {
 }
 EOF
 
+write_full_nginx_site_config() {
 cat > /etc/nginx/sites-available/$DOMAIN.conf <<'NGINX'
 # ─── HTTP → HTTPS redirect ───────────────────────────────────────────
 server {
     listen 80;
     listen [::]:80;
-    server_name *.fueld.app;
+  server_name __SERVER_NAME__;
 
     # Allow ACME challenges for Certbot
     location /.well-known/acme-challenge/ {
@@ -289,11 +319,11 @@ server {
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
-    server_name *.fueld.app;
+  server_name __SERVER_NAME__;
 
     # SSL (managed by Certbot — placeholders until certs are issued)
-    ssl_certificate /etc/letsencrypt/live/fueld.app/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/fueld.app/privkey.pem;
+  ssl_certificate /etc/letsencrypt/live/__CERT_NAME__/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/__CERT_NAME__/privkey.pem;
     ssl_session_timeout 1d;
     ssl_session_cache shared:SSL:10m;
     ssl_session_tickets off;
@@ -316,7 +346,7 @@ server {
     gzip_min_length 256;
 
     # ─── Frontend (Angular SPA) ───────────────────────────────────────
-    root /opt/fueld/web/browser;
+    root __APP_WEB_DIR__;
     index index.html;
 
     location / {
@@ -362,7 +392,7 @@ server {
 
     # ─── Uploads (served via API) ─────────────────────────────────────
     location /uploads/ {
-        alias /opt/fueld/uploads/;
+      alias __APP_UPLOADS_DIR__/;
         expires 1h;
         add_header Cache-Control "public";
     }
@@ -376,36 +406,85 @@ server {
 }
 NGINX
 
-ln -sf /etc/nginx/sites-available/$DOMAIN.conf /etc/nginx/sites-enabled/
-echo "  ✓ Nginx configured"
+sed -i.bak \
+  -e "s|__SERVER_NAME__|$DOMAIN|g" \
+  -e "s|__CERT_NAME__|$CERT_NAME|g" \
+  -e "s|__APP_WEB_DIR__|$APP_WEB_DIR|g" \
+  -e "s|__APP_UPLOADS_DIR__|$APP_UPLOADS_DIR|g" \
+  "/etc/nginx/sites-available/$DOMAIN.conf"
+rm -f "/etc/nginx/sites-available/$DOMAIN.conf.bak"
+}
+
+write_http_only_nginx_site_config() {
+cat > /etc/nginx/sites-available/$DOMAIN.conf <<'NGINX'
+server {
+    listen 80;
+    listen [::]:80;
+    server_name __SERVER_NAME__;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+
+    location / {
+        default_type text/plain;
+        return 200 'fueld bootstrap';
+    }
+}
+NGINX
+
+sed -i.bak \
+  -e "s|__SERVER_NAME__|$DOMAIN|g" \
+  "/etc/nginx/sites-available/$DOMAIN.conf"
+rm -f "/etc/nginx/sites-available/$DOMAIN.conf.bak"
+}
 
 # ─── 12. SSL Certificates ────────────────────────────────────────────
-echo "▶ Obtaining wildcard SSL certificate ($WILDCARD_DOMAIN)..."
+case "$TLS_MODE" in
+  cloudflare-wildcard)
+    echo "▶ Obtaining wildcard SSL certificate ($WILDCARD_DOMAIN)..."
 
-if [ -z "$CF_API_TOKEN" ]; then
-  echo "❌ CF_API_TOKEN is required for wildcard certificates via Cloudflare DNS."
-  echo "   Export it before running:"
-  echo "   CF_API_TOKEN=your_cloudflare_token bash setup-vps.sh"
-  exit 1
-fi
+    if [ -z "$CF_API_TOKEN" ]; then
+      echo "❌ CF_API_TOKEN is required for wildcard certificates via Cloudflare DNS."
+      echo "   Export it before running:"
+      echo "   CF_API_TOKEN=your_cloudflare_token DOMAIN=$DOMAIN bash setup-vps.sh"
+      exit 1
+    fi
 
-mkdir -p /root/.secrets/certbot
-cat > /root/.secrets/certbot/cloudflare.ini <<EOF
+    mkdir -p /root/.secrets/certbot
+    cat > /root/.secrets/certbot/cloudflare.ini <<EOF
 dns_cloudflare_api_token = $CF_API_TOKEN
 EOF
-chmod 600 /root/.secrets/certbot/cloudflare.ini
+    chmod 600 /root/.secrets/certbot/cloudflare.ini
 
-# Request wildcard cert via DNS-01 (Cloudflare)
-certbot certonly \
-  --dns-cloudflare \
-  --dns-cloudflare-credentials /root/.secrets/certbot/cloudflare.ini \
-  -d "$WILDCARD_DOMAIN" \
-  --cert-name "$BASE_DOMAIN" \
-  --non-interactive --agree-tos --email admin@fueld.app
+    certbot certonly \
+      --dns-cloudflare \
+      --dns-cloudflare-credentials /root/.secrets/certbot/cloudflare.ini \
+      -d "$WILDCARD_DOMAIN" \
+      -d "$DOMAIN" \
+      --cert-name "$CERT_NAME" \
+      --non-interactive --agree-tos --email "$CERTBOT_EMAIL"
+    ;;
+  letsencrypt-nginx)
+    echo "▶ Obtaining Let's Encrypt certificate for $DOMAIN..."
+    write_http_only_nginx_site_config
+    ln -sf /etc/nginx/sites-available/$DOMAIN.conf /etc/nginx/sites-enabled/
+    nginx -t && systemctl restart nginx
+
+    certbot certonly --webroot \
+      -w /var/www/html \
+      -d "$DOMAIN" \
+      --cert-name "$CERT_NAME" \
+      --non-interactive --agree-tos --email "$CERTBOT_EMAIL"
+    ;;
+esac
+
+write_full_nginx_site_config
 
 # Now enable the full config
 ln -sf /etc/nginx/sites-available/$DOMAIN.conf /etc/nginx/sites-enabled/
 nginx -t && systemctl restart nginx
+echo "  ✓ Nginx configured"
 
 # Auto-renewal
 systemctl enable certbot.timer
@@ -434,14 +513,15 @@ echo "  ✅ VPS Setup Complete!"
 echo "═══════════════════════════════════════════════════════════"
 echo ""
 echo "  Domain:       $DOMAIN"
+echo "  TLS Mode:     $TLS_MODE"
 echo "  DB User:      $DB_USER"
 echo "  DB Pass:      $DB_PASSWORD"
 echo "  DB Name:      $DB_NAME"
 echo "  DB URL:       postgres://$DB_USER:$DB_PASSWORD@localhost:5432/$DB_NAME"
-echo "  Env File:     /opt/fueld/.env"
-echo "  App Dir:      /opt/fueld/"
+echo "  Env File:     $APP_ENV_FILE"
+echo "  App Dir:      $APP_DIR/"
 echo ""
-echo "  Admin Login:  admin@fueld.app"
+echo "  Admin Login:  $ADMIN_EMAIL"
 echo "  Admin Pass:   $ADMIN_PASSWORD"
 echo ""
 echo "  ⚠️  SAVE THE PASSWORDS ABOVE — they won't be shown again."
@@ -449,5 +529,5 @@ echo ""
 echo "  Next steps:"
 echo "  1. Add VPS_SSH_KEY to GitHub repository secrets"
 echo "  2. Push code to trigger first deployment"
-echo "  3. After first deploy, run: bun run /opt/fueld/seed.ts"
+echo "  3. Seed initial data from a repo checkout if required"
 echo ""

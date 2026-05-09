@@ -51,15 +51,7 @@ const pageTitle = `${title} | ${siteConfig.name}`;
     <meta name="twitter:image" content={imageUrl} />
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f6f7fb" />
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#06080d" />
-    <script is:inline>
-      // Apply saved theme before paint to avoid FOUC.
-      try {
-        var t = localStorage.getItem('fueld-theme');
-        if (t === 'light' || t === 'dark') {
-          document.documentElement.setAttribute('data-theme', t);
-        }
-      } catch (_) {}
-    </script>
+    <script is:inline src="/theme.js"></script>
     {schemas.length > 0 && <SeoSchema schemas={schemas} />}
   </head>
   <body>
@@ -91,21 +83,6 @@ const pageTitle = `${title} | ${siteConfig.name}`;
           </div>
         </div>
       </header>
-      <script is:inline>
-        (function () {
-          var btn = document.querySelector('[data-theme-toggle]');
-          if (!btn) return;
-          btn.addEventListener('click', function () {
-            var current = document.documentElement.getAttribute('data-theme');
-            if (!current) {
-              current = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-            }
-            var next = current === 'dark' ? 'light' : 'dark';
-            document.documentElement.setAttribute('data-theme', next);
-            try { localStorage.setItem('fueld-theme', next); } catch (_) {}
-          });
-        })();
-      </script>
       <main id="main-content">
         <slot />
       </main>
