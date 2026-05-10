@@ -29,9 +29,14 @@ import type {
   InventorySkuDto,
   OwnCompanyDto,
   ProductType,
+  UnitSettingsDto,
   VesselDto,
   WarehouseDto,
 } from '@fueld/types';
+import {
+  SearchableDropdownComponent,
+  type DropdownOption,
+} from '@app/shared/components/searchable-dropdown/searchable-dropdown.component';
 
 import { API } from '@app/core/config/api';
 
@@ -43,7 +48,7 @@ const PRODUCT_TYPES: ProductType[] = [
 @Component({
   selector: 'app-warehouses-admin-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule],
+  imports: [FormsModule, SearchableDropdownComponent],
   template: `
     <div>
       <div class="mb-6">
@@ -255,13 +260,8 @@ const PRODUCT_TYPES: ProductType[] = [
                 </select>
               </label>
               <label class="block">
-                <span class="text-xs font-medium text-gray-600">Name</span>
-                <input [(ngModel)]="newWarehouse.name" placeholder="e.g. MV Bunker Star"
-                  class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-              </label>
-              <label class="block">
                 <span class="text-xs font-medium text-gray-600">Type</span>
-                <select [(ngModel)]="newWarehouse.type"
+                <select [(ngModel)]="newWarehouse.type" (ngModelChange)="onTypeChange()"
                   class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
                   <option value="VESSEL">Vessel</option>
                   <option value="TERMINAL">Terminal</option>
@@ -272,13 +272,23 @@ const PRODUCT_TYPES: ProductType[] = [
               @if (newWarehouse.type === 'VESSEL') {
                 <label class="block">
                   <span class="text-xs font-medium text-gray-600">Vessel</span>
-                  <select [ngModel]="newWarehouse.vesselId" (ngModelChange)="newWarehouse.vesselId = $event || null"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
-                    <option [ngValue]="null">None</option>
-                    @for (v of vessels(); track v.id) {
-                      <option [value]="v.id">{{ v.name }}</option>
-                    }
-                  </select>
+                  <app-searchable-dropdown
+                    class="mt-1 block"
+                    [options]="vesselDropdownOptions()"
+                    [selected]="newWarehouse.vesselId ?? ''"
+                    [asyncSearch]="true"
+                    [loading]="vesselSearchLoading()"
+                    [clearable]="true"
+                    placeholder="Search vessels by name or IMO…"
+                    (searchChange)="searchVessels($event)"
+                    (selectionChange)="onVesselSelected($event)"
+                  />
+                </label>
+              } @else {
+                <label class="block">
+                  <span class="text-xs font-medium text-gray-600">Name</span>
+                  <input [(ngModel)]="newWarehouse.name" placeholder="e.g. Rotterdam Terminal"
+                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
                 </label>
               }
               <label class="flex items-center gap-2 text-sm">
@@ -294,9 +304,9 @@ const PRODUCT_TYPES: ProductType[] = [
               <button (click)="closeWarehouseForm()" class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm">
                 Cancel
               </button>
-              <button (click)="submitWarehouse()" [disabled]="!canSubmitWarehouse()"
+              <button (click)="submitWarehouse()" [disabled]="!canSubmitWarehouse() || warehouseSubmitting()"
                 class="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50">
-                Create
+                {{ warehouseSubmitting() ? 'Creating…' : 'Create' }}
               </button>
             </div>
           </div>
@@ -330,8 +340,16 @@ const PRODUCT_TYPES: ProductType[] = [
               </label>
               <label class="block">
                 <span class="text-xs font-medium text-gray-600">Base unit</span>
-                <input [(ngModel)]="newSku.baseUnit"
-                  class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                <select [(ngModel)]="newSku.baseUnit" [disabled]="configuredUnits().length === 0"
+                  class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-400">
+                  @if (configuredUnits().length === 0) {
+                    <option value="">No units configured</option>
+                  } @else {
+                    @for (unit of configuredUnits(); track unit) {
+                      <option [value]="unit">{{ unit }}</option>
+                    }
+                  }
+                </select>
               </label>
               <label class="flex items-center gap-2 text-sm">
                 <input type="checkbox" [(ngModel)]="newSku.inventoryTracked" />
@@ -363,6 +381,7 @@ export class WarehousesAdminPageComponent implements OnInit {
   readonly warehousesLoading = signal(true);
   readonly skus = signal<InventorySkuDto[]>([]);
   readonly skusLoading = signal(true);
+  readonly configuredUnits = signal<string[]>([]);
   readonly vessels = signal<VesselDto[]>([]);
   // Companies that are physical-ops eligible (cached locally to avoid an extra trip).
   readonly companyPhysicalOpsState = signal<Record<string, boolean>>({});
@@ -374,6 +393,16 @@ export class WarehousesAdminPageComponent implements OnInit {
 
   readonly showWarehouseForm = signal(false);
   readonly showSkuForm = signal(false);
+  readonly vesselSearchLoading = signal(false);
+  readonly warehouseSubmitting = signal(false);
+
+  /** Async vessel results for the warehouse typeahead. */
+  readonly vesselDropdownOptions = computed<DropdownOption[]>(() =>
+    this.vessels().map((v) => ({
+      value: v.id,
+      label: v.imo ? `${v.name} · IMO ${v.imo}` : v.name,
+    })),
+  );
 
   newWarehouse: CreateWarehouseDto & { vesselId: string | null } = {
     ownerCompanyId: '',
@@ -401,7 +430,7 @@ export class WarehousesAdminPageComponent implements OnInit {
   }
 
   async loadAll(): Promise<void> {
-    await Promise.all([this.loadOwnCompanies(), this.loadWarehouses(), this.loadSkus(), this.loadVessels()]);
+    await Promise.all([this.loadOwnCompanies(), this.loadWarehouses(), this.loadSkus(), this.loadUnits()]);
   }
 
   private async loadOwnCompanies(): Promise<void> {
@@ -451,11 +480,32 @@ export class WarehousesAdminPageComponent implements OnInit {
     }
   }
 
-  private async loadVessels(): Promise<void> {
+  private async loadUnits(): Promise<void> {
     const res = await firstValueFrom(
-      this.http.get<ApiResponse<{ vessels: VesselDto[]; total: number }>>(`${API}/vessels/local?limit=200`),
+      this.http.get<ApiResponse<UnitSettingsDto>>(`${API}/admin/settings/units`),
     );
-    if (res.success) this.vessels.set(res.data.vessels);
+    if (!res.success) return;
+    this.configuredUnits.set(res.data.units);
+    const currentBaseUnit = this.newSku.baseUnit ?? '';
+    if (!res.data.units.includes(currentBaseUnit)) {
+      this.newSku = { ...this.newSku, baseUnit: this.getDefaultBaseUnit() };
+    }
+  }
+
+  async searchVessels(term: string): Promise<void> {
+    this.vesselSearchLoading.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ vessels: VesselDto[]; total: number }>>(
+          `${API}/vessels/local?search=${encodeURIComponent(term)}&limit=20`,
+        ),
+      );
+      if (res.success) {
+        this.vessels.set(res.data.vessels);
+      }
+    } finally {
+      this.vesselSearchLoading.set(false);
+    }
   }
 
   async togglePhysicalOps(companyId: string, enabled: boolean): Promise<void> {
@@ -477,6 +527,7 @@ export class WarehousesAdminPageComponent implements OnInit {
       inventoryEnabled: true,
       allowManualReplenishment: true,
     };
+    this.vessels.set([]);
     this.showWarehouseForm.set(true);
   }
 
@@ -484,20 +535,46 @@ export class WarehousesAdminPageComponent implements OnInit {
     this.showWarehouseForm.set(false);
   }
 
+  onTypeChange(): void {
+    if (this.newWarehouse.type !== 'VESSEL') {
+      this.newWarehouse.vesselId = null;
+      this.newWarehouse.name = '';
+      return;
+    }
+    // Reset name until a vessel is selected; it will be inferred from the vessel.
+    this.newWarehouse.name = '';
+  }
+
+  onVesselSelected(vesselId: string): void {
+    this.newWarehouse.vesselId = vesselId || null;
+    const selected = this.vessels().find((v) => v.id === vesselId);
+    // Name is derived from the vessel to avoid mismatches.
+    this.newWarehouse.name = selected?.name ?? '';
+  }
+
   canSubmitWarehouse(): boolean {
-    return Boolean(this.newWarehouse.ownerCompanyId && this.newWarehouse.name.trim());
+    if (!this.newWarehouse.ownerCompanyId) return false;
+    if (this.newWarehouse.type === 'VESSEL') {
+      return Boolean(this.newWarehouse.vesselId && this.newWarehouse.name.trim());
+    }
+    return Boolean(this.newWarehouse.name.trim());
   }
 
   async submitWarehouse(): Promise<void> {
     if (!this.canSubmitWarehouse()) return;
-    const res = await firstValueFrom(
-      this.http.post<ApiResponse<WarehouseDto>>(`${API}/inventory/warehouses`, this.newWarehouse),
-    );
-    if (res.success) {
-      this.showWarehouseForm.set(false);
-      await this.loadWarehouses();
-    } else if (res.message) {
-      alert(res.message);
+    this.warehouseSubmitting.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<WarehouseDto>>(`${API}/inventory/warehouses`, this.newWarehouse),
+      );
+      if (res.success) {
+        this.showWarehouseForm.set(false);
+        await this.loadWarehouses();
+      } else if (res.message) {
+        alert(res.message);
+      }
+    } finally {
+      this.warehouseSubmitting.set(false);
     }
   }
 
@@ -517,7 +594,7 @@ export class WarehousesAdminPageComponent implements OnInit {
       productType: 'VLSFO' as ProductType,
       grade: '',
       displayName: '',
-      baseUnit: 'MT',
+      baseUnit: this.getDefaultBaseUnit(),
       inventoryTracked: true,
     };
     this.showSkuForm.set(true);
@@ -528,7 +605,11 @@ export class WarehousesAdminPageComponent implements OnInit {
   }
 
   canSubmitSku(): boolean {
-    return Boolean(this.newSku.productType && this.newSku.displayName.trim());
+    return Boolean(
+      this.newSku.productType
+      && this.newSku.displayName.trim()
+      && (this.newSku.baseUnit ?? '').trim(),
+    );
   }
 
   async submitSku(): Promise<void> {
@@ -553,5 +634,9 @@ export class WarehousesAdminPageComponent implements OnInit {
       this.http.patch<ApiResponse<InventorySkuDto>>(`${API}/inventory/skus/${id}`, { [flag]: value }),
     );
     await this.loadSkus();
+  }
+
+  private getDefaultBaseUnit(): string {
+    return this.configuredUnits()[0] ?? 'MT';
   }
 }
