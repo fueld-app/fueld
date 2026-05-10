@@ -92,6 +92,12 @@ function mapSku(row: typeof inventorySkus.$inferSelect): InventorySkuDto {
   };
 }
 
+function inferInventorySkuDisplayName(productType: string, grade?: string | null): string {
+  const normalizedProductType = productType.trim();
+  const normalizedGrade = grade?.trim();
+  return normalizedGrade ? `${normalizedProductType} ${normalizedGrade}` : normalizedProductType;
+}
+
 export async function listInventorySkus(): Promise<InventorySkuDto[]> {
   const tenantId = await getTenantId();
   const rows = await db
@@ -113,14 +119,16 @@ export async function getInventorySkuById(id: string): Promise<InventorySkuDto |
 
 export async function createInventorySku(input: CreateInventorySkuDto): Promise<InventorySkuDto> {
   const tenantId = await getTenantId();
+  const normalizedGrade = input.grade?.trim() || null;
+  const normalizedDisplayName = input.displayName?.trim();
   const [created] = await db
     .insert(inventorySkus)
     .values({
       tenantId,
       // Cast string code to drizzle's enum literal type — the DB validates the value.
       productType: input.productType as typeof inventorySkus.$inferInsert.productType,
-      grade: input.grade ?? null,
-      displayName: input.displayName,
+      grade: normalizedGrade,
+      displayName: normalizedDisplayName || inferInventorySkuDisplayName(String(input.productType), normalizedGrade),
       baseUnit: input.baseUnit ?? 'MT',
       inventoryTracked: input.inventoryTracked ?? true,
       allowedUnits: input.allowedUnits ?? [],

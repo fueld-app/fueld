@@ -108,7 +108,7 @@ export const inventoryController = new Elysia({ prefix: '/inventory' })
       body: t.Object({
         productType: t.String(),
         grade: t.Optional(t.Nullable(t.String())),
-        displayName: t.String(),
+        displayName: t.Optional(t.String()),
         baseUnit: t.Optional(t.String()),
         inventoryTracked: t.Optional(t.Boolean()),
         allowedUnits: t.Optional(t.Array(t.String())),

@@ -2325,7 +2325,7 @@ export interface CreateInventorySkuDto {
   /** Product type code (must match the `product_type` enum). */
   productType: ProductType | string;
   grade?: string | null;
-  displayName: string;
+  displayName?: string;
   baseUnit?: string;
   inventoryTracked?: boolean;
   allowedUnits?: string[];

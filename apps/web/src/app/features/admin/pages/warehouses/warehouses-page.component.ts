@@ -334,8 +334,8 @@ const PRODUCT_TYPES: ProductType[] = [
                   class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
               </label>
               <label class="block">
-                <span class="text-xs font-medium text-gray-600">Display name</span>
-                <input [(ngModel)]="newSku.displayName" placeholder="e.g. VLSFO RMG 380 0.5%"
+                <span class="text-xs font-medium text-gray-600">Display name (optional)</span>
+                <input [(ngModel)]="newSku.displayName" placeholder="Defaults to product + grade"
                   class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
               </label>
               <label class="block">
@@ -607,15 +607,21 @@ export class WarehousesAdminPageComponent implements OnInit {
   canSubmitSku(): boolean {
     return Boolean(
       this.newSku.productType
-      && this.newSku.displayName.trim()
       && (this.newSku.baseUnit ?? '').trim(),
     );
   }
 
   async submitSku(): Promise<void> {
     if (!this.canSubmitSku()) return;
+    const displayName = (this.newSku.displayName ?? '').trim();
+    const grade = (this.newSku.grade ?? '').trim();
+    const payload: CreateInventorySkuDto = {
+      ...this.newSku,
+      grade: grade || null,
+      displayName: displayName || undefined,
+    };
     const res = await firstValueFrom(
-      this.http.post<ApiResponse<InventorySkuDto>>(`${API}/inventory/skus`, this.newSku),
+      this.http.post<ApiResponse<InventorySkuDto>>(`${API}/inventory/skus`, payload),
     );
     if (res.success) {
       this.showSkuForm.set(false);

@@ -315,6 +315,17 @@ describe('inventory SKUs', () => {
     expect(error).not.toBeNull();
   });
 
+  test('createInventorySku infers displayName from productType and grade when omitted', async () => {
+    const sku = await inventory.createInventorySku({
+      productType: 'MGO' as never,
+      grade: 'DMA',
+      baseUnit: 'MT',
+    });
+
+    expect(sku.displayName).toBe('MGO DMA');
+    expect(sku.grade).toBe('DMA');
+  });
+
   test('updateInventorySku updates allowedUnits and inventoryTracked', async () => {
     const updated = await inventory.updateInventorySku(skuId, {
       allowedUnits: ['MT', 'CBM'],

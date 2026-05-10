@@ -228,6 +228,20 @@ describe('inventory controller e2e', () => {
     expect(av.data?.data?.ok).toBe(true);
   });
 
+  it('create SKU infers display name when it is omitted', async () => {
+    const { token } = await seededAdmin();
+
+    const skuRes = await requestJson('/inventory/skus', {
+      method: 'POST',
+      token,
+      body: { productType: 'MGO', grade: 'DMA', baseUnit: 'MT' },
+    });
+
+    expect(skuRes.status).toBe(200);
+    expect(skuRes.data?.data?.displayName).toBe('MGO DMA');
+    expect(skuRes.data?.data?.grade).toBe('DMA');
+  });
+
   it('POST /transfers creates an INTERNAL_TRANSFER order with sides', async () => {
     const { seeded, token } = await seededAdmin();
     const db = await getDb();
