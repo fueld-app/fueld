@@ -101,7 +101,11 @@ body {
   select.order-item-inline-select:not([multiple]):not([size]) {
     background-image: none;
     min-width: max-content;
-    padding-right: 0.75rem;
+    padding-right: 0;
+  }
+
+  .order-item-inline-select-wrap > svg {
+    display: none;
   }
 
   input:is([type='date'], [type='datetime-local'], [type='time']) {
