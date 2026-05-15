@@ -92,12 +92,16 @@ body {
     display: none;
   }
 
+  .order-item-inline-select-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+  }
+
   select.order-item-inline-select:not([multiple]):not([size]) {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='M6 8l4 4 4-4' stroke='%239ca3af' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-    background-position: right 0 center;
-    background-size: 0.75rem;
+    background-image: none;
     min-width: max-content;
-    padding-right: 0.95rem;
+    padding-right: 0.75rem;
   }
 
   input:is([type='date'], [type='datetime-local'], [type='time']) {
