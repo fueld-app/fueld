@@ -92,6 +92,14 @@ body {
     display: none;
   }
 
+  select.order-item-inline-select:not([multiple]):not([size]) {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='M6 8l4 4 4-4' stroke='%239ca3af' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-position: right 0 center;
+    background-size: 0.75rem;
+    min-width: max-content;
+    padding-right: 0.95rem;
+  }
+
   input:is([type='date'], [type='datetime-local'], [type='time']) {
     -webkit-appearance: none;
     appearance: none;
