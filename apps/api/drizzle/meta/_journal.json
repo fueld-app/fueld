@@ -505,6 +505,13 @@
       "when": 1778328000000,
       "tag": "0071_inventory_physical_ops",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1778889600000,
+      "tag": "0072_order_item_product_type_text",
+      "breakpoints": true
     }
   ]
 }

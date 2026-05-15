@@ -453,6 +453,77 @@ describe('orders: item aggregates', () => {
     expect(rows.length).toBe(1);
     expect(rows[0]?.productType).toBe('LUBE');
   });
+
+  it('persists custom product labels when replacing existing items', async () => {
+    const { tenant, client, vessel, place, user } = await seedBasics();
+    const db = await getDb();
+    const { createOrder, getOrderById, saveOrderItems } = await loadOrdersService();
+
+    const created = await createOrder({
+      tenantId: tenant.id,
+      clientId: client.id,
+      vesselId: vessel.id,
+      placeId: place.id,
+      salesRepId: user.id,
+    });
+
+    await saveOrderItems(created.id, [
+      {
+        productType: 'LUBE',
+        quantity: '2',
+        unit: 'DRUMS',
+        costPrice: '0',
+        costCurrency: 'USD',
+        salesPrice: '0',
+        salesCurrency: 'USD',
+      },
+    ]);
+
+    await saveOrderItems(created.id, [
+      {
+        productType: 'LUBE',
+        quantity: '2',
+        unit: 'DRUMS',
+        costPrice: '0',
+        costCurrency: 'USD',
+        salesPrice: '0',
+        salesCurrency: 'USD',
+      },
+      {
+        productType: 'LUBE PUMPING FEE',
+        quantity: '110',
+        unit: 'GAL',
+        costPrice: '0',
+        costCurrency: 'USD',
+        salesPrice: '0.65',
+        salesCurrency: 'USD',
+      },
+      {
+        productType: 'SERVICE',
+        quantity: '1',
+        unit: 'HOURS',
+        costPrice: '0',
+        costCurrency: 'USD',
+        salesPrice: '65',
+        salesCurrency: 'USD',
+      },
+    ]);
+
+    const rows = await db.select().from(orderItems).where(eq(orderItems.orderId, created.id));
+    expect(rows).toHaveLength(3);
+    expect(rows.map((row) => row.productType).sort()).toEqual([
+      'LUBE',
+      'LUBE PUMPING FEE',
+      'SERVICE',
+    ]);
+
+    const detail = await getOrderById(created.id);
+    expect(detail?.items.map((row) => row.productType).sort()).toEqual([
+      'LUBE',
+      'LUBE PUMPING FEE',
+      'SERVICE',
+    ]);
+  });
 });
 
 describe('orders: attachments, payments, and lookups', () => {
