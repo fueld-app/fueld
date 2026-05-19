@@ -1412,172 +1412,7 @@ interface PlattsSuggestionViewModel {
         }
         }
       </div>
-      @if (orderId() || order()?.id) {
-        <div class="mt-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Port Documentation</h3>
-              <p class="mt-1 text-xs text-gray-500">Readiness for Bunker Instructions, Gate List, and Flange Worksheet packaging.</p>
-            </div>
-            @if (portDocumentationLoading()) {
-              <span class="text-xs text-gray-400">Loading…</span>
-            }
-          </div>
 
-          @if (portDocumentationError()) {
-            <div class="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
-              {{ portDocumentationError() }}
-            </div>
-          } @else if (portDocumentationContext()) {
-            <div class="mt-4 flex flex-wrap gap-2">
-              <button
-                type="button"
-                (click)="previewBunkerInstructions()"
-                [disabled]="portDocumentationAction() !== null"
-                class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
-              >
-                {{ portDocumentationAction() === 'preview-bunker' ? 'Loading Preview…' : 'Preview Bunker Instructions' }}
-              </button>
-              <button
-                type="button"
-                (click)="generateBunkerInstructions()"
-                [disabled]="portDocumentationAction() !== null"
-                class="rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-brand-700 disabled:opacity-50"
-              >
-                {{ portDocumentationAction() === 'generate-bunker' ? 'Generating…' : 'Generate Bunker Instructions' }}
-              </button>
-              <button
-                type="button"
-                (click)="generateGateList()"
-                [disabled]="portDocumentationAction() !== null"
-                class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
-              >
-                {{ portDocumentationAction() === 'generate-gate-list' ? 'Generating…' : 'Export Gate List' }}
-              </button>
-              <button
-                type="button"
-                (click)="includeFlangeWorksheetDocument()"
-                [disabled]="!portDocumentationContext()!.currentFlangeWorksheet || portDocumentationAction() !== null"
-                class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
-              >
-                {{ portDocumentationAction() === 'include-flange' ? 'Including…' : 'Include Flange Worksheet' }}
-              </button>
-            </div>
-
-            <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-4">
-              <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">Gate List</div>
-                <div class="mt-2 text-2xl font-semibold text-gray-900">{{ portDocumentationContext()!.gateListCount }}</div>
-                <div class="mt-1 text-xs text-gray-500">active personnel available for export</div>
-              </div>
-              <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">Flange Worksheet</div>
-                <div class="mt-2 text-sm font-semibold text-gray-900">{{ portDocumentationContext()!.currentFlangeWorksheet?.displayName ?? 'Not uploaded' }}</div>
-                <div class="mt-1 text-xs text-gray-500">
-                  @if (portDocumentationContext()!.currentFlangeWorksheet) {
-                    Version {{ portDocumentationContext()!.currentFlangeWorksheet!.versionNumber }}
-                  } @else {
-                    Admin upload still required
-                  }
-                </div>
-              </div>
-              <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">Generated / Included</div>
-                <div class="mt-2 text-2xl font-semibold text-gray-900">{{ portDocumentationContext()!.documents.length }}</div>
-                <div class="mt-1 text-xs text-gray-500">port document files on this order</div>
-              </div>
-              <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">Agent</div>
-                <div class="mt-2 text-sm font-semibold text-gray-900">{{ agent()?.name ?? 'Missing' }}</div>
-                <div class="mt-1 text-xs text-gray-500">required for bunker-instructions workflow</div>
-              </div>
-            </div>
-
-            @if (portDocumentationContext()!.readinessWarnings.length > 0) {
-              <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
-                <div class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Readiness Warnings</div>
-                <ul class="mt-2 space-y-1 text-sm text-amber-900">
-                  @for (warning of portDocumentationContext()!.readinessWarnings; track warning) {
-                    <li>{{ warning }}</li>
-                  }
-                </ul>
-              </div>
-            }
-
-            @if (bunkerInstructionsPreview()) {
-              <div class="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
-                <div class="flex items-center justify-between gap-3">
-                  <div>
-                    <div class="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">Bunker Instructions Preview</div>
-                    <div class="mt-1 text-sm text-gray-600">Snapshot of the data that will be packaged into the generated workbook.</div>
-                  </div>
-                  <button
-                    type="button"
-                    (click)="bunkerInstructionsPreview.set(null)"
-                    class="text-xs font-medium text-gray-500 transition hover:text-gray-700"
-                  >
-                    Close
-                  </button>
-                </div>
-
-                @if (bunkerInstructionsPreview()!.warnings.length > 0) {
-                  <div class="mt-3 rounded-lg border border-amber-200 bg-white p-3 text-sm text-amber-900">
-                    @for (warning of bunkerInstructionsPreview()!.warnings; track warning) {
-                      <div>{{ warning }}</div>
-                    }
-                  </div>
-                }
-
-                <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
-                  @for (section of bunkerInstructionsPreview()!.sections; track section.title) {
-                    <div class="rounded-lg border border-gray-200 bg-white p-3">
-                      <div class="text-sm font-semibold text-gray-900">{{ section.title }}</div>
-                      <dl class="mt-3 space-y-2">
-                        @for (field of section.fields; track field.label + field.value) {
-                          <div class="grid grid-cols-[8rem_1fr] gap-3 text-sm">
-                            <dt class="text-gray-500">{{ field.label }}</dt>
-                            <dd class="text-gray-900">{{ field.value }}</dd>
-                          </div>
-                        }
-                      </dl>
-                    </div>
-                  }
-                </div>
-              </div>
-            }
-
-            <div class="mt-4">
-              @if (portDocumentationContext()!.documents.length === 0) {
-                <div class="rounded-lg border border-dashed border-gray-200 bg-white p-4 text-sm text-gray-500">
-                  No Port Documentation files have been generated or attached for this order yet.
-                </div>
-              } @else {
-                <ul class="divide-y divide-gray-100 rounded-lg border border-gray-200">
-                  @for (doc of portDocumentationContext()!.documents; track doc.id) {
-                    <li class="flex items-center justify-between gap-4 px-4 py-3 text-sm">
-                      <div>
-                        <div class="font-medium text-gray-900">{{ doc.fileName }}</div>
-                        <div class="mt-1 text-xs text-gray-500">{{ doc.documentKind }} · {{ doc.sourceType }} · {{ doc.status }}</div>
-                      </div>
-                      <div class="flex items-center gap-3">
-                        <div class="text-xs text-gray-400">{{ formatFileSize(doc.fileSize) }}</div>
-                        <button
-                          type="button"
-                          (click)="downloadPortDocumentationDocument(doc)"
-                          [disabled]="portDocumentationAction() === 'download-' + doc.id"
-                          class="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
-                        >
-                          {{ portDocumentationAction() === 'download-' + doc.id ? 'Downloading…' : 'Download' }}
-                        </button>
-                      </div>
-                    </li>
-                  }
-                </ul>
-              }
-            </div>
-          }
-        </div>
-      }
       @if (order()?.id) {
         <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
           <app-email-history-card [orderId]="order()!.id" />
@@ -2259,6 +2094,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         id: att.id,
         fileName: att.fileName,
         label: `BDR uploaded ${new Date(att.createdAt).toLocaleDateString('en-GB')}`,
+        previewUrl: att.filePath.startsWith('http') ? att.filePath : `${API_URL}${att.filePath}`,
       })),
   );
   readonly portDocumentationEmailAttachmentOptions = computed<SendEmailAttachmentOption[]>(() =>
@@ -2268,6 +2104,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         id: doc.id,
         fileName: doc.fileName,
         label: `${this.humanizePortDocumentKind(doc.documentKind)} · ${this.humanizePortDocumentSource(doc.sourceType)}`,
+        previewUrl: `${API_URL}/orders/${this.getPortDocumentationOrderId()}/port-documentation/documents/${doc.id}/download`,
       })),
   );
   readonly emailAttachmentOptions = computed<SendEmailAttachmentOption[]>(() => {
