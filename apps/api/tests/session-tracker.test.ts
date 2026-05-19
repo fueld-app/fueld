@@ -316,14 +316,14 @@ describe('session-tracker', () => {
     expect(tracker.getSessionsByUser('u3').length).toBe(1);
   });
 
-  test('extractClientIp prioritizes x-forwarded-for then x-real-ip', () => {
+  test('extractClientIp prioritizes explicit real-client headers before forwarded chain', () => {
     const requestWithForwarded = new Request('https://api.fueld.test/ws', {
       headers: {
         'x-forwarded-for': '203.0.113.5, 70.41.3.18',
         'x-real-ip': '198.51.100.9',
       },
     });
-    expect(tracker.extractClientIp(requestWithForwarded)).toBe('203.0.113.5');
+    expect(tracker.extractClientIp(requestWithForwarded)).toBe('198.51.100.9');
 
     const requestWithRealIp = new Request('https://api.fueld.test/ws', {
       headers: { 'x-real-ip': '198.51.100.9' },
@@ -334,15 +334,25 @@ describe('session-tracker', () => {
     expect(tracker.extractClientIp(requestNoIp)).toBeNull();
   });
 
-  test('extractClientIp prefers an available IPv4 over IPv6 addresses', () => {
+  test('extractClientIp prefers explicit IPv6 client IP over forwarded proxy IPv4', () => {
     const request = new Request('https://api.fueld.test/ws', {
       headers: {
-        'x-forwarded-for': '2001:db8::10, 198.51.100.24',
-        'x-real-ip': '2001:db8::20',
+        'x-forwarded-for': '172.70.247.72, 10.0.0.1',
+        'cf-connecting-ip': '2a01:799:2021:1300:8cf1:6e14:b440:5fd7',
       },
     });
 
-    expect(tracker.extractClientIp(request)).toBe('198.51.100.24');
+    expect(tracker.extractClientIp(request)).toBe('2a01:799:2021:1300:8cf1:6e14:b440:5fd7');
+  });
+
+  test('extractClientIp falls back to x-forwarded-for when direct headers are missing', () => {
+    const request = new Request('https://api.fueld.test/ws', {
+      headers: {
+        'x-forwarded-for': '2001:db8::10, 198.51.100.24',
+      },
+    });
+
+    expect(tracker.extractClientIp(request)).toBe('2001:db8::10');
   });
 
   test('extractClientIp normalizes IPv4-mapped IPv6 addresses', () => {
