@@ -77,24 +77,31 @@ function toCandidate(input: string): IpCandidate | null {
 }
 
 export function selectClientIpFromHeaders(headers: Headers): string | null {
-  const rawCandidates = [
-    ...((headers.get('x-forwarded-for') ?? '').split(',')),
-    headers.get('x-real-ip') ?? '',
+  const directHeaderCandidates = [
     headers.get('cf-connecting-ip') ?? '',
     headers.get('true-client-ip') ?? '',
+    headers.get('x-real-ip') ?? '',
     headers.get('x-client-ip') ?? '',
-  ];
-
-  const candidates = rawCandidates
+  ]
     .map((candidate) => toCandidate(candidate))
     .filter((candidate): candidate is IpCandidate => candidate !== null)
     .filter((candidate, index, all) => all.findIndex((entry) => entry.value === candidate.value) === index);
 
+  const forwardedCandidates = (headers.get('x-forwarded-for') ?? '')
+    .split(',')
+    .map((candidate) => toCandidate(candidate))
+    .filter((candidate): candidate is IpCandidate => candidate !== null)
+    .filter((candidate, index, all) => all.findIndex((entry) => entry.value === candidate.value) === index);
+
+  const candidates = directHeaderCandidates.length > 0 ? directHeaderCandidates : forwardedCandidates;
+
   if (!candidates.length) return null;
 
   return (
-    candidates.find((candidate) => candidate.isIpv4 && !candidate.isPrivate)?.value
-    ?? candidates.find((candidate) => !candidate.isPrivate)?.value
+    candidates.find((candidate) => !candidate.isPrivate)?.value
+    ?? candidates.find((candidate) => candidate.isIpv4)?.value
+    ?? directHeaderCandidates.find((candidate) => !candidate.isPrivate)?.value
+    ?? forwardedCandidates.find((candidate) => !candidate.isPrivate)?.value
     ?? candidates.find((candidate) => candidate.isIpv4)?.value
     ?? candidates[0]?.value
     ?? null
