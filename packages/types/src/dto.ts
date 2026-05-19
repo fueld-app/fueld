@@ -1163,6 +1163,9 @@ export interface PortGateListPersonnelDto {
   fullName: string;
   roleTitle: string;
   company: string;
+  driverLicenseState: string | null;
+  driverLicenseNumber: string | null;
+  twicHolder: boolean;
   active: boolean;
   notes: string | null;
   createdBy: string | null;

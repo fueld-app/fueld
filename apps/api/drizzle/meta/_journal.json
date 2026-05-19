@@ -519,6 +519,13 @@
       "when": 1778893200000,
       "tag": "0073_port_documentation",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1778900400000,
+      "tag": "0074_gate_list_person_identity_fields",
+      "breakpoints": true
     }
   ]
 }

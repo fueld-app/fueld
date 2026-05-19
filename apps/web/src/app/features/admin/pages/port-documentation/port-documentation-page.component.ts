@@ -93,6 +93,8 @@ interface PlaceOptionDto {
                       <th class="px-4 py-3 text-left font-medium text-gray-600">Name</th>
                       <th class="px-4 py-3 text-left font-medium text-gray-600">Role</th>
                       <th class="px-4 py-3 text-left font-medium text-gray-600">Company</th>
+                      <th class="px-4 py-3 text-left font-medium text-gray-600">DL</th>
+                      <th class="px-4 py-3 text-left font-medium text-gray-600">TWIC</th>
                       <th class="px-4 py-3 text-left font-medium text-gray-600">Status</th>
                       <th class="px-4 py-3 w-24"></th>
                     </tr>
@@ -108,6 +110,8 @@ interface PlaceOptionDto {
                         </td>
                         <td class="px-4 py-3 text-gray-700">{{ person.roleTitle }}</td>
                         <td class="px-4 py-3 text-gray-700">{{ person.company }}</td>
+                        <td class="px-4 py-3 text-gray-700">{{ formatDriverLicense(person) }}</td>
+                        <td class="px-4 py-3 text-gray-700">{{ person.twicHolder ? 'Yes' : 'No' }}</td>
                         <td class="px-4 py-3">
                           <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
                             [class]="person.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'">
@@ -127,7 +131,7 @@ interface PlaceOptionDto {
                       </tr>
                     } @empty {
                       <tr>
-                        <td colspan="5" class="px-4 py-8 text-center text-gray-400">No gate list personnel found.</td>
+                        <td colspan="7" class="px-4 py-8 text-center text-gray-400">No gate list personnel found.</td>
                       </tr>
                     }
                   </tbody>
@@ -242,6 +246,14 @@ interface PlaceOptionDto {
                 <input type="text" [ngModel]="formCompany()" (ngModelChange)="formCompany.set($event)" class="app-input mt-1 w-full" />
               </div>
               <div>
+                <label class="block text-sm font-medium text-gray-700">Driver license state</label>
+                <input type="text" [ngModel]="formDriverLicenseState()" (ngModelChange)="formDriverLicenseState.set($event)" maxlength="8" class="app-input mt-1 w-full uppercase" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700">Driver license #</label>
+                <input type="text" [ngModel]="formDriverLicenseNumber()" (ngModelChange)="formDriverLicenseNumber.set($event)" class="app-input mt-1 w-full" />
+              </div>
+              <div>
                 <label class="block text-sm font-medium text-gray-700">Port (optional)</label>
                 <select [ngModel]="formPlaceId()" (ngModelChange)="formPlaceId.set($event)" class="app-input mt-1 w-full">
                   <option value="">All ports</option>
@@ -250,7 +262,11 @@ interface PlaceOptionDto {
                   }
                 </select>
               </div>
-              <div class="flex items-center gap-2 pt-7">
+              <div class="flex flex-col gap-3 pt-2 sm:pt-7">
+                <label class="flex items-center gap-2 text-sm text-gray-700">
+                  <input type="checkbox" [checked]="formTwicHolder()" (change)="formTwicHolder.set($any($event.target).checked)" class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
+                  TWIC holder
+                </label>
                 <input type="checkbox" [checked]="formActive()" (change)="formActive.set($any($event.target).checked)" class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
                 <label class="text-sm text-gray-700">Active for future exports</label>
               </div>
@@ -293,6 +309,9 @@ export class PortDocumentationPageComponent implements OnInit {
   readonly formFullName = signal('');
   readonly formRoleTitle = signal('');
   readonly formCompany = signal('');
+  readonly formDriverLicenseState = signal('');
+  readonly formDriverLicenseNumber = signal('');
+  readonly formTwicHolder = signal(false);
   readonly formPlaceId = signal('');
   readonly formActive = signal(true);
   readonly formNotes = signal('');
@@ -303,7 +322,7 @@ export class PortDocumentationPageComponent implements OnInit {
     return this.personnel().filter((person) => {
       if (!this.showInactive() && !person.active) return false;
       if (!search) return true;
-      return [person.fullName, person.roleTitle, person.company, person.notes ?? '']
+      return [person.fullName, person.roleTitle, person.company, person.driverLicenseState ?? '', person.driverLicenseNumber ?? '', person.notes ?? '']
         .some((value) => value.toLowerCase().includes(search));
     });
   });
@@ -370,6 +389,9 @@ export class PortDocumentationPageComponent implements OnInit {
     this.formFullName.set('');
     this.formRoleTitle.set('');
     this.formCompany.set('');
+    this.formDriverLicenseState.set('');
+    this.formDriverLicenseNumber.set('');
+    this.formTwicHolder.set(false);
     this.formPlaceId.set('');
     this.formActive.set(true);
     this.formNotes.set('');
@@ -382,6 +404,9 @@ export class PortDocumentationPageComponent implements OnInit {
     this.formFullName.set(person.fullName);
     this.formRoleTitle.set(person.roleTitle);
     this.formCompany.set(person.company);
+    this.formDriverLicenseState.set(person.driverLicenseState ?? '');
+    this.formDriverLicenseNumber.set(person.driverLicenseNumber ?? '');
+    this.formTwicHolder.set(person.twicHolder);
     this.formPlaceId.set(person.placeId ?? '');
     this.formActive.set(person.active);
     this.formNotes.set(person.notes ?? '');
@@ -407,6 +432,9 @@ export class PortDocumentationPageComponent implements OnInit {
       fullName: this.formFullName().trim(),
       roleTitle: this.formRoleTitle().trim(),
       company: this.formCompany().trim(),
+      driverLicenseState: this.formDriverLicenseState().trim() || null,
+      driverLicenseNumber: this.formDriverLicenseNumber().trim() || null,
+      twicHolder: this.formTwicHolder(),
       placeId: this.formPlaceId().trim() || null,
       active: this.formActive(),
       notes: this.formNotes().trim() || null,
@@ -465,6 +493,13 @@ export class PortDocumentationPageComponent implements OnInit {
     } finally {
       this.uploadingAsset.set(false);
     }
+  }
+
+  formatDriverLicense(person: PortGateListPersonnelDto): string {
+    const state = person.driverLicenseState?.trim() ?? '';
+    const number = person.driverLicenseNumber?.trim() ?? '';
+    if (state && number) return `${state} / ${number}`;
+    return state || number || '—';
   }
 
   async downloadAsset(asset: PortDocumentAssetDto): Promise<void> {

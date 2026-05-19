@@ -26,6 +26,9 @@ type GateListInput = {
   fullName: string;
   roleTitle: string;
   company: string;
+  driverLicenseState?: string | null;
+  driverLicenseNumber?: string | null;
+  twicHolder?: boolean;
   active?: boolean;
   notes?: string | null;
   placeId?: string | null;
@@ -51,6 +54,9 @@ function mapGateListPerson(row: typeof portGateListPersonnel.$inferSelect): Port
     fullName: row.fullName,
     roleTitle: row.roleTitle,
     company: row.company,
+    driverLicenseState: row.driverLicenseState ?? null,
+    driverLicenseNumber: row.driverLicenseNumber ?? null,
+    twicHolder: row.twicHolder,
     active: row.active,
     notes: row.notes ?? null,
     createdBy: row.createdBy ?? null,
@@ -234,6 +240,9 @@ function buildGateListWorkbook(order: any, personnel: PortGateListPersonnelDto[]
     Name: person.fullName,
     Role: person.roleTitle,
     Company: person.company,
+    'Driver License State': person.driverLicenseState ?? '',
+    'Driver License #': person.driverLicenseNumber ?? '',
+    'TWIC Holder': person.twicHolder ? 'Yes' : 'No',
     Notes: person.notes ?? '',
     'Port Scope': person.placeId ? order.place?.name ?? 'Specific Port' : 'All Ports',
     'Order Number': order.orderNumber ?? order.id,
@@ -242,11 +251,14 @@ function buildGateListWorkbook(order: any, personnel: PortGateListPersonnelDto[]
   }));
   const sheet = XLSX.utils.json_to_sheet(sheetRows.length > 0
     ? sheetRows
-    : [{ Name: '', Role: '', Company: '', Notes: '', 'Port Scope': '', 'Order Number': order.orderNumber ?? order.id, Vessel: order.vessel?.name ?? '', Port: order.place?.name ?? '' }]);
+    : [{ Name: '', Role: '', Company: '', 'Driver License State': '', 'Driver License #': '', 'TWIC Holder': '', Notes: '', 'Port Scope': '', 'Order Number': order.orderNumber ?? order.id, Vessel: order.vessel?.name ?? '', Port: order.place?.name ?? '' }]);
   sheet['!cols'] = [
     { wch: 28 },
     { wch: 24 },
     { wch: 24 },
+    { wch: 18 },
+    { wch: 22 },
+    { wch: 14 },
     { wch: 36 },
     { wch: 18 },
     { wch: 20 },
@@ -377,6 +389,9 @@ export async function createGateListPerson(tenantId: string, userId: string, inp
     fullName: input.fullName.trim(),
     roleTitle: input.roleTitle.trim(),
     company: input.company.trim(),
+    driverLicenseState: input.driverLicenseState?.trim() ? input.driverLicenseState.trim().toUpperCase() : null,
+    driverLicenseNumber: input.driverLicenseNumber?.trim() ? input.driverLicenseNumber.trim() : null,
+    twicHolder: input.twicHolder ?? false,
     active: input.active ?? true,
     notes: input.notes?.trim() ? input.notes.trim() : null,
     createdBy: userId,
@@ -404,6 +419,9 @@ export async function updateGateListPerson(tenantId: string, userId: string, id:
       fullName: input.fullName !== undefined ? input.fullName.trim() : existing.fullName,
       roleTitle: input.roleTitle !== undefined ? input.roleTitle.trim() : existing.roleTitle,
       company: input.company !== undefined ? input.company.trim() : existing.company,
+      driverLicenseState: input.driverLicenseState !== undefined ? (input.driverLicenseState?.trim() ? input.driverLicenseState.trim().toUpperCase() : null) : existing.driverLicenseState,
+      driverLicenseNumber: input.driverLicenseNumber !== undefined ? (input.driverLicenseNumber?.trim() ? input.driverLicenseNumber.trim() : null) : existing.driverLicenseNumber,
+      twicHolder: input.twicHolder !== undefined ? input.twicHolder : existing.twicHolder,
       active,
       notes: input.notes !== undefined ? (input.notes?.trim() ? input.notes.trim() : null) : existing.notes,
       updatedBy: userId,
