@@ -698,6 +698,9 @@ export const documentsController = new Elysia({ prefix: '/orders' })
 
         recipientEmail = nominationSupplier.supplier.contact?.email ?? '';
         recipientName = nominationSupplier.supplier.contact?.name ?? nominationSupplier.supplier.company?.name ?? '';
+      } else if (docType === 'PORT_DOCUMENTATION') {
+        recipientEmail = order.agentContact?.email ?? '';
+        recipientName = order.agentContact?.name ?? order.agent?.name ?? '';
       } else if (order.brokerGetsAll && order.brokerContact) {
         // Broker gets all customer-facing comms
         recipientEmail = order.brokerContact.email ?? '';

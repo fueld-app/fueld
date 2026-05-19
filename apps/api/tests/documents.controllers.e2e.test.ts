@@ -688,6 +688,55 @@ describe('documents + verify controller e2e', () => {
     expect(String(res.data?.data?.htmlBody ?? '')).toContain('Dear Customer');
   });
 
+  it('returns the agent contact as the default recipient for PORT_DOCUMENTATION', async () => {
+    const { token, orderId, tenantId } = await seedDocumentReadyOrder();
+    const db = await getDb();
+
+    const [agent] = await db
+      .insert(counterparties)
+      .values({
+        tenantId,
+        name: 'Port Agent Co',
+        type: 'AGENT',
+        types: ['AGENT'],
+        country: 'United States',
+      })
+      .returning();
+
+    const [agentContact] = await db
+      .insert(companyContacts)
+      .values({
+        counterpartyId: agent!.id,
+        name: 'Agent Ops',
+        email: 'agent.ops@example.com',
+        role: 'Operations',
+      })
+      .returning();
+
+    const update = await requestJson(`/orders/${orderId}`, {
+      method: 'PATCH',
+      token,
+      body: {
+        agentId: agent!.id,
+        agentContactId: agentContact!.id,
+      },
+    });
+
+    expect(update.status).toBe(200);
+    expect(update.data?.success).toBe(true);
+
+    const res = await requestJson(`/orders/${orderId}/email-defaults`, {
+      method: 'POST',
+      token,
+      body: { documentType: 'PORT_DOCUMENTATION' },
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.data?.success).toBe(true);
+    expect(res.data?.data?.recipientEmail).toBe('agent.ops@example.com');
+    expect(res.data?.data?.recipientName).toBe('Agent Ops');
+  });
+
   it('returns 404 for /email-defaults on non-existent order', async () => {
     const seeded = await seedAuthBasics();
     const login = await loginE2E(seeded.user.email, seeded.password);

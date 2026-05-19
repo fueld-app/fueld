@@ -169,7 +169,7 @@ const ACTIONS: ActionItem[] = [
       <div
         [style.top.px]="dropdownTop()"
         [style.left.px]="dropdownLeft()"
-        class="fixed z-50 w-56 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+        class="fixed z-50 w-64 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
         role="menu"
       >
         @for (action of displayActions(); track action.key) {
@@ -185,7 +185,7 @@ const ACTIONS: ActionItem[] = [
             <svg xmlns="http://www.w3.org/2000/svg" [class]="'h-4 w-4 ' + action.color" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" [attr.d]="action.icon" />
             </svg>
-            {{ action.label }}
+            <span class="flex-1 text-left whitespace-nowrap">{{ action.label }}</span>
           </button>
         }
       </div>
@@ -241,7 +241,7 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
     const rect = this.triggerRef.nativeElement.getBoundingClientRect();
     this.dropdownTop.set(rect.bottom + 4);
     // Align right edge of dropdown with right edge of trigger
-    this.dropdownLeft.set(Math.max(0, rect.right - 224)); // 224px = w-56
+    this.dropdownLeft.set(Math.max(0, rect.right - 256)); // 256px = w-64
   }
 
   private updateActions(): void {
