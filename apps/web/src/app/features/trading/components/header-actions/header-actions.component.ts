@@ -308,7 +308,7 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
             && (action.key !== 'cancel-order' || canCancelOrder)
             && action.key !== 'send-offer'
             && action.key !== 'send-proforma'
-            && action.key !== 'send-port-documentation'
+            && (action.key !== 'send-port-documentation' || hasPortDocumentationDocuments)
             && (action.key !== 'mark-paid' || canMarkPaid),
           )
           .map((action) =>
