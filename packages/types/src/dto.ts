@@ -807,6 +807,11 @@ export interface AttachmentTypeSettingsDto {
   attachmentTypes: string[];
 }
 
+/** Admin settings for Port Documentation feature access */
+export interface PortDocumentationSettingsDto {
+  enabled: boolean;
+}
+
 /** Admin settings for configurable inquiry cancellation reasons */
 export interface InquiryCancelReasonSettingsDto {
   reasons: string[];
@@ -1149,6 +1154,86 @@ export interface CompanyAttachmentDto {
   fileSize: number;
   uploadedBy: string | null;
   createdAt: string;
+}
+
+export interface PortGateListPersonnelDto {
+  id: string;
+  tenantId: string;
+  placeId: string | null;
+  fullName: string;
+  roleTitle: string;
+  company: string;
+  active: boolean;
+  notes: string | null;
+  createdBy: string | null;
+  updatedBy: string | null;
+  deactivatedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PortDocumentAssetDto {
+  id: string;
+  tenantId: string;
+  documentKind: string;
+  displayName: string;
+  originalFileName: string;
+  filePath: string;
+  mimeType: string;
+  fileSize: number;
+  sha256Hex: string;
+  versionNumber: number;
+  isCurrent: boolean;
+  active: boolean;
+  uploadedBy: string | null;
+  supersededAt: string | null;
+  createdAt: string;
+}
+
+export interface OrderPortDocumentDto {
+  id: string;
+  tenantId: string;
+  orderId: string;
+  documentKind: string;
+  sourceType: string;
+  status: string;
+  fileName: string;
+  filePath: string;
+  mimeType: string;
+  fileSize: number;
+  sha256Hex: string;
+  assetId: string | null;
+  generatedBy: string | null;
+  generatedAt: string | null;
+  includedBy: string | null;
+  includedAt: string | null;
+  supersededAt: string | null;
+  createdAt: string;
+}
+
+export interface PortDocumentationFieldDto {
+  label: string;
+  value: string;
+}
+
+export interface PortDocumentationSectionDto {
+  title: string;
+  fields: PortDocumentationFieldDto[];
+}
+
+export interface BunkerInstructionsPreviewDto {
+  orderId: string;
+  warnings: string[];
+  sections: PortDocumentationSectionDto[];
+}
+
+export interface PortDocumentationOrderContextDto {
+  orderId: string;
+  enabled: boolean;
+  gateListCount: number;
+  currentFlangeWorksheet: PortDocumentAssetDto | null;
+  readinessWarnings: string[];
+  documents: OrderPortDocumentDto[];
 }
 
 // ═══════════════════════════════════════════════════════════════════════

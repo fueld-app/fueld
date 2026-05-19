@@ -119,10 +119,13 @@ function getTruncateTables() {
     'email_rules',
     'price_references',
     'document_revisions',
+    'order_port_documents',
     'order_attachments',
     'order_items',
     'order_suppliers',
     'orders',
+    'port_document_assets',
+    'port_gate_list_personnel',
     'order_number_sequences',
     'counterparties',
     'vessels',
@@ -639,6 +642,69 @@ async function _doEnsureTestSchemaCompat(): Promise<void> {
     ADD COLUMN IF NOT EXISTS broker_id uuid,
     ADD COLUMN IF NOT EXISTS broker_contact_id uuid,
     ADD COLUMN IF NOT EXISTS broker_gets_all boolean NOT NULL DEFAULT false
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS port_gate_list_personnel (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+      tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      place_id uuid REFERENCES places(id) ON DELETE SET NULL,
+      full_name text NOT NULL,
+      role_title text NOT NULL,
+      company text NOT NULL,
+      active boolean NOT NULL DEFAULT true,
+      notes text,
+      created_by uuid REFERENCES users(id) ON DELETE SET NULL,
+      updated_by uuid REFERENCES users(id) ON DELETE SET NULL,
+      deactivated_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS port_document_assets (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+      tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      document_kind text NOT NULL,
+      display_name text NOT NULL,
+      original_file_name text NOT NULL,
+      file_path text NOT NULL,
+      mime_type text NOT NULL,
+      file_size integer NOT NULL,
+      sha256_hex text NOT NULL,
+      version_number integer NOT NULL DEFAULT 1,
+      is_current boolean NOT NULL DEFAULT true,
+      active boolean NOT NULL DEFAULT true,
+      uploaded_by uuid REFERENCES users(id) ON DELETE SET NULL,
+      superseded_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS order_port_documents (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+      tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      order_id uuid NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+      document_kind text NOT NULL,
+      source_type text NOT NULL DEFAULT 'GENERATED',
+      status text NOT NULL DEFAULT 'ACTIVE',
+      asset_id uuid REFERENCES port_document_assets(id) ON DELETE SET NULL,
+      file_name text NOT NULL,
+      file_path text NOT NULL,
+      mime_type text NOT NULL,
+      file_size integer NOT NULL,
+      sha256_hex text NOT NULL,
+      input_snapshot_json jsonb,
+      data_snapshot_json jsonb,
+      generated_by uuid REFERENCES users(id) ON DELETE SET NULL,
+      generated_at timestamptz,
+      included_by uuid REFERENCES users(id) ON DELETE SET NULL,
+      included_at timestamptz,
+      superseded_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )
   `;
 
   } finally {

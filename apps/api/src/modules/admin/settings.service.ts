@@ -1081,6 +1081,41 @@ export async function updateInquiryCancelReasonSettings(reasons: string[]): Prom
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+//  PORT DOCUMENTATION SETTINGS
+// ═══════════════════════════════════════════════════════════════════════
+
+export async function getPortDocumentationSettings(): Promise<{ enabled: boolean }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  return {
+    enabled: settings.portDocumentationSettings?.enabled ?? false,
+  };
+}
+
+export async function updatePortDocumentationSettings(data: {
+  enabled?: boolean;
+}): Promise<{ enabled: boolean }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const currentSettings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  const settings = { ...(currentSettings as any) };
+  settings.portDocumentationSettings = {
+    ...(currentSettings.portDocumentationSettings ?? {}),
+    ...(data.enabled !== undefined ? { enabled: data.enabled } : {}),
+  };
+
+  await db
+    .update(tenants)
+    .set({ settings, updatedAt: new Date() })
+    .where(eq(tenants.id, tenant.id));
+
+  return getPortDocumentationSettings();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 //  INQUIRY SETTINGS
 // ═══════════════════════════════════════════════════════════════════════
 

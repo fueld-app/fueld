@@ -241,6 +241,10 @@ export interface TenantSettings {
   };
   // Configurable attachment types for order/inquiry attachments
   attachmentTypes?: string[];
+  // Port Documentation feature settings
+  portDocumentationSettings?: {
+    enabled?: boolean;
+  };
   // Microsoft email sending
   approvedEmailDomains?: string[];            // Restrict Microsoft connect to these domains (empty/null = any)
   microsoftConnectForceUserEmail?: boolean;    // Force Microsoft connect to match the user's Fueld email
@@ -936,6 +940,75 @@ export const orderAttachments = pgTable('order_attachments', {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
+//  11c. PORT GATE LIST PERSONNEL
+// ═══════════════════════════════════════════════════════════════════════
+
+export const portGateListPersonnel = pgTable('port_gate_list_personnel', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  placeId: uuid('place_id').references(() => places.id, { onDelete: 'set null' }),
+  fullName: text('full_name').notNull(),
+  roleTitle: text('role_title').notNull(),
+  company: text('company').notNull(),
+  active: boolean('active').notNull().default(true),
+  notes: text('notes'),
+  createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+  updatedBy: uuid('updated_by').references(() => users.id, { onDelete: 'set null' }),
+  deactivatedAt: timestamp('deactivated_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+//  11d. PORT DOCUMENT ASSETS (versioned static templates)
+// ═══════════════════════════════════════════════════════════════════════
+
+export const portDocumentAssets = pgTable('port_document_assets', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  documentKind: text('document_kind').notNull(),
+  displayName: text('display_name').notNull(),
+  originalFileName: text('original_file_name').notNull(),
+  filePath: text('file_path').notNull(),
+  mimeType: text('mime_type').notNull(),
+  fileSize: integer('file_size').notNull(),
+  sha256Hex: text('sha256_hex').notNull(),
+  versionNumber: integer('version_number').notNull().default(1),
+  isCurrent: boolean('is_current').notNull().default(true),
+  active: boolean('active').notNull().default(true),
+  uploadedBy: uuid('uploaded_by').references(() => users.id, { onDelete: 'set null' }),
+  supersededAt: timestamp('superseded_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+//  11e. ORDER PORT DOCUMENTS (generated + included artifacts)
+// ═══════════════════════════════════════════════════════════════════════
+
+export const orderPortDocuments = pgTable('order_port_documents', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
+  documentKind: text('document_kind').notNull(),
+  sourceType: text('source_type').notNull().default('GENERATED'),
+  status: text('status').notNull().default('ACTIVE'),
+  assetId: uuid('asset_id').references(() => portDocumentAssets.id, { onDelete: 'set null' }),
+  fileName: text('file_name').notNull(),
+  filePath: text('file_path').notNull(),
+  mimeType: text('mime_type').notNull(),
+  fileSize: integer('file_size').notNull(),
+  sha256Hex: text('sha256_hex').notNull(),
+  inputSnapshotJson: jsonb('input_snapshot_json'),
+  dataSnapshotJson: jsonb('data_snapshot_json'),
+  generatedBy: uuid('generated_by').references(() => users.id, { onDelete: 'set null' }),
+  generatedAt: timestamp('generated_at', { withTimezone: true }),
+  includedBy: uuid('included_by').references(() => users.id, { onDelete: 'set null' }),
+  includedAt: timestamp('included_at', { withTimezone: true }),
+  supersededAt: timestamp('superseded_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ═══════════════════════════════════════════════════════════════════════
 //  12. INVOICES
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -1379,6 +1452,9 @@ export const tenantsRelations = relations(tenants, ({ many }) => ({
   teams: many(teams),
   companyGroups: many(companyGroups),
   plattsReports: many(plattsReports),
+  portGateListPersonnel: many(portGateListPersonnel),
+  portDocumentAssets: many(portDocumentAssets),
+  orderPortDocuments: many(orderPortDocuments),
 }));
 
 export const teamsRelations = relations(teams, ({ one, many }) => ({
@@ -1412,6 +1488,11 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   passkeys: many(passkeys),
   uploadedPlattsReports: many(plattsReports),
   plattsImports: many(plattsReportImports),
+  createdPortGateListPersonnel: many(portGateListPersonnel, { relationName: 'portGateListCreatedBy' }),
+  updatedPortGateListPersonnel: many(portGateListPersonnel, { relationName: 'portGateListUpdatedBy' }),
+  uploadedPortDocumentAssets: many(portDocumentAssets),
+  generatedOrderPortDocuments: many(orderPortDocuments, { relationName: 'orderPortDocumentsGeneratedBy' }),
+  includedOrderPortDocuments: many(orderPortDocuments, { relationName: 'orderPortDocumentsIncludedBy' }),
 }));
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1487,6 +1568,7 @@ export const placesRelations = relations(places, ({ one, many }) => ({
   childPlaces: many(places, { relationName: 'parentChild' }),
   orders: many(orders),
   suppliers: many(portSuppliers),
+  portGateListPersonnel: many(portGateListPersonnel),
   responsibleUser: one(users, {
     fields: [places.responsibleUserId],
     references: [users.id],
@@ -1543,6 +1625,7 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
   items: many(orderItems),
   invoices: many(invoices),
   attachments: many(orderAttachments),
+  portDocuments: many(orderPortDocuments),
   supplierNominations: many(supplierNominations),
   documentRevisions: many(documentRevisions),
 }));
@@ -1574,6 +1657,43 @@ export const orderAttachmentsRelations = relations(orderAttachments, ({ one, man
   order: one(orders, { fields: [orderAttachments.orderId], references: [orders.id] }),
   uploader: one(users, { fields: [orderAttachments.uploadedBy], references: [users.id] }),
   supplierNominationLinks: many(supplierNominationAttachments),
+}));
+
+export const portGateListPersonnelRelations = relations(portGateListPersonnel, ({ one }) => ({
+  tenant: one(tenants, { fields: [portGateListPersonnel.tenantId], references: [tenants.id] }),
+  place: one(places, { fields: [portGateListPersonnel.placeId], references: [places.id] }),
+  creator: one(users, {
+    fields: [portGateListPersonnel.createdBy],
+    references: [users.id],
+    relationName: 'portGateListCreatedBy',
+  }),
+  updater: one(users, {
+    fields: [portGateListPersonnel.updatedBy],
+    references: [users.id],
+    relationName: 'portGateListUpdatedBy',
+  }),
+}));
+
+export const portDocumentAssetsRelations = relations(portDocumentAssets, ({ one, many }) => ({
+  tenant: one(tenants, { fields: [portDocumentAssets.tenantId], references: [tenants.id] }),
+  uploader: one(users, { fields: [portDocumentAssets.uploadedBy], references: [users.id] }),
+  orderPortDocuments: many(orderPortDocuments),
+}));
+
+export const orderPortDocumentsRelations = relations(orderPortDocuments, ({ one }) => ({
+  tenant: one(tenants, { fields: [orderPortDocuments.tenantId], references: [tenants.id] }),
+  order: one(orders, { fields: [orderPortDocuments.orderId], references: [orders.id] }),
+  asset: one(portDocumentAssets, { fields: [orderPortDocuments.assetId], references: [portDocumentAssets.id] }),
+  generatedByUser: one(users, {
+    fields: [orderPortDocuments.generatedBy],
+    references: [users.id],
+    relationName: 'orderPortDocumentsGeneratedBy',
+  }),
+  includedByUser: one(users, {
+    fields: [orderPortDocuments.includedBy],
+    references: [users.id],
+    relationName: 'orderPortDocumentsIncludedBy',
+  }),
 }));
 
 export const invoicesRelations = relations(invoices, ({ one, many }) => ({
@@ -1751,6 +1871,15 @@ export type NewOrderSupplier = typeof orderSuppliers.$inferInsert;
 
 export type OrderItem = typeof orderItems.$inferSelect;
 export type NewOrderItem = typeof orderItems.$inferInsert;
+
+export type PortGateListPerson = typeof portGateListPersonnel.$inferSelect;
+export type NewPortGateListPerson = typeof portGateListPersonnel.$inferInsert;
+
+export type PortDocumentAsset = typeof portDocumentAssets.$inferSelect;
+export type NewPortDocumentAsset = typeof portDocumentAssets.$inferInsert;
+
+export type OrderPortDocument = typeof orderPortDocuments.$inferSelect;
+export type NewOrderPortDocument = typeof orderPortDocuments.$inferInsert;
 
 export type Invoice = typeof invoices.$inferSelect;
 export type NewInvoice = typeof invoices.$inferInsert;

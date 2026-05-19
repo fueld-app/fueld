@@ -9,7 +9,7 @@ import {
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
-import type { ApiResponse, OrderNumberSettingsDto, VesselCompanyRoleSettingsDto, VesselCompanyRoleOption, ProductSettingsDto, UnitSettingsDto, CurrencySettingsDto, CompanyTypeSettingsDto, AttachmentTypeSettingsDto, InquiryCancelReasonSettingsDto, UnitConversionSettingsDto } from '@fueld/types';
+import type { ApiResponse, OrderNumberSettingsDto, VesselCompanyRoleSettingsDto, VesselCompanyRoleOption, ProductSettingsDto, UnitSettingsDto, CurrencySettingsDto, CompanyTypeSettingsDto, AttachmentTypeSettingsDto, PortDocumentationSettingsDto, InquiryCancelReasonSettingsDto, UnitConversionSettingsDto } from '@fueld/types';
 
 import { API } from '@app/core/config/api';
 
@@ -691,6 +691,67 @@ interface InquirySettingsDto {
           </div>
 
           <!-- ════════════════════════════════════════════════════════ -->
+          <!--  Port Documentation                                     -->
+          <!-- ════════════════════════════════════════════════════════ -->
+          <div class="app-panel">
+            <div class="app-panel-header app-panel-header--teal">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--teal">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-teal-600" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M6.75 3A2.75 2.75 0 0 0 4 5.75v12.5A2.75 2.75 0 0 0 6.75 21h10.5A2.75 2.75 0 0 0 20 18.25V8.81a2.75 2.75 0 0 0-.806-1.944l-2.06-2.06A2.75 2.75 0 0 0 15.19 4H6.75Zm.75 5.5a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5A.75.75 0 0 1 7.5 8.5Zm0 3.75a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5a.75.75 0 0 1-.75-.75Zm0 3.75a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1-.75-.75Z" />
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-semibold text-gray-900">Port Documentation</h3>
+                <p class="text-xs text-gray-500">Enable order-level port document generation for deployments that use this workflow.</p>
+              </div>
+            </div>
+
+            <div class="app-panel-body space-y-4">
+              <div class="flex items-center justify-between gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <div>
+                  <p class="text-sm font-medium text-gray-900">Feature enabled</p>
+                  <p class="text-xs text-gray-500">Phase 1 uses a deployment-level toggle. License-based entitlement can replace this later.</p>
+                </div>
+                <button
+                  (click)="portDocumentationEnabled.set(!portDocumentationEnabled())"
+                  [disabled]="portDocumentationSaving()"
+                  [class]="portDocumentationEnabled()
+                    ? 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-teal-500 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:opacity-50'
+                    : 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:opacity-50'"
+                >
+                  <span
+                    [class]="portDocumentationEnabled()
+                      ? 'pointer-events-none inline-block h-5 w-5 translate-x-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'
+                      : 'pointer-events-none inline-block h-5 w-5 translate-x-0 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'"
+                  ></span>
+                </button>
+              </div>
+
+              <div class="rounded-lg border border-dashed border-gray-200 bg-white p-4 text-xs text-gray-500">
+                Phase 1 target: Bunker Instructions generation, Gate List export, and Flange Worksheet attachment from the order workflow.
+              </div>
+
+              <div class="flex items-center gap-3 pt-1">
+                <button
+                  (click)="savePortDocumentationSettings()"
+                  [disabled]="portDocumentationSaving()"
+                  class="app-button-primary"
+                >
+                  @if (portDocumentationSaving()) { Saving… } @else { Save Port Documentation Settings }
+                </button>
+                @if (portDocumentationSaved()) {
+                  <span class="text-sm text-green-600 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                    </svg>
+                    Saved
+                  </span>
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- ════════════════════════════════════════════════════════ -->
           <!--  Supplier Inquiry Settings                              -->
           <!-- ════════════════════════════════════════════════════════ -->
           <div class="app-panel">
@@ -1348,6 +1409,11 @@ export class SettingsPageComponent implements OnInit {
   readonly attachmentTypesSaving = signal(false);
   readonly attachmentTypesSaved = signal(false);
 
+  // Port Documentation feature
+  readonly portDocumentationEnabled = signal(false);
+  readonly portDocumentationSaving = signal(false);
+  readonly portDocumentationSaved = signal(false);
+
   // Inquiry cancellation reasons
   readonly inquiryCancelReasons = signal<string[]>([]);
   readonly inquiryCancelReasonsSaving = signal(false);
@@ -1407,6 +1473,7 @@ export class SettingsPageComponent implements OnInit {
     this.loadCurrencies();
     this.loadCompanyTypes();
     this.loadAttachmentTypes();
+    this.loadPortDocumentationSettings();
     this.loadInquirySettings();
     this.loadInquiryCancelReasons();
     this.loadSegments();
@@ -2008,6 +2075,42 @@ export class SettingsPageComponent implements OnInit {
       if (res.success) this.attachmentTypes.set(res.data.attachmentTypes);
     } catch {
       this.showToast('error', 'Failed to load attachment types.');
+    }
+  }
+
+  private async loadPortDocumentationSettings(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<PortDocumentationSettingsDto>>(`${API}/admin/settings/port-documentation`),
+      );
+      if (res.success) {
+        this.portDocumentationEnabled.set(res.data.enabled === true);
+      }
+    } catch {
+      this.showToast('error', 'Failed to load Port Documentation settings.');
+    }
+  }
+
+  async savePortDocumentationSettings(): Promise<void> {
+    this.portDocumentationSaving.set(true);
+    this.portDocumentationSaved.set(false);
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<PortDocumentationSettingsDto>>(`${API}/admin/settings/port-documentation`, {
+          enabled: this.portDocumentationEnabled(),
+        }),
+      );
+      if (res.success) {
+        this.portDocumentationEnabled.set(res.data.enabled === true);
+        this.portDocumentationSaved.set(true);
+        setTimeout(() => this.portDocumentationSaved.set(false), 3000);
+      } else {
+        this.showToast('error', (res as any).message ?? 'Failed to save Port Documentation settings.');
+      }
+    } catch {
+      this.showToast('error', 'Failed to save Port Documentation settings.');
+    } finally {
+      this.portDocumentationSaving.set(false);
     }
   }
 

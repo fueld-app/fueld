@@ -38,6 +38,9 @@ import {
   type InventorySkuDto,
   type InventoryAvailabilityResultDto,
   type OrderTransferDto,
+  type OrderPortDocumentDto,
+  type BunkerInstructionsPreviewDto,
+  type PortDocumentationOrderContextDto,
 } from '@fueld/types';
 
 import {
@@ -1408,6 +1411,172 @@ interface PlattsSuggestionViewModel {
         }
         }
       </div>
+      @if (orderId() || order()?.id) {
+        <div class="mt-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Port Documentation</h3>
+              <p class="mt-1 text-xs text-gray-500">Readiness for Bunker Instructions, Gate List, and Flange Worksheet packaging.</p>
+            </div>
+            @if (portDocumentationLoading()) {
+              <span class="text-xs text-gray-400">Loading…</span>
+            }
+          </div>
+
+          @if (portDocumentationError()) {
+            <div class="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+              {{ portDocumentationError() }}
+            </div>
+          } @else if (portDocumentationContext()) {
+            <div class="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                (click)="previewBunkerInstructions()"
+                [disabled]="portDocumentationAction() !== null"
+                class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+              >
+                {{ portDocumentationAction() === 'preview-bunker' ? 'Loading Preview…' : 'Preview Bunker Instructions' }}
+              </button>
+              <button
+                type="button"
+                (click)="generateBunkerInstructions()"
+                [disabled]="portDocumentationAction() !== null"
+                class="rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-brand-700 disabled:opacity-50"
+              >
+                {{ portDocumentationAction() === 'generate-bunker' ? 'Generating…' : 'Generate Bunker Instructions' }}
+              </button>
+              <button
+                type="button"
+                (click)="generateGateList()"
+                [disabled]="portDocumentationAction() !== null"
+                class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+              >
+                {{ portDocumentationAction() === 'generate-gate-list' ? 'Generating…' : 'Export Gate List' }}
+              </button>
+              <button
+                type="button"
+                (click)="includeFlangeWorksheetDocument()"
+                [disabled]="!portDocumentationContext()!.currentFlangeWorksheet || portDocumentationAction() !== null"
+                class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+              >
+                {{ portDocumentationAction() === 'include-flange' ? 'Including…' : 'Include Flange Worksheet' }}
+              </button>
+            </div>
+
+            <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-4">
+              <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">Gate List</div>
+                <div class="mt-2 text-2xl font-semibold text-gray-900">{{ portDocumentationContext()!.gateListCount }}</div>
+                <div class="mt-1 text-xs text-gray-500">active personnel available for export</div>
+              </div>
+              <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">Flange Worksheet</div>
+                <div class="mt-2 text-sm font-semibold text-gray-900">{{ portDocumentationContext()!.currentFlangeWorksheet?.displayName ?? 'Not uploaded' }}</div>
+                <div class="mt-1 text-xs text-gray-500">
+                  @if (portDocumentationContext()!.currentFlangeWorksheet) {
+                    Version {{ portDocumentationContext()!.currentFlangeWorksheet!.versionNumber }}
+                  } @else {
+                    Admin upload still required
+                  }
+                </div>
+              </div>
+              <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">Generated / Included</div>
+                <div class="mt-2 text-2xl font-semibold text-gray-900">{{ portDocumentationContext()!.documents.length }}</div>
+                <div class="mt-1 text-xs text-gray-500">port document files on this order</div>
+              </div>
+              <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">Agent</div>
+                <div class="mt-2 text-sm font-semibold text-gray-900">{{ agent()?.name ?? 'Missing' }}</div>
+                <div class="mt-1 text-xs text-gray-500">required for bunker-instructions workflow</div>
+              </div>
+            </div>
+
+            @if (portDocumentationContext()!.readinessWarnings.length > 0) {
+              <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                <div class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Readiness Warnings</div>
+                <ul class="mt-2 space-y-1 text-sm text-amber-900">
+                  @for (warning of portDocumentationContext()!.readinessWarnings; track warning) {
+                    <li>{{ warning }}</li>
+                  }
+                </ul>
+              </div>
+            }
+
+            @if (bunkerInstructionsPreview()) {
+              <div class="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <div class="flex items-center justify-between gap-3">
+                  <div>
+                    <div class="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">Bunker Instructions Preview</div>
+                    <div class="mt-1 text-sm text-gray-600">Snapshot of the data that will be packaged into the generated workbook.</div>
+                  </div>
+                  <button
+                    type="button"
+                    (click)="bunkerInstructionsPreview.set(null)"
+                    class="text-xs font-medium text-gray-500 transition hover:text-gray-700"
+                  >
+                    Close
+                  </button>
+                </div>
+
+                @if (bunkerInstructionsPreview()!.warnings.length > 0) {
+                  <div class="mt-3 rounded-lg border border-amber-200 bg-white p-3 text-sm text-amber-900">
+                    @for (warning of bunkerInstructionsPreview()!.warnings; track warning) {
+                      <div>{{ warning }}</div>
+                    }
+                  </div>
+                }
+
+                <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                  @for (section of bunkerInstructionsPreview()!.sections; track section.title) {
+                    <div class="rounded-lg border border-gray-200 bg-white p-3">
+                      <div class="text-sm font-semibold text-gray-900">{{ section.title }}</div>
+                      <dl class="mt-3 space-y-2">
+                        @for (field of section.fields; track field.label + field.value) {
+                          <div class="grid grid-cols-[8rem_1fr] gap-3 text-sm">
+                            <dt class="text-gray-500">{{ field.label }}</dt>
+                            <dd class="text-gray-900">{{ field.value }}</dd>
+                          </div>
+                        }
+                      </dl>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+
+            <div class="mt-4">
+              @if (portDocumentationContext()!.documents.length === 0) {
+                <div class="rounded-lg border border-dashed border-gray-200 bg-white p-4 text-sm text-gray-500">
+                  No Port Documentation files have been generated or attached for this order yet.
+                </div>
+              } @else {
+                <ul class="divide-y divide-gray-100 rounded-lg border border-gray-200">
+                  @for (doc of portDocumentationContext()!.documents; track doc.id) {
+                    <li class="flex items-center justify-between gap-4 px-4 py-3 text-sm">
+                      <div>
+                        <div class="font-medium text-gray-900">{{ doc.fileName }}</div>
+                        <div class="mt-1 text-xs text-gray-500">{{ doc.documentKind }} · {{ doc.sourceType }} · {{ doc.status }}</div>
+                      </div>
+                      <div class="flex items-center gap-3">
+                        <div class="text-xs text-gray-400">{{ formatFileSize(doc.fileSize) }}</div>
+                        <button
+                          type="button"
+                          (click)="downloadPortDocumentationDocument(doc)"
+                          [disabled]="portDocumentationAction() === 'download-' + doc.id"
+                          class="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          {{ portDocumentationAction() === 'download-' + doc.id ? 'Downloading…' : 'Download' }}
+                        </button>
+                      </div>
+                    </li>
+                  }
+                </ul>
+              }
+            </div>
+          }
+        </div>
+      }
       @if (order()?.id) {
         <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
           <app-email-history-card [orderId]="order()!.id" />
@@ -1863,6 +2032,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   selectedAttachment: File | null = null;
   readonly payments = signal<CustomerPaymentDto[]>([]);
   readonly paymentsLoading = signal(false);
+  readonly portDocumentationContext = signal<PortDocumentationOrderContextDto | null>(null);
+  readonly portDocumentationLoading = signal(false);
+  readonly portDocumentationError = signal('');
+  readonly portDocumentationAction = signal<string | null>(null);
+  readonly bunkerInstructionsPreview = signal<BunkerInstructionsPreviewDto | null>(null);
   readonly customerCreditLines = signal<CreditLineDto[]>([]);
   readonly customerCreditLoading = signal(false);
   readonly customerCreditFrozen = signal(false);
@@ -2719,10 +2893,152 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
       await this.loadAttachments();
       await this.loadPayments();
+      await this.loadPortDocumentationContext();
       await this.loadSupplierNominationSummary();
     } catch {
       this.showToast('error', 'Failed to load order.');
     }
+  }
+
+  private async loadPortDocumentationContext(): Promise<void> {
+    const id = this.orderId();
+    if (!id) return;
+
+    this.portDocumentationLoading.set(true);
+    this.portDocumentationError.set('');
+    this.bunkerInstructionsPreview.set(null);
+
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<PortDocumentationOrderContextDto>>(`${API_URL}/orders/${id}/port-documentation`),
+      );
+      if (res.success) {
+        this.portDocumentationContext.set(res.data);
+      } else {
+        this.portDocumentationContext.set(null);
+        this.portDocumentationError.set(res.message ?? 'Port Documentation is not available on this deployment yet.');
+      }
+    } catch {
+      this.portDocumentationContext.set(null);
+      this.portDocumentationError.set('Port Documentation is not available on this deployment yet.');
+    } finally {
+      this.portDocumentationLoading.set(false);
+    }
+  }
+
+  async previewBunkerInstructions(): Promise<void> {
+    const id = this.orderId();
+    if (!id) return;
+
+    this.portDocumentationAction.set('preview-bunker');
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<BunkerInstructionsPreviewDto>>(`${API_URL}/orders/${id}/port-documentation/bunker-instructions/preview`),
+      );
+      if (!res.success) {
+        this.showToast('error', res.message ?? 'Failed to load bunker instructions preview.');
+        return;
+      }
+      this.bunkerInstructionsPreview.set(res.data);
+    } catch {
+      this.showToast('error', 'Failed to load bunker instructions preview.');
+    } finally {
+      this.portDocumentationAction.set(null);
+    }
+  }
+
+  async generateBunkerInstructions(): Promise<void> {
+    await this.runPortDocumentationMutation(
+      'generate-bunker',
+      'Bunker Instructions generated.',
+      'Failed to generate Bunker Instructions.',
+      () => this.postPortDocumentationDocument('bunker-instructions/generate'),
+    );
+  }
+
+  async generateGateList(): Promise<void> {
+    await this.runPortDocumentationMutation(
+      'generate-gate-list',
+      'Gate List generated.',
+      'Failed to generate Gate List.',
+      () => this.postPortDocumentationDocument('gate-list/generate'),
+    );
+  }
+
+  async includeFlangeWorksheetDocument(): Promise<void> {
+    await this.runPortDocumentationMutation(
+      'include-flange',
+      'Flange Worksheet included on the order.',
+      'Failed to include Flange Worksheet.',
+      () => this.postPortDocumentationDocument('flange-worksheet/include'),
+    );
+  }
+
+  async downloadPortDocumentationDocument(doc: OrderPortDocumentDto): Promise<void> {
+    const id = this.orderId();
+    if (!id) return;
+
+    this.portDocumentationAction.set(`download-${doc.id}`);
+    try {
+      const response = await firstValueFrom(
+        this.http.get(`${API_URL}/orders/${id}/port-documentation/documents/${doc.id}/download`, {
+          responseType: 'blob',
+          observe: 'response',
+        }),
+      );
+      this.downloadResponseBlob(response, doc.fileName);
+    } catch {
+      this.showToast('error', 'Failed to download Port Documentation file.');
+    } finally {
+      this.portDocumentationAction.set(null);
+    }
+  }
+
+  private async postPortDocumentationDocument(pathSuffix: string): Promise<void> {
+    const id = this.orderId();
+    if (!id) throw new Error('Order not found');
+
+    const res = await firstValueFrom(
+      this.http.post<ApiResponse<OrderPortDocumentDto>>(`${API_URL}/orders/${id}/port-documentation/${pathSuffix}`, {}),
+    );
+    if (!res.success) {
+      throw new Error(res.message ?? 'Request failed');
+    }
+  }
+
+  private async runPortDocumentationMutation(
+    actionKey: string,
+    successMessage: string,
+    errorMessage: string,
+    operation: () => Promise<void>,
+  ): Promise<void> {
+    this.portDocumentationAction.set(actionKey);
+    try {
+      await operation();
+      await this.loadPortDocumentationContext();
+      this.showToast('success', successMessage);
+    } catch {
+      this.showToast('error', errorMessage);
+    } finally {
+      this.portDocumentationAction.set(null);
+    }
+  }
+
+  private downloadResponseBlob(response: HttpResponse<Blob>, fallbackFileName: string): void {
+    const blob = response.body;
+    if (!blob) throw new Error('Missing file body');
+
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = this.extractFilenameFromDisposition(response.headers.get('Content-Disposition')) ?? fallbackFileName;
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+  }
+
+  private extractFilenameFromDisposition(header: string | null): string | null {
+    const match = header?.match(/filename="?([^";]+)"?/i);
+    return match?.[1] ?? null;
   }
 
   private async loadAttachments(): Promise<void> {

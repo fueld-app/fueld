@@ -45,6 +45,8 @@ import {
   updateCompanyTypeSettings,
   getAttachmentTypeSettings,
   updateAttachmentTypeSettings,
+  getPortDocumentationSettings,
+  updatePortDocumentationSettings,
   getInquiryCancelReasonSettings,
   updateInquiryCancelReasonSettings,
   getInquirySettings,
@@ -1277,6 +1279,41 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       attachmentTypes: t.Array(t.String({ minLength: 1 })),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update configurable attachment type options' },
+  })
+
+  // ═════════════════════════════════════════════════════════════════
+  //  PORT DOCUMENTATION SETTINGS
+  // ═════════════════════════════════════════════════════════════════
+
+  .get('/port-documentation', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getPortDocumentationSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get Port Documentation feature settings' },
+  })
+
+  .put('/port-documentation', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updatePortDocumentationSettings({
+        enabled: body.enabled,
+      });
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      enabled: t.Boolean(),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update Port Documentation feature settings' },
   })
 
   // ═════════════════════════════════════════════════════════════════

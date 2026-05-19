@@ -370,6 +370,14 @@ export const routes: Routes = [
             title: 'Admin > Settings',
           },
           {
+            path: 'port-documentation',
+            loadComponent: () =>
+              import('./features/admin/pages/port-documentation/port-documentation-page.component').then(
+                (m) => m.PortDocumentationPageComponent,
+              ),
+            title: 'Admin > Port Documentation',
+          },
+          {
             path: 'llm',
             loadComponent: () =>
               import('./features/admin/pages/llm/llm-page.component').then(

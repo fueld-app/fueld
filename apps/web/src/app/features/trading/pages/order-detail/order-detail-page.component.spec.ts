@@ -474,6 +474,97 @@ describe('OrderDetailPageComponent', () => {
     expect(component.toast()).toEqual({ type: 'error', message: 'Failed to save order.' });
   });
 
+  it('loads bunker instructions preview into the panel state', async () => {
+    const { component } = await createComponent({
+      onGet: (url) => {
+        if (String(url).includes('/orders/order-1/port-documentation/bunker-instructions/preview')) {
+          return {
+            success: true,
+            data: {
+              orderId: 'order-1',
+              warnings: ['Agent is missing on the order.'],
+              sections: [
+                {
+                  title: 'Order',
+                  fields: [{ label: 'Order Number', value: '20260519-0001' }],
+                },
+              ],
+            },
+          };
+        }
+        if (String(url).includes('/orders/order-1/port-documentation')) {
+          return {
+            success: true,
+            data: {
+              orderId: 'order-1',
+              enabled: true,
+              gateListCount: 0,
+              currentFlangeWorksheet: null,
+              readinessWarnings: [],
+              documents: [],
+            },
+          };
+        }
+        return { success: true, data: [] };
+      },
+    });
+
+    await component.previewBunkerInstructions();
+
+    expect(component.bunkerInstructionsPreview()?.warnings).toEqual(['Agent is missing on the order.']);
+    expect(component.bunkerInstructionsPreview()?.sections[0]?.title).toBe('Order');
+    expect(component.portDocumentationAction()).toBeNull();
+  });
+
+  it('posts bunker instructions generation and refreshes port documentation context', async () => {
+    const postCalls: Array<{ url: string; body: unknown }> = [];
+    const { component } = await createComponent({
+      onGet: () => ({ success: true, data: [] }),
+      onPost: (url, body) => {
+        postCalls.push({ url, body });
+        return { success: true, data: {} };
+      },
+    });
+
+    const refreshSpy = vi.spyOn(component as any, 'loadPortDocumentationContext').mockImplementation(async () => {
+      component.portDocumentationContext.set({
+        orderId: 'order-1',
+        enabled: true,
+        gateListCount: 1,
+        currentFlangeWorksheet: null,
+        readinessWarnings: [],
+        documents: [{
+          id: 'doc-1',
+          tenantId: 'tenant-1',
+          orderId: 'order-1',
+          documentKind: 'BUNKER_INSTRUCTIONS',
+          sourceType: 'GENERATED',
+          status: 'ACTIVE',
+          fileName: 'bunker-instructions.xlsx',
+          filePath: '/uploads/bunker-instructions.xlsx',
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          fileSize: 128,
+          sha256Hex: 'abc',
+          assetId: null,
+          generatedBy: 'user-1',
+          generatedAt: '2026-05-19T00:00:00.000Z',
+          includedBy: null,
+          includedAt: null,
+          supersededAt: null,
+          createdAt: '2026-05-19T00:00:00.000Z',
+        }],
+      } as any);
+    });
+
+    await component.generateBunkerInstructions();
+
+    expect(postCalls.some((call) => call.url.includes('/orders/order-1/port-documentation/bunker-instructions/generate'))).toBe(true);
+    expect(refreshSpy).toHaveBeenCalled();
+    expect(component.portDocumentationContext()?.documents).toHaveLength(1);
+    expect(component.toast()).toEqual({ type: 'success', message: 'Bunker Instructions generated.' });
+    expect(component.portDocumentationAction()).toBeNull();
+  });
+
   it('defaults new rows to the active supplier and skips incomplete drafts during autosave', async () => {
     const putCalls: Array<{ url: string; body: any }> = [];
     const supplierOne = {

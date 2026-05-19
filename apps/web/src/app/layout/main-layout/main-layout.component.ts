@@ -267,6 +267,7 @@ const NAVIGATION: NavItem[] = [
       { label: 'Activity Log', route: '/admin/activity' },
       { label: 'Security', route: '/admin/security' },
       { label: 'Settings', route: '/admin/settings' },
+      { label: 'Port Documentation', route: '/admin/port-documentation' },
       { label: 'LLM / AI', route: '/admin/llm' },
       { label: 'Backup / Restore', route: '/admin/backup' },
       { label: 'Email', route: '/admin/email' },
