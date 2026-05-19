@@ -164,8 +164,15 @@ import { API } from '@app/core/config/api';
                     <td class="px-4 py-3 text-gray-600">
                       @if (s.pageTitle) {
                         <a [href]="s.currentUrl || '/'" class="text-xs font-medium text-brand-600 hover:text-brand-800 hover:underline">{{ s.pageTitle }}</a>
+                      } @else if (s.currentUrl) {
+                        <a [href]="s.currentUrl" class="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-brand-600 hover:text-brand-800 hover:underline font-mono">{{ s.currentUrl }}</a>
                       } @else {
-                        <a [href]="s.currentUrl || '/'" class="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-brand-600 hover:text-brand-800 hover:underline font-mono">{{ s.currentUrl || '/' }}</a>
+                        <div class="flex flex-col gap-1">
+                          <span class="inline-flex w-fit items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                            Page unknown
+                          </span>
+                          <span class="text-[11px] text-gray-400">Connected, waiting for presence update</span>
+                        </div>
                       }
                     </td>
                     <td class="px-4 py-3 text-gray-600 text-xs">{{ s.platform || '—' }}</td>

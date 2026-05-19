@@ -291,6 +291,11 @@ server {
     listen [::]:443 ssl http2;
     server_name *.fueld.app;
 
+  set $fueld_client_ip $remote_addr;
+  if ($http_cf_connecting_ip != "") {
+    set $fueld_client_ip $http_cf_connecting_ip;
+  }
+
     # SSL (managed by Certbot — placeholders until certs are issued)
     ssl_certificate /etc/letsencrypt/live/fueld.app/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/fueld.app/privkey.pem;
@@ -333,8 +338,10 @@ server {
     location /api/ {
         proxy_pass http://fueld_api/;
         proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Real-IP $fueld_client_ip;
+      proxy_set_header CF-Connecting-IP $fueld_client_ip;
+      proxy_set_header True-Client-IP $fueld_client_ip;
+      proxy_set_header X-Forwarded-For $fueld_client_ip;
         proxy_set_header X-Forwarded-Proto $scheme;
 
         # File uploads
@@ -353,8 +360,10 @@ server {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Real-IP $fueld_client_ip;
+      proxy_set_header CF-Connecting-IP $fueld_client_ip;
+      proxy_set_header True-Client-IP $fueld_client_ip;
+      proxy_set_header X-Forwarded-For $fueld_client_ip;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_read_timeout 86400s;
         proxy_send_timeout 86400s;
@@ -371,7 +380,7 @@ server {
     location /api/swagger {
         proxy_pass http://fueld_api/swagger;
         proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Real-IP $fueld_client_ip;
     }
 }
 NGINX

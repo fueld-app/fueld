@@ -28,6 +28,7 @@ export class WebSocketService {
   private maxReconnectAttempts = 10;
   private intentionallyClosed = false;
   private pendingMessages: { type: string; [key: string]: unknown }[] = [];
+  private lastPresenceMessage: { type: 'presence'; [key: string]: unknown } | null = null;
 
   /** Stream of all incoming messages */
   private readonly messages$ = new Subject<WsMessage>();
@@ -76,14 +77,16 @@ export class WebSocketService {
   sendPresence(url: string, pageTitle?: string): void {
     // Strip "Fueld | " prefix from the page title for the backend
     const cleanTitle = pageTitle?.replace(/^Fueld\s*\|\s*/, '') ?? null;
-    this.send({
+    const message = {
       type: 'presence',
       url,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       platform: navigator.userAgent,
       language: navigator.language,
       pageTitle: cleanTitle,
-    });
+    } as const;
+    this.lastPresenceMessage = message;
+    this.send(message);
   }
 
   /**
@@ -125,12 +128,14 @@ export class WebSocketService {
   }
 
   /** Flush any messages that were queued before the socket was ready. */
-  private flushPending(): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+  private flushPending(): boolean {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return false;
     const queued = this.pendingMessages.splice(0);
+    const hadQueuedPresence = queued.some((msg) => msg.type === 'presence');
     for (const msg of queued) {
       this.ws.send(JSON.stringify(msg));
     }
+    return hadQueuedPresence;
   }
 
   /**
@@ -162,7 +167,10 @@ export class WebSocketService {
           this.authenticated.set(true);
           console.log('[WS] Authenticated');
           this.messages$.next(msg);
-          this.flushPending();
+          const hadQueuedPresence = this.flushPending();
+          if (!hadQueuedPresence && this.lastPresenceMessage) {
+            this.send(this.lastPresenceMessage);
+          }
           return;
         }
 
@@ -210,6 +218,7 @@ export class WebSocketService {
     this.connected.set(false);
     this.authenticated.set(false);
     this.pendingMessages = [];
+    this.lastPresenceMessage = null;
 
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
