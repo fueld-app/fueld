@@ -224,8 +224,14 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
           APP_VERSION=$(cat VERSION)
-          ACTUAL_SHA=$(git rev-parse HEAD)
-          SHORT_SHA=$(git rev-parse --short=7 HEAD)
+          if git rev-parse HEAD >/dev/null 2>&1; then
+            ACTUAL_SHA=$(git rev-parse HEAD)
+          elif [ -n "${DEPLOY_REF:-}" ]; then
+            ACTUAL_SHA="$DEPLOY_REF"
+          else
+            ACTUAL_SHA='${{ github.sha }}'
+          fi
+          SHORT_SHA=$(printf '%s' "$ACTUAL_SHA" | cut -c1-7)
           SOURCE_REF='${{ github.event.inputs.deploy_ref || github.ref_name }}'
           if [ -z "$SOURCE_REF" ]; then
             SOURCE_REF="$ACTUAL_SHA"
