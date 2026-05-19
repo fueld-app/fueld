@@ -31,6 +31,7 @@ export type HeaderAction =
   | 'send-nomination'
   | 'send-proforma'
   | 'send-invoice'
+  | 'send-port-documentation'
   | 'send-inquiry'
   | 'mark-delivered'
   | 'mark-paid';
@@ -121,6 +122,12 @@ const ACTIONS: ActionItem[] = [
     icon: SEND_ICON,
     color: 'text-indigo-600',
   },
+  {
+    key: 'send-port-documentation',
+    label: 'Send Port Documentation',
+    icon: SEND_ICON,
+    color: 'text-teal-600',
+  },
   // ─── Workflow actions ────────────────────────────────────────
   {
     key: 'mark-delivered',
@@ -193,6 +200,7 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
   readonly hasBankAccount = input<boolean>(false);
   readonly hasLineItems = input<boolean>(false);
   readonly hasEnoughPayments = input<boolean>(false);
+  readonly hasPortDocumentationDocuments = input<boolean>(false);
   readonly actionTriggered = output<HeaderAction>();
 
   readonly isOpen = signal(false);
@@ -243,6 +251,7 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
     const hasSupplier = this.hasSupplier();
     const hasBankAccount = this.hasBankAccount();
     const hasLineItems = this.hasLineItems();
+    const hasPortDocumentationDocuments = this.hasPortDocumentationDocuments();
     const isInquiry = normalizedStatus === 'INQUIRY' || normalizedStatus === 'OFFER';
     const showInvoiceAsFinal =
       status === OrderStatus.Delivered
@@ -299,6 +308,7 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
             && (action.key !== 'cancel-order' || canCancelOrder)
             && action.key !== 'send-offer'
             && action.key !== 'send-proforma'
+            && action.key !== 'send-port-documentation'
             && (action.key !== 'mark-paid' || canMarkPaid),
           )
           .map((action) =>
@@ -318,6 +328,8 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
                 ? { ...action, disabled: !hasInvoicingCompany || !hasLineItems }
               : action.key === 'send-invoice'
                 ? { ...action, label: showInvoiceAsFinal ? 'Send Invoice' : 'Send Proforma Invoice', disabled: !hasBankAccount || !hasLineItems }
+              : action.key === 'send-port-documentation'
+                ? { ...action, disabled: !hasPortDocumentationDocuments }
               : action.key === 'mark-delivered'
                 ? { ...action, disabled: !canMarkDelivered }
               : action.key === 'mark-paid'

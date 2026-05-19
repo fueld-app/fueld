@@ -244,6 +244,7 @@ interface PlattsSuggestionViewModel {
           [hasBankAccount]="hasBankAccount()"
           [hasLineItems]="hasLineItems()"
           [hasEnoughPayments]="hasEnoughPaymentsForMarkPaid()"
+          [hasPortDocumentationDocuments]="(portDocumentationContext()?.documents?.length ?? 0) > 0"
           (actionTriggered)="onAction($event)"
         />
         <div class="relative">
@@ -1850,7 +1851,7 @@ interface PlattsSuggestionViewModel {
       [pdfFileName]="emailPdfFileName()"
       [orderId]="orderId()"
       [nominationOrderSupplierId]="nominationOrderSupplierId()"
-      [extraAttachments]="invoiceEmailAttachmentOptions()"
+      [extraAttachments]="emailAttachmentOptions()"
       [waLinked]="waLinked()"
       [defaultPhone]="emailModalDefaultPhone()"
       (sendEmail)="onSendEmail($event)"
@@ -2260,6 +2261,24 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         label: `BDR uploaded ${new Date(att.createdAt).toLocaleDateString('en-GB')}`,
       })),
   );
+  readonly portDocumentationEmailAttachmentOptions = computed<SendEmailAttachmentOption[]>(() =>
+    (this.portDocumentationContext()?.documents ?? [])
+      .filter((doc) => String(doc.status ?? '').toUpperCase() === 'ACTIVE')
+      .map((doc) => ({
+        id: doc.id,
+        fileName: doc.fileName,
+        label: `${this.humanizePortDocumentKind(doc.documentKind)} · ${this.humanizePortDocumentSource(doc.sourceType)}`,
+      })),
+  );
+  readonly emailAttachmentOptions = computed<SendEmailAttachmentOption[]>(() => {
+    if (this.emailDocumentType() === 'INVOICE') {
+      return this.invoiceEmailAttachmentOptions();
+    }
+    if (this.emailDocumentType() === 'PORT_DOCUMENTATION') {
+      return this.portDocumentationEmailAttachmentOptions();
+    }
+    return [];
+  });
 
   readonly isPaidOrCancelled = computed(() => {
     const status = this.order()?.status;
@@ -5124,6 +5143,13 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       case 'send-invoice':
         this.openSendEmailModal('INVOICE');
         break;
+      case 'send-port-documentation':
+        if ((this.portDocumentationContext()?.documents.length ?? 0) === 0) {
+          this.showToast('error', 'Generate or include at least one Port Documentation file before sending.');
+          break;
+        }
+        this.openSendEmailModal('PORT_DOCUMENTATION');
+        break;
       case 'send-inquiry':
         this.openSendInquiryModal();
         break;
@@ -5616,7 +5642,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
             return;
           }
           const d = res.data;
-          this.emailPdfFileName.set(`${docType}_${this.order()?.orderNumber ?? id.slice(0, 8)}.pdf`);
+          this.emailPdfFileName.set(
+            docType === 'PORT_DOCUMENTATION'
+              ? ''
+              : `${docType}_${this.order()?.orderNumber ?? id.slice(0, 8)}.pdf`,
+          );
 
           // Open the compose modal with the pre-filled data
           this.emailModal()?.showWith({
@@ -5693,6 +5723,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       NOMINATION: 'nomination',
       PROFORMA: 'proforma',
       INVOICE: 'invoice',
+      PORT_DOCUMENTATION: 'invoice',
     };
     const docLabels: Record<DocumentEmailType, string> = {
       OFFER: 'Offer',
@@ -5700,6 +5731,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       NOMINATION: 'Nomination',
       PROFORMA: 'Proforma Invoice',
       INVOICE: 'Invoice',
+      PORT_DOCUMENTATION: 'Port Documentation',
     };
 
     try {
@@ -5728,6 +5760,22 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       this.emailModal()?.waDone();
       this.showToast('error', 'Failed to send via WhatsApp. Is your device linked?');
     }
+  }
+
+  private humanizePortDocumentKind(value: string | null | undefined): string {
+    return String(value ?? '')
+      .split('_')
+      .filter(Boolean)
+      .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
+      .join(' ');
+  }
+
+  private humanizePortDocumentSource(value: string | null | undefined): string {
+    return String(value ?? '')
+      .split('_')
+      .filter(Boolean)
+      .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
+      .join(' ');
   }
 
   /** Send an already-loaded PDF via WhatsApp from the PDF preview modal */
