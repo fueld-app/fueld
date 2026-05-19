@@ -174,7 +174,7 @@ export interface OrderItemsEconomics {
                     <select
                       [ngModel]="row.orderSupplierId ?? ''"
                       (ngModelChange)="updateField(i, 'orderSupplierId', $event || null)"
-                      class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                      class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
                              focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
                     >
                       <option value="">Select supplier</option>
@@ -694,7 +694,7 @@ export interface OrderItemsEconomics {
                         [ngModel]="row.warehouseId ?? ''"
                         (ngModelChange)="updateField(i, 'warehouseId', $event || null)"
                         [disabled]="readonly()"
-                        class="rounded-md border border-gray-300 px-2 py-1 text-xs disabled:opacity-60"
+                        class="fueld-select-no-chevron appearance-none rounded-md border border-gray-300 px-2 py-1 text-xs disabled:opacity-60"
                       >
                         <option value="">— Not tracked —</option>
                         @for (w of warehouseOptionsInput(); track w.value) {
@@ -708,7 +708,7 @@ export interface OrderItemsEconomics {
                         [ngModel]="row.inventorySkuId ?? ''"
                         (ngModelChange)="updateField(i, 'inventorySkuId', $event || null)"
                         [disabled]="readonly() || !row.warehouseId"
-                        class="rounded-md border border-gray-300 px-2 py-1 text-xs disabled:opacity-60"
+                        class="fueld-select-no-chevron appearance-none rounded-md border border-gray-300 px-2 py-1 text-xs disabled:opacity-60"
                       >
                         <option value="">—</option>
                         @for (s of inventorySkuOptionsInput(); track s.value) {
@@ -845,7 +845,7 @@ export interface OrderItemsEconomics {
                   <select
                     [ngModel]="row.orderSupplierId ?? ''"
                     (ngModelChange)="updateField(i, 'orderSupplierId', $event || null)"
-                    class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                    class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
                            focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
                   >
                     <option value="">Select supplier</option>
@@ -931,7 +931,7 @@ export interface OrderItemsEconomics {
                 <select
                   [ngModel]="row.unit"
                   (ngModelChange)="updateField(i, 'unit', $event)"
-                  class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                  class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
                          focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
                 >
                   @for (u of unitOptions(); track u.value) {
@@ -950,7 +950,7 @@ export interface OrderItemsEconomics {
                 <select
                   [ngModel]="row.costUnit"
                   (ngModelChange)="updateField(i, 'costUnit', $event)"
-                  class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                  class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
                          focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
                 >
                   @for (u of unitOptions(); track u.value) {
@@ -969,7 +969,7 @@ export interface OrderItemsEconomics {
                 <select
                   [ngModel]="row.salesUnit"
                   (ngModelChange)="updateField(i, 'salesUnit', $event)"
-                  class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                  class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
                          focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
                 >
                   @for (u of unitOptions(); track u.value) {
@@ -1031,7 +1031,7 @@ export interface OrderItemsEconomics {
                       <input type="number" step="0.01" [ngModel]="row.costBarging ?? 0" (ngModelChange)="updateField(i, 'costBarging', +$event)" placeholder="Barging"
                         class="w-full rounded border border-gray-200 px-2 py-1 text-xs tabular-nums focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20" />
                       <select [ngModel]="row.costBargingUnit ?? 'l/s'" (ngModelChange)="updateField(i, 'costBargingUnit', $event)"
-                        class="w-14 rounded border border-gray-200 px-1 py-1 text-[10px] text-gray-600 focus:border-brand-500 outline-none bg-white">
+                        class="fueld-select-no-chevron w-14 appearance-none rounded border border-gray-200 px-1 py-1 text-[10px] text-gray-600 focus:border-brand-500 outline-none bg-white">
                         <option value="l/s">l/s</option><option value="pmt">pmt</option>
                       </select>
                     </div>
@@ -1050,7 +1050,7 @@ export interface OrderItemsEconomics {
                     <select
                       [ngModel]="row.costCurrency"
                       (ngModelChange)="updateField(i, 'costCurrency', $event)"
-                      class="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-700
+                      class="fueld-select-no-chevron w-20 appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-700
                              focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
                     >
                       @for (c of currencyOptions(); track c.value) {
@@ -1117,7 +1117,7 @@ export interface OrderItemsEconomics {
                       <input type="number" step="0.01" [ngModel]="row.salesBarging ?? 0" (ngModelChange)="updateField(i, 'salesBarging', +$event)" placeholder="Barging"
                         class="w-full rounded border border-gray-200 px-2 py-1 text-xs tabular-nums focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20" />
                       <select [ngModel]="row.salesBargingUnit ?? 'l/s'" (ngModelChange)="updateField(i, 'salesBargingUnit', $event)"
-                        class="w-14 rounded border border-gray-200 px-1 py-1 text-[10px] text-gray-600 focus:border-brand-500 outline-none bg-white">
+                        class="fueld-select-no-chevron w-14 appearance-none rounded border border-gray-200 px-1 py-1 text-[10px] text-gray-600 focus:border-brand-500 outline-none bg-white">
                         <option value="l/s">l/s</option><option value="pmt">pmt</option>
                       </select>
                     </div>
@@ -1136,7 +1136,7 @@ export interface OrderItemsEconomics {
                     <select
                       [ngModel]="row.salesCurrency"
                       (ngModelChange)="updateField(i, 'salesCurrency', $event)"
-                      class="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-700
+                      class="fueld-select-no-chevron w-20 appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-700
                              focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
                     >
                       @for (c of currencyOptions(); track c.value) {

@@ -283,7 +283,7 @@ import {
                 [ngModel]="supplierContactId()"
                 (ngModelChange)="supplierContactChange.emit($event)"
                 [disabled]="!supplierId()"
-                class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                class="fueld-select-no-chevron mt-1 w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
                        focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white
                        disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -405,7 +405,7 @@ import {
             [ngModel]="invoicingCompanyId()"
             (ngModelChange)="invoicingCompanyChange.emit($event)"
             [disabled]="ownCompanies().length === 0"
-            class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm font-semibold text-gray-900
+            class="fueld-select-no-chevron mt-1 w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm font-semibold text-gray-900
                    focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white
                    disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -428,7 +428,7 @@ import {
               [ngModel]="bankAccountId()"
               (ngModelChange)="bankAccountChange.emit($event)"
               [disabled]="!invoicingCompanyId() || bankAccountOptions().length === 0"
-              class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+              class="fueld-select-no-chevron mt-1 w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
                      focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white
                      disabled:opacity-50 disabled:cursor-not-allowed"
             >

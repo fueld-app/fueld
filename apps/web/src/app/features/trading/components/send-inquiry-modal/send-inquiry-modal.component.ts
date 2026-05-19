@@ -656,7 +656,7 @@ export interface SendInquiryWhatsAppPayload {
                       </label>
                       <select
                         id="preview-recipient"
-                        class="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                        class="fueld-select-no-chevron mt-1 block w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                         [ngModel]="previewRecipientId()"
                         (ngModelChange)="previewRecipientId.set($event)"
                       >

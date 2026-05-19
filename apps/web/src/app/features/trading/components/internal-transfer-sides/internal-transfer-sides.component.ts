@@ -102,7 +102,7 @@ import { API_URL } from '@app/core/config/api';
                     [ngModel]="s.paymentTermType ?? ''"
                     (ngModelChange)="updateField(s, 'paymentTermType', ($event || null))"
                     [disabled]="s.status === 'FINALIZED' || readonly()"
-                    class="mt-0.5 w-full rounded-md border border-gray-300 px-2 py-1 disabled:opacity-60"
+                    class="fueld-select-no-chevron mt-0.5 w-full appearance-none rounded-md border border-gray-300 px-2 py-1 disabled:opacity-60"
                   >
                     <option value="">— Not set —</option>
                     <option value="CREDIT">Credit</option>
