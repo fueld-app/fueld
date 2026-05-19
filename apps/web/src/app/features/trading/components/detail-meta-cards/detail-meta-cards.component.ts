@@ -101,7 +101,7 @@ import {
                   <select
                     [ngModel]="customerContactId()"
                     (ngModelChange)="customerContactChange.emit($event)"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                    class="mt-1 w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
                            focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
                   >
                     <option value="">— None —</option>
@@ -151,7 +151,7 @@ import {
                   <select
                     [ngModel]="brokerContactId()"
                     (ngModelChange)="brokerContactChange.emit($event)"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                    class="mt-1 w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
                            focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
                   >
                     <option value="">— None —</option>
@@ -219,7 +219,7 @@ import {
                   <select
                     [ngModel]="agentContactId()"
                     (ngModelChange)="agentContactChange.emit($event)"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                    class="mt-1 w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
                            focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
                   >
                     <option value="">— None —</option>
