@@ -227,9 +227,7 @@ interface PlattsSuggestionViewModel {
         <select
           [ngModel]="order()?.salesRepId ?? ''"
           (ngModelChange)="onResponsibleUserChange($event)"
-                type="number"
-                type="number"
-          class="appearance-none rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+          class="fueld-select-no-chevron appearance-none rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
         >
           <option value="">— None —</option>
           @for (u of teamUsers(); track u.id) {
@@ -271,9 +269,7 @@ interface PlattsSuggestionViewModel {
               <select
                 [ngModel]="order()?.currency ?? 'USD'"
                 (ngModelChange)="onCurrencyChange($event); settingsOpen.set(false)"
-                  type="number"
-                  type="number"
-                class="w-full appearance-none rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900
+                class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900
                        outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
               >
                 @for (c of configuredCurrencies(); track c.value) {
@@ -409,7 +405,7 @@ interface PlattsSuggestionViewModel {
             <select
               [ngModel]="order()?.customerPaymentTermType ?? ''"
               (ngModelChange)="onCustomerPaymentTermChange($event)"
-              class="w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+              class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
                      focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
             >
               <option value="">Select</option>
@@ -498,7 +494,7 @@ interface PlattsSuggestionViewModel {
             <select
               [ngModel]="activeSupplierPaymentTermType() ?? ''"
               (ngModelChange)="onSupplierPaymentTermChange($event)"
-              class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+              class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
                      focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
             >
               <option value="">Select</option>
@@ -1361,7 +1357,7 @@ interface PlattsSuggestionViewModel {
             <select
               [ngModel]="attachmentType()"
               (ngModelChange)="attachmentType.set($event)"
-              class="w-full sm:w-40 appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+              class="fueld-select-no-chevron w-full sm:w-40 appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
                      focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
             >
               @for (type of configuredAttachmentTypes(); track type) {
@@ -1476,7 +1472,7 @@ interface PlattsSuggestionViewModel {
               <select
                 [ngModel]="paymentCurrency()"
                 (ngModelChange)="paymentCurrency.set($event)"
-                class="mt-1 w-full appearance-none rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 uppercase
+                class="fueld-select-no-chevron mt-1 w-full appearance-none rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 uppercase
                        focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 bg-white"
               >
                 @for (c of configuredCurrencies(); track c.value) {

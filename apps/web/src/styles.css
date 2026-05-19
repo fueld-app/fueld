@@ -104,6 +104,11 @@ body {
     padding-right: 0;
   }
 
+  select.fueld-select-no-chevron:not([multiple]):not([size]) {
+    background-image: none;
+    padding-right: 0.5rem;
+  }
+
   .order-item-inline-select-wrap > svg {
     display: none;
   }
