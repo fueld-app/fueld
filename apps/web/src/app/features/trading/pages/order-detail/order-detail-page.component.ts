@@ -2901,7 +2901,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   private async loadPortDocumentationContext(): Promise<void> {
-    const id = this.orderId();
+    const id = this.getPortDocumentationOrderId();
     if (!id) return;
 
     this.portDocumentationLoading.set(true);
@@ -2927,7 +2927,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   async previewBunkerInstructions(): Promise<void> {
-    const id = this.orderId();
+    const id = this.getPortDocumentationOrderId();
     if (!id) return;
 
     this.portDocumentationAction.set('preview-bunker');
@@ -2975,7 +2975,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   async downloadPortDocumentationDocument(doc: OrderPortDocumentDto): Promise<void> {
-    const id = this.orderId();
+    const id = this.getPortDocumentationOrderId();
     if (!id) return;
 
     this.portDocumentationAction.set(`download-${doc.id}`);
@@ -2995,7 +2995,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   private async postPortDocumentationDocument(pathSuffix: string): Promise<void> {
-    const id = this.orderId();
+    const id = this.getPortDocumentationOrderId();
     if (!id) throw new Error('Order not found');
 
     const res = await firstValueFrom(
@@ -3022,6 +3022,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     } finally {
       this.portDocumentationAction.set(null);
     }
+  }
+
+  private getPortDocumentationOrderId(): string {
+    return this.order()?.id ?? this.orderId();
   }
 
   private downloadResponseBlob(response: HttpResponse<Blob>, fallbackFileName: string): void {

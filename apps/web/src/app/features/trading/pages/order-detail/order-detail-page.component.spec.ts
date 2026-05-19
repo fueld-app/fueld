@@ -88,6 +88,7 @@ function buildBankAccount(id: string, currency: string, isDefault = false): Bank
 
 describe('OrderDetailPageComponent', () => {
   async function createComponent(options?: {
+    routeId?: string;
     onGet?: (url: string) => { success: boolean; data?: unknown; message?: string } | void;
     onPost?: (url: string, body: unknown) => void;
     onPut?: (url: string, body: unknown) => { success: boolean; data?: unknown; message?: string } | void;
@@ -102,7 +103,7 @@ describe('OrderDetailPageComponent', () => {
         {
           provide: ActivatedRoute,
           useValue: {
-            paramMap: of(convertToParamMap({ id: 'order-1' })),
+            paramMap: of(convertToParamMap({ id: options?.routeId ?? 'order-1' })),
           },
         },
         {
@@ -514,6 +515,37 @@ describe('OrderDetailPageComponent', () => {
     expect(component.bunkerInstructionsPreview()?.warnings).toEqual(['Agent is missing on the order.']);
     expect(component.bunkerInstructionsPreview()?.sections[0]?.title).toBe('Order');
     expect(component.portDocumentationAction()).toBeNull();
+  });
+
+  it('uses the loaded order UUID for port documentation requests when the route uses an order number', async () => {
+    const getCalls: string[] = [];
+    const { component } = await createComponent({
+      routeId: '20260512-000005',
+      onGet: (url) => {
+        getCalls.push(url);
+        if (String(url).includes('/orders/00000000-0000-4000-8000-000000000005/port-documentation/bunker-instructions/preview')) {
+          return {
+            success: true,
+            data: {
+              orderId: '00000000-0000-4000-8000-000000000005',
+              warnings: [],
+              sections: [],
+            },
+          };
+        }
+        return { success: true, data: [] };
+      },
+    });
+
+    component.order.set({
+      id: '00000000-0000-4000-8000-000000000005',
+      orderNumber: '20260512-000005',
+    } as any);
+
+    await component.previewBunkerInstructions();
+
+    expect(getCalls.some((url) => url.includes('/orders/00000000-0000-4000-8000-000000000005/port-documentation/bunker-instructions/preview'))).toBe(true);
+    expect(getCalls.some((url) => url.includes('/orders/20260512-000005/port-documentation/bunker-instructions/preview'))).toBe(false);
   });
 
   it('posts bunker instructions generation and refreshes port documentation context', async () => {
