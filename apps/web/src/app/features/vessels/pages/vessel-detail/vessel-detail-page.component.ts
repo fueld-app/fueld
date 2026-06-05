@@ -571,54 +571,54 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
           </div>
 
           <!-- Orders -->
-          <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-3 min-[900px]:h-[449px] min-[900px]:flex min-[900px]:flex-col overflow-hidden">
-            <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
-              <h2 class="text-sm font-semibold text-gray-700">Orders</h2>
-              @if (vesselOrders().length) {
-                <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">{{ vesselOrders().length }}</span>
+          @if (vesselOrders().length || ordersLoading()) {
+            <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-3 min-[900px]:h-[449px] min-[900px]:flex min-[900px]:flex-col overflow-hidden">
+              <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
+                <h2 class="text-sm font-semibold text-gray-700">Orders</h2>
+                @if (vesselOrders().length) {
+                  <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">{{ vesselOrders().length }}</span>
+                }
+              </div>
+              @if (ordersLoading()) {
+                <div class="flex-1 flex items-center justify-center py-8">
+                  <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                  </svg>
+                </div>
+              } @else {
+                <div class="flex-1 min-h-0 overflow-auto">
+                  <table class="w-full text-sm">
+                    <thead class="sticky top-0 z-10">
+                      <tr class="border-b border-gray-100 bg-gray-50/60">
+                        <th class="px-5 py-2 text-left font-medium text-gray-500">Status</th>
+                        <th class="px-5 py-2 text-left font-medium text-gray-500">Client</th>
+                        <th class="px-5 py-2 text-left font-medium text-gray-500">Port</th>
+                        <th class="px-5 py-2 text-left font-medium text-gray-500">ETA</th>
+                        <th class="px-5 py-2 text-left font-medium text-gray-500">Created</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-50">
+                      @for (o of vesselOrders(); track o.id) {
+                        <tr class="hover:bg-gray-50/50 transition-colors cursor-pointer" (click)="goToOrder(o.id, o.status)">
+                          <td class="px-5 py-2.5">
+                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+                              [class]="statusBadgeClass(o.status)">
+                              {{ o.status }}
+                            </span>
+                          </td>
+                          <td class="px-5 py-2.5 text-gray-900 font-medium">{{ o.clientName }}</td>
+                          <td class="px-5 py-2.5 text-gray-600">{{ o.placeName }}</td>
+                          <td class="px-5 py-2.5 text-gray-600">{{ o.eta ? (o.eta | date:'mediumDate') : '—' }}</td>
+                          <td class="px-5 py-2.5 text-gray-600">{{ o.createdAt | date:'mediumDate' }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
               }
             </div>
-            @if (ordersLoading()) {
-              <div class="flex-1 flex items-center justify-center py-8">
-                <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                </svg>
-              </div>
-            } @else if (vesselOrders().length) {
-              <div class="flex-1 min-h-0 overflow-auto">
-                <table class="w-full text-sm">
-                  <thead class="sticky top-0 z-10">
-                    <tr class="border-b border-gray-100 bg-gray-50/60">
-                      <th class="px-5 py-2 text-left font-medium text-gray-500">Status</th>
-                      <th class="px-5 py-2 text-left font-medium text-gray-500">Client</th>
-                      <th class="px-5 py-2 text-left font-medium text-gray-500">Port</th>
-                      <th class="px-5 py-2 text-left font-medium text-gray-500">ETA</th>
-                      <th class="px-5 py-2 text-left font-medium text-gray-500">Created</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-gray-50">
-                    @for (o of vesselOrders(); track o.id) {
-                      <tr class="hover:bg-gray-50/50 transition-colors cursor-pointer" (click)="goToOrder(o.id, o.status)">
-                        <td class="px-5 py-2.5">
-                          <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                            [class]="statusBadgeClass(o.status)">
-                            {{ o.status }}
-                          </span>
-                        </td>
-                        <td class="px-5 py-2.5 text-gray-900 font-medium">{{ o.clientName }}</td>
-                        <td class="px-5 py-2.5 text-gray-600">{{ o.placeName }}</td>
-                        <td class="px-5 py-2.5 text-gray-600">{{ o.eta ? (o.eta | date:'mediumDate') : '—' }}</td>
-                        <td class="px-5 py-2.5 text-gray-600">{{ o.createdAt | date:'mediumDate' }}</td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-            } @else {
-              <div class="flex-1 flex items-center justify-center text-sm text-gray-400">No orders found for this vessel</div>
-            }
-          </div>
+          }
 
           <!-- Vessel Companies -->
           <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-5 min-[900px]:h-[449px] min-[900px]:flex min-[900px]:flex-col overflow-hidden">
@@ -1102,14 +1102,9 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
             </div>
             <!-- Comments (when no enrichment) -->
             <app-comments-card class="block min-[900px]:order-4 min-[900px]:h-[449px] overflow-hidden" entityType="vessel" [entityId]="vessel()!.id" />
-          } @else {
-            <div class="rounded-xl border border-gray-200 bg-white shadow-sm p-5 text-center min-[900px]:order-2">
-              <p class="text-sm text-gray-400">Manually created — no enrichment data</p>
-              <p class="text-xs text-gray-300 mt-1">Import from Seasearcher to get detailed vessel data</p>
-            </div>
-            <!-- Comments (when manual vessel) -->
-            <app-comments-card class="block min-[900px]:order-4 min-[900px]:h-[449px] overflow-hidden" entityType="vessel" [entityId]="vessel()!.id" />
           }
+          <!-- Comments (when no enrichment) -->
+          <app-comments-card class="block min-[900px]:order-4 min-[900px]:h-[449px] overflow-hidden" entityType="vessel" [entityId]="vessel()!.id" />
 
         </div>
 
