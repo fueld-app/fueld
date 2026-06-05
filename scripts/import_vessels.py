@@ -43,7 +43,7 @@ for name, cid in companies.items():
             break
     sql_lines.append(
         f"INSERT INTO counterparties (id, tenant_id, name, type, head_office_phone, created_at, updated_at) "
-        f"VALUES ('{cid}', '{TENANT_ID}', '{name.replace(chr(39), chr(39)+chr(39))}', 'SUPPLIER', '{phone}', NOW(), NOW());"
+        f"VALUES ('{cid}', '{TENANT_ID}', '{name.replace(chr(39), chr(39)+chr(39))}', 'CLIENT', '{phone}', NOW(), NOW());"
     )
 
 sql_lines.append("")
