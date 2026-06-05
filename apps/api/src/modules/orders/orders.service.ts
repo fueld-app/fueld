@@ -201,6 +201,7 @@ const counterpartyLegacySelect = {
   fraudPreventionText: counterparties.fraudPreventionText,
   customerTerms: counterparties.customerTerms,
   supplierTerms: counterparties.supplierTerms,
+  specialCustomerTerms: counterparties.specialCustomerTerms,
   latePaymentInterest: counterparties.latePaymentInterest,
   createdAt: counterparties.createdAt,
   updatedAt: counterparties.updatedAt,

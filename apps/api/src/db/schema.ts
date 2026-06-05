@@ -525,6 +525,10 @@ export const counterparties = pgTable('counterparties', {
   customerTerms: text('customer_terms'),
   supplierTerms: text('supplier_terms'),
 
+  // Special customer terms — per-customer override for order confirmations
+  // Takes precedence over invoicingCompany.customerTerms but below order.termsAndConditions
+  specialCustomerTerms: text('special_customer_terms'),
+
   // Late payment interest rate (e.g. "2%") — shown on invoices
   latePaymentInterest: text('late_payment_interest'),
 

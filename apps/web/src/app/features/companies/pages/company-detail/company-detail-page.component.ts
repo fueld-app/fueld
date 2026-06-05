@@ -587,7 +587,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 <h2 class="text-sm font-semibold text-gray-700">Info</h2>
                 <div class="flex items-center gap-2">
                   @if (!editing()) {
-                    @if (companyInfoTab() === 'info' || companyInfoTab() === 'headOffice') {
+                    @if (companyInfoTab() === 'info' || companyInfoTab() === 'headOffice' || companyInfoTab() === 'terms') {
                       <button
                         (click)="startEditing()"
                         class="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-600 hover:bg-gray-100 transition-colors"
@@ -642,6 +642,14 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                     (click)="companyInfoTab.set('offices')"
                   >
                     Offices
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
+                    [class]="companyInfoTab() === 'terms' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
+                    (click)="companyInfoTab.set('terms')"
+                  >
+                    Terms
                   </button>
                   <button
                     type="button"
@@ -1148,6 +1156,39 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                       </div>
                     }
                   }
+                } @else if (companyInfoTab() === 'terms') {
+                  <div class="space-y-4">
+                    <div>
+                      <dt class="text-gray-500">Special Customer Terms</dt>
+                      <dd class="mt-0.5">
+                        @if (editing()) {
+                          <textarea
+                            [ngModel]="editSpecialCustomerTerms()"
+                            (ngModelChange)="editSpecialCustomerTerms.set($event)"
+                            rows="8"
+                            class="block w-full rounded-md border border-gray-300 px-2 py-1 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
+                            placeholder="Terms that apply when this company is the customer on an order. Takes precedence over the invoicing company's default customer terms."
+                          ></textarea>
+                        } @else {
+                          <div class="whitespace-pre-line text-sm text-gray-900">
+                            @if (company()!.specialCustomerTerms) {
+                              {{ company()!.specialCustomerTerms }}
+                            } @else {
+                              <span class="text-gray-400 italic">No special customer terms set. The invoicing company's default terms will be used.</span>
+                            }
+                          </div>
+                        }
+                      </dd>
+                    </div>
+                    <div class="rounded-md bg-blue-50 p-3 text-xs text-blue-700">
+                      <p class="font-medium mb-1">How this works:</p>
+                      <ul class="list-disc list-inside space-y-0.5">
+                        <li>These terms appear on Offer/Confirmation documents when this company is the customer.</li>
+                        <li>They override the invoicing company's default customer terms.</li>
+                        <li>Per-order terms (set on the order itself) still take highest precedence.</li>
+                      </ul>
+                    </div>
+                  </div>
                 } @else if (companyInfoTab() === 'emails') {
                   @if (showAddEmail()) {
                     <div class="-mx-5 -mt-4 border-b border-gray-100 px-5 py-4 bg-gray-50/50">
@@ -3468,6 +3509,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly editHeadOfficePhone = signal('');
   readonly editHeadOfficeEmail = signal('');
   readonly editWebsite = signal('');
+  readonly editSpecialCustomerTerms = signal('');
 
   // Sync conflict state
   readonly syncConflicts = signal<{ field: string; localValue: any; seasearcherValue: any; dismissed: boolean }[]>([]);
@@ -4584,6 +4626,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     this.editHeadOfficePhone.set(c.headOfficePhone ?? '');
     this.editHeadOfficeEmail.set(c.headOfficeEmail ?? '');
     this.editWebsite.set(c.website ?? '');
+    this.editSpecialCustomerTerms.set(c.specialCustomerTerms ?? '');
     this.countrySearchQuery.set(c.country ?? '');
     this.showCountryDropdown.set(false);
     this.editing.set(true);
@@ -4612,6 +4655,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
       if (this.editHeadOfficePhone() !== (c.headOfficePhone ?? '')) body['headOfficePhone'] = this.editHeadOfficePhone() || null;
       if (this.editHeadOfficeEmail() !== (c.headOfficeEmail ?? '')) body['headOfficeEmail'] = this.editHeadOfficeEmail() || null;
       if (this.editWebsite() !== (c.website ?? '')) body['website'] = this.editWebsite() || null;
+      if (this.editSpecialCustomerTerms() !== (c.specialCustomerTerms ?? '')) body['specialCustomerTerms'] = this.editSpecialCustomerTerms() || null;
 
       if (Object.keys(body).length === 0) {
         this.editing.set(false);

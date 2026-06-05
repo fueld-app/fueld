@@ -228,6 +228,8 @@ export interface CounterpartyDto {
   /** Terms templates used when this counterparty is marked as an own company. May include ${companyName} and ${documentName}. */
   customerTerms?: string | null;
   supplierTerms?: string | null;
+  /** Special terms that apply when this counterparty is the customer on an order. Takes precedence over invoicing company's customerTerms. */
+  specialCustomerTerms?: string | null;
   responsibleUserId?: string | null;
   responsibleUserName?: string | null;
   vatNumber?: string | null;

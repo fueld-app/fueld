@@ -951,6 +951,7 @@ export async function updateCompany(
     website?: string | null;
     companyImo?: string | null;
     companyRoles?: string[] | null;
+    specialCustomerTerms?: string | null;
   },
 ) {
   // Load current company to merge manualOverrides
@@ -975,6 +976,7 @@ export async function updateCompany(
 
   // Non-overridable fields
   if (data.creditLimit !== undefined) setFields.creditLimit = data.creditLimit;
+  if (data.specialCustomerTerms !== undefined) setFields.specialCustomerTerms = data.specialCustomerTerms;
 
   // Persist manual overrides
   setFields.manualOverrides = [...newOverrides];

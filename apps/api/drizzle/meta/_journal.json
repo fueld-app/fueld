@@ -526,6 +526,13 @@
       "when": 1778900400000,
       "tag": "0074_gate_list_person_identity_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1778904000000,
+      "tag": "0075_counterparty_special_customer_terms",
+      "breakpoints": true
     }
   ]
 }

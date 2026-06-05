@@ -203,6 +203,7 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     body: t.Object({
       customerTerms: t.Optional(t.Nullable(t.String())),
       supplierTerms: t.Optional(t.Nullable(t.String())),
+      specialCustomerTerms: t.Optional(t.Nullable(t.String())),
       vatNumber: t.Optional(t.Nullable(t.String())),
       companyRegistrationNumber: t.Optional(t.Nullable(t.String())),
       fraudPreventionText: t.Optional(t.Nullable(t.String())),

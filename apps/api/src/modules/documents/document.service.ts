@@ -2036,7 +2036,7 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
     paymentTerms: formatCustomerPaymentTerms(order.customerPaymentTermType, order.customerCreditDays),
     customerNote: order.customerNote ?? null,
     termsAndConditions: replaceCompanyNamePlaceholder(
-      order.termsAndConditions ?? order.invoicingCompany?.customerTerms ?? null,
+      order.termsAndConditions ?? order.client?.specialCustomerTerms ?? order.invoicingCompany?.customerTerms ?? null,
       order.invoicingCompany?.name ?? null,
       documentName,
     ),
