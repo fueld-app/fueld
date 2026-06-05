@@ -246,6 +246,7 @@ export async function updateVessel(
     buildYear: number;
     builder: string;
     classificationSociety: string;
+    phone: string;
     ignoreForCreditEnforcement: boolean;
   }>,
 ) {

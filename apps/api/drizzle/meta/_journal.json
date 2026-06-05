@@ -540,6 +540,13 @@
       "when": 1778907600000,
       "tag": "0076_add_light_role",
       "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1778911200000,
+      "tag": "0077_add_vessel_phone",
+      "breakpoints": true
     }
   ]
 }

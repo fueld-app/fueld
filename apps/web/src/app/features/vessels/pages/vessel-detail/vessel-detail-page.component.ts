@@ -203,6 +203,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
             @if (vessel()!.imo) { IMO {{ vessel()!.imo }} }
             @if (vessel()!.mmsi) { · MMSI {{ vessel()!.mmsi }} }
             @if (vessel()!.flag) { · {{ vessel()!.flag }} }
+            @if (vessel()!.phone) { · 📞 {{ vessel()!.phone }} }
           </p>
           @if (vessel()!.lastSynced) {
             <span class="inline-flex items-center gap-1 text-xs text-gray-400" title="Last synced with Seasearcher">
