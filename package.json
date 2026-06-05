@@ -23,6 +23,7 @@
     "test:coverage": "bun run --filter @fueld/api test:coverage && bun test --coverage packages/types/tests",
     "test:orders": "bun test apps/api/tests/orders*.test.ts apps/api/tests/orders*.e2e.test.ts",
     "test:orders:coverage": "bun test --coverage apps/api/tests/orders*.test.ts apps/api/tests/orders*.e2e.test.ts",
+    "otp:manual": "bun run scripts/otp/manual-otp.ts",
     "llm:setup": "bash scripts/llm/setup.sh",
     "llm:start": "bash scripts/llm/start.sh"
   },

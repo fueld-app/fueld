@@ -3550,7 +3550,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly overrideRequesting = signal(false);
   readonly overrideDecisionLoadingId = signal<string | null>(null);
   readonly pendingRiskOverride = computed(() => this.riskOverrides().find((override) => override.status === 'PENDING') ?? null);
-  readonly companyInfoTab = signal<'info' | 'headOffice' | 'offices' | 'emails' | 'fleet' | 'roles'>('info');
+  readonly companyInfoTab = signal<'info' | 'headOffice' | 'offices' | 'emails' | 'fleet' | 'roles' | 'terms'>('info');
   readonly fleetRolesTab = signal<'fleet' | 'roles'>('fleet');
 
   // Contacts
