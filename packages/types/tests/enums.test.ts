@@ -115,6 +115,7 @@ describe('enums', () => {
       Teamlead: 'TEAMLEAD',
       CreditManager: 'CREDITMANAGER',
       OperationsManager: 'OPERATIONSMANAGER',
+      Light: 'LIGHT',
     });
   });
 });

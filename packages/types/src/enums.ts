@@ -79,6 +79,7 @@ export enum Role {
   Teamlead = 'TEAMLEAD',
   CreditManager = 'CREDITMANAGER',
   OperationsManager = 'OPERATIONSMANAGER',
+  Light = 'LIGHT',
 }
 
 /** Credit application lifecycle status. */

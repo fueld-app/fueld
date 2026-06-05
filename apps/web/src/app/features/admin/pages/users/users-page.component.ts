@@ -810,6 +810,8 @@ export class UsersPageComponent implements OnInit, OnDestroy {
     { value: 'FINANCE', label: 'Finance' },
     { value: 'TEAMLEAD', label: 'Teamlead' },
     { value: 'CREDITMANAGER', label: 'Credit Manager' },
+    { value: 'OPERATIONSMANAGER', label: 'Operations Manager' },
+    { value: 'LIGHT', label: 'Light' },
   ];
 
   ngOnInit() {
@@ -922,6 +924,10 @@ export class UsersPageComponent implements OnInit, OnDestroy {
         return 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200';
       case 'CREDITMANAGER':
         return 'bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200';
+      case 'OPERATIONSMANAGER':
+        return 'bg-orange-50 text-orange-700 ring-1 ring-orange-200';
+      case 'LIGHT':
+        return 'bg-pink-50 text-pink-700 ring-1 ring-pink-200';
       default:
         return 'bg-gray-100 text-gray-600 ring-1 ring-gray-200';
     }

@@ -26,6 +26,7 @@ export const roleEnum = pgEnum('role', [
   'TEAMLEAD',
   'CREDITMANAGER',
   'OPERATIONSMANAGER',
+  'LIGHT',
 ]);
 
 export const orderStatusEnum = pgEnum('order_status', [

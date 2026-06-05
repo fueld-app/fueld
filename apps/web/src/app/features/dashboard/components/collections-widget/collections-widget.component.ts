@@ -3,8 +3,10 @@ import {
   ChangeDetectionStrategy,
   signal,
   input,
+  inject,
 } from '@angular/core';
 import type { OverdueInvoiceDto } from '@fueld/types';
+import { AuthService } from '@app/core/auth/auth.service';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Collections Widget — Lists overdue invoices and allows adding notes
@@ -38,7 +40,11 @@ import type { OverdueInvoiceDto } from '@fueld/types';
                   </p>
                 </div>
                 <div class="text-right">
-                  <p class="text-sm font-semibold text-red-700">USD {{ invoice.amount }}</p>
+                  @if (auth.canSeePrices()) {
+                    <p class="text-sm font-semibold text-red-700">USD {{ invoice.amount }}</p>
+                  } @else {
+                    <p class="text-sm font-semibold text-gray-400 italic">Hidden</p>
+                  }
                   <p class="text-xs text-gray-500">Due {{ invoice.dueDate }}</p>
                 </div>
               </div>
@@ -103,6 +109,8 @@ import type { OverdueInvoiceDto } from '@fueld/types';
   `,
 })
 export class CollectionsWidgetComponent {
+  readonly auth = inject(AuthService);
+
   // Using input() for now, will be fetched via service later
   readonly overdueInvoices = input<OverdueInvoiceDto[]>([]);
 

@@ -888,7 +888,7 @@ export class ReportsPageComponent {
   };
 
   readonly utcHours = Array.from({ length: 24 }, (_, index) => index);
-  readonly scheduleRoleOptions: Role[] = [Role.Admin, Role.Finance, Role.Teamlead, Role.CreditManager];
+  readonly scheduleRoleOptions: Role[] = [Role.Admin, Role.Finance, Role.Teamlead, Role.CreditManager, Role.OperationsManager, Role.Light];
 
   readonly today = signal(this.formatDateInput(new Date()));
   readonly defaultFrom = signal(this.formatDateInput(new Date(new Date().getFullYear(), 0, 1)));
@@ -1363,6 +1363,10 @@ export class ReportsPageComponent {
         return 'Team lead';
       case Role.CreditManager:
         return 'Credit';
+      case Role.OperationsManager:
+        return 'Operations';
+      case Role.Light:
+        return 'Light';
       default:
         return role.charAt(0) + role.slice(1).toLowerCase();
     }

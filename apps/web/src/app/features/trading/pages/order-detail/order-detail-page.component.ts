@@ -808,11 +808,13 @@ interface PlattsSuggestionViewModel {
                     @for (cell of matrixRow.cells; track cell.supplierInquiryId) {
                       <td class="border-b border-slate-100 px-4 py-3 align-top"
                         [class.bg-slate-50]="cell.isSelectedSupplier">
-                        @if (cell.price !== null) {
+                        @if (cell.price !== null && auth.canSeePrices()) {
                           <div class="font-semibold text-slate-900">{{ cell.price }} {{ cell.currency }}</div>
                           @if (cell.note) {
                             <div class="mt-1 text-xs text-slate-500">{{ cell.note }}</div>
                           }
+                        } @else if (cell.price !== null && !auth.canSeePrices()) {
+                          <div class="font-medium text-slate-400 italic">Hidden</div>
                         } @else {
                           <div class="font-medium text-slate-500">{{ cell.note || inquiryQuoteMatrixCellLabel(cell.status) }}</div>
                         }
@@ -925,7 +927,13 @@ interface PlattsSuggestionViewModel {
                         <div class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm">
                         <div class="font-medium text-slate-900">{{ item.productType }}</div>
                         <div class="mt-1 text-xs text-slate-500">{{ formatQty(item.quantity) }} {{ item.unit }}@if (item.description) { · {{ item.description }} }</div>
-                        <div class="mt-2 text-sm font-semibold text-slate-900">{{ item.price || '—' }}@if (item.price) { {{ item.currency }} }</div>
+                        <div class="mt-2 text-sm font-semibold text-slate-900">
+                          @if (auth.canSeePrices()) {
+                            {{ item.price || '—' }}@if (item.price) { {{ item.currency }} }
+                          } @else {
+                            <span class="text-slate-400 italic font-medium">Hidden</span>
+                          }
+                        </div>
                         @if (item.note) {
                           <div class="mt-1 text-xs text-slate-500">{{ item.note }}</div>
                         }
@@ -973,17 +981,21 @@ interface PlattsSuggestionViewModel {
                           <div class="rounded-xl border border-slate-200 bg-white p-3">
                             <div class="text-sm font-semibold text-slate-900">{{ item.productType }}</div>
                             <div class="mt-1 text-xs text-slate-500">{{ formatQty(item.quantity) }} {{ item.unit }}@if (item.description) { · {{ item.description }} }</div>
-                            <label class="mt-3 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Price ({{ item.currency }})</label>
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.0001"
-                              [ngModel]="inquiryReplyPrices()[item.orderItemId] || ''"
-                              (ngModelChange)="setInquiryReplyPrice(item.orderItemId, $event)"
-                              class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-right text-sm text-slate-900
-                                     [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
-                                     focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                            />
+                            @if (auth.canSeePrices()) {
+                              <label class="mt-3 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Price ({{ item.currency }})</label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.0001"
+                                [ngModel]="inquiryReplyPrices()[item.orderItemId] || ''"
+                                (ngModelChange)="setInquiryReplyPrice(item.orderItemId, $event)"
+                                class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-right text-sm text-slate-900
+                                       [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
+                                       focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                              />
+                            } @else {
+                              <div class="mt-3 rounded-xl bg-slate-100 px-3 py-2 text-sm text-slate-500 italic">Price hidden — quantities only</div>
+                            }
                             <label class="mt-3 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Line note</label>
                             <textarea
                               rows="2"
@@ -1082,6 +1094,7 @@ interface PlattsSuggestionViewModel {
       [items]="itemRows()"
       [readonly]="isReadonly()"
       [allowDeliveredEdit]="allowDeliveredEdit()"
+      [canSeePrices]="auth.canSeePrices()"
       [supplierOptionsInput]="itemSupplierOptions()"
       [financingRateAnnual]="financingRateAnnual()"
       [financingDays]="financingDays()"
@@ -1113,21 +1126,23 @@ interface PlattsSuggestionViewModel {
     <!--  Financing Summary + Platts Signals (side-by-side on desktop) -->
     <!-- ═════════════════════════════════════════════════════════════ -->
     <div class="mt-4 grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2">
-      <div #financingSummaryContainer class="block">
-        <app-order-financing-summary
-          class="block"
-          [baseCurrency]="itemDisplayCurrency()"
-          [financingRateAnnual]="financingRateAnnual()"
-          [financingDays]="financingDays()"
-          [financingDayCountConvention]="financingDayCountConvention()"
-          [economics]="itemEconomics()"
-        />
-      </div>
+      @if (auth.canSeePrices()) {
+        <div #financingSummaryContainer class="block">
+          <app-order-financing-summary
+            class="block"
+            [baseCurrency]="itemDisplayCurrency()"
+            [financingRateAnnual]="financingRateAnnual()"
+            [financingDays]="financingDays()"
+            [financingDayCountConvention]="financingDayCountConvention()"
+            [economics]="itemEconomics()"
+          />
+        </div>
+      }
 
-    <div
-      class="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
-      [style.max-height.px]="plattsSignalsMaxHeight()"
-    >
+      <div
+        class="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
+        [style.max-height.px]="plattsSignalsMaxHeight()"
+      >
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 class="text-sm font-semibold uppercase tracking-wider text-gray-700">Platts Signals</h3>
@@ -1233,7 +1248,6 @@ interface PlattsSuggestionViewModel {
         </div>
       }
     </div>
-    </div>
 
     <!-- Delivery + Payments + Attachments + Comments -->
     @if (allowDeliveredEdit() || orderId() || order()?.id) {
@@ -1312,6 +1326,7 @@ interface PlattsSuggestionViewModel {
           </div>
         }
         @if (orderId() || order()?.id) {
+        @if (auth.canSeePrices()) {
         <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[520px] flex flex-col">
           <div class="flex items-center justify-between gap-4">
             <div>
@@ -1356,6 +1371,19 @@ interface PlattsSuggestionViewModel {
             }
           </div>
         </div>
+        } @else {
+        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[520px] flex flex-col">
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Payments</h3>
+              <p class="mt-1 text-xs text-gray-500">Payment details hidden</p>
+            </div>
+          </div>
+          <div class="mt-4 flex-1 overflow-auto flex items-center justify-center">
+            <p class="text-sm text-gray-400 italic">Payment information is not available for your role.</p>
+          </div>
+        </div>
+        }
         <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[520px] flex flex-col">
           <div class="flex items-center justify-between">
             <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Attachments</h3>

@@ -64,8 +64,10 @@ export class AuthService {
   readonly isFinance = computed(() => this.user()?.role === Role.Finance);
   readonly isTeamLead = computed(() => this.user()?.role === Role.Teamlead);
   readonly isCreditManager = computed(() => this.user()?.role === Role.CreditManager);
+  readonly isLight = computed(() => this.user()?.role === Role.Light);
   readonly canAccessCredit = computed(() => this.isAdmin() || this.isCreditManager());
   readonly canAccessReports = computed(() => this.isAuthenticated());
+  readonly canSeePrices = computed(() => !this.isLight());
   readonly userPhone = computed(() => this.user()?.phone ?? '');
   readonly avatarUrl = computed(() => {
     const url = this.user()?.avatarUrl;

@@ -386,7 +386,7 @@ const UPCOMING_FOLLOW_UP_WINDOW_DAYS = 14;
       }
 
       <!-- Top Customer Groups by Credit Exposure -->
-      @if (topCreditGroups().length) {
+      @if (topCreditGroups().length && auth.canSeePrices()) {
         <div class="mt-8 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
           <h3 class="text-lg font-semibold text-gray-900 mb-4">Top Customer Groups by Credit Exposure</h3>
           <div class="overflow-x-auto">
@@ -444,7 +444,7 @@ const UPCOMING_FOLLOW_UP_WINDOW_DAYS = 14;
                 <div>
                   <div class="flex items-center justify-between mb-1">
                     <span class="text-sm font-medium text-gray-700">{{ stage.status }}</span>
-                    <span class="text-sm font-semibold text-gray-900">{{ stage.count }} <span class="text-xs font-normal text-gray-500" title="Sell price × qty × unit conversion, converted to USD via FX rates">({{ formatUsd(parseNumber(stage.totalValue)) }})</span></span>
+                    <span class="text-sm font-semibold text-gray-900">{{ stage.count }} @if (auth.canSeePrices()) { <span class="text-xs font-normal text-gray-500" title="Sell price × qty × unit conversion, converted to USD via FX rates">({{ formatUsd(parseNumber(stage.totalValue)) }})</span> }</span>
                   </div>
                   <div class="h-3 w-full rounded-full bg-gray-100 overflow-hidden">
                     <div
@@ -683,14 +683,21 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
 
   // ─── Computed ────────────────────────────────────────────────────
 
-  readonly kpiCards = computed(() => [
-    { label: 'Total Orders', value: this.teamStats().activeOrders.toString(), description: 'Count of all non-inquiry, non-cancelled orders in the selected period.' },
-    { label: 'Total Revenue YTD', value: this.teamStats().totalRevenueYTD, description: 'Sum of sell price × qty × unit conversion factor, converted to USD via FX rates. Excludes inquiries and cancelled orders.' },
-    { label: 'Gross Profit YTD', value: this.teamStats().totalGrossProfitYTD ?? '—', description: 'Total revenue minus total cost, both converted to USD via FX rates.' },
-    { label: 'Net Profit YTD', value: this.teamStats().totalNetProfitYTD ?? '—', description: 'Gross profit minus estimated financing cost based on payment term differences.' },
-    { label: 'Avg. Deal Size', value: this.teamStats().avgDealSize, description: 'Total Revenue YTD divided by total order count.' },
-    { label: 'Overdue Invoices', value: this.collections().items.length.toString(), description: 'Number of unpaid invoices past their due date.' },
-  ]);
+  readonly kpiCards = computed(() => {
+    const cards = [
+      { label: 'Total Orders', value: this.teamStats().activeOrders.toString(), description: 'Count of all non-inquiry, non-cancelled orders in the selected period.' },
+      { label: 'Overdue Invoices', value: this.collections().items.length.toString(), description: 'Number of unpaid invoices past their due date.' },
+    ];
+    if (this.auth.canSeePrices()) {
+      cards.push(
+        { label: 'Total Revenue YTD', value: this.teamStats().totalRevenueYTD, description: 'Sum of sell price × qty × unit conversion factor, converted to USD via FX rates. Excludes inquiries and cancelled orders.' },
+        { label: 'Gross Profit YTD', value: this.teamStats().totalGrossProfitYTD ?? '—', description: 'Total revenue minus total cost, both converted to USD via FX rates.' },
+        { label: 'Net Profit YTD', value: this.teamStats().totalNetProfitYTD ?? '—', description: 'Gross profit minus estimated financing cost based on payment term differences.' },
+        { label: 'Avg. Deal Size', value: this.teamStats().avgDealSize, description: 'Total Revenue YTD divided by total order count.' },
+      );
+    }
+    return cards;
+  });
 
   // ─── Actions ─────────────────────────────────────────────────────
 

@@ -66,7 +66,7 @@ async function getPasskeyCount(userId: string): Promise<number> {
 export async function inviteUser(data: {
   email: string;
   name: string;
-  role: 'ADMIN' | 'TRADER' | 'FINANCE' | 'TEAMLEAD' | 'CREDITMANAGER';
+  role: 'ADMIN' | 'TRADER' | 'FINANCE' | 'TEAMLEAD' | 'CREDITMANAGER' | 'OPERATIONSMANAGER' | 'LIGHT';
   invitedBy: string;
 }) {
   const tenantId = await getTenantId();
@@ -216,7 +216,7 @@ export async function listInvitations() {
 
 export async function updateUserRole(
   userId: string,
-  role: 'ADMIN' | 'TRADER' | 'FINANCE' | 'TEAMLEAD' | 'CREDITMANAGER',
+  role: 'ADMIN' | 'TRADER' | 'FINANCE' | 'TEAMLEAD' | 'CREDITMANAGER' | 'OPERATIONSMANAGER' | 'LIGHT',
 ) {
   const [updated] = await db
     .update(users)

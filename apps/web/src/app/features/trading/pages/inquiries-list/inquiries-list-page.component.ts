@@ -128,8 +128,10 @@ interface LliSearchResult {
                 <th app-sort-header field="status" [sortBy]="activeSortBy()" [sortDir]="activeSortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Status</th>
                 <th app-sort-header field="responsible" [sortBy]="activeSortBy()" [sortDir]="activeSortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Responsible</th>
                 <th app-sort-header field="eta" [sortBy]="activeSortBy()" [sortDir]="activeSortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">ETA</th>
-                <th class="px-4 py-3 text-right font-medium text-gray-600">Value</th>
-                @if (isOrders()) {
+                @if (auth.canSeePrices()) {
+                  <th class="px-4 py-3 text-right font-medium text-gray-600">Value</th>
+                }
+                @if (isOrders() && auth.canSeePrices()) {
                   <th class="px-4 py-3 text-right font-medium text-gray-600">Gross</th>
                   <th class="px-4 py-3 text-right font-medium text-gray-600">Financing</th>
                   <th class="px-4 py-3 text-right font-medium text-gray-600">Net</th>
@@ -150,14 +152,16 @@ interface LliSearchResult {
                   </td>
                   <td class="px-4 py-3 text-gray-600">{{ inq.salesRepName || '—' }}</td>
                   <td class="px-4 py-3 text-gray-500">{{ inq.eta ? (inq.eta | date:'mediumDate') : '—' }}</td>
-                  <td class="px-4 py-3 text-right tabular-nums text-gray-900">
-                    @if (inq.totalValue > 0) {
-                      {{ inq.totalValue | number:'1.2-2' }} {{ inq.displayCurrency || 'USD' }}
-                    } @else {
-                      <span class="text-gray-400">—</span>
-                    }
-                  </td>
-                  @if (isOrders()) {
+                  @if (auth.canSeePrices()) {
+                    <td class="px-4 py-3 text-right tabular-nums text-gray-900">
+                      @if (inq.totalValue > 0) {
+                        {{ inq.totalValue | number:'1.2-2' }} {{ inq.displayCurrency || 'USD' }}
+                      } @else {
+                        <span class="text-gray-400">—</span>
+                      }
+                    </td>
+                  }
+                  @if (isOrders() && auth.canSeePrices()) {
                     <td class="px-4 py-3 text-right tabular-nums" [class.text-green-600]="inq.totalProfit > 0" [class.text-red-600]="inq.totalProfit < 0">
                       @if (inq.totalValue > 0 || inq.totalProfit !== 0) {
                         {{ inq.totalProfit | number:'1.2-2' }} {{ inq.displayCurrency || 'USD' }}
@@ -242,7 +246,7 @@ interface LliSearchResult {
                 <span>Resp {{ inq.salesRepName || '—' }}</span>
                 <span>{{ inq.createdAt | date:'mediumDate' }}</span>
               </div>
-              @if (isOrders()) {
+              @if (isOrders() && auth.canSeePrices()) {
                 <div class="mt-3 grid grid-cols-2 gap-2 rounded-lg border border-gray-100 bg-gray-50 p-3 text-xs">
                   <div>
                     <p class="text-[11px] uppercase tracking-wide text-gray-500">Gross</p>
@@ -435,7 +439,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-  private readonly auth = inject(AuthService);
+  readonly auth = inject(AuthService);
   private readonly newInquiryModal = inject(NewInquiryModalService);
   private queryParamSub?: Subscription;
 

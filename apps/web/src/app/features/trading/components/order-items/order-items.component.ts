@@ -139,11 +139,13 @@ export interface OrderItemsEconomics {
             @if (allowDeliveredEdit()) {
               <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[110px]">Del. Qty</th>
             }
-            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[180px]">Cost</th>
-            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[180px]">Sell</th>
-            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Gross ({{ baseCurrency() }})</th>
-            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Financing</th>
-            <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Net</th>
+            @if (canSeePrices()) {
+              <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[180px]">Cost</th>
+              <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[180px]">Sell</th>
+              <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Gross ({{ baseCurrency() }})</th>
+              <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Financing</th>
+              <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Net</th>
+            }
             @if (!readonly()) {
               <th class="w-0 p-0"></th>
             }
@@ -284,6 +286,7 @@ export interface OrderItemsEconomics {
                 </td>
               }
 
+              @if (canSeePrices()) {
               <!-- Cost (price + currency) -->
               <td class="px-4 py-2 align-top">
                 @if (readonly()) {
@@ -498,24 +501,7 @@ export interface OrderItemsEconomics {
                             <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
                           </svg>
                         </span>
-                        <span class="text-gray-400 text-xs">/</span>
-                        <span class="order-item-inline-select-wrap">
-                          <select [ngModel]="row.salesUnit"
-                            (ngModelChange)="updateField(i, 'salesUnit', $event)"
-                            class="order-item-inline-select cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
-                                   hover:text-brand-600 focus:outline-none"
-                          >
-                            @for (u of unitOptions(); track u.value) {
-                              <option [value]="u.value">{{ u.label }}</option>
-                            }
-                          </select>
-                          <svg
-                            class="pointer-events-none absolute right-0 top-1/2 h-3 w-3 -translate-y-1/2 text-gray-400"
-                            xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
-                          >
-                            <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
-                          </svg>
-                        </span>
+                        <span class="text-gray-400 text-xs shrink-0">/{{ row.salesUnit }}</span>
                       </div>
                         @if (plattsMatches(row.id).length) {
                           <div class="flex flex-wrap gap-1.5">
@@ -580,7 +566,7 @@ export interface OrderItemsEconomics {
                           <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
                         </svg>
                       </span>
-                      <span class="text-gray-400 text-xs">/</span>
+                      <span class="text-gray-400 text-xs shrink-0">/</span>
                       <span class="order-item-inline-select-wrap">
                         <select
                           [ngModel]="row.salesUnit"
@@ -663,6 +649,7 @@ export interface OrderItemsEconomics {
                   {{ netProfitForRow(row) | number:'1.2-2' }}
                 }
               </td>
+              }
 
               <!-- Delete -->
               @if (!readonly()) {
@@ -683,7 +670,7 @@ export interface OrderItemsEconomics {
             <!-- Inventory band — only when warehouses exist for this order (e.g. own-company supplier with enabled warehouse). -->
             @if (warehouseOptionsInput().length > 0) {
               <tr class="border-b border-gray-100 bg-emerald-50/30">
-                <td [attr.colspan]="(readonly() ? 9 : 10) + (allowDeliveredEdit() ? 1 : 0)" class="px-4 py-2">
+                <td [attr.colspan]="(readonly() ? 4 : 5) + (showSupplierColumn() ? 1 : 0) + (allowDeliveredEdit() ? 1 : 0) + (canSeePrices() ? 5 : 0)" class="px-4 py-2">
                   <div class="flex flex-wrap items-end gap-3 text-xs">
                     <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-700">
                       Inventory
@@ -747,7 +734,7 @@ export interface OrderItemsEconomics {
             }
           } @empty {
             <tr>
-              <td [attr.colspan]="(readonly() ? 9 : 10) + (allowDeliveredEdit() ? 1 : 0)" class="px-4 py-12 text-center">
+              <td [attr.colspan]="(readonly() ? 4 : 5) + (showSupplierColumn() ? 1 : 0) + (allowDeliveredEdit() ? 1 : 0) + (canSeePrices() ? 5 : 0)" class="px-4 py-12 text-center">
                 <p class="text-sm text-gray-400">No line items yet.</p>
                 @if (!readonly()) {
                   <button
@@ -979,6 +966,7 @@ export interface OrderItemsEconomics {
               }
             </div>
 
+            @if (canSeePrices()) {
             <!-- Cost -->
             <div>
               <label class="mb-1 block text-xs font-medium text-gray-500">Cost</label>
@@ -1058,6 +1046,20 @@ export interface OrderItemsEconomics {
                       }
                     </select>
                   </div>
+                  @if (row.unit !== row.costUnit) {
+                    <div class="mt-1 flex items-center gap-1 text-xs text-gray-500">
+                      <span>{{ conversionLabel(row.unit, row.costUnit) }}</span>
+                      <input
+                        type="number" step="0.0001" min="0"
+                        [ngModel]="row.costConversionFactor"
+                        (ngModelChange)="updateField(i, 'costConversionFactor', +$event)"
+                        class="w-16 rounded border border-gray-200 px-1.5 py-0.5 text-right text-xs tabular-nums
+                               [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
+                               focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20"
+                      />
+                      <span class="text-gray-400">{{ row.unit }}/{{ row.costUnit }}</span>
+                    </div>
+                  }
                 }
               }
             </div>
@@ -1203,6 +1205,7 @@ export interface OrderItemsEconomics {
                 </span>
               }
             </div>
+            }
 
             <!-- Delivered Qty (mobile) -->
             @if (allowDeliveredEdit()) {
@@ -1231,7 +1234,7 @@ export interface OrderItemsEconomics {
       }
 
       <!-- Mobile totals bar -->
-      @if (rows().length > 0) {
+      @if (rows().length > 0 && canSeePrices()) {
         <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
           <div class="flex items-center justify-between text-sm">
             <span class="font-medium text-gray-600">Gross Profit</span>
@@ -1270,6 +1273,13 @@ export interface OrderItemsEconomics {
             <span>Rev {{ totalRevenue() | number:'1.2-2' }} {{ baseCurrency() }}</span>
           </div>
         </div>
+      } @else if (rows().length > 0) {
+        <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+          <div class="flex items-center justify-between text-xs text-gray-400">
+            <span>{{ rows().length }} item(s) · {{ totalQty() | number:'1.0-0' }} MT</span>
+            <span class="text-sm font-medium text-gray-500">Quantities only</span>
+          </div>
+        </div>
       }
     </div>
     </div>
@@ -1281,6 +1291,7 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   readonly items = input<OrderItemRow[]>([]);
   readonly readonly = input(false);
   readonly allowDeliveredEdit = input(false);
+  readonly canSeePrices = input(true);
   readonly currency = input('USD');
   readonly financingRateAnnual = input(0.08);
   readonly financingDays = input(0);

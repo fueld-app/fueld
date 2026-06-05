@@ -103,7 +103,7 @@ export const adminController = new Elysia({ prefix: '/admin' })
       const invite = await inviteUser({
         email: body.email,
         name: body.name,
-        role: body.role as 'ADMIN' | 'TRADER' | 'FINANCE' | 'TEAMLEAD' | 'CREDITMANAGER',
+        role: body.role as 'ADMIN' | 'TRADER' | 'FINANCE' | 'TEAMLEAD' | 'CREDITMANAGER' | 'OPERATIONSMANAGER' | 'LIGHT',
         invitedBy: auth.sub,
       });
 
@@ -183,7 +183,7 @@ export const adminController = new Elysia({ prefix: '/admin' })
 
       const data = await updateUserRole(
         params.id,
-        body.role as 'ADMIN' | 'TRADER' | 'FINANCE' | 'TEAMLEAD' | 'CREDITMANAGER',
+        body.role as 'ADMIN' | 'TRADER' | 'FINANCE' | 'TEAMLEAD' | 'CREDITMANAGER' | 'OPERATIONSMANAGER' | 'LIGHT',
       );
       return { success: true, data } satisfies ApiResponse<unknown>;
     } catch (err) {
