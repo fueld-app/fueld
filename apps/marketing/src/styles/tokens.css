@@ -86,6 +86,15 @@
   --contrast-bg:
     radial-gradient(800px 400px at 100% 0%, rgba(34, 211, 238, 0.10), transparent 55%),
     linear-gradient(180deg, #0c1220 0%, #0a0e1a 100%);
+  --contrast-ink: #f3f5fa;
+  --contrast-ink-dim: #c7cdda;
+  --contrast-muted: #8a93a6;
+  --contrast-line: rgba(255, 255, 255, 0.08);
+  --contrast-line-strong: rgba(255, 255, 255, 0.16);
+  --contrast-surface-2: #141a2b;
+  --contrast-surface-tint: rgba(255, 255, 255, 0.04);
+  --contrast-heading-from: #ffffff;
+  --contrast-heading-to: #c9d2e3;
 
   /* Code */
   --code-bg:   #050810;
@@ -172,10 +181,20 @@
   --gradient-card: linear-gradient(180deg, rgba(15, 20, 35, 0.015) 0%, rgba(15, 20, 35, 0) 100%);
   --hero-grid:     rgba(15, 20, 35, 0.05);
 
-  /* Contrast band — keep dark for visual rhythm in light mode too */
+  /* Contrast band */
   --contrast-bg:
-    radial-gradient(800px 400px at 100% 0%, rgba(34, 211, 238, 0.12), transparent 55%),
-    linear-gradient(180deg, #0c1220 0%, #0a0e1a 100%);
+    radial-gradient(800px 400px at 100% 0%, rgba(34, 211, 238, 0.10), transparent 55%),
+    radial-gradient(680px 360px at 0% 100%, rgba(245, 158, 11, 0.08), transparent 60%),
+    linear-gradient(180deg, #ffffff 0%, #eef1f7 100%);
+  --contrast-ink: #0f1421;
+  --contrast-ink-dim: #3f4658;
+  --contrast-muted: #6b7385;
+  --contrast-line: rgba(15, 20, 35, 0.08);
+  --contrast-line-strong: rgba(15, 20, 35, 0.16);
+  --contrast-surface-2: #ffffff;
+  --contrast-surface-tint: rgba(15, 20, 35, 0.03);
+  --contrast-heading-from: #0f1421;
+  --contrast-heading-to: #3f4658;
 
   /* Code (light syntax) */
   --code-bg:  #f3f5fa;
@@ -258,8 +277,18 @@
     --hero-grid:     rgba(15, 20, 35, 0.05);
 
     --contrast-bg:
-      radial-gradient(800px 400px at 100% 0%, rgba(34, 211, 238, 0.12), transparent 55%),
-      linear-gradient(180deg, #0c1220 0%, #0a0e1a 100%);
+      radial-gradient(800px 400px at 100% 0%, rgba(34, 211, 238, 0.10), transparent 55%),
+      radial-gradient(680px 360px at 0% 100%, rgba(245, 158, 11, 0.08), transparent 60%),
+      linear-gradient(180deg, #ffffff 0%, #eef1f7 100%);
+    --contrast-ink: #0f1421;
+    --contrast-ink-dim: #3f4658;
+    --contrast-muted: #6b7385;
+    --contrast-line: rgba(15, 20, 35, 0.08);
+    --contrast-line-strong: rgba(15, 20, 35, 0.16);
+    --contrast-surface-2: #ffffff;
+    --contrast-surface-tint: rgba(15, 20, 35, 0.03);
+    --contrast-heading-from: #0f1421;
+    --contrast-heading-to: #3f4658;
 
     --code-bg:  #f3f5fa;
     --code-kw:  #7c3aed;

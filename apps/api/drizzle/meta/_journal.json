@@ -498,6 +498,34 @@
       "when": 1775400000000,
       "tag": "0070_supplier_inquiry_reminder_opt_in",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1778328000000,
+      "tag": "0071_inventory_physical_ops",
+      "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1778889600000,
+      "tag": "0072_order_item_product_type_text",
+      "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1778893200000,
+      "tag": "0073_port_documentation",
+      "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1778900400000,
+      "tag": "0074_gate_list_person_identity_fields",
+      "breakpoints": true
     }
   ]
 }

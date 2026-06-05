@@ -88,6 +88,7 @@ function buildBankAccount(id: string, currency: string, isDefault = false): Bank
 
 describe('OrderDetailPageComponent', () => {
   async function createComponent(options?: {
+    routeId?: string;
     onGet?: (url: string) => { success: boolean; data?: unknown; message?: string } | void;
     onPost?: (url: string, body: unknown) => void;
     onPut?: (url: string, body: unknown) => { success: boolean; data?: unknown; message?: string } | void;
@@ -102,7 +103,7 @@ describe('OrderDetailPageComponent', () => {
         {
           provide: ActivatedRoute,
           useValue: {
-            paramMap: of(convertToParamMap({ id: 'order-1' })),
+            paramMap: of(convertToParamMap({ id: options?.routeId ?? 'order-1' })),
           },
         },
         {
@@ -472,6 +473,128 @@ describe('OrderDetailPageComponent', () => {
 
     expect(putCalls.some((call) => call.url.includes('/orders/order-1/items'))).toBe(true);
     expect(component.toast()).toEqual({ type: 'error', message: 'Failed to save order.' });
+  });
+
+  it('loads bunker instructions preview into the panel state', async () => {
+    const { component } = await createComponent({
+      onGet: (url) => {
+        if (String(url).includes('/orders/order-1/port-documentation/bunker-instructions/preview')) {
+          return {
+            success: true,
+            data: {
+              orderId: 'order-1',
+              warnings: ['Agent is missing on the order.'],
+              sections: [
+                {
+                  title: 'Order',
+                  fields: [{ label: 'Order Number', value: '20260519-0001' }],
+                },
+              ],
+            },
+          };
+        }
+        if (String(url).includes('/orders/order-1/port-documentation')) {
+          return {
+            success: true,
+            data: {
+              orderId: 'order-1',
+              enabled: true,
+              gateListCount: 0,
+              currentFlangeWorksheet: null,
+              readinessWarnings: [],
+              documents: [],
+            },
+          };
+        }
+        return { success: true, data: [] };
+      },
+    });
+
+    await component.previewBunkerInstructions();
+
+    expect(component.bunkerInstructionsPreview()?.warnings).toEqual(['Agent is missing on the order.']);
+    expect(component.bunkerInstructionsPreview()?.sections[0]?.title).toBe('Order');
+    expect(component.portDocumentationAction()).toBeNull();
+  });
+
+  it('uses the loaded order UUID for port documentation requests when the route uses an order number', async () => {
+    const getCalls: string[] = [];
+    const { component } = await createComponent({
+      routeId: '20260512-000005',
+      onGet: (url) => {
+        getCalls.push(url);
+        if (String(url).includes('/orders/00000000-0000-4000-8000-000000000005/port-documentation/bunker-instructions/preview')) {
+          return {
+            success: true,
+            data: {
+              orderId: '00000000-0000-4000-8000-000000000005',
+              warnings: [],
+              sections: [],
+            },
+          };
+        }
+        return { success: true, data: [] };
+      },
+    });
+
+    component.order.set({
+      id: '00000000-0000-4000-8000-000000000005',
+      orderNumber: '20260512-000005',
+    } as any);
+
+    await component.previewBunkerInstructions();
+
+    expect(getCalls.some((url) => url.includes('/orders/00000000-0000-4000-8000-000000000005/port-documentation/bunker-instructions/preview'))).toBe(true);
+    expect(getCalls.some((url) => url.includes('/orders/20260512-000005/port-documentation/bunker-instructions/preview'))).toBe(false);
+  });
+
+  it('posts bunker instructions generation and refreshes port documentation context', async () => {
+    const postCalls: Array<{ url: string; body: unknown }> = [];
+    const { component } = await createComponent({
+      onGet: () => ({ success: true, data: [] }),
+      onPost: (url, body) => {
+        postCalls.push({ url, body });
+        return { success: true, data: {} };
+      },
+    });
+
+    const refreshSpy = vi.spyOn(component as any, 'loadPortDocumentationContext').mockImplementation(async () => {
+      component.portDocumentationContext.set({
+        orderId: 'order-1',
+        enabled: true,
+        gateListCount: 1,
+        currentFlangeWorksheet: null,
+        readinessWarnings: [],
+        documents: [{
+          id: 'doc-1',
+          tenantId: 'tenant-1',
+          orderId: 'order-1',
+          documentKind: 'BUNKER_INSTRUCTIONS',
+          sourceType: 'GENERATED',
+          status: 'ACTIVE',
+          fileName: 'bunker-instructions.xlsx',
+          filePath: '/uploads/bunker-instructions.xlsx',
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          fileSize: 128,
+          sha256Hex: 'abc',
+          assetId: null,
+          generatedBy: 'user-1',
+          generatedAt: '2026-05-19T00:00:00.000Z',
+          includedBy: null,
+          includedAt: null,
+          supersededAt: null,
+          createdAt: '2026-05-19T00:00:00.000Z',
+        }],
+      } as any);
+    });
+
+    await component.generateBunkerInstructions();
+
+    expect(postCalls.some((call) => call.url.includes('/orders/order-1/port-documentation/bunker-instructions/generate'))).toBe(true);
+    expect(refreshSpy).toHaveBeenCalled();
+    expect(component.portDocumentationContext()?.documents).toHaveLength(1);
+    expect(component.toast()).toEqual({ type: 'success', message: 'Bunker Instructions generated.' });
+    expect(component.portDocumentationAction()).toBeNull();
   });
 
   it('defaults new rows to the active supplier and skips incomplete drafts during autosave', async () => {

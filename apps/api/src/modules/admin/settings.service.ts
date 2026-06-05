@@ -144,6 +144,21 @@ export async function setOwnCompany(companyId: string, isOwn: boolean) {
   return updated;
 }
 
+/** Toggle physical-ops eligibility for a company (warehouses + inventory rules). */
+export async function setCompanyPhysicalOpsEnabled(companyId: string, enabled: boolean) {
+  const [updated] = await db
+    .update(counterparties)
+    .set({ physicalOpsEnabled: enabled, updatedAt: new Date() })
+    .where(eq(counterparties.id, companyId))
+    .returning({
+      id: counterparties.id,
+      name: counterparties.name,
+      physicalOpsEnabled: counterparties.physicalOpsEnabled,
+    });
+  if (!updated) throw new Error('Company not found');
+  return updated;
+}
+
 export async function updateOwnCompanyTerms(companyId: string, data: {
   customerTerms?: string | null;
   supplierTerms?: string | null;
@@ -1063,6 +1078,41 @@ export async function updateInquiryCancelReasonSettings(reasons: string[]): Prom
     .where(eq(tenants.id, tenant.id));
 
   return getInquiryCancelReasonSettings();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  PORT DOCUMENTATION SETTINGS
+// ═══════════════════════════════════════════════════════════════════════
+
+export async function getPortDocumentationSettings(): Promise<{ enabled: boolean }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  return {
+    enabled: settings.portDocumentationSettings?.enabled ?? false,
+  };
+}
+
+export async function updatePortDocumentationSettings(data: {
+  enabled?: boolean;
+}): Promise<{ enabled: boolean }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const currentSettings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  const settings = { ...(currentSettings as any) };
+  settings.portDocumentationSettings = {
+    ...(currentSettings.portDocumentationSettings ?? {}),
+    ...(data.enabled !== undefined ? { enabled: data.enabled } : {}),
+  };
+
+  await db
+    .update(tenants)
+    .set({ settings, updatedAt: new Date() })
+    .where(eq(tenants.id, tenant.id));
+
+  return getPortDocumentationSettings();
 }
 
 // ═══════════════════════════════════════════════════════════════════════

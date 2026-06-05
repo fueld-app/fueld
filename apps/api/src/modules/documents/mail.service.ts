@@ -30,7 +30,7 @@ function isLightColor(hex: string): boolean {
 
 // ─── Types ───────────────────────────────────────────────────────────
 
-export type DocumentEmailType = 'OFFER' | 'CONFIRMATION' | 'NOMINATION' | 'PROFORMA' | 'INVOICE' | 'INQUIRY';
+export type DocumentEmailType = 'OFFER' | 'CONFIRMATION' | 'NOMINATION' | 'PROFORMA' | 'INVOICE' | 'PORT_DOCUMENTATION' | 'INQUIRY';
 
 export interface SendDocumentEmailOptions {
   /** Document type being sent */
@@ -266,15 +266,137 @@ async function logEmail(
 
 export type InquiryEmailType = 'INQUIRY';
 
+function formatInquiryQuantity(value: string | null | undefined): string {
+  if (!value) return '';
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  if (!/^\d+(?:\.\d+)?$/.test(trimmed)) return trimmed;
+  return trimmed.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+}
+
+function formatStoredDateLabel(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const source = value.includes('T') ? value.slice(0, 10) : value;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(source);
+  if (!match) return value;
+  return `${match[2]}/${match[3]}/${match[1]}`;
+}
+
+function buildPortDocumentationEmailHtml(params: {
+  senderName: string;
+  vesselName: string;
+  vesselImo?: string | null;
+  portName: string;
+  paymentTerms?: string | null;
+  eta?: string | null;
+  agentName?: string | null;
+  customerNote?: string | null;
+  items?: Array<{ quantity: string; quantityMin?: string | null; unit: string; productType: string; description?: string | null }>;
+  companyName?: string | null;
+  companyLogoUrl?: string | null;
+  companyAddress?: string | null;
+  brandColor?: string | null;
+}): string {
+  const companyName = params.companyName?.trim() || 'FUELD';
+  const headerBg = params.brandColor?.trim() || '#ffffff';
+  const isLightBg = isLightColor(headerBg);
+  const headerTextColor = isLightBg ? '#111827' : '#ffffff';
+  const accentColor = (headerBg.toLowerCase() === '#ffffff' || headerBg.toLowerCase() === '#fff') ? '#1e3a5f' : headerBg;
+  const logoHtml = params.companyLogoUrl
+    ? `<img src="${params.companyLogoUrl}" alt="${companyName}" style="max-height: 40px; max-width: 180px; margin-bottom: 4px;" />`
+    : `<h1 style="color: ${headerTextColor}; margin: 0; font-size: 24px;">${companyName}</h1>`;
+  const addressHtml = params.companyAddress?.trim()
+    ? `<div style="color: ${headerTextColor}; font-size: 12px; margin-top: 6px; line-height: 1.5; opacity: 0.85;">${splitAddressLines(params.companyAddress).join('<br/>')}</div>`
+    : '';
+  const deliveryDate = formatStoredDateLabel(params.eta ?? null);
+  const vesselLabel = params.vesselImo
+    ? `${params.vesselName} (IMO: ${params.vesselImo})`
+    : params.vesselName;
+  const agentName = params.agentName?.trim() || 'Port Agent';
+  const items = params.items ?? [];
+  const singleItem = items.length === 1 ? items[0] : null;
+  const quantityLabel = singleItem
+    ? (() => {
+        const max = formatInquiryQuantity(singleItem.quantity);
+        const min = formatInquiryQuantity(singleItem.quantityMin);
+        return min && min !== max ? `${min} - ${max} / ${singleItem.unit}` : `${max} / ${singleItem.unit}`;
+      })()
+    : null;
+  const productLabel = singleItem
+    ? `${singleItem.productType}${singleItem.description ? ` - ${singleItem.description}` : ''}`
+    : null;
+  const itemSummaryHtml = items.length > 1
+    ? `<div style="margin: 18px 0 0;">
+        <div style="font-size: 13px; font-weight: 700; color: #111827; margin-bottom: 8px;">Products:</div>
+        <ul style="margin: 0; padding-left: 18px; color: #111827; line-height: 1.7;">
+          ${items.map((item) => {
+            const max = formatInquiryQuantity(item.quantity);
+            const min = formatInquiryQuantity(item.quantityMin);
+            const qty = min && min !== max ? `${min} - ${max}` : max;
+            return `<li><strong>${qty} ${item.unit}</strong> ${item.productType}${item.description ? ` - ${item.description}` : ''}</li>`;
+          }).join('')}
+        </ul>
+      </div>`
+    : '';
+  const noteHtml = params.customerNote?.trim()
+    ? `<div style="margin: 18px 0 0; white-space: pre-line; line-height: 1.7; color: #111827;">${params.customerNote.trim()}</div>`
+    : `<div style="margin: 18px 0 0; line-height: 1.7; color: #111827;">
+        Please keep us updated on the vessel's ETA and anticipated berth location. Kindly advise of any delivery requirement changes as soon as possible.
+      </div>`;
+
+  return `
+    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 700px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 8px;">
+      <div style="height: 4px; background: ${accentColor}; border-radius: 8px 8px 0 0;"></div>
+      <div style="background: ${headerBg}; padding: 24px 32px;">
+        ${logoHtml}
+        ${addressHtml}
+      </div>
+      <div style="background: #ffffff; padding: 32px; border-top: 1px solid #e5e7eb; color: #111827;">
+        <p style="margin: 0 0 18px; line-height: 1.7;">ATTN: <strong>${agentName.toUpperCase()}</strong></p>
+        <p style="margin: 0 0 18px; line-height: 1.7;">Please note the following will be delivered to the above-mentioned vessel:</p>
+        <table style="border-collapse: collapse; margin: 0 0 8px; width: 100%; max-width: 560px;">
+          <tr>
+            <td style="padding: 4px 18px 4px 0; color: #4b5563; font-size: 13px; width: 140px;">Vessel:</td>
+            <td style="padding: 4px 0; font-weight: 600;">${vesselLabel}</td>
+          </tr>
+          ${deliveryDate ? `<tr><td style="padding: 4px 18px 4px 0; color: #4b5563; font-size: 13px;">Delivery Date:</td><td style="padding: 4px 0; font-weight: 600;">${deliveryDate}</td></tr>` : ''}
+          <tr>
+            <td style="padding: 4px 18px 4px 0; color: #4b5563; font-size: 13px;">Port:</td>
+            <td style="padding: 4px 0; font-weight: 600;">${params.portName}</td>
+          </tr>
+          <tr>
+            <td style="padding: 4px 18px 4px 0; color: #4b5563; font-size: 13px;">Agent:</td>
+            <td style="padding: 4px 0; font-weight: 600;">${agentName}</td>
+          </tr>
+          ${params.paymentTerms ? `<tr><td style="padding: 4px 18px 4px 0; color: #4b5563; font-size: 13px;">Payment terms:</td><td style="padding: 4px 0; font-weight: 600;">${params.paymentTerms}</td></tr>` : ''}
+          ${quantityLabel ? `<tr><td style="padding: 4px 18px 4px 0; color: #4b5563; font-size: 13px;">Quantity:</td><td style="padding: 4px 0; font-weight: 600;">${quantityLabel}</td></tr>` : ''}
+          ${productLabel ? `<tr><td style="padding: 4px 18px 4px 0; color: #4b5563; font-size: 13px;">Product:</td><td style="padding: 4px 0; font-weight: 600;">${productLabel}</td></tr>` : ''}
+        </table>
+        ${itemSummaryHtml}
+        ${noteHtml}
+        <p style="margin: 24px 0 0; line-height: 1.7;">Thanks and best regards,</p>
+        <p style="margin: 8px 0 0;"><strong>${params.senderName}</strong></p>
+      </div>
+      <div style="text-align: center; padding: 16px; color: #9ca3af; font-size: 11px;">
+        Sent by ${companyName}
+      </div>
+    </div>
+  `;
+}
+
 export function buildDocumentEmailHtml(params: {
   documentType: DocumentEmailType;
   senderName: string;
   vesselName: string;
+  vesselImo?: string | null;
   portName: string;
   orderNumber: string;
   documentLabel?: string;
   paymentTerms?: string | null;
+  eta?: string | null;
+  agentName?: string | null;
   customerNote?: string | null;
+  items?: Array<{ quantity: string; quantityMin?: string | null; unit: string; productType: string; description?: string | null }>;
   itemNotes?: Array<{ label: string; note: string }>;
   companyName?: string | null;
   companyLogoUrl?: string | null;
@@ -307,6 +429,11 @@ export function buildDocumentEmailHtml(params: {
       greeting: 'Dear Customer',
       intro: `Please find attached the invoice for bunker delivery to <strong>${params.vesselName}</strong> at <strong>${params.portName}</strong>.`,
     },
+    PORT_DOCUMENTATION: {
+      title: 'Port Documentation',
+      greeting: 'Dear Customer',
+      intro: `Please find attached the port-documentation package for bunker delivery to <strong>${params.vesselName}</strong> at <strong>${params.portName}</strong>.`,
+    },
     INQUIRY: {
       title: 'Inquiry',
       greeting: 'Good day',
@@ -315,6 +442,10 @@ export function buildDocumentEmailHtml(params: {
   };
 
   const l = labels[params.documentType];
+
+  if (params.documentType === 'PORT_DOCUMENTATION') {
+    return buildPortDocumentationEmailHtml(params);
+  }
 
   const paymentTermsRow = params.paymentTerms
     ? `<tr><td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Payment terms:</td><td style="padding: 4px 0; font-weight: 600;">${params.paymentTerms}</td></tr>`
@@ -390,6 +521,7 @@ export function buildDocumentEmailSubject(params: {
     NOMINATION: 'Nomination',
     PROFORMA: 'Proforma Invoice',
     INVOICE: 'Invoice',
+    PORT_DOCUMENTATION: 'Port Documentation',
     INQUIRY: 'Inquiry',
   };
 

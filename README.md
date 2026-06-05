@@ -318,13 +318,18 @@ bun run test
 
 ## Deployment (VPS + blue/green)
 
-This repo deploys to a single VPS using:
+This repo deploys one named instance per server using:
 
 - **systemd** template unit: `fueld-api@blue` and `fueld-api@green`
 - **nginx** for TLS + static SPA + reverse-proxy
 - **blue/green swap** based on ports:
   - blue → `3000`
   - green → `3001`
+
+Instance inventory lives in `deploy/instances/*.env`.
+
+- `deploy/instances/production.env` is the current production target
+- `deploy/instances/template.env` is the template for new servers such as testing or customer-managed instances
 
 ### 1) One-time VPS bootstrap
 
@@ -334,41 +339,67 @@ It:
 
 - Installs nginx, certbot (+ Cloudflare DNS plugin), PostgreSQL, UFW, fail2ban
 - Creates a `deploy` user
-- Creates `/opt/fueld/{blue,green,web,drizzle,geoip-data,uploads/...}`
-- Writes `/opt/fueld/.env` (DB URL, JWT secrets, CORS, app URL, migration dir, etc.)
+- Creates `${APP_DIR:-/opt/fueld}/{blue,green,web,drizzle,geoip-data,uploads/...}`
+- Writes `${APP_DIR:-/opt/fueld}/.env` (DB URL, JWT secrets, CORS, app URL, migration dir, etc.)
 - Installs systemd unit template `/etc/systemd/system/fueld-api@.service`
 - Configures nginx:
-  - Serves Angular build from `/opt/fueld/web/browser`
+  - Serves Angular build from `${APP_DIR:-/opt/fueld}/web/browser`
   - Proxies the API at `/api/*` → `http://127.0.0.1:{3000|3001}/*`
   - Proxies WebSocket at `/ws`
-  - Serves `/uploads/` directly from `/opt/fueld/uploads/`
-- Obtains a wildcard TLS certificate for `*.fueld.app` via Cloudflare DNS
+  - Serves `/uploads/` directly from `${APP_DIR:-/opt/fueld}/uploads/`
+- Obtains TLS using one of two modes:
+  - `TLS_MODE=cloudflare-wildcard` for managed wildcard DNS via Cloudflare
+  - `TLS_MODE=letsencrypt-nginx` for direct per-domain issuance on customer-owned domains
 
-**Important:** it requires `CF_API_TOKEN` exported in the shell when running, because wildcard cert issuance uses DNS-01.
+Example bootstrap commands:
+
+```bash
+# Managed subdomain under your DNS
+DOMAIN=testing.fueld.app \
+TLS_MODE=cloudflare-wildcard \
+CF_API_TOKEN=... \
+bash deploy/setup-vps.sh
+
+# Customer-owned domain
+DOMAIN=app.customer-example.com \
+TLS_MODE=letsencrypt-nginx \
+CERTBOT_EMAIL=ops@customer-example.com \
+bash deploy/setup-vps.sh
+```
+
+**Important:** `CF_API_TOKEN` is only required when `TLS_MODE=cloudflare-wildcard`.
 
 ### 2) CI/CD pipeline
 
 Workflow: `.github/workflows/deploy.yml`
 
-On every push to `main`:
+Deploy behavior:
 
 - Builds the API as a **standalone Bun binary** (`apps/api/app-release`, target `bun-linux-x64`)
 - Builds the Angular app to `apps/web/dist/web/browser/`
-- On `push` to `main`, the test workflow uploads temporary GitHub Actions artifacts that the deploy workflow downloads, copies to the VPS via `scp`, and deletes after a successful deploy
-- Executes the deploy script on the VPS
+- On `workflow_run` from `main`, deploys the `production` instance automatically
+- On `workflow_dispatch`, deploys the named instance from `deploy/instances/<instance>.env`
+- Copies the release payload to the target server via `scp` and executes the deploy script there
+
+To add a new server:
+
+1. Copy `deploy/instances/template.env` to `deploy/instances/<instance>.env`
+2. Fill in host, domain, channel, and app directory
+3. Provision the server with `deploy/setup-vps.sh`
+4. Run the deploy workflow manually with `instance=<instance>`
 
 ### 3) Blue/green swap logic
 
 Script: `deploy/deploy.sh`
 
-1. Reads current slot from `/opt/fueld/active-slot` (defaults to blue)
-2. Moves new frontend build into `/opt/fueld/web`
-3. Moves drizzle migrations into `/opt/fueld/drizzle`
-4. Moves new binary into `/opt/fueld/{nextSlot}/app-release`
+1. Reads current slot from `${APP_DIR:-/opt/fueld}/active-slot` (defaults to blue)
+2. Moves new frontend build into `${APP_DIR:-/opt/fueld}/web`
+3. Moves drizzle migrations into `${APP_DIR:-/opt/fueld}/drizzle`
+4. Moves new binary into `${APP_DIR:-/opt/fueld}/{nextSlot}/app-release`
 5. Starts `fueld-api@{nextSlot}` (API runs pending DB migrations on startup)
 6. Health-checks `http://127.0.0.1:{nextPort}/health`
 7. Writes nginx upstream file `/etc/nginx/conf.d/fueld-upstream.conf` to point to the new port and reloads nginx
-8. Writes `/opt/fueld/active-slot`
+8. Writes `${APP_DIR:-/opt/fueld}/active-slot`
 9. Stops the old slot
 
 If the new slot fails its health check, the script stops it and **leaves the current slot active**.

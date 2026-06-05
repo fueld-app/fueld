@@ -27,6 +27,7 @@ import { llmController } from './modules/admin/llm.controller';
 import { activityController, adminActivityController } from './modules/activity/activity.controller';
 import { ordersController } from './modules/orders/orders.controller';
 import { commentsController } from './modules/comments/comments.controller';
+import { portDocumentationController } from './modules/port-documentation/port-documentation.controller';
 import { logFromRequest, startPruneJob } from './modules/activity/activity.service';
 import {
   addSession,
@@ -58,6 +59,8 @@ import { riskMonitoringController } from './modules/risk-monitoring/risk-monitor
 import { runScheduledChecks } from './modules/risk-monitoring/risk-monitoring.service';
 import { vesselSanctionsController } from './modules/vessel-sanctions/vessel-sanctions.controller';
 import { runScheduledVesselSanctionChecks } from './modules/vessel-sanctions/vessel-sanctions.service';
+import { inventoryController } from './modules/inventory/inventory.controller';
+import { transfersController } from './modules/inventory/transfers.controller';
 import { reconnectStoredSessions as reconnectWhatsAppSessions } from './modules/whatsapp/whatsapp.service';
 import { plattsController } from './modules/platts/platts.controller';
 import { resumePendingPlattsParseJobs } from './modules/platts/platts.service';
@@ -426,6 +429,7 @@ export async function createApp(options: CreateAppOptions = {}) {
     .use(activityController)
     .use(adminActivityController)
     .use(ordersController)
+    .use(portDocumentationController)
     .use(commentsController)
     .use(securityController)
     .use(llmController)
@@ -435,6 +439,8 @@ export async function createApp(options: CreateAppOptions = {}) {
     .use(plattsController)
     .use(riskMonitoringController)
     .use(vesselSanctionsController)
+    .use(inventoryController)
+    .use(transfersController)
     .get('/uploads/avatars/:filename', async ({ params, set }: { params: { filename: string }; set: any }) => {
       const { join } = await import('path');
       const path = join(process.cwd(), 'uploads/avatars', params.filename);

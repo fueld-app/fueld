@@ -543,16 +543,15 @@ img {
 
 .content-band--contrast {
   background: var(--contrast-bg);
-  /* Force dark-on-dark text inside contrast band regardless of theme */
-  --ink: #f3f5fa;
-  --ink-dim: #c7cdda;
-  --muted: #8a93a6;
-  --line: rgba(255, 255, 255, 0.08);
-  --line-strong: rgba(255, 255, 255, 0.16);
-  --surface-2: #141a2b;
-  --surface-tint: rgba(255, 255, 255, 0.04);
-  --heading-from: #ffffff;
-  --heading-to: #c9d2e3;
+  --ink: var(--contrast-ink);
+  --ink-dim: var(--contrast-ink-dim);
+  --muted: var(--contrast-muted);
+  --line: var(--contrast-line);
+  --line-strong: var(--contrast-line-strong);
+  --surface-2: var(--contrast-surface-2);
+  --surface-tint: var(--contrast-surface-tint);
+  --heading-from: var(--contrast-heading-from);
+  --heading-to: var(--contrast-heading-to);
   color: var(--ink);
 }
 

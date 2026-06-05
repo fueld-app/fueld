@@ -12,7 +12,7 @@ import {
   effect,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { DecimalPipe } from '@angular/common';
+import { DecimalPipe, SlicePipe } from '@angular/common';
 import { ProductType, PricingModel, type PlattsSuggestionsResponseDto } from '@fueld/types';
 import { Subscription } from 'rxjs';
 import {
@@ -69,6 +69,18 @@ export interface OrderItemRow {
   salesBargingUnit?: string | null;
   salesCreditDays?: number | null;
   salesPriceFinalized?: boolean;
+  // Inventory linkage (optional; only relevant when an inventory-enabled warehouse applies)
+  inventorySkuId?: string | null;
+  warehouseId?: string | null;
+  plannedInventoryAt?: string | null;
+}
+
+/** Availability status for a given order item, keyed by row id. */
+export interface OrderItemAvailability {
+  ok: boolean;
+  earliestAvailableAt: string | null;
+  shortageQuantity: string | null;
+  reason: string | null;
 }
 
 export interface OrderItemsEconomics {
@@ -85,7 +97,7 @@ export interface OrderItemsEconomics {
 @Component({
   selector: 'app-order-items',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, DecimalPipe, SearchableDropdownComponent],
+  imports: [FormsModule, DecimalPipe, SlicePipe, SearchableDropdownComponent],
   template: `
     <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
       <!-- ═══════════════════════════════════════════════════════════ -->
@@ -162,7 +174,7 @@ export interface OrderItemsEconomics {
                     <select
                       [ngModel]="row.orderSupplierId ?? ''"
                       (ngModelChange)="updateField(i, 'orderSupplierId', $event || null)"
-                      class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                      class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
                              focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
                     >
                       <option value="">Select supplier</option>
@@ -223,16 +235,24 @@ export interface OrderItemsEconomics {
                       class="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm tabular-nums
                              focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                     />
-                    <select
-                      [ngModel]="row.unit"
-                      (ngModelChange)="updateField(i, 'unit', $event)"
-                      class="cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
-                             hover:text-brand-600 focus:outline-none"
-                    >
-                      @for (u of unitOptions(); track u.value) {
-                        <option [value]="u.value">{{ u.label }}</option>
-                      }
-                    </select>
+                    <span class="order-item-inline-select-wrap">
+                      <select
+                        [ngModel]="row.unit"
+                        (ngModelChange)="updateField(i, 'unit', $event)"
+                        class="order-item-inline-select cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
+                               hover:text-brand-600 focus:outline-none"
+                      >
+                        @for (u of unitOptions(); track u.value) {
+                          <option [value]="u.value">{{ u.label }}</option>
+                        }
+                      </select>
+                      <svg
+                        class="pointer-events-none absolute right-0 top-1/2 h-3 w-3 -translate-y-1/2 text-gray-400"
+                        xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
+                      >
+                        <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+                      </svg>
+                    </span>
                     <button
                       type="button"
                       (click)="toggleSpread(row.id, i)"
@@ -296,15 +316,23 @@ export interface OrderItemsEconomics {
                           placeholder="Reference..."
                           (selectionChange)="updateField(i, 'costReferenceId', $event)"
                         />
-                        <select [ngModel]="row.costCurrency"
-                          (ngModelChange)="updateField(i, 'costCurrency', $event)"
-                          class="cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
-                                 hover:text-brand-600 focus:outline-none"
-                        >
-                          @for (c of currencyOptions(); track c.value) {
-                            <option [value]="c.value">{{ c.label }}</option>
-                          }
-                        </select>
+                        <span class="order-item-inline-select-wrap">
+                          <select [ngModel]="row.costCurrency"
+                            (ngModelChange)="updateField(i, 'costCurrency', $event)"
+                            class="order-item-inline-select cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
+                                   hover:text-brand-600 focus:outline-none"
+                          >
+                            @for (c of currencyOptions(); track c.value) {
+                              <option [value]="c.value">{{ c.label }}</option>
+                            }
+                          </select>
+                          <svg
+                            class="pointer-events-none absolute right-0 top-1/2 h-3 w-3 -translate-y-1/2 text-gray-400"
+                            xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
+                          >
+                            <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+                          </svg>
+                        </span>
                         <span class="text-gray-400 text-xs shrink-0">/{{ row.costUnit }}</span>
                       </div>
                         @if (plattsMatches(row.id).length) {
@@ -352,27 +380,43 @@ export interface OrderItemsEconomics {
                                [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
                                focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                       />
-                      <select
-                        [ngModel]="row.costCurrency"
-                        (ngModelChange)="updateField(i, 'costCurrency', $event)"
-                        class="cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
-                               hover:text-brand-600 focus:outline-none"
-                      >
-                        @for (c of currencyOptions(); track c.value) {
-                          <option [value]="c.value">{{ c.label }}</option>
-                        }
-                      </select>
+                      <span class="order-item-inline-select-wrap">
+                        <select
+                          [ngModel]="row.costCurrency"
+                          (ngModelChange)="updateField(i, 'costCurrency', $event)"
+                          class="order-item-inline-select cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
+                                 hover:text-brand-600 focus:outline-none"
+                        >
+                          @for (c of currencyOptions(); track c.value) {
+                            <option [value]="c.value">{{ c.label }}</option>
+                          }
+                        </select>
+                        <svg
+                          class="pointer-events-none absolute right-0 top-1/2 h-3 w-3 -translate-y-1/2 text-gray-400"
+                          xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
+                        >
+                          <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+                        </svg>
+                      </span>
                       <span class="text-gray-400 text-xs shrink-0">/</span>
-                      <select
-                        [ngModel]="row.costUnit"
-                        (ngModelChange)="updateField(i, 'costUnit', $event)"
-                        class="cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
-                               hover:text-brand-600 focus:outline-none"
-                      >
-                        @for (u of unitOptions(); track u.value) {
-                          <option [value]="u.value">{{ u.label }}</option>
-                        }
-                      </select>
+                      <span class="order-item-inline-select-wrap">
+                        <select
+                          [ngModel]="row.costUnit"
+                          (ngModelChange)="updateField(i, 'costUnit', $event)"
+                          class="order-item-inline-select cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
+                                 hover:text-brand-600 focus:outline-none"
+                        >
+                          @for (u of unitOptions(); track u.value) {
+                            <option [value]="u.value">{{ u.label }}</option>
+                          }
+                        </select>
+                        <svg
+                          class="pointer-events-none absolute right-0 top-1/2 h-3 w-3 -translate-y-1/2 text-gray-400"
+                          xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
+                        >
+                          <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+                        </svg>
+                      </span>
                     </div>
                     @if (row.unit !== row.costUnit) {
                       <div class="mt-1 flex items-center gap-1 justify-end">
@@ -437,25 +481,41 @@ export interface OrderItemsEconomics {
                           placeholder="Reference..."
                           (selectionChange)="updateField(i, 'salesReferenceId', $event)"
                         />
-                        <select [ngModel]="row.salesCurrency"
-                          (ngModelChange)="updateField(i, 'salesCurrency', $event)"
-                          class="cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
-                                 hover:text-brand-600 focus:outline-none"
-                        >
-                          @for (c of currencyOptions(); track c.value) {
-                            <option [value]="c.value">{{ c.label }}</option>
-                          }
-                        </select>
+                        <span class="order-item-inline-select-wrap">
+                          <select [ngModel]="row.salesCurrency"
+                            (ngModelChange)="updateField(i, 'salesCurrency', $event)"
+                            class="order-item-inline-select cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
+                                   hover:text-brand-600 focus:outline-none"
+                          >
+                            @for (c of currencyOptions(); track c.value) {
+                              <option [value]="c.value">{{ c.label }}</option>
+                            }
+                          </select>
+                          <svg
+                            class="pointer-events-none absolute right-0 top-1/2 h-3 w-3 -translate-y-1/2 text-gray-400"
+                            xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
+                          >
+                            <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+                          </svg>
+                        </span>
                         <span class="text-gray-400 text-xs">/</span>
-                        <select [ngModel]="row.salesUnit"
-                          (ngModelChange)="updateField(i, 'salesUnit', $event)"
-                          class="cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
-                                 hover:text-brand-600 focus:outline-none"
-                        >
-                          @for (u of unitOptions(); track u.value) {
-                            <option [value]="u.value">{{ u.label }}</option>
-                          }
-                        </select>
+                        <span class="order-item-inline-select-wrap">
+                          <select [ngModel]="row.salesUnit"
+                            (ngModelChange)="updateField(i, 'salesUnit', $event)"
+                            class="order-item-inline-select cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
+                                   hover:text-brand-600 focus:outline-none"
+                          >
+                            @for (u of unitOptions(); track u.value) {
+                              <option [value]="u.value">{{ u.label }}</option>
+                            }
+                          </select>
+                          <svg
+                            class="pointer-events-none absolute right-0 top-1/2 h-3 w-3 -translate-y-1/2 text-gray-400"
+                            xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
+                          >
+                            <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+                          </svg>
+                        </span>
                       </div>
                         @if (plattsMatches(row.id).length) {
                           <div class="flex flex-wrap gap-1.5">
@@ -502,27 +562,43 @@ export interface OrderItemsEconomics {
                                [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
                                focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                       />
-                      <select
-                        [ngModel]="row.salesCurrency"
-                        (ngModelChange)="updateField(i, 'salesCurrency', $event)"
-                        class="cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
-                               hover:text-brand-600 focus:outline-none"
-                      >
-                        @for (c of currencyOptions(); track c.value) {
-                          <option [value]="c.value">{{ c.label }}</option>
-                        }
-                      </select>
+                      <span class="order-item-inline-select-wrap">
+                        <select
+                          [ngModel]="row.salesCurrency"
+                          (ngModelChange)="updateField(i, 'salesCurrency', $event)"
+                          class="order-item-inline-select cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
+                                 hover:text-brand-600 focus:outline-none"
+                        >
+                          @for (c of currencyOptions(); track c.value) {
+                            <option [value]="c.value">{{ c.label }}</option>
+                          }
+                        </select>
+                        <svg
+                          class="pointer-events-none absolute right-0 top-1/2 h-3 w-3 -translate-y-1/2 text-gray-400"
+                          xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
+                        >
+                          <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+                        </svg>
+                      </span>
                       <span class="text-gray-400 text-xs">/</span>
-                      <select
-                        [ngModel]="row.salesUnit"
-                        (ngModelChange)="updateField(i, 'salesUnit', $event)"
-                        class="cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
-                               hover:text-brand-600 focus:outline-none"
-                      >
-                        @for (u of unitOptions(); track u.value) {
-                          <option [value]="u.value">{{ u.label }}</option>
-                        }
-                      </select>
+                      <span class="order-item-inline-select-wrap">
+                        <select
+                          [ngModel]="row.salesUnit"
+                          (ngModelChange)="updateField(i, 'salesUnit', $event)"
+                          class="order-item-inline-select cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
+                                 hover:text-brand-600 focus:outline-none"
+                        >
+                          @for (u of unitOptions(); track u.value) {
+                            <option [value]="u.value">{{ u.label }}</option>
+                          }
+                        </select>
+                        <svg
+                          class="pointer-events-none absolute right-0 top-1/2 h-3 w-3 -translate-y-1/2 text-gray-400"
+                          xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
+                        >
+                          <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+                        </svg>
+                      </span>
                     </div>
                   }
                   <!-- Pricing model toggle + density -->
@@ -603,6 +679,72 @@ export interface OrderItemsEconomics {
                 </td>
               }
             </tr>
+
+            <!-- Inventory band — only when warehouses exist for this order (e.g. own-company supplier with enabled warehouse). -->
+            @if (warehouseOptionsInput().length > 0) {
+              <tr class="border-b border-gray-100 bg-emerald-50/30">
+                <td [attr.colspan]="(readonly() ? 9 : 10) + (allowDeliveredEdit() ? 1 : 0)" class="px-4 py-2">
+                  <div class="flex flex-wrap items-end gap-3 text-xs">
+                    <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-700">
+                      Inventory
+                    </span>
+                    <label class="flex flex-col gap-0.5">
+                      <span class="text-[10px] font-medium uppercase tracking-wider text-gray-500">Warehouse</span>
+                      <select
+                        [ngModel]="row.warehouseId ?? ''"
+                        (ngModelChange)="updateField(i, 'warehouseId', $event || null)"
+                        [disabled]="readonly()"
+                        class="fueld-select-no-chevron appearance-none rounded-md border border-gray-300 px-2 py-1 text-xs disabled:opacity-60"
+                      >
+                        <option value="">— Not tracked —</option>
+                        @for (w of warehouseOptionsInput(); track w.value) {
+                          <option [value]="w.value">{{ w.label }}</option>
+                        }
+                      </select>
+                    </label>
+                    <label class="flex flex-col gap-0.5">
+                      <span class="text-[10px] font-medium uppercase tracking-wider text-gray-500">SKU</span>
+                      <select
+                        [ngModel]="row.inventorySkuId ?? ''"
+                        (ngModelChange)="updateField(i, 'inventorySkuId', $event || null)"
+                        [disabled]="readonly() || !row.warehouseId"
+                        class="fueld-select-no-chevron appearance-none rounded-md border border-gray-300 px-2 py-1 text-xs disabled:opacity-60"
+                      >
+                        <option value="">—</option>
+                        @for (s of inventorySkuOptionsInput(); track s.value) {
+                          <option [value]="s.value">{{ s.label }}</option>
+                        }
+                      </select>
+                    </label>
+                    <label class="flex flex-col gap-0.5">
+                      <span class="text-[10px] font-medium uppercase tracking-wider text-gray-500">Planned date</span>
+                      <input
+                        type="date"
+                        [ngModel]="formatDateInput(row.plannedInventoryAt)"
+                        (ngModelChange)="updateField(i, 'plannedInventoryAt', parseDateInput($event))"
+                        [disabled]="readonly() || !row.warehouseId"
+                        class="rounded-md border border-gray-300 px-2 py-1 text-xs disabled:opacity-60"
+                      />
+                    </label>
+                    @if (availabilityByRowId()[row.id]; as a) {
+                      @if (!a.ok) {
+                        <span class="ml-auto inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700"
+                          [title]="a.reason ?? 'Insufficient stock'">
+                          Short {{ a.shortageQuantity }}
+                          @if (a.earliestAvailableAt) {
+                            · earliest {{ a.earliestAvailableAt | slice:0:10 }}
+                          }
+                        </span>
+                      } @else if (row.warehouseId && row.inventorySkuId) {
+                        <span class="ml-auto inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                          Available
+                        </span>
+                      }
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
           } @empty {
             <tr>
               <td [attr.colspan]="(readonly() ? 9 : 10) + (allowDeliveredEdit() ? 1 : 0)" class="px-4 py-12 text-center">
@@ -703,7 +845,7 @@ export interface OrderItemsEconomics {
                   <select
                     [ngModel]="row.orderSupplierId ?? ''"
                     (ngModelChange)="updateField(i, 'orderSupplierId', $event || null)"
-                    class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                    class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
                            focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
                   >
                     <option value="">Select supplier</option>
@@ -789,7 +931,7 @@ export interface OrderItemsEconomics {
                 <select
                   [ngModel]="row.unit"
                   (ngModelChange)="updateField(i, 'unit', $event)"
-                  class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                  class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
                          focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
                 >
                   @for (u of unitOptions(); track u.value) {
@@ -808,7 +950,7 @@ export interface OrderItemsEconomics {
                 <select
                   [ngModel]="row.costUnit"
                   (ngModelChange)="updateField(i, 'costUnit', $event)"
-                  class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                  class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
                          focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
                 >
                   @for (u of unitOptions(); track u.value) {
@@ -827,7 +969,7 @@ export interface OrderItemsEconomics {
                 <select
                   [ngModel]="row.salesUnit"
                   (ngModelChange)="updateField(i, 'salesUnit', $event)"
-                  class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+                  class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
                          focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
                 >
                   @for (u of unitOptions(); track u.value) {
@@ -889,7 +1031,7 @@ export interface OrderItemsEconomics {
                       <input type="number" step="0.01" [ngModel]="row.costBarging ?? 0" (ngModelChange)="updateField(i, 'costBarging', +$event)" placeholder="Barging"
                         class="w-full rounded border border-gray-200 px-2 py-1 text-xs tabular-nums focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20" />
                       <select [ngModel]="row.costBargingUnit ?? 'l/s'" (ngModelChange)="updateField(i, 'costBargingUnit', $event)"
-                        class="w-14 rounded border border-gray-200 px-1 py-1 text-[10px] text-gray-600 focus:border-brand-500 outline-none bg-white">
+                        class="fueld-select-no-chevron w-14 appearance-none rounded border border-gray-200 px-1 py-1 text-[10px] text-gray-600 focus:border-brand-500 outline-none bg-white">
                         <option value="l/s">l/s</option><option value="pmt">pmt</option>
                       </select>
                     </div>
@@ -908,7 +1050,7 @@ export interface OrderItemsEconomics {
                     <select
                       [ngModel]="row.costCurrency"
                       (ngModelChange)="updateField(i, 'costCurrency', $event)"
-                      class="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-700
+                      class="fueld-select-no-chevron w-20 appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-700
                              focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
                     >
                       @for (c of currencyOptions(); track c.value) {
@@ -975,7 +1117,7 @@ export interface OrderItemsEconomics {
                       <input type="number" step="0.01" [ngModel]="row.salesBarging ?? 0" (ngModelChange)="updateField(i, 'salesBarging', +$event)" placeholder="Barging"
                         class="w-full rounded border border-gray-200 px-2 py-1 text-xs tabular-nums focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20" />
                       <select [ngModel]="row.salesBargingUnit ?? 'l/s'" (ngModelChange)="updateField(i, 'salesBargingUnit', $event)"
-                        class="w-14 rounded border border-gray-200 px-1 py-1 text-[10px] text-gray-600 focus:border-brand-500 outline-none bg-white">
+                        class="fueld-select-no-chevron w-14 appearance-none rounded border border-gray-200 px-1 py-1 text-[10px] text-gray-600 focus:border-brand-500 outline-none bg-white">
                         <option value="l/s">l/s</option><option value="pmt">pmt</option>
                       </select>
                     </div>
@@ -994,7 +1136,7 @@ export interface OrderItemsEconomics {
                     <select
                       [ngModel]="row.salesCurrency"
                       (ngModelChange)="updateField(i, 'salesCurrency', $event)"
-                      class="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-700
+                      class="fueld-select-no-chevron w-20 appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-700
                              focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
                     >
                       @for (c of currencyOptions(); track c.value) {
@@ -1150,6 +1292,11 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   readonly supplierOptionsInput = input<DropdownOption[]>([]);
   readonly priceReferencesInput = input<{ id: string; name: string; code: string }[]>([]);
   readonly plattsSuggestionsInput = input<PlattsSuggestionsResponseDto['items']>([]);
+  // Inventory pickers (optional; only rendered when warehouseOptionsInput is non-empty).
+  readonly warehouseOptionsInput = input<DropdownOption[]>([]);
+  readonly inventorySkuOptionsInput = input<DropdownOption[]>([]);
+  /** Map of order-item row id → availability check result (controlled by parent). */
+  readonly availabilityByRowId = input<Record<string, OrderItemAvailability>>({});
   readonly itemsChange = output<OrderItemRow[]>();
   readonly economicsChange = output<OrderItemsEconomics>();
   readonly displayCurrencyChange = output<string>();
@@ -1417,6 +1564,22 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
 
     const parsed = Number(normalized);
     return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  /** Format an ISO timestamp to a `YYYY-MM-DD` string (UTC day, matches the rest of the app). */
+  formatDateInput(value: string | null | undefined): string {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toISOString().slice(0, 10);
+  }
+
+  /** Convert a date input value to an ISO timestamp pinned to UTC noon (matches order ETA convention). */
+  parseDateInput(value: string | null | undefined): string | null {
+    if (!value) return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    return new Date(`${trimmed}T12:00:00Z`).toISOString();
   }
 
   supplierLabel(orderSupplierId: string | null | undefined): string {

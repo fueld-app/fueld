@@ -34,12 +34,20 @@ import {
   type PlattsSuggestionsResponseDto,
   type OrderSupplierDto,
   type SupplierNominationSummaryDto,
+  type WarehouseDto,
+  type InventorySkuDto,
+  type InventoryAvailabilityResultDto,
+  type OrderTransferDto,
+  type OrderPortDocumentDto,
+  type BunkerInstructionsPreviewDto,
+  type PortDocumentationOrderContextDto,
 } from '@fueld/types';
 
 import {
   OrderItemsComponent,
   type OrderItemRow,
   type OrderItemsEconomics,
+  type OrderItemAvailability,
 } from '../../components/order-items/order-items.component';
 import { OrderFinancingSummaryComponent } from '../../components/order-financing-summary/order-financing-summary.component';
 import {
@@ -57,6 +65,8 @@ import { ActivityTimelineComponent } from '../../../../shared/components/activit
 import { EmailHistoryCardComponent } from '../../../../shared/components/email-history-card/email-history-card.component';
 import { TradingDetailHeaderComponent } from '../../components/detail-header/detail-header.component';
 import { TradingDetailMetaCardsComponent } from '../../components/detail-meta-cards/detail-meta-cards.component';
+import { InternalTransferSummaryComponent } from '../../components/internal-transfer-summary/internal-transfer-summary.component';
+import { InternalTransferSidesComponent } from '../../components/internal-transfer-sides/internal-transfer-sides.component';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { CreditApplicationModalComponent } from '../../../credit/components/credit-application-modal.component';
 
@@ -194,6 +204,8 @@ interface PlattsSuggestionViewModel {
     PdfPreviewModalComponent,
     TradingDetailHeaderComponent,
     TradingDetailMetaCardsComponent,
+    InternalTransferSummaryComponent,
+    InternalTransferSidesComponent,
     CreditApplicationModalComponent,
   ],
   template: `
@@ -215,7 +227,7 @@ interface PlattsSuggestionViewModel {
         <select
           [ngModel]="order()?.salesRepId ?? ''"
           (ngModelChange)="onResponsibleUserChange($event)"
-          class="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+          class="fueld-select-no-chevron appearance-none rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
         >
           <option value="">— None —</option>
           @for (u of teamUsers(); track u.id) {
@@ -232,6 +244,7 @@ interface PlattsSuggestionViewModel {
           [hasBankAccount]="hasBankAccount()"
           [hasLineItems]="hasLineItems()"
           [hasEnoughPayments]="hasEnoughPaymentsForMarkPaid()"
+          [hasPortDocumentationDocuments]="(portDocumentationContext()?.documents?.length ?? 0) > 0"
           (actionTriggered)="onAction($event)"
         />
         <div class="relative">
@@ -256,7 +269,7 @@ interface PlattsSuggestionViewModel {
               <select
                 [ngModel]="order()?.currency ?? 'USD'"
                 (ngModelChange)="onCurrencyChange($event); settingsOpen.set(false)"
-                class="w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900
+                class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900
                        outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
               >
                 @for (c of configuredCurrencies(); track c.value) {
@@ -268,6 +281,12 @@ interface PlattsSuggestionViewModel {
         </div>
       </div>
     </app-trading-detail-header>
+
+    @if (isInternalTransfer()) {
+      <div class="mt-4">
+        <app-internal-transfer-summary [transfer]="transfer()" />
+      </div>
+    }
 
     <app-trading-detail-meta-cards
       [clientName]="clientName()"
@@ -345,7 +364,7 @@ interface PlattsSuggestionViewModel {
       (agentContactChange)="onAgentContactChange($event)"
     >
       <div supplierHeaderTabs>
-        @if (orderSupplierTabs().length > 0) {
+        @if (orderSupplierTabs().length > 0 && !isInternalTransfer()) {
           <div class="grid min-w-0 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
             <div class="scrollbar-none min-w-0 flex-1 overflow-x-auto">
               <div class="flex min-w-max items-center gap-1">
@@ -386,7 +405,7 @@ interface PlattsSuggestionViewModel {
             <select
               [ngModel]="order()?.customerPaymentTermType ?? ''"
               (ngModelChange)="onCustomerPaymentTermChange($event)"
-              class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+              class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
                      focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
             >
               <option value="">Select</option>
@@ -475,7 +494,7 @@ interface PlattsSuggestionViewModel {
             <select
               [ngModel]="activeSupplierPaymentTermType() ?? ''"
               (ngModelChange)="onSupplierPaymentTermChange($event)"
-              class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+              class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
                      focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
             >
               <option value="">Select</option>
@@ -603,7 +622,7 @@ interface PlattsSuggestionViewModel {
       </div>
     </app-trading-detail-meta-cards>
 
-    @if (isInquiryContext()) {
+    @if (isInquiryContext() && !isInternalTransfer()) {
       <div class="mt-4 grid gap-4 lg:grid-cols-2 lg:items-stretch">
         <div class="flex h-full flex-col overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-emerald-50 shadow-sm lg:order-1">
         <div class="border-b border-slate-200/70 px-5 py-4">
@@ -1066,10 +1085,22 @@ interface PlattsSuggestionViewModel {
       [currencyOptionsInput]="configuredCurrencies()"
       [priceReferencesInput]="configuredPriceReferences()"
       [plattsSuggestionsInput]="plattsSuggestionItems()"
+      [warehouseOptionsInput]="warehouseDropdownOptions()"
+      [inventorySkuOptionsInput]="inventorySkuDropdownOptions()"
+      [availabilityByRowId]="availabilityByRowId()"
       (itemsChange)="onItemsChange($event)"
       (economicsChange)="onItemEconomicsChange($event)"
       (displayCurrencyChange)="itemDisplayCurrency.set($event)"
     />
+
+    @if (isInternalTransfer()) {
+      <div class="mt-4">
+        <app-internal-transfer-sides
+          [orderId]="orderId()"
+          [readonly]="isReadonly()"
+        />
+      </div>
+    }
 
     <!-- ═════════════════════════════════════════════════════════════ -->
     <!--  Financing Summary + Platts Signals (side-by-side on desktop) -->
@@ -1326,7 +1357,7 @@ interface PlattsSuggestionViewModel {
             <select
               [ngModel]="attachmentType()"
               (ngModelChange)="attachmentType.set($event)"
-              class="w-full sm:w-40 rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
+              class="fueld-select-no-chevron w-full sm:w-40 appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
                      focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
             >
               @for (type of configuredAttachmentTypes(); track type) {
@@ -1381,6 +1412,7 @@ interface PlattsSuggestionViewModel {
         }
         }
       </div>
+
       @if (order()?.id) {
         <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
           <app-email-history-card [orderId]="order()!.id" />
@@ -1440,7 +1472,7 @@ interface PlattsSuggestionViewModel {
               <select
                 [ngModel]="paymentCurrency()"
                 (ngModelChange)="paymentCurrency.set($event)"
-                class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 uppercase
+                class="fueld-select-no-chevron mt-1 w-full appearance-none rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 uppercase
                        focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 bg-white"
               >
                 @for (c of configuredCurrencies(); track c.value) {
@@ -1560,7 +1592,7 @@ interface PlattsSuggestionViewModel {
             <select
               [ngModel]="selectedInquiryCancelReason()"
               (ngModelChange)="selectedInquiryCancelReason.set($event)"
-              class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
+              class="fueld-select-no-chevron mt-1 w-full appearance-none rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
                      focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 bg-white"
             >
               @for (reason of availableInquiryCancelReasons(); track reason) {
@@ -1654,7 +1686,7 @@ interface PlattsSuggestionViewModel {
       [pdfFileName]="emailPdfFileName()"
       [orderId]="orderId()"
       [nominationOrderSupplierId]="nominationOrderSupplierId()"
-      [extraAttachments]="invoiceEmailAttachmentOptions()"
+      [extraAttachments]="emailAttachmentOptions()"
       [waLinked]="waLinked()"
       [defaultPhone]="emailModalDefaultPhone()"
       (sendEmail)="onSendEmail($event)"
@@ -1748,6 +1780,57 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly inquiryItems = computed(() =>
     this.itemRows().map((r) => ({ productType: r.productType, quantity: r.quantity, quantityMin: r.quantityMin, unit: r.costUnit ?? r.unit })),
   );
+
+  // ─── Inventory (physical-ops) state ─────────────────────────────────
+  /** All warehouses (loaded once on init); filtered to relevant ones via `availableWarehouses`. */
+  readonly allWarehouses = signal<WarehouseDto[]>([]);
+  /** Inventory SKUs (loaded once). */
+  readonly inventorySkus = signal<InventorySkuDto[]>([]);
+  /** Live availability check results keyed by item row id. */
+  readonly availabilityByRowId = signal<Record<string, OrderItemAvailability>>({});
+  /** Debounce timers per row id for availability checks. */
+  private readonly availabilityTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  /** Warehouses tied to the current order's client or supplier (so inventory pickers show useful options only). */
+  readonly availableWarehouses = computed<WarehouseDto[]>(() => {
+    const order = this.order();
+    if (!order) return [];
+    const relevantCompanyIds = new Set<string>();
+    if (order.clientId) relevantCompanyIds.add(order.clientId);
+    if (order.supplierId) relevantCompanyIds.add(order.supplierId);
+    for (const supplier of this.orderSuppliers()) {
+      if (supplier.companyId) relevantCompanyIds.add(supplier.companyId);
+    }
+    return this.allWarehouses().filter((w) =>
+      w.active && w.inventoryEnabled && relevantCompanyIds.has(w.ownerCompanyId),
+    );
+  });
+
+  readonly warehouseDropdownOptions = computed<DropdownOption[]>(() =>
+    this.availableWarehouses().map((w) => ({
+      value: w.id,
+      label: w.vesselName ? `${w.name} · ${w.vesselName}` : w.name,
+    })),
+  );
+
+  readonly inventorySkuDropdownOptions = computed<DropdownOption[]>(() =>
+    this.inventorySkus()
+      .filter((s) => s.active && s.inventoryTracked)
+      .map((s) => ({
+        value: s.id,
+        label: s.grade ? `${s.displayName} (${s.grade})` : s.displayName,
+      })),
+  );
+
+  /** True when any tracked line currently fails the availability check. */
+  readonly hasInventoryShortage = computed(() => {
+    const map = this.availabilityByRowId();
+    return Object.values(map).some((a) => a && !a.ok);
+  });
+
+  // ─── Internal transfer state ────────────────────────────────────────
+  readonly transfer = signal<OrderTransferDto | null>(null);
+  readonly isInternalTransfer = computed(() => this.order()?.orderKind === 'INTERNAL_TRANSFER');
   readonly itemEconomics = signal<OrderItemsEconomics>({
     totalQuantity: 0,
     totalCost: 0,
@@ -1785,6 +1868,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   selectedAttachment: File | null = null;
   readonly payments = signal<CustomerPaymentDto[]>([]);
   readonly paymentsLoading = signal(false);
+  readonly portDocumentationContext = signal<PortDocumentationOrderContextDto | null>(null);
+  readonly portDocumentationLoading = signal(false);
+  readonly portDocumentationError = signal('');
+  readonly portDocumentationAction = signal<string | null>(null);
+  readonly bunkerInstructionsPreview = signal<BunkerInstructionsPreviewDto | null>(null);
   readonly customerCreditLines = signal<CreditLineDto[]>([]);
   readonly customerCreditLoading = signal(false);
   readonly customerCreditFrozen = signal(false);
@@ -2006,8 +2094,28 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         id: att.id,
         fileName: att.fileName,
         label: `BDR uploaded ${new Date(att.createdAt).toLocaleDateString('en-GB')}`,
+        previewUrl: att.filePath.startsWith('http') ? att.filePath : `${API_URL}${att.filePath}`,
       })),
   );
+  readonly portDocumentationEmailAttachmentOptions = computed<SendEmailAttachmentOption[]>(() =>
+    (this.portDocumentationContext()?.documents ?? [])
+      .filter((doc) => String(doc.status ?? '').toUpperCase() === 'ACTIVE')
+      .map((doc) => ({
+        id: doc.id,
+        fileName: doc.fileName,
+        label: `${this.humanizePortDocumentKind(doc.documentKind)} · ${this.humanizePortDocumentSource(doc.sourceType)}`,
+        previewUrl: `${API_URL}/orders/${this.getPortDocumentationOrderId()}/port-documentation/documents/${doc.id}/download`,
+      })),
+  );
+  readonly emailAttachmentOptions = computed<SendEmailAttachmentOption[]>(() => {
+    if (this.emailDocumentType() === 'INVOICE') {
+      return this.invoiceEmailAttachmentOptions();
+    }
+    if (this.emailDocumentType() === 'PORT_DOCUMENTATION') {
+      return this.portDocumentationEmailAttachmentOptions();
+    }
+    return [];
+  });
 
   readonly isPaidOrCancelled = computed(() => {
     const status = this.order()?.status;
@@ -2592,6 +2700,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
             salesBargingUnit: item.salesBargingUnit ?? null,
             salesCreditDays: item.salesCreditDays ?? null,
             salesPriceFinalized: item.salesPriceFinalized ?? false,
+            // Inventory linkage (optional, only present when admin enabled inventory for this order's warehouse)
+            inventorySkuId: item.inventorySkuId ?? null,
+            warehouseId: item.warehouseId ?? null,
+            plannedInventoryAt: item.plannedInventoryAt ?? null,
           })),
         );
         this.draftItemIds.set(new Set());
@@ -2600,6 +2712,14 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         await this.loadSupplierCreditLines(this.activeOrderSupplier()?.companyId ?? d.supplierId);
         await this.loadReferenceData();
         await this.loadPlattsSuggestions();
+        // Reference data (incl. warehouses + SKUs) is now loaded; run an initial
+        // availability check for any tracked lines that came back from the server.
+        this.scheduleAvailabilityChecks();
+        if (d.orderKind === 'INTERNAL_TRANSFER') {
+          await this.loadInternalTransfer();
+        } else {
+          this.transfer.set(null);
+        }
         await this.loadCompanyContacts('customer', d.clientId);
         if (this.activeOrderSupplier()?.companyId ?? d.supplierId) {
           await this.loadCompanyContacts('supplier', this.activeOrderSupplier()?.companyId ?? d.supplierId);
@@ -2629,10 +2749,156 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
       await this.loadAttachments();
       await this.loadPayments();
+      await this.loadPortDocumentationContext();
       await this.loadSupplierNominationSummary();
     } catch {
       this.showToast('error', 'Failed to load order.');
     }
+  }
+
+  private async loadPortDocumentationContext(): Promise<void> {
+    const id = this.getPortDocumentationOrderId();
+    if (!id) return;
+
+    this.portDocumentationLoading.set(true);
+    this.portDocumentationError.set('');
+    this.bunkerInstructionsPreview.set(null);
+
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<PortDocumentationOrderContextDto>>(`${API_URL}/orders/${id}/port-documentation`),
+      );
+      if (res.success) {
+        this.portDocumentationContext.set(res.data);
+      } else {
+        this.portDocumentationContext.set(null);
+        this.portDocumentationError.set(res.message ?? 'Port Documentation is not available on this deployment yet.');
+      }
+    } catch {
+      this.portDocumentationContext.set(null);
+      this.portDocumentationError.set('Port Documentation is not available on this deployment yet.');
+    } finally {
+      this.portDocumentationLoading.set(false);
+    }
+  }
+
+  async previewBunkerInstructions(): Promise<void> {
+    const id = this.getPortDocumentationOrderId();
+    if (!id) return;
+
+    this.portDocumentationAction.set('preview-bunker');
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<BunkerInstructionsPreviewDto>>(`${API_URL}/orders/${id}/port-documentation/bunker-instructions/preview`),
+      );
+      if (!res.success) {
+        this.showToast('error', res.message ?? 'Failed to load bunker instructions preview.');
+        return;
+      }
+      this.bunkerInstructionsPreview.set(res.data);
+    } catch {
+      this.showToast('error', 'Failed to load bunker instructions preview.');
+    } finally {
+      this.portDocumentationAction.set(null);
+    }
+  }
+
+  async generateBunkerInstructions(): Promise<void> {
+    await this.runPortDocumentationMutation(
+      'generate-bunker',
+      'Bunker Instructions generated.',
+      'Failed to generate Bunker Instructions.',
+      () => this.postPortDocumentationDocument('bunker-instructions/generate'),
+    );
+  }
+
+  async generateGateList(): Promise<void> {
+    await this.runPortDocumentationMutation(
+      'generate-gate-list',
+      'Gate List generated.',
+      'Failed to generate Gate List.',
+      () => this.postPortDocumentationDocument('gate-list/generate'),
+    );
+  }
+
+  async includeFlangeWorksheetDocument(): Promise<void> {
+    await this.runPortDocumentationMutation(
+      'include-flange',
+      'Flange Worksheet included on the order.',
+      'Failed to include Flange Worksheet.',
+      () => this.postPortDocumentationDocument('flange-worksheet/include'),
+    );
+  }
+
+  async downloadPortDocumentationDocument(doc: OrderPortDocumentDto): Promise<void> {
+    const id = this.getPortDocumentationOrderId();
+    if (!id) return;
+
+    this.portDocumentationAction.set(`download-${doc.id}`);
+    try {
+      const response = await firstValueFrom(
+        this.http.get(`${API_URL}/orders/${id}/port-documentation/documents/${doc.id}/download`, {
+          responseType: 'blob',
+          observe: 'response',
+        }),
+      );
+      this.downloadResponseBlob(response, doc.fileName);
+    } catch {
+      this.showToast('error', 'Failed to download Port Documentation file.');
+    } finally {
+      this.portDocumentationAction.set(null);
+    }
+  }
+
+  private async postPortDocumentationDocument(pathSuffix: string): Promise<void> {
+    const id = this.getPortDocumentationOrderId();
+    if (!id) throw new Error('Order not found');
+
+    const res = await firstValueFrom(
+      this.http.post<ApiResponse<OrderPortDocumentDto>>(`${API_URL}/orders/${id}/port-documentation/${pathSuffix}`, {}),
+    );
+    if (!res.success) {
+      throw new Error(res.message ?? 'Request failed');
+    }
+  }
+
+  private async runPortDocumentationMutation(
+    actionKey: string,
+    successMessage: string,
+    errorMessage: string,
+    operation: () => Promise<void>,
+  ): Promise<void> {
+    this.portDocumentationAction.set(actionKey);
+    try {
+      await operation();
+      await this.loadPortDocumentationContext();
+      this.showToast('success', successMessage);
+    } catch {
+      this.showToast('error', errorMessage);
+    } finally {
+      this.portDocumentationAction.set(null);
+    }
+  }
+
+  private getPortDocumentationOrderId(): string {
+    return this.order()?.id ?? this.orderId();
+  }
+
+  private downloadResponseBlob(response: HttpResponse<Blob>, fallbackFileName: string): void {
+    const blob = response.body;
+    if (!blob) throw new Error('Missing file body');
+
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = this.extractFilenameFromDisposition(response.headers.get('Content-Disposition')) ?? fallbackFileName;
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+  }
+
+  private extractFilenameFromDisposition(header: string | null): string | null {
+    const match = header?.match(/filename="?([^";]+)"?/i);
+    return match?.[1] ?? null;
   }
 
   private async loadAttachments(): Promise<void> {
@@ -2850,7 +3116,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   private async loadReferenceData(): Promise<void> {
     try {
-      const [suppliersRes, usersRes, productsRes, unitsRes, unitConversionsRes, currenciesRes, attachmentTypesRes, cancelReasonsRes, priceRefsRes] = await Promise.all([
+      const [suppliersRes, usersRes, productsRes, unitsRes, unitConversionsRes, currenciesRes, attachmentTypesRes, cancelReasonsRes, priceRefsRes, warehousesRes, skusRes] = await Promise.all([
         firstValueFrom(
           this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
             `${API_URL}/companies/local?type=SUPPLIER&limit=100`,
@@ -2879,6 +3145,12 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         ),
         firstValueFrom(
           this.http.get<ApiResponse<{ references: { id: string; name: string; code: string }[] }>>(`${API_URL}/admin/settings/my-price-references`),
+        ),
+        firstValueFrom(
+          this.http.get<ApiResponse<WarehouseDto[]>>(`${API_URL}/inventory/warehouses?activeOnly=true&inventoryEnabledOnly=true`),
+        ),
+        firstValueFrom(
+          this.http.get<ApiResponse<InventorySkuDto[]>>(`${API_URL}/inventory/skus`),
         ),
       ]);
       if (suppliersRes.success) {
@@ -2913,6 +3185,12 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       }
       if (priceRefsRes.success) {
         this.configuredPriceReferences.set(priceRefsRes.data.references ?? []);
+      }
+      if (warehousesRes.success) {
+        this.allWarehouses.set(warehousesRes.data ?? []);
+      }
+      if (skusRes.success) {
+        this.inventorySkus.set(skusRes.data ?? []);
       }
     } catch {
       // silently ignore
@@ -3379,6 +3657,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         salesBarging: r.salesBarging != null ? String(r.salesBarging) : null,
         salesBargingUnit: r.salesBargingUnit ?? null,
         salesCreditDays: r.salesCreditDays ?? null,
+        // Inventory linkage — only persisted when the line is tracked.
+        inventorySkuId: r.inventorySkuId ?? null,
+        warehouseId: r.warehouseId ?? null,
+        plannedInventoryAt: r.plannedInventoryAt ?? null,
       };
     });
   }
@@ -3671,7 +3953,93 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   onItemsChange(items: OrderItemRow[]): void {
     this.itemRows.set(this.normalizeIncomingItemRows(items));
     this.queuePlattsSuggestionsLoad();
+    this.scheduleAvailabilityChecks();
     this.triggerAutosave();
+  }
+
+  // ─── Inventory availability ──────────────────────────────────────
+  /** Schedule an availability check for each tracked line; debounced per row. */
+  private scheduleAvailabilityChecks(): void {
+    const rows = this.itemRows();
+    const trackedIds = new Set<string>();
+    for (const row of rows) {
+      if (!row.warehouseId || !row.inventorySkuId) continue;
+      trackedIds.add(row.id);
+
+      // Debounce 300ms per row to avoid hammering the API while editing quantity.
+      const existing = this.availabilityTimers.get(row.id);
+      if (existing) clearTimeout(existing);
+      this.availabilityTimers.set(row.id, setTimeout(() => {
+        this.availabilityTimers.delete(row.id);
+        void this.runAvailabilityCheck(row.id);
+      }, 300));
+    }
+
+    // Drop stale entries for rows that are no longer tracked or were removed.
+    this.availabilityByRowId.update((current) => {
+      const next: Record<string, OrderItemAvailability> = {};
+      for (const [rowId, value] of Object.entries(current)) {
+        if (trackedIds.has(rowId)) next[rowId] = value;
+      }
+      return next;
+    });
+  }
+
+  /** Load the internal-transfer extension (source/destination companies + warehouses). */
+  private async loadInternalTransfer(): Promise<void> {
+    const id = this.orderId();
+    if (!id) return;
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ transfer: OrderTransferDto; sides: unknown[] }>>(
+          `${API_URL}/transfers/${id}`,
+        ),
+      );
+      if (res.success && res.data?.transfer) {
+        this.transfer.set(res.data.transfer);
+      }
+    } catch {
+      // non-fatal: a missing transfer extension just hides the summary card.
+    }
+  }
+
+  private async runAvailabilityCheck(rowId: string): Promise<void> {
+    const row = this.itemRows().find((r) => r.id === rowId);
+    if (!row || !row.warehouseId || !row.inventorySkuId) return;
+    const quantity = row.quantity > 0 ? row.quantity : 0;
+    if (quantity <= 0) {
+      this.availabilityByRowId.update((m) => {
+        const next = { ...m };
+        delete next[rowId];
+        return next;
+      });
+      return;
+    }
+
+    // Resolve the planned date — explicit field wins; otherwise fall back to ETA, then now.
+    const neededAt = row.plannedInventoryAt
+      ?? this.order()?.eta
+      ?? new Date().toISOString();
+
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<InventoryAvailabilityResultDto>>(
+          `${API_URL}/inventory/check-availability`,
+          {
+            warehouseId: row.warehouseId,
+            skuId: row.inventorySkuId,
+            quantity: String(quantity),
+            unit: row.unit,
+            neededAt,
+          },
+        ),
+      );
+      if (res.success) {
+        this.availabilityByRowId.update((m) => ({ ...m, [rowId]: res.data }));
+      }
+    } catch {
+      // Silent — availability is advisory; backend still enforces at confirmation.
+    }
   }
 
   async loadPlattsSuggestions(): Promise<void> {
@@ -4612,6 +4980,13 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       case 'send-invoice':
         this.openSendEmailModal('INVOICE');
         break;
+      case 'send-port-documentation':
+        if ((this.portDocumentationContext()?.documents.length ?? 0) === 0) {
+          this.showToast('error', 'Generate or include at least one Port Documentation file before sending.');
+          break;
+        }
+        this.openSendEmailModal('PORT_DOCUMENTATION');
+        break;
       case 'send-inquiry':
         this.openSendInquiryModal();
         break;
@@ -4671,6 +5046,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     if (!id) return;
     if (!this.hasLineItems()) {
       this.showToast('error', 'Add at least one line item before converting to order.');
+      return;
+    }
+    // Block confirmation when any inventory-tracked line currently fails availability.
+    if (this.hasInventoryShortage()) {
+      this.showToast('error', 'One or more tracked line items are short on inventory. Adjust quantity, warehouse, or planned date before confirming.');
       return;
     }
 
@@ -5099,7 +5479,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
             return;
           }
           const d = res.data;
-          this.emailPdfFileName.set(`${docType}_${this.order()?.orderNumber ?? id.slice(0, 8)}.pdf`);
+          this.emailPdfFileName.set(
+            docType === 'PORT_DOCUMENTATION'
+              ? ''
+              : `${docType}_${this.order()?.orderNumber ?? id.slice(0, 8)}.pdf`,
+          );
 
           // Open the compose modal with the pre-filled data
           this.emailModal()?.showWith({
@@ -5176,6 +5560,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       NOMINATION: 'nomination',
       PROFORMA: 'proforma',
       INVOICE: 'invoice',
+      PORT_DOCUMENTATION: 'invoice',
     };
     const docLabels: Record<DocumentEmailType, string> = {
       OFFER: 'Offer',
@@ -5183,6 +5568,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       NOMINATION: 'Nomination',
       PROFORMA: 'Proforma Invoice',
       INVOICE: 'Invoice',
+      PORT_DOCUMENTATION: 'Port Documentation',
     };
 
     try {
@@ -5211,6 +5597,22 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       this.emailModal()?.waDone();
       this.showToast('error', 'Failed to send via WhatsApp. Is your device linked?');
     }
+  }
+
+  private humanizePortDocumentKind(value: string | null | undefined): string {
+    return String(value ?? '')
+      .split('_')
+      .filter(Boolean)
+      .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
+      .join(' ');
+  }
+
+  private humanizePortDocumentSource(value: string | null | undefined): string {
+    return String(value ?? '')
+      .split('_')
+      .filter(Boolean)
+      .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
+      .join(' ');
   }
 
   /** Send an already-loaded PDF via WhatsApp from the PDF preview modal */

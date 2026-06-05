@@ -3,7 +3,7 @@ name: Tests
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, staging-bootstrap]
   workflow_dispatch:
 
 concurrency:

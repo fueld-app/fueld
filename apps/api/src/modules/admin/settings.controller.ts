@@ -9,6 +9,7 @@ import { authGuard } from '../auth/auth.guard';
 import {
   listOwnCompanies,
   setOwnCompany,
+  setCompanyPhysicalOpsEnabled,
   listTeams,
   createTeam,
   updateTeam,
@@ -44,6 +45,8 @@ import {
   updateCompanyTypeSettings,
   getAttachmentTypeSettings,
   updateAttachmentTypeSettings,
+  getPortDocumentationSettings,
+  updatePortDocumentationSettings,
   getInquiryCancelReasonSettings,
   updateInquiryCancelReasonSettings,
   getInquirySettings,
@@ -169,6 +172,21 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   }, {
     params: t.Object({ id: t.String() }),
     detail: { tags: ['Admin Settings'], summary: 'Unmark a company as own' },
+  })
+
+  .put('/own-companies/:id/physical-ops', async ({ auth, params, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await setCompanyPhysicalOpsEnabled(params.id, body.enabled);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    params: t.Object({ id: t.String() }),
+    body: t.Object({ enabled: t.Boolean() }),
+    detail: { tags: ['Admin Settings'], summary: 'Toggle physical-ops eligibility' },
   })
 
   .put('/own-companies/:id/terms', async ({ auth, params, body }) => {
@@ -1261,6 +1279,41 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       attachmentTypes: t.Array(t.String({ minLength: 1 })),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update configurable attachment type options' },
+  })
+
+  // ═════════════════════════════════════════════════════════════════
+  //  PORT DOCUMENTATION SETTINGS
+  // ═════════════════════════════════════════════════════════════════
+
+  .get('/port-documentation', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getPortDocumentationSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get Port Documentation feature settings' },
+  })
+
+  .put('/port-documentation', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updatePortDocumentationSettings({
+        enabled: body.enabled,
+      });
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      enabled: t.Boolean(),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update Port Documentation feature settings' },
   })
 
   // ═════════════════════════════════════════════════════════════════

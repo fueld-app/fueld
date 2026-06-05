@@ -1,16 +1,24 @@
-name: Deploy to Production
+name: Deploy Instance
 
 on:
   workflow_run:
     workflows: [Tests]
     types: [completed]
-    branches: [main]
+    branches: [main, staging-bootstrap]
   workflow_dispatch:
+    inputs:
+      instance:
+        description: Deploy target instance config from deploy/instances/<instance>.env
+        required: true
+        default: staging
+        type: string
+      deploy_ref:
+        description: Branch, tag, or commit SHA to deploy (optional for manual runs)
+        required: false
+        default: ''
+        type: string
 
 env:
-  VPS_HOST: 139.162.157.31
-  VPS_USER: deploy
-  DOMAIN: riviera-marine.fueld.app
   BUN_VERSION: '1.3.10'
 
 permissions:
@@ -87,11 +95,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: inspect-run
     if: ${{ (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success') && needs.inspect-run.outputs.should_deploy == 'true' }}
-    environment: production
+    environment: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.instance || 'staging' }}
     env:
-      DEPLOY_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+      DEPLOY_REF: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.event.inputs.deploy_ref || github.sha }}
     concurrency:
-      group: deploy-production
+      group: deploy-${{ github.event_name == 'workflow_dispatch' && github.event.inputs.instance || 'staging' }}
       cancel-in-progress: false
 
     steps:
@@ -100,7 +108,7 @@ jobs:
         uses: actions/checkout@v6
         continue-on-error: true
         with:
-          ref: ${{ env.DEPLOY_SHA }}
+          ref: ${{ env.DEPLOY_REF }}
 
       - name: Fallback checkout via archive download
         if: steps.checkout.outcome == 'failure'
@@ -108,7 +116,7 @@ jobs:
           curl -fL --retry 5 --retry-all-errors --retry-delay 3 \
             -H "Authorization: Bearer ${{ github.token }}" \
             -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${DEPLOY_SHA}" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/tarball/${DEPLOY_REF}" \
             -o repo.tar.gz
           tar -xzf repo.tar.gz --strip-components=1
           rm repo.tar.gz
@@ -119,6 +127,56 @@ jobs:
         with:
           bun-version: ${{ env.BUN_VERSION }}
           node-version: '22'
+
+      - name: Resolve target instance
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            INSTANCE="${{ github.event.inputs.instance }}"
+          else
+            INSTANCE="staging"
+          fi
+
+          CONFIG_FILE="deploy/instances/${INSTANCE}.env"
+          if [ ! -f "$CONFIG_FILE" ]; then
+            echo "Missing instance config: $CONFIG_FILE" >&2
+            exit 1
+          fi
+
+          set -a
+          source "$CONFIG_FILE"
+          set +a
+
+          required_vars=(INSTANCE_NAME VPS_HOST VPS_USER DOMAIN APP_DIR)
+          for required_var in "${required_vars[@]}"; do
+            if [ -z "${!required_var:-}" ]; then
+              echo "Missing $required_var in $CONFIG_FILE" >&2
+              exit 1
+            fi
+          done
+
+          {
+            echo "instance=$INSTANCE"
+            echo "instance_name=$INSTANCE_NAME"
+            echo "vps_host=$VPS_HOST"
+            echo "vps_user=$VPS_USER"
+            echo "domain=$DOMAIN"
+            echo "app_dir=$APP_DIR"
+            echo "deploy_ref=$DEPLOY_REF"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Target Instance"
+            echo ""
+            echo "- instance: $INSTANCE"
+            echo "- deploy_ref: $DEPLOY_REF"
+            echo "- host: $VPS_HOST"
+            echo "- domain: $DOMAIN"
+            echo "- app_dir: $APP_DIR"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Download API binary artifact from Tests
         if: ${{ github.event_name == 'workflow_run' }}
@@ -166,13 +224,23 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
           APP_VERSION=$(cat VERSION)
-          SHORT_SHA=$(git rev-parse --short=7 HEAD)
-          BRANCH_NAME=${GITHUB_REF_NAME:-main}
+          if git rev-parse HEAD >/dev/null 2>&1; then
+            ACTUAL_SHA=$(git rev-parse HEAD)
+          elif [ -n "${DEPLOY_REF:-}" ]; then
+            ACTUAL_SHA="$DEPLOY_REF"
+          else
+            ACTUAL_SHA='${{ github.sha }}'
+          fi
+          SHORT_SHA=$(printf '%s' "$ACTUAL_SHA" | cut -c1-7)
+          SOURCE_REF='${{ github.event.inputs.deploy_ref || github.ref_name }}'
+          if [ -z "$SOURCE_REF" ]; then
+            SOURCE_REF="$ACTUAL_SHA"
+          fi
           BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           DEPLOY_VERSION="${APP_VERSION}+deploy.${GITHUB_RUN_NUMBER}.sha.${SHORT_SHA}"
           APP_VERSION="$APP_VERSION" \
-          GIT_SHA="$GITHUB_SHA" \
-          GIT_BRANCH="$BRANCH_NAME" \
+          GIT_SHA="$ACTUAL_SHA" \
+          GIT_BRANCH="$SOURCE_REF" \
           BUILD_TIME="$BUILD_TIME" \
           DEPLOY_VERSION="$DEPLOY_VERSION" \
           GITHUB_RUN_NUMBER="$GITHUB_RUN_NUMBER" \
@@ -201,15 +269,23 @@ jobs:
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          INSTANCE_NAME="${{ steps.target.outputs.instance_name }}"
+          # Try per-instance key first, fall back to shared key
+          if [ -n "${INSTANCE_NAME}" ] && [ -n "${{ secrets[format('VPS_SSH_KEY_{0}', steps.target.outputs.instance_name)] }}" ]; then
+            echo "Using per-instance SSH key: VPS_SSH_KEY_${INSTANCE_NAME}"
+            echo "${{ secrets[format('VPS_SSH_KEY_{0}', steps.target.outputs.instance_name)] }}" > ~/.ssh/deploy_key
+          else
+            echo "Using shared SSH key: VPS_SSH_KEY"
+            echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          fi
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ env.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+          ssh-keyscan -H ${{ steps.target.outputs.vps_host }} >> ~/.ssh/known_hosts 2>/dev/null
 
       - name: Create staging directory on VPS
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-            ${{ env.VPS_USER }}@${{ env.VPS_HOST }} \
-            "mkdir -p /opt/fueld/staging"
+            ${{ steps.target.outputs.vps_user }}@${{ steps.target.outputs.vps_host }} \
+            "mkdir -p '${{ steps.target.outputs.app_dir }}/staging'"
 
       - name: Upload API binary
         run: |
@@ -221,7 +297,7 @@ jobs:
 
           scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             "$API_BINARY_PATH" \
-            ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/opt/fueld/staging/app-release.gz
+            ${{ steps.target.outputs.vps_user }}@${{ steps.target.outputs.vps_host }}:${{ steps.target.outputs.app_dir }}/staging/app-release.gz
 
       - name: Package frontend for upload
         run: |
@@ -232,7 +308,7 @@ jobs:
         run: |
           scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             /tmp/web-browser.tar.gz \
-            ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/opt/fueld/staging/web-browser.tar.gz
+            ${{ steps.target.outputs.vps_user }}@${{ steps.target.outputs.vps_host }}:${{ steps.target.outputs.app_dir }}/staging/web-browser.tar.gz
 
       - name: Package drizzle migrations for upload
         run: |
@@ -243,32 +319,32 @@ jobs:
         run: |
           scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             /tmp/drizzle.tar.gz \
-            ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/opt/fueld/staging/drizzle.tar.gz
+            ${{ steps.target.outputs.vps_user }}@${{ steps.target.outputs.vps_host }}:${{ steps.target.outputs.app_dir }}/staging/drizzle.tar.gz
 
       - name: Upload deploy script
         run: |
           scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             deploy/deploy.sh \
-            ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/opt/fueld/staging/deploy.sh
+            ${{ steps.target.outputs.vps_user }}@${{ steps.target.outputs.vps_host }}:${{ steps.target.outputs.app_dir }}/staging/deploy.sh
 
       - name: Upload build metadata
         run: |
           scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             build-info.json \
-            ${{ env.VPS_USER }}@${{ env.VPS_HOST }}:/opt/fueld/staging/build-info.json
+            ${{ steps.target.outputs.vps_user }}@${{ steps.target.outputs.vps_host }}:${{ steps.target.outputs.app_dir }}/staging/build-info.json
 
       - name: Execute deployment
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-            ${{ env.VPS_USER }}@${{ env.VPS_HOST }} \
-            "chmod +x /opt/fueld/staging/deploy.sh && bash /opt/fueld/staging/deploy.sh"
+            ${{ steps.target.outputs.vps_user }}@${{ steps.target.outputs.vps_host }} \
+            "APP_DIR='${{ steps.target.outputs.app_dir }}'; chmod +x \"\$APP_DIR/staging/deploy.sh\" && APP_DIR=\"\$APP_DIR\" bash \"\$APP_DIR/staging/deploy.sh\""
 
       - name: Verify deployment
         run: |
           sleep 3
           STATUS=$(ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-            ${{ env.VPS_USER }}@${{ env.VPS_HOST }} \
-            "curl -sf http://127.0.0.1:\$(cat /opt/fueld/active-slot | xargs -I{} sh -c 'if [ {} = blue ]; then echo 3000; else echo 3001; fi')/health | jq -r '.data.status'" 2>/dev/null || echo "failed")
+            ${{ steps.target.outputs.vps_user }}@${{ steps.target.outputs.vps_host }} \
+            "APP_DIR='${{ steps.target.outputs.app_dir }}'; curl -sf http://127.0.0.1:\$(cat \"\$APP_DIR/active-slot\" | xargs -I{} sh -c 'if [ {} = blue ]; then echo 3000; else echo 3001; fi')/health | jq -r '.data.status'" 2>/dev/null || echo "failed")
           if [ "$STATUS" = "ok" ]; then
             echo "✅ Deployment verified — API health check passed"
           else

@@ -33,12 +33,13 @@ import { API_URL } from '@app/core/config/api';
 //  - WhatsApp send option
 // ═══════════════════════════════════════════════════════════════════════
 
-export type DocumentEmailType = 'OFFER' | 'CONFIRMATION' | 'NOMINATION' | 'PROFORMA' | 'INVOICE';
+export type DocumentEmailType = 'OFFER' | 'CONFIRMATION' | 'NOMINATION' | 'PROFORMA' | 'INVOICE' | 'PORT_DOCUMENTATION';
 
 export interface SendEmailAttachmentOption {
   id: string;
   fileName: string;
   label?: string;
+  previewUrl?: string;
 }
 
 export interface SendEmailPayload {
@@ -64,6 +65,7 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
   NOMINATION: 'Nomination',
   PROFORMA: 'Proforma Invoice',
   INVOICE: 'Invoice',
+  PORT_DOCUMENTATION: 'Port Documentation',
 };
 
 @Component({
@@ -92,7 +94,7 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
                 Send {{ docLabel() }}
               </h2>
               <p class="text-sm text-gray-500 mt-0.5">
-                Compose email with PDF attachment
+                {{ hasPrimaryDocument() ? 'Compose email with PDF attachment' : 'Compose email with selected document attachments' }}
               </p>
             </div>
             <button
@@ -322,6 +324,7 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
             </div>
 
             <!-- Attachment + PDF Preview -->
+            @if (hasPrimaryDocument()) {
             <div class="flex items-center gap-3">
               <div
                 class="flex-1 flex items-center gap-2 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-600"
@@ -390,13 +393,14 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
                 Preview
               </button>
             </div>
+            }
 
             @if (showExtraAttachments()) {
               <div class="rounded-xl border border-gray-200 bg-gray-50/80 p-4">
                 <div class="flex items-start justify-between gap-3">
                   <div>
-                    <h3 class="text-sm font-semibold text-gray-900">Additional attachments</h3>
-                    <p class="mt-0.5 text-xs text-gray-500">Select BDR files to include with the invoice email.</p>
+                    <h3 class="text-sm font-semibold text-gray-900">{{ attachmentSectionTitle() }}</h3>
+                    <p class="mt-0.5 text-xs text-gray-500">{{ attachmentSectionDescription() }}</p>
                   </div>
                   <span class="rounded-full bg-white px-2 py-1 text-[11px] font-medium text-gray-500 ring-1 ring-gray-200">
                     {{ selectedAttachmentIds().length }} selected
@@ -404,7 +408,7 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
                 </div>
                 <div class="mt-3 space-y-2">
                   @for (attachment of visibleExtraAttachments(); track attachment.id) {
-                    <label class="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 transition-colors hover:border-brand-300 hover:bg-brand-50/40">
+                    <div class="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 transition-colors hover:border-brand-300 hover:bg-brand-50/40">
                       <input
                         type="checkbox"
                         class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
@@ -417,7 +421,32 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
                           <div class="truncate text-xs text-gray-500">{{ attachment.label }}</div>
                         }
                       </div>
-                    </label>
+                      <button
+                        type="button"
+                        (click)="previewAttachment(attachment)"
+                        [disabled]="previewingAttachmentId() === attachment.id || !attachment.previewUrl"
+                        class="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        @if (previewingAttachmentId() === attachment.id) {
+                          <svg
+                            class="h-3.5 w-3.5 animate-spin"
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            aria-hidden="true"
+                          >
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                          </svg>
+                        } @else {
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path d="M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />
+                            <path fill-rule="evenodd" d="M.664 10.59a1.651 1.651 0 0 1 0-1.186A10.004 10.004 0 0 1 10 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0 1 10 17c-4.257 0-7.893-2.66-9.336-6.41ZM14 10a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" clip-rule="evenodd" />
+                          </svg>
+                        }
+                        Preview
+                      </button>
+                    </div>
                   }
                 </div>
               </div>
@@ -457,7 +486,7 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
             }
 
             <!-- WhatsApp phone -->
-            @if (waLinked()) {
+            @if (supportsWhatsApp() && waLinked()) {
               <div>
                 <label
                   for="wa-phone"
@@ -490,7 +519,7 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
               Cancel
             </button>
             <!-- Send via WhatsApp -->
-            @if (waLinked() && waPhoneNumber) {
+            @if (supportsWhatsApp() && waLinked() && waPhoneNumber) {
               <button
                 (click)="doSendWa()"
                 [disabled]="waSending()"
@@ -625,6 +654,7 @@ export class SendEmailModalComponent {
   readonly showBcc = signal(false);
   readonly loadingPreview = signal(false);
   readonly pdfPreviewUrl = signal<SafeResourceUrl | null>(null);
+  readonly previewingAttachmentId = signal<string | null>(null);
   readonly selectedAttachmentIds = signal<string[]>([]);
   readonly isMobilePreview = isMobilePdfPreviewUserAgent(navigator.userAgent);
 
@@ -638,13 +668,25 @@ export class SendEmailModalComponent {
   readonly docLabel = computed(
     () => DOC_LABELS[this.documentType()] ?? 'Document',
   );
+  readonly hasPrimaryDocument = computed(() => this.documentType() !== 'PORT_DOCUMENTATION');
+  readonly supportsWhatsApp = computed(() => this.hasPrimaryDocument());
   readonly recipientScope = computed<'customer' | 'supplier'>(() =>
     this.documentType() === 'NOMINATION' ? 'supplier' : 'customer',
   );
   readonly visibleExtraAttachments = computed(() =>
-    this.documentType() === 'INVOICE' ? this.extraAttachments() : [],
+    this.documentType() === 'INVOICE' || this.documentType() === 'PORT_DOCUMENTATION'
+      ? this.extraAttachments()
+      : [],
   );
   readonly showExtraAttachments = computed(() => this.visibleExtraAttachments().length > 0);
+  readonly attachmentSectionTitle = computed(() =>
+    this.documentType() === 'PORT_DOCUMENTATION' ? 'Port Documentation files' : 'Additional attachments',
+  );
+  readonly attachmentSectionDescription = computed(() =>
+    this.documentType() === 'PORT_DOCUMENTATION'
+      ? 'Select the generated or included port-document files to attach to this email.'
+      : 'Select BDR files to include with the invoice email.',
+  );
 
   hasRecipient(): boolean {
     return (this.toInput()?.getEmails()?.length ?? 0) > 0;
@@ -672,7 +714,9 @@ export class SendEmailModalComponent {
     this.pdfPreviewUrl.set(null);
     const availableAttachmentIds = this.visibleExtraAttachments().map((attachment) => attachment.id);
     this.selectedAttachmentIds.set(
-      availableAttachmentIds.length === 1 ? availableAttachmentIds : [],
+      this.documentType() === 'PORT_DOCUMENTATION'
+        ? availableAttachmentIds
+        : availableAttachmentIds.length === 1 ? availableAttachmentIds : [],
     );
 
     if (
@@ -778,12 +822,14 @@ export class SendEmailModalComponent {
     if (!oid) return;
 
     const docType = this.documentType();
+    if (docType === 'PORT_DOCUMENTATION') return;
     const pdfEndpoints: Record<DocumentEmailType, string> = {
       OFFER: 'offer',
       CONFIRMATION: 'offer',
       NOMINATION: 'nomination',
       PROFORMA: 'proforma',
       INVOICE: 'invoice',
+      PORT_DOCUMENTATION: 'invoice',
     };
 
     this.loadingPreview.set(true);
@@ -833,6 +879,31 @@ export class SendEmailModalComponent {
       URL.revokeObjectURL(this._pdfBlobUrl);
       this._pdfBlobUrl = null;
     }
+  }
+
+  previewAttachment(attachment: SendEmailAttachmentOption): void {
+    if (!attachment.previewUrl) return;
+
+    this.previewingAttachmentId.set(attachment.id);
+    this.http
+      .get(attachment.previewUrl, { responseType: 'blob' })
+      .subscribe({
+        next: (blob) => {
+          this.previewingAttachmentId.set(null);
+          const objectUrl = URL.createObjectURL(blob);
+          const previewWindow = window.open(objectUrl, '_blank', 'noopener');
+          if (!previewWindow) {
+            const anchor = document.createElement('a');
+            anchor.href = objectUrl;
+            anchor.download = attachment.fileName;
+            anchor.click();
+          }
+          setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+        },
+        error: () => {
+          this.previewingAttachmentId.set(null);
+        },
+      });
   }
 
   // ── Send actions ──

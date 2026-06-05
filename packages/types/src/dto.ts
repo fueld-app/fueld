@@ -573,6 +573,8 @@ export interface CreateVesselDto {
 export interface OrderDto {
   id: string;
   orderNumber: string | null;
+  /** Distinguishes external trades from internal own-company-to-own-company transfers. */
+  orderKind?: OrderKind;
   tenantId: string;
   clientId: string;
   vesselId: string;
@@ -803,6 +805,11 @@ export interface CompanyTypeSettingsDto {
 /** Admin settings for configurable attachment types */
 export interface AttachmentTypeSettingsDto {
   attachmentTypes: string[];
+}
+
+/** Admin settings for Port Documentation feature access */
+export interface PortDocumentationSettingsDto {
+  enabled: boolean;
 }
 
 /** Admin settings for configurable inquiry cancellation reasons */
@@ -1147,6 +1154,89 @@ export interface CompanyAttachmentDto {
   fileSize: number;
   uploadedBy: string | null;
   createdAt: string;
+}
+
+export interface PortGateListPersonnelDto {
+  id: string;
+  tenantId: string;
+  placeId: string | null;
+  fullName: string;
+  roleTitle: string;
+  company: string;
+  driverLicenseState: string | null;
+  driverLicenseNumber: string | null;
+  twicHolder: boolean;
+  active: boolean;
+  notes: string | null;
+  createdBy: string | null;
+  updatedBy: string | null;
+  deactivatedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PortDocumentAssetDto {
+  id: string;
+  tenantId: string;
+  documentKind: string;
+  displayName: string;
+  originalFileName: string;
+  filePath: string;
+  mimeType: string;
+  fileSize: number;
+  sha256Hex: string;
+  versionNumber: number;
+  isCurrent: boolean;
+  active: boolean;
+  uploadedBy: string | null;
+  supersededAt: string | null;
+  createdAt: string;
+}
+
+export interface OrderPortDocumentDto {
+  id: string;
+  tenantId: string;
+  orderId: string;
+  documentKind: string;
+  sourceType: string;
+  status: string;
+  fileName: string;
+  filePath: string;
+  mimeType: string;
+  fileSize: number;
+  sha256Hex: string;
+  assetId: string | null;
+  generatedBy: string | null;
+  generatedAt: string | null;
+  includedBy: string | null;
+  includedAt: string | null;
+  supersededAt: string | null;
+  createdAt: string;
+}
+
+export interface PortDocumentationFieldDto {
+  label: string;
+  value: string;
+}
+
+export interface PortDocumentationSectionDto {
+  title: string;
+  fields: PortDocumentationFieldDto[];
+}
+
+export interface BunkerInstructionsPreviewDto {
+  orderId: string;
+  warnings: string[];
+  sections: PortDocumentationSectionDto[];
+}
+
+export interface PortDocumentationOrderContextDto {
+  orderId: string;
+  enabled: boolean;
+  gateListCount: number;
+  currentFlangeWorksheet: PortDocumentAssetDto | null;
+  readinessWarnings: string[];
+  documents: OrderPortDocumentDto[];
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -2286,4 +2376,257 @@ export interface VesselSanctionCheckDto {
   source: string;
   matchedOn: string | null;
   checkedAt: string;
+}
+// ═══════════════════════════════════════════════════════════════════════
+//  INVENTORY / PHYSICAL OPS
+// ═══════════════════════════════════════════════════════════════════════
+
+export type OrderKind = 'EXTERNAL' | 'INTERNAL_TRANSFER';
+export type WarehouseType = 'VESSEL' | 'TERMINAL' | 'SHORE_TANK' | 'OTHER';
+export type InventoryMovementType =
+  | 'INBOUND_DELIVERY'
+  | 'OUTBOUND_DELIVERY'
+  | 'TRANSFER_OUT'
+  | 'TRANSFER_IN'
+  | 'ADJUSTMENT'
+  | 'OPENING_BALANCE';
+export type ReplenishmentStatus = 'PLANNED' | 'LINKED' | 'COMPLETED' | 'CANCELLED';
+export type TransferSideStatus = 'DRAFT' | 'FINALIZED';
+export type TransferSideKind = 'SOURCE_SELL' | 'DESTINATION_BUY';
+export type ReservationDirection = 'OUTBOUND' | 'TRANSFER_OUT';
+
+export interface InventorySkuDto {
+  id: string;
+  tenantId: string;
+  productType: ProductType;
+  grade: string | null;
+  displayName: string;
+  baseUnit: string;
+  inventoryTracked: boolean;
+  allowedUnits: string[];
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateInventorySkuDto {
+  /** Product type code (must match the `product_type` enum). */
+  productType: ProductType | string;
+  grade?: string | null;
+  displayName?: string;
+  baseUnit?: string;
+  inventoryTracked?: boolean;
+  allowedUnits?: string[];
+}
+
+export interface UpdateInventorySkuDto {
+  grade?: string | null;
+  displayName?: string;
+  baseUnit?: string;
+  inventoryTracked?: boolean;
+  allowedUnits?: string[];
+  active?: boolean;
+}
+
+export interface WarehouseDto {
+  id: string;
+  tenantId: string;
+  ownerCompanyId: string;
+  ownerCompanyName: string;
+  name: string;
+  type: WarehouseType;
+  vesselId: string | null;
+  vesselName: string | null;
+  placeId: string | null;
+  placeName: string | null;
+  inventoryEnabled: boolean;
+  allowManualReplenishment: boolean;
+  active: boolean;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateWarehouseDto {
+  ownerCompanyId: string;
+  name: string;
+  type?: WarehouseType;
+  vesselId?: string | null;
+  placeId?: string | null;
+  inventoryEnabled?: boolean;
+  allowManualReplenishment?: boolean;
+  notes?: string | null;
+}
+
+export interface UpdateWarehouseDto {
+  name?: string;
+  type?: WarehouseType;
+  vesselId?: string | null;
+  placeId?: string | null;
+  inventoryEnabled?: boolean;
+  allowManualReplenishment?: boolean;
+  active?: boolean;
+  notes?: string | null;
+}
+
+export interface InventoryMovementDto {
+  id: string;
+  warehouseId: string;
+  warehouseName: string;
+  skuId: string;
+  skuDisplayName: string;
+  quantity: string;
+  unit: string;
+  movementType: InventoryMovementType;
+  occurredAt: string;
+  orderId: string | null;
+  orderItemId: string | null;
+  replenishmentPlanId: string | null;
+  note: string | null;
+  createdByName: string | null;
+  createdAt: string;
+}
+
+export interface InventoryReservationDto {
+  id: string;
+  warehouseId: string;
+  warehouseName: string;
+  skuId: string;
+  skuDisplayName: string;
+  quantity: string;
+  unit: string;
+  reservedFor: string;
+  orderId: string;
+  orderItemId: string;
+  direction: ReservationDirection;
+  releasedAt: string | null;
+  createdAt: string;
+}
+
+export interface InventoryReplenishmentPlanDto {
+  id: string;
+  warehouseId: string;
+  warehouseName: string;
+  skuId: string;
+  skuDisplayName: string;
+  quantity: string;
+  unit: string;
+  expectedAt: string;
+  status: ReplenishmentStatus;
+  orderId: string | null;
+  orderNumber: string | null;
+  note: string | null;
+  createdByName: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateReplenishmentPlanDto {
+  warehouseId: string;
+  skuId: string;
+  quantity: string;
+  unit?: string;
+  expectedAt: string;
+  orderId?: string | null;
+  note?: string | null;
+}
+
+export interface UpdateReplenishmentPlanDto {
+  quantity?: string;
+  unit?: string;
+  expectedAt?: string;
+  status?: ReplenishmentStatus;
+  orderId?: string | null;
+  note?: string | null;
+}
+
+/** Aggregated stock state for a (warehouse, SKU) pair. */
+export interface InventoryBalanceDto {
+  warehouseId: string;
+  warehouseName: string;
+  ownerCompanyId: string;
+  ownerCompanyName: string;
+  vesselId: string | null;
+  vesselName: string | null;
+  skuId: string;
+  skuDisplayName: string;
+  productType: ProductType;
+  grade: string | null;
+  baseUnit: string;
+  /** Sum of past movements (positive net = stock present). */
+  onHand: string;
+  /** Sum of active reservations (outbound). */
+  reserved: string;
+  /** onHand minus reserved. */
+  availableNow: string;
+  /** Sum of pending PLANNED + LINKED replenishment plans. */
+  plannedInbound: string;
+  /** Sum of future outbound reservations (reservedFor in the future). */
+  plannedOutbound: string;
+  /** Earliest UTC timestamp at which an outbound delivery becomes possible (null = available now). */
+  earliestAvailableAt: string | null;
+}
+
+export interface InventoryAvailabilityCheckDto {
+  warehouseId: string;
+  skuId: string;
+  quantity: string;
+  unit?: string;
+  /** Date at which the outbound delivery is needed. */
+  neededAt: string;
+}
+
+export interface InventoryAvailabilityResultDto {
+  ok: boolean;
+  earliestAvailableAt: string | null;
+  shortageQuantity: string | null;
+  reason: string | null;
+}
+
+export interface OrderTransferDto {
+  orderId: string;
+  sourceCompanyId: string;
+  sourceCompanyName: string;
+  destinationCompanyId: string;
+  destinationCompanyName: string;
+  sourceWarehouseId: string;
+  sourceWarehouseName: string;
+  destinationWarehouseId: string;
+  destinationWarehouseName: string;
+  plannedArrivalAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrderTransferSideDto {
+  id: string;
+  orderId: string;
+  kind: TransferSideKind;
+  status: TransferSideStatus;
+  companyId: string;
+  companyName: string;
+  invoicingCompanyId: string | null;
+  invoicingCompanyName: string | null;
+  bankAccountId: string | null;
+  paymentTermType: PaymentTermType | null;
+  creditDays: number | null;
+  currency: string;
+  invoiceId: string | null;
+  finalizedAt: string | null;
+  finalizedByName: string | null;
+  note: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateInternalTransferDto {
+  sourceCompanyId: string;
+  destinationCompanyId: string;
+  sourceWarehouseId: string;
+  destinationWarehouseId: string;
+  vesselId: string;
+  placeId: string;
+  plannedArrivalAt?: string | null;
+  eta?: string | null;
+  etd?: string | null;
 }

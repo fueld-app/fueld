@@ -180,11 +180,17 @@ export const routes: Routes = [
       // ── Operations ──
       {
         path: 'operations',
-        loadComponent: () =>
-          import('./pages/placeholder/placeholder-page.component').then(
-            (m) => m.PlaceholderPageComponent,
-          ),
-        title: 'Operations',
+        children: [
+          { path: '', redirectTo: 'inventory', pathMatch: 'full' as const },
+          {
+            path: 'inventory',
+            loadComponent: () =>
+              import('./features/operations/pages/inventory/inventory-page.component').then(
+                (m) => m.InventoryPageComponent,
+              ),
+            title: 'Operations > Inventory',
+          },
+        ],
       },
       // ── Credit ──
       {
@@ -364,6 +370,14 @@ export const routes: Routes = [
             title: 'Admin > Settings',
           },
           {
+            path: 'port-documentation',
+            loadComponent: () =>
+              import('./features/admin/pages/port-documentation/port-documentation-page.component').then(
+                (m) => m.PortDocumentationPageComponent,
+              ),
+            title: 'Admin > Port Documentation',
+          },
+          {
             path: 'llm',
             loadComponent: () =>
               import('./features/admin/pages/llm/llm-page.component').then(
@@ -395,8 +409,14 @@ export const routes: Routes = [
               ),
             title: 'Admin > Credit Settings',
           },
-          {
-            path: 'vessel-sanctions',
+          {            path: 'warehouses',
+            loadComponent: () =>
+              import('./features/admin/pages/warehouses/warehouses-page.component').then(
+                (m) => m.WarehousesAdminPageComponent,
+              ),
+            title: 'Admin > Warehouses',
+          },
+          {            path: 'vessel-sanctions',
             loadComponent: () =>
               import('./features/admin/pages/vessel-sanctions/vessel-sanctions-page.component').then(
                 (m) => m.VesselSanctionsPageComponent,

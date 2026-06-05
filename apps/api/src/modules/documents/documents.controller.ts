@@ -8,7 +8,7 @@ import { getPortSuppliers } from '../lloyds/lli.service';
 import { logActivity } from '../activity/activity.service';
 import { sendWhatsAppGroupMessage, sendWhatsAppMessage } from '../whatsapp/whatsapp.service';
 import { db } from '../../db';
-import { users, counterparties, invoices as invoicesTable, companyContacts, companyEmails, supplierInquiries, supplierInquiryItemQuotes, portSuppliers, emailLog, tenants, orders, orderAttachments, orderSuppliers } from '../../db/schema';
+import { users, counterparties, invoices as invoicesTable, companyContacts, companyEmails, supplierInquiries, supplierInquiryItemQuotes, portSuppliers, emailLog, tenants, orders, orderAttachments, orderPortDocuments, orderSuppliers, orderTransferSides } from '../../db/schema';
 import { getEmailTemplate, getApplicableEmailRules, renderTemplate, type TemplateVariables } from '../admin/email-settings.service';
 import { getInquirySettings } from '../admin/settings.service';
 import { applyStaleSupplierInquiryStatuses, createSupplierQuoteToken, getSupplierQuoteExpiryDate, getSupplierQuoteFormUrl, getSupplierInquiryOrderContext, saveSupplierInquiryResponse } from './supplier-inquiry.service';
@@ -41,6 +41,32 @@ function injectNominationResponseLink(htmlBody: string, responseUrl: string): st
     return replaced;
   }
   return `${replaced}${buildNominationResponseLinkCardHtml(responseUrl)}`;
+}
+
+/**
+ * For internal-transfer orders, finance documents (proforma/invoice) must not be
+ * generated until the relevant transfer side is finalized. Returns null when the
+ * order is not a transfer; otherwise returns an error message when blocked, or
+ * the empty string when the requested side is finalized.
+ */
+async function getTransferDocumentBlockReason(
+  order: Awaited<ReturnType<typeof getOrderById>>,
+  side: 'SOURCE_SELL' | 'DESTINATION_BUY' = 'SOURCE_SELL',
+): Promise<string | null> {
+  if (!order || (order as { orderKind?: string }).orderKind !== 'INTERNAL_TRANSFER') return null;
+  const [row] = await db
+    .select({ status: orderTransferSides.status })
+    .from(orderTransferSides)
+    .where(and(
+      eq(orderTransferSides.orderId, order.id),
+      eq(orderTransferSides.kind, side),
+    ))
+    .limit(1);
+  if (!row) return 'Transfer side not configured';
+  if (row.status !== 'FINALIZED') {
+    return `${side === 'SOURCE_SELL' ? 'Source' : 'Destination'} side is still in DRAFT — finalize it before generating documents`;
+  }
+  return '';
 }
 
 function resolveNominationOrderSupplier(
@@ -122,6 +148,36 @@ async function loadSelectedOrderAttachments(orderId: string, attachmentIds: stri
     const file = Bun.file(`${process.cwd()}${normalizedPath}`);
     if (!(await file.exists())) {
       throw new Error(`Attachment file is missing: ${row.fileName}`);
+    }
+
+    return {
+      filename: row.fileName,
+      content: Buffer.from(await file.arrayBuffer()),
+      contentType: row.mimeType,
+    };
+  }));
+}
+
+async function loadSelectedOrderPortDocuments(orderId: string, documentIds: string[]) {
+  if (documentIds.length === 0) return [];
+
+  const rows = await db
+    .select()
+    .from(orderPortDocuments)
+    .where(and(
+      eq(orderPortDocuments.orderId, orderId),
+      inArray(orderPortDocuments.id, documentIds),
+    ));
+
+  if (rows.length !== documentIds.length) {
+    throw new Error('One or more selected Port Documentation files were not found on this order');
+  }
+
+  return Promise.all(rows.map(async (row) => {
+    const normalizedPath = row.filePath.startsWith('/') ? row.filePath : `/${row.filePath}`;
+    const file = Bun.file(`${process.cwd()}${normalizedPath}`);
+    if (!(await file.exists())) {
+      throw new Error(`Port Documentation file is missing: ${row.fileName}`);
     }
 
     return {
@@ -326,7 +382,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
   // ── GET /orders/:id/proforma/pdf ───────────────────────────────────
   .get(
     '/:id/proforma/pdf',
-    async ({ params, set }) => {
+    async ({ params, query, set }) => {
       const orderId = await resolveOrderId(params.id);
       if (!orderId) { set.status = 404; return { success: false, message: 'Order not found' }; }
       const order = await getOrderById(orderId);
@@ -337,6 +393,12 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       if (!order?.bankAccountId) {
         set.status = 400;
         return { success: false, message: 'Select a bank account before generating Proforma Invoice' };
+      }
+      const requestedSide = (query.side === 'DESTINATION_BUY' ? 'DESTINATION_BUY' : 'SOURCE_SELL') as 'SOURCE_SELL' | 'DESTINATION_BUY';
+      const transferBlock = await getTransferDocumentBlockReason(order, requestedSide);
+      if (transferBlock) {
+        set.status = 400;
+        return { success: false, message: transferBlock };
       }
       const { buffer, fileName, revision } = await generateProformaInvoicePdfBuffer(orderId);
 
@@ -352,9 +414,10 @@ export const documentsController = new Elysia({ prefix: '/orders' })
     },
     {
       params: t.Object({ id: t.String() }),
+      query: t.Object({ side: t.Optional(t.String()) }),
       detail: {
         tags: ['Documents'],
-        summary: 'Generate proforma invoice PDF for an order/inquiry',
+        summary: 'Generate proforma invoice PDF for an order/inquiry. For internal-transfer orders, optional `side=SOURCE_SELL|DESTINATION_BUY` selects which transfer side must be FINALIZED.',
         security: [{ bearerAuth: [] }],
       },
     },
@@ -363,7 +426,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
   // ── GET /orders/:id/invoice/pdf ────────────────────────────────────
   .get(
     '/:id/invoice/pdf',
-    async ({ params, set }) => {
+    async ({ params, query, set }) => {
       const orderId = await resolveOrderId(params.id);
       if (!orderId) { set.status = 404; return { success: false, message: 'Order not found' }; }
       const order = await getOrderById(orderId);
@@ -374,6 +437,12 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       if (!order?.bankAccountId) {
         set.status = 400;
         return { success: false, message: 'Select a bank account before generating Invoice/Proforma' };
+      }
+      const requestedSide = (query.side === 'DESTINATION_BUY' ? 'DESTINATION_BUY' : 'SOURCE_SELL') as 'SOURCE_SELL' | 'DESTINATION_BUY';
+      const transferBlock = await getTransferDocumentBlockReason(order, requestedSide);
+      if (transferBlock) {
+        set.status = 400;
+        return { success: false, message: transferBlock };
       }
       const { buffer, fileName, revision } = await generateOrderInvoicePdfBuffer(orderId);
 
@@ -389,9 +458,10 @@ export const documentsController = new Elysia({ prefix: '/orders' })
     },
     {
       params: t.Object({ id: t.String() }),
+      query: t.Object({ side: t.Optional(t.String()) }),
       detail: {
         tags: ['Documents'],
-        summary: 'Generate invoice PDF for an order',
+        summary: 'Generate invoice PDF for an order. For internal-transfer orders, optional `side=SOURCE_SELL|DESTINATION_BUY` selects which transfer side must be FINALIZED.',
         description: 'Fetches order, client, items and generates a professional invoice PDF.',
         security: [{ bearerAuth: [] }],
       },
@@ -407,10 +477,6 @@ export const documentsController = new Elysia({ prefix: '/orders' })
 
       const order = await getOrderById(orderId);
       if (!order) { set.status = 404; return { success: false, message: 'Order not found' }; }
-      if (!order.items?.length) {
-        set.status = 400;
-        return { success: false, message: 'Add at least one line item before sending' };
-      }
 
       // Fetch the sender's full name from the users table
       const [sender] = await db.select({ name: users.name }).from(users).where(eq(users.id, auth.userId)).limit(1);
@@ -419,8 +485,12 @@ export const documentsController = new Elysia({ prefix: '/orders' })
 
       // Generate the right PDF based on document type
       const docType = body.documentType as DocumentEmailType;
-      let pdfBuffer: Buffer;
-      let pdfFileName: string;
+      if (docType !== 'PORT_DOCUMENTATION' && !order.items?.length) {
+        set.status = 400;
+        return { success: false, message: 'Add at least one line item before sending' };
+      }
+      let pdfBuffer: Buffer | undefined;
+      let pdfFileName: string | undefined;
       let nominationResponseUrl: string | null = null;
       let nominationSupplierId: string | null = null;
 
@@ -481,21 +551,30 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           pdfFileName = result.fileName;
           break;
         }
+        case 'PORT_DOCUMENTATION': {
+          break;
+        }
         default:
           set.status = 400;
           return { success: false, message: `Unknown document type: ${body.documentType}` };
       }
 
       const attachmentIds = [...new Set((body.attachmentIds ?? []).filter(Boolean))];
-      if (attachmentIds.length > 0 && docType !== 'INVOICE') {
+      if (attachmentIds.length > 0 && docType !== 'INVOICE' && docType !== 'PORT_DOCUMENTATION') {
         set.status = 400;
-        return { success: false, message: 'Additional attachments are only supported for invoice emails' };
+        return { success: false, message: 'Additional attachments are only supported for invoice and Port Documentation emails' };
+      }
+      if (docType === 'PORT_DOCUMENTATION' && attachmentIds.length === 0) {
+        set.status = 400;
+        return { success: false, message: 'Select at least one Port Documentation file to send' };
       }
 
       let attachments: Array<{ filename: string; content: Buffer; contentType?: string }> = [];
       if (attachmentIds.length > 0) {
         try {
-          attachments = await loadSelectedOrderAttachments(orderId, attachmentIds);
+          attachments = docType === 'PORT_DOCUMENTATION'
+            ? await loadSelectedOrderPortDocuments(orderId, attachmentIds)
+            : await loadSelectedOrderAttachments(orderId, attachmentIds);
         } catch (error: any) {
           set.status = 400;
           return { success: false, message: error?.message ?? 'Failed to load selected attachments' };
@@ -555,6 +634,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           t.Literal('NOMINATION'),
           t.Literal('PROFORMA'),
           t.Literal('INVOICE'),
+          t.Literal('PORT_DOCUMENTATION'),
         ], { description: 'Type of document to send' }),
         recipientEmail: t.String({ format: 'email', description: 'Primary recipient email address' }),
         ccEmails: t.Optional(t.Array(t.String({ format: 'email' }), { description: 'CC email addresses' })),
@@ -602,6 +682,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         NOMINATION: 'Nomination',
         PROFORMA: 'Proforma Invoice',
         INVOICE: 'Invoice',
+        PORT_DOCUMENTATION: 'Port Documentation',
         INQUIRY: 'Inquiry',
       };
 
@@ -617,6 +698,9 @@ export const documentsController = new Elysia({ prefix: '/orders' })
 
         recipientEmail = nominationSupplier.supplier.contact?.email ?? '';
         recipientName = nominationSupplier.supplier.contact?.name ?? nominationSupplier.supplier.company?.name ?? '';
+      } else if (docType === 'PORT_DOCUMENTATION') {
+        recipientEmail = order.agentContact?.email ?? '';
+        recipientName = order.agentContact?.name ?? order.agent?.name ?? '';
       } else if (order.brokerGetsAll && order.brokerContact) {
         // Broker gets all customer-facing comms
         recipientEmail = order.brokerContact.email ?? '';
@@ -722,10 +806,20 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             documentType: docType,
             senderName,
             vesselName,
+            vesselImo: order.vessel?.imo ?? null,
             portName,
             orderNumber,
             paymentTerms,
+            eta: order.eta ?? null,
+            agentName: order.agentContact?.name ?? order.agent?.name ?? null,
             customerNote: docType === 'NOMINATION' ? order.supplierNote ?? null : order.customerNote ?? null,
+            items: order.items?.map((item: any) => ({
+              quantity: item.quantity,
+              quantityMin: item.quantityMin,
+              unit: item.unit,
+              productType: item.productType,
+              description: item.description ?? null,
+            })) ?? [],
             companyName,
             companyLogoUrl,
             companyAddress,
@@ -744,10 +838,20 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           documentType: docType,
           senderName,
           vesselName,
+          vesselImo: order.vessel?.imo ?? null,
           portName,
           orderNumber,
           paymentTerms,
+          eta: order.eta ?? null,
+          agentName: order.agentContact?.name ?? order.agent?.name ?? null,
           customerNote: docType === 'NOMINATION' ? order.supplierNote ?? null : order.customerNote ?? null,
+          items: order.items?.map((item: any) => ({
+            quantity: item.quantity,
+            quantityMin: item.quantityMin,
+            unit: item.unit,
+            productType: item.productType,
+            description: item.description ?? null,
+          })) ?? [],
           companyName,
           companyLogoUrl,
           companyAddress,
@@ -786,6 +890,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           t.Literal('NOMINATION'),
           t.Literal('PROFORMA'),
           t.Literal('INVOICE'),
+          t.Literal('PORT_DOCUMENTATION'),
         ]),
         orderSupplierId: t.Optional(t.Nullable(t.String())),
       }),
