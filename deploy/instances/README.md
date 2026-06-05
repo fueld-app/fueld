@@ -20,7 +20,7 @@ CERTBOT_EMAIL=ops@example.com      # Email for Let's Encrypt notifications
 | File | Instance | Host | Domain | Purpose |
 |------|----------|------|--------|---------|
 | `staging.env` | staging | 31.70.79.3 | staging.fueld.app | Staging / pre-production validation |
-| `production.env` | production | 139.162.157.31 | riviera-marine.fueld.app | Production — Riviera Marine |
+| `riviera-marine.env` | riviera-marine | 139.162.157.31 | riviera-marine.fueld.app | Production — Riviera Marine |
 | `template.env` | — | — | — | Copy this to create new instances |
 
 ## Adding a New Client Instance
@@ -41,7 +41,7 @@ All instances use the same `VPS_SSH_KEY` GitHub secret. The same private key is 
 **Cons**: Key compromise affects all instances
 
 ### Option B: Per-Instance Keys (More Secure)
-Each instance has its own secret: `VPS_SSH_KEY_STAGING`, `VPS_SSH_KEY_PRODUCTION`, `VPS_SSH_KEY_ACME`, etc.
+Each instance has its own secret: `VPS_SSH_KEY_STAGING`, `VPS_SSH_KEY_RIVIERA_MARINE`, `VPS_SSH_KEY_CHANNELTX`, etc.
 
 **Pros**: Isolation, fine-grained access control  
 **Cons**: More secrets to manage, deploy.yml needs updating
