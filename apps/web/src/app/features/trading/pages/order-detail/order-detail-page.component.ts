@@ -587,7 +587,14 @@ interface PlattsSuggestionViewModel {
         }
 
         <div class="mt-4"></div>
-        <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Customer terms</p>
+        <div class="flex items-center gap-2 mb-1.5">
+          <p class="text-xs font-medium uppercase tracking-wider text-gray-400">Customer terms</p>
+          @if (order()?.termsAndConditions) {
+            <span class="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">Order override</span>
+          } @else if (client()?.specialCustomerTerms) {
+            <span class="inline-flex rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">{{ client()?.name }} special terms</span>
+          }
+        </div>
         @if (customerTermsText()) {
           <p
             class="mt-1 text-sm text-gray-700 whitespace-pre-line"
@@ -1943,9 +1950,13 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly showCustomerTermsFull = signal(false);
   readonly showSupplierTermsFull = signal(false);
 
-  readonly customerTermsText = computed(() =>
-    this.renderCompanyTerms(this.selectedOwnCompany()?.customerTerms, 'customer') || '',
-  );
+  readonly customerTermsText = computed(() => {
+    const orderTerms = this.order()?.termsAndConditions;
+    if (orderTerms) return this.renderCompanyTerms(orderTerms, 'customer') || '';
+    const specialTerms = this.client()?.specialCustomerTerms;
+    if (specialTerms) return this.renderCompanyTerms(specialTerms, 'customer') || '';
+    return this.renderCompanyTerms(this.selectedOwnCompany()?.customerTerms, 'customer') || '';
+  });
 
   readonly supplierTermsText = computed(() =>
     this.renderCompanyTerms(this.selectedOwnCompany()?.supplierTerms, 'supplier') || '',
