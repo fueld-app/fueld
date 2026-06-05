@@ -269,7 +269,15 @@ jobs:
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          INSTANCE_NAME="${{ steps.target.outputs.instance_name }}"
+          # Try per-instance key first, fall back to shared key
+          if [ -n "${INSTANCE_NAME}" ] && [ -n "${{ secrets[format('VPS_SSH_KEY_{0}', steps.target.outputs.instance_name)] }}" ]; then
+            echo "Using per-instance SSH key: VPS_SSH_KEY_${INSTANCE_NAME}"
+            echo "${{ secrets[format('VPS_SSH_KEY_{0}', steps.target.outputs.instance_name)] }}" > ~/.ssh/deploy_key
+          else
+            echo "Using shared SSH key: VPS_SSH_KEY"
+            echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          fi
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ steps.target.outputs.vps_host }} >> ~/.ssh/known_hosts 2>/dev/null
 
