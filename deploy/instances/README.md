@@ -21,6 +21,8 @@ CERTBOT_EMAIL=ops@example.com      # Email for Let's Encrypt notifications
 |------|----------|------|--------|---------|
 | `staging.env` | staging | 31.70.79.3 | staging.fueld.app | Staging / pre-production validation |
 | `riviera-marine.env` | riviera-marine | 139.162.157.31 | riviera-marine.fueld.app | Production — Riviera Marine |
+| `channeltx.env` | channeltx | 74.208.245.215 | channeltx.fueld.app | Production — ChannelTX |
+| `moxie.env` | moxie | 31.70.94.96 | moxie.fueld.app | Production — Moxie Brokerage |
 | `template.env` | — | — | — | Copy this to create new instances |
 
 ## Adding a New Client Instance
