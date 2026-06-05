@@ -203,7 +203,6 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
             @if (vessel()!.imo) { IMO {{ vessel()!.imo }} }
             @if (vessel()!.mmsi) { · MMSI {{ vessel()!.mmsi }} }
             @if (vessel()!.flag) { · {{ vessel()!.flag }} }
-            @if (vessel()!.phone) { · 📞 {{ vessel()!.phone }} }
           </p>
           @if (vessel()!.lastSynced) {
             <span class="inline-flex items-center gap-1 text-xs text-gray-400" title="Last synced with Seasearcher">
@@ -478,6 +477,21 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                       </dd>
                     } @else {
                       <dd class="mt-0.5 font-medium text-gray-900">{{ vessel()!.classificationSociety ?? '—' }}</dd>
+                    }
+                  </div>
+                  <div>
+                    <dt class="text-gray-500">Phone</dt>
+                    @if (editing()) {
+                      <dd class="mt-0.5">
+                        <input type="tel" [value]="editPhone()" (input)="editPhone.set($any($event.target).value)"
+                          class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
+                      </dd>
+                    } @else {
+                      <dd class="mt-0.5 font-medium">
+                        @if (vessel()!.phone) {
+                          <a [href]="'tel:' + vessel()!.phone" class="text-brand-700 hover:text-brand-900 hover:underline transition-colors">{{ formatPhone(vessel()!.phone) }}</a>
+                        } @else { — }
+                      </dd>
                     }
                   </div>
                   <div>
@@ -1350,6 +1364,7 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
   readonly editBuildYear = signal<string>('');
   readonly editBuilder = signal('');
   readonly editClassification = signal('');
+  readonly editPhone = signal('');
   readonly editLoa = signal('');
   readonly editBreadth = signal('');
   readonly editDepth = signal('');
@@ -1960,6 +1975,7 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
     this.editBuildYear.set(v.buildYear != null ? String(v.buildYear) : '');
     this.editBuilder.set(v.builder ?? '');
     this.editClassification.set(v.classificationSociety ?? '');
+    this.editPhone.set(v.phone ?? '');
     this.editLoa.set(v.loa != null ? String(v.loa) : '');
     this.editBreadth.set(v.breadth != null ? String(v.breadth) : '');
     this.editDepth.set(v.depth != null ? String(v.depth) : '');
@@ -1986,6 +2002,7 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
       if (this.editStatus() !== (v.status ?? '')) body['status'] = this.editStatus() || undefined;
       if (this.editBuilder() !== (v.builder ?? '')) body['builder'] = this.editBuilder() || undefined;
       if (this.editClassification() !== (v.classificationSociety ?? '')) body['classificationSociety'] = this.editClassification() || undefined;
+      if (this.editPhone() !== (v.phone ?? '')) body['phone'] = this.editPhone() || undefined;
 
       // Numeric fields — parse to number or undefined
       const byStr = this.editBuildYear().trim();
@@ -2174,6 +2191,14 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
       case 'CANCELLED': case 'LOST': return 'bg-red-100 text-red-700';
       default: return 'bg-gray-100 text-gray-600';
     }
+  }
+
+  formatPhone(phone: string | null | undefined): string {
+    if (!phone) return '';
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length === 10) return '+1 ' + digits.replace(/(\d{3})(\d{3})(\d{4})/, '($1) $2-$3');
+    if (digits.length === 11 && digits.startsWith('1')) return '+1 ' + digits.slice(1).replace(/(\d{3})(\d{3})(\d{4})/, '($1) $2-$3');
+    return phone;
   }
 
   private showToast(type: 'success' | 'error', message: string): void {
