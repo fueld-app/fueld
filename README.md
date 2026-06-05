@@ -328,7 +328,7 @@ This repo deploys one named instance per server using:
 
 Instance inventory lives in `deploy/instances/*.env`.
 
-- `deploy/instances/production.env` is the current production target
+- `deploy/instances/riviera-marine.env` is the current production target
 - `deploy/instances/template.env` is the template for new servers such as testing or customer-managed instances
 
 ### 1) One-time VPS bootstrap
