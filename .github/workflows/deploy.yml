@@ -8,10 +8,15 @@ on:
   workflow_dispatch:
     inputs:
       instance:
-        description: Deploy target instance config from deploy/instances/<instance>.env
+        description: Deploy target instance
         required: true
         default: staging
-        type: string
+        type: choice
+        options:
+          - staging
+          - riviera-marine
+          - channeltx
+          - moxie
       deploy_ref:
         description: Branch, tag, or commit SHA to deploy (optional for manual runs)
         required: false
