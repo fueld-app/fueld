@@ -167,6 +167,48 @@ export async function acceptInvitation(token: string, password: string) {
   return user!;
 }
 
+// ── Reinvite (regenerate token for existing pending invitation) ──────
+
+export async function reinviteInvitation(invitationId: string, invitedBy: string) {
+  const tenantId = await getTenantId();
+
+  const invite = await db.query.invitations.findFirst({
+    where: and(
+      eq(invitations.id, invitationId),
+      eq(invitations.tenantId, tenantId),
+    ),
+  });
+
+  if (!invite) throw new Error('Invitation not found');
+  if (invite.acceptedAt) throw new Error('This invitation has already been accepted');
+
+  // Generate a new token and reset expiry
+  const token = crypto.randomUUID() + '-' + crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+  await db
+    .update(invitations)
+    .set({ token, expiresAt, invitedBy })
+    .where(eq(invitations.id, invitationId));
+
+  // Get inviter name for display
+  const inviter = await db.query.users.findFirst({
+    where: eq(users.id, invitedBy),
+  });
+
+  return {
+    id: invite.id,
+    email: invite.email,
+    name: invite.name,
+    role: invite.role,
+    token,
+    invitedByName: inviter?.name ?? 'Unknown',
+    expiresAt: expiresAt.toISOString(),
+    acceptedAt: null,
+    createdAt: invite.createdAt.toISOString(),
+  };
+}
+
 // ── Get Pending Invitations ──────────────────────────────────────────
 
 export async function listInvitations() {

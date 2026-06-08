@@ -4,6 +4,7 @@ import {
   listUsers,
   inviteUser,
   listInvitations,
+  reinviteInvitation,
   updateUserRole,
   toggleUserActive,
   acceptInvitation,
@@ -94,6 +95,41 @@ export const adminController = new Elysia({ prefix: '/admin' })
     }
   }, {
     detail: { tags: ['Admin'], summary: 'List all invitations', security: [{ bearerAuth: [] }] },
+  })
+
+  // ── POST /admin/invitations/:id/reinvite ─────────────────────────
+  .post('/invitations/:id/reinvite', async ({ auth, params }) => {
+    try {
+      requireAdmin(auth);
+      const invite = await reinviteInvitation(params.id, auth.sub);
+
+      // Build invite link — frontend will handle the /invite/:token route
+      const baseUrl = process.env['APP_URL'] || 'http://localhost:4200';
+      const inviteLink = `${baseUrl}/invite/${invite.token}`;
+
+      let emailSent = false;
+      try {
+        emailSent = await sendInviteEmail({
+          to: invite.email,
+          inviteLink,
+          invitedByName: invite.invitedByName,
+          role: invite.role,
+        });
+      } catch (err: any) {
+        console.warn('[Email] Re-invite send failed:', err?.message ?? err);
+      }
+
+      return {
+        success: true,
+        data: { ...invite, inviteLink, emailSent },
+      } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to re-invite user';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    params: t.Object({ id: t.String() }),
+    detail: { tags: ['Admin'], summary: 'Re-invite a pending user with a new token', security: [{ bearerAuth: [] }] },
   })
 
   // ── POST /admin/users/invite ─────────────────────────────────────

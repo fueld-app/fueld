@@ -470,6 +470,7 @@ import { API } from '@app/core/config/api';
                     <th class="px-4 py-3 text-left font-medium text-gray-600">Invited By</th>
                     <th class="px-4 py-3 text-left font-medium text-gray-600">Expires</th>
                     <th class="px-4 py-3 text-left font-medium text-gray-600">Status</th>
+                    <th class="px-4 py-3 text-right font-medium text-gray-600">Actions</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-gray-100">
@@ -494,7 +495,53 @@ import { API } from '@app/core/config/api';
                           <span class="text-xs font-medium text-amber-600">Pending</span>
                         }
                       </td>
+                      <td class="px-4 py-3 text-right">
+                        @if (!inv.acceptedAt) {
+                          <button
+                            (click)="reinvite(inv)"
+                            [disabled]="reinvitingId() === inv.id"
+                            class="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50 transition-colors disabled:opacity-50"
+                          >
+                            @if (reinvitingId() === inv.id) {
+                              <svg class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                              </svg>
+                            }
+                            Re-invite
+                          </button>
+                        }
+                      </td>
                     </tr>
+                    @if (reinviteLinkResult() && reinviteTargetId() === inv.id) {
+                      <tr>
+                        <td colspan="7" class="bg-indigo-50/50 px-4 py-3">
+                          <div class="flex items-center gap-2">
+                            <input
+                              type="text"
+                              [value]="reinviteLinkResult()"
+                              readonly
+                              class="app-input-mono flex-1 bg-white text-xs text-gray-700"
+                            />
+                            <button
+                              (click)="copyReinviteLink()"
+                              class="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors shrink-0"
+                            >
+                              {{ reinviteCopied() ? 'Copied!' : 'Copy' }}
+                            </button>
+                            <button
+                              (click)="clearReinviteLink()"
+                              class="rounded-md px-2 py-1 text-xs text-gray-400 hover:text-gray-600 transition-colors shrink-0"
+                              title="Dismiss"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                              </svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    }
                   }
                   </tbody>
                 </table>
@@ -795,6 +842,12 @@ export class UsersPageComponent implements OnInit, OnDestroy {
   readonly passwordResetExpiresAt = signal('');
   readonly passwordResetEmailSent = signal<boolean | null>(null);
   readonly passwordResetCopied = signal(false);
+
+  // Re-invite
+  readonly reinvitingId = signal<string | null>(null);
+  readonly reinviteLinkResult = signal('');
+  readonly reinviteTargetId = signal('');
+  readonly reinviteCopied = signal(false);
 
   inviteForm = { name: '', email: '', role: 'TRADER' };
 
@@ -1210,6 +1263,55 @@ export class UsersPageComponent implements OnInit, OnDestroy {
       document.body.removeChild(input);
       this.copied.set(true);
       setTimeout(() => this.copied.set(false), 2000);
+    }
+  }
+
+  // ── Re-invite ───────────────────────────────────────────────────
+
+  clearReinviteLink() {
+    this.reinviteLinkResult.set('');
+    this.reinviteTargetId.set('');
+    this.reinviteCopied.set(false);
+  }
+
+  async copyReinviteLink() {
+    try {
+      await navigator.clipboard.writeText(this.reinviteLinkResult());
+      this.reinviteCopied.set(true);
+      setTimeout(() => this.reinviteCopied.set(false), 2000);
+    } catch {
+      const input = document.createElement('input');
+      input.value = this.reinviteLinkResult();
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand('copy');
+      document.body.removeChild(input);
+      this.reinviteCopied.set(true);
+      setTimeout(() => this.reinviteCopied.set(false), 2000);
+    }
+  }
+
+  async reinvite(inv: InvitationDto) {
+    this.reinvitingId.set(inv.id);
+    this.reinviteLinkResult.set('');
+    this.reinviteTargetId.set('');
+    this.reinviteCopied.set(false);
+
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<InvitationDto>>(`${API}/admin/invitations/${inv.id}/reinvite`, {}),
+      );
+
+      if (res.success && res.data) {
+        this.reinviteLinkResult.set(res.data.inviteLink);
+        this.reinviteTargetId.set(inv.id);
+        // Refresh the invitations list to show updated expiry
+        this.loadData();
+      }
+    } catch (err: any) {
+      console.error('Failed to re-invite:', err);
+    } finally {
+      this.reinvitingId.set(null);
     }
   }
 
