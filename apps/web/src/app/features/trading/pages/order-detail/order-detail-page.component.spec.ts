@@ -599,6 +599,114 @@ describe('OrderDetailPageComponent', () => {
     expect(component.portDocumentationAction()).toBeNull();
   });
 
+  it('auto-prepares port documentation and opens send modal when no files exist yet', async () => {
+    const postCalls: Array<{ url: string; body: unknown }> = [];
+    const { component } = await createComponent({
+      onGet: () => ({ success: true, data: [] }),
+      onPost: (url, body) => {
+        postCalls.push({ url, body });
+        return;
+      },
+    });
+
+    component.portDocumentationContext.set({
+      orderId: 'order-1',
+      enabled: true,
+      gateListCount: 1,
+      currentFlangeWorksheet: {
+        id: 'asset-1',
+        tenantId: 'tenant-1',
+        documentKind: 'FLANGE_WORKSHEET',
+        displayName: 'Flange Worksheet',
+        originalFileName: 'flange.pdf',
+        filePath: '/uploads/flange.pdf',
+        mimeType: 'application/pdf',
+        fileSize: 42,
+        sha256Hex: 'hash',
+        versionNumber: 1,
+        isCurrent: true,
+        active: true,
+        uploadedBy: 'user-1',
+        supersededAt: null,
+        createdAt: '2026-05-19T00:00:00.000Z',
+      },
+      readinessWarnings: [],
+      documents: [],
+    } as any);
+
+    const refreshSpy = vi.spyOn(component as any, 'loadPortDocumentationContext').mockImplementation(async () => {
+      component.portDocumentationContext.set({
+        orderId: 'order-1',
+        enabled: true,
+        gateListCount: 1,
+        currentFlangeWorksheet: null,
+        readinessWarnings: [],
+        documents: [{
+          id: 'doc-1',
+          tenantId: 'tenant-1',
+          orderId: 'order-1',
+          documentKind: 'BUNKER_INSTRUCTIONS',
+          sourceType: 'GENERATED',
+          status: 'ACTIVE',
+          fileName: 'bunker.xlsx',
+          filePath: '/uploads/bunker.xlsx',
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          fileSize: 100,
+          sha256Hex: 'abc',
+          assetId: null,
+          generatedBy: 'user-1',
+          generatedAt: '2026-05-19T00:00:00.000Z',
+          includedBy: null,
+          includedAt: null,
+          supersededAt: null,
+          createdAt: '2026-05-19T00:00:00.000Z',
+        }],
+      } as any);
+    });
+    const modalSpy = vi.spyOn(component, 'openSendEmailModal').mockImplementation(() => {});
+
+    await component.onAction('send-port-documentation');
+
+    expect(postCalls.some((call) => call.url.includes('/orders/order-1/port-documentation/bunker-instructions/generate'))).toBe(true);
+    expect(postCalls.some((call) => call.url.includes('/orders/order-1/port-documentation/gate-list/generate'))).toBe(true);
+    expect(postCalls.some((call) => call.url.includes('/orders/order-1/port-documentation/flange-worksheet/include'))).toBe(true);
+    expect(refreshSpy).toHaveBeenCalled();
+    expect(modalSpy).toHaveBeenCalledWith('PORT_DOCUMENTATION');
+    expect(component.portDocumentationAction()).toBeNull();
+  });
+
+  it('shows the first readiness warning when port documentation cannot be prepared automatically', async () => {
+    const { component } = await createComponent();
+
+    component.portDocumentationContext.set({
+      orderId: 'order-1',
+      enabled: true,
+      gateListCount: 0,
+      currentFlangeWorksheet: null,
+      readinessWarnings: ['Agent is missing on the order.'],
+      documents: [],
+    } as any);
+
+    const refreshSpy = vi.spyOn(component as any, 'loadPortDocumentationContext').mockImplementation(async () => {
+      component.portDocumentationContext.set({
+        orderId: 'order-1',
+        enabled: true,
+        gateListCount: 0,
+        currentFlangeWorksheet: null,
+        readinessWarnings: ['Agent is missing on the order.'],
+        documents: [],
+      } as any);
+    });
+    const modalSpy = vi.spyOn(component, 'openSendEmailModal').mockImplementation(() => {});
+
+    await component.onAction('send-port-documentation');
+
+    expect(refreshSpy).toHaveBeenCalled();
+    expect(modalSpy).not.toHaveBeenCalled();
+    expect(component.toast()).toEqual({ type: 'error', message: 'Agent is missing on the order.' });
+    expect(component.portDocumentationAction()).toBeNull();
+  });
+
   it('defaults new rows to the active supplier and skips incomplete drafts during autosave', async () => {
     const putCalls: Array<{ url: string; body: any }> = [];
     const supplierOne = {
