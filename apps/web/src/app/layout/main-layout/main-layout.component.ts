@@ -303,13 +303,15 @@ const NAVIGATION: NavItem[] = [
       aria-label="Main navigation"
     >
       <!-- Brand -->
-      <div class="flex h-16 items-center gap-3 px-6">
-        <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600">
+      <div class="flex h-16 items-center gap-3 px-3" [class.justify-center]="sidebarCollapsed()" [class.px-6]="!sidebarCollapsed()">
+        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-600">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
             <path fill-rule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clip-rule="evenodd" />
           </svg>
         </div>
-        <span class="text-lg font-bold tracking-tight text-sidebar-text-active">FUELD</span>
+        @if (!sidebarCollapsed()) {
+          <span class="text-lg font-bold tracking-tight text-sidebar-text-active">FUELD</span>
+        }
       </div>
 
       <!-- Nav list -->
@@ -322,12 +324,16 @@ const NAVIGATION: NavItem[] = [
               routerLinkActive="bg-sidebar-active text-sidebar-text-active"
               [routerLinkActiveOptions]="{ exact: item.route === '/' }"
               class="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-text transition-colors hover:bg-sidebar-hover hover:text-sidebar-text-active focus-visible:outline-none"
+              [class.justify-center]="sidebarCollapsed()"
+              [title]="sidebarCollapsed() ? item.label : ''"
               (click)="closeSidebar()"
             >
               <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" [attr.d]="item.icon" />
               </svg>
-              {{ item.label }}
+              @if (!sidebarCollapsed()) {
+                {{ item.label }}
+              }
             </a>
           } @else {
             <!-- Expandable group -->
@@ -335,25 +341,29 @@ const NAVIGATION: NavItem[] = [
               <button
                 (click)="toggleGroup(item.label)"
                 class="group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-text transition-colors hover:bg-sidebar-hover hover:text-sidebar-text-active focus-visible:outline-none"
+                [class.justify-center]="sidebarCollapsed()"
                 [attr.aria-expanded]="isGroupOpen(item.label)"
+                [title]="sidebarCollapsed() ? item.label : ''"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
                   <path stroke-linecap="round" stroke-linejoin="round" [attr.d]="item.icon" />
                 </svg>
-                <span class="flex-1 text-left">{{ item.label }}</span>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-4 w-4 transition-transform"
-                  [class.rotate-90]="isGroupOpen(item.label)"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  aria-hidden="true"
-                >
-                  <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
-                </svg>
+                @if (!sidebarCollapsed()) {
+                  <span class="flex-1 text-left">{{ item.label }}</span>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="h-4 w-4 transition-transform"
+                    [class.rotate-90]="isGroupOpen(item.label)"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
+                  </svg>
+                }
               </button>
 
-              @if (isGroupOpen(item.label)) {
+              @if (isGroupOpen(item.label) && !sidebarCollapsed()) {
                 <div class="ml-5 mt-1 space-y-0.5 border-l border-sidebar-hover pl-4">
                   @for (child of item.children; track child.label) {
                     @if (!child.allowedRoles || child.allowedRoles.includes('ADMIN') && auth.isAdmin() || child.allowedRoles.includes(auth.userRole())) {
@@ -376,30 +386,44 @@ const NAVIGATION: NavItem[] = [
 
       <!-- Sidebar footer -->
       <div class="border-t border-sidebar-hover px-4 py-3">
-        <div class="flex items-center justify-between">
-          <p class="truncate text-xs text-sidebar-text/60" [title]="footerVersion()">{{ footerVersion() }}</p>
-          @if (llmHealthy() !== null) {
-            <a routerLink="/admin/llm" class="group flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] transition-colors hover:bg-sidebar-hover"
-              [title]="llmHealthy() ? 'LLM Online' : 'LLM Offline'">
-              <span class="relative flex h-2 w-2">
-                @if (llmHealthy()) {
-                  <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60"></span>
-                  <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-400"></span>
-                } @else {
-                  <span class="relative inline-flex h-2 w-2 rounded-full bg-red-400"></span>
-                }
-              </span>
-              <span class="text-sidebar-text/50 group-hover:text-sidebar-text/80">AI</span>
-            </a>
-          }
-        </div>
+        @if (!sidebarCollapsed()) {
+          <div class="flex items-center justify-between">
+            <p class="truncate text-xs text-sidebar-text/60" [title]="footerVersion()">{{ footerVersion() }}</p>
+            @if (llmHealthy() !== null) {
+              <a routerLink="/admin/llm" class="group flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] transition-colors hover:bg-sidebar-hover"
+                [title]="llmHealthy() ? 'LLM Online' : 'LLM Offline'">
+                <span class="relative flex h-2 w-2">
+                  @if (llmHealthy()) {
+                    <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60"></span>
+                    <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-400"></span>
+                  } @else {
+                    <span class="relative inline-flex h-2 w-2 rounded-full bg-red-400"></span>
+                  }
+                </span>
+                <span class="text-sidebar-text/50 group-hover:text-sidebar-text/80">AI</span>
+              </a>
+            }
+          </div>
+        }
+        <!-- Collapse toggle (desktop) -->
+        <button
+          (click)="sidebarCollapsed.update(v => !v)"
+          class="mt-2 hidden w-full items-center justify-center rounded-md py-1.5 text-sidebar-text/40 hover:bg-sidebar-hover hover:text-sidebar-text/70 lg:flex transition-colors"
+          [title]="sidebarCollapsed() ? 'Expand sidebar' : 'Collapse sidebar'"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform" [class.rotate-180]="sidebarCollapsed()" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+          </svg>
+        </button>
       </div>
     </aside>
 
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <!--  Main content area                                             -->
     <!-- ═══════════════════════════════════════════════════════════════ -->
-    <div class="app-shell flex min-h-screen min-h-[100dvh] flex-col lg:pl-64">
+    <div class="app-shell flex min-h-screen min-h-[100dvh] flex-col transition-all duration-300 ease-in-out"
+      [class.lg:pl-64]="!sidebarCollapsed()"
+      [class.lg:pl-16]="sidebarCollapsed()">
       @if (showUpdateToast()) {
         <div class="app-update-toast fixed z-50 w-80 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-lg">
           <p class="text-sm font-semibold text-amber-900">Update available</p>
@@ -815,6 +839,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   private readonly newInquiryModal = inject(NewInquiryModalService);
 
   readonly sidebarOpen = signal(false);
+  readonly sidebarCollapsed = signal(false);
   private readonly commodityPriceMap = signal<Record<string, CommodityPrice>>({});
   readonly commodityPrices = computed(() =>
     Object.values(this.commodityPriceMap()).sort((left, right) => left.name.localeCompare(right.name)),
@@ -1250,11 +1275,12 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
   readonly sidebarClasses = computed(() => {
     const base =
-      'app-sidebar fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-sidebar transition-transform duration-300 ease-in-out';
+      'app-sidebar fixed inset-y-0 left-0 z-50 flex flex-col bg-sidebar transition-all duration-300 ease-in-out';
+    const width = this.sidebarCollapsed() ? 'w-16' : 'w-64';
     const mobileVisibility = this.sidebarOpen()
       ? 'translate-x-0 visible pointer-events-auto'
       : '-translate-x-full invisible pointer-events-none';
-    return `${base} ${mobileVisibility} lg:translate-x-0 lg:visible lg:pointer-events-auto`;
+    return `${base} ${width} ${mobileVisibility} lg:translate-x-0 lg:visible lg:pointer-events-auto`;
   });
 
   toggleSidebar(): void {

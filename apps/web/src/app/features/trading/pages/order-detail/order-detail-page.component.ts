@@ -1251,7 +1251,7 @@ interface PlattsSuggestionViewModel {
 
     <!-- Delivery + Payments + Attachments + Comments -->
     @if (allowDeliveredEdit() || orderId() || order()?.id) {
-      <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         @if (allowDeliveredEdit()) {
           <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[520px] flex flex-col">
             <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Delivery Details</h3>
