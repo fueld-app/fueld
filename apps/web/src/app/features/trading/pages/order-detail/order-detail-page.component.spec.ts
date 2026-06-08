@@ -144,6 +144,7 @@ describe('OrderDetailPageComponent', () => {
             user: signal({ id: 'user-1' }),
             userName: signal('Test User'),
             userEmail: signal('test@fueld.local'),
+            isAdmin: () => false,
             canSeePrices: () => true,
           },
         },

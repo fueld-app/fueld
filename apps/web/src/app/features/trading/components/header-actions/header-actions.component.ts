@@ -34,7 +34,8 @@ export type HeaderAction =
   | 'send-port-documentation'
   | 'send-inquiry'
   | 'mark-delivered'
-  | 'mark-paid';
+  | 'mark-paid'
+  | 'reopen-order';
 
 interface ActionItem {
   key: HeaderAction;

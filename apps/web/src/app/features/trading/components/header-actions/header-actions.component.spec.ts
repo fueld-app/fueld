@@ -6,6 +6,7 @@ describe('HeaderActionsComponent', () => {
   async function createComponent(options?: {
     status?: OrderStatus;
     hasPortDocumentationDocuments?: boolean;
+    portDocumentationEnabled?: boolean;
   }) {
     await TestBed.configureTestingModule({
       imports: [HeaderActionsComponent],
@@ -15,6 +16,7 @@ describe('HeaderActionsComponent', () => {
     fixture.componentRef.setInput('orderId', 'order-1');
     fixture.componentRef.setInput('status', options?.status ?? OrderStatus.Confirmed);
     fixture.componentRef.setInput('hasPortDocumentationDocuments', options?.hasPortDocumentationDocuments ?? false);
+    fixture.componentRef.setInput('portDocumentationEnabled', options?.portDocumentationEnabled ?? false);
     fixture.detectChanges();
 
     return fixture.componentInstance;
@@ -28,15 +30,30 @@ describe('HeaderActionsComponent', () => {
     const component = await createComponent({
       status: OrderStatus.Confirmed,
       hasPortDocumentationDocuments: true,
+      portDocumentationEnabled: true,
     });
 
     expect(component.displayActions().some((action) => action.key === 'send-port-documentation')).toBe(true);
   });
 
-  it('hides Send Port Documentation when no port documentation files exist', async () => {
+  it('disables Send Port Documentation when no port documentation files exist', async () => {
     const component = await createComponent({
       status: OrderStatus.Confirmed,
       hasPortDocumentationDocuments: false,
+      portDocumentationEnabled: true,
+    });
+
+    const action = component.displayActions().find((item) => item.key === 'send-port-documentation');
+
+    expect(action).toBeDefined();
+    expect(action?.disabled).toBe(true);
+  });
+
+  it('hides Send Port Documentation when port documentation is disabled', async () => {
+    const component = await createComponent({
+      status: OrderStatus.Confirmed,
+      hasPortDocumentationDocuments: true,
+      portDocumentationEnabled: false,
     });
 
     expect(component.displayActions().some((action) => action.key === 'send-port-documentation')).toBe(false);
