@@ -246,6 +246,7 @@ interface PlattsSuggestionViewModel {
           [hasEnoughPayments]="hasEnoughPaymentsForMarkPaid()"
           [hasPortDocumentationDocuments]="(portDocumentationContext()?.documents?.length ?? 0) > 0"
           [portDocumentationEnabled]="portDocumentationContext()?.enabled ?? false"
+          [isAdmin]="auth.isAdmin()"
           (actionTriggered)="onAction($event)"
         />
         <div class="relative">
@@ -5066,6 +5067,9 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       case 'mark-delivered':
         this.markDelivered();
         break;
+      case 'reopen-order':
+        this.reopenOrder();
+        break;
     }
   }
 
@@ -5244,6 +5248,16 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     }
 
     await this.setOrderStatus(OrderStatus.Delivered);
+  }
+
+  private async reopenOrder(): Promise<void> {
+    const status = this.order()?.status;
+    if (status !== OrderStatus.Delivered && status !== OrderStatus.Invoiced) {
+      this.showToast('error', 'Only delivered or invoiced orders can be reopened.');
+      return;
+    }
+    await this.setOrderStatus(OrderStatus.Confirmed);
+    this.showToast('success', 'Order reopened for editing.');
   }
 
   async saveOrder(): Promise<void> {
