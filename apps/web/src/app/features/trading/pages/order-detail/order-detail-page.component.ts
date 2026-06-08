@@ -1253,7 +1253,7 @@ interface PlattsSuggestionViewModel {
 
     <!-- Delivery + Payments + Attachments + Comments -->
     @if (allowDeliveredEdit() || orderId() || order()?.id) {
-      <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         @if (allowDeliveredEdit()) {
           <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[520px] flex flex-col">
             <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Delivery Details</h3>
@@ -1461,6 +1461,174 @@ interface PlattsSuggestionViewModel {
         }
         }
       </div>
+
+      @if (order()?.id) {
+        <div class="mt-4">
+          <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <h3 class="text-sm font-semibold uppercase tracking-wider text-gray-700">Port Documentation</h3>
+                <p class="mt-1 text-xs text-gray-500">
+                  Generate or include the files that can be sent from the Actions menu.
+                </p>
+              </div>
+              @if (portDocumentationContext()?.enabled) {
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    (click)="previewBunkerInstructions()"
+                    [disabled]="portDocumentationAction() !== null"
+                    class="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {{ portDocumentationAction() === 'preview-bunker' ? 'Loading preview…' : 'Preview Bunker Instructions' }}
+                  </button>
+                  <button
+                    type="button"
+                    (click)="generateBunkerInstructions()"
+                    [disabled]="portDocumentationAction() !== null"
+                    class="inline-flex items-center justify-center rounded-lg bg-brand-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {{ portDocumentationAction() === 'generate-bunker' ? 'Generating…' : 'Generate Bunker Instructions' }}
+                  </button>
+                  <button
+                    type="button"
+                    (click)="generateGateList()"
+                    [disabled]="portDocumentationAction() !== null"
+                    class="inline-flex items-center justify-center rounded-lg bg-brand-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {{ portDocumentationAction() === 'generate-gate-list' ? 'Generating…' : 'Generate Gate List' }}
+                  </button>
+                  <button
+                    type="button"
+                    (click)="includeFlangeWorksheetDocument()"
+                    [disabled]="portDocumentationAction() !== null || !portDocumentationContext()?.currentFlangeWorksheet"
+                    class="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {{ portDocumentationAction() === 'include-flange' ? 'Including…' : 'Include Flange Worksheet' }}
+                  </button>
+                </div>
+              }
+            </div>
+
+            @if (portDocumentationLoading()) {
+              <div class="mt-4 text-sm text-gray-400">Loading Port Documentation…</div>
+            } @else if (portDocumentationError()) {
+              <div class="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {{ portDocumentationError() }}
+              </div>
+            } @else if (!(portDocumentationContext()?.enabled ?? false)) {
+              <div class="mt-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                Port Documentation is disabled for this order or deployment.
+              </div>
+            } @else {
+              <div class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+                <div class="space-y-4">
+                  @if ((portDocumentationContext()?.readinessWarnings?.length ?? 0) > 0) {
+                    <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                      <p class="text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">Readiness warnings</p>
+                      <ul class="mt-2 space-y-1 text-sm text-amber-900">
+                        @for (warning of portDocumentationContext()!.readinessWarnings; track warning) {
+                          <li>{{ warning }}</li>
+                        }
+                      </ul>
+                    </div>
+                  }
+
+                  <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                      <div class="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">Gate list personnel</div>
+                      <div class="mt-2 text-2xl font-semibold text-gray-900">{{ portDocumentationContext()?.gateListCount ?? 0 }}</div>
+                      <p class="mt-1 text-xs text-gray-500">Used when generating the Gate List.</p>
+                    </div>
+                    <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                      <div class="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">Flange worksheet asset</div>
+                      <div class="mt-2 text-sm font-semibold text-gray-900">
+                        {{ portDocumentationContext()?.currentFlangeWorksheet?.displayName ?? 'No active asset available' }}
+                      </div>
+                      <p class="mt-1 text-xs text-gray-500">Include the current uploaded worksheet on this order.</p>
+                    </div>
+                  </div>
+
+                  @if (bunkerInstructionsPreview(); as preview) {
+                    <div class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+                      <div class="flex items-center justify-between gap-3">
+                        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">Bunker Instructions preview</p>
+                        <span class="text-xs text-blue-600">{{ preview.sections.length }} section{{ preview.sections.length === 1 ? '' : 's' }}</span>
+                      </div>
+                      @if (preview.warnings.length > 0) {
+                        <ul class="mt-2 space-y-1 text-sm text-blue-900">
+                          @for (warning of preview.warnings; track warning) {
+                            <li>{{ warning }}</li>
+                          }
+                        </ul>
+                      }
+                      <div class="mt-3 space-y-3">
+                        @for (section of preview.sections; track section.title) {
+                          <div class="rounded-lg border border-blue-100 bg-white px-3 py-3">
+                            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">{{ section.title }}</p>
+                            <dl class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                              @for (field of section.fields; track field.label) {
+                                <div>
+                                  <dt class="text-[11px] font-medium uppercase tracking-[0.12em] text-gray-500">{{ field.label }}</dt>
+                                  <dd class="mt-1 text-sm text-gray-800">{{ field.value || '—' }}</dd>
+                                </div>
+                              }
+                            </dl>
+                          </div>
+                        }
+                      </div>
+                    </div>
+                  }
+                </div>
+
+                <div class="rounded-lg border border-gray-200 bg-white p-4">
+                  <div class="flex items-center justify-between gap-3">
+                    <div>
+                      <p class="text-xs font-semibold uppercase tracking-[0.14em] text-gray-500">Generated files</p>
+                      <p class="mt-1 text-sm text-gray-600">These are the files available for “Send Port Documentation”.</p>
+                    </div>
+                    <span class="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">
+                      {{ portDocumentationContext()?.documents?.length ?? 0 }} file{{ (portDocumentationContext()?.documents?.length ?? 0) === 1 ? '' : 's' }}
+                    </span>
+                  </div>
+
+                  <div class="mt-4">
+                    @if ((portDocumentationContext()?.documents?.length ?? 0) === 0) {
+                      <div class="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-sm text-gray-500">
+                        No Port Documentation files have been generated or included yet.
+                      </div>
+                    } @else {
+                      <ul class="space-y-2">
+                        @for (doc of portDocumentationContext()!.documents; track doc.id) {
+                          <li class="flex items-center justify-between gap-3 rounded-lg border border-gray-100 px-3 py-3">
+                            <div class="min-w-0">
+                              <div class="flex flex-wrap items-center gap-2">
+                                <span class="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-600">{{ doc.documentKind }}</span>
+                                <span class="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700">{{ doc.sourceType }}</span>
+                                <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">{{ doc.status }}</span>
+                              </div>
+                              <div class="mt-2 truncate text-sm font-medium text-gray-900">{{ doc.fileName }}</div>
+                              <div class="mt-1 text-xs text-gray-500">{{ formatFileSize(doc.fileSize) }} · {{ doc.createdAt | date : 'medium' }}</div>
+                            </div>
+                            <button
+                              type="button"
+                              (click)="downloadPortDocumentationDocument(doc)"
+                              [disabled]="portDocumentationAction() === 'download-' + doc.id"
+                              class="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {{ portDocumentationAction() === 'download-' + doc.id ? 'Downloading…' : 'Download' }}
+                            </button>
+                          </li>
+                        }
+                      </ul>
+                    }
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      }
 
       @if (order()?.id) {
         <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
