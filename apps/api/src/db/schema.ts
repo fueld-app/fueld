@@ -202,6 +202,8 @@ export const transferSideKindEnum = pgEnum('transfer_side_kind', [
 export interface TenantSettings {
   activityRetentionDays?: number;
   financingRateAnnual?: number;
+  // Timezone
+  defaultTimezone?: string;       // IANA timezone ID (e.g. "America/Chicago", "Europe/Copenhagen", "Asia/Dubai") — used for all UI/email/PDF date formatting
   // Security / Auth
   ssoProvider?: 'microsoft' | 'google' | 'none';
   ssoClientId?: string;

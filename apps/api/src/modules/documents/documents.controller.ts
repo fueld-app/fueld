@@ -1344,8 +1344,9 @@ export const documentsController = new Elysia({ prefix: '/orders' })
 
       const resolvedEta = normalizeInquiryDateInput(body?.eta) ?? order.eta;
       const resolvedEtd = normalizeInquiryDateInput(body?.etd) ?? order.etd;
-      const etaLabel = formatStoredDateOnlyLabel(resolvedEta);
-      const etdLabel = formatStoredDateOnlyLabel(resolvedEtd);
+      const placeTimezone = order.place?.timezone ?? null;
+      const etaLabel = formatStoredDateOnlyLabel(resolvedEta, placeTimezone);
+      const etdLabel = formatStoredDateOnlyLabel(resolvedEtd, placeTimezone);
       const deliveryWindow = etaLabel && etdLabel
         ? `${etaLabel} to ${etdLabel}`
         : etaLabel || etdLabel || '';
@@ -1478,8 +1479,9 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       const inquirySettings = await getInquirySettings();
       const resolvedEta = normalizeInquiryDateInput(body.eta) ?? order.eta;
       const resolvedEtd = normalizeInquiryDateInput(body.etd) ?? order.etd;
-      const etaLabel = formatStoredDateOnlyLabel(resolvedEta);
-      const etdLabel = formatStoredDateOnlyLabel(resolvedEtd);
+      const placeTimezone = order.place?.timezone ?? null;
+      const etaLabel = formatStoredDateOnlyLabel(resolvedEta, placeTimezone);
+      const etdLabel = formatStoredDateOnlyLabel(resolvedEtd, placeTimezone);
       const deliveryWindow = etaLabel && etdLabel
         ? `${etaLabel} to ${etdLabel}`
         : etaLabel || etdLabel || '';
@@ -1786,6 +1788,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       const inquirySettings = await getInquirySettings();
       const resolvedEta = normalizeInquiryDateInput(body.eta) ?? order.eta;
       const resolvedEtd = normalizeInquiryDateInput(body.etd) ?? order.etd;
+      const placeTimezone = order.place?.timezone ?? null;
 
       const existingInquiries = await db
         .select({ id: supplierInquiries.id, supplierId: supplierInquiries.supplierId })
@@ -1812,8 +1815,8 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             vesselName: order.vessel?.name ?? 'Vessel',
             vesselImo: order.vessel?.imo ?? null,
             portName: order.place?.name ?? 'Port',
-            etaFormatted: formatStoredDateOnlyLabel(resolvedEta),
-            etdFormatted: formatStoredDateOnlyLabel(resolvedEtd),
+            etaFormatted: formatStoredDateOnlyLabel(resolvedEta, placeTimezone),
+            etdFormatted: formatStoredDateOnlyLabel(resolvedEtd, placeTimezone),
             responseDeadlineFormatted,
             personalNote: target.personalNote ?? null,
             quoteFormUrl,

@@ -64,6 +64,8 @@ import {
   updateBrokerSettings,
   getFollowUpSettings,
   updateFollowUpSettings,
+  getTimezoneSettings,
+  updateTimezoneSettings,
 } from './settings.service';
 import { reloadCurrencies } from '../prices/price.service';
 import {
@@ -513,6 +515,18 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     }
   }, {
     detail: { tags: ['Admin Settings'], summary: 'Get follow-up settings for current tenant' },
+  })
+
+  .get('/my-timezone', async () => {
+    try {
+      const data = await getTimezoneSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get timezone setting for current tenant' },
   })
 
   // ── Integrations ────────────────────────────────────────────────
@@ -1717,4 +1731,37 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       defaultFollowUpDays: t.Optional(t.Number({ minimum: 1, maximum: 365 })),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update follow-up settings' },
+  })
+
+  // ═════════════════════════════════════════════════════════════
+  //  TIMEZONE SETTINGS
+  // ═════════════════════════════════════════════════════════════
+
+  .get('/timezone', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getTimezoneSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get timezone setting' },
+  })
+
+  .put('/timezone', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateTimezoneSettings(body);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      defaultTimezone: t.Optional(t.Nullable(t.String())),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update timezone setting' },
   });

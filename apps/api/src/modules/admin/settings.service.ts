@@ -1477,3 +1477,41 @@ export async function updateFollowUpSettings(data: { defaultFollowUpDays?: numbe
 
   return getFollowUpSettings();
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+//  TIMEZONE SETTINGS
+// ═══════════════════════════════════════════════════════════════════════
+
+export async function getTimezoneSettings(): Promise<{ defaultTimezone: string | null }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  return { defaultTimezone: settings.defaultTimezone ?? null };
+}
+
+export async function updateTimezoneSettings(data: { defaultTimezone?: string | null }): Promise<{ defaultTimezone: string | null }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = { ...(tenant.settings as any) };
+
+  if (data.defaultTimezone !== undefined) {
+    // Validate IANA timezone if a value is provided
+    if (data.defaultTimezone !== null && data.defaultTimezone !== '') {
+      try {
+        Intl.DateTimeFormat(undefined, { timeZone: data.defaultTimezone });
+      } catch {
+        throw new Error(`Invalid IANA timezone: ${data.defaultTimezone}`);
+      }
+    }
+    settings.defaultTimezone = data.defaultTimezone || null;
+  }
+
+  await db
+    .update(tenants)
+    .set({ settings, updatedAt: new Date() })
+    .where(eq(tenants.id, tenant.id));
+
+  return getTimezoneSettings();
+}

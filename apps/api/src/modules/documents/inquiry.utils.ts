@@ -1,11 +1,5 @@
 import type { TemplateVariables } from '../admin/email-settings.service';
-
-const storedDateOnlyLabelFormatter = new Intl.DateTimeFormat('en-GB', {
-  timeZone: 'UTC',
-  day: '2-digit',
-  month: 'short',
-  year: 'numeric',
-});
+import { isIanaTimezone } from '../../utils/timezone';
 
 export function buildInquiryTemplateVariables(params: {
   vesselName: string;
@@ -46,11 +40,19 @@ export function buildInquiryTemplateVariables(params: {
   };
 }
 
-export function formatStoredDateOnlyLabel(value: string | Date | null | undefined): string | null {
+export function formatStoredDateOnlyLabel(value: string | Date | null | undefined, tz?: string | null): string | null {
   if (!value) return null;
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  return storedDateOnlyLabelFormatter.format(date);
+
+  const safeTz = tz && isIanaTimezone(tz) ? tz : 'UTC';
+
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: safeTz,
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(date);
 }
 
 export function normalizeInquiryDateInput(value: string | null | undefined): string | null {

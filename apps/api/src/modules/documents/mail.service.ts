@@ -274,12 +274,25 @@ function formatInquiryQuantity(value: string | null | undefined): string {
   return trimmed.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
 }
 
-function formatStoredDateLabel(value: string | null | undefined): string | null {
+function formatStoredDateLabel(value: string | null | undefined, tz?: string | null): string | null {
   if (!value) return null;
-  const source = value.includes('T') ? value.slice(0, 10) : value;
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(source);
-  if (!match) return value;
-  return `${match[2]}/${match[3]}/${match[1]}`;
+  const date = typeof value === 'string' ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return null;
+
+  const safeTz = tz && (() => { try { Intl.DateTimeFormat(undefined, { timeZone: tz }); return true; } catch { return false; } })() ? tz : 'UTC';
+
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: safeTz,
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).formatToParts(date);
+
+  const map = new Map(parts.map((p) => [p.type, p.value]));
+  const day = map.get('day') ?? '01';
+  const month = map.get('month') ?? '01';
+  const year = map.get('year') ?? '0000';
+  return `${month}/${day}/${year}`;
 }
 
 function buildPortDocumentationEmailHtml(params: {

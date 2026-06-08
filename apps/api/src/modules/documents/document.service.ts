@@ -8,6 +8,7 @@ import { basename, dirname, extname, join } from 'node:path';
 import QRCode from 'qrcode';
 import { db } from '../../db';
 import { bankAccounts, orders, orderItems, counterparties, vessels, places, invoices, users, documentRevisions, tenants, priceReferences, type TenantSettings } from '../../db/schema';
+import { isIanaTimezone } from '../../utils/timezone';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Document Service — Server-side PDF generation (pdfmake v0.3)
@@ -668,14 +669,25 @@ export function splitAddressLines(address: string): string[] {
   return trimmed.split(/,\s*/).map(l => l.trim()).filter(Boolean);
 }
 
-function formatStoredDateOnlyForDisplay(value: string | Date | null | undefined): string | null {
+function formatStoredDateOnlyForDisplay(value: string | Date | null | undefined, tz?: string | null): string | null {
   if (!value) return null;
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return null;
 
-  const year = String(date.getUTCFullYear()).padStart(4, '0');
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(date.getUTCDate()).padStart(2, '0');
+  // Use the provided timezone if valid, otherwise fall back to UTC
+  const safeTz = tz && isIanaTimezone(tz) ? tz : 'UTC';
+
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: safeTz,
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).formatToParts(date);
+
+  const map = new Map(parts.map((p) => [p.type, p.value]));
+  const day = map.get('day') ?? '01';
+  const month = map.get('month') ?? '01';
+  const year = map.get('year') ?? '0000';
   return `${day}-${month}-${year}`;
 }
 
@@ -715,8 +727,8 @@ function computeDueDate(
   return new Date(baseDate.getTime() + 30 * 86_400_000).toISOString().split('T')[0]!;
 }
 
-function formatDateTimeForDisplay(value: string | null, _tz: string | null | undefined, _omitTz = false): string | null {
-  return formatStoredDateOnlyForDisplay(value);
+function formatDateTimeForDisplay(value: string | null, tz: string | null | undefined, _omitTz = false): string | null {
+  return formatStoredDateOnlyForDisplay(value, tz);
 }
 
 function replaceCompanyNamePlaceholder(

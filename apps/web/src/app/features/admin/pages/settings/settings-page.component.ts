@@ -134,6 +134,68 @@ interface InquirySettingsDto {
           </div>
 
           <!-- ════════════════════════════════════════════════════════ -->
+          <!--  Timezone                                               -->
+          <!-- ════════════════════════════════════════════════════════ -->
+          <div class="app-panel">
+            <div class="app-panel-header app-panel-header--blue">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--blue">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-semibold text-gray-900">Timezone</h3>
+                <p class="text-xs text-gray-500">Default timezone for date/time display in the UI, emails, WhatsApp messages, and PDF documents.</p>
+              </div>
+            </div>
+
+            <div class="app-panel-body space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Default timezone</label>
+                <select
+                  [ngModel]="defaultTimezone()"
+                  (ngModelChange)="setDefaultTimezone($event)"
+                  class="app-input w-full max-w-xs bg-white"
+                >
+                  <option value="">Browser default (no override)</option>
+                  @for (tz of commonTimezones(); track tz.value) {
+                    <option [value]="tz.value">{{ tz.label }}</option>
+                  }
+                </select>
+                <p class="mt-1 text-xs text-gray-500">
+                  All timestamps are stored as UTC. This setting controls how dates are displayed.
+                  Leave empty to use each user's browser timezone.
+                </p>
+              </div>
+
+              @if (defaultTimezone()) {
+                <div class="rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm text-blue-800">
+                  Current time in {{ defaultTimezone() }}:
+                  <span class="font-semibold">{{ timezonePreview() }}</span>
+                </div>
+              }
+
+              <div class="flex items-center gap-3 pt-2">
+                <button
+                  (click)="saveTimezone()"
+                  [disabled]="timezoneSaving()"
+                  class="app-button-primary"
+                >
+                  @if (timezoneSaving()) { Saving… } @else { Save Timezone }
+                </button>
+                @if (timezoneSaved()) {
+                  <span class="text-sm text-green-600 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                    </svg>
+                    Saved
+                  </span>
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- ════════════════════════════════════════════════════════ -->
           <!--  Product Options                                        -->
           <!-- ════════════════════════════════════════════════════════ -->
           <div class="app-panel">
@@ -1439,6 +1501,50 @@ export class SettingsPageComponent implements OnInit {
   readonly followUpSaving = signal(false);
   readonly followUpSaved = signal(false);
 
+  // Timezone settings
+  readonly defaultTimezone = signal('');
+  readonly timezoneSaving = signal(false);
+  readonly timezoneSaved = signal(false);
+
+  readonly commonTimezones = signal<{ value: string; label: string }[]>([
+    { value: 'America/Chicago', label: 'America/Chicago (Houston, CST/CDT)' },
+    { value: 'Europe/Copenhagen', label: 'Europe/Copenhagen (CET/CEST)' },
+    { value: 'Europe/Monaco', label: 'Europe/Monaco (CET/CEST)' },
+    { value: 'Asia/Dubai', label: 'Asia/Dubai (GST)' },
+    { value: 'Europe/London', label: 'Europe/London (GMT/BST)' },
+    { value: 'Europe/Paris', label: 'Europe/Paris (CET/CEST)' },
+    { value: 'America/New_York', label: 'America/New York (EST/EDT)' },
+    { value: 'America/Los_Angeles', label: 'America/Los Angeles (PST/PDT)' },
+    { value: 'Asia/Singapore', label: 'Asia/Singapore (SGT)' },
+    { value: 'Asia/Tokyo', label: 'Asia/Tokyo (JST)' },
+    { value: 'Asia/Shanghai', label: 'Asia/Shanghai (CST)' },
+    { value: 'Asia/Kolkata', label: 'Asia/Kolkata (IST)' },
+    { value: 'Europe/Moscow', label: 'Europe/Moscow (MSK)' },
+    { value: 'Australia/Sydney', label: 'Australia/Sydney (AEST/AEDT)' },
+    { value: 'Pacific/Auckland', label: 'Pacific/Auckland (NZST/NZDT)' },
+    { value: 'UTC', label: 'UTC (Coordinated Universal Time)' },
+  ]);
+
+  readonly timezonePreview = computed(() => {
+    const tz = this.defaultTimezone();
+    if (!tz) return '';
+    try {
+      return new Intl.DateTimeFormat('en-GB', {
+        timeZone: tz,
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+        timeZoneName: 'short',
+      }).format(new Date());
+    } catch {
+      return 'Invalid timezone';
+    }
+  });
+
   readonly livePreview = computed(() => {
     const tmpl = this.template();
     const pfx = this.prefix();
@@ -1478,6 +1584,7 @@ export class SettingsPageComponent implements OnInit {
     this.loadInquiryCancelReasons();
     this.loadSegments();
     this.loadFollowUpSettings();
+    this.loadTimezoneSettings();
   }
 
   private async loadSettings(): Promise<void> {
@@ -2550,6 +2657,47 @@ export class SettingsPageComponent implements OnInit {
       this.showToast('error', 'Failed to save follow-up settings.');
     } finally {
       this.followUpSaving.set(false);
+    }
+  }
+
+  // ─── Timezone settings ─────────────────────────────────────────
+
+  private async loadTimezoneSettings(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ defaultTimezone: string | null }>>(`${API}/admin/settings/timezone`),
+      );
+      if (res.success) {
+        this.defaultTimezone.set(res.data.defaultTimezone ?? '');
+      }
+    } catch {
+      // ignore – defaults work fine
+    }
+  }
+
+  setDefaultTimezone(value: string): void {
+    this.defaultTimezone.set(value);
+  }
+
+  async saveTimezone(): Promise<void> {
+    this.timezoneSaving.set(true);
+    this.timezoneSaved.set(false);
+    try {
+      const tz = this.defaultTimezone() || null;
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<{ defaultTimezone: string | null }>>(`${API}/admin/settings/timezone`, { defaultTimezone: tz }),
+      );
+      if (res.success) {
+        this.defaultTimezone.set(res.data.defaultTimezone ?? '');
+        this.timezoneSaved.set(true);
+        setTimeout(() => this.timezoneSaved.set(false), 3000);
+      } else {
+        this.showToast('error', (res as any).message ?? 'Failed to save.');
+      }
+    } catch {
+      this.showToast('error', 'Failed to save timezone settings.');
+    } finally {
+      this.timezoneSaving.set(false);
     }
   }
 }
