@@ -944,6 +944,7 @@ export const orderAttachments = pgTable('order_attachments', {
   mimeType: text('mime_type').notNull(),
   fileSize: integer('file_size').notNull(),
   uploadedBy: uuid('uploaded_by').references(() => users.id),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

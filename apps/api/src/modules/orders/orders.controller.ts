@@ -29,6 +29,7 @@ import {
   resolveOrderId,
   listOrderAttachments,
   createOrderAttachment,
+  deleteOrderAttachment,
   listOrderPayments,
   createOrderPayment,
   finalizeItemPrice,
@@ -740,6 +741,29 @@ export const ordersController = new Elysia({ prefix: '/orders' })
       detail: {
         tags: ['Orders'],
         summary: 'Upload an attachment for an order',
+      },
+    },
+  )
+  .delete(
+    '/:id/attachments/:attachmentId',
+    async ({ params, auth }) => {
+      try {
+        const orderId = await resolveOrderId(params.id);
+        if (!orderId) return { success: false, data: null, message: 'Order not found' };
+
+        await deleteOrderAttachment(params.attachmentId, orderId);
+        return { success: true, data: { deleted: true } } satisfies ApiResponse<{ deleted: boolean }>;
+      } catch (err) {
+        console.error('[Orders] Delete attachment failed:', err);
+        const message = err instanceof Error ? err.message : 'Failed to delete attachment';
+        return { success: false, data: null, message };
+      }
+    },
+    {
+      params: t.Object({ id: t.String(), attachmentId: t.String() }),
+      detail: {
+        tags: ['Orders'],
+        summary: 'Soft-delete an attachment from an order (file retained on disk)',
       },
     },
   )

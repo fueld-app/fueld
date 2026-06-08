@@ -1424,17 +1424,29 @@ interface PlattsSuggestionViewModel {
               <ul class="divide-y divide-gray-100">
                 @for (att of attachments(); track att.id) {
                   <li class="flex items-center justify-between py-2 text-sm">
-                    <div class="flex items-center gap-2">
-                      <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">{{ att.type }}</span>
+                    <div class="flex items-center gap-2 min-w-0">
+                      <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600 shrink-0">{{ att.type }}</span>
                       <button
                         type="button"
                         (click)="openAttachment(att)"
-                        class="text-left text-brand-600 hover:underline"
+                        class="text-left text-brand-600 hover:underline truncate"
                       >
                         {{ att.fileName }}
                       </button>
                     </div>
-                    <span class="text-xs text-gray-400">{{ formatFileSize(att.fileSize) }}</span>
+                    <div class="flex items-center gap-2 shrink-0">
+                      <span class="text-xs text-gray-400">{{ formatFileSize(att.fileSize) }}</span>
+                      <button
+                        type="button"
+                        (click)="deleteAttachment(att)"
+                        class="rounded p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                        title="Remove attachment"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z" clip-rule="evenodd" />
+                        </svg>
+                      </button>
+                    </div>
                   </li>
                 }
               </ul>
@@ -3574,6 +3586,24 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       this.showToast('error', 'Failed to upload attachment.');
     } finally {
       this.uploadingAttachment.set(false);
+    }
+  }
+
+  async deleteAttachment(att: OrderAttachmentDto): Promise<void> {
+    const id = this.orderId();
+    if (!id) return;
+    try {
+      const res = await firstValueFrom(
+        this.http.delete<ApiResponse<{ deleted: boolean }>>(`${API_URL}/orders/${id}/attachments/${att.id}`),
+      );
+      if (res.success) {
+        this.attachments.update((prev) => prev.filter((a) => a.id !== att.id));
+        this.showToast('success', 'Attachment removed.');
+      } else {
+        this.showToast('error', res.message ?? 'Failed to remove attachment.');
+      }
+    } catch {
+      this.showToast('error', 'Failed to remove attachment.');
     }
   }
 

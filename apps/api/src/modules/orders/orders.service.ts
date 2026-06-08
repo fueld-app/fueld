@@ -4,7 +4,7 @@
 //  An "inquiry" is simply an order with status INQUIRY or OFFER.
 // ═══════════════════════════════════════════════════════════════════════
 
-import { eq, and, desc, asc, sql, ilike, inArray, or } from 'drizzle-orm';
+import { eq, and, desc, asc, sql, ilike, inArray, or, isNull } from 'drizzle-orm';
 import { db } from '../../db';
 import {
   orders,
@@ -1542,7 +1542,7 @@ export async function listOrderAttachments(orderId: string) {
   const rows = await db
     .select()
     .from(orderAttachments)
-    .where(eq(orderAttachments.orderId, orderId));
+    .where(and(eq(orderAttachments.orderId, orderId), isNull(orderAttachments.deletedAt)));
 
   return rows.map((row) => ({
     id: row.id,
@@ -1580,6 +1580,16 @@ export async function createOrderAttachment(input: {
     .returning();
 
   return created ?? null;
+}
+
+export async function deleteOrderAttachment(attachmentId: string, orderId: string): Promise<void> {
+  const result = await db
+    .update(orderAttachments)
+    .set({ deletedAt: new Date() })
+    .where(and(eq(orderAttachments.id, attachmentId), eq(orderAttachments.orderId, orderId)))
+    .returning({ id: orderAttachments.id });
+
+  if (!result.length) throw new Error('Attachment not found');
 }
 
 // ─── Customer Payments (ledger) ───────────────────────────────────
