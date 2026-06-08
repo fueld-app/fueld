@@ -245,6 +245,7 @@ interface PlattsSuggestionViewModel {
           [hasLineItems]="hasLineItems()"
           [hasEnoughPayments]="hasEnoughPaymentsForMarkPaid()"
           [hasPortDocumentationDocuments]="(portDocumentationContext()?.documents?.length ?? 0) > 0"
+          [portDocumentationEnabled]="portDocumentationContext()?.enabled ?? false"
           (actionTriggered)="onAction($event)"
         />
         <div class="relative">

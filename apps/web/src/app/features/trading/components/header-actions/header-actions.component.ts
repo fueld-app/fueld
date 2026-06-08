@@ -201,6 +201,7 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
   readonly hasLineItems = input<boolean>(false);
   readonly hasEnoughPayments = input<boolean>(false);
   readonly hasPortDocumentationDocuments = input<boolean>(false);
+  readonly portDocumentationEnabled = input<boolean>(false);
   readonly actionTriggered = output<HeaderAction>();
 
   readonly isOpen = signal(false);
@@ -252,6 +253,7 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
     const hasBankAccount = this.hasBankAccount();
     const hasLineItems = this.hasLineItems();
     const hasPortDocumentationDocuments = this.hasPortDocumentationDocuments();
+    const portDocumentationEnabled = this.portDocumentationEnabled();
     const isInquiry = normalizedStatus === 'INQUIRY' || normalizedStatus === 'OFFER';
     const showInvoiceAsFinal =
       status === OrderStatus.Delivered
@@ -308,7 +310,7 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
             && (action.key !== 'cancel-order' || canCancelOrder)
             && action.key !== 'send-offer'
             && action.key !== 'send-proforma'
-            && (action.key !== 'send-port-documentation' || hasPortDocumentationDocuments)
+            && (action.key !== 'send-port-documentation' || portDocumentationEnabled)
             && (action.key !== 'mark-paid' || canMarkPaid),
           )
           .map((action) =>
