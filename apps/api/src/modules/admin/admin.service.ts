@@ -68,12 +68,14 @@ export async function inviteUser(data: {
   name: string;
   role: 'ADMIN' | 'TRADER' | 'FINANCE' | 'TEAMLEAD' | 'CREDITMANAGER' | 'OPERATIONSMANAGER' | 'LIGHT';
   invitedBy: string;
+  allowReinvite?: boolean;
 }) {
   const tenantId = await getTenantId();
+  const normalizedEmail = data.email.toLowerCase();
 
   // Check if email is already registered
   const existing = await db.query.users.findFirst({
-    where: eq(users.email, data.email.toLowerCase()),
+    where: eq(users.email, normalizedEmail),
   });
   if (existing) {
     throw new Error('A user with this email already exists');
@@ -82,12 +84,47 @@ export async function inviteUser(data: {
   // Check for an existing pending invite
   const existingInvite = await db.query.invitations.findFirst({
     where: and(
-      eq(invitations.email, data.email.toLowerCase()),
+      eq(invitations.email, normalizedEmail),
       isNull(invitations.acceptedAt),
     ),
   });
+
+  // Get inviter name for display
+  const inviter = await db.query.users.findFirst({
+    where: eq(users.id, data.invitedBy),
+  });
+
   if (existingInvite) {
-    throw new Error('An invitation for this email is already pending');
+    if (!data.allowReinvite) {
+      throw new Error('An invitation for this email is already pending');
+    }
+
+    const token = crypto.randomUUID() + '-' + crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    const [invite] = await db
+      .update(invitations)
+      .set({
+        name: data.name,
+        role: data.role,
+        token,
+        invitedBy: data.invitedBy,
+        expiresAt,
+      })
+      .where(eq(invitations.id, existingInvite.id))
+      .returning();
+
+    return {
+      id: invite!.id,
+      email: invite!.email,
+      name: invite!.name,
+      role: invite!.role,
+      token: invite!.token,
+      invitedByName: inviter?.name ?? 'Unknown',
+      expiresAt: invite!.expiresAt.toISOString(),
+      acceptedAt: null,
+      createdAt: invite!.createdAt.toISOString(),
+    };
   }
 
   // Generate a secure random token
@@ -100,7 +137,7 @@ export async function inviteUser(data: {
     .insert(invitations)
     .values({
       tenantId,
-      email: data.email.toLowerCase(),
+      email: normalizedEmail,
       name: data.name,
       role: data.role,
       token,
@@ -108,11 +145,6 @@ export async function inviteUser(data: {
       expiresAt,
     })
     .returning();
-
-  // Get inviter name for display
-  const inviter = await db.query.users.findFirst({
-    where: eq(users.id, data.invitedBy),
-  });
 
   return {
     id: invite!.id,

@@ -141,6 +141,7 @@ export const adminController = new Elysia({ prefix: '/admin' })
         name: body.name,
         role: body.role as 'ADMIN' | 'TRADER' | 'FINANCE' | 'TEAMLEAD' | 'CREDITMANAGER' | 'OPERATIONSMANAGER' | 'LIGHT',
         invitedBy: auth.sub,
+        allowReinvite: body.allowReinvite,
       });
 
       // Build invite link — frontend will handle the /invite/:token route
@@ -172,6 +173,7 @@ export const adminController = new Elysia({ prefix: '/admin' })
       email: t.String({ format: 'email' }),
       name: t.String({ minLength: 1 }),
       role: t.String(),
+      allowReinvite: t.Optional(t.Boolean()),
     }),
     detail: { tags: ['Admin'], summary: 'Invite a new user via email', security: [{ bearerAuth: [] }] },
   })

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
-import { users } from '../src/db/schema';
+import { invitations, users } from '../src/db/schema';
 import { hashPassword } from '../src/modules/auth/password.service';
 import { getDb, seedAuthBasics, truncateAll } from './helpers/db';
 import { loginE2E, requestJson } from './helpers/e2e';
@@ -106,5 +106,54 @@ describe('admin controller branch e2e', () => {
     expect(second.status).toBe(200);
     expect(second.data?.success).toBe(false);
     expect(String(second.data?.message ?? '')).toContain('already pending');
+  });
+
+  it('reissues a pending invitation via the existing invite endpoint', async () => {
+    const { token } = await adminTokenForSeededUser();
+    const db = await getDb();
+
+    const first = await requestJson('/admin/users/invite', {
+      method: 'POST',
+      token,
+      body: {
+        email: 'reinvite-via-invite@test.local',
+        name: 'Reinvite Target',
+        role: 'TRADER',
+      },
+    });
+
+    expect(first.status).toBe(200);
+    expect(first.data?.success).toBe(true);
+
+    const originalToken = String(first.data?.data?.token ?? '');
+    const originalId = String(first.data?.data?.id ?? '');
+    expect(originalToken).toBeTruthy();
+    expect(originalId).toBeTruthy();
+
+    const second = await requestJson('/admin/users/invite', {
+      method: 'POST',
+      token,
+      body: {
+        email: 'reinvite-via-invite@test.local',
+        name: 'Reinvite Target',
+        role: 'TRADER',
+        allowReinvite: true,
+      },
+    });
+
+    expect(second.status).toBe(200);
+    expect(second.data?.success).toBe(true);
+    expect(String(second.data?.data?.id ?? '')).toBe(originalId);
+    expect(String(second.data?.data?.token ?? '')).not.toBe(originalToken);
+    expect(String(second.data?.data?.inviteLink ?? '')).toContain('/invite/');
+
+    const rows = await db
+      .select({ id: invitations.id, token: invitations.token })
+      .from(invitations)
+      .where(eq(invitations.email, 'reinvite-via-invite@test.local'));
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.id).toBe(originalId);
+    expect(rows[0]?.token).toBe(String(second.data?.data?.token ?? ''));
   });
 });
