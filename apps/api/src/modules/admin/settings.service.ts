@@ -329,8 +329,14 @@ export async function updateTeam(
 }
 
 export async function deleteTeam(teamId: string) {
-  // Remove user-team associations (cascade will handle this, but explicit is safer)
+  // Remove user-team associations from join table
   await db.delete(userTeams).where(eq(userTeams.teamId, teamId));
+
+  // Clear primary_team_id references so FK constraint doesn't block deletion
+  await db
+    .update(users)
+    .set({ primaryTeamId: null })
+    .where(eq(users.primaryTeamId, teamId));
 
   const [deleted] = await db
     .delete(teams)

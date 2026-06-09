@@ -86,10 +86,10 @@ describe('settings controller branch e2e', () => {
     expect(bankDelete.data?.success).toBe(false);
     expect(String(bankDelete.data?.message ?? '')).toContain('Bank account not found');
 
-    const userTeamMissing = await requestJson('/admin/settings/users/123e4567-e89b-12d3-a456-426614174000/team', {
+    const userTeamMissing = await requestJson('/admin/settings/users/123e4567-e89b-12d3-a456-426614174000/teams', {
       method: 'PATCH',
       token,
-      body: { teamId: null },
+      body: { teamIds: [] },
     });
 
     expect(userTeamMissing.status).toBe(200);

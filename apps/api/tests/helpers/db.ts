@@ -482,8 +482,14 @@ async function _doEnsureTestSchemaCompat(): Promise<void> {
       mime_type text NOT NULL,
       file_size integer NOT NULL,
       uploaded_by uuid REFERENCES users(id),
+      deleted_at timestamptz,
       created_at timestamptz NOT NULL DEFAULT now()
     )
+  `;
+
+  await sql`
+    ALTER TABLE order_attachments
+    ADD COLUMN IF NOT EXISTS deleted_at timestamptz
   `;
 
   await sql`
