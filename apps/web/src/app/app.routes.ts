@@ -56,10 +56,18 @@ export const routes: Routes = [
       {
         path: '',
         loadComponent: () =>
+          import('./pages/dashboard/dashboard-redirect.component').then(
+            (m) => m.DashboardRedirectComponent,
+          ),
+        pathMatch: 'full',
+        title: 'Dashboard',
+      },
+      {
+        path: 'dashboard',
+        loadComponent: () =>
           import('./pages/dashboard/dashboard-page.component').then(
             (m) => m.DashboardPageComponent,
           ),
-        pathMatch: 'full',
         title: 'Dashboard',
       },
       {
@@ -181,7 +189,15 @@ export const routes: Routes = [
       {
         path: 'operations',
         children: [
-          { path: '', redirectTo: 'inventory', pathMatch: 'full' as const },
+          { path: '', redirectTo: 'board', pathMatch: 'full' as const },
+          {
+            path: 'board',
+            loadComponent: () =>
+              import('./features/operations/pages/board/operations-board-page.component').then(
+                (m) => m.OperationsBoardPageComponent,
+              ),
+            title: 'Operations > Board',
+          },
           {
             path: 'inventory',
             loadComponent: () =>

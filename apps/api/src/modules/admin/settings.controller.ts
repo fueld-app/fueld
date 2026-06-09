@@ -61,6 +61,8 @@ import {
   updateDefaultUnitSettings,
   getTaxRateSettings,
   updateTaxRateSettings,
+  getRoleDashboardSettings,
+  updateRoleDashboardSettings,
   updateOwnCompanyTerms,
   getWhatsAppSettings,
   updateWhatsAppSettings,
@@ -92,7 +94,7 @@ import {
   setDesktopCredentials,
   isAppConfigured as isQBAppConfigured,
 } from '../quickbooks/quickbooks.service';
-import { updateUserTeam } from './admin.service';
+import { updateUserTeams } from './admin.service';
 import {
   getEmailTemplates,
   upsertEmailTemplate,
@@ -361,10 +363,10 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   //  USER TEAM + COMPANY ACCESS
   // ═══════════════════════════════════════════════════════════════════
 
-  .patch('/users/:id/team', async ({ auth, params, body }) => {
+  .patch('/users/:id/teams', async ({ auth, params, body }) => {
     try {
       requireAdmin(auth);
-      const data = await updateUserTeam(params.id, body.teamId);
+      const data = await updateUserTeams(params.id, body.teamIds);
       return { success: true, data } satisfies ApiResponse<unknown>;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed';
@@ -372,8 +374,8 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     }
   }, {
     params: t.Object({ id: t.String() }),
-    body: t.Object({ teamId: t.Nullable(t.String()) }),
-    detail: { tags: ['Admin Settings'], summary: 'Assign user to a team' },
+    body: t.Object({ teamIds: t.Array(t.String()) }),
+    detail: { tags: ['Admin Settings'], summary: 'Assign user to multiple teams' },
   })
 
   .get('/users/:id/companies', async ({ auth, params }) => {
@@ -1431,6 +1433,39 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       })),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update tax rate settings' },
+  })
+
+  // ═════════════════════════════════════════════════════════════════
+  //  ROLE DASHBOARD SETTINGS
+  // ═════════════════════════════════════════════════════════════════
+
+  .get('/role-dashboards', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getRoleDashboardSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get role dashboard settings' },
+  })
+
+  .put('/role-dashboards', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateRoleDashboardSettings(body.dashboards as Record<string, string>);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      dashboards: t.Record(t.String(), t.String()),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update role dashboard settings' },
   })
 
   // ═════════════════════════════════════════════════════════════════

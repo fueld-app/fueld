@@ -1790,6 +1790,60 @@ interface InquirySettingsDto {
             </div>
           </div>
 
+          <!-- ════════════════════════════════════════════════════════ -->
+          <!--  Role Dashboards                                        -->
+          <!-- ════════════════════════════════════════════════════════ -->
+          <div class="app-panel">
+            <div class="app-panel-header app-panel-header--indigo">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--indigo">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" />
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-semibold text-gray-900">Role Dashboards</h3>
+                <p class="text-xs text-gray-500">Configure default landing page per role.</p>
+              </div>
+            </div>
+
+            <div class="app-panel-body space-y-3">
+              @for (role of availableRoles; track role.key) {
+                <div class="flex items-center gap-3">
+                  <span class="w-24 text-sm font-medium text-gray-700">{{ role.label }}</span>
+                  <select
+                    [ngModel]="roleDashboards()[role.key] ?? ''"
+                    (ngModelChange)="setRoleDashboard(role.key, $event)"
+                    class="app-input flex-1"
+                  >
+                    <option value="">Default Dashboard</option>
+                    <option value="/operations/board">Operations Board</option>
+                    <option value="/trading/orders">Active Orders</option>
+                    <option value="/trading/inquiries">Inquiries</option>
+                    <option value="/reports">Reports</option>
+                  </select>
+                </div>
+              }
+
+              <div class="flex items-center gap-3 pt-2">
+                <button
+                  (click)="saveRoleDashboards()"
+                  [disabled]="roleDashboardsSaving()"
+                  class="app-button-primary"
+                >
+                  @if (roleDashboardsSaving()) { Saving… } @else { Save Dashboards }
+                </button>
+                @if (roleDashboardsSaved()) {
+                  <span class="text-sm text-green-600 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                    </svg>
+                    Saved
+                  </span>
+                }
+              </div>
+            </div>
+          </div>
+
         </div>
       }
 
@@ -1921,6 +1975,20 @@ export class SettingsPageComponent implements OnInit {
   readonly taxRatesSaving = signal(false);
   readonly taxRatesSaved = signal(false);
 
+  // Role dashboards
+  readonly roleDashboards = signal<Record<string, string>>({});
+  readonly roleDashboardsSaving = signal(false);
+  readonly roleDashboardsSaved = signal(false);
+  readonly availableRoles = [
+    { key: 'ADMIN', label: 'Admin' },
+    { key: 'TRADER', label: 'Trader' },
+    { key: 'FINANCE', label: 'Finance' },
+    { key: 'TEAMLEAD', label: 'Team Lead' },
+    { key: 'CREDITMANAGER', label: 'Credit Manager' },
+    { key: 'OPERATIONSMANAGER', label: 'Operations Manager' },
+    { key: 'LIGHT', label: 'Light' },
+  ];
+
   readonly commonTimezones = signal<{ value: string; label: string }[]>([
     { value: 'America/Chicago', label: 'America/Chicago (Houston, CST/CDT)' },
     { value: 'Europe/Copenhagen', label: 'Europe/Copenhagen (CET/CEST)' },
@@ -2005,6 +2073,7 @@ export class SettingsPageComponent implements OnInit {
     this.loadOrderCategories();
     this.loadDefaultUnit();
     this.loadTaxRates();
+    this.loadRoleDashboards();
   }
 
   private async loadSettings(): Promise<void> {
@@ -3379,6 +3448,46 @@ export class SettingsPageComponent implements OnInit {
       this.showToast('error', 'Failed to save tax rates.');
     } finally {
       this.taxRatesSaving.set(false);
+    }
+  }
+
+  // ─── Role Dashboard settings ───────────────────────────────────
+
+  private async loadRoleDashboards(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ dashboards: Record<string, string> }>>(`${API}/admin/settings/role-dashboards`),
+      );
+      if (res.success) {
+        this.roleDashboards.set(res.data.dashboards ?? {});
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  setRoleDashboard(roleKey: string, route: string): void {
+    this.roleDashboards.update((current) => ({ ...current, [roleKey]: route }));
+  }
+
+  async saveRoleDashboards(): Promise<void> {
+    this.roleDashboardsSaving.set(true);
+    this.roleDashboardsSaved.set(false);
+    try {
+      const payload = this.roleDashboards();
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<{ dashboards: typeof payload }>>(`${API}/admin/settings/role-dashboards`, { dashboards: payload }),
+      );
+      if (res.success) {
+        this.roleDashboardsSaved.set(true);
+        setTimeout(() => this.roleDashboardsSaved.set(false), 3000);
+      } else {
+        this.showToast('error', (res as any).message ?? 'Failed to save role dashboards.');
+      }
+    } catch {
+      this.showToast('error', 'Failed to save role dashboards.');
+    } finally {
+      this.roleDashboardsSaving.set(false);
     }
   }
 

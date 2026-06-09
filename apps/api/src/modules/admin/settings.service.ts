@@ -2,13 +2,14 @@
 //  Settings Service — Own companies, teams, company groups
 // ═══════════════════════════════════════════════════════════════════════
 
-import { eq, and, sql, isNull } from 'drizzle-orm';
+import { eq, and, sql, isNull, inArray } from 'drizzle-orm';
 import { db } from '../../db';
 import {
   counterparties,
   teams,
   teamCompanies,
   users,
+  userTeams,
   userCompanyOverrides,
   companyGroups,
   companyGroupMembers,
@@ -252,17 +253,18 @@ export async function listTeams(): Promise<TeamDto[]> {
       .innerJoin(counterparties, eq(teamCompanies.counterpartyId, counterparties.id))
       .where(eq(teamCompanies.teamId, t.id));
 
-    // Count users in this team
+    // Count users in this team via user_teams join table
     const [memberCount] = await db
       .select({ count: sql<number>`count(*)::int` })
-      .from(users)
-      .where(eq(users.teamId, t.id));
+      .from(userTeams)
+      .where(eq(userTeams.teamId, t.id));
 
-    // Get member details
+    // Get member details via user_teams join table
     const memberRows = await db
       .select({ id: users.id, name: users.name })
-      .from(users)
-      .where(eq(users.teamId, t.id))
+      .from(userTeams)
+      .innerJoin(users, eq(userTeams.userId, users.id))
+      .where(eq(userTeams.teamId, t.id))
       .orderBy(users.name);
 
     result.push({
@@ -327,11 +329,8 @@ export async function updateTeam(
 }
 
 export async function deleteTeam(teamId: string) {
-  // Unassign users from this team
-  await db
-    .update(users)
-    .set({ teamId: null, updatedAt: new Date() })
-    .where(eq(users.teamId, teamId));
+  // Remove user-team associations (cascade will handle this, but explicit is safer)
+  await db.delete(userTeams).where(eq(userTeams.teamId, teamId));
 
   const [deleted] = await db
     .delete(teams)
@@ -469,11 +468,16 @@ export async function getUserCompanyAccess(userId: string): Promise<OwnCompanyDt
     return overrides;
   }
 
-  // Fall back to team companies
-  const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
-  const teamId = user?.teamId;
-  if (!teamId) {
-    // No team, no overrides → return all own companies
+  // Fall back to team companies — union across ALL teams the user belongs to
+  const userTeamIds = await db
+    .select({ teamId: userTeams.teamId })
+    .from(userTeams)
+    .where(eq(userTeams.userId, userId));
+
+  const teamIds = userTeamIds.map((ut) => ut.teamId).filter(Boolean);
+
+  if (teamIds.length === 0) {
+    // No teams, no overrides → return all own companies
     return listOwnCompanies();
   }
 
@@ -483,19 +487,19 @@ export async function getUserCompanyAccess(userId: string): Promise<OwnCompanyDt
         .select(OWN_COMPANY_SELECT)
         .from(teamCompanies)
         .innerJoin(counterparties, eq(teamCompanies.counterpartyId, counterparties.id))
-        .where(eq(teamCompanies.teamId, teamId));
+        .where(inArray(teamCompanies.teamId, teamIds));
     } catch (err) {
       if (!isMissingCompanyRegistrationNumberColumnError(err)) throw err;
       const legacy = await db
         .select(OWN_COMPANY_SELECT_LEGACY)
         .from(teamCompanies)
         .innerJoin(counterparties, eq(teamCompanies.counterpartyId, counterparties.id))
-        .where(eq(teamCompanies.teamId, teamId));
+        .where(inArray(teamCompanies.teamId, teamIds));
       return withLegacyRegistrationNumber(legacy);
     }
   })();
 
-  // If team has no companies assigned, return all own companies
+  // If teams have no companies assigned, return all own companies
   return teamCos.length > 0 ? teamCos : listOwnCompanies();
 }
 
@@ -1666,6 +1670,33 @@ export async function updateTaxRateSettings(rates: TaxRateConfig[]): Promise<{ r
     .where(eq(tenants.id, tenant.id));
 
   return getTaxRateSettings();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  ROLE DASHBOARD SETTINGS
+// ═══════════════════════════════════════════════════════════════════════
+
+export async function getRoleDashboardSettings(): Promise<{ dashboards: Record<string, string> }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  return { dashboards: settings.roleDashboards ?? {} };
+}
+
+export async function updateRoleDashboardSettings(dashboards: Record<string, string>): Promise<{ dashboards: Record<string, string> }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = { ...(tenant.settings as any) };
+  settings.roleDashboards = dashboards;
+
+  await db
+    .update(tenants)
+    .set({ settings, updatedAt: new Date() })
+    .where(eq(tenants.id, tenant.id));
+
+  return getRoleDashboardSettings();
 }
 
 // ═══════════════════════════════════════════════════════════════════════

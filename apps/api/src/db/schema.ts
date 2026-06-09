@@ -12,6 +12,7 @@ import {
   doublePrecision,
   index,
   uniqueIndex,
+  primaryKey,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
@@ -338,6 +339,8 @@ export interface TenantSettings {
     rate: number; // e.g. 0.07 for 7%
     productType?: string;
   }[];
+  // Role-based default landing pages (role key → route path)
+  roleDashboards?: Record<string, string>;
   // Shared report presets and schedules
   reportsSettings?: {
     savedViews?: {
@@ -419,8 +422,8 @@ export const users = pgTable('users', {
   name: text('name').notNull(),
   role: roleEnum('role').notNull().default('TRADER'),
 
-  // Team membership (determines default own-company access)
-  teamId: uuid('team_id').references(() => teams.id),
+  // Primary team membership (backward compat — real membership is in user_teams)
+  primaryTeamId: uuid('primary_team_id').references(() => teams.id),
 
   // Account status
   isActive: boolean('is_active').notNull().default(true),
@@ -596,6 +599,17 @@ export const teamCompanies = pgTable('team_companies', {
   teamId: uuid('team_id').notNull().references(() => teams.id, { onDelete: 'cascade' }),
   counterpartyId: uuid('counterparty_id').notNull().references(() => counterparties.id, { onDelete: 'cascade' }),
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+//  5b. USER ↔ TEAM MEMBERSHIP (many-to-many)
+// ═══════════════════════════════════════════════════════════════════════
+
+export const userTeams = pgTable('user_teams', {
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  teamId: uuid('team_id').notNull().references(() => teams.id, { onDelete: 'cascade' }),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.userId, table.teamId] }),
+}));
 
 // ═══════════════════════════════════════════════════════════════════════
 //  6. USER ↔ OWN COMPANY OVERRIDES (per-user, overrides team defaults)
@@ -1515,8 +1529,13 @@ export const tenantsRelations = relations(tenants, ({ many }) => ({
 
 export const teamsRelations = relations(teams, ({ one, many }) => ({
   tenant: one(tenants, { fields: [teams.tenantId], references: [tenants.id] }),
-  members: many(users),
+  members: many(userTeams),
   teamCompanies: many(teamCompanies),
+}));
+
+export const userTeamsRelations = relations(userTeams, ({ one }) => ({
+  team: one(teams, { fields: [userTeams.teamId], references: [teams.id] }),
+  user: one(users, { fields: [userTeams.userId], references: [users.id] }),
 }));
 
 export const teamCompaniesRelations = relations(teamCompanies, ({ one }) => ({
@@ -1531,7 +1550,7 @@ export const userCompanyOverridesRelations = relations(userCompanyOverrides, ({ 
 
 export const usersRelations = relations(users, ({ one, many }) => ({
   tenant: one(tenants, { fields: [users.tenantId], references: [tenants.id] }),
-  team: one(teams, { fields: [users.teamId], references: [teams.id] }),
+  teams: many(userTeams),
   delegate: one(users, {
     fields: [users.delegateId],
     references: [users.id],

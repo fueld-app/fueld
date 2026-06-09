@@ -229,6 +229,7 @@ const NAVIGATION: NavItem[] = [
     label: 'Operations',
     icon: 'M4 7h16M4 12h16M4 17h10',
     children: [
+      { label: 'Board', route: '/operations/board' },
       { label: 'Inventory', route: '/operations/inventory' },
     ],
   },

@@ -148,8 +148,8 @@ export interface AdminUserDto {
   email: string;
   name: string;
   role: Role;
-  teamId: string | null;
-  teamName: string | null;
+  teamIds: string[];
+  teamNames: string[];
   is2faEnabled: boolean;
   hasPasskeys: boolean;
   hasMicrosoftSso: boolean;
@@ -844,6 +844,10 @@ export interface TaxRateConfigDto {
 /** Admin settings for tax rates */
 export interface TaxRateSettingsDto {
   rates: TaxRateConfigDto[];
+}
+
+export interface RoleDashboardSettingsDto {
+  dashboards: Record<string, string>;
 }
 
 export interface FinancingSettingsDto {
