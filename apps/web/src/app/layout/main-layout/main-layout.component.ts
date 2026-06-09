@@ -408,7 +408,7 @@ const NAVIGATION: NavItem[] = [
         }
         <!-- Collapse toggle (desktop) -->
         <button
-          (click)="sidebarCollapsed.update(v => !v)"
+          (click)="toggleSidebarCollapsed()"
           class="mt-2 hidden w-full items-center justify-center rounded-md py-1.5 text-sidebar-text/40 hover:bg-sidebar-hover hover:text-sidebar-text/70 lg:flex transition-colors"
           [title]="sidebarCollapsed() ? 'Expand sidebar' : 'Collapse sidebar'"
         >
@@ -841,6 +841,11 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
   readonly sidebarOpen = signal(false);
   readonly sidebarCollapsed = signal(false);
+
+  toggleSidebarCollapsed(): void {
+    this.sidebarCollapsed.update((v) => !v);
+  }
+
   private readonly commodityPriceMap = signal<Record<string, CommodityPrice>>({});
   readonly commodityPrices = computed(() =>
     Object.values(this.commodityPriceMap()).sort((left, right) => left.name.localeCompare(right.name)),

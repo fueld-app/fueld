@@ -1327,7 +1327,7 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   // Inventory pickers (optional; only rendered when warehouseOptionsInput is non-empty).
   readonly warehouseOptionsInput = input<DropdownOption[]>([]);
   readonly inventorySkuOptionsInput = input<DropdownOption[]>([]);
-  readonly catalogItemsInput = input<{ name: string; description?: string; defaultUnit?: string; defaultCostPrice?: number; defaultSalesPrice?: number }[]>([]);
+  readonly catalogItemsInput = input<{ name: string; description?: string; defaultUnit?: string; defaultCostPrice?: number; defaultSalesPrice?: number; defaultTaxRateId?: string }[]>([]);
   readonly defaultUnitInput = input<string>('MT');
   readonly taxRatesInput = input<{ id: string; name: string; rate: number }[]>([]);
   /** Map of order-item row id → availability check result (controlled by parent). */
