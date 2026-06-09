@@ -306,6 +306,33 @@ export interface TenantSettings {
     mode: 'multi' | 'single';
     options: { key: string; label: string; description?: string }[];
   }[];
+  // Product catalog — configurable items with defaults for order line items
+  catalogItems?: {
+    id: string;
+    name: string;
+    description?: string;
+    defaultUnit?: string;
+    defaultCostPrice?: number;
+    defaultSalesPrice?: number;
+    defaultTaxRateId?: string;
+    categoryKey?: string;
+  }[];
+  // Order categories — for grouping orders (fuels, services, environmental, etc.)
+  orderCategories?: {
+    key: string;
+    label: string;
+    description?: string;
+    defaultUnit?: string;
+  }[];
+  // Default unit for new order line items (overrides hardcoded 'MT')
+  defaultUnit?: string;
+  // Tax rates — simple flat percentage per product
+  taxRates?: {
+    id: string;
+    name: string;
+    rate: number; // e.g. 0.07 for 7%
+    productType?: string;
+  }[];
   // Shared report presets and schedules
   reportsSettings?: {
     savedViews?: {
@@ -826,6 +853,9 @@ export const orders = pgTable('orders', {
   // Place remark (seeded from place.orderRemark on creation, editable per-order)
   placeRemark: text('place_remark'),
 
+  // Order category — groups orders into business lines (fuels, services, etc.)
+  categoryKey: text('category_key'),
+
   // Analytics
   lossReason: text('loss_reason'),
   closedAt: timestamp('closed_at', { withTimezone: true }),
@@ -897,6 +927,10 @@ export const orderItems = pgTable('order_items', {
   salesPrice: numeric('sales_price', { precision: 12, scale: 4 }),
   salesCurrency: text('sales_currency').notNull().default('USD'),
   profit: numeric('profit', { precision: 12, scale: 4 }),
+
+  // ── Tax ───────────────────────────────────────────────────────────
+  taxRate: numeric('tax_rate', { precision: 5, scale: 4 }),
+  taxAmount: numeric('tax_amount', { precision: 14, scale: 2 }),
 
   // ── Formula pricing (cost side) ───────────────────────────────────
   costPricingModel: pricingModelEnum('cost_pricing_model').notNull().default('FIXED'),

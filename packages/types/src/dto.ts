@@ -619,6 +619,7 @@ export interface OrderDto {
   financingCostPerMt?: string | null;
   totalNetProfit?: string;
   netMarginPct?: string | null;
+  categoryKey?: string | null;
   closedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -795,6 +796,54 @@ export interface UnitSettingsDto {
 /** Admin settings for configurable currency options */
 export interface CurrencySettingsDto {
   currencies: string[];
+}
+
+/** Product catalog item configuration */
+export interface CatalogItemConfigDto {
+  id: string;
+  name: string;
+  description?: string;
+  defaultUnit?: string;
+  defaultCostPrice?: number;
+  defaultSalesPrice?: number;
+  defaultTaxRateId?: string;
+  categoryKey?: string;
+}
+
+/** Admin settings for product catalog */
+export interface CatalogSettingsDto {
+  items: CatalogItemConfigDto[];
+}
+
+/** Order category configuration */
+export interface OrderCategoryConfigDto {
+  key: string;
+  label: string;
+  description?: string;
+  defaultUnit?: string;
+}
+
+/** Admin settings for order categories */
+export interface OrderCategorySettingsDto {
+  categories: OrderCategoryConfigDto[];
+}
+
+/** Admin settings for default unit */
+export interface DefaultUnitSettingsDto {
+  defaultUnit: string;
+}
+
+/** Tax rate configuration */
+export interface TaxRateConfigDto {
+  id: string;
+  name: string;
+  rate: number;
+  productType?: string;
+}
+
+/** Admin settings for tax rates */
+export interface TaxRateSettingsDto {
+  rates: TaxRateConfigDto[];
 }
 
 export interface FinancingSettingsDto {

@@ -51,6 +51,14 @@ import {
   updateInquiryCancelReasonSettings,
   getInquirySettings,
   updateInquirySettings,
+  getCatalogSettings,
+  updateCatalogSettings,
+  getOrderCategorySettings,
+  updateOrderCategorySettings,
+  getDefaultUnitSettings,
+  updateDefaultUnitSettings,
+  getTaxRateSettings,
+  updateTaxRateSettings,
   updateOwnCompanyTerms,
   getWhatsAppSettings,
   updateWhatsAppSettings,
@@ -1228,6 +1236,157 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       annualRate: t.Number({ minimum: 0, maximum: 1 }),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update financing settings' },
+  })
+
+  // ═════════════════════════════════════════════════════════════════
+  //  CATALOG SETTINGS
+  // ═════════════════════════════════════════════════════════════════
+
+  .get('/catalog', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getCatalogSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get product catalog settings' },
+  })
+
+  .put('/catalog', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateCatalogSettings(body.items);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      items: t.Array(t.Object({
+        id: t.String(),
+        name: t.String({ minLength: 1 }),
+        description: t.Optional(t.String()),
+        defaultUnit: t.Optional(t.String()),
+        defaultCostPrice: t.Optional(t.Number()),
+        defaultSalesPrice: t.Optional(t.Number()),
+        defaultTaxRateId: t.Optional(t.String()),
+        categoryKey: t.Optional(t.String()),
+      })),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update product catalog settings' },
+  })
+
+  // ═════════════════════════════════════════════════════════════════
+  //  ORDER CATEGORY SETTINGS
+  // ═════════════════════════════════════════════════════════════════
+
+  .get('/order-categories', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getOrderCategorySettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get order category settings' },
+  })
+
+  .put('/order-categories', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateOrderCategorySettings(body.categories);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      categories: t.Array(t.Object({
+        key: t.String({ minLength: 1 }),
+        label: t.String({ minLength: 1 }),
+        description: t.Optional(t.String()),
+        defaultUnit: t.Optional(t.String()),
+      })),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update order category settings' },
+  })
+
+  // ═════════════════════════════════════════════════════════════════
+  //  DEFAULT UNIT SETTINGS
+  // ═════════════════════════════════════════════════════════════════
+
+  .get('/default-unit', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getDefaultUnitSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get default unit setting' },
+  })
+
+  .put('/default-unit', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateDefaultUnitSettings(body.defaultUnit);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      defaultUnit: t.String({ minLength: 1 }),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update default unit setting' },
+  })
+
+  // ═════════════════════════════════════════════════════════════════
+  //  TAX RATE SETTINGS
+  // ═════════════════════════════════════════════════════════════════
+
+  .get('/tax-rates', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getTaxRateSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get tax rate settings' },
+  })
+
+  .put('/tax-rates', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateTaxRateSettings(body.rates);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      rates: t.Array(t.Object({
+        id: t.String(),
+        name: t.String({ minLength: 1 }),
+        rate: t.Number({ minimum: 0, maximum: 1 }),
+        productType: t.Optional(t.String()),
+      })),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update tax rate settings' },
   })
 
   // ═════════════════════════════════════════════════════════════════

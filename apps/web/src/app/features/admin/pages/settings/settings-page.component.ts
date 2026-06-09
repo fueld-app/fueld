@@ -1401,6 +1401,318 @@ interface InquirySettingsDto {
             </div>
           </div>
 
+          <!-- ════════════════════════════════════════════════════════ -->
+          <!--  Product Catalog                                        -->
+          <!-- ════════════════════════════════════════════════════════ -->
+          <div class="app-panel">
+            <div class="app-panel-header app-panel-header--emerald">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--emerald">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5zm4.707 3.707a1 1 0 00-1.414-1.414l-3 3a1 1 0 000 1.414l3 3a1 1 0 001.414-1.414L8.414 9H10a3 3 0 013 3v1a1 1 0 102 0v-1a5 5 0 00-5-5H8.414l1.293-1.293z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-semibold text-gray-900">Product Catalog</h3>
+                <p class="text-xs text-gray-500">Configure products with default description, unit, price, and tax.</p>
+              </div>
+            </div>
+
+            <div class="app-panel-body space-y-3 max-h-[28rem] overflow-y-auto">
+              @for (item of catalogItems(); track $index; let i = $index) {
+                <div class="space-y-2 rounded-lg border border-gray-200 p-3">
+                  <div class="flex items-center gap-2">
+                    <input
+                      type="text"
+                      [value]="item.name"
+                      (input)="updateCatalogItem(i, 'name', $any($event.target).value)"
+                      placeholder="Product name"
+                      class="app-input flex-1"
+                    />
+                    <button
+                      (click)="removeCatalogItem(i)"
+                      class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
+                      title="Remove item"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    [value]="item.description"
+                    (input)="updateCatalogItem(i, 'description', $any($event.target).value)"
+                    placeholder="Default description"
+                    class="app-input w-full"
+                  />
+                  <div class="grid grid-cols-3 gap-2">
+                    <input
+                      type="text"
+                      [value]="item.defaultUnit"
+                      (input)="updateCatalogItem(i, 'defaultUnit', $any($event.target).value)"
+                      placeholder="Unit"
+                      class="app-input"
+                    />
+                    <input
+                      type="number"
+                      [value]="item.defaultCostPrice"
+                      (input)="updateCatalogItem(i, 'defaultCostPrice', $any($event.target).value)"
+                      placeholder="Cost price"
+                      class="app-input"
+                    />
+                    <input
+                      type="number"
+                      [value]="item.defaultSalesPrice"
+                      (input)="updateCatalogItem(i, 'defaultSalesPrice', $any($event.target).value)"
+                      placeholder="Sales price"
+                      class="app-input"
+                    />
+                  </div>
+                </div>
+              }
+              <button
+                (click)="addCatalogItem()"
+                class="app-button-add"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+                </svg>
+                Add Catalog Item
+              </button>
+
+              <div class="flex items-center gap-3 pt-2">
+                <button
+                  (click)="saveCatalog()"
+                  [disabled]="catalogSaving()"
+                  class="app-button-primary"
+                >
+                  @if (catalogSaving()) { Saving… } @else { Save Catalog }
+                </button>
+                @if (catalogSaved()) {
+                  <span class="text-sm text-green-600 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                    </svg>
+                    Saved
+                  </span>
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- ════════════════════════════════════════════════════════ -->
+          <!--  Order Categories                                       -->
+          <!-- ════════════════════════════════════════════════════════ -->
+          <div class="app-panel">
+            <div class="app-panel-header app-panel-header--amber">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--amber">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M2 4.75A.75.75 0 012.75 4h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 4.75zm0 5A.75.75 0 012.75 9h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 9.75zm0 5a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75a.75.75 0 01-.75-.75z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-semibold text-gray-900">Order Categories</h3>
+                <p class="text-xs text-gray-500">Group orders into business lines (fuels, services, environmental, etc.).</p>
+              </div>
+            </div>
+
+            <div class="app-panel-body space-y-3 max-h-[28rem] overflow-y-auto">
+              @for (cat of orderCategories(); track $index; let i = $index) {
+                <div class="flex items-center gap-2">
+                  <input
+                    type="text"
+                    [value]="cat.key"
+                    (input)="updateOrderCategory(i, 'key', $any($event.target).value)"
+                    placeholder="Key"
+                    class="app-input w-24"
+                  />
+                  <input
+                    type="text"
+                    [value]="cat.label"
+                    (input)="updateOrderCategory(i, 'label', $any($event.target).value)"
+                    placeholder="Label"
+                    class="app-input flex-1"
+                  />
+                  <input
+                    type="text"
+                    [value]="cat.defaultUnit"
+                    (input)="updateOrderCategory(i, 'defaultUnit', $any($event.target).value)"
+                    placeholder="Unit"
+                    class="app-input w-20"
+                  />
+                  <button
+                    (click)="removeOrderCategory(i)"
+                    class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
+                    title="Remove category"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              }
+              <button
+                (click)="addOrderCategory()"
+                class="app-button-add"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+                </svg>
+                Add Category
+              </button>
+
+              <div class="flex items-center gap-3 pt-2">
+                <button
+                  (click)="saveOrderCategories()"
+                  [disabled]="orderCategoriesSaving()"
+                  class="app-button-primary"
+                >
+                  @if (orderCategoriesSaving()) { Saving… } @else { Save Categories }
+                </button>
+                @if (orderCategoriesSaved()) {
+                  <span class="text-sm text-green-600 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                    </svg>
+                    Saved
+                  </span>
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- ════════════════════════════════════════════════════════ -->
+          <!--  Default Unit                                           -->
+          <!-- ════════════════════════════════════════════════════════ -->
+          <div class="app-panel">
+            <div class="app-panel-header app-panel-header--brand">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--brand">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-brand-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 2a.75.75 0 01.75.75v.258a33.186 33.186 0 016.668.83.75.75 0 01-.336 1.461 31.28 31.28 0 00-1.103-.232l1.702 7.545a.75.75 0 01-.387.832A4.981 4.981 0 0115 14c-.825 0-1.606-.2-2.294-.556a.75.75 0 01-.387-.832l1.77-7.849a31.743 31.743 0 00-3.339-.254v11.505a20.01 20.01 0 013.78.501.75.75 0 11-.339 1.462A18.558 18.558 0 0010 17.5c-1.442 0-2.845.165-4.191.477a.75.75 0 01-.338-1.462 20.01 20.01 0 013.779-.501V4.509c-1.129.026-2.243.112-3.34.254l1.771 7.85a.75.75 0 01-.387.83A4.981 4.981 0 015 14c-.825 0-1.606-.2-2.294-.556a.75.75 0 01-.387-.832l1.702-7.545c-.372.06-.742.126-1.103.232a.75.75 0 11-.336-1.462 33.186 33.186 0 016.668-.829V2.75A.75.75 0 0110 2zM5 12.662l-1.395-6.177C4.6 6.327 5.597 6.2 6 6.2c.404 0 1.4.127 2.395.285L5 12.662zm8.395-6.177L15 12.662l1.395-6.177C14.6 6.327 13.597 6.2 13.2 6.2c-.404 0-1.4.127-2.395.285z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-semibold text-gray-900">Default Unit</h3>
+                <p class="text-xs text-gray-500">Default unit for new order line items.</p>
+              </div>
+            </div>
+
+            <div class="app-panel-body space-y-5">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Default unit</label>
+                <input
+                  type="text"
+                  [ngModel]="defaultUnit()"
+                  (ngModelChange)="defaultUnit.set($event)"
+                  placeholder="e.g. GAL"
+                  class="app-input w-full max-w-xs"
+                />
+              </div>
+
+              <div class="flex items-center gap-3 pt-2">
+                <button
+                  (click)="saveDefaultUnit()"
+                  [disabled]="defaultUnitSaving()"
+                  class="app-button-primary"
+                >
+                  @if (defaultUnitSaving()) { Saving… } @else { Save Default Unit }
+                </button>
+                @if (defaultUnitSaved()) {
+                  <span class="text-sm text-green-600 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                    </svg>
+                    Saved
+                  </span>
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- ════════════════════════════════════════════════════════ -->
+          <!--  Tax Rates                                              -->
+          <!-- ════════════════════════════════════════════════════════ -->
+          <div class="app-panel">
+            <div class="app-panel-header app-panel-header--rose">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--rose">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-rose-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-semibold text-gray-900">Tax Rates</h3>
+                <p class="text-xs text-gray-500">Configure flat tax rates per product.</p>
+              </div>
+            </div>
+
+            <div class="app-panel-body space-y-3 max-h-[28rem] overflow-y-auto">
+              @for (rate of taxRates(); track $index; let i = $index) {
+                <div class="flex items-center gap-2">
+                  <input
+                    type="text"
+                    [value]="rate.name"
+                    (input)="updateTaxRate(i, 'name', $any($event.target).value)"
+                    placeholder="Tax name"
+                    class="app-input flex-1"
+                  />
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="1"
+                    [value]="rate.rate"
+                    (input)="updateTaxRate(i, 'rate', $any($event.target).value)"
+                    placeholder="Rate (0.07)"
+                    class="app-input w-24"
+                  />
+                  <input
+                    type="text"
+                    [value]="rate.productType"
+                    (input)="updateTaxRate(i, 'productType', $any($event.target).value)"
+                    placeholder="Product"
+                    class="app-input w-24"
+                  />
+                  <button
+                    (click)="removeTaxRate(i)"
+                    class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
+                    title="Remove rate"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              }
+              <button
+                (click)="addTaxRate()"
+                class="app-button-add"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+                </svg>
+                Add Tax Rate
+              </button>
+
+              <div class="flex items-center gap-3 pt-2">
+                <button
+                  (click)="saveTaxRates()"
+                  [disabled]="taxRatesSaving()"
+                  class="app-button-primary"
+                >
+                  @if (taxRatesSaving()) { Saving… } @else { Save Tax Rates }
+                </button>
+                @if (taxRatesSaved()) {
+                  <span class="text-sm text-green-600 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                    </svg>
+                    Saved
+                  </span>
+                }
+              </div>
+            </div>
+          </div>
+
         </div>
       }
 
@@ -1506,6 +1818,26 @@ export class SettingsPageComponent implements OnInit {
   readonly timezoneSaving = signal(false);
   readonly timezoneSaved = signal(false);
 
+  // Product catalog
+  readonly catalogItems = signal<{ id: string; name: string; description: string; defaultUnit: string; defaultCostPrice: string; defaultSalesPrice: string; defaultTaxRateId: string; categoryKey: string }[]>([]);
+  readonly catalogSaving = signal(false);
+  readonly catalogSaved = signal(false);
+
+  // Order categories
+  readonly orderCategories = signal<{ key: string; label: string; description: string; defaultUnit: string }[]>([]);
+  readonly orderCategoriesSaving = signal(false);
+  readonly orderCategoriesSaved = signal(false);
+
+  // Default unit
+  readonly defaultUnit = signal('MT');
+  readonly defaultUnitSaving = signal(false);
+  readonly defaultUnitSaved = signal(false);
+
+  // Tax rates
+  readonly taxRates = signal<{ id: string; name: string; rate: string; productType: string }[]>([]);
+  readonly taxRatesSaving = signal(false);
+  readonly taxRatesSaved = signal(false);
+
   readonly commonTimezones = signal<{ value: string; label: string }[]>([
     { value: 'America/Chicago', label: 'America/Chicago (Houston, CST/CDT)' },
     { value: 'Europe/Copenhagen', label: 'Europe/Copenhagen (CET/CEST)' },
@@ -1585,6 +1917,10 @@ export class SettingsPageComponent implements OnInit {
     this.loadSegments();
     this.loadFollowUpSettings();
     this.loadTimezoneSettings();
+    this.loadCatalog();
+    this.loadOrderCategories();
+    this.loadDefaultUnit();
+    this.loadTaxRates();
   }
 
   private async loadSettings(): Promise<void> {
@@ -2657,6 +2993,257 @@ export class SettingsPageComponent implements OnInit {
       this.showToast('error', 'Failed to save follow-up settings.');
     } finally {
       this.followUpSaving.set(false);
+    }
+  }
+
+  // ─── Catalog settings ─────────────────────────────────────────
+
+  private async loadCatalog(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ items: { id: string; name: string; description?: string; defaultUnit?: string; defaultCostPrice?: number; defaultSalesPrice?: number; defaultTaxRateId?: string; categoryKey?: string }[] }>>(`${API}/admin/settings/catalog`),
+      );
+      if (res.success) {
+        this.catalogItems.set(
+          (res.data.items ?? []).map((item) => ({
+            id: item.id,
+            name: item.name,
+            description: item.description ?? '',
+            defaultUnit: item.defaultUnit ?? '',
+            defaultCostPrice: item.defaultCostPrice != null ? String(item.defaultCostPrice) : '',
+            defaultSalesPrice: item.defaultSalesPrice != null ? String(item.defaultSalesPrice) : '',
+            defaultTaxRateId: item.defaultTaxRateId ?? '',
+            categoryKey: item.categoryKey ?? '',
+          })),
+        );
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  addCatalogItem(): void {
+    this.catalogItems.update((items) => [
+      ...items,
+      { id: crypto.randomUUID(), name: '', description: '', defaultUnit: '', defaultCostPrice: '', defaultSalesPrice: '', defaultTaxRateId: '', categoryKey: '' },
+    ]);
+  }
+
+  removeCatalogItem(index: number): void {
+    this.catalogItems.update((items) => items.filter((_, i) => i !== index));
+  }
+
+  updateCatalogItem(index: number, field: string, value: string): void {
+    this.catalogItems.update((items) => {
+      const next = [...items];
+      next[index] = { ...next[index]!, [field]: value };
+      return next;
+    });
+  }
+
+  async saveCatalog(): Promise<void> {
+    this.catalogSaving.set(true);
+    this.catalogSaved.set(false);
+    try {
+      const payload = this.catalogItems()
+        .filter((item) => item.name.trim())
+        .map((item) => ({
+          id: item.id,
+          name: item.name.trim(),
+          description: item.description.trim() || undefined,
+          defaultUnit: item.defaultUnit.trim() || undefined,
+          defaultCostPrice: item.defaultCostPrice.trim() ? parseFloat(item.defaultCostPrice) : undefined,
+          defaultSalesPrice: item.defaultSalesPrice.trim() ? parseFloat(item.defaultSalesPrice) : undefined,
+          defaultTaxRateId: item.defaultTaxRateId.trim() || undefined,
+          categoryKey: item.categoryKey.trim() || undefined,
+        }));
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<{ items: typeof payload }>>(`${API}/admin/settings/catalog`, { items: payload }),
+      );
+      if (res.success) {
+        this.catalogSaved.set(true);
+        setTimeout(() => this.catalogSaved.set(false), 3000);
+      } else {
+        this.showToast('error', (res as any).message ?? 'Failed to save catalog.');
+      }
+    } catch {
+      this.showToast('error', 'Failed to save catalog.');
+    } finally {
+      this.catalogSaving.set(false);
+    }
+  }
+
+  // ─── Order category settings ────────────────────────────────────
+
+  private async loadOrderCategories(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ categories: { key: string; label: string; description?: string; defaultUnit?: string }[] }>>(`${API}/admin/settings/order-categories`),
+      );
+      if (res.success) {
+        this.orderCategories.set(
+          (res.data.categories ?? []).map((cat) => ({
+            key: cat.key,
+            label: cat.label,
+            description: cat.description ?? '',
+            defaultUnit: cat.defaultUnit ?? '',
+          })),
+        );
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  addOrderCategory(): void {
+    this.orderCategories.update((cats) => [
+      ...cats,
+      { key: '', label: '', description: '', defaultUnit: '' },
+    ]);
+  }
+
+  removeOrderCategory(index: number): void {
+    this.orderCategories.update((cats) => cats.filter((_, i) => i !== index));
+  }
+
+  updateOrderCategory(index: number, field: string, value: string): void {
+    this.orderCategories.update((cats) => {
+      const next = [...cats];
+      next[index] = { ...next[index]!, [field]: value };
+      return next;
+    });
+  }
+
+  async saveOrderCategories(): Promise<void> {
+    this.orderCategoriesSaving.set(true);
+    this.orderCategoriesSaved.set(false);
+    try {
+      const payload = this.orderCategories()
+        .filter((cat) => cat.key.trim() && cat.label.trim())
+        .map((cat) => ({
+          key: cat.key.trim(),
+          label: cat.label.trim(),
+          description: cat.description.trim() || undefined,
+          defaultUnit: cat.defaultUnit.trim() || undefined,
+        }));
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<{ categories: typeof payload }>>(`${API}/admin/settings/order-categories`, { categories: payload }),
+      );
+      if (res.success) {
+        this.orderCategoriesSaved.set(true);
+        setTimeout(() => this.orderCategoriesSaved.set(false), 3000);
+      } else {
+        this.showToast('error', (res as any).message ?? 'Failed to save order categories.');
+      }
+    } catch {
+      this.showToast('error', 'Failed to save order categories.');
+    } finally {
+      this.orderCategoriesSaving.set(false);
+    }
+  }
+
+  // ─── Default unit settings ─────────────────────────────────────
+
+  private async loadDefaultUnit(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ defaultUnit: string }>>(`${API}/admin/settings/default-unit`),
+      );
+      if (res.success) {
+        this.defaultUnit.set(res.data.defaultUnit);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  async saveDefaultUnit(): Promise<void> {
+    this.defaultUnitSaving.set(true);
+    this.defaultUnitSaved.set(false);
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<{ defaultUnit: string }>>(`${API}/admin/settings/default-unit`, { defaultUnit: this.defaultUnit() }),
+      );
+      if (res.success) {
+        this.defaultUnit.set(res.data.defaultUnit);
+        this.defaultUnitSaved.set(true);
+        setTimeout(() => this.defaultUnitSaved.set(false), 3000);
+      } else {
+        this.showToast('error', (res as any).message ?? 'Failed to save default unit.');
+      }
+    } catch {
+      this.showToast('error', 'Failed to save default unit.');
+    } finally {
+      this.defaultUnitSaving.set(false);
+    }
+  }
+
+  // ─── Tax rate settings ─────────────────────────────────────────
+
+  private async loadTaxRates(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ rates: { id: string; name: string; rate: number; productType?: string }[] }>>(`${API}/admin/settings/tax-rates`),
+      );
+      if (res.success) {
+        this.taxRates.set(
+          (res.data.rates ?? []).map((rate) => ({
+            id: rate.id,
+            name: rate.name,
+            rate: String(rate.rate),
+            productType: rate.productType ?? '',
+          })),
+        );
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  addTaxRate(): void {
+    this.taxRates.update((rates) => [
+      ...rates,
+      { id: crypto.randomUUID(), name: '', rate: '', productType: '' },
+    ]);
+  }
+
+  removeTaxRate(index: number): void {
+    this.taxRates.update((rates) => rates.filter((_, i) => i !== index));
+  }
+
+  updateTaxRate(index: number, field: string, value: string): void {
+    this.taxRates.update((rates) => {
+      const next = [...rates];
+      next[index] = { ...next[index]!, [field]: value };
+      return next;
+    });
+  }
+
+  async saveTaxRates(): Promise<void> {
+    this.taxRatesSaving.set(true);
+    this.taxRatesSaved.set(false);
+    try {
+      const payload = this.taxRates()
+        .filter((rate) => rate.name.trim())
+        .map((rate) => ({
+          id: rate.id,
+          name: rate.name.trim(),
+          rate: parseFloat(rate.rate) || 0,
+          productType: rate.productType.trim() || undefined,
+        }));
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<{ rates: typeof payload }>>(`${API}/admin/settings/tax-rates`, { rates: payload }),
+      );
+      if (res.success) {
+        this.taxRatesSaved.set(true);
+        setTimeout(() => this.taxRatesSaved.set(false), 3000);
+      } else {
+        this.showToast('error', (res as any).message ?? 'Failed to save tax rates.');
+      }
+    } catch {
+      this.showToast('error', 'Failed to save tax rates.');
+    } finally {
+      this.taxRatesSaving.set(false);
     }
   }
 

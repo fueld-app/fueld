@@ -278,6 +278,18 @@ interface PlattsSuggestionViewModel {
                   <option [value]="c.value">{{ c.label }}</option>
                 }
               </select>
+              <label class="mt-2 mb-1 block text-xs font-medium text-gray-500">Category</label>
+              <select
+                [ngModel]="order()?.categoryKey ?? ''"
+                (ngModelChange)="onCategoryChange($event); settingsOpen.set(false)"
+                class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900
+                       outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+              >
+                <option value="">— None —</option>
+                @for (c of orderCategories(); track c.key) {
+                  <option [value]="c.key">{{ c.label }}</option>
+                }
+              </select>
             </div>
           }
         </div>
@@ -1111,6 +1123,9 @@ interface PlattsSuggestionViewModel {
       [plattsSuggestionsInput]="plattsSuggestionItems()"
       [warehouseOptionsInput]="warehouseDropdownOptions()"
       [inventorySkuOptionsInput]="inventorySkuDropdownOptions()"
+      [catalogItemsInput]="catalogItems()"
+      [defaultUnitInput]="defaultUnit()"
+      [taxRatesInput]="taxRates()"
       [availabilityByRowId]="availabilityByRowId()"
       (itemsChange)="onItemsChange($event)"
       (economicsChange)="onItemEconomicsChange($event)"
@@ -1962,6 +1977,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly configuredCurrencies = signal<DropdownOption[]>([]);
   readonly configuredPriceReferences = signal<{ id: string; name: string; code: string }[]>([]);
   readonly configuredAttachmentTypes = signal<string[]>(['BDR', 'OTHER']);
+  readonly catalogItems = signal<{ name: string; description?: string; defaultUnit?: string; defaultCostPrice?: number; defaultSalesPrice?: number }[]>([]);
+  readonly defaultUnit = signal<string>('MT');
+  readonly orderCategories = signal<{ key: string; label: string }[]>([]);
+  readonly taxRates = signal<{ id: string; name: string; rate: number }[]>([]);
   readonly plattsSuggestions = signal<PlattsSuggestionsResponseDto | null>(null);
   readonly plattsSuggestionsLoading = signal(false);
   readonly plattsSuggestionsError = signal<string | null>(null);
@@ -2677,6 +2696,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
           financingCostPerMt: d.financingCostPerMt ?? null,
           totalNetProfit: d.totalNetProfit ?? '0.0000',
           netMarginPct: d.netMarginPct ?? null,
+          categoryKey: d.categoryKey ?? null,
           closedAt: d.closedAt,
           deliveredAt: d.deliveredAt ?? null,
           createdAt: d.createdAt,
@@ -2760,6 +2780,9 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
             inventorySkuId: item.inventorySkuId ?? null,
             warehouseId: item.warehouseId ?? null,
             plannedInventoryAt: item.plannedInventoryAt ?? null,
+            // Tax
+            taxRate: item.taxRate != null ? parseFloat(item.taxRate) : null,
+            taxAmount: item.taxAmount != null ? parseFloat(item.taxAmount) : null,
           })),
         );
         this.draftItemIds.set(new Set());
@@ -3172,7 +3195,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   private async loadReferenceData(): Promise<void> {
     try {
-      const [suppliersRes, usersRes, productsRes, unitsRes, unitConversionsRes, currenciesRes, attachmentTypesRes, cancelReasonsRes, priceRefsRes, warehousesRes, skusRes] = await Promise.all([
+      const [suppliersRes, usersRes, productsRes, catalogRes, defaultUnitRes, orderCategoriesRes, taxRatesRes, unitsRes, unitConversionsRes, currenciesRes, attachmentTypesRes, cancelReasonsRes, priceRefsRes, warehousesRes, skusRes] = await Promise.all([
         firstValueFrom(
           this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
             `${API_URL}/companies/local?type=SUPPLIER&limit=100`,
@@ -3183,6 +3206,18 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         ),
         firstValueFrom(
           this.http.get<ApiResponse<{ products: string[] }>>(`${API_URL}/admin/settings/my-products`),
+        ),
+        firstValueFrom(
+          this.http.get<ApiResponse<{ items: { name: string; description?: string; defaultUnit?: string; defaultCostPrice?: number; defaultSalesPrice?: number }[] }>>(`${API_URL}/admin/settings/catalog`),
+        ),
+        firstValueFrom(
+          this.http.get<ApiResponse<{ defaultUnit: string }>>(`${API_URL}/admin/settings/default-unit`),
+        ),
+        firstValueFrom(
+          this.http.get<ApiResponse<{ categories: { key: string; label: string }[] }>>(`${API_URL}/admin/settings/order-categories`),
+        ),
+        firstValueFrom(
+          this.http.get<ApiResponse<{ rates: { id: string; name: string; rate: number }[] }>>(`${API_URL}/admin/settings/tax-rates`),
         ),
         firstValueFrom(
           this.http.get<ApiResponse<{ units: string[] }>>(`${API_URL}/admin/settings/my-units`),
@@ -3223,6 +3258,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       if (productsRes.success) this.configuredProducts.set(
         productsRes.data.products.map((p) => ({ value: p, label: p })),
       );
+      if (catalogRes.success) this.catalogItems.set(catalogRes.data.items ?? []);
+      if (defaultUnitRes.success) this.defaultUnit.set(defaultUnitRes.data.defaultUnit ?? 'MT');
+      if (orderCategoriesRes.success) this.orderCategories.set(orderCategoriesRes.data.categories ?? []);
+      if (taxRatesRes.success) this.taxRates.set(taxRatesRes.data.rates ?? []);
       if (unitsRes.success) this.configuredUnits.set(
         unitsRes.data.units.map((u) => ({ value: u, label: u })),
       );
@@ -3740,6 +3779,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         inventorySkuId: r.inventorySkuId ?? null,
         warehouseId: r.warehouseId ?? null,
         plannedInventoryAt: r.plannedInventoryAt ?? null,
+        taxRate: r.taxRate != null ? String(r.taxRate) : null,
       };
     });
   }
@@ -4928,6 +4968,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     this.triggerAutosave();
   }
 
+  onCategoryChange(categoryKey: string): void {
+    this.order.update((o) => (o ? { ...o, categoryKey: categoryKey || null } : o));
+    this.triggerAutosave();
+  }
+
   toggleSettings(event: MouseEvent): void {
     if (!this.settingsOpen()) {
       const btn = event.currentTarget as HTMLElement;
@@ -4975,6 +5020,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
           agentId: o.agentId ?? null,
           agentContactId: o.agentContactId ?? null,
           termsAndConditions: o.termsAndConditions ?? null,
+          categoryKey: o.categoryKey ?? null,
           eta: o.eta,
           etd: o.etd,
           deliveredAt: o.deliveredAt ?? null,
@@ -5397,6 +5443,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
           agentId: o.agentId ?? null,
           agentContactId: o.agentContactId ?? null,
           termsAndConditions: o.termsAndConditions ?? null,
+          categoryKey: o.categoryKey ?? null,
           eta: o.eta,
           etd: o.etd,
           deliveredAt: o.deliveredAt ?? null,

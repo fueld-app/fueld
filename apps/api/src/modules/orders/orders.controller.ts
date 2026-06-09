@@ -312,6 +312,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
           brokerGetsAll: body.brokerGetsAll ?? false,
           agentId: body.agentId ?? null,
           agentContactId: body.agentContactId ?? null,
+          categoryKey: body.categoryKey ?? null,
           eta: body.eta,
           etd: body.etd,
         });
@@ -356,6 +357,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         agentId: t.Optional(t.Nullable(t.String())),
         agentContactId: t.Optional(t.Nullable(t.String())),
         termsAndConditions: t.Optional(t.Nullable(t.String())),
+        categoryKey: t.Optional(t.Nullable(t.String())),
         eta: t.Optional(t.String()),
         etd: t.Optional(t.String()),
       }),
@@ -548,6 +550,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
             salesBargingUnit: t.Optional(t.Nullable(t.String())),
             salesCreditDays: t.Optional(t.Nullable(t.Number())),
             salesPriceFinalized: t.Optional(t.Nullable(t.Boolean())),
+            taxRate: t.Optional(t.Nullable(t.String())),
           }),
         ),
       }),

@@ -1479,6 +1479,139 @@ export async function updateFollowUpSettings(data: { defaultFollowUpDays?: numbe
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+//  CATALOG SETTINGS
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface CatalogItemConfig {
+  id: string;
+  name: string;
+  description?: string;
+  defaultUnit?: string;
+  defaultCostPrice?: number;
+  defaultSalesPrice?: number;
+  defaultTaxRateId?: string;
+  categoryKey?: string;
+}
+
+export async function getCatalogSettings(): Promise<{ items: CatalogItemConfig[] }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  return { items: settings.catalogItems ?? [] };
+}
+
+export async function updateCatalogSettings(items: CatalogItemConfig[]): Promise<{ items: CatalogItemConfig[] }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = { ...(tenant.settings as any) };
+  settings.catalogItems = items;
+
+  await db
+    .update(tenants)
+    .set({ settings, updatedAt: new Date() })
+    .where(eq(tenants.id, tenant.id));
+
+  return getCatalogSettings();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  ORDER CATEGORY SETTINGS
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface OrderCategoryConfig {
+  key: string;
+  label: string;
+  description?: string;
+  defaultUnit?: string;
+}
+
+export async function getOrderCategorySettings(): Promise<{ categories: OrderCategoryConfig[] }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  return { categories: settings.orderCategories ?? [] };
+}
+
+export async function updateOrderCategorySettings(categories: OrderCategoryConfig[]): Promise<{ categories: OrderCategoryConfig[] }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = { ...(tenant.settings as any) };
+  settings.orderCategories = categories;
+
+  await db
+    .update(tenants)
+    .set({ settings, updatedAt: new Date() })
+    .where(eq(tenants.id, tenant.id));
+
+  return getOrderCategorySettings();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  DEFAULT UNIT SETTINGS
+// ═══════════════════════════════════════════════════════════════════════
+
+export async function getDefaultUnitSettings(): Promise<{ defaultUnit: string }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  return { defaultUnit: settings.defaultUnit ?? 'MT' };
+}
+
+export async function updateDefaultUnitSettings(defaultUnit: string): Promise<{ defaultUnit: string }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = { ...(tenant.settings as any) };
+  settings.defaultUnit = defaultUnit;
+
+  await db
+    .update(tenants)
+    .set({ settings, updatedAt: new Date() })
+    .where(eq(tenants.id, tenant.id));
+
+  return getDefaultUnitSettings();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  TAX RATE SETTINGS
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface TaxRateConfig {
+  id: string;
+  name: string;
+  rate: number;
+  productType?: string;
+}
+
+export async function getTaxRateSettings(): Promise<{ rates: TaxRateConfig[] }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  return { rates: settings.taxRates ?? [] };
+}
+
+export async function updateTaxRateSettings(rates: TaxRateConfig[]): Promise<{ rates: TaxRateConfig[] }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = { ...(tenant.settings as any) };
+  settings.taxRates = rates;
+
+  await db
+    .update(tenants)
+    .set({ settings, updatedAt: new Date() })
+    .where(eq(tenants.id, tenant.id));
+
+  return getTaxRateSettings();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 //  TIMEZONE SETTINGS
 // ═══════════════════════════════════════════════════════════════════════
 

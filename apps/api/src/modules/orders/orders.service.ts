@@ -75,6 +75,7 @@ interface CreateOrderInput {
   brokerGetsAll?: boolean;
   agentId?: string | null;
   agentContactId?: string | null;
+  categoryKey?: string | null;
 }
 
 interface UpdateOrderInput {
@@ -107,6 +108,7 @@ interface UpdateOrderInput {
   brokerGetsAll?: boolean;
   agentId?: string | null;
   agentContactId?: string | null;
+  categoryKey?: string | null;
 }
 
 interface SaveItemInput {
@@ -147,6 +149,8 @@ interface SaveItemInput {
   salesBargingUnit?: string | null;
   salesCreditDays?: number | null;
   salesPriceFinalized?: boolean | null;
+  // Tax
+  taxRate?: string | null;
   // Inventory linkage (optional)
   inventorySkuId?: string | null;
   warehouseId?: string | null;
@@ -1317,6 +1321,7 @@ export async function createOrder(input: CreateOrderInput) {
     brokerGetsAll: input.brokerGetsAll ?? false,
     agentId: input.agentId ?? null,
     agentContactId: input.agentContactId ?? null,
+    categoryKey: input.categoryKey ?? null,
     placeRemark,
   };
 
@@ -1397,6 +1402,7 @@ export async function updateOrder(id: string, input: UpdateOrderInput, activityU
   if (input.brokerGetsAll !== undefined) setData.brokerGetsAll = input.brokerGetsAll;
   if (input.agentId !== undefined) setData.agentId = input.agentId;
   if (input.agentContactId !== undefined) setData.agentContactId = input.agentContactId;
+  if (input.categoryKey !== undefined) setData.categoryKey = input.categoryKey;
 
   // Auto-set closedAt when status moves to CANCELLED or PAID
   if (input.status === 'CANCELLED' || input.status === 'PAID') {
@@ -1481,6 +1487,17 @@ export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
       unitConversionFactor: item.unitConversionFactor,
     });
 
+    // Compute tax amount if taxRate is provided
+    let taxAmount: string | null = null;
+    if (item.taxRate != null && item.salesPrice != null) {
+      const rate = parseFloat(item.taxRate);
+      const price = parseFloat(item.salesPrice);
+      const qty = parseFloat(item.quantity);
+      if (Number.isFinite(rate) && Number.isFinite(price) && Number.isFinite(qty)) {
+        taxAmount = (price * qty * rate).toFixed(2);
+      }
+    }
+
     return {
       orderId,
       orderSupplierId: orderSupplierId ?? null,
@@ -1520,6 +1537,9 @@ export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
       salesBargingUnit: item.salesBargingUnit ?? null,
       salesCreditDays: item.salesCreditDays ?? null,
       salesPriceFinalized: item.salesPriceFinalized ?? false,
+      // Tax
+      taxRate: item.taxRate ?? null,
+      taxAmount,
       // Inventory linkage
       inventorySkuId: item.inventorySkuId ?? null,
       warehouseId: item.warehouseId ?? null,

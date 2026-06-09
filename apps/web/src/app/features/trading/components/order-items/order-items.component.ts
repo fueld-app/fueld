@@ -73,6 +73,9 @@ export interface OrderItemRow {
   inventorySkuId?: string | null;
   warehouseId?: string | null;
   plannedInventoryAt?: string | null;
+  // Tax
+  taxRate?: number | null;
+  taxAmount?: number | null;
 }
 
 /** Availability status for a given order item, keyed by row id. */
@@ -145,6 +148,7 @@ export interface OrderItemsEconomics {
               <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Gross ({{ baseCurrency() }})</th>
               <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Financing</th>
               <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Net</th>
+              <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[100px]">Tax</th>
             }
             @if (!readonly()) {
               <th class="w-0 p-0"></th>
@@ -647,6 +651,23 @@ export interface OrderItemsEconomics {
                   <span class="italic text-amber-600 text-xs">TBD</span>
                 } @else {
                   {{ netProfitForRow(row) | number:'1.2-2' }}
+                }
+              </td>
+
+              <!-- Tax -->
+              <td class="px-4 py-3 pt-4 text-right tabular-nums"
+                [class.text-green-600]="!isFormulaUnfinalized(row) && row.taxAmount != null && row.taxAmount > 0"
+                [class.font-semibold]="!isFormulaUnfinalized(row) && row.taxAmount != null && row.taxAmount > 0"
+              >
+                @if (isFormulaUnfinalized(row)) {
+                  <span class="italic text-amber-600 text-xs">TBD</span>
+                } @else {
+                  @if (row.taxRate != null) {
+                    <span class="text-xs text-gray-500">{{ row.taxRate | number:'1.2-2' }}%</span>
+                    <div>{{ row.taxAmount ?? 0 | number:'1.2-2' }}</div>
+                  } @else {
+                    <span class="text-gray-400 text-xs">—</span>
+                  }
                 }
               </td>
               }
@@ -1306,6 +1327,9 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   // Inventory pickers (optional; only rendered when warehouseOptionsInput is non-empty).
   readonly warehouseOptionsInput = input<DropdownOption[]>([]);
   readonly inventorySkuOptionsInput = input<DropdownOption[]>([]);
+  readonly catalogItemsInput = input<{ name: string; description?: string; defaultUnit?: string; defaultCostPrice?: number; defaultSalesPrice?: number }[]>([]);
+  readonly defaultUnitInput = input<string>('MT');
+  readonly taxRatesInput = input<{ id: string; name: string; rate: number }[]>([]);
   /** Map of order-item row id → availability check result (controlled by parent). */
   readonly availabilityByRowId = input<Record<string, OrderItemAvailability>>({});
   readonly itemsChange = output<OrderItemRow[]>();
@@ -1497,6 +1521,7 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   // ─── Actions ─────────────────────────────────────────────────────
 
   addRow(): void {
+    const defaultUnit = this.defaultUnitInput() || 'MT';
     const newRow: OrderItemRow = {
       id: crypto.randomUUID(),
       orderSupplierId: this.supplierOptions().length === 1 ? this.supplierOptions()[0]!.value : null,
@@ -1505,9 +1530,9 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
       quantity: 0,
       quantityMin: null,
       quantityMax: null,
-      unit: 'MT',
-      costUnit: 'MT',
-      salesUnit: 'MT',
+      unit: defaultUnit,
+      costUnit: defaultUnit,
+      salesUnit: defaultUnit,
       costConversionFactor: 1,
       unitConversionFactor: 1,
       costPrice: 0,
@@ -1539,6 +1564,22 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
       if (field === 'productType') {
         row.costPlattsEntryId = null;
         row.salesPlattsEntryId = null;
+
+        // Auto-populate from catalog when productType changes and fields are empty
+        const catalog = this.catalogItemsInput();
+        const match = catalog.find((c) => c.name === (value as string));
+        if (match) {
+          if (!row.description) row.description = match.description ?? '';
+          if (row.unit === 'MT' || !row.unit) row.unit = match.defaultUnit ?? this.defaultUnitInput() ?? 'MT';
+          if (row.costUnit === 'MT' || !row.costUnit) row.costUnit = match.defaultUnit ?? this.defaultUnitInput() ?? 'MT';
+          if (row.salesUnit === 'MT' || !row.salesUnit) row.salesUnit = match.defaultUnit ?? this.defaultUnitInput() ?? 'MT';
+          if (row.costPrice === 0) row.costPrice = match.defaultCostPrice ?? 0;
+          if (row.salesPrice === 0) row.salesPrice = match.defaultSalesPrice ?? 0;
+          if (match.defaultTaxRateId) {
+            const rateConfig = this.taxRatesInput().find((r) => r.id === match.defaultTaxRateId);
+            if (rateConfig) row.taxRate = rateConfig.rate;
+          }
+        }
       }
       if (field === 'costPricingModel' && value !== PricingModel.Formula && value !== 'FORMULA') {
         row.costPlattsEntryId = null;
