@@ -885,6 +885,7 @@ function buildInvoiceDocument(data: {
   companyPhone: string | null;
   companyEmail: string | null;
   printMeta?: DocumentPrintMeta | null;
+  purchaseOrderNumber?: string | null;
 }): TDocumentDefinitions {
   // Build line items table
   const tableHeader: TableCell[] = [
@@ -940,6 +941,9 @@ function buildInvoiceDocument(data: {
             stack: [
               { text: 'INVOICE', style: 'invoiceTitle' },
               { text: `#${data.invoiceNumber}`, style: 'invoiceNumber' },
+              ...(data.purchaseOrderNumber?.trim() ? [
+                { text: `PO: ${data.purchaseOrderNumber.trim()}`, style: 'invoiceNumber', color: '#374151' } as Content,
+              ] : []),
             ],
             alignment: 'right',
           },
@@ -1281,6 +1285,7 @@ export async function generateInvoicePdfBuffer(invoiceId: string): Promise<Buffe
     fromPhone: order.salesRep?.phone ?? null,
     paymentTerms: formatCustomerPaymentTerms(order.customerPaymentTermType, order.customerCreditDays),
     customerNote: order.customerNote ?? null,
+    purchaseOrderNumber: order.purchaseOrderNumber ?? null,
     termsAndConditions: order.termsAndConditions ?? null,
     placeRemark: order.placeRemark ?? order.place.orderRemark ?? null,
     companyName: order.invoicingCompany?.name ?? null,
@@ -1428,6 +1433,7 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
     fromPhone: order.salesRep?.phone ?? null,
     paymentTerms: formatCustomerPaymentTerms(order.customerPaymentTermType, order.customerCreditDays),
     customerNote: order.customerNote ?? null,
+    purchaseOrderNumber: order.purchaseOrderNumber ?? null,
     termsAndConditions: order.termsAndConditions ?? null,
     placeRemark: order.placeRemark ?? order.place.orderRemark ?? null,
     companyName: order.invoicingCompany?.name ?? null,
@@ -1583,6 +1589,7 @@ function buildOfferDocument(data: {
   supplierResponseTitle?: string | null;
   supplierResponseText?: string | null;
   printMeta?: DocumentPrintMeta | null;
+  purchaseOrderNumber?: string | null;
 }): TDocumentDefinitions {
   // ── Prepare data ──────────────────────────────────────────────────
   const refNum = data.orderNumber ?? 'DRAFT';
@@ -1732,6 +1739,9 @@ function buildOfferDocument(data: {
         body: [
           [{ text: 'Date:', bold: true, alignment: 'right', margin: [0, 0, 4, 0] }, { text: createdDate, alignment: 'right' }],
           [{ text: 'Ref.:', bold: true, alignment: 'right', margin: [0, 0, 4, 0] }, { text: refNum, alignment: 'right' }],
+          ...(data.purchaseOrderNumber?.trim() ? [
+            [{ text: 'PO No.:', bold: true, alignment: 'right', margin: [0, 0, 4, 0] }, { text: data.purchaseOrderNumber.trim(), alignment: 'right' }],
+          ] : []),
         ],
       },
       layout: {
@@ -2047,6 +2057,7 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
     fromPhone: order.salesRep?.phone ?? null,
     paymentTerms: formatCustomerPaymentTerms(order.customerPaymentTermType, order.customerCreditDays),
     customerNote: order.customerNote ?? null,
+    purchaseOrderNumber: order.purchaseOrderNumber ?? null,
     termsAndConditions: replaceCompanyNamePlaceholder(
       order.termsAndConditions ?? order.client?.specialCustomerTerms ?? order.invoicingCompany?.customerTerms ?? null,
       order.invoicingCompany?.name ?? null,
@@ -2395,6 +2406,7 @@ function buildProformaDocument(data: {
   placeRemark?: string | null;
   docTitle?: string;
   printMeta?: DocumentPrintMeta | null;
+  purchaseOrderNumber?: string | null;
 }): TDocumentDefinitions {
   // ── Prepare data ──────────────────────────────────────────────────
   const refNum = data.orderNumber ?? 'DRAFT';
@@ -2513,6 +2525,9 @@ function buildProformaDocument(data: {
         body: [
           [{ text: 'Date:', bold: true, alignment: 'right', margin: [0, 0, 4, 0] }, { text: createdDate, alignment: 'right' }],
           [{ text: 'Ref.:', bold: true, alignment: 'right', margin: [0, 0, 4, 0] }, { text: refNum, alignment: 'right' }],
+          ...(data.purchaseOrderNumber?.trim() ? [
+            [{ text: 'PO No.:', bold: true, alignment: 'right', margin: [0, 0, 4, 0] }, { text: data.purchaseOrderNumber.trim(), alignment: 'right' }],
+          ] : []),
         ],
       },
       layout: {
@@ -2856,6 +2871,7 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
     fromPhone: order.salesRep?.phone ?? null,
     paymentTerms,
     customerNote: order.customerNote ?? null,
+    purchaseOrderNumber: order.purchaseOrderNumber ?? null,
     termsAndConditions: order.termsAndConditions ?? null,
     placeRemark: order.placeRemark ?? order.place.orderRemark ?? null,
     companyName: order.invoicingCompany?.name ?? null,

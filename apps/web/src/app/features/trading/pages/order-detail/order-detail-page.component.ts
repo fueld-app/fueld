@@ -340,8 +340,10 @@ interface PlattsSuggestionViewModel {
       [supplierContactName]="activeSupplierContactName()"
       [customerContactOptions]="customerContactDropdownOptions()"
       [supplierContactOptions]="supplierContactDropdownOptions()"
+      [purchaseOrderNumber]="order()?.purchaseOrderNumber ?? ''"
       (customerContactChange)="onCustomerContactChange($event)"
       (supplierContactChange)="onActiveSupplierContactChange($event)"
+      (purchaseOrderNumberChange)="onPurchaseOrderNumberChange($event)"
       [brokerId]="order()?.brokerId ?? ''"
       [brokerName]="brokerName()"
       [brokerOptions]="brokerDropdownOptions()"
@@ -2654,6 +2656,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
           customerPaymentTermType: d.customerPaymentTermType ?? null,
           customerCreditDays: d.customerCreditDays ?? null,
           customerNote: d.customerNote ?? null,
+          purchaseOrderNumber: d.purchaseOrderNumber ?? null,
           customerContactId: d.customerContactId ?? null,
           supplierId: d.supplierId ?? null,
           supplierPaymentTermType: d.supplierPaymentTermType ?? null,
@@ -3403,6 +3406,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   onCustomerNoteChange(value: string): void {
     this.order.update((o) => (o ? { ...o, customerNote: value } : o));
+    this.triggerAutosave();
+  }
+
+  onPurchaseOrderNumberChange(value: string): void {
+    this.order.update((o) => (o ? { ...o, purchaseOrderNumber: value || null } : o));
     this.triggerAutosave();
   }
 
@@ -4923,6 +4931,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
           customerPaymentTermType: o.customerPaymentTermType ?? null,
           customerCreditDays: o.customerCreditDays ?? null,
           customerNote: o.customerNote ?? null,
+          purchaseOrderNumber: o.purchaseOrderNumber ?? null,
           customerContactId: o.customerContactId ?? null,
           supplierId: o.supplierId ?? null,
           supplierPaymentTermType: o.supplierPaymentTermType ?? null,
@@ -5344,6 +5353,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
           customerPaymentTermType: o.customerPaymentTermType ?? null,
           customerCreditDays: o.customerCreditDays ?? null,
           customerNote: o.customerNote ?? null,
+          purchaseOrderNumber: o.purchaseOrderNumber ?? null,
           customerContactId: o.customerContactId ?? null,
           supplierId: o.supplierId ?? null,
           supplierPaymentTermType: o.supplierPaymentTermType ?? null,

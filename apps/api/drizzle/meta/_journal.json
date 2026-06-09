@@ -547,6 +547,13 @@
       "when": 1778911200000,
       "tag": "0077_add_vessel_phone",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1779500000000,
+      "tag": "0078_add_purchase_order_number",
+      "breakpoints": true
     }
   ]
 }

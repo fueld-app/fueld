@@ -59,6 +59,7 @@ interface CreateOrderInput {
   customerPaymentTermType?: 'CREDIT' | 'COD' | 'PREPAY' | null;
   customerCreditDays?: number | null;
   customerNote?: string | null;
+  purchaseOrderNumber?: string | null;
   customerContactId?: string | null;
   supplierId?: string | null;
   supplierPaymentTermType?: 'CREDIT' | 'COD' | 'PREPAY' | null;
@@ -89,6 +90,7 @@ interface UpdateOrderInput {
   customerPaymentTermType?: 'CREDIT' | 'COD' | 'PREPAY' | null;
   customerCreditDays?: number | null;
   customerNote?: string | null;
+  purchaseOrderNumber?: string | null;
   customerContactId?: string | null;
   supplierId?: string | null;
   supplierPaymentTermType?: 'CREDIT' | 'COD' | 'PREPAY' | null;
@@ -1128,6 +1130,7 @@ export async function getOrderById(idOrNumber: string) {
     customerPaymentTermType: row.customerPaymentTermType ?? null,
     customerCreditDays: row.customerCreditDays ?? null,
     customerNote: row.customerNote ?? null,
+    purchaseOrderNumber: row.purchaseOrderNumber ?? null,
     customerContactId: row.customerContactId ?? null,
     supplierId: row.supplierId ?? null,
     supplierPaymentTermType: row.supplierPaymentTermType ?? null,
@@ -1248,6 +1251,7 @@ export async function createOrder(input: CreateOrderInput) {
     customerPaymentTermType: input.customerPaymentTermType ?? null,
     customerCreditDays: input.customerCreditDays ?? null,
     customerNote: input.customerNote ?? null,
+    purchaseOrderNumber: input.purchaseOrderNumber ?? null,
     customerContactId: input.customerContactId ?? null,
     supplierId: input.supplierId ?? null,
     supplierPaymentTermType: input.supplierPaymentTermType ?? null,
@@ -1320,6 +1324,7 @@ export async function updateOrder(id: string, input: UpdateOrderInput, activityU
     setData.customerCreditDays = input.customerCreditDays;
   }
   if (input.customerNote !== undefined) setData.customerNote = input.customerNote;
+  if (input.purchaseOrderNumber !== undefined) setData.purchaseOrderNumber = input.purchaseOrderNumber;
   if (input.customerContactId !== undefined) setData.customerContactId = input.customerContactId;
   if (input.supplierId !== undefined) setData.supplierId = input.supplierId;
   if (input.supplierPaymentTermType !== undefined) {

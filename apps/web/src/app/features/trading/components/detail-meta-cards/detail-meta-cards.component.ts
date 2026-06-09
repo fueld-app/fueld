@@ -111,6 +111,21 @@ import {
                   </select>
                 }
               </div>
+              <div class="mt-3 border-t border-gray-100 pt-3">
+                <label class="text-xs font-medium text-gray-400">PO Number</label>
+                @if (isReadonly()) {
+                  <p class="mt-1 text-sm text-gray-900">{{ purchaseOrderNumber() || '—' }}</p>
+                } @else {
+                  <input
+                    type="text"
+                    [ngModel]="purchaseOrderNumber()"
+                    (ngModelChange)="purchaseOrderNumberChange.emit($event)"
+                    placeholder="e.g. PO-2026-001"
+                    class="mt-1 w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-900
+                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                  />
+                }
+              </div>
             }
           }
           @if (activeClientPartyTab() === 'broker' && showBrokerTab()) {
@@ -524,6 +539,7 @@ export class TradingDetailMetaCardsComponent {
   readonly supplierContactName = input<string>('');
   readonly customerContactOptions = input<{ value: string; label: string }[]>([]);
   readonly supplierContactOptions = input<{ value: string; label: string }[]>([]);
+  readonly purchaseOrderNumber = input<string>('');
 
   // Broker
   readonly brokerId = input<string>('');
@@ -559,6 +575,7 @@ export class TradingDetailMetaCardsComponent {
   readonly responsibleChange = output<string>();
   readonly customerContactChange = output<string>();
   readonly supplierContactChange = output<string>();
+  readonly purchaseOrderNumberChange = output<string>();
   readonly brokerSearch = output<string>();
   readonly brokerChange = output<string>();
   readonly brokerContactChange = output<string>();

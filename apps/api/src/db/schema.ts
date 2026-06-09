@@ -796,6 +796,7 @@ export const orders = pgTable('orders', {
   customerPaymentTermType: paymentTermTypeEnum('customer_payment_term_type'),
   customerCreditDays: integer('customer_credit_days'),
   customerNote: text('customer_note'),
+  purchaseOrderNumber: text('purchase_order_number'),
 
   supplierId: uuid('supplier_id').references(() => counterparties.id),
   supplierPaymentTermType: paymentTermTypeEnum('supplier_payment_term_type'),

@@ -594,6 +594,7 @@ export interface OrderDto {
   customerPaymentTermType?: PaymentTermType | null;
   customerCreditDays?: number | null;
   customerNote?: string | null;
+  purchaseOrderNumber?: string | null;
   customerContactId?: string | null;
   supplierId?: string | null;
   supplierPaymentTermType?: PaymentTermType | null;
@@ -671,6 +672,7 @@ export interface CreateOrderDto {
   customerPaymentTermType?: PaymentTermType;
   customerCreditDays?: number;
   customerNote?: string;
+  purchaseOrderNumber?: string;
   customerContactId?: string;
   supplierId?: string;
   supplierPaymentTermType?: PaymentTermType;
@@ -700,6 +702,7 @@ export interface UpdateOrderDto {
   customerPaymentTermType?: PaymentTermType | null;
   customerCreditDays?: number | null;
   customerNote?: string | null;
+  purchaseOrderNumber?: string | null;
   customerContactId?: string | null;
   supplierId?: string | null;
   supplierPaymentTermType?: PaymentTermType | null;
