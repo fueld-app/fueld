@@ -550,7 +550,7 @@ export const counterparties = pgTable('counterparties', {
 
   // ── Preferred invoicing company (for suppliers) ────────────────────
   // When this supplier is used on an order, default the invoicing company to this own company.
-  preferredInvoicingCompanyId: uuid('preferred_invoicing_company_id').references(() => counterparties.id),
+  preferredInvoicingCompanyId: uuid('preferred_invoicing_company_id'),
 
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -1538,6 +1538,7 @@ export const counterpartiesRelations = relations(counterparties, ({ one, many })
   tenant: one(tenants, { fields: [counterparties.tenantId], references: [tenants.id] }),
   responsibleUser: one(users, { fields: [counterparties.responsibleUserId], references: [users.id] }),
   parent: one(counterparties, { fields: [counterparties.parentId], references: [counterparties.id], relationName: 'parentChild' }),
+  preferredInvoicingCompany: one(counterparties, { fields: [counterparties.preferredInvoicingCompanyId], references: [counterparties.id], relationName: 'preferredInvoicing' }),
   children: many(counterparties, { relationName: 'parentChild' }),
   clientOrders: many(orders),
   suppliedItems: many(orderItems),
