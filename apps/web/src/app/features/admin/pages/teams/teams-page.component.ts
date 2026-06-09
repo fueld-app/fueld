@@ -374,16 +374,20 @@ export class TeamsPageComponent implements OnInit {
     // Users to add to this team
     for (const userId of desiredMembers) {
       if (!currentMemberIds.has(userId)) {
+        const user = this.allUsers().find(u => u.id === userId);
+        const teamIds = Array.from(new Set([...(user?.teamIds ?? []), teamId]));
         await firstValueFrom(
-          this.http.patch<ApiResponse<unknown>>(`${API}/admin/settings/users/${userId}/team`, { teamId }),
+          this.http.patch<ApiResponse<unknown>>(`${API}/admin/settings/users/${userId}/teams`, { teamIds }),
         );
       }
     }
     // Users to remove from this team
     for (const userId of currentMemberIds) {
       if (!desiredMembers.has(userId)) {
+        const user = this.allUsers().find(u => u.id === userId);
+        const teamIds = (user?.teamIds ?? []).filter(t => t !== teamId);
         await firstValueFrom(
-          this.http.patch<ApiResponse<unknown>>(`${API}/admin/settings/users/${userId}/team`, { teamId: null }),
+          this.http.patch<ApiResponse<unknown>>(`${API}/admin/settings/users/${userId}/teams`, { teamIds }),
         );
       }
     }

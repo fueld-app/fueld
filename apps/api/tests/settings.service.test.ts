@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
-import { counterparties, users } from '../src/db/schema';
+import { counterparties, users, userTeams } from '../src/db/schema';
 import { getDb, seedBasics, truncateAll } from './helpers/db';
 
 async function loadSettingsService() {
@@ -43,7 +43,8 @@ describe('admin settings.service', () => {
     expect(accessNoTeam.map((c) => c.id).sort()).toEqual([client.id, own2!.id].sort());
 
     const team = await createTeam({ name: 'Team A', companyIds: [client.id] });
-    await db.update(users).set({ teamId: team.id }).where(eq(users.id, user.id));
+    await db.update(users).set({ primaryTeamId: team.id }).where(eq(users.id, user.id));
+    await db.insert(userTeams).values({ userId: user.id, teamId: team.id });
 
     const accessByTeam = await getUserCompanyAccess(user.id);
     expect(accessByTeam.map((c) => c.id)).toEqual([client.id]);
@@ -77,7 +78,8 @@ describe('admin settings.service', () => {
       .returning();
 
     const team = await createTeam({ name: 'Ops', companyIds: [client.id] });
-    await db.update(users).set({ teamId: team.id }).where(eq(users.id, user.id));
+    await db.update(users).set({ primaryTeamId: team.id }).where(eq(users.id, user.id));
+    await db.insert(userTeams).values({ userId: user.id, teamId: team.id });
 
     const listedTeams = await listTeams();
     const teamRow = listedTeams.find((t) => t.id === team.id)!;
@@ -297,7 +299,8 @@ describe('admin settings.service', () => {
     await setOwnCompany(own2!.id, true);
 
     const emptyTeam = await createTeam({ name: 'No Companies Team', companyIds: [] });
-    await db.update(users).set({ teamId: emptyTeam.id, updatedAt: new Date() }).where(eq(users.id, user.id));
+    await db.update(users).set({ primaryTeamId: emptyTeam.id, updatedAt: new Date() }).where(eq(users.id, user.id));
+    await db.insert(userTeams).values({ userId: user.id, teamId: emptyTeam.id });
 
     const access = await getUserCompanyAccess(user.id);
     expect(access.map((c) => c.id).sort()).toEqual([client.id, own2!.id].sort());

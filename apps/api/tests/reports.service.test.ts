@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from 'bun:test';
 import { eq } from 'drizzle-orm';
-import { activityLogs, teams, tenants, users, orders } from '../src/db/schema';
+import { activityLogs, teams, tenants, users, orders, userTeams } from '../src/db/schema';
 import { getDb, seedBasics, truncateAll } from './helpers/db';
 import { Role } from '@fueld/types';
 
@@ -122,23 +122,26 @@ describe('reports.service', () => {
     const [teamA] = await db.insert(teams).values({ tenantId: tenant.id, name: 'Alpha' }).returning();
     const [teamB] = await db.insert(teams).values({ tenantId: tenant.id, name: 'Beta' }).returning();
 
-    await db.update(users).set({ role: Role.Teamlead, teamId: teamA.id, updatedAt: new Date() }).where(eq(users.id, user.id));
+    await db.update(users).set({ role: Role.Teamlead, primaryTeamId: teamA.id, updatedAt: new Date() }).where(eq(users.id, user.id));
+    await db.insert(userTeams).values({ userId: user.id, teamId: teamA.id });
 
     const [teammate] = await db.insert(users).values({
       tenantId: tenant.id,
       email: 'teammate@fueld.test',
       name: 'Teammate',
       role: Role.Trader,
-      teamId: teamA.id,
+      primaryTeamId: teamA.id,
     }).returning();
+    await db.insert(userTeams).values({ userId: teammate.id, teamId: teamA.id });
 
     const [outsider] = await db.insert(users).values({
       tenantId: tenant.id,
       email: 'outsider@fueld.test',
       name: 'Outsider',
       role: Role.Trader,
-      teamId: teamB.id,
+      primaryTeamId: teamB.id,
     }).returning();
+    await db.insert(userTeams).values({ userId: outsider.id, teamId: teamB.id });
 
     const ownOrder = await createOrder({ tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: user.id });
     const teamOrder = await createOrder({ tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: teammate.id });
@@ -268,10 +271,13 @@ describe('reports.service', () => {
 
     const [teamA] = await db.insert(teams).values({ tenantId: tenant.id, name: 'Alpha' }).returning();
     const [teamB] = await db.insert(teams).values({ tenantId: tenant.id, name: 'Beta' }).returning();
-    await db.update(users).set({ role: Role.Teamlead, teamId: teamA.id, updatedAt: new Date() }).where(eq(users.id, user.id));
+    await db.update(users).set({ role: Role.Teamlead, primaryTeamId: teamA.id, updatedAt: new Date() }).where(eq(users.id, user.id));
+    await db.insert(userTeams).values({ userId: user.id, teamId: teamA.id });
 
-    const [teammate] = await db.insert(users).values({ tenantId: tenant.id, email: 'scoped@fueld.test', name: 'Scoped Trader', role: Role.Trader, teamId: teamA.id }).returning();
-    const [outsider] = await db.insert(users).values({ tenantId: tenant.id, email: 'outside@fueld.test', name: 'Outside Trader', role: Role.Trader, teamId: teamB.id }).returning();
+    const [teammate] = await db.insert(users).values({ tenantId: tenant.id, email: 'scoped@fueld.test', name: 'Scoped Trader', role: Role.Trader, primaryTeamId: teamA.id }).returning();
+    await db.insert(userTeams).values({ userId: teammate.id, teamId: teamA.id });
+    const [outsider] = await db.insert(users).values({ tenantId: tenant.id, email: 'outside@fueld.test', name: 'Outside Trader', role: Role.Trader, primaryTeamId: teamB.id }).returning();
+    await db.insert(userTeams).values({ userId: outsider.id, teamId: teamB.id });
 
     const teamOrder = await createOrder({ tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: teammate.id });
     const outsideOrder = await createOrder({ tenantId: tenant.id, clientId: client.id, vesselId: vessel.id, placeId: place.id, salesRepId: outsider.id });

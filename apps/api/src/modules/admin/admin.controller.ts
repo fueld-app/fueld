@@ -40,7 +40,7 @@ function sanitiseUser(user: {
   name: string;
   role: string;
   tenantId: string | null;
-  teamId: string | null;
+  primaryTeamId: string | null;
   is2faEnabled: boolean;
   isActive: boolean;
   isOnLeave: boolean;
@@ -55,7 +55,7 @@ function sanitiseUser(user: {
     name: user.name,
     role: user.role,
     tenantId: user.tenantId,
-    teamId: user.teamId,
+    primaryTeamId: user.primaryTeamId,
     is2faEnabled: user.is2faEnabled,
     isActive: user.isActive,
     isOnLeave: user.isOnLeave,

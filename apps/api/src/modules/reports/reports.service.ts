@@ -44,6 +44,7 @@ import {
   tenants,
   type TenantSettings,
   users,
+  userTeams,
   vessels,
 } from '../../db/schema';
 import { sendNotificationEmail } from '../../lib/email';
@@ -446,10 +447,17 @@ async function resolveReportAccessContext(
 ): Promise<ReportAccessContext> {
   const requestingUser = await db.query.users.findFirst({
     where: eq(users.id, requestingUserId),
-    columns: { id: true, role: true, teamId: true },
+    columns: { id: true, role: true, primaryTeamId: true },
   });
 
   if (!requestingUser) throw new Error('User not found');
+
+  // Load all teams this user belongs to
+  const userTeamRows = await db
+    .select({ teamId: userTeams.teamId })
+    .from(userTeams)
+    .where(eq(userTeams.userId, requestingUserId));
+  const userTeamIds = userTeamRows.map((r) => r.teamId);
 
   const canManage = MANAGE_SHARED_REPORT_ROLES.includes(requestingUser.role as Role);
   const canViewAll = [Role.Admin, Role.Finance, Role.CreditManager].includes(requestingUser.role as Role);
@@ -467,15 +475,22 @@ async function resolveReportAccessContext(
         canManageSchedules: canManage,
       },
       userIds: null,
-      teamId: requestingUser.teamId ?? null,
+      teamId: requestingUser.primaryTeamId ?? null,
     };
   }
 
-  if (requestingUser.role === Role.Teamlead && requestingUser.teamId) {
+  if (requestingUser.role === Role.Teamlead && userTeamIds.length > 0) {
     const teamMembers = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(and(eq(users.tenantId, tenantId), eq(users.teamId, requestingUser.teamId), inArray(users.role, [Role.Trader, Role.Teamlead])));
+      .select({ id: userTeams.userId })
+      .from(userTeams)
+      .innerJoin(users, eq(userTeams.userId, users.id))
+      .where(
+        and(
+          eq(users.tenantId, tenantId),
+          inArray(userTeams.teamId, userTeamIds),
+          inArray(users.role, [Role.Trader, Role.Teamlead]),
+        ),
+      );
 
     return {
       access: {
@@ -489,7 +504,7 @@ async function resolveReportAccessContext(
         canManageSchedules: canManage,
       },
       userIds: teamMembers.map((member) => member.id),
-      teamId: requestingUser.teamId,
+      teamId: requestingUser.primaryTeamId ?? null,
     };
   }
 
@@ -510,7 +525,7 @@ async function resolveReportAccessContext(
       canManageSchedules: false,
     },
     userIds: Array.from(new Set([requestingUserId, ...delegatedUsers.map((user) => user.id)])),
-    teamId: requestingUser.teamId ?? null,
+    teamId: requestingUser.primaryTeamId ?? null,
   };
 }
 
@@ -545,7 +560,7 @@ async function fetchScopedDataset(
       traderId: orders.salesRepId,
       traderName: users.name,
       traderEmail: users.email,
-      teamId: users.teamId,
+      teamId: users.primaryTeamId,
       teamName: teams.name,
       clientId: counterparties.id,
       clientName: counterparties.name,
@@ -561,7 +576,7 @@ async function fetchScopedDataset(
     })
     .from(orders)
     .innerJoin(users, eq(orders.salesRepId, users.id))
-    .leftJoin(teams, eq(users.teamId, teams.id))
+    .leftJoin(teams, eq(users.primaryTeamId, teams.id))
     .innerJoin(counterparties, eq(orders.clientId, counterparties.id))
     .innerJoin(vessels, eq(orders.vesselId, vessels.id))
     .where(and(...conditions));

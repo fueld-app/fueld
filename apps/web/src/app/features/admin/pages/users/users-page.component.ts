@@ -308,16 +308,19 @@ import { API } from '@app/core/config/api';
                     }
                   </td>
                   <td class="px-4 py-3">
-                    <select
-                      [ngModel]="user.teamId || ''"
-                      (ngModelChange)="changeTeam(user.id, $event)"
-                      class="rounded-md border border-gray-200 bg-transparent px-2 py-1 text-xs text-gray-700 focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                    >
-                      <option value="">No team</option>
+                    <div class="flex flex-wrap gap-1">
                       @for (team of teamsList(); track team.id) {
-                        <option [value]="team.id">{{ team.name }}</option>
+                        <label class="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-1 text-xs cursor-pointer hover:bg-gray-50 transition-colors">
+                          <input
+                            type="checkbox"
+                            [checked]="user.teamIds.includes(team.id)"
+                            (change)="toggleUserTeam(user.id, team.id, $any($event.target).checked)"
+                            class="h-3.5 w-3.5 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                          />
+                          <span class="text-gray-700">{{ team.name }}</span>
+                        </label>
                       }
-                    </select>
+                    </div>
                   </td>
                   <td class="px-4 py-3 text-center">
                     <div class="flex flex-wrap justify-center gap-1">
@@ -797,9 +800,9 @@ export class UsersPageComponent implements OnInit, OnDestroy {
     }
     const team = this.filterTeam();
     if (team === '__none__') {
-      result = result.filter((u) => !u.teamId);
+      result = result.filter((u) => u.teamIds.length === 0);
     } else if (team) {
-      result = result.filter((u) => u.teamId === team);
+      result = result.filter((u) => u.teamIds.includes(team));
     }
     const status = this.filterStatus();
     if (status === 'active') {
@@ -1092,24 +1095,35 @@ export class UsersPageComponent implements OnInit, OnDestroy {
 
   // ── Team assignment ──────────────────────────────────────────────
 
-  async changeTeam(userId: string, teamId: string) {
+  async toggleUserTeam(userId: string, teamId: string, checked: boolean) {
+    const user = this.users().find((u) => u.id === userId);
+    if (!user) return;
+
+    const currentTeams = new Set(user.teamIds);
+    if (checked) {
+      currentTeams.add(teamId);
+    } else {
+      currentTeams.delete(teamId);
+    }
+    const teamIds = Array.from(currentTeams);
+
     try {
       const res = await firstValueFrom(
-        this.http.patch<ApiResponse<AdminUserDto>>(`${API}/admin/settings/users/${userId}/team`, {
-          teamId: teamId || null,
+        this.http.patch<ApiResponse<AdminUserDto>>(`${API}/admin/settings/users/${userId}/teams`, {
+          teamIds,
         }),
       );
       if (res.success) {
         this.users.update((list) =>
           list.map((u) =>
             u.id === userId
-              ? { ...u, teamId: teamId || null, teamName: this.teamsList().find(t => t.id === teamId)?.name ?? null }
+              ? { ...u, teamIds: res.data.teamIds, teamNames: res.data.teamNames }
               : u,
           ),
         );
       }
     } catch (err) {
-      console.error('Failed to change team:', err);
+      console.error('Failed to update teams:', err);
     }
   }
 

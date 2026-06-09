@@ -102,6 +102,7 @@ function getTruncateTables() {
     'company_group_members',
     'company_groups',
     'team_companies',
+    'user_teams',
     'teams',
     'company_emails',
     'company_contacts',
@@ -708,6 +709,19 @@ async function _doEnsureTestSchemaCompat(): Promise<void> {
       superseded_at timestamptz,
       created_at timestamptz NOT NULL DEFAULT now()
     )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS user_teams (
+      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      team_id uuid NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      PRIMARY KEY (user_id, team_id)
+    )
+  `;
+
+  await sql`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS primary_team_id uuid
   `;
 
   } finally {

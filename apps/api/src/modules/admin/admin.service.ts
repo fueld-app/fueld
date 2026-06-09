@@ -1,6 +1,6 @@
-import { eq, desc, and, isNull, sql } from 'drizzle-orm';
+import { eq, desc, and, isNull, sql, inArray } from 'drizzle-orm';
 import { db } from '../../db';
-import { users, invitations, tenants, teams, passkeys } from '../../db/schema';
+import { users, invitations, tenants, teams, passkeys, userTeams } from '../../db/schema';
 import { hashPassword } from '../auth/password.service';
 
 // ─── Admin Service ───────────────────────────────────────────────────
@@ -25,8 +25,6 @@ export async function listUsers() {
       email: users.email,
       name: users.name,
       role: users.role,
-      teamId: users.teamId,
-      teamName: teams.name,
       is2faEnabled: users.is2faEnabled,
       o365Id: users.o365Id,
       passkeyCount: sql<number>`count(${passkeys.id})`,
@@ -36,21 +34,46 @@ export async function listUsers() {
       createdAt: users.createdAt,
     })
     .from(users)
-    .leftJoin(teams, eq(users.teamId, teams.id))
     .leftJoin(passkeys, eq(passkeys.userId, users.id))
     .where(eq(users.tenantId, tenantId))
-    .groupBy(users.id, teams.name)
+    .groupBy(users.id)
     .orderBy(desc(users.createdAt));
 
-  return rows.map((u) => ({
-    ...u,
-    teamName: u.teamName ?? null,
-    phone: u.phone ?? null,
-    allowedIps: u.allowedIps ? JSON.parse(u.allowedIps) as string[] : null,
-    hasPasskeys: Number(u.passkeyCount) > 0,
-    hasMicrosoftSso: !!u.o365Id,
-    createdAt: u.createdAt.toISOString(),
-  }));
+  // Fetch team memberships for all users in one query
+  const allUserIds = rows.map((r) => r.id);
+  const teamMemberships = allUserIds.length > 0
+    ? await db
+        .select({
+          userId: userTeams.userId,
+          teamId: userTeams.teamId,
+          teamName: teams.name,
+        })
+        .from(userTeams)
+        .innerJoin(teams, eq(userTeams.teamId, teams.id))
+        .where(inArray(userTeams.userId, allUserIds))
+    : [];
+
+  const teamsByUser = new Map<string, { teamIds: string[]; teamNames: string[] }>();
+  for (const tm of teamMemberships) {
+    const existing = teamsByUser.get(tm.userId) ?? { teamIds: [], teamNames: [] };
+    existing.teamIds.push(tm.teamId);
+    existing.teamNames.push(tm.teamName ?? '');
+    teamsByUser.set(tm.userId, existing);
+  }
+
+  return rows.map((u) => {
+    const userTeams = teamsByUser.get(u.id) ?? { teamIds: [], teamNames: [] };
+    return {
+      ...u,
+      teamIds: userTeams.teamIds,
+      teamNames: userTeams.teamNames,
+      phone: u.phone ?? null,
+      allowedIps: u.allowedIps ? JSON.parse(u.allowedIps) as string[] : null,
+      hasPasskeys: Number(u.passkeyCount) > 0,
+      hasMicrosoftSso: !!u.o365Id,
+      createdAt: u.createdAt.toISOString(),
+    };
+  });
 }
 
 async function getPasskeyCount(userId: string): Promise<number> {
@@ -300,22 +323,22 @@ export async function updateUserRole(
 
   if (!updated) throw new Error('User not found');
 
-  // Fetch team name
-  let teamName: string | null = null;
-  if (updated.teamId) {
-    const team = await db.query.teams.findFirst({ where: eq(teams.id, updated.teamId) });
-    teamName = team?.name ?? null;
-  }
-
   const passkeyCount = await getPasskeyCount(updated.id);
+
+  // Fetch team memberships
+  const teamRows = await db
+    .select({ teamId: userTeams.teamId, teamName: teams.name })
+    .from(userTeams)
+    .innerJoin(teams, eq(userTeams.teamId, teams.id))
+    .where(eq(userTeams.userId, updated.id));
 
   return {
     id: updated.id,
     email: updated.email,
     name: updated.name,
     role: updated.role,
-    teamId: updated.teamId,
-    teamName,
+    teamIds: teamRows.map((r) => r.teamId),
+    teamNames: teamRows.map((r) => r.teamName ?? ''),
     is2faEnabled: updated.is2faEnabled,
     hasPasskeys: passkeyCount > 0,
     hasMicrosoftSso: !!updated.o365Id,
@@ -336,21 +359,22 @@ export async function toggleUserActive(userId: string, isActive: boolean) {
 
   if (!updated) throw new Error('User not found');
 
-  let teamName: string | null = null;
-  if (updated.teamId) {
-    const team = await db.query.teams.findFirst({ where: eq(teams.id, updated.teamId) });
-    teamName = team?.name ?? null;
-  }
-
   const passkeyCount = await getPasskeyCount(updated.id);
+
+  // Fetch team memberships
+  const teamRows = await db
+    .select({ teamId: userTeams.teamId, teamName: teams.name })
+    .from(userTeams)
+    .innerJoin(teams, eq(userTeams.teamId, teams.id))
+    .where(eq(userTeams.userId, updated.id));
 
   return {
     id: updated.id,
     email: updated.email,
     name: updated.name,
     role: updated.role,
-    teamId: updated.teamId,
-    teamName,
+    teamIds: teamRows.map((r) => r.teamId),
+    teamNames: teamRows.map((r) => r.teamName ?? ''),
     is2faEnabled: updated.is2faEnabled,
     hasPasskeys: passkeyCount > 0,
     hasMicrosoftSso: !!updated.o365Id,
@@ -360,34 +384,49 @@ export async function toggleUserActive(userId: string, isActive: boolean) {
   };
 }
 
-// ── Update User Team ─────────────────────────────────────────────────
+// ── Update User Teams ──────────────────────────────────────────────
 
-export async function updateUserTeam(userId: string, teamId: string | null) {
-  const [updated] = await db
-    .update(users)
-    .set({ teamId, updatedAt: new Date() })
-    .where(eq(users.id, userId))
-    .returning();
+export async function updateUserTeams(userId: string, teamIds: string[]) {
+  // Validate user exists
+  const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
+  if (!user) throw new Error('User not found');
 
-  if (!updated) throw new Error('User not found');
+  // Replace all team associations for this user
+  await db.delete(userTeams).where(eq(userTeams.userId, userId));
 
-  let teamName: string | null = null;
-  if (updated.teamId) {
-    const team = await db.query.teams.findFirst({ where: eq(teams.id, updated.teamId) });
-    teamName = team?.name ?? null;
+  const cleaned = Array.from(new Set(teamIds.filter((id) => id && id.trim().length > 0)));
+  if (cleaned.length > 0) {
+    await db.insert(userTeams).values(
+      cleaned.map((teamId) => ({ userId, teamId })),
+    );
   }
 
+  // Also update primaryTeamId to the first selected team (or null if none)
+  const primaryTeamId = cleaned[0] ?? null;
+  await db
+    .update(users)
+    .set({ primaryTeamId, updatedAt: new Date() })
+    .where(eq(users.id, userId));
+
+  // Fetch team names for response
+  const teamNames = cleaned.length > 0
+    ? await db
+        .select({ name: teams.name })
+        .from(teams)
+        .where(inArray(teams.id, cleaned))
+    : [];
+
   return {
-    id: updated.id,
-    email: updated.email,
-    name: updated.name,
-    role: updated.role,
-    teamId: updated.teamId,
-    teamName,
-    is2faEnabled: updated.is2faEnabled,
-    isActive: updated.isActive,
-    allowedIps: updated.allowedIps ? JSON.parse(updated.allowedIps) as string[] : null,
-    createdAt: updated.createdAt.toISOString(),
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    teamIds: cleaned,
+    teamNames: teamNames.map((t) => t.name ?? ''),
+    is2faEnabled: user.is2faEnabled,
+    isActive: user.isActive,
+    allowedIps: user.allowedIps ? JSON.parse(user.allowedIps) as string[] : null,
+    createdAt: user.createdAt.toISOString(),
   };
 }
 
