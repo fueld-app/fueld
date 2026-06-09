@@ -1,0 +1,485 @@
+BEGIN;
+
+-- ============================================================
+-- AMBIGUOUS MERGES: 26 cases need manual review
+-- ============================================================
+-- For each case, uncomment the pair you want to merge,
+-- then run this script.
+--
+-- Format per case:
+--   -- YSBLU → SAS YSBLUE (5bdca38b-e082-40d0-9554-ba5453368e20)
+--   UPDATE company_place_supply_rules SET company_id = '5bdca38b-e082-40d0-9554-ba5453368e20' WHERE company_id = '818f25bd-afa6-4aa3-8085-2a8658dd3c7c';
+--   DELETE FROM counterparties WHERE id = '818f25bd-afa6-4aa3-8085-2a8658dd3c7c';
+--
+
+-- === BP (21244ef9-0933-4fee-83ae-e3466b194285) ===
+-- Options:
+--   → BP Marine Limited (ecba2b54-6fff-42cc-87b7-afe649a17f9f)
+--   → BP Sinopec Marine Fuels Private Limited (7b059a51-0755-409a-8d7f-b955058fd149)
+-- Uncomment ONE pair below:
+-- UPDATE company_place_supply_rules SET company_id = 'ecba2b54-6fff-42cc-87b7-afe649a17f9f' WHERE company_id = '21244ef9-0933-4fee-83ae-e3466b194285';
+-- DELETE FROM counterparties WHERE id = '21244ef9-0933-4fee-83ae-e3466b194285';  -- merge into BP Marine Limited
+-- UPDATE company_place_supply_rules SET company_id = '7b059a51-0755-409a-8d7f-b955058fd149' WHERE company_id = '21244ef9-0933-4fee-83ae-e3466b194285';
+-- DELETE FROM counterparties WHERE id = '21244ef9-0933-4fee-83ae-e3466b194285';  -- merge into BP Sinopec Marine Fuels Private Limited
+
+-- === CHEVRON (9c6ab60b-3fd4-432b-afc3-fb481231ee95) ===
+-- Options:
+--   → Chevron Malaysia Limited (d3b70d8d-875c-42aa-879c-240829a1d199)
+--   → Chevron Marine Products LLC (0fce96b3-1380-4a33-b554-d66dcc4cbf57)
+--   → Chevron Singapore Private Limited (79629da7-692d-422e-893f-e2ab9e528751)
+-- Uncomment ONE pair below:
+-- UPDATE company_place_supply_rules SET company_id = 'd3b70d8d-875c-42aa-879c-240829a1d199' WHERE company_id = '9c6ab60b-3fd4-432b-afc3-fb481231ee95';
+-- DELETE FROM counterparties WHERE id = '9c6ab60b-3fd4-432b-afc3-fb481231ee95';  -- merge into Chevron Malaysia Limited
+-- UPDATE company_place_supply_rules SET company_id = '0fce96b3-1380-4a33-b554-d66dcc4cbf57' WHERE company_id = '9c6ab60b-3fd4-432b-afc3-fb481231ee95';
+-- DELETE FROM counterparties WHERE id = '9c6ab60b-3fd4-432b-afc3-fb481231ee95';  -- merge into Chevron Marine Products LLC
+-- UPDATE company_place_supply_rules SET company_id = '79629da7-692d-422e-893f-e2ab9e528751' WHERE company_id = '9c6ab60b-3fd4-432b-afc3-fb481231ee95';
+-- DELETE FROM counterparties WHERE id = '9c6ab60b-3fd4-432b-afc3-fb481231ee95';  -- merge into Chevron Singapore Private Limited
+
+-- === CPG (5d40ff16-3ce0-4e00-b23b-ab69de2c300a) ===
+-- Options:
+--   → CPG Bunkering Services (29bd2a68-1f06-4eef-a996-ebe586248af8)
+--   → CPG Operations DMCC (5276590a-1e75-40dd-9b93-9dbc8c66f60a)
+-- Uncomment ONE pair below:
+-- UPDATE company_place_supply_rules SET company_id = '29bd2a68-1f06-4eef-a996-ebe586248af8' WHERE company_id = '5d40ff16-3ce0-4e00-b23b-ab69de2c300a';
+-- DELETE FROM counterparties WHERE id = '5d40ff16-3ce0-4e00-b23b-ab69de2c300a';  -- merge into CPG Bunkering Services
+-- UPDATE company_place_supply_rules SET company_id = '5276590a-1e75-40dd-9b93-9dbc8c66f60a' WHERE company_id = '5d40ff16-3ce0-4e00-b23b-ab69de2c300a';
+-- DELETE FROM counterparties WHERE id = '5d40ff16-3ce0-4e00-b23b-ab69de2c300a';  -- merge into CPG Operations DMCC
+
+-- === Chimbusco (a2885bb2-407b-4d48-a6c9-129d7c58f819) ===
+-- Options:
+--   → Chimbusco Pan Nation Petro Chemical Company Limited (747affba-20c6-4b43-85a2-e274698cc319)
+--   → Chimbusco Shipping Company Limited (bf0f883a-2ace-4bab-ae22-945ef17ccb2d)
+-- Uncomment ONE pair below:
+-- UPDATE company_place_supply_rules SET company_id = '747affba-20c6-4b43-85a2-e274698cc319' WHERE company_id = 'a2885bb2-407b-4d48-a6c9-129d7c58f819';
+-- DELETE FROM counterparties WHERE id = 'a2885bb2-407b-4d48-a6c9-129d7c58f819';  -- merge into Chimbusco Pan Nation Petro Chemical Company Limited
+-- UPDATE company_place_supply_rules SET company_id = 'bf0f883a-2ace-4bab-ae22-945ef17ccb2d' WHERE company_id = 'a2885bb2-407b-4d48-a6c9-129d7c58f819';
+-- DELETE FROM counterparties WHERE id = 'a2885bb2-407b-4d48-a6c9-129d7c58f819';  -- merge into Chimbusco Shipping Company Limited
+
+-- === Eastpec (6288c2bd-b90b-4fdd-8da1-2c7689e74c35) ===
+-- Options:
+--   → Eastpec Oil Trading Private Limited (852e2527-8a34-42a0-b935-772f52b5e8cf)
+--   → Eastpec Trading Private Limited (c455d7a9-6836-48fc-8736-b802f281b0f7)
+-- Uncomment ONE pair below:
+-- UPDATE company_place_supply_rules SET company_id = '852e2527-8a34-42a0-b935-772f52b5e8cf' WHERE company_id = '6288c2bd-b90b-4fdd-8da1-2c7689e74c35';
+-- DELETE FROM counterparties WHERE id = '6288c2bd-b90b-4fdd-8da1-2c7689e74c35';  -- merge into Eastpec Oil Trading Private Limited
+-- UPDATE company_place_supply_rules SET company_id = 'c455d7a9-6836-48fc-8736-b802f281b0f7' WHERE company_id = '6288c2bd-b90b-4fdd-8da1-2c7689e74c35';
+-- DELETE FROM counterparties WHERE id = '6288c2bd-b90b-4fdd-8da1-2c7689e74c35';  -- merge into Eastpec Trading Private Limited
+
+-- === Equatorial (3ae4fa1e-962f-4cdf-9073-f2dc7c0502e3) ===
+-- Options:
+--   → Equatorial Marine Fuel Management Services Private Limited (708dbd45-8df1-4082-a2b8-94e2a1b8db95)
+--   → Equatorial Maritime Services Private Limited (c44d4141-7fe7-4776-b91d-907f0ba51f18)
+-- Uncomment ONE pair below:
+-- UPDATE company_place_supply_rules SET company_id = '708dbd45-8df1-4082-a2b8-94e2a1b8db95' WHERE company_id = '3ae4fa1e-962f-4cdf-9073-f2dc7c0502e3';
+-- DELETE FROM counterparties WHERE id = '3ae4fa1e-962f-4cdf-9073-f2dc7c0502e3';  -- merge into Equatorial Marine Fuel Management Services Private Limited
+-- UPDATE company_place_supply_rules SET company_id = 'c44d4141-7fe7-4776-b91d-907f0ba51f18' WHERE company_id = '3ae4fa1e-962f-4cdf-9073-f2dc7c0502e3';
+-- DELETE FROM counterparties WHERE id = '3ae4fa1e-962f-4cdf-9073-f2dc7c0502e3';  -- merge into Equatorial Maritime Services Private Limited
+
+-- === Fast bunkering (0d3ed538-bf0c-4b7f-bd61-534f1feab97e) ===
+-- Options:
+--   → Fast Bunkering Klaipeda Limited (2b51d2c4-60e7-4896-8753-b7acadfcbcde)
+--   → Fast Bunkering Limited (SIA 'Fast Bunkering') (bc816490-14b3-4212-ae66-cd35f5bff567)
+-- Uncomment ONE pair below:
+-- UPDATE company_place_supply_rules SET company_id = '2b51d2c4-60e7-4896-8753-b7acadfcbcde' WHERE company_id = '0d3ed538-bf0c-4b7f-bd61-534f1feab97e';
+-- DELETE FROM counterparties WHERE id = '0d3ed538-bf0c-4b7f-bd61-534f1feab97e';  -- merge into Fast Bunkering Klaipeda Limited
+-- UPDATE company_place_supply_rules SET company_id = 'bc816490-14b3-4212-ae66-cd35f5bff567' WHERE company_id = '0d3ed538-bf0c-4b7f-bd61-534f1feab97e';
+-- DELETE FROM counterparties WHERE id = '0d3ed538-bf0c-4b7f-bd61-534f1feab97e';  -- merge into Fast Bunkering Limited (SIA 'Fast Bunkering')
+
+-- === G Ocean (85311017-cf52-40cb-8ca0-89e726ec24c2) ===
+-- Options:
+--   → G Ocean Trading Private Limited (d5e3371f-d85c-48f5-9a33-3dd6d0d2a355)
+--   → Shandong Ocean Investment Company Limited (bf621bee-58f3-4b2a-b05c-c43810a8ef22)
+-- Uncomment ONE pair below:
+-- UPDATE company_place_supply_rules SET company_id = 'd5e3371f-d85c-48f5-9a33-3dd6d0d2a355' WHERE company_id = '85311017-cf52-40cb-8ca0-89e726ec24c2';
+-- DELETE FROM counterparties WHERE id = '85311017-cf52-40cb-8ca0-89e726ec24c2';  -- merge into G Ocean Trading Private Limited
+-- UPDATE company_place_supply_rules SET company_id = 'bf621bee-58f3-4b2a-b05c-c43810a8ef22' WHERE company_id = '85311017-cf52-40cb-8ca0-89e726ec24c2';
+-- DELETE FROM counterparties WHERE id = '85311017-cf52-40cb-8ca0-89e726ec24c2';  -- merge into Shandong Ocean Investment Company Limited
+
+-- === Ina (c0b49495-575c-4d4d-b08b-53e7a719afd3) ===
+-- Options:
+--   → INA-Industrija Nafte-NAFTAPLIN (f9367e06-d7a4-4e95-bf0b-bf385ea1ddc9)
+--   → Refinaria de Manaus S.A. (dba REAM) (5ce451da-dfb3-4256-9db7-f5fe6f0b4952)
+--   → RUBIS SURINAME (29942d58-8131-446a-87fe-3c4f9b15766b)
+-- Uncomment ONE pair below:
+-- UPDATE company_place_supply_rules SET company_id = 'f9367e06-d7a4-4e95-bf0b-bf385ea1ddc9' WHERE company_id = 'c0b49495-575c-4d4d-b08b-53e7a719afd3';
+-- DELETE FROM counterparties WHERE id = 'c0b49495-575c-4d4d-b08b-53e7a719afd3';  -- merge into INA-Industrija Nafte-NAFTAPLIN
+-- UPDATE company_place_supply_rules SET company_id = '5ce451da-dfb3-4256-9db7-f5fe6f0b4952' WHERE company_id = 'c0b49495-575c-4d4d-b08b-53e7a719afd3';
+-- DELETE FROM counterparties WHERE id = 'c0b49495-575c-4d4d-b08b-53e7a719afd3';  -- merge into Refinaria de Manaus S.A. (dba REAM)
+-- UPDATE company_place_supply_rules SET company_id = '29942d58-8131-446a-87fe-3c4f9b15766b' WHERE company_id = 'c0b49495-575c-4d4d-b08b-53e7a719afd3';
+-- DELETE FROM counterparties WHERE id = 'c0b49495-575c-4d4d-b08b-53e7a719afd3';  -- merge into RUBIS SURINAME
+
+-- === LINDSAY BLEE (079bc159-d293-4468-a9e3-2a6fae175351) ===
+-- Options:
+--   → Lindsay Blee Americas LLC (b185c3d8-3704-4c4a-86ed-7fee0f328691)
+--   → Lindsay Blee & Company Limited (74becb20-7dcb-4bc4-86d0-d30d51bed9ec)
+-- Uncomment ONE pair below:
+-- UPDATE company_place_supply_rules SET company_id = 'b185c3d8-3704-4c4a-86ed-7fee0f328691' WHERE company_id = '079bc159-d293-4468-a9e3-2a6fae175351';
+-- DELETE FROM counterparties WHERE id = '079bc159-d293-4468-a9e3-2a6fae175351';  -- merge into Lindsay Blee Americas LLC
+-- UPDATE company_place_supply_rules SET company_id = '74becb20-7dcb-4bc4-86d0-d30d51bed9ec' WHERE company_id = '079bc159-d293-4468-a9e3-2a6fae175351';
+-- DELETE FROM counterparties WHERE id = '079bc159-d293-4468-a9e3-2a6fae175351';  -- merge into Lindsay Blee & Company Limited
+
+-- === Monjasa (f6a42a6f-0ee7-48cd-83f3-40e68a49f2c7) ===
+-- Options:
+--   → Monjasa DMCC (93fa6d74-dff7-4947-9997-d5acddb2a92d)
+--   → Monjasa S.A. (91db7ffd-40fc-4a78-b3fb-5a2d01fde743)
+-- Uncomment ONE pair below:
+-- UPDATE company_place_supply_rules SET company_id = '93fa6d74-dff7-4947-9997-d5acddb2a92d' WHERE company_id = 'f6a42a6f-0ee7-48cd-83f3-40e68a49f2c7';
+-- DELETE FROM counterparties WHERE id = 'f6a42a6f-0ee7-48cd-83f3-40e68a49f2c7';  -- merge into Monjasa DMCC
+-- UPDATE company_place_supply_rules SET company_id = '91db7ffd-40fc-4a78-b3fb-5a2d01fde743' WHERE company_id = 'f6a42a6f-0ee7-48cd-83f3-40e68a49f2c7';
+-- DELETE FROM counterparties WHERE id = 'f6a42a6f-0ee7-48cd-83f3-40e68a49f2c7';  -- merge into Monjasa S.A.
+
+-- === Oasis (8217fb96-1b95-4119-834f-9bcd13028938) ===
+-- Options:
+--   → Oasis Marine F.Z.E (642c14cc-6a39-4eec-96dc-33b91d96c4ce)
+--   → Raysut Oasis Trading & Contracting Company (cfc8bba3-31d5-4986-a964-19d4a68c9d0c)
+-- Uncomment ONE pair below:
+-- UPDATE company_place_supply_rules SET company_id = '642c14cc-6a39-4eec-96dc-33b91d96c4ce' WHERE company_id = '8217fb96-1b95-4119-834f-9bcd13028938';
+-- DELETE FROM counterparties WHERE id = '8217fb96-1b95-4119-834f-9bcd13028938';  -- merge into Oasis Marine F.Z.E
+-- UPDATE company_place_supply_rules SET company_id = 'cfc8bba3-31d5-4986-a964-19d4a68c9d0c' WHERE company_id = '8217fb96-1b95-4119-834f-9bcd13028938';
+-- DELETE FROM counterparties WHERE id = '8217fb96-1b95-4119-834f-9bcd13028938';  -- merge into Raysut Oasis Trading & Contracting Company
+
+-- === Petrol (9232ce01-080d-4fe0-a1bc-3eef1a852560) ===
+-- Options:
+--   → ADRIATICA PETROLI SRL (d22f494a-28e1-4dcf-9cc5-ae097cf97ba4)
+--   → American Petroleum Co. Inc. (e60e645d-45ad-42d8-abb8-a7e0e7bf4546)
+--   → Ampol Australia Petroleum Proprietary Limited (f28e25da-3ce1-4f25-a466-e1072e7f5ebc)
+--   → Arkas Petrol Urunleri ve Ticaret AS (Arkas Bunkering & Trading SA) (2d30c670-aaf1-4c31-b320-6cea2918e640)
+--   → Basile Petroli S.p.A. (69090a3e-f31c-46f2-b4c0-c5c87cb8a69f)
+--   → Best Petroleum Corp. (979c3237-ecb8-48bf-98a9-e2576ab51b46)
+--   → Bunker House Petroleum Private Limited (76fbda92-fd02-47a0-8473-47d7355cc8ef)
+--   → Energy Petrol Shipping Trade Industry Incorporated (128d6e1b-9db4-4f2d-9e99-568d74998f29)
+--   → Global Petrol Group (7341335a-ad60-4e7f-82db-3c3f89374136)
+--   → Gulf Petrol Supplies LLC (ec3cc3ec-13ea-4843-af50-51279351613c)
+--   → Island Petroleum Limited (3deefaea-4923-43c3-8d4d-5ce2b33655e1)
+--   → Kuwait Petroleum Italia S.p.A. (4d29c06b-d2f7-4390-b46b-4fac9a269742)
+--   → Maxum Petroleum Incorporated (e4d46416-d732-43b3-a7b7-e3baf70355c3)
+--   → Misr Petroleum Company (68222b0c-7609-45e0-8415-22a55203f0aa)
+--   → Peninsula Petroleum Limited (b1a4a2d1-3076-479f-a3a0-800e45fc7079)
+--   → Petrol Ofisi AS (146ac53d-94f5-430f-a113-18c7530eb14d)
+--   → Pinnacle Petroleum Inc. (9e5d844b-1541-44aa-a161-8eba98f38e32)
+--   → Reiter Petroleum Incorporated (1f9bc3e5-d781-48b9-8b9a-1c965fb8ac0f)
+--   → Saurix Petroleum Limited (faffbbe7-14b3-4b04-93b2-4e78c5bad023)
+--   → Sea Oil Petroleum Private Limited (e11bfa76-6963-4127-acef-4347424fc6ca)
+--   → Sea Oil Petroleum Pte Ltd (fd161fb1-fac9-4b8e-b2f8-53c8e61259bf)
+--   → Seychelles Petroleum Company Limited (SEYPEC) (73c86722-ab97-46a0-8ab8-13ade1429c5a)
+--   → Sol Petroleo SA (4bd1e837-ca45-46c8-932a-7300e7588893)
+--   → Tigonic Petroleum LLC (9847387b-4d00-4165-ac4f-c64d6ee8af12)
+--   → Transpetrol (ae1c98dc-4357-4af9-b793-cb0d6a729450)
+--   → Transpetrol Limitada (abf0d6a4-dd3b-415b-a8bb-1112c50ae8c4)
+--   → United Petroleum Export Company Limited(UNEX) (cdc799be-efc8-422f-a752-59e6a5daf380)
+--   → Ventrin Petroleum Company Limited (383fc7ee-06d0-44f9-823f-b88223e3a054)
+--   → Viroque Petroleum SL (0d99ddca-f686-4bca-a4c1-6e657ede7fa1)
+--   → Western Fuel Supply for Petroleum Products Co. Ltd (b313f779-bbad-4a67-b365-21db4dc3eaef)
+--   → ZEN Petroleum Limited (ce7054fc-6e39-487e-823a-24f4172a6d1e)
+-- Uncomment ONE pair below:
+-- UPDATE company_place_supply_rules SET company_id = 'd22f494a-28e1-4dcf-9cc5-ae097cf97ba4' WHERE company_id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';
+-- DELETE FROM counterparties WHERE id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';  -- merge into ADRIATICA PETROLI SRL
+-- UPDATE company_place_supply_rules SET company_id = 'e60e645d-45ad-42d8-abb8-a7e0e7bf4546' WHERE company_id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';
+-- DELETE FROM counterparties WHERE id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';  -- merge into American Petroleum Co. Inc.
+-- UPDATE company_place_supply_rules SET company_id = 'f28e25da-3ce1-4f25-a466-e1072e7f5ebc' WHERE company_id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';
+-- DELETE FROM counterparties WHERE id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';  -- merge into Ampol Australia Petroleum Proprietary Limited
+-- UPDATE company_place_supply_rules SET company_id = '2d30c670-aaf1-4c31-b320-6cea2918e640' WHERE company_id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';
+-- DELETE FROM counterparties WHERE id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';  -- merge into Arkas Petrol Urunleri ve Ticaret AS (Arkas Bunkering & Trading SA)
+-- UPDATE company_place_supply_rules SET company_id = '69090a3e-f31c-46f2-b4c0-c5c87cb8a69f' WHERE company_id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';
+-- DELETE FROM counterparties WHERE id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';  -- merge into Basile Petroli S.p.A.
+-- UPDATE company_place_supply_rules SET company_id = '979c3237-ecb8-48bf-98a9-e2576ab51b46' WHERE company_id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';
+-- DELETE FROM counterparties WHERE id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';  -- merge into Best Petroleum Corp.
+-- UPDATE company_place_supply_rules SET company_id = '76fbda92-fd02-47a0-8473-47d7355cc8ef' WHERE company_id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';
+-- DELETE FROM counterparties WHERE id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';  -- merge into Bunker House Petroleum Private Limited
+-- UPDATE company_place_supply_rules SET company_id = '128d6e1b-9db4-4f2d-9e99-568d74998f29' WHERE company_id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';
+-- DELETE FROM counterparties WHERE id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';  -- merge into Energy Petrol Shipping Trade Industry Incorporated
+-- UPDATE company_place_supply_rules SET company_id = '7341335a-ad60-4e7f-82db-3c3f89374136' WHERE company_id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';
+-- DELETE FROM counterparties WHERE id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';  -- merge into Global Petrol Group
+-- UPDATE company_place_supply_rules SET company_id = 'ec3cc3ec-13ea-4843-af50-51279351613c' WHERE company_id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';
+-- DELETE FROM counterparties WHERE id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';  -- merge into Gulf Petrol Supplies LLC
+-- UPDATE company_place_supply_rules SET company_id = '3deefaea-4923-43c3-8d4d-5ce2b33655e1' WHERE company_id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';
+-- DELETE FROM counterparties WHERE id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';  -- merge into Island Petroleum Limited
+-- UPDATE company_place_supply_rules SET company_id = '4d29c06b-d2f7-4390-b46b-4fac9a269742' WHERE company_id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';
+-- DELETE FROM counterparties WHERE id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';  -- merge into Kuwait Petroleum Italia S.p.A.
+-- UPDATE company_place_supply_rules SET company_id = 'e4d46416-d732-43b3-a7b7-e3baf70355c3' WHERE company_id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';
+-- DELETE FROM counterparties WHERE id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';  -- merge into Maxum Petroleum Incorporated
+-- UPDATE company_place_supply_rules SET company_id = '68222b0c-7609-45e0-8415-22a55203f0aa' WHERE company_id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';
+-- DELETE FROM counterparties WHERE id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';  -- merge into Misr Petroleum Company
+-- UPDATE company_place_supply_rules SET company_id = 'b1a4a2d1-3076-479f-a3a0-800e45fc7079' WHERE company_id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';
+-- DELETE FROM counterparties WHERE id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';  -- merge into Peninsula Petroleum Limited
+-- UPDATE company_place_supply_rules SET company_id = '146ac53d-94f5-430f-a113-18c7530eb14d' WHERE company_id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';
+-- DELETE FROM counterparties WHERE id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';  -- merge into Petrol Ofisi AS
+-- UPDATE company_place_supply_rules SET company_id = '9e5d844b-1541-44aa-a161-8eba98f38e32' WHERE company_id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';
+-- DELETE FROM counterparties WHERE id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';  -- merge into Pinnacle Petroleum Inc.
+-- UPDATE company_place_supply_rules SET company_id = '1f9bc3e5-d781-48b9-8b9a-1c965fb8ac0f' WHERE company_id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';
+-- DELETE FROM counterparties WHERE id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';  -- merge into Reiter Petroleum Incorporated
+-- UPDATE company_place_supply_rules SET company_id = 'faffbbe7-14b3-4b04-93b2-4e78c5bad023' WHERE company_id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';
+-- DELETE FROM counterparties WHERE id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';  -- merge into Saurix Petroleum Limited
+-- UPDATE company_place_supply_rules SET company_id = 'e11bfa76-6963-4127-acef-4347424fc6ca' WHERE company_id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';
+-- DELETE FROM counterparties WHERE id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';  -- merge into Sea Oil Petroleum Private Limited
+-- UPDATE company_place_supply_rules SET company_id = 'fd161fb1-fac9-4b8e-b2f8-53c8e61259bf' WHERE company_id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';
+-- DELETE FROM counterparties WHERE id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';  -- merge into Sea Oil Petroleum Pte Ltd
+-- UPDATE company_place_supply_rules SET company_id = '73c86722-ab97-46a0-8ab8-13ade1429c5a' WHERE company_id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';
+-- DELETE FROM counterparties WHERE id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';  -- merge into Seychelles Petroleum Company Limited (SEYPEC)
+-- UPDATE company_place_supply_rules SET company_id = '4bd1e837-ca45-46c8-932a-7300e7588893' WHERE company_id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';
+-- DELETE FROM counterparties WHERE id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';  -- merge into Sol Petroleo SA
+-- UPDATE company_place_supply_rules SET company_id = '9847387b-4d00-4165-ac4f-c64d6ee8af12' WHERE company_id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';
+-- DELETE FROM counterparties WHERE id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';  -- merge into Tigonic Petroleum LLC
+-- UPDATE company_place_supply_rules SET company_id = 'ae1c98dc-4357-4af9-b793-cb0d6a729450' WHERE company_id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';
+-- DELETE FROM counterparties WHERE id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';  -- merge into Transpetrol
+-- UPDATE company_place_supply_rules SET company_id = 'abf0d6a4-dd3b-415b-a8bb-1112c50ae8c4' WHERE company_id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';
+-- DELETE FROM counterparties WHERE id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';  -- merge into Transpetrol Limitada
+-- UPDATE company_place_supply_rules SET company_id = 'cdc799be-efc8-422f-a752-59e6a5daf380' WHERE company_id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';
+-- DELETE FROM counterparties WHERE id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';  -- merge into United Petroleum Export Company Limited(UNEX)
+-- UPDATE company_place_supply_rules SET company_id = '383fc7ee-06d0-44f9-823f-b88223e3a054' WHERE company_id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';
+-- DELETE FROM counterparties WHERE id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';  -- merge into Ventrin Petroleum Company Limited
+-- UPDATE company_place_supply_rules SET company_id = '0d99ddca-f686-4bca-a4c1-6e657ede7fa1' WHERE company_id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';
+-- DELETE FROM counterparties WHERE id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';  -- merge into Viroque Petroleum SL
+-- UPDATE company_place_supply_rules SET company_id = 'b313f779-bbad-4a67-b365-21db4dc3eaef' WHERE company_id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';
+-- DELETE FROM counterparties WHERE id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';  -- merge into Western Fuel Supply for Petroleum Products Co. Ltd
+-- UPDATE company_place_supply_rules SET company_id = 'ce7054fc-6e39-487e-823a-24f4172a6d1e' WHERE company_id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';
+-- DELETE FROM counterparties WHERE id = '9232ce01-080d-4fe0-a1bc-3eef1a852560';  -- merge into ZEN Petroleum Limited
+
+-- === Quality bunker supply (ca7ac68d-23ff-4079-8f96-a66710282584) ===
+-- Options:
+--   → C.I. Quality Bunker Supply S.A.S (QBS) (51c51f94-1a1e-4d4e-8535-b8270a8a2309)
+--   → quality bunker supply ( QBS) (f0d923bd-abd0-4a19-828f-ca682960ffce)
+-- Uncomment ONE pair below:
+-- UPDATE company_place_supply_rules SET company_id = '51c51f94-1a1e-4d4e-8535-b8270a8a2309' WHERE company_id = 'ca7ac68d-23ff-4079-8f96-a66710282584';
+-- DELETE FROM counterparties WHERE id = 'ca7ac68d-23ff-4079-8f96-a66710282584';  -- merge into C.I. Quality Bunker Supply S.A.S (QBS)
+-- UPDATE company_place_supply_rules SET company_id = 'f0d923bd-abd0-4a19-828f-ca682960ffce' WHERE company_id = 'ca7ac68d-23ff-4079-8f96-a66710282584';
+-- DELETE FROM counterparties WHERE id = 'ca7ac68d-23ff-4079-8f96-a66710282584';  -- merge into quality bunker supply ( QBS)
+
+-- === Repsol (7412ddb0-475f-4825-ab0d-6ae7dac36ba6) ===
+-- Options:
+--   → Repsol Portugal Lda (3f02ba56-8892-4ccd-82ed-b2d62bab9e35)
+--   → Repsol Trading S.A. (eeecf4ee-9446-4741-be64-009c61b22849)
+-- Uncomment ONE pair below:
+-- UPDATE company_place_supply_rules SET company_id = '3f02ba56-8892-4ccd-82ed-b2d62bab9e35' WHERE company_id = '7412ddb0-475f-4825-ab0d-6ae7dac36ba6';
+-- DELETE FROM counterparties WHERE id = '7412ddb0-475f-4825-ab0d-6ae7dac36ba6';  -- merge into Repsol Portugal Lda
+-- UPDATE company_place_supply_rules SET company_id = 'eeecf4ee-9446-4741-be64-009c61b22849' WHERE company_id = '7412ddb0-475f-4825-ab0d-6ae7dac36ba6';
+-- DELETE FROM counterparties WHERE id = '7412ddb0-475f-4825-ab0d-6ae7dac36ba6';  -- merge into Repsol Trading S.A.
+
+-- === Rubis (e2c14dc3-a926-46d5-8a7a-8158ecf5ea84) ===
+-- Options:
+--   → RUBIS ANTIGUA (b6a03566-9722-4753-9d3f-ba82110e1ab6)
+--   → Rubis Bahamas Limited (ef4d85fa-6b8b-4622-aa05-839fcb11075f)
+--   → Rubis Barbados (aa118a17-8dcb-4d66-af2e-3830d8c6eebd)
+--   → Rubis Cayman Islands (7a69e4a1-2635-494c-80eb-fdf909b37f19)
+--   → RUBIS CHANNEL ISLANDS (c0521ee9-b5c1-4961-b12b-57c90f551114)
+--   → RUBIS DOMINICA (93ec879a-1b0f-41c7-a399-6417c523ed85)
+--   → Rubis Eastern Caribbean SRL (81f3b571-cd5b-436a-97cd-50cbd3fd52a0)
+--   → RUBIS GRENADA (ed55f44f-9998-4ee2-b5ec-80589bb2422b)
+--   → RUBIS GUYANA (54031bbe-514c-4baf-8cf4-a9da65afd085)
+--   → Rubis Jamaica (9e8fa69c-0071-4e5f-b94d-1c6db67a2431)
+--   → RUBIS MARTINIQUE, GUADELOUPE,  ST BARTHS & FRENCH GUIANA (b94f84ce-71d6-40cd-ba0e-b2111b16d8f5)
+--   → RUBIS ST. LUCIA (4c9bafaf-d810-4bfe-bd93-dc1664bed027)
+--   → RUBIS ST. VINCENT (76f9fe7e-3eb4-46e1-835f-708d348c1800)
+--   → RUBIS SURINAME (29942d58-8131-446a-87fe-3c4f9b15766b)
+--   → RUBIS TURKS & CAICOS (58b864c0-6cb7-4633-a186-1e9f07193511)
+-- Uncomment ONE pair below:
+-- UPDATE company_place_supply_rules SET company_id = 'b6a03566-9722-4753-9d3f-ba82110e1ab6' WHERE company_id = 'e2c14dc3-a926-46d5-8a7a-8158ecf5ea84';
+-- DELETE FROM counterparties WHERE id = 'e2c14dc3-a926-46d5-8a7a-8158ecf5ea84';  -- merge into RUBIS ANTIGUA
+-- UPDATE company_place_supply_rules SET company_id = 'ef4d85fa-6b8b-4622-aa05-839fcb11075f' WHERE company_id = 'e2c14dc3-a926-46d5-8a7a-8158ecf5ea84';
+-- DELETE FROM counterparties WHERE id = 'e2c14dc3-a926-46d5-8a7a-8158ecf5ea84';  -- merge into Rubis Bahamas Limited
+-- UPDATE company_place_supply_rules SET company_id = 'aa118a17-8dcb-4d66-af2e-3830d8c6eebd' WHERE company_id = 'e2c14dc3-a926-46d5-8a7a-8158ecf5ea84';
+-- DELETE FROM counterparties WHERE id = 'e2c14dc3-a926-46d5-8a7a-8158ecf5ea84';  -- merge into Rubis Barbados
+-- UPDATE company_place_supply_rules SET company_id = '7a69e4a1-2635-494c-80eb-fdf909b37f19' WHERE company_id = 'e2c14dc3-a926-46d5-8a7a-8158ecf5ea84';
+-- DELETE FROM counterparties WHERE id = 'e2c14dc3-a926-46d5-8a7a-8158ecf5ea84';  -- merge into Rubis Cayman Islands
+-- UPDATE company_place_supply_rules SET company_id = 'c0521ee9-b5c1-4961-b12b-57c90f551114' WHERE company_id = 'e2c14dc3-a926-46d5-8a7a-8158ecf5ea84';
+-- DELETE FROM counterparties WHERE id = 'e2c14dc3-a926-46d5-8a7a-8158ecf5ea84';  -- merge into RUBIS CHANNEL ISLANDS
+-- UPDATE company_place_supply_rules SET company_id = '93ec879a-1b0f-41c7-a399-6417c523ed85' WHERE company_id = 'e2c14dc3-a926-46d5-8a7a-8158ecf5ea84';
+-- DELETE FROM counterparties WHERE id = 'e2c14dc3-a926-46d5-8a7a-8158ecf5ea84';  -- merge into RUBIS DOMINICA
+-- UPDATE company_place_supply_rules SET company_id = '81f3b571-cd5b-436a-97cd-50cbd3fd52a0' WHERE company_id = 'e2c14dc3-a926-46d5-8a7a-8158ecf5ea84';
+-- DELETE FROM counterparties WHERE id = 'e2c14dc3-a926-46d5-8a7a-8158ecf5ea84';  -- merge into Rubis Eastern Caribbean SRL
+-- UPDATE company_place_supply_rules SET company_id = 'ed55f44f-9998-4ee2-b5ec-80589bb2422b' WHERE company_id = 'e2c14dc3-a926-46d5-8a7a-8158ecf5ea84';
+-- DELETE FROM counterparties WHERE id = 'e2c14dc3-a926-46d5-8a7a-8158ecf5ea84';  -- merge into RUBIS GRENADA
+-- UPDATE company_place_supply_rules SET company_id = '54031bbe-514c-4baf-8cf4-a9da65afd085' WHERE company_id = 'e2c14dc3-a926-46d5-8a7a-8158ecf5ea84';
+-- DELETE FROM counterparties WHERE id = 'e2c14dc3-a926-46d5-8a7a-8158ecf5ea84';  -- merge into RUBIS GUYANA
+-- UPDATE company_place_supply_rules SET company_id = '9e8fa69c-0071-4e5f-b94d-1c6db67a2431' WHERE company_id = 'e2c14dc3-a926-46d5-8a7a-8158ecf5ea84';
+-- DELETE FROM counterparties WHERE id = 'e2c14dc3-a926-46d5-8a7a-8158ecf5ea84';  -- merge into Rubis Jamaica
+-- UPDATE company_place_supply_rules SET company_id = 'b94f84ce-71d6-40cd-ba0e-b2111b16d8f5' WHERE company_id = 'e2c14dc3-a926-46d5-8a7a-8158ecf5ea84';
+-- DELETE FROM counterparties WHERE id = 'e2c14dc3-a926-46d5-8a7a-8158ecf5ea84';  -- merge into RUBIS MARTINIQUE, GUADELOUPE,  ST BARTHS & FRENCH GUIANA
+-- UPDATE company_place_supply_rules SET company_id = '4c9bafaf-d810-4bfe-bd93-dc1664bed027' WHERE company_id = 'e2c14dc3-a926-46d5-8a7a-8158ecf5ea84';
+-- DELETE FROM counterparties WHERE id = 'e2c14dc3-a926-46d5-8a7a-8158ecf5ea84';  -- merge into RUBIS ST. LUCIA
+-- UPDATE company_place_supply_rules SET company_id = '76f9fe7e-3eb4-46e1-835f-708d348c1800' WHERE company_id = 'e2c14dc3-a926-46d5-8a7a-8158ecf5ea84';
+-- DELETE FROM counterparties WHERE id = 'e2c14dc3-a926-46d5-8a7a-8158ecf5ea84';  -- merge into RUBIS ST. VINCENT
+-- UPDATE company_place_supply_rules SET company_id = '29942d58-8131-446a-87fe-3c4f9b15766b' WHERE company_id = 'e2c14dc3-a926-46d5-8a7a-8158ecf5ea84';
+-- DELETE FROM counterparties WHERE id = 'e2c14dc3-a926-46d5-8a7a-8158ecf5ea84';  -- merge into RUBIS SURINAME
+-- UPDATE company_place_supply_rules SET company_id = '58b864c0-6cb7-4633-a186-1e9f07193511' WHERE company_id = 'e2c14dc3-a926-46d5-8a7a-8158ecf5ea84';
+-- DELETE FROM counterparties WHERE id = 'e2c14dc3-a926-46d5-8a7a-8158ecf5ea84';  -- merge into RUBIS TURKS & CAICOS
+
+-- === SK (8d558d19-daab-449c-9568-54784070c6b8) ===
+-- Options:
+--   → SK B&T Private Limited (f7c154da-0d13-4e7d-be6b-52f940f8a6c9)
+--   → Skeljungur HF (f09f4b5f-d445-4dfd-bb7d-16374820aadf)
+--   → SK Energy International Private Limited (2d3b6667-9513-4f80-8c66-dad893bc33be)
+--   → SKP Enterprises Limited (6282b2ce-ba30-410b-84be-66f2251e65ef)
+-- Uncomment ONE pair below:
+-- UPDATE company_place_supply_rules SET company_id = 'f7c154da-0d13-4e7d-be6b-52f940f8a6c9' WHERE company_id = '8d558d19-daab-449c-9568-54784070c6b8';
+-- DELETE FROM counterparties WHERE id = '8d558d19-daab-449c-9568-54784070c6b8';  -- merge into SK B&T Private Limited
+-- UPDATE company_place_supply_rules SET company_id = 'f09f4b5f-d445-4dfd-bb7d-16374820aadf' WHERE company_id = '8d558d19-daab-449c-9568-54784070c6b8';
+-- DELETE FROM counterparties WHERE id = '8d558d19-daab-449c-9568-54784070c6b8';  -- merge into Skeljungur HF
+-- UPDATE company_place_supply_rules SET company_id = '2d3b6667-9513-4f80-8c66-dad893bc33be' WHERE company_id = '8d558d19-daab-449c-9568-54784070c6b8';
+-- DELETE FROM counterparties WHERE id = '8d558d19-daab-449c-9568-54784070c6b8';  -- merge into SK Energy International Private Limited
+-- UPDATE company_place_supply_rules SET company_id = '6282b2ce-ba30-410b-84be-66f2251e65ef' WHERE company_id = '8d558d19-daab-449c-9568-54784070c6b8';
+-- DELETE FROM counterparties WHERE id = '8d558d19-daab-449c-9568-54784070c6b8';  -- merge into SKP Enterprises Limited
+
+-- === SS (5f836f33-d6c4-4122-a092-5bd678062938) ===
+-- Options:
+--   → Cross Office SIA. (d6689697-60e3-436a-b37b-6b44151ebe79)
+--   → Esso Malaysia Berhad (bc35808e-3421-4289-bccd-44ad3a017c84)
+--   → Oljefirma J. Christensson A/B (0f086391-0d52-4ef1-a0b6-2cbc5e12f357)
+--   → Unimot Express Sp Zoo (ba35972d-c9ce-4d64-9595-fd753229a43c)
+-- Uncomment ONE pair below:
+-- UPDATE company_place_supply_rules SET company_id = 'd6689697-60e3-436a-b37b-6b44151ebe79' WHERE company_id = '5f836f33-d6c4-4122-a092-5bd678062938';
+-- DELETE FROM counterparties WHERE id = '5f836f33-d6c4-4122-a092-5bd678062938';  -- merge into Cross Office SIA.
+-- UPDATE company_place_supply_rules SET company_id = 'bc35808e-3421-4289-bccd-44ad3a017c84' WHERE company_id = '5f836f33-d6c4-4122-a092-5bd678062938';
+-- DELETE FROM counterparties WHERE id = '5f836f33-d6c4-4122-a092-5bd678062938';  -- merge into Esso Malaysia Berhad
+-- UPDATE company_place_supply_rules SET company_id = '0f086391-0d52-4ef1-a0b6-2cbc5e12f357' WHERE company_id = '5f836f33-d6c4-4122-a092-5bd678062938';
+-- DELETE FROM counterparties WHERE id = '5f836f33-d6c4-4122-a092-5bd678062938';  -- merge into Oljefirma J. Christensson A/B
+-- UPDATE company_place_supply_rules SET company_id = 'ba35972d-c9ce-4d64-9595-fd753229a43c' WHERE company_id = '5f836f33-d6c4-4122-a092-5bd678062938';
+-- DELETE FROM counterparties WHERE id = '5f836f33-d6c4-4122-a092-5bd678062938';  -- merge into Unimot Express Sp Zoo
+
+-- === Sea Oil Petroleum (c35a869d-6648-42da-b013-ca2d46b72919) ===
+-- Options:
+--   → Sea Oil Petroleum Private Limited (e11bfa76-6963-4127-acef-4347424fc6ca)
+--   → Sea Oil Petroleum Pte Ltd (fd161fb1-fac9-4b8e-b2f8-53c8e61259bf)
+-- Uncomment ONE pair below:
+-- UPDATE company_place_supply_rules SET company_id = 'e11bfa76-6963-4127-acef-4347424fc6ca' WHERE company_id = 'c35a869d-6648-42da-b013-ca2d46b72919';
+-- DELETE FROM counterparties WHERE id = 'c35a869d-6648-42da-b013-ca2d46b72919';  -- merge into Sea Oil Petroleum Private Limited
+-- UPDATE company_place_supply_rules SET company_id = 'fd161fb1-fac9-4b8e-b2f8-53c8e61259bf' WHERE company_id = 'c35a869d-6648-42da-b013-ca2d46b72919';
+-- DELETE FROM counterparties WHERE id = 'c35a869d-6648-42da-b013-ca2d46b72919';  -- merge into Sea Oil Petroleum Pte Ltd
+
+-- === Seka (12317c9d-42c7-4229-841e-acc962062bba) ===
+-- Options:
+--   → Seka S.A. (4ecb1f4a-1450-4d4a-a1be-ec0a905096cd)
+--   → SEKAVIN FZCO (1d2b7169-9656-4f16-8f07-b52aca77071b)
+--   → Sekavin S.A. (2199d0e6-d350-4d38-a6c1-ffd8fae22e57)
+-- Uncomment ONE pair below:
+-- UPDATE company_place_supply_rules SET company_id = '4ecb1f4a-1450-4d4a-a1be-ec0a905096cd' WHERE company_id = '12317c9d-42c7-4229-841e-acc962062bba';
+-- DELETE FROM counterparties WHERE id = '12317c9d-42c7-4229-841e-acc962062bba';  -- merge into Seka S.A.
+-- UPDATE company_place_supply_rules SET company_id = '1d2b7169-9656-4f16-8f07-b52aca77071b' WHERE company_id = '12317c9d-42c7-4229-841e-acc962062bba';
+-- DELETE FROM counterparties WHERE id = '12317c9d-42c7-4229-841e-acc962062bba';  -- merge into SEKAVIN FZCO
+-- UPDATE company_place_supply_rules SET company_id = '2199d0e6-d350-4d38-a6c1-ffd8fae22e57' WHERE company_id = '12317c9d-42c7-4229-841e-acc962062bba';
+-- DELETE FROM counterparties WHERE id = '12317c9d-42c7-4229-841e-acc962062bba';  -- merge into Sekavin S.A.
+
+-- === Sekavin (19feb9df-cf02-4c15-b8d5-1cf738efdd92) ===
+-- Options:
+--   → SEKAVIN FZCO (1d2b7169-9656-4f16-8f07-b52aca77071b)
+--   → Sekavin S.A. (2199d0e6-d350-4d38-a6c1-ffd8fae22e57)
+-- Uncomment ONE pair below:
+-- UPDATE company_place_supply_rules SET company_id = '1d2b7169-9656-4f16-8f07-b52aca77071b' WHERE company_id = '19feb9df-cf02-4c15-b8d5-1cf738efdd92';
+-- DELETE FROM counterparties WHERE id = '19feb9df-cf02-4c15-b8d5-1cf738efdd92';  -- merge into SEKAVIN FZCO
+-- UPDATE company_place_supply_rules SET company_id = '2199d0e6-d350-4d38-a6c1-ffd8fae22e57' WHERE company_id = '19feb9df-cf02-4c15-b8d5-1cf738efdd92';
+-- DELETE FROM counterparties WHERE id = '19feb9df-cf02-4c15-b8d5-1cf738efdd92';  -- merge into Sekavin S.A.
+
+-- === Shell (76e3b159-5a8c-4045-ab48-62eac0c1270e) ===
+-- Options:
+--   → Shell International Trading Middle East Limited (SITME) (1a06eb2d-55d3-4df0-b67c-153c2ce276f4)
+--   → Shell Malaysia Trading Sendirian Berhad (5fd5a9bb-2302-47f2-bdb1-665ba9eca450)
+--   → Shell Trading (US) Company (1353c5aa-1641-4b97-9602-e7aaf1781c8d)
+-- Uncomment ONE pair below:
+-- UPDATE company_place_supply_rules SET company_id = '1a06eb2d-55d3-4df0-b67c-153c2ce276f4' WHERE company_id = '76e3b159-5a8c-4045-ab48-62eac0c1270e';
+-- DELETE FROM counterparties WHERE id = '76e3b159-5a8c-4045-ab48-62eac0c1270e';  -- merge into Shell International Trading Middle East Limited (SITME)
+-- UPDATE company_place_supply_rules SET company_id = '5fd5a9bb-2302-47f2-bdb1-665ba9eca450' WHERE company_id = '76e3b159-5a8c-4045-ab48-62eac0c1270e';
+-- DELETE FROM counterparties WHERE id = '76e3b159-5a8c-4045-ab48-62eac0c1270e';  -- merge into Shell Malaysia Trading Sendirian Berhad
+-- UPDATE company_place_supply_rules SET company_id = '1353c5aa-1641-4b97-9602-e7aaf1781c8d' WHERE company_id = '76e3b159-5a8c-4045-ab48-62eac0c1270e';
+-- DELETE FROM counterparties WHERE id = '76e3b159-5a8c-4045-ab48-62eac0c1270e';  -- merge into Shell Trading (US) Company
+
+-- === Total (d24b49fd-3506-4494-aa72-5db998ef5ce8) ===
+-- Options:
+--   → TotalEnergies Marine Fuels Private Limited (dfc4d668-ad0b-4922-aa35-eb425cf65592)
+--   → TOTSA TotalEnergies Trading SA (e9331bf4-05a8-4c34-807c-4bee9e8e1039)
+-- Uncomment ONE pair below:
+-- UPDATE company_place_supply_rules SET company_id = 'dfc4d668-ad0b-4922-aa35-eb425cf65592' WHERE company_id = 'd24b49fd-3506-4494-aa72-5db998ef5ce8';
+-- DELETE FROM counterparties WHERE id = 'd24b49fd-3506-4494-aa72-5db998ef5ce8';  -- merge into TotalEnergies Marine Fuels Private Limited
+-- UPDATE company_place_supply_rules SET company_id = 'e9331bf4-05a8-4c34-807c-4bee9e8e1039' WHERE company_id = 'd24b49fd-3506-4494-aa72-5db998ef5ce8';
+-- DELETE FROM counterparties WHERE id = 'd24b49fd-3506-4494-aa72-5db998ef5ce8';  -- merge into TOTSA TotalEnergies Trading SA
+
+-- === Vivo (93191921-5e24-48ad-babe-cd31c09c4d0d) ===
+-- Options:
+--   → Vivo Energy Cabo Verde S.A. (c0fd2cdb-003b-4df5-ae69-0121f985638a)
+--   → Vivo Energy Côte d’Ivoire (36ca7a05-4c68-48c5-a6fe-9461658748b2)
+--   → Vivo Energy Gabon (1d392407-b26b-4e35-a979-7c1c6c81ae78)
+--   → Vivo Energy Ghana (c40ffbb6-c3bd-4022-bd7d-09a30ce1454e)
+--   → Vivo Energy Guinea (4c1709d0-a4c4-4263-8c5c-7efcd9d513e3)
+--   → Vivo Energy Kenya (83cf3eb5-4200-424b-8ed0-6e73e9bc4980)
+--   → Vivo Energy Madagascar (8f89a015-3881-4e9c-a0b1-f577d1b53ad3)
+--   → Vivo Energy Maroc S.A. (8e42ec9c-867f-45ce-888b-04a3223438bd)
+--   → Vivo Energy Mozambique (10dd04c9-4605-4341-9834-d9697a2933d0)
+--   → Vivo Energy Namibia (7f2c7202-961d-45b9-8caa-706fe85c3860)
+--   → Vivo Energy Réunion (c91e21bf-b1a7-4e3e-b816-213a39c745b6)
+--   → Vivo Energy Senegal (9fcb0690-e5de-4e67-87be-bb23ec3bf8da)
+-- Uncomment ONE pair below:
+-- UPDATE company_place_supply_rules SET company_id = 'c0fd2cdb-003b-4df5-ae69-0121f985638a' WHERE company_id = '93191921-5e24-48ad-babe-cd31c09c4d0d';
+-- DELETE FROM counterparties WHERE id = '93191921-5e24-48ad-babe-cd31c09c4d0d';  -- merge into Vivo Energy Cabo Verde S.A.
+-- UPDATE company_place_supply_rules SET company_id = '36ca7a05-4c68-48c5-a6fe-9461658748b2' WHERE company_id = '93191921-5e24-48ad-babe-cd31c09c4d0d';
+-- DELETE FROM counterparties WHERE id = '93191921-5e24-48ad-babe-cd31c09c4d0d';  -- merge into Vivo Energy Côte d’Ivoire
+-- UPDATE company_place_supply_rules SET company_id = '1d392407-b26b-4e35-a979-7c1c6c81ae78' WHERE company_id = '93191921-5e24-48ad-babe-cd31c09c4d0d';
+-- DELETE FROM counterparties WHERE id = '93191921-5e24-48ad-babe-cd31c09c4d0d';  -- merge into Vivo Energy Gabon
+-- UPDATE company_place_supply_rules SET company_id = 'c40ffbb6-c3bd-4022-bd7d-09a30ce1454e' WHERE company_id = '93191921-5e24-48ad-babe-cd31c09c4d0d';
+-- DELETE FROM counterparties WHERE id = '93191921-5e24-48ad-babe-cd31c09c4d0d';  -- merge into Vivo Energy Ghana
+-- UPDATE company_place_supply_rules SET company_id = '4c1709d0-a4c4-4263-8c5c-7efcd9d513e3' WHERE company_id = '93191921-5e24-48ad-babe-cd31c09c4d0d';
+-- DELETE FROM counterparties WHERE id = '93191921-5e24-48ad-babe-cd31c09c4d0d';  -- merge into Vivo Energy Guinea
+-- UPDATE company_place_supply_rules SET company_id = '83cf3eb5-4200-424b-8ed0-6e73e9bc4980' WHERE company_id = '93191921-5e24-48ad-babe-cd31c09c4d0d';
+-- DELETE FROM counterparties WHERE id = '93191921-5e24-48ad-babe-cd31c09c4d0d';  -- merge into Vivo Energy Kenya
+-- UPDATE company_place_supply_rules SET company_id = '8f89a015-3881-4e9c-a0b1-f577d1b53ad3' WHERE company_id = '93191921-5e24-48ad-babe-cd31c09c4d0d';
+-- DELETE FROM counterparties WHERE id = '93191921-5e24-48ad-babe-cd31c09c4d0d';  -- merge into Vivo Energy Madagascar
+-- UPDATE company_place_supply_rules SET company_id = '8e42ec9c-867f-45ce-888b-04a3223438bd' WHERE company_id = '93191921-5e24-48ad-babe-cd31c09c4d0d';
+-- DELETE FROM counterparties WHERE id = '93191921-5e24-48ad-babe-cd31c09c4d0d';  -- merge into Vivo Energy Maroc S.A.
+-- UPDATE company_place_supply_rules SET company_id = '10dd04c9-4605-4341-9834-d9697a2933d0' WHERE company_id = '93191921-5e24-48ad-babe-cd31c09c4d0d';
+-- DELETE FROM counterparties WHERE id = '93191921-5e24-48ad-babe-cd31c09c4d0d';  -- merge into Vivo Energy Mozambique
+-- UPDATE company_place_supply_rules SET company_id = '7f2c7202-961d-45b9-8caa-706fe85c3860' WHERE company_id = '93191921-5e24-48ad-babe-cd31c09c4d0d';
+-- DELETE FROM counterparties WHERE id = '93191921-5e24-48ad-babe-cd31c09c4d0d';  -- merge into Vivo Energy Namibia
+-- UPDATE company_place_supply_rules SET company_id = 'c91e21bf-b1a7-4e3e-b816-213a39c745b6' WHERE company_id = '93191921-5e24-48ad-babe-cd31c09c4d0d';
+-- DELETE FROM counterparties WHERE id = '93191921-5e24-48ad-babe-cd31c09c4d0d';  -- merge into Vivo Energy Réunion
+-- UPDATE company_place_supply_rules SET company_id = '9fcb0690-e5de-4e67-87be-bb23ec3bf8da' WHERE company_id = '93191921-5e24-48ad-babe-cd31c09c4d0d';
+-- DELETE FROM counterparties WHERE id = '93191921-5e24-48ad-babe-cd31c09c4d0d';  -- merge into Vivo Energy Senegal
+
+-- === Vivo Energy (4a6905fb-0a5e-48d6-a594-9663db3198f8) ===
+-- Options:
+--   → Vivo Energy Cabo Verde S.A. (c0fd2cdb-003b-4df5-ae69-0121f985638a)
+--   → Vivo Energy Côte d’Ivoire (36ca7a05-4c68-48c5-a6fe-9461658748b2)
+--   → Vivo Energy Gabon (1d392407-b26b-4e35-a979-7c1c6c81ae78)
+--   → Vivo Energy Ghana (c40ffbb6-c3bd-4022-bd7d-09a30ce1454e)
+--   → Vivo Energy Guinea (4c1709d0-a4c4-4263-8c5c-7efcd9d513e3)
+--   → Vivo Energy Kenya (83cf3eb5-4200-424b-8ed0-6e73e9bc4980)
+--   → Vivo Energy Madagascar (8f89a015-3881-4e9c-a0b1-f577d1b53ad3)
+--   → Vivo Energy Maroc S.A. (8e42ec9c-867f-45ce-888b-04a3223438bd)
+--   → Vivo Energy Mozambique (10dd04c9-4605-4341-9834-d9697a2933d0)
+--   → Vivo Energy Namibia (7f2c7202-961d-45b9-8caa-706fe85c3860)
+--   → Vivo Energy Réunion (c91e21bf-b1a7-4e3e-b816-213a39c745b6)
+--   → Vivo Energy Senegal (9fcb0690-e5de-4e67-87be-bb23ec3bf8da)
+-- Uncomment ONE pair below:
+-- UPDATE company_place_supply_rules SET company_id = 'c0fd2cdb-003b-4df5-ae69-0121f985638a' WHERE company_id = '4a6905fb-0a5e-48d6-a594-9663db3198f8';
+-- DELETE FROM counterparties WHERE id = '4a6905fb-0a5e-48d6-a594-9663db3198f8';  -- merge into Vivo Energy Cabo Verde S.A.
+-- UPDATE company_place_supply_rules SET company_id = '36ca7a05-4c68-48c5-a6fe-9461658748b2' WHERE company_id = '4a6905fb-0a5e-48d6-a594-9663db3198f8';
+-- DELETE FROM counterparties WHERE id = '4a6905fb-0a5e-48d6-a594-9663db3198f8';  -- merge into Vivo Energy Côte d’Ivoire
+-- UPDATE company_place_supply_rules SET company_id = '1d392407-b26b-4e35-a979-7c1c6c81ae78' WHERE company_id = '4a6905fb-0a5e-48d6-a594-9663db3198f8';
+-- DELETE FROM counterparties WHERE id = '4a6905fb-0a5e-48d6-a594-9663db3198f8';  -- merge into Vivo Energy Gabon
+-- UPDATE company_place_supply_rules SET company_id = 'c40ffbb6-c3bd-4022-bd7d-09a30ce1454e' WHERE company_id = '4a6905fb-0a5e-48d6-a594-9663db3198f8';
+-- DELETE FROM counterparties WHERE id = '4a6905fb-0a5e-48d6-a594-9663db3198f8';  -- merge into Vivo Energy Ghana
+-- UPDATE company_place_supply_rules SET company_id = '4c1709d0-a4c4-4263-8c5c-7efcd9d513e3' WHERE company_id = '4a6905fb-0a5e-48d6-a594-9663db3198f8';
+-- DELETE FROM counterparties WHERE id = '4a6905fb-0a5e-48d6-a594-9663db3198f8';  -- merge into Vivo Energy Guinea
+-- UPDATE company_place_supply_rules SET company_id = '83cf3eb5-4200-424b-8ed0-6e73e9bc4980' WHERE company_id = '4a6905fb-0a5e-48d6-a594-9663db3198f8';
+-- DELETE FROM counterparties WHERE id = '4a6905fb-0a5e-48d6-a594-9663db3198f8';  -- merge into Vivo Energy Kenya
+-- UPDATE company_place_supply_rules SET company_id = '8f89a015-3881-4e9c-a0b1-f577d1b53ad3' WHERE company_id = '4a6905fb-0a5e-48d6-a594-9663db3198f8';
+-- DELETE FROM counterparties WHERE id = '4a6905fb-0a5e-48d6-a594-9663db3198f8';  -- merge into Vivo Energy Madagascar
+-- UPDATE company_place_supply_rules SET company_id = '8e42ec9c-867f-45ce-888b-04a3223438bd' WHERE company_id = '4a6905fb-0a5e-48d6-a594-9663db3198f8';
+-- DELETE FROM counterparties WHERE id = '4a6905fb-0a5e-48d6-a594-9663db3198f8';  -- merge into Vivo Energy Maroc S.A.
+-- UPDATE company_place_supply_rules SET company_id = '10dd04c9-4605-4341-9834-d9697a2933d0' WHERE company_id = '4a6905fb-0a5e-48d6-a594-9663db3198f8';
+-- DELETE FROM counterparties WHERE id = '4a6905fb-0a5e-48d6-a594-9663db3198f8';  -- merge into Vivo Energy Mozambique
+-- UPDATE company_place_supply_rules SET company_id = '7f2c7202-961d-45b9-8caa-706fe85c3860' WHERE company_id = '4a6905fb-0a5e-48d6-a594-9663db3198f8';
+-- DELETE FROM counterparties WHERE id = '4a6905fb-0a5e-48d6-a594-9663db3198f8';  -- merge into Vivo Energy Namibia
+-- UPDATE company_place_supply_rules SET company_id = 'c91e21bf-b1a7-4e3e-b816-213a39c745b6' WHERE company_id = '4a6905fb-0a5e-48d6-a594-9663db3198f8';
+-- DELETE FROM counterparties WHERE id = '4a6905fb-0a5e-48d6-a594-9663db3198f8';  -- merge into Vivo Energy Réunion
+-- UPDATE company_place_supply_rules SET company_id = '9fcb0690-e5de-4e67-87be-bb23ec3bf8da' WHERE company_id = '4a6905fb-0a5e-48d6-a594-9663db3198f8';
+-- DELETE FROM counterparties WHERE id = '4a6905fb-0a5e-48d6-a594-9663db3198f8';  -- merge into Vivo Energy Senegal
+
+-- === minerva (ec45e6f1-3b57-4e62-b594-06206233779c) ===
+-- Options:
+--   → Minerva Bunkering Private Limited (42a5069c-1a66-478c-848e-b3121d4864b0)
+--   → Minerva Bunkering (USA) LLC (1a97538b-4aa4-4fc8-86c7-b30f1d11dc7d)
+-- Uncomment ONE pair below:
+-- UPDATE company_place_supply_rules SET company_id = '42a5069c-1a66-478c-848e-b3121d4864b0' WHERE company_id = 'ec45e6f1-3b57-4e62-b594-06206233779c';
+-- DELETE FROM counterparties WHERE id = 'ec45e6f1-3b57-4e62-b594-06206233779c';  -- merge into Minerva Bunkering Private Limited
+-- UPDATE company_place_supply_rules SET company_id = '1a97538b-4aa4-4fc8-86c7-b30f1d11dc7d' WHERE company_id = 'ec45e6f1-3b57-4e62-b594-06206233779c';
+-- DELETE FROM counterparties WHERE id = 'ec45e6f1-3b57-4e62-b594-06206233779c';  -- merge into Minerva Bunkering (USA) LLC
+
+COMMIT;

@@ -10,7 +10,7 @@ import { sendWhatsAppGroupMessage, sendWhatsAppMessage } from '../whatsapp/whats
 import { db } from '../../db';
 import { users, counterparties, invoices as invoicesTable, companyContacts, companyEmails, supplierInquiries, supplierInquiryItemQuotes, portSuppliers, emailLog, tenants, orders, orderAttachments, orderPortDocuments, orderSuppliers, orderTransferSides } from '../../db/schema';
 import { getEmailTemplate, getApplicableEmailRules, renderTemplate, type TemplateVariables } from '../admin/email-settings.service';
-import { getInquirySettings } from '../admin/settings.service';
+import { getInquirySettings, getDeliveryDocumentationSettings } from '../admin/settings.service';
 import { applyStaleSupplierInquiryStatuses, createSupplierQuoteToken, getSupplierQuoteExpiryDate, getSupplierQuoteFormUrl, getSupplierInquiryOrderContext, saveSupplierInquiryResponse } from './supplier-inquiry.service';
 import { createSupplierNominationLink, getSupplierNominationFormUrl, getSupplierNominationSummary } from './supplier-nomination.service';
 import {
@@ -139,8 +139,10 @@ async function loadSelectedOrderAttachments(orderId: string, attachmentIds: stri
     throw new Error('One or more selected attachments were not found on this order');
   }
 
-  if (rows.some((row) => String(row.type ?? '').toUpperCase() !== 'BDR')) {
-    throw new Error('Only BDR attachments can be added to invoice emails');
+  const docSettings = await getDeliveryDocumentationSettings();
+  const allowedTypes = docSettings.deliveryDocumentationTypes;
+  if (rows.some((row) => !allowedTypes.includes(String(row.type ?? '').toUpperCase()))) {
+    throw new Error(`Only ${allowedTypes.join('/')} attachments can be added to invoice emails`);
   }
 
   return Promise.all(rows.map(async (row) => {

@@ -9,7 +9,7 @@ import {
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
-import type { ApiResponse, OrderNumberSettingsDto, VesselCompanyRoleSettingsDto, VesselCompanyRoleOption, ProductSettingsDto, UnitSettingsDto, CurrencySettingsDto, CompanyTypeSettingsDto, AttachmentTypeSettingsDto, PortDocumentationSettingsDto, InquiryCancelReasonSettingsDto, UnitConversionSettingsDto } from '@fueld/types';
+import type { ApiResponse, OrderNumberSettingsDto, VesselCompanyRoleSettingsDto, VesselCompanyRoleOption, ProductSettingsDto, UnitSettingsDto, CurrencySettingsDto, CompanyTypeSettingsDto, AttachmentTypeSettingsDto, DeliveryDocumentationSettingsDto, PortDocumentationSettingsDto, InquiryCancelReasonSettingsDto, UnitConversionSettingsDto } from '@fueld/types';
 
 import { API } from '@app/core/config/api';
 
@@ -741,6 +741,83 @@ interface InquirySettingsDto {
                   @if (attachmentTypesSaving()) { Saving… } @else { Save Types }
                 </button>
                 @if (attachmentTypesSaved()) {
+                  <span class="text-sm text-green-600 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                    </svg>
+                    Saved
+                  </span>
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- ════════════════════════════════════════════════════════ -->
+          <!--  Delivery Documentation                               -->
+          <!-- ════════════════════════════════════════════════════════ -->
+          <div class="app-panel">
+            <div class="app-panel-header app-panel-header--amber">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--amber">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-semibold text-gray-900">Delivery Documentation</h3>
+                <p class="text-xs text-gray-500">Configure which attachment types are required to close (mark delivered) an order.</p>
+              </div>
+            </div>
+
+            <div class="app-panel-body space-y-4">
+              <div class="flex items-center justify-between gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <div>
+                  <p class="text-sm font-medium text-gray-900">Require delivery documentation</p>
+                  <p class="text-xs text-gray-500">When enabled, orders cannot be marked as delivered without at least one attachment of the selected types.</p>
+                </div>
+                <button
+                  (click)="requireDeliveryDocumentation.set(!requireDeliveryDocumentation())"
+                  [disabled]="deliveryDocumentationSaving()"
+                  [class]="requireDeliveryDocumentation()
+                    ? 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-amber-500 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 disabled:opacity-50'
+                    : 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 disabled:opacity-50'"
+                >
+                  <span
+                    [class]="requireDeliveryDocumentation()
+                      ? 'pointer-events-none inline-block h-5 w-5 translate-x-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'
+                      : 'pointer-events-none inline-block h-5 w-5 translate-x-0 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'"
+                  ></span>
+                </button>
+              </div>
+
+              @if (requireDeliveryDocumentation()) {
+                <div class="space-y-2">
+                  <p class="text-sm font-medium text-gray-700">Valid delivery documentation types</p>
+                  <p class="text-xs text-gray-500">Select which configured attachment types satisfy the delivery closeout rule.</p>
+                  <div class="flex flex-wrap gap-2">
+                    @for (type of attachmentTypes(); track type) {
+                      <label class="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm cursor-pointer hover:bg-gray-50 transition-colors">
+                        <input
+                          type="checkbox"
+                          [checked]="deliveryDocumentationTypes().includes(type)"
+                          (change)="toggleDeliveryDocumentationType(type, $any($event.target).checked)"
+                          class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                        />
+                        <span class="font-mono text-xs uppercase">{{ type }}</span>
+                      </label>
+                    }
+                  </div>
+                </div>
+              }
+
+              <div class="flex items-center gap-3 pt-1">
+                <button
+                  (click)="saveDeliveryDocumentationSettings()"
+                  [disabled]="deliveryDocumentationSaving()"
+                  class="app-button-primary"
+                >
+                  @if (deliveryDocumentationSaving()) { Saving… } @else { Save Delivery Documentation }
+                </button>
+                @if (deliveryDocumentationSaved()) {
                   <span class="text-sm text-green-600 flex items-center gap-1">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                       <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
@@ -1783,6 +1860,12 @@ export class SettingsPageComponent implements OnInit {
   readonly attachmentTypesSaving = signal(false);
   readonly attachmentTypesSaved = signal(false);
 
+  // Delivery Documentation
+  readonly requireDeliveryDocumentation = signal(true);
+  readonly deliveryDocumentationTypes = signal<string[]>(['BDR']);
+  readonly deliveryDocumentationSaving = signal(false);
+  readonly deliveryDocumentationSaved = signal(false);
+
   // Port Documentation feature
   readonly portDocumentationEnabled = signal(false);
   readonly portDocumentationSaving = signal(false);
@@ -1911,6 +1994,7 @@ export class SettingsPageComponent implements OnInit {
     this.loadCurrencies();
     this.loadCompanyTypes();
     this.loadAttachmentTypes();
+    this.loadDeliveryDocumentationSettings();
     this.loadPortDocumentationSettings();
     this.loadInquirySettings();
     this.loadInquiryCancelReasons();
@@ -2505,6 +2589,57 @@ export class SettingsPageComponent implements OnInit {
       this.showToast('error', 'Failed to save company types.');
     } finally {
       this.companyTypesSaving.set(false);
+    }
+  }
+
+  // ─── Delivery Documentation ────────────────────────────────────────
+
+  private async loadDeliveryDocumentationSettings(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<DeliveryDocumentationSettingsDto>>(`${API}/admin/settings/delivery-documentation`),
+      );
+      if (res.success) {
+        this.requireDeliveryDocumentation.set(res.data.requireDeliveryDocumentation);
+        this.deliveryDocumentationTypes.set(res.data.deliveryDocumentationTypes);
+      }
+    } catch {
+      this.showToast('error', 'Failed to load delivery documentation settings.');
+    }
+  }
+
+  toggleDeliveryDocumentationType(type: string, checked: boolean): void {
+    const current = new Set(this.deliveryDocumentationTypes());
+    if (checked) {
+      current.add(type);
+    } else {
+      current.delete(type);
+    }
+    this.deliveryDocumentationTypes.set(Array.from(current));
+  }
+
+  async saveDeliveryDocumentationSettings(): Promise<void> {
+    this.deliveryDocumentationSaving.set(true);
+    this.deliveryDocumentationSaved.set(false);
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<DeliveryDocumentationSettingsDto>>(`${API}/admin/settings/delivery-documentation`, {
+          requireDeliveryDocumentation: this.requireDeliveryDocumentation(),
+          deliveryDocumentationTypes: this.deliveryDocumentationTypes(),
+        }),
+      );
+      if (res.success) {
+        this.requireDeliveryDocumentation.set(res.data.requireDeliveryDocumentation);
+        this.deliveryDocumentationTypes.set(res.data.deliveryDocumentationTypes);
+        this.deliveryDocumentationSaved.set(true);
+        setTimeout(() => this.deliveryDocumentationSaved.set(false), 3000);
+      } else {
+        this.showToast('error', (res as any).message ?? 'Failed to save delivery documentation settings.');
+      }
+    } catch {
+      this.showToast('error', 'Failed to save delivery documentation settings.');
+    } finally {
+      this.deliveryDocumentationSaving.set(false);
     }
   }
 

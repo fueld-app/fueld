@@ -244,6 +244,11 @@ export interface TenantSettings {
   };
   // Configurable attachment types for order/inquiry attachments
   attachmentTypes?: string[];
+  // Delivery documentation settings — which attachment types satisfy delivery closeout rules
+  deliveryDocumentationSettings?: {
+    requireDeliveryDocumentation?: boolean; // default true
+    deliveryDocumentationTypes?: string[];   // default ['BDR']
+  };
   // Port Documentation feature settings
   portDocumentationSettings?: {
     enabled?: boolean;

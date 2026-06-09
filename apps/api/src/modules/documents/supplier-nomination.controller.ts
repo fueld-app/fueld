@@ -7,6 +7,7 @@ import type { ApiResponse, PublicSupplierNominationDto, SupplierNominationAttach
 import { db } from '../../db';
 import { companyContacts, counterparties } from '../../db/schema';
 import { createOrderAttachment, getOrderById } from '../orders/orders.service';
+import { getDeliveryDocumentationSettings } from '../admin/settings.service';
 import {
   expireSupplierNomination,
   getSupplierNominationByToken,
@@ -184,9 +185,12 @@ export const supplierNominationController = new Elysia({ prefix: '/supplier-nomi
       await mkdir(dir, { recursive: true });
       await Bun.write(join(dir, filename), file);
 
+      const docSettings = await getDeliveryDocumentationSettings();
+      const uploadType = docSettings.deliveryDocumentationTypes[0] ?? 'BDR';
+
       const record = await createOrderAttachment({
         orderId: resolved.order.id,
-        type: 'BDR',
+        type: uploadType,
         fileName: file.name,
         filePath: `/uploads/attachments/${filename}`,
         mimeType: file.type,

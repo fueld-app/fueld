@@ -45,6 +45,8 @@ import {
   updateCompanyTypeSettings,
   getAttachmentTypeSettings,
   updateAttachmentTypeSettings,
+  getDeliveryDocumentationSettings,
+  updateDeliveryDocumentationSettings,
   getPortDocumentationSettings,
   updatePortDocumentationSettings,
   getInquiryCancelReasonSettings,
@@ -499,6 +501,48 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     }
   }, {
     detail: { tags: ['Admin Settings'], summary: 'Get attachment type options for current tenant' },
+  })
+
+  .get('/delivery-documentation', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getDeliveryDocumentationSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get delivery documentation settings' },
+  })
+
+  .put('/delivery-documentation', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateDeliveryDocumentationSettings(body);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      requireDeliveryDocumentation: t.Optional(t.Boolean()),
+      deliveryDocumentationTypes: t.Optional(t.Array(t.String())),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update delivery documentation settings' },
+  })
+
+  .get('/my-delivery-documentation', async () => {
+    try {
+      const data = await getDeliveryDocumentationSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get delivery documentation settings for current tenant' },
   })
 
   .get('/my-inquiry-cancel-reasons', async () => {

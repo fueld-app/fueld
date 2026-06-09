@@ -1784,6 +1784,32 @@ export async function updateOrderStatus(
     .where(eq(orders.id, id))
     .limit(1);
 
+  // Validate delivery documentation requirements before marking delivered
+  if (newStatus === 'DELIVERED') {
+    const { getDeliveryDocumentationSettings } = await import('../admin/settings.service');
+    const docSettings = await getDeliveryDocumentationSettings();
+    if (docSettings.requireDeliveryDocumentation) {
+      const requiredTypes = docSettings.deliveryDocumentationTypes;
+      const deliveryDocs = await db
+        .select({ type: orderAttachments.type })
+        .from(orderAttachments)
+        .where(
+          and(
+            eq(orderAttachments.orderId, id),
+            isNull(orderAttachments.deletedAt),
+          ),
+        );
+      const hasRequiredDoc = deliveryDocs.some((doc) =>
+        requiredTypes.includes((doc.type ?? '').toUpperCase()),
+      );
+      if (!hasRequiredDoc) {
+        throw new Error(
+          `Missing required delivery documentation. Required types: ${requiredTypes.join(', ')}`,
+        );
+      }
+    }
+  }
+
   const [updated] = await db
     .update(orders)
     .set(setData)

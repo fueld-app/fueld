@@ -865,6 +865,12 @@ export interface AttachmentTypeSettingsDto {
   attachmentTypes: string[];
 }
 
+/** Admin settings for delivery documentation requirements */
+export interface DeliveryDocumentationSettingsDto {
+  requireDeliveryDocumentation: boolean;
+  deliveryDocumentationTypes: string[];
+}
+
 /** Admin settings for Port Documentation feature access */
 export interface PortDocumentationSettingsDto {
   enabled: boolean;

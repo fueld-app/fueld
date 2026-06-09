@@ -1037,6 +1037,63 @@ export async function updateAttachmentTypeSettings(attachmentTypes: string[]): P
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+//  DELIVERY DOCUMENTATION SETTINGS
+// ═══════════════════════════════════════════════════════════════════════
+
+const DEFAULT_DELIVERY_DOCUMENTATION_TYPES = ['BDR'];
+
+export interface DeliveryDocumentationSettings {
+  requireDeliveryDocumentation: boolean;
+  deliveryDocumentationTypes: string[];
+}
+
+export async function getDeliveryDocumentationSettings(): Promise<DeliveryDocumentationSettings> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  const docSettings = settings.deliveryDocumentationSettings ?? {};
+  return {
+    requireDeliveryDocumentation: docSettings.requireDeliveryDocumentation ?? true,
+    deliveryDocumentationTypes: docSettings.deliveryDocumentationTypes ?? DEFAULT_DELIVERY_DOCUMENTATION_TYPES,
+  };
+}
+
+export async function updateDeliveryDocumentationSettings(data: {
+  requireDeliveryDocumentation?: boolean;
+  deliveryDocumentationTypes?: string[];
+}): Promise<DeliveryDocumentationSettings> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const currentSettings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  const settings = { ...(currentSettings as any) };
+  const docSettings = { ...(currentSettings.deliveryDocumentationSettings ?? {}) };
+
+  if (data.requireDeliveryDocumentation !== undefined) {
+    docSettings.requireDeliveryDocumentation = data.requireDeliveryDocumentation;
+  }
+
+  if (data.deliveryDocumentationTypes !== undefined) {
+    const cleaned = Array.from(new Set(
+      data.deliveryDocumentationTypes
+        .map((type) => type.trim().toUpperCase())
+        .filter((type) => type.length > 0),
+    ));
+    docSettings.deliveryDocumentationTypes = cleaned;
+  }
+
+  settings.deliveryDocumentationSettings = docSettings;
+
+  await db
+    .update(tenants)
+    .set({ settings, updatedAt: new Date() })
+    .where(eq(tenants.id, tenant.id));
+
+  return getDeliveryDocumentationSettings();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 //  INQUIRY CANCELLATION REASON SETTINGS
 // ═══════════════════════════════════════════════════════════════════════
 

@@ -41,6 +41,7 @@ import {
   type OrderPortDocumentDto,
   type BunkerInstructionsPreviewDto,
   type PortDocumentationOrderContextDto,
+  type DeliveryDocumentationSettingsDto,
 } from '@fueld/types';
 
 import {
@@ -1329,7 +1330,7 @@ interface PlattsSuggestionViewModel {
                   }
                   @if (supplierNomination()!.attachments.length > 0) {
                     <div>
-                      <div class="text-[11px] font-medium uppercase tracking-[0.14em] text-amber-700/80">BDRs uploaded</div>
+                      <div class="text-[11px] font-medium uppercase tracking-[0.14em] text-amber-700/80">Delivery docs uploaded</div>
                       <div class="mt-1 font-semibold">{{ supplierNomination()!.attachments.length }}</div>
                     </div>
                   }
@@ -1977,6 +1978,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly configuredCurrencies = signal<DropdownOption[]>([]);
   readonly configuredPriceReferences = signal<{ id: string; name: string; code: string }[]>([]);
   readonly configuredAttachmentTypes = signal<string[]>(['BDR', 'OTHER']);
+  readonly deliveryDocumentationSettings = signal<DeliveryDocumentationSettingsDto>({
+    requireDeliveryDocumentation: true,
+    deliveryDocumentationTypes: ['BDR'],
+  });
   readonly catalogItems = signal<{ name: string; description?: string; defaultUnit?: string; defaultCostPrice?: number; defaultSalesPrice?: number }[]>([]);
   readonly defaultUnit = signal<string>('MT');
   readonly orderCategories = signal<{ key: string; label: string }[]>([]);
@@ -2158,19 +2163,21 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     return !!internalDate && !!supplierDate && internalDate !== supplierDate;
   });
 
-  readonly hasBdrAttachment = computed(() =>
-    this.attachments().some((att) => (att.type ?? '').toUpperCase() === 'BDR'),
-  );
-  readonly invoiceEmailAttachmentOptions = computed<SendEmailAttachmentOption[]>(() =>
-    this.attachments()
-      .filter((att) => (att.type ?? '').toUpperCase() === 'BDR')
+  readonly hasDeliveryDocumentation = computed(() => {
+    const allowedTypes = this.deliveryDocumentationSettings().deliveryDocumentationTypes;
+    return this.attachments().some((att) => allowedTypes.includes((att.type ?? '').toUpperCase()));
+  });
+  readonly invoiceEmailAttachmentOptions = computed<SendEmailAttachmentOption[]>(() => {
+    const allowedTypes = this.deliveryDocumentationSettings().deliveryDocumentationTypes;
+    return this.attachments()
+      .filter((att) => allowedTypes.includes((att.type ?? '').toUpperCase()))
       .map((att) => ({
         id: att.id,
         fileName: att.fileName,
-        label: `BDR uploaded ${new Date(att.createdAt).toLocaleDateString('en-GB')}`,
+        label: `${att.type ?? 'Doc'} uploaded ${new Date(att.createdAt).toLocaleDateString('en-GB')}`,
         previewUrl: att.filePath.startsWith('http') ? att.filePath : `${API_URL}${att.filePath}`,
-      })),
-  );
+      }));
+  });
   readonly portDocumentationEmailAttachmentOptions = computed<SendEmailAttachmentOption[]>(() =>
     (this.portDocumentationContext()?.documents ?? [])
       .filter((doc) => String(doc.status ?? '').toUpperCase() === 'ACTIVE')
@@ -3195,7 +3202,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   private async loadReferenceData(): Promise<void> {
     try {
-      const [suppliersRes, usersRes, productsRes, catalogRes, defaultUnitRes, orderCategoriesRes, taxRatesRes, unitsRes, unitConversionsRes, currenciesRes, attachmentTypesRes, cancelReasonsRes, priceRefsRes, warehousesRes, skusRes] = await Promise.all([
+      const [suppliersRes, usersRes, productsRes, catalogRes, defaultUnitRes, orderCategoriesRes, taxRatesRes, unitsRes, unitConversionsRes, currenciesRes, attachmentTypesRes, deliveryDocRes, cancelReasonsRes, priceRefsRes, warehousesRes, skusRes] = await Promise.all([
         firstValueFrom(
           this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
             `${API_URL}/companies/local?type=SUPPLIER&limit=100`,
@@ -3230,6 +3237,9 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         ),
         firstValueFrom(
           this.http.get<ApiResponse<{ attachmentTypes: string[] }>>(`${API_URL}/admin/settings/my-attachment-types`),
+        ),
+        firstValueFrom(
+          this.http.get<ApiResponse<DeliveryDocumentationSettingsDto>>(`${API_URL}/admin/settings/my-delivery-documentation`),
         ),
         firstValueFrom(
           this.http.get<ApiResponse<{ reasons: string[] }>>(`${API_URL}/admin/settings/my-inquiry-cancel-reasons`),
@@ -3274,6 +3284,9 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         if (!attachmentTypesRes.data.attachmentTypes.includes(this.attachmentType())) {
           this.attachmentType.set(attachmentTypesRes.data.attachmentTypes[0]!);
         }
+      }
+      if (deliveryDocRes.success) {
+        this.deliveryDocumentationSettings.set(deliveryDocRes.data);
       }
       if (cancelReasonsRes.success) {
         this.inquiryCancelReasons.set(cancelReasonsRes.data.reasons ?? []);
@@ -5371,8 +5384,9 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       this.showToast('error', 'Enter delivered quantity for every line item before marking delivered.');
       return;
     }
-    if (!this.hasBdrAttachment()) {
-      this.showToast('error', 'Upload a BDR attachment before marking delivered.');
+    const docSettings = this.deliveryDocumentationSettings();
+    if (docSettings.requireDeliveryDocumentation && !this.hasDeliveryDocumentation()) {
+      this.showToast('error', 'Upload required delivery documentation before marking delivered.');
       return;
     }
 

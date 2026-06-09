@@ -685,7 +685,7 @@ export class SendEmailModalComponent {
   readonly attachmentSectionDescription = computed(() =>
     this.documentType() === 'PORT_DOCUMENTATION'
       ? 'Select the generated or included port-document files to attach to this email.'
-      : 'Select BDR files to include with the invoice email.',
+      : 'Select delivery documentation files to include with the invoice email.',
   );
 
   hasRecipient(): boolean {
