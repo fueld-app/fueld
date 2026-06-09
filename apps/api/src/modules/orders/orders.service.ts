@@ -22,6 +22,8 @@ import {
   invoices,
   companyContacts,
   priceReferences,
+  creditLines,
+  creditLineCounterparties,
 } from '../../db/schema';
 import type { Order, TenantSettings } from '../../db/schema';
 import { logActivity } from '../activity/activity.service';
@@ -1236,6 +1238,29 @@ export async function createOrder(input: CreateOrderInput) {
     placeRemark = placeRow?.orderRemark ?? null;
   }
 
+  // Auto-default payment terms to CREDIT if client has active credit lines
+  let customerPaymentTermType = input.customerPaymentTermType ?? null;
+  let customerCreditDays = input.customerCreditDays ?? null;
+  if (customerPaymentTermType === null) {
+    const creditLineRows = await db
+      .select({ periodDays: creditLines.periodDays })
+      .from(creditLines)
+      .innerJoin(
+        creditLineCounterparties,
+        eq(creditLineCounterparties.creditLineId, creditLines.id),
+      )
+      .where(
+        and(
+          eq(creditLines.type, 'CUSTOMER'),
+          eq(creditLineCounterparties.counterpartyId, input.clientId),
+        ),
+      );
+    if (creditLineRows.length > 0) {
+      customerPaymentTermType = 'CREDIT';
+      customerCreditDays = Math.max(...creditLineRows.map((r) => r.periodDays));
+    }
+  }
+
   const values: typeof orders.$inferInsert = {
     tenantId: input.tenantId,
     orderNumber,
@@ -1248,8 +1273,8 @@ export async function createOrder(input: CreateOrderInput) {
     currency,
     eta: input.eta ? new Date(input.eta) : null,
     etd: input.etd ? new Date(input.etd) : null,
-    customerPaymentTermType: input.customerPaymentTermType ?? null,
-    customerCreditDays: input.customerCreditDays ?? null,
+    customerPaymentTermType,
+    customerCreditDays,
     customerNote: input.customerNote ?? null,
     purchaseOrderNumber: input.purchaseOrderNumber ?? null,
     customerContactId: input.customerContactId ?? null,

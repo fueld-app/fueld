@@ -4420,7 +4420,17 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     const clientData = this.clients().find((c) => c.id === clientId);
     this.client.set(clientData ?? null);
     this.customerContact.set(null);
-    void this.loadCustomerCreditLines(clientId);
+    void this.loadCustomerCreditLines(clientId).then(() => {
+      // Auto-default to CREDIT if client has credit lines and no payment term is set
+      const currentOrder = this.order();
+      if (currentOrder && !currentOrder.customerPaymentTermType) {
+        const summary = this.customerCreditSummary();
+        if (summary && !this.customerCreditFrozen()) {
+          this.order.update((o) => (o ? { ...o, customerPaymentTermType: PaymentTermType.Credit, customerCreditDays: summary.maxDays } : o));
+          this.triggerAutosave();
+        }
+      }
+    });
     void this.loadCompanyContacts('customer', clientId);
     this.triggerAutosave();
   }

@@ -17,7 +17,7 @@ import { StatusBadgeComponent } from '../../../../shared/components/status-badge
 import { SearchableDropdownComponent, type DropdownOption } from '../../../../shared/components/searchable-dropdown/searchable-dropdown.component';
 import { PaginationComponent, SortHeaderComponent } from '../../../../shared/components';
 import type { SortChangeEvent } from '../../../../shared/components';
-import type { ApiResponse, OrderListRowDto, CounterpartyDto, VesselDto, PlaceDto } from '@fueld/types';
+import type { ApiResponse, OrderListRowDto, CounterpartyDto, VesselDto, PlaceDto, CreditLineDto } from '@fueld/types';
 import { DecimalPipe, DatePipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
 
@@ -324,6 +324,12 @@ interface LliSearchResult {
                 (searchChange)="searchClients($event)"
                 (selectionChange)="onNewClientChange($event)"
               />
+              @if (newInquiryCreditSummary()) {
+                <p class="mt-1.5 text-xs text-green-700">
+                  Credit available: {{ newInquiryCreditSummary()!.available | number : '1.2-2' }}
+                  {{ newInquiryCreditSummary()!.currency }} · Max {{ newInquiryCreditSummary()!.maxDays }} days
+                </p>
+              }
             </div>
 
             <!-- Vessel -->
@@ -552,6 +558,18 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   readonly newEta = signal('');
   readonly newEtd = signal('');
 
+  readonly newInquiryCreditLines = signal<CreditLineDto[]>([]);
+  readonly newInquiryCreditLoading = signal(false);
+
+  readonly newInquiryCreditSummary = computed(() => {
+    const lines = this.newInquiryCreditLines();
+    if (!lines.length) return null;
+    const available = lines.reduce((sum, line) => sum + (parseFloat(line.availableAmount) || 0), 0);
+    const maxDays = Math.max(...lines.map((line) => line.periodDays));
+    const currency = lines[0]?.currency ?? 'USD';
+    return { currency, available, maxDays };
+  });
+
   readonly etdMinDate = computed(() => this.newEta() || '');
 
   readonly canCreateInquiry = computed(
@@ -765,6 +783,23 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
     const selected = this.clients().find((c) => c.id === clientId) ?? null;
     if (selected) this.selectedClient.set(selected);
     this.newClientId.set(clientId);
+    void this.loadNewInquiryCreditLines(clientId);
+  }
+
+  private async loadNewInquiryCreditLines(counterpartyId: string): Promise<void> {
+    this.newInquiryCreditLoading.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ items: CreditLineDto[]; total: number }>>(
+          `${API}/credit/lines?type=CUSTOMER&counterpartyId=${encodeURIComponent(counterpartyId)}&limit=50`,
+        ),
+      );
+      this.newInquiryCreditLines.set(res.success ? (res.data.items ?? []) : []);
+    } catch {
+      this.newInquiryCreditLines.set([]);
+    } finally {
+      this.newInquiryCreditLoading.set(false);
+    }
   }
 
   async onNewVesselChange(vesselId: string): Promise<void> {
