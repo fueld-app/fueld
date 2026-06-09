@@ -507,6 +507,8 @@ export async function listCompanies(query?: {
         parentId: counterparties.parentId,
         parentName: sql<string | null>`(SELECT c2.name FROM counterparties c2 WHERE c2.id = ${counterparties.parentId})`.as('parent_name'),
         segments: counterparties.segments,
+        preferredInvoicingCompanyId: counterparties.preferredInvoicingCompanyId,
+        preferredInvoicingCompanyName: sql<string | null>`(SELECT c3.name FROM counterparties c3 WHERE c3.id = ${counterparties.preferredInvoicingCompanyId})`.as('preferred_invoicing_company_name'),
         createdAt: counterparties.createdAt,
         updatedAt: counterparties.updatedAt,
       })
@@ -952,6 +954,7 @@ export async function updateCompany(
     companyImo?: string | null;
     companyRoles?: string[] | null;
     specialCustomerTerms?: string | null;
+    preferredInvoicingCompanyId?: string | null;
   },
 ) {
   // Load current company to merge manualOverrides
@@ -977,6 +980,7 @@ export async function updateCompany(
   // Non-overridable fields
   if (data.creditLimit !== undefined) setFields.creditLimit = data.creditLimit;
   if (data.specialCustomerTerms !== undefined) setFields.specialCustomerTerms = data.specialCustomerTerms;
+  if (data.preferredInvoicingCompanyId !== undefined) setFields.preferredInvoicingCompanyId = data.preferredInvoicingCompanyId;
 
   // Persist manual overrides
   setFields.manualOverrides = [...newOverrides];

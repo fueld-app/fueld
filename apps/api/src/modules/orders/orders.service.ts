@@ -251,6 +251,7 @@ async function getCompanyContactById(contactId: string | null | undefined) {
 async function getPreferredOwnCompanyId(
   tenantId: string,
   requestedCompanyId?: string | null,
+  supplierId?: string | null,
 ): Promise<string | null> {
   const normalizedCompanyId = requestedCompanyId?.trim() ?? '';
   if (normalizedCompanyId) {
@@ -265,6 +266,33 @@ async function getPreferredOwnCompanyId(
       .limit(1);
 
     if (requestedCompany?.id) return requestedCompany.id;
+  }
+
+  // If a supplier is specified and has a preferred invoicing company, use that
+  const normalizedSupplierId = supplierId?.trim() ?? '';
+  if (normalizedSupplierId) {
+    const [supplier] = await db
+      .select({ preferredInvoicingCompanyId: counterparties.preferredInvoicingCompanyId })
+      .from(counterparties)
+      .where(and(
+        eq(counterparties.id, normalizedSupplierId),
+        eq(counterparties.tenantId, tenantId),
+      ))
+      .limit(1);
+
+    if (supplier?.preferredInvoicingCompanyId) {
+      const [preferredCompany] = await db
+        .select({ id: counterparties.id })
+        .from(counterparties)
+        .where(and(
+          eq(counterparties.id, supplier.preferredInvoicingCompanyId),
+          eq(counterparties.tenantId, tenantId),
+          eq(counterparties.isOwnCompany, true),
+        ))
+        .limit(1);
+
+      if (preferredCompany?.id) return preferredCompany.id;
+    }
   }
 
   const [fallbackCompany] = await db
@@ -1224,7 +1252,7 @@ export async function createOrder(input: CreateOrderInput) {
   // Generate the external order number
   const orderNumber = await generateOrderNumber(input.tenantId);
   const currency = input.currency ?? 'USD';
-  const invoicingCompanyId = await getPreferredOwnCompanyId(input.tenantId, input.invoicingCompanyId ?? null);
+  const invoicingCompanyId = await getPreferredOwnCompanyId(input.tenantId, input.invoicingCompanyId ?? null, input.supplierId ?? null);
   const bankAccountId = await getPreferredBankAccountId(invoicingCompanyId, currency, input.bankAccountId ?? null);
 
   // Seed placeRemark from the place's default if not explicitly provided
@@ -1322,6 +1350,7 @@ export async function updateOrder(id: string, input: UpdateOrderInput, activityU
   const resolvedInvoicingCompanyId = await getPreferredOwnCompanyId(
     currentOrder.tenantId,
     requestedInvoicingCompanyId,
+    input.supplierId !== undefined ? input.supplierId : currentOrder.supplierId,
   );
   const shouldRecomputeBankAccount = input.invoicingCompanyId !== undefined || input.bankAccountId !== undefined || input.currency !== undefined;
   const requestedBankAccountId = shouldRecomputeBankAccount

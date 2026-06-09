@@ -241,6 +241,9 @@ export interface CounterpartyDto {
   /** Parent/child hierarchy — single-level only */
   parentId?: string | null;
   parentName?: string | null;
+  /** Preferred own company to invoice from when this supplier is used on an order */
+  preferredInvoicingCompanyId?: string | null;
+  preferredInvoicingCompanyName?: string | null;
 }
 
 /** Lightweight child summary returned alongside a parent company detail. */

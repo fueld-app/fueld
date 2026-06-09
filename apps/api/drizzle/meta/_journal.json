@@ -554,6 +554,13 @@
       "when": 1779500000000,
       "tag": "0078_add_purchase_order_number",
       "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1779500000001,
+      "tag": "0079_add_preferred_invoicing_company",
+      "breakpoints": true
     }
   ]
 }

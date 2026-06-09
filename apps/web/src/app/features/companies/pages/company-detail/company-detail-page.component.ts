@@ -17,7 +17,7 @@ import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subscription, skip, timeout } from 'rxjs';
 import { Title } from '@angular/platform-browser';
 import * as L from 'leaflet/dist/leaflet-src.esm.js';
-import type { ApiResponse, CompanyAttachmentDto, CompanyContactDto, CompanyEmailDto, CompanyEmailType, CompanyChildSummaryDto, CompanyParentSummaryDto, CompanyGroupAggregateDto, CompanyPlaceSupplyRuleApplySummaryDto, CompanyPlaceSupplyRuleDto, CompanyPlaceSupplyRulePlaceType, CounterpartyDto, PortSupplierDto, RiskHitDto, RiskOverrideDto, SupplyPortDto, VesselCompanyDto, VesselCompanyRole, VesselCompanyRoleOption, VesselDto } from '@fueld/types';
+import type { ApiResponse, CompanyAttachmentDto, CompanyContactDto, CompanyEmailDto, CompanyEmailType, CompanyChildSummaryDto, CompanyParentSummaryDto, CompanyGroupAggregateDto, CompanyPlaceSupplyRuleApplySummaryDto, CompanyPlaceSupplyRuleDto, CompanyPlaceSupplyRulePlaceType, CounterpartyDto, PortSupplierDto, RiskHitDto, RiskOverrideDto, SupplyPortDto, VesselCompanyDto, VesselCompanyRole, VesselCompanyRoleOption, VesselDto, OwnCompanyDto } from '@fueld/types';
 import { flagFromIso3 } from '../../../../shared/utils/flags';
 
 interface CompanyOfficeDto {
@@ -906,6 +906,29 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                         }
                       </dd>
                     </div>
+                    @if (companyTypes().includes('SUPPLIER')) {
+                      <div>
+                        <dt class="text-gray-500">Preferred Invoicing Company</dt>
+                        @if (editing()) {
+                          <dd class="mt-0.5">
+                            <select
+                              [ngModel]="editPreferredInvoicingCompanyId() ?? ''"
+                              (ngModelChange)="editPreferredInvoicingCompanyId.set($event || null)"
+                              class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
+                            >
+                              <option value="">— None —</option>
+                              @for (co of ownCompanies(); track co.id) {
+                                <option [value]="co.id">{{ co.name }}</option>
+                              }
+                            </select>
+                          </dd>
+                        } @else {
+                          <dd class="mt-0.5 font-medium text-gray-900">
+                            {{ company()!.preferredInvoicingCompanyName ?? '—' }}
+                          </dd>
+                        }
+                      </div>
+                    }
                   </dl>
                 } @else if (companyInfoTab() === 'headOffice') {
                   <div class="space-y-4">
@@ -3510,6 +3533,10 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly editHeadOfficeEmail = signal('');
   readonly editWebsite = signal('');
   readonly editSpecialCustomerTerms = signal('');
+  readonly editPreferredInvoicingCompanyId = signal<string | null>(null);
+
+  // Own companies (for preferred invoicing company selector)
+  readonly ownCompanies = signal<OwnCompanyDto[]>([]);
 
   // Sync conflict state
   readonly syncConflicts = signal<{ field: string; localValue: any; seasearcherValue: any; dismissed: boolean }[]>([]);
@@ -3839,6 +3866,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
         this.loadCompanyEmails(id);
         this.loadCompanyOffices(id);
         this.loadParentChildData(id);
+        this.loadOwnCompanies();
         this.loadRiskSummary();
         if (res.data.seasearcherId) {
           // Show syncing indicator — backend auto-syncs via WS presence
@@ -4627,6 +4655,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     this.editHeadOfficeEmail.set(c.headOfficeEmail ?? '');
     this.editWebsite.set(c.website ?? '');
     this.editSpecialCustomerTerms.set(c.specialCustomerTerms ?? '');
+    this.editPreferredInvoicingCompanyId.set(c.preferredInvoicingCompanyId ?? null);
     this.countrySearchQuery.set(c.country ?? '');
     this.showCountryDropdown.set(false);
     this.editing.set(true);
@@ -4656,6 +4685,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
       if (this.editHeadOfficeEmail() !== (c.headOfficeEmail ?? '')) body['headOfficeEmail'] = this.editHeadOfficeEmail() || null;
       if (this.editWebsite() !== (c.website ?? '')) body['website'] = this.editWebsite() || null;
       if (this.editSpecialCustomerTerms() !== (c.specialCustomerTerms ?? '')) body['specialCustomerTerms'] = this.editSpecialCustomerTerms() || null;
+      if (this.editPreferredInvoicingCompanyId() !== (c.preferredInvoicingCompanyId ?? null)) body['preferredInvoicingCompanyId'] = this.editPreferredInvoicingCompanyId();
 
       if (Object.keys(body).length === 0) {
         this.editing.set(false);
@@ -6033,6 +6063,19 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
       );
       if (res.success && res.data) {
         this.groupAggregate.set(res.data);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  private async loadOwnCompanies(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<OwnCompanyDto[]>>(`${API}/companies/own`),
+      );
+      if (res.success && res.data) {
+        this.ownCompanies.set(res.data);
       }
     } catch {
       // ignore

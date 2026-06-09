@@ -548,6 +548,10 @@ export const counterparties = pgTable('counterparties', {
   // Inventory rules only apply to companies with this flag set.
   physicalOpsEnabled: boolean('physical_ops_enabled').notNull().default(false),
 
+  // ── Preferred invoicing company (for suppliers) ────────────────────
+  // When this supplier is used on an order, default the invoicing company to this own company.
+  preferredInvoicingCompanyId: uuid('preferred_invoicing_company_id').references(() => counterparties.id),
+
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

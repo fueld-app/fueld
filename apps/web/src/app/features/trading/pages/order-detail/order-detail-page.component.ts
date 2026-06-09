@@ -4454,6 +4454,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       this.supplierContact.set(null);
       void this.loadSupplierCreditLines(supplierId);
       void this.loadCompanyContacts('supplier', supplierId);
+      this.applyPreferredInvoicingCompanyFromSupplier(supplierData);
       this.triggerAutosave();
       return;
     }
@@ -4468,7 +4469,27 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     this.supplierContact.set(null);
     void this.loadSupplierCreditLines(supplierId);
     void this.loadCompanyContacts('supplier', supplierId);
+    this.applyPreferredInvoicingCompanyFromSupplier(supplierData);
     this.triggerAutosave();
+  }
+
+  private applyPreferredInvoicingCompanyFromSupplier(supplierData: CounterpartyDto | null): void {
+    const preferredId = supplierData?.preferredInvoicingCompanyId;
+    if (!preferredId) return;
+
+    const currentOrder = this.order();
+    if (!currentOrder) return;
+
+    const currentInvoicingId = currentOrder.invoicingCompanyId;
+    if (currentInvoicingId === preferredId) return;
+
+    // Validate the preferred company is in the user's accessible own companies
+    const isValid = this.ownCompanies().some((co) => co.id === preferredId);
+    if (!isValid) return;
+
+    this.order.update((o) => o ? { ...o, invoicingCompanyId: preferredId, bankAccountId: null } : o);
+    this.bankAccounts.set([]);
+    void this.loadBankAccounts(preferredId, { autoSelect: true });
   }
 
   applyComparisonSupplier(row: InquirySupplierComparisonRow): void {

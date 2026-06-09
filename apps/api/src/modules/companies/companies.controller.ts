@@ -611,6 +611,7 @@ export const companiesController = new Elysia({ prefix: '/companies' })
         companyImo: t.Optional(t.Nullable(t.String())),
         companyRoles: t.Optional(t.Nullable(t.Array(t.String()))),
         specialCustomerTerms: t.Optional(t.Nullable(t.String())),
+        preferredInvoicingCompanyId: t.Optional(t.Nullable(t.String())),
       }),
       detail: {
         tags: ['Companies'],
