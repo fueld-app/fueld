@@ -36,7 +36,7 @@ describe('HeaderActionsComponent', () => {
     expect(component.displayActions().some((action) => action.key === 'send-port-documentation')).toBe(true);
   });
 
-  it('disables Send Port Documentation when no port documentation files exist', async () => {
+  it('enables Send Port Documentation when feature is enabled even without existing files', async () => {
     const component = await createComponent({
       status: OrderStatus.Confirmed,
       hasPortDocumentationDocuments: false,
@@ -46,7 +46,7 @@ describe('HeaderActionsComponent', () => {
     const action = component.displayActions().find((item) => item.key === 'send-port-documentation');
 
     expect(action).toBeDefined();
-    expect(action?.disabled).toBe(true);
+    expect(action?.disabled).toBe(false);
   });
 
   it('hides Send Port Documentation when port documentation is disabled', async () => {
