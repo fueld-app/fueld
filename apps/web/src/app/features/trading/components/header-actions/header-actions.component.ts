@@ -343,7 +343,7 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
               : action.key === 'send-invoice'
                 ? { ...action, label: showInvoiceAsFinal ? 'Send Invoice' : 'Send Proforma Invoice', disabled: !hasBankAccount || !hasLineItems }
               : action.key === 'send-port-documentation'
-                ? { ...action, disabled: !hasPortDocumentationDocuments }
+                ? { ...action, disabled: false }
               : action.key === 'mark-delivered'
                 ? { ...action, disabled: !canMarkDelivered }
               : action.key === 'mark-paid'
