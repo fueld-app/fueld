@@ -869,6 +869,11 @@ export interface AttachmentTypeSettingsDto {
   attachmentTypes: string[];
 }
 
+/** Admin settings for configurable vessel types */
+export interface VesselTypeSettingsDto {
+  vesselTypes: string[];
+}
+
 /** Admin settings for delivery documentation requirements */
 export interface DeliveryDocumentationSettingsDto {
   requireDeliveryDocumentation: boolean;

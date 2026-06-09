@@ -1010,6 +1010,66 @@ export async function updateCompanyTypeSettings(companyTypes: string[]): Promise
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+//  VESSEL TYPE SETTINGS
+// ═══════════════════════════════════════════════════════════════════════
+
+const DEFAULT_VESSEL_TYPES = [
+  'BULK CARRIER',
+  'CONTAINER SHIP',
+  'GENERAL CARGO',
+  'OIL TANKER',
+  'CHEMICAL TANKER',
+  'LPG TANKER',
+  'LNG TANKER',
+  'PRODUCT TANKER',
+  'CRUDE OIL TANKER',
+  'RO-RO CARGO',
+  'PASSENGER SHIP',
+  'FERRY',
+  'YACHT',
+  'TUG',
+  'OFFSHORE SUPPLY',
+  'DREDGER',
+  'FISHING VESSEL',
+  'REEFER',
+  'BARGE',
+  'OTHER',
+];
+
+export async function getVesselTypeSettings(): Promise<{ vesselTypes: string[] }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  return { vesselTypes: settings.vesselTypes ?? DEFAULT_VESSEL_TYPES };
+}
+
+export async function updateVesselTypeSettings(vesselTypes: string[]): Promise<{ vesselTypes: string[] }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const cleaned = Array.from(new Set(
+    vesselTypes
+      .map((type) => type.trim().toUpperCase())
+      .filter((type) => type.length > 0),
+  ));
+
+  if (!cleaned.length) {
+    throw new Error('At least one vessel type is required');
+  }
+
+  const settings = { ...(tenant.settings as any) };
+  settings.vesselTypes = cleaned;
+
+  await db
+    .update(tenants)
+    .set({ settings, updatedAt: new Date() })
+    .where(eq(tenants.id, tenant.id));
+
+  return getVesselTypeSettings();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 //  ATTACHMENT TYPE SETTINGS
 // ═══════════════════════════════════════════════════════════════════════
 

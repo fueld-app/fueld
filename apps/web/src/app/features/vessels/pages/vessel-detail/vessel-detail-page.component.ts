@@ -409,8 +409,13 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                     <dt class="text-gray-500">Type</dt>
                     @if (editing()) {
                       <dd class="mt-0.5">
-                        <input type="text" [value]="editType()" (input)="editType.set($any($event.target).value)"
-                          class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
+                        <select [value]="editType()" (change)="editType.set($any($event.target).value)"
+                          class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100 bg-white">
+                          <option value="">— Select Type —</option>
+                          @for (t of vesselTypes(); track t) {
+                            <option [value]="t">{{ t }}</option>
+                          }
+                        </select>
                       </dd>
                     } @else {
                       <dd class="mt-0.5 font-medium text-gray-900 capitalize">{{ vessel()!.type ?? '—' }}</dd>
@@ -1372,6 +1377,8 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
   readonly editDwt = signal('');
   readonly editGrossTonnage = signal('');
 
+  readonly vesselTypes = signal<string[]>([]);
+
   // Company navigation
   readonly navigatingCompanyId = signal<string | null>(null);
 
@@ -1589,6 +1596,7 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
     this.loadRoleOptions();
+    this.loadVesselTypes();
     if (id) this.loadVessel(id);
 
     // React to same-route navigation (e.g. clicking related vessel links)
@@ -1618,6 +1626,7 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
     this.positionMapInitialized = false;
     this.vessel.set(null);
     this.enrichment.set(null);
+    this.vesselTypes.set([]);
     this.loading.set(true);
     this.linkedCreditImpacts.set([]);
     this.vesselOrders.set([]);
@@ -1961,6 +1970,20 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
 
   roleBorderClass(typeCode: string): string {
     return ROLE_BORDER_COLORS[typeCode] ?? 'border-l-gray-300';
+  }
+
+  // ─── Vessel Types ──────────────────────────────────────────────────
+  private async loadVesselTypes(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ vesselTypes: string[] }>>(`${API}/admin/settings/my-vessel-types`),
+      );
+      if (res.success && res.data) {
+        this.vesselTypes.set(res.data.vesselTypes);
+      }
+    } catch (err) {
+      console.error('Failed to load vessel types:', err);
+    }
   }
 
   // ─── Editing ───────────────────────────────────────────────────────

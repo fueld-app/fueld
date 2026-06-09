@@ -45,6 +45,8 @@ import {
   updateCompanyTypeSettings,
   getAttachmentTypeSettings,
   updateAttachmentTypeSettings,
+  getVesselTypeSettings,
+  updateVesselTypeSettings,
   getDeliveryDocumentationSettings,
   updateDeliveryDocumentationSettings,
   getPortDocumentationSettings,
@@ -503,6 +505,18 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     }
   }, {
     detail: { tags: ['Admin Settings'], summary: 'Get attachment type options for current tenant' },
+  })
+
+  .get('/my-vessel-types', async () => {
+    try {
+      const data = await getVesselTypeSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get vessel type options for current tenant' },
   })
 
   .get('/delivery-documentation', async ({ auth }) => {
@@ -1532,6 +1546,35 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       attachmentTypes: t.Array(t.String({ minLength: 1 })),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update configurable attachment type options' },
+  })
+
+  .get('/vessel-types', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getVesselTypeSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get configurable vessel type options' },
+  })
+
+  .put('/vessel-types', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateVesselTypeSettings(body.vesselTypes);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      vesselTypes: t.Array(t.String({ minLength: 1 })),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update configurable vessel type options' },
   })
 
   // ═════════════════════════════════════════════════════════════════

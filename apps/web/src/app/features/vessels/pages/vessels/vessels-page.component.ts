@@ -309,6 +309,17 @@ interface VesselSearchResult {
                 </div>
               </div>
 
+              <!-- Phone -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                <input
+                  type="tel"
+                  [ngModel]="createForm().phone"
+                  (ngModelChange)="updateCreateForm('phone', $event)"
+                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                />
+              </div>
+
               <!-- Flag + Type row -->
               <div class="grid grid-cols-2 gap-3">
                 <div>
@@ -322,12 +333,16 @@ interface VesselSearchResult {
                 </div>
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                  <input
-                    type="text"
+                  <select
                     [ngModel]="createForm().type"
                     (ngModelChange)="updateCreateForm('type', $event)"
-                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
-                  />
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                  >
+                    <option value="">— Select Type —</option>
+                    @for (t of vesselTypes(); track t) {
+                      <option [value]="t">{{ t }}</option>
+                    }
+                  </select>
                 </div>
               </div>
             </div>
@@ -394,7 +409,10 @@ export class VesselsPageComponent implements OnInit, OnDestroy {
     mmsi: '',
     flag: '',
     type: '',
+    phone: '',
   });
+
+  readonly vesselTypes = signal<string[]>([]);
 
   ngOnInit(): void {
     // Restore page from URL query params
@@ -403,6 +421,7 @@ export class VesselsPageComponent implements OnInit, OnDestroy {
     if (page > 0) this.currentPage.set(page);
 
     this.loadVessels();
+    this.loadVesselTypes();
 
     this.searchSubject
       .pipe(
@@ -559,6 +578,20 @@ export class VesselsPageComponent implements OnInit, OnDestroy {
     }
   }
 
+  // ─── Vessel Types ──────────────────────────────────────────────────
+  private async loadVesselTypes(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ vesselTypes: string[] }>>(`${API}/admin/settings/my-vessel-types`),
+      );
+      if (res.success && res.data) {
+        this.vesselTypes.set(res.data.vesselTypes);
+      }
+    } catch (err) {
+      console.error('Failed to load vessel types:', err);
+    }
+  }
+
   // ─── Create ────────────────────────────────────────────────────────
   openCreateModal(): void {
     this.createForm.set({
@@ -567,6 +600,7 @@ export class VesselsPageComponent implements OnInit, OnDestroy {
       mmsi: '',
       flag: '',
       type: '',
+      phone: '',
     });
     this.createError.set(null);
     this.dropdownOpen.set(false);
@@ -592,6 +626,7 @@ export class VesselsPageComponent implements OnInit, OnDestroy {
       if (form.mmsi) body['mmsi'] = form.mmsi.trim();
       if (form.flag) body['flag'] = form.flag.trim();
       if (form.type) body['type'] = form.type.trim();
+      if (form.phone) body['phone'] = form.phone.trim();
 
       const res = await firstValueFrom(
         this.http.post<ApiResponse<VesselDto>>(`${API}/vessels/local`, body),

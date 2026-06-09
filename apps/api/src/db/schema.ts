@@ -233,6 +233,8 @@ export interface TenantSettings {
   currencies?: string[];
   // Configurable company types (e.g. CLIENT, SUPPLIER, BROKER, AGENT)
   companyTypes?: string[];
+  // Configurable vessel types for dropdown classification
+  vesselTypes?: string[];
   // Configurable reasons required when cancelling inquiries
   inquiryCancelReasons?: string[];
   inquirySettings?: {

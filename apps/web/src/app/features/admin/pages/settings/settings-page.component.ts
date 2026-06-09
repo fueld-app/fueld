@@ -9,7 +9,7 @@ import {
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
-import type { ApiResponse, OrderNumberSettingsDto, VesselCompanyRoleSettingsDto, VesselCompanyRoleOption, ProductSettingsDto, UnitSettingsDto, CurrencySettingsDto, CompanyTypeSettingsDto, AttachmentTypeSettingsDto, DeliveryDocumentationSettingsDto, PortDocumentationSettingsDto, InquiryCancelReasonSettingsDto, UnitConversionSettingsDto } from '@fueld/types';
+import type { ApiResponse, OrderNumberSettingsDto, VesselCompanyRoleSettingsDto, VesselCompanyRoleOption, ProductSettingsDto, UnitSettingsDto, CurrencySettingsDto, CompanyTypeSettingsDto, AttachmentTypeSettingsDto, VesselTypeSettingsDto, DeliveryDocumentationSettingsDto, PortDocumentationSettingsDto, InquiryCancelReasonSettingsDto, UnitConversionSettingsDto } from '@fueld/types';
 
 import { API } from '@app/core/config/api';
 
@@ -741,6 +741,81 @@ interface InquirySettingsDto {
                   @if (attachmentTypesSaving()) { Saving… } @else { Save Types }
                 </button>
                 @if (attachmentTypesSaved()) {
+                  <span class="text-sm text-green-600 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                    </svg>
+                    Saved
+                  </span>
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- ════════════════════════════════════════════════════════ -->
+          <!--  Vessel Types                                           -->
+          <!-- ════════════════════════════════════════════════════════ -->
+          <div class="app-panel">
+            <div class="app-panel-header app-panel-header--teal">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--teal">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-teal-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-semibold text-gray-900">Vessel Types</h3>
+                <p class="text-xs text-gray-500">Configure which vessel types appear in vessel dropdowns.</p>
+              </div>
+            </div>
+
+            <div class="app-panel-body space-y-3 max-h-[28rem] overflow-y-auto">
+              @for (vt of vesselTypes(); track $index; let i = $index) {
+                <div class="flex items-center gap-2">
+                  <div class="flex flex-col gap-0.5 shrink-0">
+                    <button (click)="moveVesselTypeUp(i)" [disabled]="i === 0" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move up">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
+                    </button>
+                    <button (click)="moveVesselTypeDown(i)" [disabled]="i === vesselTypes().length - 1" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move down">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    [value]="vt"
+                    (input)="updateVesselType(i, $any($event.target).value)"
+                          class="app-input-mono-uppercase flex-1"
+                  />
+                  <button
+                    (click)="removeVesselType(i)"
+                    [disabled]="vesselTypes().length <= 1"
+                    class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 transition-colors shrink-0"
+                    title="Remove type"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              }
+              <button
+                (click)="addVesselType()"
+                class="app-button-add"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+                </svg>
+                Add Type
+              </button>
+
+              <div class="flex items-center gap-3 pt-2">
+                <button
+                  (click)="saveVesselTypes()"
+                  [disabled]="vesselTypesSaving()"
+                      class="app-button-primary"
+                >
+                  @if (vesselTypesSaving()) { Saving… } @else { Save Types }
+                </button>
+                @if (vesselTypesSaved()) {
                   <span class="text-sm text-green-600 flex items-center gap-1">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                       <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
@@ -1914,6 +1989,11 @@ export class SettingsPageComponent implements OnInit {
   readonly attachmentTypesSaving = signal(false);
   readonly attachmentTypesSaved = signal(false);
 
+  // Vessel Types
+  readonly vesselTypes = signal<string[]>([]);
+  readonly vesselTypesSaving = signal(false);
+  readonly vesselTypesSaved = signal(false);
+
   // Delivery Documentation
   readonly requireDeliveryDocumentation = signal(true);
   readonly deliveryDocumentationTypes = signal<string[]>(['BDR']);
@@ -2062,6 +2142,7 @@ export class SettingsPageComponent implements OnInit {
     this.loadCurrencies();
     this.loadCompanyTypes();
     this.loadAttachmentTypes();
+    this.loadVesselTypes();
     this.loadDeliveryDocumentationSettings();
     this.loadPortDocumentationSettings();
     this.loadInquirySettings();
@@ -2813,6 +2894,74 @@ export class SettingsPageComponent implements OnInit {
       this.showToast('error', 'Failed to save attachment types.');
     } finally {
       this.attachmentTypesSaving.set(false);
+    }
+  }
+
+  // ─── Vessel Types ──────────────────────────────────────────────────
+
+  private async loadVesselTypes(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<VesselTypeSettingsDto>>(`${API}/admin/settings/vessel-types`),
+      );
+      if (res.success) this.vesselTypes.set(res.data.vesselTypes);
+    } catch {
+      this.showToast('error', 'Failed to load vessel types.');
+    }
+  }
+
+  updateVesselType(index: number, value: string): void {
+    const updated = [...this.vesselTypes()];
+    updated[index] = value.toUpperCase();
+    this.vesselTypes.set(updated);
+  }
+
+  addVesselType(): void {
+    this.vesselTypes.set([...this.vesselTypes(), '']);
+  }
+
+  removeVesselType(index: number): void {
+    this.vesselTypes.set(this.vesselTypes().filter((_, i) => i !== index));
+  }
+
+  moveVesselTypeUp(index: number): void {
+    if (index <= 0) return;
+    const updated = [...this.vesselTypes()];
+    [updated[index - 1], updated[index]] = [updated[index], updated[index - 1]];
+    this.vesselTypes.set(updated);
+  }
+
+  moveVesselTypeDown(index: number): void {
+    const arr = this.vesselTypes();
+    if (index >= arr.length - 1) return;
+    const updated = [...arr];
+    [updated[index], updated[index + 1]] = [updated[index + 1], updated[index]];
+    this.vesselTypes.set(updated);
+  }
+
+  async saveVesselTypes(): Promise<void> {
+    const valid = this.vesselTypes().filter((vt) => vt.trim());
+    if (valid.length === 0) {
+      this.showToast('error', 'At least one vessel type is required.');
+      return;
+    }
+    this.vesselTypesSaving.set(true);
+    this.vesselTypesSaved.set(false);
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<VesselTypeSettingsDto>>(`${API}/admin/settings/vessel-types`, { vesselTypes: valid }),
+      );
+      if (res.success) {
+        this.vesselTypes.set(res.data.vesselTypes);
+        this.vesselTypesSaved.set(true);
+        setTimeout(() => this.vesselTypesSaved.set(false), 3000);
+      } else {
+        this.showToast('error', (res as any).message ?? 'Failed to save.');
+      }
+    } catch {
+      this.showToast('error', 'Failed to save vessel types.');
+    } finally {
+      this.vesselTypesSaving.set(false);
     }
   }
 
