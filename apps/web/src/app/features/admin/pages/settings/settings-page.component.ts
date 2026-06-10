@@ -1752,13 +1752,15 @@ interface InquirySettingsDto {
             <div class="app-panel-body space-y-5">
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Default unit</label>
-                <input
-                  type="text"
+                <select
                   [ngModel]="defaultUnit()"
                   (ngModelChange)="defaultUnit.set($event)"
-                  placeholder="e.g. GAL"
                   class="app-input w-full max-w-xs"
-                />
+                >
+                  @for (u of units(); track u) {
+                    <option [value]="u">{{ u }}</option>
+                  }
+                </select>
               </div>
 
               <div class="flex items-center gap-3 pt-2">
