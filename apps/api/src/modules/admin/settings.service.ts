@@ -1095,6 +1095,11 @@ export async function updateAttachmentTypeSettings(attachmentTypes: string[]): P
     throw new Error('At least one attachment type is required');
   }
 
+  // Safeguard: BDR is a core document type and must always remain available
+  if (!cleaned.includes('BDR')) {
+    cleaned.unshift('BDR');
+  }
+
   const settings = { ...(tenant.settings as any) };
   settings.attachmentTypes = cleaned;
 
