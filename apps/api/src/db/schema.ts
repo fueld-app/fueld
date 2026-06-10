@@ -486,6 +486,7 @@ export const pushSubscriptions = pgTable('push_subscriptions', {
 
 export const whatsappSessions = pgTable('whatsapp_sessions', {
   id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
   userId: uuid('user_id').notNull().references(() => users.id).unique(),
   creds: jsonb('creds'),                       // Baileys AuthenticationCreds
   syncedAt: timestamp('synced_at', { withTimezone: true }),
@@ -497,6 +498,7 @@ export const whatsappSessions = pgTable('whatsapp_sessions', {
 
 export const whatsappKeys = pgTable('whatsapp_keys', {
   id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
   userId: uuid('user_id').notNull().references(() => users.id),
   keyType: text('key_type').notNull(),          // e.g. 'pre-key', 'session', 'sender-key', 'app-state-sync-key', etc.
   keyId: text('key_id').notNull(),              // The specific key identifier
