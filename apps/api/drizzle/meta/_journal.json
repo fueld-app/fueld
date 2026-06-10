@@ -582,6 +582,13 @@
       "when": 1779500000004,
       "tag": "0082_order_attachments_deleted_at",
       "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "7",
+      "when": 1779500000005,
+      "tag": "0083_whatsapp_tenant_id",
+      "breakpoints": true
     }
   ]
 }
