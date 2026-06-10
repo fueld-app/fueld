@@ -879,6 +879,7 @@ export async function listOrders(query?: ListOrdersQuery) {
     status: orders.status,
     responsible: users.name,
     eta: orders.eta,
+    dueDate: orders.dueDate,
     createdAt: orders.createdAt,
   };
   const sortCol = sortMap[query?.sortBy ?? ''] ?? orders.createdAt;
@@ -901,6 +902,7 @@ export async function listOrders(query?: ListOrdersQuery) {
         supplierPaymentTermType: orders.supplierPaymentTermType,
         supplierCreditDays: orders.supplierCreditDays,
         eta: orders.eta,
+        dueDate: orders.dueDate,
         createdAt: orders.createdAt,
         updatedAt: orders.updatedAt,
       })
@@ -1005,6 +1007,7 @@ export async function listOrders(query?: ListOrdersQuery) {
     placeName: r.placeName,
     salesRepName: r.salesRepName,
     eta: r.eta?.toISOString() ?? null,
+    dueDate: r.dueDate?.toISOString() ?? r.eta?.toISOString() ?? null,
     totalValue: itemAggs[r.id]?.totalValue ?? 0,
     totalProfit: itemAggs[r.id]?.totalProfit ?? 0,
     totalFinancingCost: itemAggs[r.id]?.totalFinancingCost ?? 0,

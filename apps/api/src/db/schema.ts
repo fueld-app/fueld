@@ -17,6 +17,17 @@ import {
 import { relations } from 'drizzle-orm';
 
 // ═══════════════════════════════════════════════════════════════════════
+//  JSONB TYPES
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface UserUiPreferences {
+  orderListColumns?: {
+    visible: string[];
+    order: string[];
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 //  PG ENUMS
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -460,6 +471,9 @@ export const users = pgTable('users', {
   leaveEndDate: date('leave_end_date'),
   delegateId: uuid('delegate_id'), // FK added via relations (self-ref)
 
+  // UI preferences (column visibility, etc.) — per-user, cross-device
+  uiPreferences: jsonb('ui_preferences').$type<UserUiPreferences>().default({}),
+
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -846,6 +860,7 @@ export const orders = pgTable('orders', {
 
   eta: timestamp('eta', { withTimezone: true }),
   etd: timestamp('etd', { withTimezone: true }),
+  dueDate: date('due_date'),
 
   customerPaymentTermType: paymentTermTypeEnum('customer_payment_term_type'),
   customerCreditDays: integer('customer_credit_days'),

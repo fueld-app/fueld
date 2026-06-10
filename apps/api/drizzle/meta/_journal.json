@@ -589,6 +589,13 @@
       "when": 1779500000005,
       "tag": "0083_whatsapp_tenant_id",
       "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1779500000006,
+      "tag": "0084_user_ui_preferences",
+      "breakpoints": true
     }
   ]
 }

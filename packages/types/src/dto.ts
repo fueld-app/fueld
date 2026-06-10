@@ -751,6 +751,8 @@ export interface OrderListRowDto {
   placeName: string;
   salesRepName: string | null;
   eta: string | null;
+  /** Due date for payment/delivery — falls back to ETA when not explicitly set. */
+  dueDate: string | null;
   totalValue: number;
   totalProfit: number;
   totalFinancingCost?: number;
@@ -760,6 +762,14 @@ export interface OrderListRowDto {
   displayCurrency?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Per-user UI preferences persisted cross-device via backend JSONB. */
+export interface UserUiPreferences {
+  orderListColumns?: {
+    visible: string[];
+    order: string[];
+  };
 }
 
 /** Admin settings for order number template */

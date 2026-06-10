@@ -16,8 +16,9 @@ import { FormsModule } from '@angular/forms';
 import { StatusBadgeComponent } from '../../../../shared/components/status-badge/status-badge.component';
 import { SearchableDropdownComponent, type DropdownOption } from '../../../../shared/components/searchable-dropdown/searchable-dropdown.component';
 import { PaginationComponent, SortHeaderComponent } from '../../../../shared/components';
+import { ColumnPickerComponent, type ColumnOption } from '../../../../shared/components/column-picker/column-picker.component';
 import type { SortChangeEvent } from '../../../../shared/components';
-import type { ApiResponse, OrderListRowDto, CounterpartyDto, VesselDto, PlaceDto, CreditLineDto } from '@fueld/types';
+import type { ApiResponse, OrderListRowDto, CounterpartyDto, VesselDto, PlaceDto, CreditLineDto, UserUiPreferences } from '@fueld/types';
 import { DecimalPipe, DatePipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
 
@@ -27,6 +28,7 @@ import { firstValueFrom } from 'rxjs';
 
 import { API } from '@app/core/config/api';
 import { AuthService } from '@app/core/auth/auth.service';
+import { UserPreferencesService } from '@app/core/services/user-preferences.service';
 import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.service';
 
 interface TeamUserOption {
@@ -62,7 +64,7 @@ interface LliSearchResult {
 @Component({
   selector: 'app-inquiries-list-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, StatusBadgeComponent, FormsModule, DecimalPipe, DatePipe, SearchableDropdownComponent, PaginationComponent, SortHeaderComponent],
+  imports: [RouterLink, StatusBadgeComponent, FormsModule, DecimalPipe, DatePipe, SearchableDropdownComponent, PaginationComponent, SortHeaderComponent, ColumnPickerComponent],
   template: `
     <div>
       <!-- Header -->
@@ -105,6 +107,15 @@ interface LliSearchResult {
             (selectionChange)="onResponsibleFilterChange($event)"
           />
         </div>
+        <div class="ml-auto">
+          <app-column-picker
+            [columns]="allColumnOptions()"
+            [visible]="visibleColumnFields()"
+            [order]="columnOrder()"
+            (visibleChange)="onColumnVisibilityChange($event)"
+            (orderChange)="onColumnOrderChange($event)"
+          />
+        </div>
       </div>
 
       <!-- Loading state -->
@@ -121,70 +132,88 @@ interface LliSearchResult {
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-gray-200 bg-gray-50/80">
-                <th app-sort-header field="orderNumber" [sortBy]="activeSortBy()" [sortDir]="activeSortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">No.</th>
-                <th app-sort-header field="client" [sortBy]="activeSortBy()" [sortDir]="activeSortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Client</th>
-                <th app-sort-header field="vessel" [sortBy]="activeSortBy()" [sortDir]="activeSortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Vessel</th>
-                <th app-sort-header field="port" [sortBy]="activeSortBy()" [sortDir]="activeSortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Port</th>
-                <th app-sort-header field="status" [sortBy]="activeSortBy()" [sortDir]="activeSortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Status</th>
-                <th app-sort-header field="responsible" [sortBy]="activeSortBy()" [sortDir]="activeSortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Responsible</th>
-                <th app-sort-header field="eta" [sortBy]="activeSortBy()" [sortDir]="activeSortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">ETA</th>
-                @if (auth.canSeePrices()) {
-                  <th class="px-4 py-3 text-right font-medium text-gray-600">Value</th>
+                @for (col of visibleColumns(); track col.field) {
+                  @if (col.sortable) {
+                    <th app-sort-header [field]="col.field" [sortBy]="activeSortBy()" [sortDir]="activeSortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">{{ col.label }}</th>
+                  } @else {
+                    <th class="px-4 py-3 text-left font-medium text-gray-600">{{ col.label }}</th>
+                  }
                 }
-                @if (isOrders() && auth.canSeePrices()) {
-                  <th class="px-4 py-3 text-right font-medium text-gray-600">Gross</th>
-                  <th class="px-4 py-3 text-right font-medium text-gray-600">Financing</th>
-                  <th class="px-4 py-3 text-right font-medium text-gray-600">Net</th>
-                }
-                <th app-sort-header field="createdAt" [sortBy]="activeSortBy()" [sortDir]="activeSortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Created</th>
                 <th class="px-4 py-3 w-12"></th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
               @for (inq of inquiries(); track inq.id) {
                 <tr class="transition-colors hover:bg-gray-50/50 cursor-pointer" (click)="goToDetail(inq.orderNumber || inq.id)">
-                  <td class="px-4 py-3 font-mono text-xs text-gray-500">{{ inq.orderNumber ?? '—' }}</td>
-                  <td class="px-4 py-3 font-medium text-gray-900">{{ inq.clientName }}</td>
-                  <td class="px-4 py-3 text-gray-600">{{ inq.vesselName }}</td>
-                  <td class="px-4 py-3 text-gray-600">{{ inq.placeName }}</td>
-                  <td class="px-4 py-3">
-                    <app-status-badge [status]="inq.status" />
-                  </td>
-                  <td class="px-4 py-3 text-gray-600">{{ inq.salesRepName || '—' }}</td>
-                  <td class="px-4 py-3 text-gray-500">{{ inq.eta ? (inq.eta | date:'mediumDate') : '—' }}</td>
-                  @if (auth.canSeePrices()) {
-                    <td class="px-4 py-3 text-right tabular-nums text-gray-900">
-                      @if (inq.totalValue > 0) {
-                        {{ inq.totalValue | number:'1.2-2' }} {{ inq.displayCurrency || 'USD' }}
-                      } @else {
-                        <span class="text-gray-400">—</span>
+                  @for (col of visibleColumns(); track col.field) {
+                    @switch (col.field) {
+                      @case ('orderNumber') {
+                        <td class="px-4 py-3 font-mono text-xs text-gray-500">{{ inq.orderNumber ?? '—' }}</td>
                       }
-                    </td>
+                      @case ('client') {
+                        <td class="px-4 py-3 font-medium text-gray-900">{{ inq.clientName }}</td>
+                      }
+                      @case ('vessel') {
+                        <td class="px-4 py-3 text-gray-600">{{ inq.vesselName }}</td>
+                      }
+                      @case ('port') {
+                        <td class="px-4 py-3 text-gray-600">{{ inq.placeName }}</td>
+                      }
+                      @case ('status') {
+                        <td class="px-4 py-3">
+                          <app-status-badge [status]="inq.status" />
+                        </td>
+                      }
+                      @case ('responsible') {
+                        <td class="px-4 py-3 text-gray-600">{{ inq.salesRepName || '—' }}</td>
+                      }
+                      @case ('eta') {
+                        <td class="px-4 py-3 text-gray-500">{{ inq.eta ? (inq.eta | date:'mediumDate') : '—' }}</td>
+                      }
+                      @case ('dueDate') {
+                        <td class="px-4 py-3 text-gray-500">{{ inq.dueDate ? (inq.dueDate | date:'mediumDate') : '—' }}</td>
+                      }
+                      @case ('value') {
+                        <td class="px-4 py-3 text-right tabular-nums text-gray-900">
+                          @if (inq.totalValue > 0) {
+                            {{ inq.totalValue | number:'1.2-2' }} {{ inq.displayCurrency || 'USD' }}
+                          } @else {
+                            <span class="text-gray-400">—</span>
+                          }
+                        </td>
+                      }
+                      @case ('gross') {
+                        <td class="px-4 py-3 text-right tabular-nums" [class.text-green-600]="inq.totalProfit > 0" [class.text-red-600]="inq.totalProfit < 0">
+                          @if (inq.totalValue > 0 || inq.totalProfit !== 0) {
+                            {{ inq.totalProfit | number:'1.2-2' }} {{ inq.displayCurrency || 'USD' }}
+                          } @else {
+                            <span class="text-gray-400">—</span>
+                          }
+                        </td>
+                      }
+                      @case ('financing') {
+                        <td class="px-4 py-3 text-right tabular-nums text-amber-700">
+                          @if (inq.totalValue > 0 || (inq.totalFinancingCost ?? 0) !== 0) {
+                            {{ (inq.totalFinancingCost ?? 0) | number:'1.2-2' }} {{ inq.displayCurrency || 'USD' }}
+                          } @else {
+                            <span class="text-gray-400">—</span>
+                          }
+                        </td>
+                      }
+                      @case ('net') {
+                        <td class="px-4 py-3 text-right tabular-nums" [class.text-green-600]="(inq.totalNetProfit ?? 0) > 0" [class.text-red-600]="(inq.totalNetProfit ?? 0) < 0">
+                          @if (inq.totalValue > 0 || (inq.totalNetProfit ?? 0) !== 0) {
+                            {{ (inq.totalNetProfit ?? 0) | number:'1.2-2' }} {{ inq.displayCurrency || 'USD' }}
+                          } @else {
+                            <span class="text-gray-400">—</span>
+                          }
+                        </td>
+                      }
+                      @case ('createdAt') {
+                        <td class="px-4 py-3 text-gray-500">{{ inq.createdAt | date:'mediumDate' }}</td>
+                      }
+                    }
                   }
-                  @if (isOrders() && auth.canSeePrices()) {
-                    <td class="px-4 py-3 text-right tabular-nums" [class.text-green-600]="inq.totalProfit > 0" [class.text-red-600]="inq.totalProfit < 0">
-                      @if (inq.totalValue > 0 || inq.totalProfit !== 0) {
-                        {{ inq.totalProfit | number:'1.2-2' }} {{ inq.displayCurrency || 'USD' }}
-                      } @else {
-                        <span class="text-gray-400">—</span>
-                      }
-                    </td>
-                    <td class="px-4 py-3 text-right tabular-nums text-amber-700">
-                      @if (inq.totalValue > 0 || (inq.totalFinancingCost ?? 0) !== 0) {
-                        {{ (inq.totalFinancingCost ?? 0) | number:'1.2-2' }} {{ inq.displayCurrency || 'USD' }}
-                      } @else {
-                        <span class="text-gray-400">—</span>
-                      }
-                    </td>
-                    <td class="px-4 py-3 text-right tabular-nums" [class.text-green-600]="(inq.totalNetProfit ?? 0) > 0" [class.text-red-600]="(inq.totalNetProfit ?? 0) < 0">
-                      @if (inq.totalValue > 0 || (inq.totalNetProfit ?? 0) !== 0) {
-                        {{ (inq.totalNetProfit ?? 0) | number:'1.2-2' }} {{ inq.displayCurrency || 'USD' }}
-                      } @else {
-                        <span class="text-gray-400">—</span>
-                      }
-                    </td>
-                  }
-                  <td class="px-4 py-3 text-gray-500">{{ inq.createdAt | date:'mediumDate' }}</td>
                   <td class="px-4 py-3">
                     <a
                       [routerLink]="[baseRoute(), inq.orderNumber || inq.id]"
@@ -200,7 +229,7 @@ interface LliSearchResult {
                 </tr>
               } @empty {
                 <tr>
-                  <td [attr.colspan]="isOrders() ? 13 : 10" class="px-4 py-12 text-center">
+                  <td [attr.colspan]="visibleColumns().length + 1" class="px-4 py-12 text-center">
                     <p class="text-sm text-gray-400">{{ isOrders() ? 'No orders found.' : 'No inquiries found.' }}</p>
                     @if (!isOrders()) {
                       <button
@@ -512,6 +541,94 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   readonly activeSortDir = computed<'asc' | 'desc'>(() => this.sortBy() ? this.sortDir() : this.defaultSortDir());
   readonly toast = signal<{ type: 'success' | 'error'; message: string } | null>(null);
 
+  // ─── Column configuration ─────────────────────────────────────────
+  private readonly userPrefs = inject(UserPreferencesService);
+
+  readonly allColumnOptions = computed<ColumnOption[]>(() => {
+    const base: ColumnOption[] = [
+      { field: 'orderNumber', label: 'No.' },
+      { field: 'client', label: 'Client' },
+      { field: 'vessel', label: 'Vessel' },
+      { field: 'port', label: 'Port' },
+      { field: 'status', label: 'Status' },
+      { field: 'responsible', label: 'Responsible' },
+      { field: 'eta', label: 'ETA' },
+      { field: 'dueDate', label: 'Due Date' },
+      { field: 'createdAt', label: 'Created' },
+    ];
+    if (this.auth.canSeePrices()) {
+      base.push({ field: 'value', label: 'Value' });
+    }
+    if (this.isOrders() && this.auth.canSeePrices()) {
+      base.push(
+        { field: 'gross', label: 'Gross' },
+        { field: 'financing', label: 'Financing' },
+        { field: 'net', label: 'Net' },
+      );
+    }
+    return base;
+  });
+
+  readonly defaultVisibleColumns = computed<string[]>(() => {
+    const base = ['orderNumber', 'client', 'vessel', 'port', 'status', 'responsible', 'eta', 'createdAt'];
+    if (this.isDeliveredOrders() || this.isCompletedOrders()) {
+      base.splice(base.indexOf('eta') + 1, 0, 'dueDate');
+    }
+    if (this.auth.canSeePrices()) {
+      base.push('value');
+    }
+    if (this.isOrders() && this.auth.canSeePrices()) {
+      base.push('gross', 'financing', 'net');
+    }
+    return base;
+  });
+
+  readonly defaultColumnOrder = computed<string[]>(() =>
+    this.allColumnOptions().map((c) => c.field),
+  );
+
+  readonly columnConfig = computed(() => {
+    const prefs = this.userPrefs.preferences();
+    const mode = this.resolvedMode();
+    const key = `orderList_${mode}` as keyof UserUiPreferences;
+    return (prefs[key] as { visible?: string[]; order?: string[] } | undefined) ?? {};
+  });
+
+  readonly visibleColumnFields = computed(() =>
+    this.columnConfig().visible ?? this.defaultVisibleColumns(),
+  );
+
+  readonly columnOrder = computed(() =>
+    this.columnConfig().order ?? this.defaultColumnOrder(),
+  );
+
+  readonly visibleColumns = computed(() => {
+    const orderMap = new Map(this.columnOrder().map((f, i) => [f, i]));
+    return this.allColumnOptions()
+      .filter((c) => this.visibleColumnFields().includes(c.field))
+      .sort((a, b) => (orderMap.get(a.field) ?? 0) - (orderMap.get(b.field) ?? 0));
+  });
+
+  onColumnVisibilityChange(visible: string[]): void {
+    const mode = this.resolvedMode();
+    this.userPrefs.patch({
+      [`orderList_${mode}`]: {
+        visible,
+        order: this.columnOrder(),
+      },
+    } as Partial<UserUiPreferences>);
+  }
+
+  onColumnOrderChange(order: string[]): void {
+    const mode = this.resolvedMode();
+    this.userPrefs.patch({
+      [`orderList_${mode}`]: {
+        visible: this.visibleColumnFields(),
+        order,
+      },
+    } as Partial<UserUiPreferences>);
+  }
+
   // ─── Broker filter ────────────────────────────────────────────────
   readonly filterBrokerId = signal('');
   readonly brokerFilterOptions = signal<DropdownOption[]>([]);
@@ -599,6 +716,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.loadInquiries();
     void this.loadResponsibleUsers();
+    void this.userPrefs.load();
     if (!this.isOrders()) {
       this.loadDropdownData();
 

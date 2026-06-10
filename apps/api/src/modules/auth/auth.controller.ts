@@ -1284,6 +1284,67 @@ export const authController = new Elysia({ prefix: '/auth' })
   )
 
   // ══════════════════════════════════════════════════════════════════
+  //  UI PREFERENCES
+  // ══════════════════════════════════════════════════════════════════
+
+  // ── GET /auth/preferences — get current user's UI preferences ──────
+  .get(
+    '/preferences',
+    async ({ headers, jwtAccess }) => {
+      try {
+        const authHeader = headers['authorization'];
+        if (!authHeader?.startsWith('Bearer ')) {
+          return { success: false, data: null, message: 'Missing authorization header' } satisfies ApiResponse<null>;
+        }
+        const token = authHeader.slice(7);
+        const decoded = extractPayload(await jwtAccess.verify(token));
+        if (!decoded) {
+          return { success: false, data: null, message: 'Invalid token' } satisfies ApiResponse<null>;
+        }
+
+        const { getUserUiPreferences } = await import('./auth.service');
+        const prefs = await getUserUiPreferences(decoded.sub);
+        return { success: true, data: prefs } satisfies ApiResponse<unknown>;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to load preferences';
+        return { success: false, data: null, message } satisfies ApiResponse<null>;
+      }
+    },
+    {
+      detail: { tags: ['Auth'], summary: 'Get current user UI preferences', security: [{ bearerAuth: [] }] },
+    },
+  )
+
+  // ── PUT /auth/preferences — update current user's UI preferences ───
+  .put(
+    '/preferences',
+    async ({ body, headers, jwtAccess }) => {
+      try {
+        const authHeader = headers['authorization'];
+        if (!authHeader?.startsWith('Bearer ')) {
+          return { success: false, data: null, message: 'Missing authorization header' } satisfies ApiResponse<null>;
+        }
+        const token = authHeader.slice(7);
+        const decoded = extractPayload(await jwtAccess.verify(token));
+        if (!decoded) {
+          return { success: false, data: null, message: 'Invalid token' } satisfies ApiResponse<null>;
+        }
+
+        const { updateUserUiPreferences } = await import('./auth.service');
+        const prefs = await updateUserUiPreferences(decoded.sub, body as Record<string, unknown>);
+        return { success: true, data: prefs } satisfies ApiResponse<unknown>;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to save preferences';
+        return { success: false, data: null, message } satisfies ApiResponse<null>;
+      }
+    },
+    {
+      body: t.Object({}, { additionalProperties: true }),
+      detail: { tags: ['Auth'], summary: 'Update current user UI preferences (shallow merge)', security: [{ bearerAuth: [] }] },
+    },
+  )
+
+  // ══════════════════════════════════════════════════════════════════
   //  AVATAR
   // ══════════════════════════════════════════════════════════════════
 

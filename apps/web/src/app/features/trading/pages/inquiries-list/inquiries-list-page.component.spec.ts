@@ -5,6 +5,7 @@ import { of } from 'rxjs';
 import { HttpClient } from '@angular/common/http';
 import { InquiriesListPageComponent } from './inquiries-list-page.component';
 import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.service';
+import { UserPreferencesService } from '@app/core/services/user-preferences.service';
 
 describe('InquiriesListPageComponent', () => {
   let requestedUrls: string[];
@@ -30,6 +31,7 @@ describe('InquiriesListPageComponent', () => {
                   placeName: 'Monaco',
                   salesRepName: 'Patrick',
                   eta: '2026-03-10T00:00:00.000Z',
+                  dueDate: '2026-03-15T00:00:00.000Z',
                   totalValue: 1308000,
                   totalProfit: 32000,
                   totalFinancingCost: 4195.0685,
@@ -48,8 +50,13 @@ describe('InquiriesListPageComponent', () => {
           return of({ success: true, data: [] });
         }
 
+        if (url.includes('/auth/preferences')) {
+          return of({ success: true, data: {} });
+        }
+
         return of({ success: true, data: { items: [], total: 0 } });
       },
+      put: () => of({ success: true, data: {} }),
     };
 
     await TestBed.configureTestingModule({
@@ -59,6 +66,7 @@ describe('InquiriesListPageComponent', () => {
         { provide: HttpClient, useValue: http },
         { provide: ActivatedRoute, useValue: { queryParamMap: of(convertToParamMap({})) } },
         { provide: NewInquiryModalService, useValue: { requestId: signal(0) } },
+        { provide: UserPreferencesService, useValue: { preferences: signal({}), load: () => Promise.resolve(), patch: () => {} } },
       ],
     }).compileComponents();
   });

@@ -271,3 +271,23 @@ export async function verify2faToken(
 
   return verifyTotpToken(token, user.twoFactorSecret);
 }
+
+// ── UI Preferences ─────────────────────────────────────────────────
+
+export async function getUserUiPreferences(userId: string): Promise<Record<string, unknown>> {
+  const user = await findUserById(userId);
+  return (user?.uiPreferences as Record<string, unknown>) ?? {};
+}
+
+export async function updateUserUiPreferences(
+  userId: string,
+  patch: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const existing = await getUserUiPreferences(userId);
+  const merged = { ...existing, ...patch };
+  await db
+    .update(users)
+    .set({ uiPreferences: merged, updatedAt: new Date() })
+    .where(eq(users.id, userId));
+  return merged;
+}
