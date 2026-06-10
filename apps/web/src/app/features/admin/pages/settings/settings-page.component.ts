@@ -211,7 +211,7 @@ interface InquirySettingsDto {
               </div>
             </div>
 
-            <div class="app-panel-body space-y-3 max-h-[28rem] overflow-y-auto">
+            <div class="app-panel-body space-y-3 flex-1 min-h-0 overflow-y-auto">
               @for (p of products(); track $index; let i = $index) {
                 <div class="flex items-center gap-2">
                   <div class="flex flex-col gap-0.5 shrink-0">
@@ -286,7 +286,7 @@ interface InquirySettingsDto {
               </div>
             </div>
 
-            <div class="app-panel-body space-y-3 max-h-[28rem] overflow-y-auto">
+            <div class="app-panel-body space-y-3 flex-1 min-h-0 overflow-y-auto">
               @for (u of units(); track $index; let i = $index) {
                 <div class="flex items-center gap-2">
                   <div class="flex flex-col gap-0.5 shrink-0">
@@ -361,7 +361,7 @@ interface InquirySettingsDto {
               </div>
             </div>
 
-            <div class="app-panel-body space-y-3 max-h-[28rem] overflow-y-auto">
+            <div class="app-panel-body space-y-3 flex-1 min-h-0 overflow-y-auto">
               @for (conv of unitConversions(); track $index; let i = $index) {
                 <div class="flex items-center gap-2 min-w-0">
                   <input
@@ -455,7 +455,7 @@ interface InquirySettingsDto {
               </div>
             </div>
 
-            <div class="app-panel-body space-y-3 max-h-[28rem] overflow-y-auto">
+            <div class="app-panel-body space-y-3 flex-1 min-h-0 overflow-y-auto">
               @for (ref of priceRefs(); track ref.id; let i = $index) {
                 <div class="flex items-center gap-2 min-w-0">
                   <input
@@ -539,7 +539,7 @@ interface InquirySettingsDto {
               </div>
             </div>
 
-            <div class="app-panel-body space-y-3 max-h-[28rem] overflow-y-auto">
+            <div class="app-panel-body space-y-3 flex-1 min-h-0 overflow-y-auto">
               @for (c of currencies(); track $index; let i = $index) {
                 <div class="flex items-center gap-2">
                   <div class="flex flex-col gap-0.5 shrink-0">
@@ -617,7 +617,7 @@ interface InquirySettingsDto {
               </div>
             </div>
 
-            <div class="app-panel-body space-y-3 max-h-[28rem] overflow-y-auto">
+            <div class="app-panel-body space-y-3 flex-1 min-h-0 overflow-y-auto">
               @for (ct of companyTypes(); track $index; let i = $index) {
                 <div class="flex items-center gap-2">
                   <div class="flex flex-col gap-0.5 shrink-0">
@@ -693,7 +693,7 @@ interface InquirySettingsDto {
               </div>
             </div>
 
-            <div class="app-panel-body space-y-3 max-h-[28rem] overflow-y-auto">
+            <div class="app-panel-body space-y-3 flex-1 min-h-0 overflow-y-auto">
               @for (type of attachmentTypes(); track $index; let i = $index) {
                 <div class="flex items-center gap-2">
                   <div class="flex flex-col gap-0.5 shrink-0">
@@ -768,7 +768,7 @@ interface InquirySettingsDto {
               </div>
             </div>
 
-            <div class="app-panel-body space-y-3 max-h-[28rem] overflow-y-auto">
+            <div class="app-panel-body space-y-3 flex-1 min-h-0 overflow-y-auto">
               @for (vt of vesselTypes(); track $index; let i = $index) {
                 <div class="flex items-center gap-2">
                   <div class="flex flex-col gap-0.5 shrink-0">
@@ -1179,7 +1179,7 @@ interface InquirySettingsDto {
               </div>
             </div>
 
-            <div class="app-panel-body space-y-3 max-h-[28rem] overflow-y-auto">
+            <div class="app-panel-body space-y-3 flex-1 min-h-0 overflow-y-auto">
               @for (reason of inquiryCancelReasons(); track $index; let i = $index) {
                 <div class="flex items-center gap-2">
                   <div class="flex flex-col gap-0.5 shrink-0">
@@ -1569,7 +1569,7 @@ interface InquirySettingsDto {
               </div>
             </div>
 
-            <div class="app-panel-body space-y-3 max-h-[28rem] overflow-y-auto">
+            <div class="app-panel-body space-y-3 flex-1 min-h-0 overflow-y-auto">
               @for (item of catalogItems(); track $index; let i = $index) {
                 <div class="space-y-2 rounded-lg border border-gray-200 p-3">
                   <div class="flex items-center gap-2">
@@ -1668,7 +1668,7 @@ interface InquirySettingsDto {
               </div>
             </div>
 
-            <div class="app-panel-body space-y-3 max-h-[28rem] overflow-y-auto">
+            <div class="app-panel-body space-y-3 flex-1 min-h-0 overflow-y-auto">
               @for (cat of orderCategories(); track $index; let i = $index) {
                 <div class="flex items-center gap-2">
                   <input
@@ -1799,7 +1799,7 @@ interface InquirySettingsDto {
               </div>
             </div>
 
-            <div class="app-panel-body space-y-3 max-h-[28rem] overflow-y-auto">
+            <div class="app-panel-body space-y-3 flex-1 min-h-0 overflow-y-auto">
               @for (rate of taxRates(); track $index; let i = $index) {
                 <div class="flex items-center gap-2">
                   <input
