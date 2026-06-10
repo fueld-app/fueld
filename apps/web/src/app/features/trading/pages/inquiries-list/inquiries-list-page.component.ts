@@ -449,38 +449,45 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   private readonly newInquiryModal = inject(NewInquiryModalService);
   private queryParamSub?: Subscription;
 
-  readonly mode = input<'inquiries' | 'active-orders' | 'completed-orders' | 'cancelled-orders' | undefined>('inquiries');
+  readonly mode = input<'inquiries' | 'active-orders' | 'delivered-orders' | 'completed-orders' | 'cancelled-orders' | undefined>('inquiries');
   readonly resolvedMode = computed(() => this.mode() ?? 'inquiries');
 
   readonly isOrders = computed(() => this.resolvedMode() !== 'inquiries');
   readonly isActiveOrders = computed(() => this.resolvedMode() === 'active-orders');
+  readonly isDeliveredOrders = computed(() => this.resolvedMode() === 'delivered-orders');
   readonly isCompletedOrders = computed(() => this.resolvedMode() === 'completed-orders');
   readonly isCancelledOrders = computed(() => this.resolvedMode() === 'cancelled-orders');
   readonly baseRoute = computed(() => (
     this.isActiveOrders()
       ? '/trading/orders'
-      : this.isCompletedOrders()
-        ? '/trading/completed-orders'
-        : this.isCancelledOrders()
-          ? '/trading/cancelled-orders'
-          : '/trading/inquiries'
+      : this.isDeliveredOrders()
+        ? '/trading/delivered-orders'
+        : this.isCompletedOrders()
+          ? '/trading/completed-orders'
+          : this.isCancelledOrders()
+            ? '/trading/cancelled-orders'
+            : '/trading/inquiries'
   ));
   readonly titleText = computed(() => (
     this.isActiveOrders()
       ? 'Active Orders'
-      : this.isCompletedOrders()
-        ? 'Completed Orders'
-        : this.isCancelledOrders()
-          ? 'Cancelled Orders'
+      : this.isDeliveredOrders()
+        ? 'Delivered Orders'
+        : this.isCompletedOrders()
+          ? 'Completed Orders'
+          : this.isCancelledOrders()
+            ? 'Cancelled Orders'
         : 'Inquiries'
   ));
   readonly subtitleText = computed(() =>
     this.isActiveOrders()
       ? 'Orders waiting for delivery or payment.'
-      : this.isCompletedOrders()
-        ? 'Orders that are paid and delivered.'
-        : this.isCancelledOrders()
-          ? 'Orders that have been cancelled.'
+      : this.isDeliveredOrders()
+        ? 'Orders that have been delivered but not yet invoiced or paid.'
+        : this.isCompletedOrders()
+          ? 'Orders that are paid and delivered.'
+          : this.isCancelledOrders()
+            ? 'Orders that have been cancelled.'
         : 'Manage bunker inquiries and offers before confirmation.',
   );
   readonly searchPlaceholder = computed(() =>
@@ -616,7 +623,9 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
     try {
       const params = new URLSearchParams();
       if (this.isActiveOrders()) {
-        params.set('statuses', 'CONFIRMED,DELIVERED,INVOICED');
+        params.set('statuses', 'CONFIRMED,INVOICED');
+      } else if (this.isDeliveredOrders()) {
+        params.set('statuses', 'DELIVERED');
       } else if (this.isCompletedOrders()) {
         params.set('statuses', 'PAID');
       } else if (this.isCancelledOrders()) {

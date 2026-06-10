@@ -100,6 +100,24 @@ export const routes: Routes = [
             title: 'Trading > Active Orders',
           },
           {
+            path: 'orders/delivered',
+            redirectTo: 'delivered-orders',
+            pathMatch: 'full',
+          },
+          {
+            path: 'orders/delivered/:id',
+            redirectTo: 'delivered-orders/:id',
+            pathMatch: 'full',
+          },
+          {
+            path: 'delivered-orders',
+            loadComponent: () =>
+              import('./features/trading/pages/delivered-orders-list/delivered-orders-list-page.component').then(
+                (m) => m.DeliveredOrdersListPageComponent,
+              ),
+            title: 'Trading > Delivered Orders',
+          },
+          {
             path: 'orders/completed',
             redirectTo: 'completed-orders',
             pathMatch: 'full',
@@ -142,6 +160,14 @@ export const routes: Routes = [
                 (m) => m.OrderDetailPageComponent,
               ),
             title: 'Trading > Completed Orders',
+          },
+          {
+            path: 'delivered-orders/:id',
+            loadComponent: () =>
+              import('./features/trading/pages/order-detail/order-detail-page.component').then(
+                (m) => m.OrderDetailPageComponent,
+              ),
+            title: 'Trading > Delivered Orders',
           },
           {
             path: 'cancelled-orders/:id',

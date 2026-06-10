@@ -2617,10 +2617,14 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   private detailBaseRouteForStatus(status: string):
     '/trading/orders'
     | '/trading/inquiries'
+    | '/trading/delivered-orders'
     | '/trading/completed-orders'
     | '/trading/cancelled-orders' {
     if (status === OrderStatus.Inquiry || status === OrderStatus.Offer) {
       return '/trading/inquiries';
+    }
+    if (status === OrderStatus.Delivered) {
+      return '/trading/delivered-orders';
     }
     if (status === OrderStatus.Paid) {
       return '/trading/completed-orders';
@@ -2636,12 +2640,14 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     const expectedBase = this.detailBaseRouteForStatus(status);
     const isOnOrdersPath = currentPath.startsWith('/trading/orders/');
     const isOnInquiriesPath = currentPath.startsWith('/trading/inquiries/');
+    const isOnDeliveredPath = currentPath.startsWith('/trading/delivered-orders/');
     const isOnCompletedPath = currentPath.startsWith('/trading/completed-orders/');
     const isOnCancelledPath = currentPath.startsWith('/trading/cancelled-orders/');
 
     const isAlreadyOnExpectedPath =
       (expectedBase === '/trading/orders' && isOnOrdersPath)
       || (expectedBase === '/trading/inquiries' && isOnInquiriesPath)
+      || (expectedBase === '/trading/delivered-orders' && isOnDeliveredPath)
       || (expectedBase === '/trading/completed-orders' && isOnCompletedPath)
       || (expectedBase === '/trading/cancelled-orders' && isOnCancelledPath);
 
