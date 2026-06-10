@@ -1241,7 +1241,7 @@ interface InquirySettingsDto {
           <!-- ════════════════════════════════════════════════════════ -->
           <!--  Vessel–Company Role Options                            -->
           <!-- ════════════════════════════════════════════════════════ -->
-          <div class="app-panel min-[900px]:col-span-2">
+          <div class="app-panel min-[900px]:col-span-2 flex flex-col">
             <div class="app-panel-header app-panel-header--purple">
               <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--purple">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-purple-600" viewBox="0 0 20 20" fill="currentColor">
@@ -1254,7 +1254,7 @@ interface InquirySettingsDto {
               </div>
             </div>
 
-            <div class="app-panel-body space-y-4 max-h-[28rem] overflow-y-auto">
+            <div class="app-panel-body space-y-4 flex-1 min-h-0 overflow-y-auto">
               @if (rolesLoading()) {
                 <div class="flex items-center justify-center py-6">
                   <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
