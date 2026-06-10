@@ -91,7 +91,7 @@ describe('InquiriesListPageComponent', () => {
 
     expect(component.activeSortBy()).toBe('eta');
     expect(component.activeSortDir()).toBe('desc');
-    expect(latestOrdersRequest()).toContain('statuses=CONFIRMED%2CDELIVERED%2CINVOICED');
+    expect(latestOrdersRequest()).toContain('statuses=CONFIRMED%2CINVOICED');
     expect(latestOrdersRequest()).toContain('sortBy=eta');
     expect(latestOrdersRequest()).toContain('sortDir=desc');
   });
