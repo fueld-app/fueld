@@ -55,7 +55,7 @@ import { SettingsToastService } from './settings-toast.service';
   `,
 })
 export class SettingsShellComponent {
-  private readonly toastService = inject(SettingsToastService);
+  readonly toastService = inject(SettingsToastService);
 
   tabs = [
     { path: 'general', label: 'General' },
