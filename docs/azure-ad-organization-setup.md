@@ -197,6 +197,99 @@ Follow Step 2 above for the new tenant.
 
 ---
 
+## Troubleshooting
+
+### "It looks like the application has been removed or is configured to use an incorrect application identifier"
+
+This error occurs when the Azure tenant does not have the Microsoft Graph service principal pre-provisioned (common in new/free tenants). The `az ad app permission add` command uses an older API that fails in this case.
+
+**Fix**: Use the Azure Portal to create the app registration manually:
+
+1. Go to [https://portal.azure.com](https://portal.azure.com) → **Microsoft Entra ID** → **App registrations** → **+ New registration**
+2. **Name**: `Fueld — <tenant-name>`
+3. **Supported account types**: `Accounts in this organizational directory only`
+4. **Redirect URI**: `Web` → `https://<domain>/api/auth/microsoft/callback`
+5. Click **Register**
+6. Go to **API permissions** → **+ Add a permission** → **Microsoft Graph** → **Delegated permissions**
+7. Add: `openid`, `profile`, `User.Read`, `Mail.Send`
+8. Click **Grant admin consent for [tenant]**
+9. Go to **Certificates & secrets** → **+ New client secret** → 24 months
+10. Copy the secret value immediately
+
+### Mail.Send not visible in Azure Portal API permissions list
+
+The Azure Portal UI sometimes fails to render `Mail.Send` in the permissions list even when it is correctly configured via API.
+
+**Verify via CLI**:
+```bash
+az ad app show --id <app-id> --query 'requiredResourceAccess' -o json
+```
+
+You should see both permission GUIDs:
+- `e1fe6dd8-ba31-4d61-89e7-88639da4683d` → User.Read
+- `e383f46e-2787-4529-8551-86ec2b8b75c4` → Mail.Send
+
+If both GUIDs are present, the permission is configured correctly and the portal UI is just not rendering it. You can proceed safely.
+
+### "AADSTS700082: The refresh token has expired"
+
+Your Azure CLI session has expired. Re-authenticate:
+
+```bash
+az login --tenant <tenant-id> --allow-no-subscriptions
+```
+
+### "Insufficient privileges to complete the operation"
+
+You need **Application Administrator** or **Global Administrator** role in the target Azure AD tenant. Ask your IT admin to grant you this role or run the script for you.
+
+### "Admin consent is required"
+
+After creating the app, you must grant admin consent for the Microsoft Graph permissions:
+
+```bash
+az ad app permission admin-consent --id <app-id>
+```
+
+Or in the portal: **App registrations** → **API permissions** → **Grant admin consent for [tenant]**.
+
+### "Invalid client secret" or "AADSTS7000215"
+
+The client secret may have expired or been deleted. Rotate it (see Rotating Secrets above).
+
+### "The reply URL does not match"
+
+The redirect URI in the Azure app must exactly match what Fueld generates. Verify:
+
+```bash
+az ad app show --id <app-id> --query "web.redirectUris"
+```
+
+It should return:
+```json
+[
+  "https://channeltx.fueld.app/api/auth/microsoft/callback"
+]
+```
+
+If it doesn't match, update it:
+
+```bash
+az ad app update --id <app-id> --web-redirect-uris "https://channeltx.fueld.app/api/auth/microsoft/callback"
+```
+
+### Users can't sign in — "User account does not exist"
+
+The app is configured for **single-tenant** (`AzureADMyOrg`). Only users in the same Azure AD tenant can sign in. If you need to allow external users (e.g., customers with their own Microsoft 365), change the sign-in audience:
+
+```bash
+az ad app update --id <app-id> --sign-in-audience AzureADMultipleOrgs
+```
+
+> ⚠️ This allows any Microsoft work account to sign in. Use approved email domains in Fueld Admin → Security to restrict access.
+
+---
+
 ## Credentials File
 
 The script saves all credentials to:

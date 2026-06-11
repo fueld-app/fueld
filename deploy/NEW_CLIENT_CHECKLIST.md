@@ -9,6 +9,7 @@ Use this checklist when bringing a new production server online for a client.
 - [ ] VPS root password or rescue console access available
 - [ ] Cloudflare API token ready (if using `cloudflare-wildcard` TLS mode)
 - [ ] Client slug decided (e.g., `acme-corp`, used for filenames)
+- [ ] Azure AD app registration ready (see Step 2.5 below)
 
 ## Step 1: Initial Server Access
 
@@ -57,6 +58,73 @@ The script outputs:
 # Backup the .env file
 scp root@<VPS_IP>:/opt/fueld/.env ./<client>-<date>.env.backup
 ```
+
+## Step 2.5: Create Azure AD App Registration (for Microsoft 365 / SSO)
+
+If the client needs Microsoft 365 integration (SSO + Outlook email sending), create an Azure AD app registration **before** first deploy.
+
+### Prerequisites
+- Azure CLI installed (`az --version`)
+- Logged into the Fueld Azure AD tenant: `az login --tenant <fueld-tenant-id> --allow-no-subscriptions`
+
+### Add the new tenant to the script
+
+Edit `deploy/setup-fueld-azure-organization.sh` and add the client to the `TENANTS` array:
+
+```bash
+TENANTS=(
+  "riviera-marine:riviera-marine.fueld.app"
+  "channeltx:channeltx.fueld.app"
+  "<client-slug>:<client-domain>"    # ← add this line
+)
+```
+
+### Run the script
+
+```bash
+cd /path/to/fueld
+./deploy/setup-fueld-azure-organization.sh <fueld-tenant-id>
+```
+
+The script will:
+1. Create an app registration: `Fueld — <client-slug>`
+2. Configure redirect URI: `https://<client-domain>/api/auth/microsoft/callback`
+3. Add Microsoft Graph permissions: `User.Read` (SSO) + `Mail.Send` (Outlook email)
+4. Grant admin consent
+5. Create a client secret (2-year expiry)
+6. Save credentials to `deploy/instances/fueld-azure-apps-credentials.txt`
+
+### Enter credentials in Fueld
+
+After first deploy, log in as admin and go to **Admin → Integrations → Microsoft 365 / Entra ID**:
+
+| Field | Value |
+|-------|-------|
+| **Client ID** | From `fueld-azure-apps-credentials.txt` |
+| **Client Secret** | From `fueld-azure-apps-credentials.txt` |
+| **Tenant ID** | The shared Fueld tenant ID |
+
+Then go to **Admin → Security → SSO Provider**:
+- Set **SSO Provider** to `Microsoft Entra ID (Azure AD)`
+- Toggle **SSO Enabled** ON
+- (Optional) Add approved email domains
+
+### Troubleshooting
+
+If the script fails with *"application has been removed or is configured to use an incorrect application identifier"*, the tenant may not have the Microsoft Graph service principal. Use the Azure Portal instead:
+
+1. Go to [https://portal.azure.com](https://portal.azure.com) → **Microsoft Entra ID** → **App registrations** → **+ New registration**
+2. **Name**: `Fueld — <client-slug>`
+3. **Supported account types**: `Accounts in this organizational directory only`
+4. **Redirect URI**: `Web` → `https://<client-domain>/api/auth/microsoft/callback`
+5. Click **Register**
+6. Go to **API permissions** → **+ Add a permission** → **Microsoft Graph** → **Delegated permissions**
+7. Add: `openid`, `profile`, `User.Read`, `Mail.Send`
+8. Click **Grant admin consent for [tenant]**
+9. Go to **Certificates & secrets** → **+ New client secret** → 24 months
+10. Copy the secret value immediately
+
+> ⚠️ **Note**: The Azure Portal UI sometimes does not render `Mail.Send` in the permissions list even when it is configured. Verify via CLI: `az ad app show --id <app-id> --query 'requiredResourceAccess'`
 
 ## Step 4: Customize Environment
 
