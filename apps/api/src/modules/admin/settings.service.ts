@@ -820,6 +820,12 @@ export async function getProductSettings(): Promise<{ products: string[] }> {
   if (!tenant) throw new Error('No tenant found');
 
   const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  // Products now come from the catalog — names only, for order line dropdowns
+  const catalogItems = settings.catalogItems ?? [];
+  if (catalogItems.length > 0) {
+    return { products: catalogItems.map((item) => item.name) };
+  }
+  // Fallback to legacy products list if catalog is empty
   return { products: settings.products ?? DEFAULT_PRODUCTS };
 }
 
@@ -828,6 +834,31 @@ export async function updateProductSettings(products: string[]): Promise<{ produ
   if (!tenant) throw new Error('No tenant found');
 
   const settings = { ...(tenant.settings as any) };
+  const existingCatalog = (settings.catalogItems ?? []) as import('../../db/schema').TenantSettings['catalogItems'];
+
+  // Build a map of existing catalog items by name for quick lookup
+  const existingByName = new Map(existingCatalog?.map((item) => [item.name, item]) ?? []);
+
+  // Rebuild catalog: preserve existing items (with prices etc.), add new ones as name-only
+  const newCatalog = products
+    .filter((name) => name.trim().length > 0)
+    .map((name) => {
+      const existing = existingByName.get(name);
+      if (existing) return existing;
+      return {
+        id: crypto.randomUUID(),
+        name,
+        description: '',
+        defaultUnit: '',
+        defaultCostPrice: undefined,
+        defaultSalesPrice: undefined,
+        defaultTaxRateId: '',
+        categoryKey: '',
+      };
+    });
+
+  settings.catalogItems = newCatalog;
+  // Also keep legacy products in sync for any old clients
   settings.products = products;
 
   await db

@@ -9,7 +9,7 @@ import {
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
-import type { ApiResponse, OrderNumberSettingsDto, VesselCompanyRoleSettingsDto, VesselCompanyRoleOption, ProductSettingsDto, UnitSettingsDto, CurrencySettingsDto, CompanyTypeSettingsDto, AttachmentTypeSettingsDto, VesselTypeSettingsDto, DeliveryDocumentationSettingsDto, PortDocumentationSettingsDto, InquiryCancelReasonSettingsDto, UnitConversionSettingsDto } from '@fueld/types';
+import type { ApiResponse, OrderNumberSettingsDto, VesselCompanyRoleSettingsDto, VesselCompanyRoleOption, UnitSettingsDto, CurrencySettingsDto, CompanyTypeSettingsDto, AttachmentTypeSettingsDto, VesselTypeSettingsDto, DeliveryDocumentationSettingsDto, PortDocumentationSettingsDto, InquiryCancelReasonSettingsDto, UnitConversionSettingsDto } from '@fueld/types';
 
 import { API } from '@app/core/config/api';
 
@@ -184,81 +184,6 @@ interface InquirySettingsDto {
                   @if (timezoneSaving()) { Saving… } @else { Save Timezone }
                 </button>
                 @if (timezoneSaved()) {
-                  <span class="text-sm text-green-600 flex items-center gap-1">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
-                    </svg>
-                    Saved
-                  </span>
-                }
-              </div>
-            </div>
-          </div>
-
-          <!-- ════════════════════════════════════════════════════════ -->
-          <!--  Product Options                                        -->
-          <!-- ════════════════════════════════════════════════════════ -->
-          <div class="app-panel">
-            <div class="app-panel-header app-panel-header--emerald">
-              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--emerald">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5zm4.707 3.707a1 1 0 00-1.414-1.414l-3 3a1 1 0 000 1.414l3 3a1 1 0 001.414-1.414L8.414 9H10a3 3 0 013 3v1a1 1 0 102 0v-1a5 5 0 00-5-5H8.414l1.293-1.293z" clip-rule="evenodd" />
-                </svg>
-              </div>
-              <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-semibold text-gray-900">Products</h3>
-                <p class="text-xs text-gray-500">Configure which products appear in order line item dropdowns.</p>
-              </div>
-            </div>
-
-            <div class="app-panel-body space-y-3 flex-1 min-h-0 overflow-y-auto">
-              @for (p of products(); track $index; let i = $index) {
-                <div class="flex items-center gap-2">
-                  <div class="flex flex-col gap-0.5 shrink-0">
-                    <button (click)="moveProductUp(i)" [disabled]="i === 0" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move up">
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
-                    </button>
-                    <button (click)="moveProductDown(i)" [disabled]="i === products().length - 1" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move down">
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
-                    </button>
-                  </div>
-                  <input
-                    type="text"
-                    [value]="p"
-                    (input)="updateProduct(i, $any($event.target).value)"
-                          class="app-input-mono-uppercase flex-1"
-                  />
-                  <button
-                    (click)="removeProduct(i)"
-                    [disabled]="products().length <= 1"
-                    class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 transition-colors shrink-0"
-                    title="Remove product"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-                    </svg>
-                  </button>
-                </div>
-              }
-              <button
-                (click)="addProduct()"
-                class="app-button-add"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
-                </svg>
-                Add Product
-              </button>
-
-              <div class="flex items-center gap-3 pt-2">
-                <button
-                  (click)="saveProducts()"
-                  [disabled]="productsSaving()"
-                      class="app-button-primary"
-                >
-                  @if (productsSaving()) { Saving… } @else { Save Products }
-                </button>
-                @if (productsSaved()) {
                   <span class="text-sm text-green-600 flex items-center gap-1">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                       <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
@@ -1554,7 +1479,7 @@ interface InquirySettingsDto {
           </div>
 
           <!-- ════════════════════════════════════════════════════════ -->
-          <!--  Product Catalog                                        -->
+          <!--  Products                                               -->
           <!-- ════════════════════════════════════════════════════════ -->
           <div class="app-panel">
             <div class="app-panel-header app-panel-header--emerald">
@@ -1564,8 +1489,8 @@ interface InquirySettingsDto {
                 </svg>
               </div>
               <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-semibold text-gray-900">Product Catalog</h3>
-                <p class="text-xs text-gray-500">Configure products with default description, unit, price, and tax.</p>
+                <h3 class="text-sm font-semibold text-gray-900">Products</h3>
+                <p class="text-xs text-gray-500">Configure products / services with optional default description, unit, and pricing.</p>
               </div>
             </div>
 
@@ -1629,7 +1554,7 @@ interface InquirySettingsDto {
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
                 </svg>
-                Add Catalog Item
+                Add Product
               </button>
 
               <div class="flex items-center gap-3 pt-2">
@@ -1638,7 +1563,7 @@ interface InquirySettingsDto {
                   [disabled]="catalogSaving()"
                   class="app-button-primary"
                 >
-                  @if (catalogSaving()) { Saving… } @else { Save Catalog }
+                  @if (catalogSaving()) { Saving… } @else { Save Products }
                 </button>
                 @if (catalogSaved()) {
                   <span class="text-sm text-green-600 flex items-center gap-1">
@@ -1956,11 +1881,6 @@ export class SettingsPageComponent implements OnInit {
   readonly rolesSaved = signal(false);
   readonly roles = signal<VesselCompanyRoleOption[]>([]);
 
-  // Products
-  readonly products = signal<string[]>([]);
-  readonly productsSaving = signal(false);
-  readonly productsSaved = signal(false);
-
   // Units
   readonly units = signal<string[]>([]);
   readonly unitsSaving = signal(false);
@@ -2137,7 +2057,6 @@ export class SettingsPageComponent implements OnInit {
   ngOnInit(): void {
     this.loadSettings();
     this.loadRoles();
-    this.loadProducts();
     this.loadUnits();
     this.loadUnitConversions();
     this.loadPriceRefs();
@@ -2299,74 +2218,6 @@ export class SettingsPageComponent implements OnInit {
       this.showToast('error', 'Failed to save vessel-company roles.');
     } finally {
       this.rolesSaving.set(false);
-    }
-  }
-
-  // ─── Products ───────────────────────────────────────────────────────
-
-  private async loadProducts(): Promise<void> {
-    try {
-      const res = await firstValueFrom(
-        this.http.get<ApiResponse<ProductSettingsDto>>(`${API}/admin/settings/products`),
-      );
-      if (res.success) this.products.set(res.data.products);
-    } catch {
-      this.showToast('error', 'Failed to load products.');
-    }
-  }
-
-  updateProduct(index: number, value: string): void {
-    const updated = [...this.products()];
-    updated[index] = value.toUpperCase();
-    this.products.set(updated);
-  }
-
-  addProduct(): void {
-    this.products.set([...this.products(), '']);
-  }
-
-  removeProduct(index: number): void {
-    this.products.set(this.products().filter((_, i) => i !== index));
-  }
-
-  moveProductUp(index: number): void {
-    if (index <= 0) return;
-    const updated = [...this.products()];
-    [updated[index - 1], updated[index]] = [updated[index], updated[index - 1]];
-    this.products.set(updated);
-  }
-
-  moveProductDown(index: number): void {
-    const arr = this.products();
-    if (index >= arr.length - 1) return;
-    const updated = [...arr];
-    [updated[index], updated[index + 1]] = [updated[index + 1], updated[index]];
-    this.products.set(updated);
-  }
-
-  async saveProducts(): Promise<void> {
-    const valid = this.products().filter(p => p.trim());
-    if (valid.length === 0) {
-      this.showToast('error', 'At least one product is required.');
-      return;
-    }
-    this.productsSaving.set(true);
-    this.productsSaved.set(false);
-    try {
-      const res = await firstValueFrom(
-        this.http.put<ApiResponse<ProductSettingsDto>>(`${API}/admin/settings/products`, { products: valid }),
-      );
-      if (res.success) {
-        this.products.set(res.data.products);
-        this.productsSaved.set(true);
-        setTimeout(() => this.productsSaved.set(false), 3000);
-      } else {
-        this.showToast('error', (res as any).message ?? 'Failed to save.');
-      }
-    } catch {
-      this.showToast('error', 'Failed to save products.');
-    } finally {
-      this.productsSaving.set(false);
     }
   }
 
