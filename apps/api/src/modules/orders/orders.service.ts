@@ -1007,7 +1007,7 @@ export async function listOrders(query?: ListOrdersQuery) {
     placeName: r.placeName,
     salesRepName: r.salesRepName,
     eta: r.eta?.toISOString() ?? null,
-    dueDate: r.dueDate?.toISOString() ?? r.eta?.toISOString() ?? null,
+    dueDate: r.dueDate ?? r.eta?.toISOString() ?? null,
     totalValue: itemAggs[r.id]?.totalValue ?? 0,
     totalProfit: itemAggs[r.id]?.totalProfit ?? 0,
     totalFinancingCost: itemAggs[r.id]?.totalFinancingCost ?? 0,
