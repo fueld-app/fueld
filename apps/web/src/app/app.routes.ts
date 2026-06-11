@@ -406,10 +406,53 @@ export const routes: Routes = [
           {
             path: 'settings',
             loadComponent: () =>
-              import('./features/admin/pages/settings/settings-page.component').then(
-                (m) => m.SettingsPageComponent,
+              import('./features/admin/pages/settings/settings-shell.component').then(
+                (m) => m.SettingsShellComponent,
               ),
             title: 'Admin > Settings',
+            children: [
+              { path: '', redirectTo: 'general', pathMatch: 'full' },
+              {
+                path: 'general',
+                loadComponent: () =>
+                  import('./features/admin/pages/settings/general-settings-page.component').then(
+                    (m) => m.GeneralSettingsPageComponent,
+                  ),
+                title: 'Admin > Settings > General',
+              },
+              {
+                path: 'products',
+                loadComponent: () =>
+                  import('./features/admin/pages/settings/products-settings-page.component').then(
+                    (m) => m.ProductsSettingsPageComponent,
+                  ),
+                title: 'Admin > Settings > Products',
+              },
+              {
+                path: 'units-pricing',
+                loadComponent: () =>
+                  import('./features/admin/pages/settings/units-pricing-settings-page.component').then(
+                    (m) => m.UnitsPricingSettingsPageComponent,
+                  ),
+                title: 'Admin > Settings > Units & Pricing',
+              },
+              {
+                path: 'companies',
+                loadComponent: () =>
+                  import('./features/admin/pages/settings/companies-settings-page.component').then(
+                    (m) => m.CompaniesSettingsPageComponent,
+                  ),
+                title: 'Admin > Settings > Companies',
+              },
+              {
+                path: 'documents',
+                loadComponent: () =>
+                  import('./features/admin/pages/settings/documents-settings-page.component').then(
+                    (m) => m.DocumentsSettingsPageComponent,
+                  ),
+                title: 'Admin > Settings > Documents',
+              },
+            ],
           },
           {
             path: 'port-documentation',
