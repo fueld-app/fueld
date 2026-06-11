@@ -471,8 +471,6 @@ export async function sendWhatsAppGroupMessage(
 
 // ─── Templated Group Message ────────────────────────────────────────
 
-import { whatsappNotificationRules } from '../../db/schema';
-
 /**
  * Interpolate template variables in a message template.
  * Variables: {{key}} → value from context object.

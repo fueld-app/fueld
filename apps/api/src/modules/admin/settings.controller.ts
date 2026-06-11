@@ -1730,7 +1730,7 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   .get('/whatsapp/notification-rules', async ({ auth }) => {
     try {
       requireAdmin(auth);
-      const data = await getWhatsAppNotificationRules();
+      const data = await db.select().from(whatsappNotificationRules).where(eq(whatsappNotificationRules.tenantId, auth.tenantId));
       return { success: true, data } satisfies ApiResponse<unknown>;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed';
@@ -1743,7 +1743,13 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   .post('/whatsapp/notification-rules', async ({ auth, body }) => {
     try {
       requireAdmin(auth);
-      const data = await createWhatsAppNotificationRule(body);
+      const [data] = await db.insert(whatsappNotificationRules).values({
+        tenantId: auth.tenantId,
+        eventType: body.eventType,
+        enabled: body.enabled ?? true,
+        messageTemplate: body.messageTemplate,
+        targetGroupJid: body.targetGroupJid ?? null,
+      }).returning();
       return { success: true, data } satisfies ApiResponse<unknown>;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed';
@@ -1762,7 +1768,15 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   .put('/whatsapp/notification-rules/:id', async ({ auth, params, body }) => {
     try {
       requireAdmin(auth);
-      const data = await updateWhatsAppNotificationRule(params.id, body);
+      const [data] = await db.update(whatsappNotificationRules)
+        .set({
+          enabled: body.enabled,
+          messageTemplate: body.messageTemplate,
+          targetGroupJid: body.targetGroupJid,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(whatsappNotificationRules.id, params.id), eq(whatsappNotificationRules.tenantId, auth.tenantId)))
+        .returning();
       return { success: true, data } satisfies ApiResponse<unknown>;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed';
@@ -1781,7 +1795,8 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   .delete('/whatsapp/notification-rules/:id', async ({ auth, params }) => {
     try {
       requireAdmin(auth);
-      await deleteWhatsAppNotificationRule(params.id);
+      await db.delete(whatsappNotificationRules)
+        .where(and(eq(whatsappNotificationRules.id, params.id), eq(whatsappNotificationRules.tenantId, auth.tenantId)));
       return { success: true, data: null } satisfies ApiResponse<null>;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed';

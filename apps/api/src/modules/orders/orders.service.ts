@@ -1870,7 +1870,7 @@ export async function updateOrderStatus(
         .from(orders)
         .leftJoin(vessels, eq(orders.vesselId, vessels.id))
         .leftJoin(places, eq(orders.placeId, places.id))
-        .leftJoin(counterparties, eq(orders.customerId, counterparties.id))
+        .leftJoin(counterparties, eq(orders.clientId, counterparties.id))
         .where(eq(orders.id, id))
         .limit(1);
 
