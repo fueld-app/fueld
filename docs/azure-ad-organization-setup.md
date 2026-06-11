@@ -96,13 +96,16 @@ Example:
 For each tenant configured in the script (`riviera-marine`, `channeltx`, etc.):
 
 1. **Creates an app registration** with display name `Fueld — <tenant-name>`
-2. **Configures the redirect URI** as `https://<domain>/api/auth/microsoft/callback`
-3. **Adds Microsoft Graph API permissions**:
+2. **Configures multi-tenant sign-in** (`AzureADMultipleOrgs`) so any Microsoft work account can sign in — not just users in the Fueld tenant
+3. **Configures the redirect URI** as `https://<domain>/api/auth/microsoft/callback`
+4. **Adds Microsoft Graph API permissions**:
    - `User.Read` — for SSO login (openid + profile)
    - `Mail.Send` — for sending emails via Microsoft Graph
-4. **Grants admin consent** for the permissions
-5. **Creates a client secret** with 2-year expiry
-6. **Saves all credentials** to `deploy/instances/fueld-azure-apps-credentials.txt`
+5. **Grants admin consent** for the permissions
+6. **Creates a client secret** with 2-year expiry
+7. **Saves all credentials** to `deploy/instances/fueld-azure-apps-credentials.txt`
+
+> ⚠️ **Security**: Because the app is multi-tenant, any Microsoft work account can attempt to sign in. Always configure **approved email domains** in Fueld Admin → Security to restrict which domains are allowed (e.g., `channeltx.com`).
 
 ### Script output
 
@@ -230,6 +233,20 @@ You should see both permission GUIDs:
 - `e383f46e-2787-4529-8551-86ec2b8b75c4` → Mail.Send
 
 If both GUIDs are present, the permission is configured correctly and the portal UI is just not rendering it. You can proceed safely.
+
+### "AADSTS700016: Application with identifier was not found in the directory"
+
+This error occurs when a user tries to sign in with a Microsoft account from a different tenant than where the app is registered. The app was created as **single-tenant** (`AzureADMyOrg`), which only allows users in the same tenant to sign in.
+
+**Fix**: Change the app to **multi-tenant** (`AzureADMultipleOrgs`):
+
+```bash
+az ad app update --id <app-id> --sign-in-audience AzureADMultipleOrgs
+```
+
+Or in the Azure Portal: **App registrations** → **Authentication** → **Supported account types** → select **"Accounts in any organizational directory"**.
+
+> ⚠️ **Security**: When using multi-tenant, always configure **approved email domains** in Fueld Admin → Security to restrict which Microsoft accounts can sign in (e.g., `channeltx.com`).
 
 ### "AADSTS700082: The refresh token has expired"
 

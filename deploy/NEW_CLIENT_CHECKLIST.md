@@ -87,12 +87,14 @@ cd /path/to/fueld
 ```
 
 The script will:
-1. Create an app registration: `Fueld — <client-slug>`
+1. Create a **multi-tenant** app registration: `Fueld — <client-slug>` (allows any Microsoft work account to sign in)
 2. Configure redirect URI: `https://<client-domain>/api/auth/microsoft/callback`
 3. Add Microsoft Graph permissions: `User.Read` (SSO) + `Mail.Send` (Outlook email)
 4. Grant admin consent
 5. Create a client secret (2-year expiry)
 6. Save credentials to `deploy/instances/fueld-azure-apps-credentials.txt`
+
+> ⚠️ **Security**: Because the app is multi-tenant, any Microsoft work account can attempt to sign in. Always configure **approved email domains** in Fueld Admin → Security to restrict access (e.g., `client-domain.com`).
 
 ### Enter credentials in Fueld
 

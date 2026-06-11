@@ -21,7 +21,6 @@ FUELD_ORG_NAME="fueld"
 
 # Tenants to create apps for
 TENANTS=(
-  "riviera-marine:riviera-marine.fueld.app"
   "channeltx:channeltx.fueld.app"
 )
 
@@ -116,30 +115,21 @@ for tenant_config in "${TENANTS[@]}"; do
 
   echo "   Creating app for ${tenant_name} (${domain})..."
 
-  # Create app
+  # Create app (multi-tenant so any Microsoft work account can sign in)
   app_json=$(az ad app create \
     --display-name "$app_name" \
-    --sign-in-audience AzureADMyOrg \
+    --sign-in-audience AzureADMultipleOrgs \
     --web-redirect-uris "$redirect_uri" \
-    --enable-id-token-issuance true \
-    --enable-access-token-issuance true \
     --query '{appId: appId, objectId: id}' \
     -o json)
 
   app_id=$(echo "$app_json" | jq -r '.appId')
   object_id=$(echo "$app_json" | jq -r '.objectId')
 
-  # Add permissions
-  az ad app permission add \
+  # Add permissions using modern API (requiredResourceAccess)
+  az ad app update \
     --id "$app_id" \
-    --api "$GRAPH_API_ID" \
-    --api-permissions "${USER_READ_PERMISSION}=Scope" \
-    --only-show-errors
-
-  az ad app permission add \
-    --id "$app_id" \
-    --api "$GRAPH_API_ID" \
-    --api-permissions "${MAIL_SEND_PERMISSION}=Scope" \
+    --required-resource-accesses '[{"resourceAppId":"00000003-0000-0000-c000-000000000000","resourceAccess":[{"id":"e1fe6dd8-ba31-4d61-89e7-88639da4683d","type":"Scope"},{"id":"e383f46e-2787-4529-8551-86ec2b8b75c4","type":"Scope"}]}]' \
     --only-show-errors
 
   # Grant admin consent
