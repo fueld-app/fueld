@@ -167,6 +167,9 @@ interface LliSearchResult {
                       @case ('responsible') {
                         <td class="px-4 py-3 text-gray-600">{{ inq.salesRepName || '—' }}</td>
                       }
+                      @case ('invoicingCompany') {
+                        <td class="px-4 py-3 text-gray-600">{{ inq.invoicingCompanyName || '—' }}</td>
+                      }
                       @case ('eta') {
                         <td class="px-4 py-3 text-gray-500">{{ inq.eta ? (inq.eta | date:'mediumDate') : '—' }}</td>
                       }
@@ -552,6 +555,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
       { field: 'port', label: 'Port' },
       { field: 'status', label: 'Status' },
       { field: 'responsible', label: 'Responsible' },
+      { field: 'invoicingCompany', label: 'Invoicing' },
       { field: 'eta', label: 'ETA' },
       { field: 'dueDate', label: 'Due Date' },
       { field: 'createdAt', label: 'Created' },

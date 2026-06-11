@@ -5,6 +5,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import { eq, and, desc, asc, sql, ilike, inArray, or, isNull } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { db } from '../../db';
 import {
   orders,
@@ -870,6 +871,8 @@ export async function listOrders(query?: ListOrdersQuery) {
   const page = query?.page ?? 1;
   const offset = (page - 1) * limit;
 
+  const invoicingCompany = alias(counterparties, 'invoicing_company');
+
   // Sortable columns
   const sortMap: Record<string, any> = {
     orderNumber: orders.orderNumber,
@@ -880,6 +883,7 @@ export async function listOrders(query?: ListOrdersQuery) {
     responsible: users.name,
     eta: orders.eta,
     dueDate: orders.dueDate,
+    invoicingCompany: invoicingCompany.name,
     createdAt: orders.createdAt,
   };
   const sortCol = sortMap[query?.sortBy ?? ''] ?? orders.createdAt;
@@ -897,6 +901,7 @@ export async function listOrders(query?: ListOrdersQuery) {
         vesselName: vessels.name,
         placeName: places.name,
         salesRepName: users.name,
+        invoicingCompanyName: invoicingCompany.name,
         customerPaymentTermType: orders.customerPaymentTermType,
         customerCreditDays: orders.customerCreditDays,
         supplierPaymentTermType: orders.supplierPaymentTermType,
@@ -911,6 +916,7 @@ export async function listOrders(query?: ListOrdersQuery) {
       .innerJoin(vessels, eq(orders.vesselId, vessels.id))
       .innerJoin(places, eq(orders.placeId, places.id))
       .leftJoin(users, eq(orders.salesRepId, users.id))
+      .leftJoin(invoicingCompany, eq(orders.invoicingCompanyId, invoicingCompany.id))
       .where(where)
       .orderBy(sortFn(sortCol))
       .limit(limit)
@@ -1006,6 +1012,7 @@ export async function listOrders(query?: ListOrdersQuery) {
     vesselName: r.vesselName,
     placeName: r.placeName,
     salesRepName: r.salesRepName,
+    invoicingCompanyName: r.invoicingCompanyName,
     eta: r.eta?.toISOString() ?? null,
     dueDate: r.dueDate ?? r.eta?.toISOString() ?? null,
     totalValue: itemAggs[r.id]?.totalValue ?? 0,

@@ -750,6 +750,8 @@ export interface OrderListRowDto {
   vesselName: string;
   placeName: string;
   salesRepName: string | null;
+  /** Invoicing company name (own company that issues the invoice). */
+  invoicingCompanyName: string | null;
   eta: string | null;
   /** Due date for payment/delivery — falls back to ETA when not explicitly set. */
   dueDate: string | null;

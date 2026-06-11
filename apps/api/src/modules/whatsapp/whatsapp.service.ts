@@ -202,7 +202,7 @@ export async function startWhatsAppSession(userId: string): Promise<{ qr?: strin
     auth: state,
     logger: baileysLogger,
     printQRInTerminal: false,
-    browser: ['Fueld', 'Desktop', '1.0.0'],
+    browser: ['Chrome (Linux)', '', ''],
     generateHighQualityLinkPreview: false,
   });
 
