@@ -42,8 +42,8 @@ BEGIN
 
     -- Build set of existing catalog item names (case-insensitive match)
     existing_names := ARRAY(
-      SELECT lower(trim(item->>'name'))
-      FROM jsonb_array_elements(existing_catalog) AS item
+      SELECT lower(trim(catalog_item->>'name'))
+      FROM jsonb_array_elements(existing_catalog) AS catalog_item
     );
 
     -- Start with existing catalog
