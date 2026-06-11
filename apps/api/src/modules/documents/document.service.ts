@@ -1389,15 +1389,7 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
   } catch { /* QR generation failed — continue without */ }
 
   // Company logo
-  let companyLogoDataUrl: string | null = null;
-  if (order.invoicingCompany?.logoUrl) {
-    const logoPath = join(process.cwd(), 'uploads', order.invoicingCompany.logoUrl);
-    if (existsSync(logoPath)) {
-      const ext = extname(logoPath).replace('.', '');
-      const mime = ext === 'svg' ? 'image/svg+xml' : ext === 'png' ? 'image/png' : 'image/jpeg';
-      companyLogoDataUrl = `data:${mime};base64,${readFileSync(logoPath).toString('base64')}`;
-    }
-  }
+  const companyLogoDataUrl = tryLoadLogoDataUrl(order.invoicingCompany?.logoUrl ?? null);
 
   // Resolve price reference names for formula-priced items
   const invoiceRefIds = new Set<string>();
@@ -1432,6 +1424,12 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
     fromEmail: order.salesRep?.email ?? null,
     fromPhone: order.salesRep?.phone ?? null,
     paymentTerms: formatCustomerPaymentTerms(order.customerPaymentTermType, order.customerCreditDays),
+    dueDate: computeDueDate(
+      invoice?.createdAt ?? order.createdAt,
+      order.customerPaymentTermType,
+      order.customerCreditDays,
+      order.eta,
+    ),
     customerNote: order.customerNote ?? null,
     purchaseOrderNumber: order.purchaseOrderNumber ?? null,
     termsAndConditions: order.termsAndConditions ?? null,
@@ -2371,6 +2369,7 @@ function buildProformaDocument(data: {
   fromEmail: string | null;
   fromPhone: string | null;
   paymentTerms: string | null;
+  dueDate?: string | null;
   customerNote: string | null;
   termsAndConditions: string | null;
   companyName: string | null;
@@ -2660,6 +2659,9 @@ function buildProformaDocument(data: {
       // Payment terms
       ...(data.paymentTerms
         ? [{ text: [{ text: 'Payment terms:  ', bold: true }, { text: data.paymentTerms.replace(/_/g, ' ') }], margin: [0, 0, 0, 2] } as Content]
+        : []),
+      ...(data.dueDate
+        ? [{ text: [{ text: 'Due date:  ', bold: true }, { text: data.dueDate }], margin: [0, 0, 0, 2] } as Content]
         : []),
 
       // Notes
