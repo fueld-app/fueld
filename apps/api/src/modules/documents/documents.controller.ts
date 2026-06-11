@@ -6,7 +6,7 @@ import { sendDocumentEmail, buildDocumentEmailHtml, buildDocumentEmailSubject, b
 import { resolveOrderId, getOrderById } from '../orders/orders.service';
 import { getPortSuppliers } from '../lloyds/lli.service';
 import { logActivity } from '../activity/activity.service';
-import { sendWhatsAppGroupMessage, sendWhatsAppMessage } from '../whatsapp/whatsapp.service';
+import { sendWhatsAppGroupMessage, sendWhatsAppMessage, sendTemplatedGroupMessage } from '../whatsapp/whatsapp.service';
 import { db } from '../../db';
 import { users, counterparties, invoices as invoicesTable, companyContacts, companyEmails, supplierInquiries, supplierInquiryItemQuotes, portSuppliers, emailLog, tenants, orders, orderAttachments, orderPortDocuments, orderSuppliers, orderTransferSides } from '../../db/schema';
 import { getEmailTemplate, getApplicableEmailRules, renderTemplate, type TemplateVariables } from '../admin/email-settings.service';
@@ -1688,53 +1688,37 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         }).catch(() => {});
       }
 
-      // Send WhatsApp group notification on first inquiry (configurable)
+      // Send WhatsApp group notification on first inquiry (configurable via notification rules)
       if (isFirstInquiry && successfulSuppliers.length > 0) {
         try {
-          const [tenant] = await db
-            .select({ settings: tenants.settings })
-            .from(tenants)
-            .where(eq(tenants.id, auth.tenantId))
-            .limit(1);
-          const settings = tenant?.settings as any;
-          const groupJid = settings?.whatsappDefaultGroupJid;
-          const waEnabled = settings?.whatsappEnabled !== false;
-          const firstInquiryGroupNotificationEnabled = settings?.whatsappFirstInquiryGroupNotificationEnabled !== false;
+          const vesselName = order.vessel?.name ?? 'Unknown Vessel';
+          const vesselImo = order.vessel?.imo ?? '';
+          const portName = order.place?.name ?? 'Unknown Port';
+          const supplierList = successfulSuppliers.map(s => s.supplierName).join(', ');
+          const fmtQty = (v: string | null | undefined) => v ? parseFloat(v).toString() : '';
+          const productLines = order.items.map((i: any) => {
+            const min = i.quantityMin ? fmtQty(i.quantityMin) : '';
+            const max = fmtQty(i.quantity);
+            const qty = min && min !== max ? `${min} - ${max}` : max;
+            return `${qty} ${i.unit} ${i.productType}${i.description ? ' – ' + i.description : ''}`;
+          }).join(', ');
 
-          if (waEnabled && firstInquiryGroupNotificationEnabled && groupJid) {
-            const vesselName = order.vessel?.name ?? 'Unknown Vessel';
-            const vesselImo = order.vessel?.imo ? ` (IMO: ${order.vessel.imo})` : '';
-            const portName = order.place?.name ?? 'Unknown Port';
-            const supplierList = successfulSuppliers.map(s => s.supplierName).join(', ');
-            const fmtQty = (v: string | null | undefined) => v ? parseFloat(v).toString() : '';
-            const productLines = order.items.map((i: any) => {
-              const min = i.quantityMin ? fmtQty(i.quantityMin) : '';
-              const max = fmtQty(i.quantity);
-              const qty = min && min !== max ? `${min} - ${max}` : max;
-              return `  • ${qty} ${i.unit} ${i.productType}${i.description ? ' – ' + i.description : ''}`;
-            }).join('\n');
-
-            const waText = [
-              `📋 *Inquiry Sent*`,
-              ``,
-              `*Vessel:* ${vesselName}${vesselImo}`,
-              `*Port:* ${portName}`,
-              etaLabel ? `*ETA:* ${etaLabel}` : null,
-              etdLabel ? `*ETD:* ${etdLabel}` : null,
-              ``,
-              `*Products:*`,
-              productLines,
-              ``,
-              `*Suppliers (${successfulSuppliers.length}):* ${supplierList}`,
-              `*Sent by:* ${senderName}`,
-            ].filter(Boolean).join('\n');
-
-            sendWhatsAppGroupMessage(auth.userId, groupJid, waText).catch((err) => {
-              console.error('[Documents] Failed to send WhatsApp group notification:', err);
-            });
-          }
+          sendTemplatedGroupMessage(auth.tenantId, 'inquiry_sent', {
+            vesselName,
+            vesselImo,
+            portName,
+            eta: etaLabel ?? '',
+            etd: etdLabel ?? '',
+            products: productLines,
+            supplierCount: String(successfulSuppliers.length),
+            suppliers: supplierList,
+            sentBy: senderName,
+            orderNumber: order.orderNumber ?? order.id.slice(0, 8),
+          }).catch((err) => {
+            console.error('[Documents] Failed to send templated WhatsApp group notification:', err);
+          });
         } catch (err) {
-          console.error('[Documents] Failed to check WhatsApp group settings:', err);
+          console.error('[Documents] Failed to send WhatsApp group notification:', err);
         }
       }
 

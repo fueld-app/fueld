@@ -1404,6 +1404,98 @@ export async function updateWhatsAppSettings(data: { enabled?: boolean; defaultG
   return getWhatsAppSettings();
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+//  WHATSAPP NOTIFICATION RULES
+// ═══════════════════════════════════════════════════════════════════════
+
+import { whatsappNotificationRules } from '../../db/schema';
+
+export async function getWhatsAppNotificationRules() {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const rows = await db
+    .select()
+    .from(whatsappNotificationRules)
+    .where(eq(whatsappNotificationRules.tenantId, tenant.id))
+    .orderBy(whatsappNotificationRules.eventType);
+
+  return rows;
+}
+
+export async function createWhatsAppNotificationRule(data: {
+  eventType: string;
+  enabled?: boolean;
+  messageTemplate: string;
+  targetGroupJid?: string | null;
+}) {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const [rule] = await db
+    .insert(whatsappNotificationRules)
+    .values({
+      tenantId: tenant.id,
+      eventType: data.eventType,
+      enabled: data.enabled ?? true,
+      messageTemplate: data.messageTemplate,
+      targetGroupJid: data.targetGroupJid ?? null,
+    })
+    .onConflictDoUpdate({
+      target: [whatsappNotificationRules.tenantId, whatsappNotificationRules.eventType],
+      set: {
+        enabled: data.enabled ?? true,
+        messageTemplate: data.messageTemplate,
+        targetGroupJid: data.targetGroupJid ?? null,
+        updatedAt: new Date(),
+      },
+    })
+    .returning();
+
+  return rule;
+}
+
+export async function updateWhatsAppNotificationRule(
+  id: string,
+  data: { enabled?: boolean; messageTemplate?: string; targetGroupJid?: string | null },
+) {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const [rule] = await db
+    .update(whatsappNotificationRules)
+    .set({
+      ...(data.enabled !== undefined && { enabled: data.enabled }),
+      ...(data.messageTemplate !== undefined && { messageTemplate: data.messageTemplate }),
+      ...(data.targetGroupJid !== undefined && { targetGroupJid: data.targetGroupJid }),
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(whatsappNotificationRules.id, id),
+        eq(whatsappNotificationRules.tenantId, tenant.id),
+      ),
+    )
+    .returning();
+
+  if (!rule) throw new Error('Rule not found');
+  return rule;
+}
+
+export async function deleteWhatsAppNotificationRule(id: string) {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  await db
+    .delete(whatsappNotificationRules)
+    .where(
+      and(
+        eq(whatsappNotificationRules.id, id),
+        eq(whatsappNotificationRules.tenantId, tenant.id),
+      ),
+    );
+}
+
 /**
  * Fetch terms for a selected company.
  * @param companyId - The ID of the selected company.

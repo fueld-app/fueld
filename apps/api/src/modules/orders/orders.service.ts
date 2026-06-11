@@ -28,6 +28,7 @@ import {
 } from '../../db/schema';
 import type { Order, TenantSettings } from '../../db/schema';
 import { logActivity } from '../activity/activity.service';
+import { sendTemplatedGroupMessage } from '../whatsapp/whatsapp.service';
 import {
   calculateGrossProfitBase,
   calculateOrderEconomics,
@@ -1849,6 +1850,42 @@ export async function updateOrderStatus(
       entityId: id,
       metadata: { newStatus, lossReason },
     });
+  }
+
+  // WhatsApp group notifications for status changes
+  if (updated) {
+    const eventType = newStatus === 'CONFIRMED' ? 'order_confirmed'
+      : newStatus === 'DELIVERED' ? 'order_delivered'
+      : null;
+
+    if (eventType) {
+      const [orderDetails] = await db
+        .select({
+          orderNumber: orders.orderNumber,
+          tenantId: orders.tenantId,
+          vesselName: vessels.name,
+          placeName: places.name,
+          customerName: counterparties.name,
+        })
+        .from(orders)
+        .leftJoin(vessels, eq(orders.vesselId, vessels.id))
+        .leftJoin(places, eq(orders.placeId, places.id))
+        .leftJoin(counterparties, eq(orders.customerId, counterparties.id))
+        .where(eq(orders.id, id))
+        .limit(1);
+
+      if (orderDetails) {
+        sendTemplatedGroupMessage(orderDetails.tenantId, eventType, {
+          orderNumber: orderDetails.orderNumber ?? id.slice(0, 8),
+          vesselName: orderDetails.vesselName ?? 'Unknown Vessel',
+          portName: orderDetails.placeName ?? 'Unknown Port',
+          customerName: orderDetails.customerName ?? 'Unknown Customer',
+          status: newStatus,
+        }).catch((err) => {
+          console.error(`[orders] WhatsApp ${eventType} notification failed:`, err);
+        });
+      }
+    }
   }
 
   return updated ?? null;

@@ -913,6 +913,135 @@ import { API } from '@app/core/config/api';
                   }
                 </div>
               }
+
+              <!-- Notification Rules -->
+              @if (waEnabled()) {
+                <div class="mt-5 border-t border-gray-100 pt-5">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <p class="text-sm font-medium text-gray-900">Group Notification Rules</p>
+                      <p class="text-xs text-gray-500">Configure which events send messages to the linked WhatsApp group.</p>
+                    </div>
+                    <button
+                      (click)="loadWaNotificationRules()"
+                      [disabled]="waRulesLoading()"
+                      class="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                    >
+                      @if (waRulesLoading()) {
+                        <svg class="h-3 w-3 animate-spin inline" viewBox="0 0 24 24" fill="none">
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                      } @else {
+                        Refresh
+                      }
+                    </button>
+                  </div>
+
+                  @if (waRulesSaveSuccess()) {
+                    <div class="mt-3 flex items-center gap-2 rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-700">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                      </svg>
+                      {{ waRulesSaveSuccess() }}
+                    </div>
+                  }
+                  @if (waRulesSaveError()) {
+                    <div class="mt-3 flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                      </svg>
+                      {{ waRulesSaveError() }}
+                    </div>
+                  }
+
+                  <div class="mt-3 space-y-3">
+                    @for (rule of waNotificationRules(); track rule.id) {
+                      <div class="rounded-lg border border-gray-200 bg-gray-50/50 p-3">
+                        <div class="flex items-center justify-between">
+                          <div class="flex items-center gap-3">
+                            <button
+                              (click)="toggleWaNotificationRule(rule)"
+                              [disabled]="waRulesSaving()"
+                              [class]="rule.enabled
+                                ? 'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-green-500 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50'
+                                : 'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50'"
+                            >
+                              <span
+                                [class]="rule.enabled
+                                  ? 'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out translate-x-4'
+                                  : 'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out translate-x-0'"
+                              ></span>
+                            </button>
+                            <span class="text-sm font-medium text-gray-900">{{ formatEventType(rule.eventType) }}</span>
+                          </div>
+                          <div class="flex items-center gap-2">
+                            <button
+                              (click)="startEditWaRule(rule)"
+                              class="text-xs text-brand-600 hover:text-brand-700 font-medium"
+                            >Edit</button>
+                            <button
+                              (click)="testWaRule(rule)"
+                              [disabled]="waRulesSaving()"
+                              class="text-xs text-gray-500 hover:text-gray-700 font-medium disabled:opacity-50"
+                            >Test</button>
+                          </div>
+                        </div>
+
+                        @if (waRulesEditing() === rule.id) {
+                          <div class="mt-3 space-y-3">
+                            <div>
+                              <label class="block text-xs font-medium text-gray-700">Message Template</label>
+                              <textarea
+                                [ngModel]="waRulesEditTemplate()"
+                                (ngModelChange)="waRulesEditTemplate.set($event)"
+                                rows="3"
+                                class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                                placeholder="Use {{variable}} for dynamic values"
+                              ></textarea>
+                              <p class="mt-1 text-xs text-gray-500">Available variables depend on event type. Common: {{orderNumber}}, {{vesselName}}, {{portName}}, {{customerName}}, {{status}}</p>
+                            </div>
+                            <div>
+                              <label class="block text-xs font-medium text-gray-700">Target Group JID (optional)</label>
+                              <input
+                                type="text"
+                                [ngModel]="waRulesEditGroupJid()"
+                                (ngModelChange)="waRulesEditGroupJid.set($event)"
+                                class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                                placeholder="Leave empty to use default group"
+                              />
+                            </div>
+                            <div class="flex items-center gap-2">
+                              <button
+                                (click)="saveWaRuleEdit(rule.id)"
+                                [disabled]="waRulesSaving()"
+                                class="inline-flex items-center gap-1 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                              >
+                                Save
+                              </button>
+                              <button
+                                (click)="cancelEditWaRule()"
+                                class="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        } @else {
+                          <p class="mt-2 text-xs text-gray-600 font-mono whitespace-pre-wrap">{{ rule.messageTemplate }}</p>
+                          @if (rule.targetGroupJid) {
+                            <p class="mt-1 text-xs text-gray-500">Group: {{ rule.targetGroupJid }}</p>
+                          }
+                        }
+                      </div>
+                    } @empty {
+                      @if (!waRulesLoading()) {
+                        <p class="text-sm text-gray-500">No notification rules configured. Click Refresh to load rules.</p>
+                      }
+                    }
+                  </div>
+                </div>
+              }
             </div>
           </div>
 
@@ -996,6 +1125,18 @@ export class IntegrationsPageComponent implements OnInit {
     if (!term) return groups;
     return groups.filter((g) => g.name.toLowerCase().includes(term));
   });
+
+  // ── WhatsApp Notification Rules ────────────────────────────────────
+  readonly waNotificationRules = signal<
+    { id: string; eventType: string; enabled: boolean; messageTemplate: string; targetGroupJid: string | null }[]
+  >([]);
+  readonly waRulesLoading = signal(false);
+  readonly waRulesSaving = signal(false);
+  readonly waRulesSaveSuccess = signal('');
+  readonly waRulesSaveError = signal('');
+  readonly waRulesEditing = signal<string | null>(null);
+  readonly waRulesEditTemplate = signal('');
+  readonly waRulesEditGroupJid = signal<string | null>(null);
 
   // ── Computed status helpers ────────────────────────────────────────
   lliStatus = () => this.integrations().find((i) => i.provider.toUpperCase() === 'LLI') ?? null;
@@ -1478,6 +1619,118 @@ export class IntegrationsPageComponent implements OnInit {
     } finally {
       this.waGroupsLoading.set(false);
     }
+  }
+
+  // ── WhatsApp Notification Rules ──────────────────────────────────────
+
+  async loadWaNotificationRules(): Promise<void> {
+    this.waRulesLoading.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ id: string; eventType: string; enabled: boolean; messageTemplate: string; targetGroupJid: string | null }[]>>(
+          `${API}/admin/settings/whatsapp/notification-rules`,
+        ),
+      );
+      if (res.success) this.waNotificationRules.set(res.data);
+    } catch (err) {
+      console.error('Failed to load WhatsApp notification rules:', err);
+    } finally {
+      this.waRulesLoading.set(false);
+    }
+  }
+
+  async toggleWaNotificationRule(rule: { id: string; eventType: string; enabled: boolean; messageTemplate: string; targetGroupJid: string | null }): Promise<void> {
+    this.waRulesSaving.set(true);
+    this.waRulesSaveSuccess.set('');
+    this.waRulesSaveError.set('');
+
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<{ id: string; eventType: string; enabled: boolean; messageTemplate: string; targetGroupJid: string | null }>>(
+          `${API}/admin/settings/whatsapp/notification-rules/${rule.id}`,
+          { enabled: !rule.enabled },
+        ),
+      );
+      if (res.success) {
+        this.waNotificationRules.update((rules) =>
+          rules.map((r) => (r.id === rule.id ? { ...r, enabled: res.data.enabled } : r)),
+        );
+        this.waRulesSaveSuccess.set(`${this.formatEventType(rule.eventType)} ${res.data.enabled ? 'enabled' : 'disabled'}.`);
+      }
+    } catch (err: any) {
+      this.waRulesSaveError.set(err?.error?.message ?? 'Failed to update rule.');
+    } finally {
+      this.waRulesSaving.set(false);
+    }
+  }
+
+  startEditWaRule(rule: { id: string; eventType: string; enabled: boolean; messageTemplate: string; targetGroupJid: string | null }): void {
+    this.waRulesEditing.set(rule.id);
+    this.waRulesEditTemplate.set(rule.messageTemplate);
+    this.waRulesEditGroupJid.set(rule.targetGroupJid);
+  }
+
+  cancelEditWaRule(): void {
+    this.waRulesEditing.set(null);
+    this.waRulesEditTemplate.set('');
+    this.waRulesEditGroupJid.set(null);
+  }
+
+  async saveWaRuleEdit(ruleId: string): Promise<void> {
+    this.waRulesSaving.set(true);
+    this.waRulesSaveSuccess.set('');
+    this.waRulesSaveError.set('');
+
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<{ id: string; eventType: string; enabled: boolean; messageTemplate: string; targetGroupJid: string | null }>>(
+          `${API}/admin/settings/whatsapp/notification-rules/${ruleId}`,
+          {
+            messageTemplate: this.waRulesEditTemplate(),
+            targetGroupJid: this.waRulesEditGroupJid(),
+          },
+        ),
+      );
+      if (res.success) {
+        this.waNotificationRules.update((rules) =>
+          rules.map((r) => (r.id === ruleId ? { ...r, messageTemplate: res.data.messageTemplate, targetGroupJid: res.data.targetGroupJid } : r)),
+        );
+        this.waRulesSaveSuccess.set('Rule updated successfully.');
+        this.cancelEditWaRule();
+      }
+    } catch (err: any) {
+      this.waRulesSaveError.set(err?.error?.message ?? 'Failed to save rule.');
+    } finally {
+      this.waRulesSaving.set(false);
+    }
+  }
+
+  async testWaRule(rule: { id: string; eventType: string; enabled: boolean; messageTemplate: string; targetGroupJid: string | null }): Promise<void> {
+    this.waRulesSaveSuccess.set('');
+    this.waRulesSaveError.set('');
+
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<{ sent: boolean }>>(
+          `${API}/admin/settings/whatsapp/notification-rules/${rule.id}/test`,
+          {},
+        ),
+      );
+      if (res.success && res.data.sent) {
+        this.waRulesSaveSuccess.set(`Test message sent for ${this.formatEventType(rule.eventType)}.`);
+      } else {
+        this.waRulesSaveError.set(res.message ?? 'Test message failed to send.');
+      }
+    } catch (err: any) {
+      this.waRulesSaveError.set(err?.error?.message ?? 'Failed to send test message.');
+    }
+  }
+
+  formatEventType(eventType: string): string {
+    return eventType
+      .split('_')
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
   }
 
   // ── Utilities ──────────────────────────────────────────────────────

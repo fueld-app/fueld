@@ -2,24 +2,18 @@
 //  Credit Application — WhatsApp notification helper
 // ═══════════════════════════════════════════════════════════════════════
 
-import { getWhatsAppSettings } from '../admin/settings.service';
-import { sendWhatsAppGroupMessage } from '../whatsapp/whatsapp.service';
-import { getCreditManagerUserIds } from './credit-applications.service';
+import { sendTemplatedGroupMessage } from '../whatsapp/whatsapp.service';
 
 /**
- * Send a WhatsApp message about a new credit application to the default group.
- * No-ops gracefully when WhatsApp is disabled or no group is configured.
+ * Send a WhatsApp message about a credit application event to the default group.
+ * Uses configurable notification rules. No-ops gracefully when rule is missing or disabled.
  */
-export async function notifyCreditApplicationWhatsApp(message: string): Promise<void> {
-  const waSettings = await getWhatsAppSettings();
-  if (!waSettings.enabled || !waSettings.defaultGroupJid) return;
-
-  // Use any credit-manager/admin user as the sender (WhatsApp falls back to any connected session)
-  const userIds = await getCreditManagerUserIds();
-  const senderId = userIds[0];
-  if (!senderId) return;
-
-  const result = await sendWhatsAppGroupMessage(senderId, waSettings.defaultGroupJid, `📋 ${message}`);
+export async function notifyCreditApplicationWhatsApp(
+  tenantId: string,
+  eventType: 'credit_application_submitted' | 'credit_application_processed',
+  context: Record<string, string | number | undefined>,
+): Promise<void> {
+  const result = await sendTemplatedGroupMessage(tenantId, eventType, context);
   if (!result.success) {
     console.warn('[CreditNotifications] WhatsApp group message failed:', result.message);
   }

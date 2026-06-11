@@ -97,6 +97,10 @@ import {
   isAppConfigured as isQBAppConfigured,
 } from '../quickbooks/quickbooks.service';
 import { updateUserTeams } from './admin.service';
+import { sendTemplatedGroupMessage } from '../whatsapp/whatsapp.service';
+import { whatsappNotificationRules } from '../../db/schema';
+import { eq, and } from 'drizzle-orm';
+import { db } from '../../db';
 import {
   getEmailTemplates,
   upsertEmailTemplate,
@@ -1717,6 +1721,128 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       firstInquiryGroupNotificationEnabled: t.Optional(t.Boolean()),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update WhatsApp integration settings' },
+  })
+
+  // ═════════════════════════════════════════════════════════════
+  //  WHATSAPP NOTIFICATION RULES
+  // ═════════════════════════════════════════════════════════════
+
+  .get('/whatsapp/notification-rules', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getWhatsAppNotificationRules();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get WhatsApp notification rules' },
+  })
+
+  .post('/whatsapp/notification-rules', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await createWhatsAppNotificationRule(body);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      eventType: t.String({ minLength: 1 }),
+      enabled: t.Optional(t.Boolean()),
+      messageTemplate: t.String({ minLength: 1 }),
+      targetGroupJid: t.Optional(t.Nullable(t.String())),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Create WhatsApp notification rule' },
+  })
+
+  .put('/whatsapp/notification-rules/:id', async ({ auth, params, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateWhatsAppNotificationRule(params.id, body);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    params: t.Object({ id: t.String({ format: 'uuid' }) }),
+    body: t.Object({
+      enabled: t.Optional(t.Boolean()),
+      messageTemplate: t.Optional(t.String({ minLength: 1 })),
+      targetGroupJid: t.Optional(t.Nullable(t.String())),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update WhatsApp notification rule' },
+  })
+
+  .delete('/whatsapp/notification-rules/:id', async ({ auth, params }) => {
+    try {
+      requireAdmin(auth);
+      await deleteWhatsAppNotificationRule(params.id);
+      return { success: true, data: null } satisfies ApiResponse<null>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    params: t.Object({ id: t.String({ format: 'uuid' }) }),
+    detail: { tags: ['Admin Settings'], summary: 'Delete WhatsApp notification rule' },
+  })
+
+  .post('/whatsapp/notification-rules/:id/test', async ({ auth, params }) => {
+    try {
+      requireAdmin(auth);
+      const tenant = await db.query.tenants.findFirst();
+      if (!tenant) throw new Error('No tenant found');
+
+      const [rule] = await db
+        .select()
+        .from(whatsappNotificationRules)
+        .where(
+          and(
+            eq(whatsappNotificationRules.id, params.id),
+            eq(whatsappNotificationRules.tenantId, tenant.id),
+          ),
+        )
+        .limit(1);
+
+      if (!rule) throw new Error('Rule not found');
+      if (!rule.enabled) throw new Error('Rule is disabled');
+
+      // Send a test message with sample data
+      const testContext: Record<string, string | number | undefined> = {
+        orderNumber: 'TEST-123',
+        vesselName: 'Test Vessel',
+        portName: 'Test Port',
+        customerName: 'Test Customer',
+        supplierName: 'Test Supplier',
+        companyName: 'Test Company',
+        status: 'TEST',
+        traderEmail: 'test@example.com',
+        currency: 'USD',
+        amount: '10000',
+        products: '100 MT VLSFO',
+        supplierCount: '3',
+        suppliers: 'Supplier A, Supplier B',
+        sentBy: 'Test User',
+        eta: '2026-06-15',
+        etd: '2026-06-14',
+      };
+
+      const result = await sendTemplatedGroupMessage(tenant.id, rule.eventType, testContext);
+      if (!result.success) throw new Error(result.message);
+
+      return { success: true, data: { sent: true } } satisfies ApiResponse<{ sent: boolean }>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    params: t.Object({ id: t.String({ format: 'uuid' }) }),
+    detail: { tags: ['Admin Settings'], summary: 'Test WhatsApp notification rule' },
   })
 
   // ═════════════════════════════════════════════════════════════

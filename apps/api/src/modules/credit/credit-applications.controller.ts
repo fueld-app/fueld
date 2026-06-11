@@ -37,7 +37,11 @@ interface CreditApplicationsControllerDeps {
   authPlugin?: typeof authGuard;
   sendNotificationToUsers?: typeof sendNotificationToUsers;
   sendNotificationEmail?: typeof sendNotificationEmail;
-  notifyCreditApplicationWhatsApp?: typeof notifyCreditApplicationWhatsApp;
+  notifyCreditApplicationWhatsApp?: (
+    tenantId: string,
+    eventType: 'credit_application_submitted' | 'credit_application_processed',
+    context: Record<string, string | number | undefined>,
+  ) => Promise<void>;
 }
 
 export function createCreditApplicationsController(deps: CreditApplicationsControllerDeps = {}) {
@@ -208,7 +212,12 @@ export function createCreditApplicationsController(deps: CreditApplicationsContr
 
           // WhatsApp notification
           if (settings.notifyWhatsApp) {
-            await notifyCreditApplicationWhatsAppFn(notificationBody);
+            await notifyCreditApplicationWhatsAppFn(auth.tenantId, 'credit_application_submitted', {
+              traderEmail: auth.email ?? 'A trader',
+              companyName: app.counterpartyName,
+              currency: app.requestedCurrency,
+              amount: Number(app.requestedAmount).toLocaleString(),
+            });
           }
         } catch (e) {
           console.error('[CreditApplications] Notification failed:', e);
@@ -291,8 +300,12 @@ export function createCreditApplicationsController(deps: CreditApplicationsContr
               }
             }
             if (settings.notifyTraderWhatsApp) {
-              const waBody = `Credit application for ${app.counterpartyName} (${app.requestedCurrency} ${Number(app.requestedAmount).toLocaleString()}) has been ${statusLabel}.`;
-              await notifyCreditApplicationWhatsAppFn(waBody);
+              await notifyCreditApplicationWhatsAppFn(auth.tenantId, 'credit_application_processed', {
+                companyName: app.counterpartyName,
+                currency: app.requestedCurrency,
+                amount: Number(app.requestedAmount).toLocaleString(),
+                status: statusLabel,
+              });
             }
           } catch (e) {
             console.error('[CreditApplications] Trader notification failed:', e);

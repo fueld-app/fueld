@@ -28,7 +28,7 @@ const baileysLogger = {
 } as any;
 import { eq, and } from 'drizzle-orm';
 import { db } from '../../db';
-import { whatsappSessions, whatsappKeys, users } from '../../db/schema';
+import { whatsappSessions, whatsappKeys, users, tenants, whatsappNotificationRules } from '../../db/schema';
 import { sendToUserSockets } from '../activity/session-tracker';
 import { parseRFQ } from './rfq-parser';
 import { saveIncomingRfq, getUserTenantId } from '../rfq/rfq.service';
@@ -467,6 +467,74 @@ export async function sendWhatsAppGroupMessage(
     console.error(`[WhatsApp] Failed to send group message to ${groupJid}:`, err.message);
     return { success: false, message: err?.message ?? 'Failed to send group message' };
   }
+}
+
+// ─── Templated Group Message ────────────────────────────────────────
+
+import { whatsappNotificationRules } from '../../db/schema';
+
+/**
+ * Interpolate template variables in a message template.
+ * Variables: {{key}} → value from context object.
+ */
+function interpolateTemplate(template: string, context: Record<string, string | number | undefined>): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+    const val = context[key];
+    return val !== undefined && val !== null ? String(val) : `{{${key}}}`;
+  });
+}
+
+/**
+ * Send a templated WhatsApp group message based on a notification rule.
+ * Looks up the rule for the tenant + event type, interpolates the template,
+ * and sends to the configured group (or tenant default).
+ */
+export async function sendTemplatedGroupMessage(
+  tenantId: string,
+  eventType: string,
+  context: Record<string, string | number | undefined>,
+): Promise<{ success: boolean; message: string }> {
+  // 1. Find the rule
+  const [rule] = await db
+    .select()
+    .from(whatsappNotificationRules)
+    .where(
+      and(
+        eq(whatsappNotificationRules.tenantId, tenantId),
+        eq(whatsappNotificationRules.eventType, eventType),
+      ),
+    )
+    .limit(1);
+
+  if (!rule) {
+    return { success: false, message: `No notification rule found for event type: ${eventType}` };
+  }
+
+  if (!rule.enabled) {
+    return { success: false, message: `Notification rule for ${eventType} is disabled` };
+  }
+
+  // 2. Determine target group JID
+  let groupJid = rule.targetGroupJid;
+  if (!groupJid) {
+    // Fall back to tenant default
+    const [tenant] = await db
+      .select({ settings: tenants.settings })
+      .from(tenants)
+      .where(eq(tenants.id, tenantId))
+      .limit(1);
+    groupJid = (tenant?.settings as any)?.whatsappDefaultGroupJid ?? null;
+  }
+
+  if (!groupJid) {
+    return { success: false, message: `No target group JID configured for ${eventType}` };
+  }
+
+  // 3. Interpolate template
+  const text = interpolateTemplate(rule.messageTemplate, context);
+
+  // 4. Send
+  return sendWhatsAppGroupMessage(null, groupJid, text);
 }
 
 export async function sendWhatsAppMessage(

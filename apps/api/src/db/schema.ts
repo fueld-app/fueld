@@ -520,6 +520,21 @@ export const whatsappKeys = pgTable('whatsapp_keys', {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
+//  3c. WHATSAPP NOTIFICATION RULES (configurable group messages per tenant)
+// ═══════════════════════════════════════════════════════════════════════
+
+export const whatsappNotificationRules = pgTable('whatsapp_notification_rules', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  eventType: text('event_type').notNull(),      // e.g. 'inquiry_sent', 'order_confirmed', 'credit_application_submitted'
+  enabled: boolean('enabled').notNull().default(true),
+  messageTemplate: text('message_template').notNull(),
+  targetGroupJid: text('target_group_jid'),    // optional override; falls back to tenant whatsappDefaultGroupJid
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ═══════════════════════════════════════════════════════════════════════
 //  4. COUNTERPARTIES
 // ═══════════════════════════════════════════════════════════════════════
 
