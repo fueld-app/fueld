@@ -624,6 +624,13 @@
       "when": 1779500000010,
       "tag": "0088_migrate_products_to_catalog",
       "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1779500000011,
+      "tag": "0089_backfill_catalog_items",
+      "breakpoints": true
     }
   ]
 }
