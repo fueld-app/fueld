@@ -997,9 +997,9 @@ import { API } from '@app/core/config/api';
                                 (ngModelChange)="waRulesEditTemplate.set($event)"
                                 rows="3"
                                 class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
-                                placeholder="Use {{variable}} for dynamic values"
+                                [placeholder]="waTemplatePlaceholder"
                               ></textarea>
-                              <p class="mt-1 text-xs text-gray-500">Available variables depend on event type. Common: {{orderNumber}}, {{vesselName}}, {{portName}}, {{customerName}}, {{status}}</p>
+                              <p class="mt-1 text-xs text-gray-500">{{ waTemplateHelp }}</p>
                             </div>
                             <div>
                               <label class="block text-xs font-medium text-gray-700">Target Group JID (optional)</label>
@@ -1137,6 +1137,10 @@ export class IntegrationsPageComponent implements OnInit {
   readonly waRulesEditing = signal<string | null>(null);
   readonly waRulesEditTemplate = signal('');
   readonly waRulesEditGroupJid = signal<string | null>(null);
+
+  // Template literal strings (avoid Angular template parsing of {{...}})
+  readonly waTemplatePlaceholder = 'Use {{variable}} for dynamic values';
+  readonly waTemplateHelp = 'Available variables depend on event type. Common: {{orderNumber}}, {{vesselName}}, {{portName}}, {{customerName}}, {{status}}';
 
   // ── Computed status helpers ────────────────────────────────────────
   lliStatus = () => this.integrations().find((i) => i.provider.toUpperCase() === 'LLI') ?? null;

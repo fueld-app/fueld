@@ -1888,7 +1888,7 @@ interface InquirySettingsDto {
                 <div class="flex items-center gap-3">
                   <span class="w-24 text-sm font-medium text-gray-700">{{ role.label }}</span>
                   <select
-                    [ngModel]="roleDashboards()[role.key] ?? ''"
+                    [ngModel]="roleDashboards()[role.key]"
                     (ngModelChange)="setRoleDashboard(role.key, $event)"
                     class="app-input flex-1"
                   >
