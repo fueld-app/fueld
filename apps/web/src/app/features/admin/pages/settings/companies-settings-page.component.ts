@@ -17,6 +17,7 @@ import type {
 } from '@fueld/types';
 
 import { API } from '@app/core/config/api';
+import { SettingsToastService } from './settings-toast.service';
 
 @Component({
   selector: 'app-companies-settings-page',
@@ -457,25 +458,14 @@ import { API } from '@app/core/config/api';
         </div>
       }
 
-      <!-- Toast notification -->
-      @if (toast()) {
-        <div
-          class="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium shadow-lg transition-opacity"
-          [class]="toast()!.type === 'success'
-            ? 'border border-green-200 bg-green-50 text-green-800'
-            : 'border border-red-200 bg-red-50 text-red-800'"
-        >
-          {{ toast()!.message }}
-        </div>
-      }
     </div>
   `,
 })
 export class CompaniesSettingsPageComponent implements OnInit {
   private readonly http = inject(HttpClient);
+  private readonly toastService = inject(SettingsToastService);
 
   readonly loading = signal(true);
-  readonly toast = signal<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Company Types
   readonly companyTypes = signal<string[]>([]);
@@ -512,11 +502,6 @@ export class CompaniesSettingsPageComponent implements OnInit {
     this.loadSegments();
   }
 
-  private showToast(type: 'success' | 'error', message: string): void {
-    this.toast.set({ type, message });
-    setTimeout(() => this.toast.set(null), 4000);
-  }
-
   // ─── Company Types ─────────────────────────────────────────────────
 
   private async loadCompanyTypes(): Promise<void> {
@@ -526,7 +511,7 @@ export class CompaniesSettingsPageComponent implements OnInit {
       );
       if (res.success) this.companyTypes.set(res.data.companyTypes);
     } catch {
-      this.showToast('error', 'Failed to load company types.');
+      this.toastService.show('error', 'Failed to load company types.');
     } finally {
       this.loading.set(false);
     }
@@ -564,7 +549,7 @@ export class CompaniesSettingsPageComponent implements OnInit {
   async saveCompanyTypes(): Promise<void> {
     const valid = this.companyTypes().filter((ct) => ct.trim());
     if (valid.length === 0) {
-      this.showToast('error', 'At least one company type is required.');
+      this.toastService.show('error', 'At least one company type is required.');
       return;
     }
     this.companyTypesSaving.set(true);
@@ -578,10 +563,10 @@ export class CompaniesSettingsPageComponent implements OnInit {
         this.companyTypesSaved.set(true);
         setTimeout(() => this.companyTypesSaved.set(false), 3000);
       } else {
-        this.showToast('error', (res as any).message ?? 'Failed to save.');
+        this.toastService.show('error', (res as any).message ?? 'Failed to save.');
       }
     } catch {
-      this.showToast('error', 'Failed to save company types.');
+      this.toastService.show('error', 'Failed to save company types.');
     } finally {
       this.companyTypesSaving.set(false);
     }
@@ -596,7 +581,7 @@ export class CompaniesSettingsPageComponent implements OnInit {
       );
       if (res.success) this.vesselTypes.set(res.data.vesselTypes);
     } catch {
-      this.showToast('error', 'Failed to load vessel types.');
+      this.toastService.show('error', 'Failed to load vessel types.');
     }
   }
 
@@ -632,7 +617,7 @@ export class CompaniesSettingsPageComponent implements OnInit {
   async saveVesselTypes(): Promise<void> {
     const valid = this.vesselTypes().filter((vt) => vt.trim());
     if (valid.length === 0) {
-      this.showToast('error', 'At least one vessel type is required.');
+      this.toastService.show('error', 'At least one vessel type is required.');
       return;
     }
     this.vesselTypesSaving.set(true);
@@ -646,10 +631,10 @@ export class CompaniesSettingsPageComponent implements OnInit {
         this.vesselTypesSaved.set(true);
         setTimeout(() => this.vesselTypesSaved.set(false), 3000);
       } else {
-        this.showToast('error', (res as any).message ?? 'Failed to save.');
+        this.toastService.show('error', (res as any).message ?? 'Failed to save.');
       }
     } catch {
-      this.showToast('error', 'Failed to save vessel types.');
+      this.toastService.show('error', 'Failed to save vessel types.');
     } finally {
       this.vesselTypesSaving.set(false);
     }
@@ -669,7 +654,7 @@ export class CompaniesSettingsPageComponent implements OnInit {
         this.roles.set(res.data.roles);
       }
     } catch {
-      this.showToast('error', 'Failed to load vessel-company roles.');
+      this.toastService.show('error', 'Failed to load vessel-company roles.');
     } finally {
       this.rolesLoading.set(false);
     }
@@ -720,7 +705,7 @@ export class CompaniesSettingsPageComponent implements OnInit {
   async saveRoles(): Promise<void> {
     const valid = this.roles().filter((r) => r.key && r.label);
     if (valid.length === 0) {
-      this.showToast('error', 'At least one role is required.');
+      this.toastService.show('error', 'At least one role is required.');
       return;
     }
     this.rolesSaving.set(true);
@@ -737,10 +722,10 @@ export class CompaniesSettingsPageComponent implements OnInit {
         this.rolesSaved.set(true);
         setTimeout(() => this.rolesSaved.set(false), 3000);
       } else {
-        this.showToast('error', (res as any).message ?? 'Failed to save.');
+        this.toastService.show('error', (res as any).message ?? 'Failed to save.');
       }
     } catch {
-      this.showToast('error', 'Failed to save vessel-company roles.');
+      this.toastService.show('error', 'Failed to save vessel-company roles.');
     } finally {
       this.rolesSaving.set(false);
     }
@@ -764,7 +749,7 @@ export class CompaniesSettingsPageComponent implements OnInit {
       );
       if (res.success) this.segmentCategories.set(res.data.segmentCategories);
     } catch {
-      this.showToast('error', 'Failed to load segment settings.');
+      this.toastService.show('error', 'Failed to load segment settings.');
     }
   }
 
@@ -877,7 +862,7 @@ export class CompaniesSettingsPageComponent implements OnInit {
       (c) => c.label.trim() && c.options.some((o) => o.label.trim()),
     );
     if (cats.length === 0) {
-      this.showToast('error', 'At least one category with one option is required.');
+      this.toastService.show('error', 'At least one category with one option is required.');
       return;
     }
     // Clean empty options
@@ -904,10 +889,10 @@ export class CompaniesSettingsPageComponent implements OnInit {
         this.segmentsSaved.set(true);
         setTimeout(() => this.segmentsSaved.set(false), 3000);
       } else {
-        this.showToast('error', (res as any).message ?? 'Failed to save.');
+        this.toastService.show('error', (res as any).message ?? 'Failed to save.');
       }
     } catch {
-      this.showToast('error', 'Failed to save segment settings.');
+      this.toastService.show('error', 'Failed to save segment settings.');
     } finally {
       this.segmentsSaving.set(false);
     }

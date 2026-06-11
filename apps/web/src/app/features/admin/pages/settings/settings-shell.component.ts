@@ -1,9 +1,10 @@
 import {
   Component,
   ChangeDetectionStrategy,
-  signal,
+  inject,
 } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
+import { SettingsToastService } from './settings-toast.service';
 
 @Component({
   selector: 'app-settings-shell',
@@ -40,21 +41,21 @@ import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
       <router-outlet />
 
       <!-- Toast notification -->
-      @if (toast()) {
+      @if (toastService.toast()) {
         <div
           class="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium shadow-lg transition-opacity"
-          [class]="toast()!.type === 'success'
+          [class]="toastService.toast()!.type === 'success'
             ? 'border border-green-200 bg-green-50 text-green-800'
             : 'border border-red-200 bg-red-50 text-red-800'"
         >
-          {{ toast()!.message }}
+          {{ toastService.toast()!.message }}
         </div>
       }
     </div>
   `,
 })
 export class SettingsShellComponent {
-  readonly toast = signal<{ type: 'success' | 'error'; message: string } | null>(null);
+  private readonly toastService = inject(SettingsToastService);
 
   tabs = [
     { path: 'general', label: 'General' },
@@ -64,8 +65,4 @@ export class SettingsShellComponent {
     { path: 'documents', label: 'Documents & Workflow' },
   ] as const;
 
-  showToast(type: 'success' | 'error', message: string): void {
-    this.toast.set({ type, message });
-    setTimeout(() => this.toast.set(null), 3000);
-  }
 }

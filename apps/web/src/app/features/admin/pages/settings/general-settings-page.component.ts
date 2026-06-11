@@ -12,6 +12,7 @@ import { firstValueFrom } from 'rxjs';
 import type { ApiResponse, OrderNumberSettingsDto } from '@fueld/types';
 
 import { API } from '@app/core/config/api';
+import { SettingsToastService } from './settings-toast.service';
 
 @Component({
   selector: 'app-general-settings-page',
@@ -296,27 +297,16 @@ import { API } from '@app/core/config/api';
         </div>
       }
 
-      <!-- Toast notification -->
-      @if (toast()) {
-        <div
-          class="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium shadow-lg transition-opacity"
-          [class]="toast()!.type === 'success'
-            ? 'border border-green-200 bg-green-50 text-green-800'
-            : 'border border-red-200 bg-red-50 text-red-800'"
-        >
-          {{ toast()!.message }}
-        </div>
-      }
     </div>
   `,
 })
 export class GeneralSettingsPageComponent implements OnInit {
   private readonly http = inject(HttpClient);
+  private readonly toastService = inject(SettingsToastService);
 
   readonly loading = signal(true);
   readonly saving = signal(false);
   readonly saved = signal(false);
-  readonly toast = signal<{ type: 'success' | 'error'; message: string } | null>(null);
 
   readonly template = signal('{YYYY}{MM}{DD}-{SEQ:6}');
   readonly prefix = signal('');
@@ -427,7 +417,7 @@ export class GeneralSettingsPageComponent implements OnInit {
         this.nextSeq.set(res.data.nextSeq);
       }
     } catch {
-      this.showToast('error', 'Failed to load order number settings.');
+      this.toastService.show('error', 'Failed to load order number settings.');
     } finally {
       this.loading.set(false);
     }
@@ -451,10 +441,10 @@ export class GeneralSettingsPageComponent implements OnInit {
         this.saved.set(true);
         setTimeout(() => this.saved.set(false), 3000);
       } else {
-        this.showToast('error', res.message ?? 'Failed to save.');
+        this.toastService.show('error', res.message ?? 'Failed to save.');
       }
     } catch {
-      this.showToast('error', 'Failed to save order number settings.');
+      this.toastService.show('error', 'Failed to save order number settings.');
     } finally {
       this.saving.set(false);
     }
@@ -490,10 +480,10 @@ export class GeneralSettingsPageComponent implements OnInit {
         this.timezoneSaved.set(true);
         setTimeout(() => this.timezoneSaved.set(false), 3000);
       } else {
-        this.showToast('error', (res as any).message ?? 'Failed to save.');
+        this.toastService.show('error', (res as any).message ?? 'Failed to save.');
       }
     } catch {
-      this.showToast('error', 'Failed to save timezone settings.');
+      this.toastService.show('error', 'Failed to save timezone settings.');
     } finally {
       this.timezoneSaving.set(false);
     }
@@ -528,10 +518,10 @@ export class GeneralSettingsPageComponent implements OnInit {
         this.roleDashboardsSaved.set(true);
         setTimeout(() => this.roleDashboardsSaved.set(false), 3000);
       } else {
-        this.showToast('error', (res as any).message ?? 'Failed to save role dashboards.');
+        this.toastService.show('error', (res as any).message ?? 'Failed to save role dashboards.');
       }
     } catch {
-      this.showToast('error', 'Failed to save role dashboards.');
+      this.toastService.show('error', 'Failed to save role dashboards.');
     } finally {
       this.roleDashboardsSaving.set(false);
     }
@@ -557,7 +547,7 @@ export class GeneralSettingsPageComponent implements OnInit {
   async saveFollowUpSettings(): Promise<void> {
     const days = parseInt(this.followUpDefaultDays(), 10);
     if (!days || days < 1 || days > 365) {
-      this.showToast('error', 'Days must be between 1 and 365.');
+      this.toastService.show('error', 'Days must be between 1 and 365.');
       return;
     }
     this.followUpSaving.set(true);
@@ -571,17 +561,13 @@ export class GeneralSettingsPageComponent implements OnInit {
         this.followUpSaved.set(true);
         setTimeout(() => this.followUpSaved.set(false), 3000);
       } else {
-        this.showToast('error', (res as any).message ?? 'Failed to save.');
+        this.toastService.show('error', (res as any).message ?? 'Failed to save.');
       }
     } catch {
-      this.showToast('error', 'Failed to save follow-up settings.');
+      this.toastService.show('error', 'Failed to save follow-up settings.');
     } finally {
       this.followUpSaving.set(false);
     }
   }
 
-  private showToast(type: 'success' | 'error', message: string): void {
-    this.toast.set({ type, message });
-    setTimeout(() => this.toast.set(null), 4000);
-  }
 }

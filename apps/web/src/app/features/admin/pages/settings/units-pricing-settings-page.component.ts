@@ -12,6 +12,7 @@ import { firstValueFrom } from 'rxjs';
 import type { ApiResponse, UnitSettingsDto, CurrencySettingsDto, UnitConversionSettingsDto } from '@fueld/types';
 
 import { API } from '@app/core/config/api';
+import { SettingsToastService } from './settings-toast.service';
 
 @Component({
   selector: 'app-units-pricing-settings-page',
@@ -353,23 +354,11 @@ import { API } from '@app/core/config/api';
 
     </div>
 
-    <!-- Toast notification -->
-    @if (toast()) {
-      <div
-        class="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium shadow-lg transition-opacity"
-        [class]="toast()!.type === 'success'
-          ? 'border border-green-200 bg-green-50 text-green-800'
-          : 'border border-red-200 bg-red-50 text-red-800'"
-      >
-        {{ toast()!.message }}
-      </div>
-    }
   `,
 })
 export class UnitsPricingSettingsPageComponent implements OnInit {
   private readonly http = inject(HttpClient);
-
-  readonly toast = signal<{ type: 'success' | 'error'; message: string } | null>(null);
+  private readonly toastService = inject(SettingsToastService);
 
   // Units
   readonly units = signal<string[]>([]);
@@ -446,11 +435,6 @@ export class UnitsPricingSettingsPageComponent implements OnInit {
     this.loadCurrencies();
   }
 
-  private showToast(type: 'success' | 'error', message: string): void {
-    this.toast.set({ type, message });
-    setTimeout(() => this.toast.set(null), 4000);
-  }
-
   // ─── Units ─────────────────────────────────────────────────────────
 
   private async loadUnits(): Promise<void> {
@@ -460,7 +444,7 @@ export class UnitsPricingSettingsPageComponent implements OnInit {
       );
       if (res.success) this.units.set(res.data.units);
     } catch {
-      this.showToast('error', 'Failed to load units.');
+      this.toastService.show('error', 'Failed to load units.');
     }
   }
 
@@ -496,7 +480,7 @@ export class UnitsPricingSettingsPageComponent implements OnInit {
   async saveUnits(): Promise<void> {
     const valid = this.units().filter(u => u.trim());
     if (valid.length === 0) {
-      this.showToast('error', 'At least one unit is required.');
+      this.toastService.show('error', 'At least one unit is required.');
       return;
     }
     this.unitsSaving.set(true);
@@ -510,10 +494,10 @@ export class UnitsPricingSettingsPageComponent implements OnInit {
         this.unitsSaved.set(true);
         setTimeout(() => this.unitsSaved.set(false), 3000);
       } else {
-        this.showToast('error', (res as any).message ?? 'Failed to save.');
+        this.toastService.show('error', (res as any).message ?? 'Failed to save.');
       }
     } catch {
-      this.showToast('error', 'Failed to save units.');
+      this.toastService.show('error', 'Failed to save units.');
     } finally {
       this.unitsSaving.set(false);
     }
@@ -528,7 +512,7 @@ export class UnitsPricingSettingsPageComponent implements OnInit {
       );
       if (res.success) this.unitConversions.set(res.data.conversions);
     } catch {
-      this.showToast('error', 'Failed to load unit conversions.');
+      this.toastService.show('error', 'Failed to load unit conversions.');
     }
   }
 
@@ -560,10 +544,10 @@ export class UnitsPricingSettingsPageComponent implements OnInit {
         this.unitConversionsSaved.set(true);
         setTimeout(() => this.unitConversionsSaved.set(false), 3000);
       } else {
-        this.showToast('error', (res as any).message ?? 'Failed to save.');
+        this.toastService.show('error', (res as any).message ?? 'Failed to save.');
       }
     } catch {
-      this.showToast('error', 'Failed to save unit conversions.');
+      this.toastService.show('error', 'Failed to save unit conversions.');
     } finally {
       this.unitConversionsSaving.set(false);
     }
@@ -578,7 +562,7 @@ export class UnitsPricingSettingsPageComponent implements OnInit {
       );
       if (res.success) this.priceRefs.set(res.data.references);
     } catch {
-      this.showToast('error', 'Failed to load price references.');
+      this.toastService.show('error', 'Failed to load price references.');
     }
   }
 
@@ -600,7 +584,7 @@ export class UnitsPricingSettingsPageComponent implements OnInit {
     if (ref && !ref._new) {
       firstValueFrom(
         this.http.delete<ApiResponse<null>>(`${API}/admin/settings/price-references/${ref.id}`),
-      ).catch(() => this.showToast('error', 'Failed to delete price reference.'));
+      ).catch(() => this.toastService.show('error', 'Failed to delete price reference.'));
     }
   }
 
@@ -633,7 +617,7 @@ export class UnitsPricingSettingsPageComponent implements OnInit {
       this.priceRefsSaved.set(true);
       setTimeout(() => this.priceRefsSaved.set(false), 3000);
     } catch {
-      this.showToast('error', 'Failed to save price references.');
+      this.toastService.show('error', 'Failed to save price references.');
     } finally {
       this.priceRefsSaving.set(false);
     }
@@ -648,7 +632,7 @@ export class UnitsPricingSettingsPageComponent implements OnInit {
       );
       if (res.success) this.currencies.set(res.data.currencies);
     } catch {
-      this.showToast('error', 'Failed to load currencies.');
+      this.toastService.show('error', 'Failed to load currencies.');
     }
   }
 
@@ -686,7 +670,7 @@ export class UnitsPricingSettingsPageComponent implements OnInit {
   async saveCurrencies(): Promise<void> {
     const valid = this.currencies().filter(c => c.trim());
     if (valid.length === 0) {
-      this.showToast('error', 'At least one currency is required.');
+      this.toastService.show('error', 'At least one currency is required.');
       return;
     }
     this.currenciesSaving.set(true);
@@ -700,10 +684,10 @@ export class UnitsPricingSettingsPageComponent implements OnInit {
         this.currenciesSaved.set(true);
         setTimeout(() => this.currenciesSaved.set(false), 3000);
       } else {
-        this.showToast('error', (res as any).message ?? 'Failed to save.');
+        this.toastService.show('error', (res as any).message ?? 'Failed to save.');
       }
     } catch {
-      this.showToast('error', 'Failed to save currencies.');
+      this.toastService.show('error', 'Failed to save currencies.');
     } finally {
       this.currenciesSaving.set(false);
     }

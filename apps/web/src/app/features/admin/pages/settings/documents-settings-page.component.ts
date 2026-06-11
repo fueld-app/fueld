@@ -17,6 +17,7 @@ import type {
 } from '@fueld/types';
 
 import { API } from '@app/core/config/api';
+import { SettingsToastService } from './settings-toast.service';
 
 interface InquirySettingsDto {
   supplierResponseUrlEnabled: boolean;
@@ -541,25 +542,14 @@ interface InquirySettingsDto {
         </div>
       }
 
-      <!-- Toast notification -->
-      @if (toast()) {
-        <div
-          class="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium shadow-lg transition-opacity"
-          [class]="toast()!.type === 'success'
-            ? 'border border-green-200 bg-green-50 text-green-800'
-            : 'border border-red-200 bg-red-50 text-red-800'"
-        >
-          {{ toast()!.message }}
-        </div>
-      }
     </div>
   `,
 })
 export class DocumentsSettingsPageComponent implements OnInit {
   private readonly http = inject(HttpClient);
+  private readonly toastService = inject(SettingsToastService);
 
   readonly loading = signal(true);
-  readonly toast = signal<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Attachment Types
   readonly attachmentTypes = signal<string[]>([]);
@@ -603,11 +593,6 @@ export class DocumentsSettingsPageComponent implements OnInit {
     this.loading.set(false);
   }
 
-  private showToast(type: 'success' | 'error', message: string): void {
-    this.toast.set({ type, message });
-    setTimeout(() => this.toast.set(null), 4000);
-  }
-
   // ─── Attachment Types ──────────────────────────────────────────────
 
   private async loadAttachmentTypes(): Promise<void> {
@@ -617,7 +602,7 @@ export class DocumentsSettingsPageComponent implements OnInit {
       );
       if (res.success) this.attachmentTypes.set(res.data.attachmentTypes);
     } catch {
-      this.showToast('error', 'Failed to load attachment types.');
+      this.toastService.show('error', 'Failed to load attachment types.');
     }
   }
 
@@ -653,7 +638,7 @@ export class DocumentsSettingsPageComponent implements OnInit {
   async saveAttachmentTypes(): Promise<void> {
     const valid = this.attachmentTypes().map((t) => t.trim()).filter((t) => t.length > 0);
     if (valid.length === 0) {
-      this.showToast('error', 'At least one attachment type is required.');
+      this.toastService.show('error', 'At least one attachment type is required.');
       return;
     }
     this.attachmentTypesSaving.set(true);
@@ -667,10 +652,10 @@ export class DocumentsSettingsPageComponent implements OnInit {
         this.attachmentTypesSaved.set(true);
         setTimeout(() => this.attachmentTypesSaved.set(false), 3000);
       } else {
-        this.showToast('error', (res as any).message ?? 'Failed to save.');
+        this.toastService.show('error', (res as any).message ?? 'Failed to save.');
       }
     } catch {
-      this.showToast('error', 'Failed to save attachment types.');
+      this.toastService.show('error', 'Failed to save attachment types.');
     } finally {
       this.attachmentTypesSaving.set(false);
     }
@@ -688,7 +673,7 @@ export class DocumentsSettingsPageComponent implements OnInit {
         this.deliveryDocumentationTypes.set(res.data.deliveryDocumentationTypes);
       }
     } catch {
-      this.showToast('error', 'Failed to load delivery documentation settings.');
+      this.toastService.show('error', 'Failed to load delivery documentation settings.');
     }
   }
 
@@ -718,10 +703,10 @@ export class DocumentsSettingsPageComponent implements OnInit {
         this.deliveryDocumentationSaved.set(true);
         setTimeout(() => this.deliveryDocumentationSaved.set(false), 3000);
       } else {
-        this.showToast('error', (res as any).message ?? 'Failed to save delivery documentation settings.');
+        this.toastService.show('error', (res as any).message ?? 'Failed to save delivery documentation settings.');
       }
     } catch {
-      this.showToast('error', 'Failed to save delivery documentation settings.');
+      this.toastService.show('error', 'Failed to save delivery documentation settings.');
     } finally {
       this.deliveryDocumentationSaving.set(false);
     }
@@ -738,7 +723,7 @@ export class DocumentsSettingsPageComponent implements OnInit {
         this.portDocumentationEnabled.set(res.data.enabled === true);
       }
     } catch {
-      this.showToast('error', 'Failed to load Port Documentation settings.');
+      this.toastService.show('error', 'Failed to load Port Documentation settings.');
     }
   }
 
@@ -756,10 +741,10 @@ export class DocumentsSettingsPageComponent implements OnInit {
         this.portDocumentationSaved.set(true);
         setTimeout(() => this.portDocumentationSaved.set(false), 3000);
       } else {
-        this.showToast('error', (res as any).message ?? 'Failed to save Port Documentation settings.');
+        this.toastService.show('error', (res as any).message ?? 'Failed to save Port Documentation settings.');
       }
     } catch {
-      this.showToast('error', 'Failed to save Port Documentation settings.');
+      this.toastService.show('error', 'Failed to save Port Documentation settings.');
     } finally {
       this.portDocumentationSaving.set(false);
     }
@@ -774,7 +759,7 @@ export class DocumentsSettingsPageComponent implements OnInit {
       );
       if (res.success) this.inquiryCancelReasons.set(res.data.reasons);
     } catch {
-      this.showToast('error', 'Failed to load inquiry cancellation reasons.');
+      this.toastService.show('error', 'Failed to load inquiry cancellation reasons.');
     }
   }
 
@@ -810,7 +795,7 @@ export class DocumentsSettingsPageComponent implements OnInit {
   async saveInquiryCancelReasons(): Promise<void> {
     const valid = this.inquiryCancelReasons().map((r) => r.trim()).filter((r) => r.length > 0);
     if (valid.length === 0) {
-      this.showToast('error', 'At least one inquiry cancellation reason is required.');
+      this.toastService.show('error', 'At least one inquiry cancellation reason is required.');
       return;
     }
     this.inquiryCancelReasonsSaving.set(true);
@@ -824,10 +809,10 @@ export class DocumentsSettingsPageComponent implements OnInit {
         this.inquiryCancelReasonsSaved.set(true);
         setTimeout(() => this.inquiryCancelReasonsSaved.set(false), 3000);
       } else {
-        this.showToast('error', (res as any).message ?? 'Failed to save.');
+        this.toastService.show('error', (res as any).message ?? 'Failed to save.');
       }
     } catch {
-      this.showToast('error', 'Failed to save inquiry cancellation reasons.');
+      this.toastService.show('error', 'Failed to save inquiry cancellation reasons.');
     } finally {
       this.inquiryCancelReasonsSaving.set(false);
     }
@@ -844,7 +829,7 @@ export class DocumentsSettingsPageComponent implements OnInit {
         this.applyInquirySettings(res.data);
       }
     } catch {
-      this.showToast('error', 'Failed to load supplier inquiry settings.');
+      this.toastService.show('error', 'Failed to load supplier inquiry settings.');
     }
   }
 

@@ -11,6 +11,7 @@ import { firstValueFrom } from 'rxjs';
 import type { ApiResponse } from '@fueld/types';
 
 import { API } from '@app/core/config/api';
+import { SettingsToastService } from './settings-toast.service';
 
 @Component({
   selector: 'app-products-settings-page',
@@ -285,23 +286,11 @@ import { API } from '@app/core/config/api';
 
     </div>
 
-    <!-- Toast notification -->
-    @if (toast()) {
-      <div
-        class="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium shadow-lg transition-opacity"
-        [class]="toast()!.type === 'success'
-          ? 'border border-green-200 bg-green-50 text-green-800'
-          : 'border border-red-200 bg-red-50 text-red-800'"
-      >
-        {{ toast()!.message }}
-      </div>
-    }
   `,
 })
 export class ProductsSettingsPageComponent implements OnInit {
   private readonly http = inject(HttpClient);
-
-  readonly toast = signal<{ type: 'success' | 'error'; message: string } | null>(null);
+  private readonly toastService = inject(SettingsToastService);
 
   // Product catalog
   readonly catalogItems = signal<{ id: string; name: string; description: string; defaultUnit: string; defaultCostPrice: string; defaultSalesPrice: string; defaultTaxRateId: string; categoryKey: string }[]>([]);
@@ -322,11 +311,6 @@ export class ProductsSettingsPageComponent implements OnInit {
     this.loadCatalog();
     this.loadOrderCategories();
     this.loadTaxRates();
-  }
-
-  private showToast(type: 'success' | 'error', message: string): void {
-    this.toast.set({ type, message });
-    setTimeout(() => this.toast.set(null), 4000);
   }
 
   // ─── Catalog settings ─────────────────────────────────────────
@@ -397,10 +381,10 @@ export class ProductsSettingsPageComponent implements OnInit {
         this.catalogSaved.set(true);
         setTimeout(() => this.catalogSaved.set(false), 3000);
       } else {
-        this.showToast('error', (res as any).message ?? 'Failed to save catalog.');
+        this.toastService.show('error', (res as any).message ?? 'Failed to save catalog.');
       }
     } catch {
-      this.showToast('error', 'Failed to save catalog.');
+      this.toastService.show('error', 'Failed to save catalog.');
     } finally {
       this.catalogSaving.set(false);
     }
@@ -466,10 +450,10 @@ export class ProductsSettingsPageComponent implements OnInit {
         this.orderCategoriesSaved.set(true);
         setTimeout(() => this.orderCategoriesSaved.set(false), 3000);
       } else {
-        this.showToast('error', (res as any).message ?? 'Failed to save order categories.');
+        this.toastService.show('error', (res as any).message ?? 'Failed to save order categories.');
       }
     } catch {
-      this.showToast('error', 'Failed to save order categories.');
+      this.toastService.show('error', 'Failed to save order categories.');
     } finally {
       this.orderCategoriesSaving.set(false);
     }
@@ -535,10 +519,10 @@ export class ProductsSettingsPageComponent implements OnInit {
         this.taxRatesSaved.set(true);
         setTimeout(() => this.taxRatesSaved.set(false), 3000);
       } else {
-        this.showToast('error', (res as any).message ?? 'Failed to save tax rates.');
+        this.toastService.show('error', (res as any).message ?? 'Failed to save tax rates.');
       }
     } catch {
-      this.showToast('error', 'Failed to save tax rates.');
+      this.toastService.show('error', 'Failed to save tax rates.');
     } finally {
       this.taxRatesSaving.set(false);
     }
