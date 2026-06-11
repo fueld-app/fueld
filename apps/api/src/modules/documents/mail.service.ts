@@ -464,6 +464,10 @@ export function buildDocumentEmailHtml(params: {
     ? `<tr><td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Payment terms:</td><td style="padding: 4px 0; font-weight: 600;">${params.paymentTerms}</td></tr>`
     : '';
 
+  const deliveryDateRow = params.eta
+    ? `<tr><td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Delivery date:</td><td style="padding: 4px 0; font-weight: 600;">${new Date(params.eta).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}</td></tr>`
+    : '';
+
   const customerNote = params.customerNote?.trim()
     ? `<p style="margin-top: 12px; white-space: pre-line;">${params.customerNote}</p>`
     : '';
@@ -507,6 +511,7 @@ export function buildDocumentEmailHtml(params: {
             <td style="padding: 4px 16px 4px 0; color: #6b7280; font-size: 13px;">Port:</td>
             <td style="padding: 4px 0; font-weight: 600;">${params.portName}</td>
           </tr>
+          ${deliveryDateRow}
           ${paymentTermsRow}
         </table>
         ${customerNote}
