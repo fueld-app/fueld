@@ -366,6 +366,16 @@ export class PlaceDetailStore {
         this.pageTitle.setTitle(`Fueld | Places > ${p.name}`);
       }
     });
+
+    // Retry map init whenever container or place/enrichment becomes available
+    effect(() => {
+      const p = this.place();
+      const enrichment = this.enrichment();
+      const container = this.mapContainer;
+      if (!p?.lat || !p?.long || !container || this.map) return;
+      // Defer to next tick so the DOM container is fully laid out
+      setTimeout(() => this.initMap(), 0);
+    });
   }
 
   async loadPlace(id: string): Promise<void> {
@@ -492,8 +502,6 @@ export class PlaceDetailStore {
       }
     } catch (err) {
       console.error('Failed to load enrichment:', err);
-    } finally {
-      setTimeout(() => this.initMap(), 0);
     }
   }
 
@@ -578,8 +586,10 @@ export class PlaceDetailStore {
 
   setMapContainer(el: HTMLElement | null): void {
     this.mapContainer = el;
-    if (el) {
-      setTimeout(() => this.initMap(), 0);
+    if (!el) {
+      this.map?.remove();
+      this.map = null;
+      this.vesselLayer = null;
     }
   }
 

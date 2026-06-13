@@ -20,8 +20,10 @@ import { CommentsCardComponent } from '@app/shared/components/comments-card/comm
         <app-place-map-card />
         <app-place-info-card />
       </div>
-      <app-comments-card entityType="place" [entityId]="store.place()!.id" />
-      <app-activity-timeline entityType="place" [entityId]="store.place()!.id" />
+      <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <app-comments-card entityType="place" [entityId]="store.place()!.id" />
+        <app-activity-timeline entityType="place" [entityId]="store.place()!.id" />
+      </div>
     </div>
   `,
 })
