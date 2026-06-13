@@ -7,7 +7,7 @@ import { PlaceDetailStore } from '../../place-detail.store';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [DatePipe, DecimalPipe],
   template: `
-    <div class="app-panel lg:h-[449px] lg:flex lg:flex-col overflow-hidden">
+    <div class="app-panel h-[420px] flex flex-col">
       <div class="app-panel-header app-panel-header--blue justify-between px-5 py-3">
         <h2 class="text-sm font-semibold text-gray-700">
           @if (store.trafficTab() === 'arrivals') {
@@ -49,11 +49,12 @@ import { PlaceDetailStore } from '../../place-detail.store';
         </div>
       </div>
 
+      <div class="flex-1 overflow-y-auto">
       @if (store.trafficTab() === 'arrivals') {
         @if (!store.arrivalsLoading() && !store.expectedArrivals().length) {
           <div class="px-5 py-6 text-center text-sm text-gray-400">No expected arrivals in the next 7 days</div>
         } @else if (store.expectedArrivals().length) {
-          <div class="divide-y divide-gray-50 max-h-[400px] overflow-y-auto">
+          <div class="divide-y divide-gray-50">
             @for (a of store.expectedArrivals(); track a.id) {
               <div class="px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors">
                 <div class="flex items-center justify-between">
@@ -100,7 +101,7 @@ import { PlaceDetailStore } from '../../place-detail.store';
         @if (!store.nearbyVessels().length) {
           <div class="px-5 py-6 text-center text-sm text-gray-400">No nearby vessels</div>
         } @else {
-          <div class="divide-y divide-gray-50 max-h-[400px] overflow-y-auto">
+          <div class="divide-y divide-gray-50">
             @for (v of store.nearbyVessels(); track v.id) {
               <div class="px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors">
                 <div class="flex items-center justify-between">
@@ -154,6 +155,7 @@ import { PlaceDetailStore } from '../../place-detail.store';
           </div>
         }
       }
+      </div>
     </div>
   `,
 })

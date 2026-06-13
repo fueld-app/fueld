@@ -7,7 +7,7 @@ import { PlaceDetailStore } from '../../place-detail.store';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule],
   template: `
-    <div class="app-panel">
+    <div class="app-panel h-[420px] flex flex-col">
       <div class="app-panel-header app-panel-header--blue justify-between px-5 py-3">
         <h2 class="text-sm font-semibold text-gray-700">Default Order Remark</h2>
         @if (!store.editingOrderRemark()) {
@@ -20,7 +20,7 @@ import { PlaceDetailStore } from '../../place-detail.store';
         }
       </div>
 
-      <div class="px-5 py-4">
+      <div class="flex-1 overflow-y-auto px-5 py-4">
         @if (store.editingOrderRemark()) {
           <textarea
             [ngModel]="store.orderRemarkDraft()"

@@ -7,7 +7,7 @@ import { PlaceDetailStore } from '../../place-detail.store';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule],
   template: `
-    <div class="app-panel">
+    <div class="app-panel h-[420px] flex flex-col">
       <div class="app-panel-header app-panel-header--blue justify-between px-5 py-3">
         <h2 class="text-sm font-semibold text-gray-700">Suppliers
           @if (store.portSuppliers().length) {
@@ -115,47 +115,49 @@ import { PlaceDetailStore } from '../../place-detail.store';
         </div>
       }
 
-      @if (!store.portSuppliers().length) {
-        <div class="px-5 py-6 text-center text-sm text-gray-400">No suppliers linked to this place</div>
-      } @else {
-        <div class="divide-y divide-gray-50">
-          @for (supplier of store.portSuppliers(); track supplier.id) {
-            <div class="px-5 py-3">
-              <div class="flex items-center justify-between">
-                <button
-                  (click)="store.navigateToCompany(supplier.companyId)"
-                  class="text-sm font-medium text-brand-600 hover:text-brand-800 hover:underline text-left"
-                >
-                  {{ supplier.companyName }}
-                </button>
-                <div class="flex items-center gap-2">
+      <div class="flex-1 overflow-y-auto">
+        @if (!store.portSuppliers().length) {
+          <div class="px-5 py-6 text-center text-sm text-gray-400">No suppliers linked to this place</div>
+        } @else {
+          <div class="divide-y divide-gray-50">
+            @for (supplier of store.portSuppliers(); track supplier.id) {
+              <div class="px-5 py-3">
+                <div class="flex items-center justify-between">
                   <button
-                    (click)="store.openEditSupplier(supplier)"
-                    class="text-xs text-gray-500 hover:text-gray-700"
+                    (click)="store.navigateToCompany(supplier.companyId)"
+                    class="text-sm font-medium text-brand-600 hover:text-brand-800 hover:underline text-left"
                   >
-                    Edit
+                    {{ supplier.companyName }}
                   </button>
-                  <button
-                    (click)="store.deleteSupplier(supplier.id)"
-                    class="text-xs text-red-500 hover:text-red-700"
-                  >
-                    Remove
-                  </button>
+                  <div class="flex items-center gap-2">
+                    <button
+                      (click)="store.openEditSupplier(supplier)"
+                      class="text-xs text-gray-500 hover:text-gray-700"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      (click)="store.deleteSupplier(supplier.id)"
+                      class="text-xs text-red-500 hover:text-red-700"
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </div>
+                @if (supplier.products.length) {
+                  <div class="mt-1 flex flex-wrap gap-1">
+                    @for (product of supplier.products; track product) {
+                      <span class="inline-flex items-center rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-600">
+                        {{ product }}
+                      </span>
+                    }
+                  </div>
+                }
               </div>
-              @if (supplier.products.length) {
-                <div class="mt-1 flex flex-wrap gap-1">
-                  @for (product of supplier.products; track product) {
-                    <span class="inline-flex items-center rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-600">
-                      {{ product }}
-                    </span>
-                  }
-                </div>
-              }
-            </div>
-          }
-        </div>
-      }
+            }
+          </div>
+        }
+      </div>
     </div>
   `,
 })

@@ -8,7 +8,7 @@ import { PlaceDetailStore } from '../../place-detail.store';
   template: `
     @if (store.place()!.lat && store.place()!.long) {
       <div class="app-panel overflow-hidden flex flex-col"
-           [class]="store.mapFullscreen() ? 'fixed inset-0 z-[70] rounded-none border-0 h-screen' : 'lg:h-[449px]'">
+           [class]="store.mapFullscreen() ? 'fixed inset-0 z-[70] rounded-none border-0 h-screen' : 'h-[420px]'">
         <div class="app-panel-header app-panel-header--sky justify-between px-5 py-3">
           <h2 class="text-sm font-semibold text-gray-700">
             Location
@@ -43,7 +43,7 @@ import { PlaceDetailStore } from '../../place-detail.store';
             </button>
           </div>
         </div>
-        <div [class]="store.mapFullscreen() ? 'h-[calc(100dvh-49px)]' : 'h-[400px]'" #mapContainer></div>
+        <div class="flex-1 min-h-0" [class]="store.mapFullscreen() ? 'h-[calc(100dvh-49px)]' : ''" #mapContainer></div>
       </div>
     }
   `,

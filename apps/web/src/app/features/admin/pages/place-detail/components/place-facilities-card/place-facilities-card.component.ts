@@ -6,11 +6,12 @@ import { PlaceDetailStore } from '../../place-detail.store';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [],
   template: `
-    <div class="app-panel">
+    <div class="app-panel h-[420px] flex flex-col">
       <div class="app-panel-header app-panel-header--blue px-5 py-3">
         <h2 class="text-sm font-semibold text-gray-700">Port Facilities</h2>
       </div>
 
+      <div class="flex-1 overflow-y-auto">
       @if (!store.facilities().length) {
         <div class="px-5 py-6 text-center text-sm text-gray-400">No facilities registered</div>
       } @else {
@@ -40,6 +41,7 @@ import { PlaceDetailStore } from '../../place-detail.store';
         </div>
       }
     </div>
+  </div>
   `,
 })
 export class PlaceFacilitiesCardComponent {

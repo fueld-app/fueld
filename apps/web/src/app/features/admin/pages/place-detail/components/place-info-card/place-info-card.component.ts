@@ -7,7 +7,7 @@ import { PlaceDetailStore } from '../../place-detail.store';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule],
   template: `
-    <div class="app-panel lg:h-[449px] lg:flex lg:flex-col overflow-hidden">
+    <div class="app-panel h-[420px] flex flex-col">
       <div class="app-panel-header app-panel-header--brand justify-between px-5 py-3">
         <div class="flex items-center gap-2">
           <h2 class="text-sm font-semibold text-gray-700">General Information</h2>
@@ -43,7 +43,7 @@ import { PlaceDetailStore } from '../../place-detail.store';
           </div>
         }
       </div>
-      <div class="app-panel-body max-h-[400px] overflow-y-auto">
+      <div class="app-panel-body flex-1 overflow-y-auto">
         @if (!store.editingPlace()) {
           <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
             <div>

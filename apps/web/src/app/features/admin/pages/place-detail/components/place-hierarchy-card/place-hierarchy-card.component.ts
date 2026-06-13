@@ -6,15 +6,16 @@ import { PlaceDetailStore } from '../../place-detail.store';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [],
   template: `
-    <div class="app-panel">
+    <div class="app-panel h-[420px] flex flex-col">
       <div class="app-panel-header app-panel-header--blue px-5 py-3">
         <h2 class="text-sm font-semibold text-gray-700">Terminals & Anchorages</h2>
       </div>
 
-      @if (!store.terminals().length && !store.anchorages().length) {
-        <div class="px-5 py-6 text-center text-sm text-gray-400">No terminals or anchorages registered</div>
-      } @else {
-        <div class="divide-y divide-gray-50">
+      <div class="flex-1 overflow-y-auto">
+        @if (!store.terminals().length && !store.anchorages().length) {
+          <div class="px-5 py-6 text-center text-sm text-gray-400">No terminals or anchorages registered</div>
+        } @else {
+          <div class="divide-y divide-gray-50">
           @for (item of store.terminals(); track item.id) {
             <div class="px-5 py-3">
               <div class="flex items-center justify-between">
@@ -71,6 +72,7 @@ import { PlaceDetailStore } from '../../place-detail.store';
         </div>
       }
     </div>
+  </div>
   `,
 })
 export class PlaceHierarchyCardComponent {
