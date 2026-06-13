@@ -1,27 +1,27 @@
 import { Component, ChangeDetectionStrategy, inject } from '@angular/core';
 import { PlaceDetailStore } from '../../place-detail.store';
-import { PlaceHeaderComponent } from '../../components/place-header/place-header.component';
 import { PlaceMapCardComponent } from '../../components/place-map-card/place-map-card.component';
 import { PlaceInfoCardComponent } from '../../components/place-info-card/place-info-card.component';
-import { PlaceTrafficCardComponent } from '../../components/place-traffic-card/place-traffic-card.component';
+import { ActivityTimelineComponent } from '@app/shared/components/activity-timeline/activity-timeline.component';
+import { CommentsCardComponent } from '@app/shared/components/comments-card/comments-card.component';
 
 @Component({
   selector: 'app-place-overview-tab',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    PlaceHeaderComponent,
     PlaceMapCardComponent,
     PlaceInfoCardComponent,
-    PlaceTrafficCardComponent,
+    ActivityTimelineComponent,
+    CommentsCardComponent,
   ],
   template: `
     <div class="space-y-4">
-      <app-place-header />
       <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <app-place-map-card />
-        <app-place-traffic-card />
+        <app-place-info-card />
       </div>
-      <app-place-info-card />
+      <app-comments-card entityType="place" [entityId]="store.place()!.id" />
+      <app-activity-timeline entityType="place" [entityId]="store.place()!.id" />
     </div>
   `,
 })

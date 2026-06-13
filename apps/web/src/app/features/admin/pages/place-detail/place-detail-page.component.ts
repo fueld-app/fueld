@@ -2,8 +2,6 @@ import { Component, ChangeDetectionStrategy, inject, OnInit, OnDestroy } from '@
 import { ActivatedRoute, RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { PlaceDetailStore } from './place-detail.store';
-import { ActivityTimelineComponent } from '../../../../shared/components/activity-timeline/activity-timeline.component';
-import { CommentsCardComponent } from '../../../../shared/components/comments-card/comments-card.component';
 import { PlaceHeaderComponent } from './components/place-header/place-header.component';
 
 @Component({
@@ -13,8 +11,6 @@ import { PlaceHeaderComponent } from './components/place-header/place-header.com
     RouterOutlet,
     RouterLink,
     RouterLinkActive,
-    ActivityTimelineComponent,
-    CommentsCardComponent,
     PlaceHeaderComponent,
   ],
   providers: [PlaceDetailStore],
@@ -68,13 +64,6 @@ import { PlaceHeaderComponent } from './components/place-header/place-header.com
         </div>
 
         <router-outlet />
-
-        @if (place) {
-          <div class="mt-6 space-y-4">
-            <app-comments-card entityType="place" [entityId]="place.id" />
-            <app-activity-timeline entityType="place" [entityId]="place.id" />
-          </div>
-        }
 
         @if (store.showDeleteModal() && store.canDeleteEntity()) {
           <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" (click)="store.showDeleteModal.set(false)">
