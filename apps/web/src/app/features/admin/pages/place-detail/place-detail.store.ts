@@ -562,7 +562,8 @@ export class PlaceDetailStore {
 
     this.wsSubs.push(
       this.wsService.onRaw('error').subscribe((msg) => {
-        console.error('[WS] Error:', (msg as any).message);
+        const payload = msg as any;
+        console.error('[WS] Error:', payload.message ?? payload.error ?? 'Unknown error', payload);
         this.vesselsLoading.set(false);
         this.syncing.set(false);
       }),
