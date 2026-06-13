@@ -962,7 +962,7 @@ interface PlattsSuggestionViewModel {
 
     <!-- Delivery + Payments + Attachments + Comments -->
     @if (allowDeliveredEdit() || orderId() || order()?.id) {
-      <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         @if (allowDeliveredEdit()) {
           <app-order-delivery-card
             [deliveredAtLocal]="deliveredAtLocal()"
