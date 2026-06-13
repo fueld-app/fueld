@@ -68,6 +68,7 @@ import { OrderDeliveryCardComponent } from './components/order-delivery-card/ord
 import { OrderAttachmentsCardComponent } from './components/order-attachments-card/order-attachments-card.component';
 import { OrderSettingsDropdownComponent } from './components/order-settings-dropdown/order-settings-dropdown.component';
 import { OrderPlattsSignalsComponent } from './components/order-platts-signals/order-platts-signals.component';
+import { OrderSecondaryTabsComponent } from './components/order-secondary-tabs/order-secondary-tabs.component';
 import { OrderPaymentsCardComponent } from './components/order-payments-card/order-payments-card.component';
 import { CommentsCardComponent } from '../../../../shared/components/comments-card/comments-card.component';
 import { PdfPreviewModalComponent } from '../../../../shared/components/pdf-preview-modal/pdf-preview-modal.component';
@@ -224,6 +225,7 @@ interface PlattsSuggestionViewModel {
     OrderAttachmentsCardComponent,
     OrderSettingsDropdownComponent,
     OrderPlattsSignalsComponent,
+    OrderSecondaryTabsComponent,
   ],
   template: `
     <app-trading-detail-header
@@ -941,33 +943,22 @@ interface PlattsSuggestionViewModel {
     }
 
     <!-- ═════════════════════════════════════════════════════════════ -->
-    <!--  Financing Summary + Platts Signals (side-by-side on desktop) -->
+        <!-- ═════════════════════════════════════════════════════════════ -->
+    <!--  Financing Summary (always visible when user can see prices) -->
     <!-- ═════════════════════════════════════════════════════════════ -->
-    <div class="mt-4 grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2">
-      @if (auth.canSeePrices()) {
-        <div #financingSummaryContainer class="block">
-          <app-order-financing-summary
-            class="block"
-            [baseCurrency]="itemDisplayCurrency()"
-            [financingRateAnnual]="financingRateAnnual()"
-            [financingDays]="financingDays()"
-            [financingDayCountConvention]="financingDayCountConvention()"
-            [economics]="itemEconomics()"
-          />
-        </div>
-      }
+    @if (auth.canSeePrices()) {
+      <div class="mt-4">
+        <app-order-financing-summary
+          [baseCurrency]="itemDisplayCurrency()"
+          [financingRateAnnual]="financingRateAnnual()"
+          [financingDays]="financingDays()"
+          [financingDayCountConvention]="financingDayCountConvention()"
+          [economics]="itemEconomics()"
+        />
+      </div>
+    }
 
-      <div
-        <app-order-platts-signals
-            [items]="plattsSuggestionItems()"
-            [meta]="plattsSuggestionsMeta()"
-            [loading]="plattsSuggestionsLoading()"
-            [error]="plattsSuggestionsError()"
-            (refresh)="loadPlattsSuggestions()"
-            (openReport)="openPlattsReport($event)"
-          />
-
-    <!-- Delivery + Payments -->
+    <!-- Delivery + Payments + Attachments + Comments -->
     @if (allowDeliveredEdit() || orderId() || order()?.id) {
       <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         @if (allowDeliveredEdit()) {
@@ -994,33 +985,49 @@ interface PlattsSuggestionViewModel {
           />
         }
         <app-order-attachments-card
-            [attachments]="attachments()"
-            [attachmentTypes]="configuredAttachmentTypes()"
-            [(attachmentType)]="attachmentType"
-            [uploading]="uploadingAttachment()"
-            [hasFile]="!!selectedAttachment"
-            (upload)="uploadAttachment()"
-            (open)="openAttachment($event)"
-            (delete)="deleteAttachment($event)"
-            (fileSelected)="onAttachmentSelected($event)"
-          />
+          [attachments]="attachments()"
+          [attachmentTypes]="configuredAttachmentTypes()"
+          [(attachmentType)]="attachmentType"
+          [uploading]="uploadingAttachment()"
+          [hasFile]="!!selectedAttachment"
+          (upload)="uploadAttachment()"
+          (open)="openAttachment($event)"
+          (delete)="deleteAttachment($event)"
+          (fileSelected)="onAttachmentSelected($event)"
+        />
         @if (orderId()) {
           <div class="h-full max-h-[520px] overflow-auto">
             <app-comments-card entityType="order" [entityId]="orderId()" [enableFollowUp]="false" />
           </div>
         }
-        }
       </div>
-
-      @if (order()?.id) {
-        <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <app-email-history-card [orderId]="order()!.id" />
-          <app-activity-timeline entityType="order" [entityId]="order()!.id" />
-        </div>
-      }
     }
 
-    <!-- Toast notification -->
+    <!-- Secondary tabs: Platts Signals, Email History, Activity -->
+    @if (order()?.id) {
+      <app-order-secondary-tabs
+        [plattsVisible]="plattsSuggestionItems().length > 0 || plattsSuggestionsLoading()"
+        [emailVisible]="true"
+        [activityVisible]="true"
+      >
+        <div tab-platts>
+          <app-order-platts-signals
+            [items]="plattsSuggestionItems()"
+            [meta]="plattsSuggestionsMeta()"
+            [loading]="plattsSuggestionsLoading()"
+            [error]="plattsSuggestionsError()"
+            (refresh)="loadPlattsSuggestions()"
+            (openReport)="openPlattsReport($event)"
+          />
+        </div>
+        <div tab-email>
+          <app-email-history-card [orderId]="order()!.id" />
+        </div>
+        <div tab-activity>
+          <app-activity-timeline entityType="order" [entityId]="order()!.id" />
+        </div>
+      </app-order-secondary-tabs>
+    }<!-- Toast notification -->
     @if (toast()) {
       <div
         class="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-lg border px-4 py-3 text-sm font-medium shadow-lg transition-all"
