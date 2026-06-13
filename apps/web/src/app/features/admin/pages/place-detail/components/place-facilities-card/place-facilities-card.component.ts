@@ -26,7 +26,7 @@ import { PlaceDetailStore } from '../../place-detail.store';
             @for (facility of store.facilities(); track facility.id) {
               <div class="px-5 py-3">
                 <div class="flex items-center justify-between">
-                  <span class="text-sm font-medium text-gray-800">{{ facility.label ?? facility.name }}</span>
+                  <span class="text-sm font-medium text-gray-800">{{ facility.label || facility.name }}</span>
                   @if (facility.category) {
                     <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
                       {{ facility.category }}
