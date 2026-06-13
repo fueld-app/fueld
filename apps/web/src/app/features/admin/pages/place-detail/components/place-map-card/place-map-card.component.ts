@@ -43,7 +43,7 @@ import { PlaceDetailStore } from '../../place-detail.store';
             </button>
           </div>
         </div>
-        <div class="flex-1 min-h-0" [class]="store.mapFullscreen() ? 'h-[calc(100dvh-49px)]' : ''" #mapContainer></div>
+        <div class="flex-1 min-h-0 relative" [class]="store.mapFullscreen() ? 'h-[calc(100dvh-49px)]' : ''" #mapContainer></div>
       </div>
     }
   `,

@@ -373,8 +373,13 @@ export class PlaceDetailStore {
       const enrichment = this.enrichment();
       const container = this.mapContainer;
       if (!p?.lat || !p?.long || !container || this.map) return;
-      // Defer to next tick so the DOM container is fully laid out
-      setTimeout(() => this.initMap(), 0);
+      // Defer to next tick so the DOM container is fully laid out and has size
+      setTimeout(() => {
+        if (!this.mapContainer || this.map) return;
+        this.initMap();
+        // Leaflet needs a resize after the container becomes visible/sized
+        setTimeout(() => this.map?.invalidateSize(), 0);
+      }, 0);
     });
   }
 
