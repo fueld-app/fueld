@@ -53,10 +53,16 @@ export class PlaceMapCardComponent implements AfterViewInit, OnDestroy {
   private readonly mapContainer = viewChild<ElementRef<HTMLDivElement>>('mapContainer');
 
   ngAfterViewInit(): void {
-    const el = this.mapContainer()?.nativeElement;
-    if (el) {
-      this.store.setMapContainer(el);
-    }
+    // viewChild may not be ready immediately in dev mode; wait for it
+    const trySetContainer = () => {
+      const el = this.mapContainer()?.nativeElement;
+      if (el) {
+        this.store.setMapContainer(el);
+      } else {
+        requestAnimationFrame(trySetContainer);
+      }
+    };
+    trySetContainer();
   }
 
   ngOnDestroy(): void {
