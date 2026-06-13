@@ -62,6 +62,7 @@ import { SendInquiryModalComponent, type SendInquiryPayload, type SendInquiryWha
 import type { DropdownOption } from '../../../../shared/components/searchable-dropdown/searchable-dropdown.component';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
+import { OrderPaymentTermsCardComponent } from './components/order-payment-terms-card/order-payment-terms-card.component';
 import { CommentsCardComponent } from '../../../../shared/components/comments-card/comments-card.component';
 import { PdfPreviewModalComponent } from '../../../../shared/components/pdf-preview-modal/pdf-preview-modal.component';
 import { ActivityTimelineComponent } from '../../../../shared/components/activity-timeline/activity-timeline.component';
@@ -210,6 +211,7 @@ interface PlattsSuggestionViewModel {
     InternalTransferSummaryComponent,
     InternalTransferSidesComponent,
     CreditApplicationModalComponent,
+    OrderPaymentTermsCardComponent,
   ],
   template: `
     <app-trading-detail-header
@@ -416,169 +418,43 @@ interface PlattsSuggestionViewModel {
       </div>
       <!-- Customer Payment (projected into client card) -->
       <div customerPayment>
-        <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Payment</p>
-        @if (isReadonly()) {
-          <p class="mt-1 text-sm font-semibold text-gray-900">{{ formatCustomerPaymentTerms() }}</p>
-        } @else {
-          <div class="flex items-center gap-2">
-            <select
-              [ngModel]="order()?.customerPaymentTermType ?? ''"
-              (ngModelChange)="onCustomerPaymentTermChange($event)"
-              class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
-                     focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
-            >
-              <option value="">Select</option>
-              @for (opt of paymentTermOptions; track opt.value) {
-                <option
-                  [value]="opt.value"
-                  [disabled]="(opt.value === 'CREDIT' && !canUseCustomerCredit())"
-                >
-                  {{ opt.value === 'CREDIT' && !canUseCustomerCredit() ? (customerCreditFrozen() ? 'Credit (frozen)' : 'Credit (no line)') : opt.label }}
-                </option>
-              }
-            </select>
-            @if (order()?.customerPaymentTermType === 'CREDIT') {
-              <input
-                type="number"
-                min="0"
-                [attr.max]="customerCreditSummary()?.maxDays ?? null"
-                [ngModel]="order()?.customerCreditDays ?? ''"
-                (ngModelChange)="onCustomerCreditDaysChange($event)"
-                placeholder="Days"
-                class="w-24 rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm
-                       focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-              />
-            }
-          </div>
-          <div class="mt-2 text-xs text-gray-500">
-            @if (customerCreditLoading()) {
-              <span>Loading credit line...</span>
-            } @else if (customerCreditSummary()) {
-              @if (customerCreditFrozen()) {
-                <span class="text-red-600 font-medium">Credit frozen — risk monitoring hit</span>
-              } @else {
-                <span>
-                  Available: {{ customerCreditSummary()!.available | number : '1.2-2' }}
-                  {{ customerCreditSummary()!.currency }} · Max {{ customerCreditSummary()!.maxDays }} days
-                </span>
-              }
-              @if (!isReadonly()) {
-                <button (click)="showCreditApplicationModal.set(true)"
-                  class="ml-2 text-xs text-brand-600 hover:text-brand-700 underline">Request Increase</button>
-              }
-            } @else {
-              <span>No credit line on file.</span>
-              @if (!isReadonly()) {
-                <button (click)="showCreditApplicationModal.set(true)"
-                  class="ml-1 text-xs text-brand-600 hover:text-brand-700 underline">Request Credit</button>
-              }
-            }
-          </div>
-        }
-        <!-- Note toggle -->
-        @if (!isReadonly()) {
-          @if (showCustomerPaymentNote()) {
-            <div class="mt-2">
-              <textarea
-                rows="2"
-                [ngModel]="order()?.customerNote ?? ''"
-                (ngModelChange)="onCustomerNoteChange($event)"
-                placeholder="Customer note for PDFs and emails"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
-                       focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-              ></textarea>
-              <button (click)="showCustomerPaymentNote.set(false)"
-                class="mt-1 text-xs text-gray-400 hover:text-gray-600 transition-colors">Hide note</button>
-            </div>
-          } @else {
-            <button (click)="showCustomerPaymentNote.set(true)"
-              class="mt-2 inline-flex items-center gap-1 text-xs text-gray-400 hover:text-brand-600 transition-colors">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M2 4.75A.75.75 0 0 1 2.75 4h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 4.75Zm0 10.5a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5a.75.75 0 0 1-.75-.75ZM2 10a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 10Z" />
-              </svg>
-              {{ order()?.customerNote ? 'Edit note' : 'Add note' }}
-            </button>
-          }
-        } @else if (order()?.customerNote) {
-          <p class="mt-2 text-xs text-gray-500 whitespace-pre-line">{{ order()?.customerNote }}</p>
-        }
+        <app-order-payment-terms-card
+          side="customer"
+          [readonly]="isReadonly()"
+          [paymentTermType]="order()?.customerPaymentTermType ?? ''"
+          [creditDays]="order()?.customerCreditDays ?? null"
+          [creditSummary]="customerCreditSummary()"
+          [creditLoading]="customerCreditLoading()"
+          [creditFrozen]="customerCreditFrozen()"
+          [canUseCredit]="canUseCustomerCredit()"
+          [note]="order()?.customerNote ?? null"
+          [showNote]="showCustomerPaymentNote()"
+          [paymentTermOptions]="paymentTermOptions"
+          (paymentTermTypeChange)="onCustomerPaymentTermChange($event as any)"
+          (creditDaysChange)="onCustomerCreditDaysChange($event)"
+          (noteChange)="onCustomerNoteChange($event)"
+          (showNoteChange)="showCustomerPaymentNote.set($event)"
+          (requestCredit)="showCreditApplicationModal.set(true)"
+        />
       </div>
       <!-- Supplier Payment (projected into supplier card) -->
       <div supplierPayment>
-        <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Payment</p>
-        @if (isReadonly()) {
-          <p class="mt-1 text-sm font-semibold text-gray-900">{{ formatSupplierPaymentTerms() }}</p>
-        } @else {
-          <div class="flex items-center gap-2">
-            <select
-              [ngModel]="activeSupplierPaymentTermType() ?? ''"
-              (ngModelChange)="onSupplierPaymentTermChange($event)"
-              class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
-                     focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
-            >
-              <option value="">Select</option>
-              @for (opt of paymentTermOptions; track opt.value) {
-                <option
-                  [value]="opt.value"
-                  [disabled]="opt.value === 'CREDIT' && !canUseSupplierCredit()"
-                >
-                  {{ opt.value === 'CREDIT' && !canUseSupplierCredit() ? 'Credit (no line)' : opt.label }}
-                </option>
-              }
-            </select>
-            @if (activeSupplierPaymentTermType() === 'CREDIT') {
-              <input
-                type="number"
-                min="0"
-                [attr.max]="supplierCreditSummary()?.maxDays ?? null"
-                [ngModel]="activeSupplierCreditDays() ?? ''"
-                (ngModelChange)="onSupplierCreditDaysChange($event)"
-                placeholder="Days"
-                class="w-24 rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm
-                       focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-              />
-            }
-          </div>
-          <div class="mt-2 text-xs text-gray-500">
-            @if (supplierCreditLoading()) {
-              <span>Loading credit line...</span>
-            } @else if (supplierCreditSummary()) {
-              <span>
-                Available: {{ supplierCreditSummary()!.available | number : '1.2-2' }}
-                {{ supplierCreditSummary()!.currency }} · Max {{ supplierCreditSummary()!.maxDays }} days
-              </span>
-            } @else {
-              <span>No credit line on file.</span>
-            }
-          </div>
-        }
-        <!-- Note toggle -->
-        @if (!isReadonly()) {
-          @if (showSupplierPaymentNote()) {
-            <div class="mt-2">
-              <textarea
-                rows="2"
-                [ngModel]="activeSupplierNote() ?? ''"
-                (ngModelChange)="onSupplierNoteChange($event)"
-                placeholder="Supplier note"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
-                       focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-              ></textarea>
-              <button (click)="showSupplierPaymentNote.set(false)"
-                class="mt-1 text-xs text-gray-400 hover:text-gray-600 transition-colors">Hide note</button>
-            </div>
-          } @else {
-            <button (click)="showSupplierPaymentNote.set(true)"
-              class="mt-2 inline-flex items-center gap-1 text-xs text-gray-400 hover:text-brand-600 transition-colors">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M2 4.75A.75.75 0 0 1 2.75 4h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 4.75Zm0 10.5a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5a.75.75 0 0 1-.75-.75ZM2 10a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 10Z" />
-              </svg>
-              {{ activeSupplierNote() ? 'Edit note' : 'Add note' }}
-            </button>
-          }
-        } @else if (activeSupplierNote()) {
-          <p class="mt-2 text-xs text-gray-500 whitespace-pre-line">{{ activeSupplierNote() }}</p>
-        }
+        <app-order-payment-terms-card
+          side="supplier"
+          [readonly]="isReadonly()"
+          [paymentTermType]="activeSupplierPaymentTermType() ?? ''"
+          [creditDays]="activeSupplierCreditDays() ?? null"
+          [creditSummary]="supplierCreditSummary()"
+          [creditLoading]="supplierCreditLoading()"
+          [canUseCredit]="canUseSupplierCredit()"
+          [note]="activeSupplierNote() ?? null"
+          [showNote]="showSupplierPaymentNote()"
+          [paymentTermOptions]="paymentTermOptions"
+          (paymentTermTypeChange)="onSupplierPaymentTermChange($event as any)"
+          (creditDaysChange)="onSupplierCreditDaysChange($event)"
+          (noteChange)="onSupplierNoteChange($event)"
+          (showNoteChange)="showSupplierPaymentNote.set($event)"
+        />
       </div>
       <!-- Notes + T&C (projected into invoicing card) -->
       <div notesAndTerms>
