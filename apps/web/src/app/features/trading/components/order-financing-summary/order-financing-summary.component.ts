@@ -8,56 +8,57 @@ import type { OrderItemsEconomics } from '../order-items/order-item.types';
   imports: [DecimalPipe],
   template: `
     <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
-      <div class="flex flex-wrap items-stretch divide-x divide-gray-100">
+      <!-- Header -->
+      <div class="flex items-center justify-between border-b border-gray-100 px-4 py-2.5">
+        <div class="flex items-center gap-2">
+          <h3 class="text-xs font-semibold uppercase tracking-[0.15em] text-gray-600">P&amp;L</h3>
+          <span class="text-[11px] text-gray-400">·</span>
+          <span class="text-xs text-gray-500">{{ baseCurrency() }}</span>
+        </div>
+        <span class="rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700">
+          {{ (financingRateAnnual() * 100) | number:'1.1-1' }}% · {{ financingDays() }}d
+        </span>
+      </div>
+
+      <!-- Metrics -->
+      <div class="grid grid-cols-3 divide-x divide-gray-100">
         <!-- Gross Profit -->
-        <div class="flex flex-1 flex-col items-center justify-center gap-0.5 px-3 py-3 min-w-[100px]">
-          <span class="text-[10px] font-medium uppercase tracking-wider text-gray-500">Gross</span>
-          <span class="text-sm font-bold tabular-nums" [class.text-green-600]="economics().totalGrossProfit > 0" [class.text-red-600]="economics().totalGrossProfit < 0">
+        <div class="px-4 py-3">
+          <p class="text-[11px] font-medium uppercase tracking-wider text-gray-500">Gross</p>
+          <p class="mt-1 text-lg font-bold tabular-nums leading-tight"
+            [class.text-green-600]="economics().totalGrossProfit > 0"
+            [class.text-red-600]="economics().totalGrossProfit < 0">
             {{ economics().totalGrossProfit | number:'1.2-2' }}
-          </span>
-          <span class="text-[9px] text-gray-400">{{ baseCurrency() }}</span>
+          </p>
         </div>
 
         <!-- Financing Cost -->
-        <div class="flex flex-1 flex-col items-center justify-center gap-0.5 px-3 py-3 min-w-[100px]">
-          <span class="text-[10px] font-medium uppercase tracking-wider text-amber-700">Financing</span>
-          <span class="text-sm font-bold tabular-nums text-amber-800">
+        <div class="px-4 py-3 bg-amber-50/30">
+          <p class="text-[11px] font-medium uppercase tracking-wider text-amber-700">Financing</p>
+          <p class="mt-1 text-lg font-bold tabular-nums leading-tight text-amber-800">
             {{ economics().totalFinancingCost | number:'1.2-2' }}
-          </span>
-          <span class="text-[9px] text-amber-600/60">{{ baseCurrency() }}</span>
+          </p>
         </div>
 
         <!-- Net Profit -->
-        <div class="flex flex-1 flex-col items-center justify-center gap-0.5 px-3 py-3 min-w-[100px]">
-          <span class="text-[10px] font-medium uppercase tracking-wider text-gray-500">Net</span>
-          <span class="text-sm font-bold tabular-nums" [class.text-green-600]="economics().totalNetProfit > 0" [class.text-red-600]="economics().totalNetProfit < 0">
+        <div class="px-4 py-3">
+          <p class="text-[11px] font-medium uppercase tracking-wider text-gray-500">Net</p>
+          <p class="mt-1 text-lg font-bold tabular-nums leading-tight"
+            [class.text-green-600]="economics().totalNetProfit > 0"
+            [class.text-red-600]="economics().totalNetProfit < 0">
             {{ economics().totalNetProfit | number:'1.2-2' }}
-          </span>
-          <span class="text-[9px] text-gray-400">{{ baseCurrency() }}</span>
+          </p>
         </div>
+      </div>
 
-        <!-- Net Margin -->
-        <div class="flex flex-1 flex-col items-center justify-center gap-0.5 px-3 py-3 min-w-[80px]">
-          <span class="text-[10px] font-medium uppercase tracking-wider text-gray-500">Margin</span>
-          <span class="text-sm font-bold tabular-nums text-gray-900">
-            {{ (economics().netMarginPct ?? 0) | number:'1.1-1' }}%
-          </span>
+      <!-- Secondary metrics row -->
+      <div class="flex items-center justify-between border-t border-gray-100 px-4 py-2">
+        <div class="flex items-center gap-4 text-xs text-gray-500">
+          <span>Margin <strong class="text-gray-700">{{ (economics().netMarginPct ?? 0) | number:'1.1-1' }}%</strong></span>
+          <span class="hidden sm:inline">Financing/MT <strong class="text-gray-700">{{ (economics().financingCostPerMt ?? 0) | number:'1.2-2' }} {{ baseCurrency() }}</strong></span>
         </div>
-
-        <!-- Financing / MT -->
-        <div class="hidden lg:flex flex-1 flex-col items-center justify-center gap-0.5 px-3 py-3 min-w-[80px]">
-          <span class="text-[10px] font-medium uppercase tracking-wider text-gray-500">/ MT</span>
-          <span class="text-sm font-bold tabular-nums text-gray-900">
-            {{ (economics().financingCostPerMt ?? 0) | number:'1.2-2' }}
-          </span>
-          <span class="text-[9px] text-gray-400">{{ baseCurrency() }}</span>
-        </div>
-
-        <!-- Terms badge -->
-        <div class="flex items-center gap-1.5 px-3 py-3 shrink-0">
-          <span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 whitespace-nowrap">
-            {{ (financingRateAnnual() * 100) | number:'1.1-1' }}% · {{ financingDays() }}d
-          </span>
+        <div class="text-[11px] text-gray-400">
+          <span>Qty <strong class="text-gray-600">{{ economics().totalQuantity | number:'1.0-0' }} MT</strong></span>
         </div>
       </div>
     </div>
