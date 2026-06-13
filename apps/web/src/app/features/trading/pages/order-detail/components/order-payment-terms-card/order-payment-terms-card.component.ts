@@ -7,7 +7,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
-import type { DropdownOption } from '../../../../shared/components/searchable-dropdown/searchable-dropdown.component';
+import type { DropdownOption } from '@app/shared/components/searchable-dropdown/searchable-dropdown.component';
 
 export interface CreditSummary {
   available: number;

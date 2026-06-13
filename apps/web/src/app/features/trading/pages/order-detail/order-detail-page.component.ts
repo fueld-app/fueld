@@ -275,7 +275,9 @@ interface PlattsSuggestionViewModel {
             [categoryOptions]="orderCategories()"
             (currencyChange)="onCurrencyChange($event)"
             (categoryChange)="onCategoryChange($event)"
-          /></app-trading-detail-header>
+          />
+        </div>
+      </app-trading-detail-header>
 
     @if (isInternalTransfer()) {
       <div class="mt-4">
@@ -406,7 +408,7 @@ interface PlattsSuggestionViewModel {
           [note]="order()?.customerNote ?? null"
           [showNote]="showCustomerPaymentNote()"
           [paymentTermOptions]="paymentTermOptions"
-          (paymentTermTypeChange)="onCustomerPaymentTermChange($event as any)"
+          (paymentTermTypeChange)="onCustomerPaymentTermChange($event)"
           (creditDaysChange)="onCustomerCreditDaysChange($event)"
           (noteChange)="onCustomerNoteChange($event)"
           (showNoteChange)="showCustomerPaymentNote.set($event)"
@@ -1589,9 +1591,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   private readonly draftItemIds = signal<Set<string>>(new Set());
   private autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
   private plattsSuggestionTimer: ReturnType<typeof setTimeout> | null = null;
-  private financingSummaryResizeObserver: ResizeObserver | null = null;
   private changeVersion = signal(0);
-  private readonly handleWindowResize = () => this.syncPlattsSignalsHeight();
 
   // ─── Computed ────────────────────────────────────────────────────
 
@@ -2115,15 +2115,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   ngAfterViewInit(): void {
-    const container = this.financingSummaryContainer()?.nativeElement;
-    if (!container) return;
-
-    this.financingSummaryResizeObserver = new ResizeObserver(() => {
-      this.syncPlattsSignalsHeight();
-    });
-    this.financingSummaryResizeObserver.observe(container);
-    window.addEventListener('resize', this.handleWindowResize);
-    this.syncPlattsSignalsHeight();
+    // View init done
   }
 
   ngOnDestroy(): void {
@@ -2133,22 +2125,9 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     if (this.plattsSuggestionTimer) {
       clearTimeout(this.plattsSuggestionTimer);
     }
-    this.financingSummaryResizeObserver?.disconnect();
-    this.financingSummaryResizeObserver = null;
-    window.removeEventListener('resize', this.handleWindowResize);
   }
 
-  private syncPlattsSignalsHeight(): void {
-    const container = this.financingSummaryContainer()?.nativeElement;
-    if (!container) return;
 
-    if (!window.matchMedia('(min-width: 1024px)').matches) {
-      this.plattsSignalsMaxHeight.set(null);
-      return;
-    }
-
-    this.plattsSignalsMaxHeight.set(Math.ceil(container.getBoundingClientRect().height));
-  }
 
   private detailBaseRouteForStatus(status: string):
     '/trading/orders'
@@ -2888,7 +2867,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     }
     this.order.update((o) => {
       if (!o) return o;
-      const next = { ...o, customerPaymentTermType: value || null };
+      const next = { ...o, customerPaymentTermType: (value || null) as any };
       if (value !== 'CREDIT') next.customerCreditDays = null;
       return next;
     });
@@ -4528,15 +4507,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     this.triggerAutosave();
   }
 
-  toggleSettings(event: MouseEvent): void {
-    if (!this.settingsOpen()) {
-      const btn = event.currentTarget as HTMLElement;
-      const rect = btn.getBoundingClientRect();
-      this.settingsDropdownTop.set(rect.bottom + 4);
-      this.settingsDropdownLeft.set(Math.max(0, rect.right - 192)); // 192px = w-48
-    }
-    this.settingsOpen.set(!this.settingsOpen());
-  }
+
 
   private triggerAutosave(): void {
     if (this.isPaidOrCancelled()) return;

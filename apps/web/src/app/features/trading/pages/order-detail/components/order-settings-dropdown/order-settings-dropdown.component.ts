@@ -7,7 +7,7 @@ import {
   HostListener,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import type { DropdownOption } from '../../../../shared/components/searchable-dropdown/searchable-dropdown.component';
+import type { DropdownOption } from '@app/shared/components/searchable-dropdown/searchable-dropdown.component';
 
 @Component({
   selector: 'app-order-settings-dropdown',
