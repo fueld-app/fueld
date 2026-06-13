@@ -21,11 +21,14 @@
   - Extracted `order-item-pricing.component.ts` (386 lines)
   - Extracted `order-item-inventory-band.component.ts` (110 lines)
   - Extracted `order-item.types.ts`
+- `send-inquiry-modal.component.ts` (1,762 → 1,682 lines)
+  - Extracted `inquiry-body-editor.component.ts` (114 lines)
+  - Extracted `inquiry-deadline-picker.component.ts` (82 lines)
 
 ### Next candidates (by size)
-1. `send-inquiry-modal.component.ts` (1,762 lines)
-2. `integrations-page.component.ts` (1,747 lines)
-3. `order-detail-page.component.ts` (5,939 lines — defer until others are done)
+1. `integrations-page.component.ts` (1,747 lines)
+2. `order-detail-page.component.ts` (5,939 lines)
+3. `inquiries-list-page.component.ts` (1,196 lines)
 
 ### `/ship` command
 - Installed globally at `~/.pi/agent/extensions/ship-command.ts`
