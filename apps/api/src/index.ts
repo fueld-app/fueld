@@ -546,7 +546,13 @@ export async function createApp(options: CreateAppOptions = {}) {
         }
 
         try {
-          const data = typeof message === 'string' ? JSON.parse(message) : message;
+          const text =
+            typeof message === 'string'
+              ? message
+              : message instanceof Uint8Array || Buffer.isBuffer(message)
+                ? new TextDecoder().decode(message)
+                : String(message);
+          const data = JSON.parse(text);
 
           switch (data.type) {
             case 'presence': {
@@ -691,9 +697,9 @@ export async function createApp(options: CreateAppOptions = {}) {
             default:
               ws.send(JSON.stringify({ type: 'error', message: `Unknown message type: ${data.type}` }));
           }
-        } catch (err) {
-          console.error('[WS] Error:', err);
-          ws.send(JSON.stringify({ type: 'error', message: 'Failed to process request' }));
+        } catch (err: any) {
+          console.error('[WS] Error processing message:', err);
+          ws.send(JSON.stringify({ type: 'error', message: err?.message ?? 'Failed to process request', details: String(err) }));
         }
       },
 
