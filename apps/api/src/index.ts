@@ -675,12 +675,17 @@ export async function createApp(options: CreateAppOptions = {}) {
             case 'sync-place': {
               if (!data.placeId) break;
               console.log(`[WS] Syncing place ${data.placeId} from Seasearcher…`);
-              const updated = await syncPlaceFromSeasearcher(String(data.placeId));
-              if (updated) {
-                ws.send(JSON.stringify({ type: 'place-synced', data: updated }));
-                console.log(`[WS] Place ${data.placeId} synced successfully`);
-              } else {
-                ws.send(JSON.stringify({ type: 'sync-error', message: 'Place not found or no Seasearcher ID' }));
+              try {
+                const updated = await syncPlaceFromSeasearcher(String(data.placeId));
+                if (updated) {
+                  ws.send(JSON.stringify({ type: 'place-synced', data: updated }));
+                  console.log(`[WS] Place ${data.placeId} synced successfully`);
+                } else {
+                  ws.send(JSON.stringify({ type: 'sync-error', message: 'Place not found or no Seasearcher ID' }));
+                }
+              } catch (err: any) {
+                console.warn(`[WS] Sync place ${data.placeId} failed:`, err.message);
+                ws.send(JSON.stringify({ type: 'sync-error', message: err?.message ?? 'Failed to sync place' }));
               }
               break;
             }
