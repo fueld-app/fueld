@@ -283,6 +283,49 @@ export const routes: Routes = [
             (m) => m.CompanyDetailPageComponent,
           ),
         title: 'Companies',
+        children: [
+          { path: '', redirectTo: 'overview', pathMatch: 'full' },
+          {
+            path: 'overview',
+            loadComponent: () =>
+              import('./features/companies/pages/company-detail/tabs/overview-tab.component').then(
+                (m) => m.OverviewTabComponent,
+              ),
+            title: 'Overview',
+          },
+          {
+            path: 'commercial',
+            loadComponent: () =>
+              import('./features/companies/pages/company-detail/tabs/commercial-tab.component').then(
+                (m) => m.CommercialTabComponent,
+              ),
+            title: 'Commercial',
+          },
+          {
+            path: 'fleet',
+            loadComponent: () =>
+              import('./features/companies/pages/company-detail/tabs/fleet-tab.component').then(
+                (m) => m.FleetTabComponent,
+              ),
+            title: 'Fleet',
+          },
+          {
+            path: 'group',
+            loadComponent: () =>
+              import('./features/companies/pages/company-detail/tabs/group-tab.component').then(
+                (m) => m.GroupTabComponent,
+              ),
+            title: 'Group',
+          },
+          {
+            path: 'risk',
+            loadComponent: () =>
+              import('./features/companies/pages/company-detail/tabs/risk-tab.component').then(
+                (m) => m.RiskTabComponent,
+              ),
+            title: 'Risk',
+          },
+        ],
       },
       // ── Places ──
       {
