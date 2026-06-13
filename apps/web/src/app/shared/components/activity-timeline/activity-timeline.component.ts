@@ -44,8 +44,8 @@ interface ActivityItem {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [DatePipe],
   template: `
-    <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
-      <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
+    <div class="app-panel h-[420px] flex flex-col overflow-hidden">
+      <div class="app-panel-header app-panel-header--blue justify-between px-5 py-3">
         <h2 class="text-sm font-semibold text-gray-700">Activity History</h2>
         <div class="flex items-center gap-2">
           @if (total() > 0) {
@@ -63,6 +63,7 @@ interface ActivityItem {
         </div>
       </div>
 
+      <div class="flex-1 min-h-0 overflow-y-auto">
       @if (loading()) {
         <div class="flex items-center justify-center py-8">
           <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
@@ -71,7 +72,7 @@ interface ActivityItem {
           </svg>
         </div>
       } @else if (items().length) {
-        <div class="divide-y divide-gray-50 max-h-96 overflow-y-auto">
+        <div class="divide-y divide-gray-50">
           @for (item of items(); track item.id) {
             <div class="px-5 py-3 flex items-start gap-3 hover:bg-gray-50/50 transition-colors">
               <!-- Action icon -->
@@ -174,6 +175,7 @@ interface ActivityItem {
           No activity recorded for this entity yet.
         </div>
       }
+      </div>
     </div>
   `,
 })

@@ -41,9 +41,9 @@ interface Comment {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, DatePipe],
   template: `
-    <div class="h-full rounded-xl border border-gray-200 bg-white shadow-sm flex flex-col overflow-hidden">
+    <div class="app-panel h-[420px] flex flex-col overflow-hidden">
       <!-- Header -->
-      <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
+      <div class="app-panel-header app-panel-header--blue justify-between px-5 py-3">
         <h2 class="text-sm font-semibold text-gray-700">Comments</h2>
         @if (comments().length) {
           <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
