@@ -997,21 +997,29 @@ interface PlattsSuggestionViewModel {
           (delete)="deleteAttachment($event)"
           (fileSelected)="onAttachmentSelected($event)"
         />
-        @if (orderId()) {
-          <div class="h-full max-h-[520px] overflow-auto">
-            <app-comments-card entityType="order" [entityId]="orderId()" [enableFollowUp]="false" />
-          </div>
-        }
+
       </div>
     }
 
-    <!-- Secondary tabs: Platts Signals, Email History, Activity -->
+    <!-- Secondary tabs -->
     @if (order()?.id) {
       <app-order-secondary-tabs
-        [plattsVisible]="plattsSuggestionItems().length > 0 || plattsSuggestionsLoading()"
-        [emailVisible]="true"
+        [commentsVisible]="true"
         [activityVisible]="true"
+        [emailVisible]="true"
+        [plattsVisible]="plattsSuggestionItems().length > 0 || plattsSuggestionsLoading()"
+        [suppliersVisible]="isInquiryContext() && rankedInquirySuppliers().length > 0"
+        defaultTab="comments"
       >
+        <div tab-comments>
+          <app-comments-card entityType="order" [entityId]="orderId()" [enableFollowUp]="false" />
+        </div>
+        <div tab-activity>
+          <app-activity-timeline entityType="order" [entityId]="order()!.id" />
+        </div>
+        <div tab-email>
+          <app-email-history-card [orderId]="order()!.id" />
+        </div>
         <div tab-platts>
           <app-order-platts-signals
             [items]="plattsSuggestionItems()"
@@ -1022,11 +1030,66 @@ interface PlattsSuggestionViewModel {
             (openReport)="openPlattsReport($event)"
           />
         </div>
-        <div tab-email>
-          <app-email-history-card [orderId]="order()!.id" />
+        <div tab-suppliers>
+          @if (isInquiryContext()) {
+            <div class="text-sm text-gray-500">
+              @if (inquirySupplierContextLoading()) {
+                <p>Loading supplier comparison context...</p>
+              } @else if (rankedInquirySuppliers().length === 0) {
+                <p>No supplier history available for this inquiry yet.</p>
+              } @else {
+                <p class="mb-3">{{ rankedInquirySuppliers().length }} supplier{{ rankedInquirySuppliers().length === 1 ? '' : 's' }} ranked at this port</p>
+                <div class="grid gap-3 lg:grid-cols-2">
+                  @for (supplier of rankedInquirySuppliers(); track supplier.supplierId) {
+                    <div class="rounded-2xl border px-4 py-3 shadow-sm transition-all"
+                      [class.border-emerald-300]="selectedSupplierComparison()?.supplierId === supplier.supplierId"
+                      [class.bg-emerald-50/80]="selectedSupplierComparison()?.supplierId === supplier.supplierId"
+                      [class.border-slate-200]="selectedSupplierComparison()?.supplierId !== supplier.supplierId"
+                      [class.bg-white]="selectedSupplierComparison()?.supplierId !== supplier.supplierId"
+                    >
+                      <span class="font-semibold text-gray-900">{{ supplier.supplierName }}</span>
+                      <div class="mt-2 flex flex-wrap gap-1.5">
+                        @if (supplier.performance.deliveredCountOverall > 0) {
+                          <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-200">{{ supplier.performance.deliveredCountOverall }} delivered</span>
+                        }
+                        @if (supplier.performance.deliveredCountAtPlace > 0) {
+                          <span class="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-blue-200">{{ supplier.performance.deliveredCountAtPlace }} at this place</span>
+                        }
+                        @if (quoteRateLabel(supplier.performance)) {
+                          <span class="rounded-full bg-fuchsia-50 px-2 py-0.5 text-[10px] font-medium text-fuchsia-700 ring-1 ring-fuchsia-200">{{ quoteRateLabel(supplier.performance) }}</span>
+                        }
+                      </div>
+                      @if (!isReadonly()) {
+                        <button (click)="applyComparisonSupplier(supplier)"
+                          [disabled]="selectedSupplierComparison()?.supplierId === supplier.supplierId"
+                          class="mt-3 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors"
+                          [class.bg-brand-600]="selectedSupplierComparison()?.supplierId !== supplier.supplierId"
+                          [class.text-white]="selectedSupplierComparison()?.supplierId !== supplier.supplierId"
+                          [class.bg-slate-100]="selectedSupplierComparison()?.supplierId === supplier.supplierId"
+                          [class.text-slate-500]="selectedSupplierComparison()?.supplierId === supplier.supplierId"
+                        >
+                          {{ selectedSupplierComparison()?.supplierId === supplier.supplierId ? 'Selected' : 'Set as supplier' }}
+                        </button>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          } @else {
+            <div class="py-8 text-center text-sm text-gray-400">Supplier context is only available for inquiries.</div>
+          }
         </div>
-        <div tab-activity>
-          <app-activity-timeline entityType="order" [entityId]="order()!.id" />
+        <div tab-capture>
+          <div class="flex flex-col items-center justify-center py-12 text-sm text-gray-400">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z" />
+            </svg>
+            <p class="font-medium text-gray-500">Manual Capture</p>
+            <p class="mt-1">Upload or paste PDF/email content to auto-fill order details.</p>
+            <p class="mt-4 text-xs">Coming soon — planned for Phase 3.</p>
+          </div>
         </div>
       </app-order-secondary-tabs>
     }<!-- Toast notification -->
