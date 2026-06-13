@@ -13,7 +13,7 @@ import { PlaceFacilitiesCardComponent } from '../../components/place-facilities-
     PlaceFacilitiesCardComponent,
   ],
   template: `
-    <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-4">
       <div class="lg:col-span-2">
         <app-place-traffic-card />
       </div>
