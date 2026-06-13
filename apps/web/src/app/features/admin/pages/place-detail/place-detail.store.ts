@@ -374,11 +374,16 @@ export class PlaceDetailStore {
       const container = this.mapContainer;
       if (!p?.lat || !p?.long || !container || this.map) return;
       // Poll until the container has a non-zero size, then init the map
+      let attempts = 0;
+      const maxAttempts = 120; // ~2s at 60fps
       const tryInit = () => {
         if (!this.mapContainer || this.map) return;
         const rect = this.mapContainer.getBoundingClientRect();
+        attempts++;
         if (rect.width === 0 || rect.height === 0) {
-          requestAnimationFrame(tryInit);
+          if (attempts < maxAttempts) {
+            requestAnimationFrame(tryInit);
+          }
           return;
         }
         this.initMap();

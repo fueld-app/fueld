@@ -50,10 +50,13 @@ import { PlaceDetailStore } from '../../place-detail.store';
 })
 export class PlaceMapCardComponent implements AfterViewInit, OnDestroy {
   readonly store = inject(PlaceDetailStore);
-  private readonly mapContainer = viewChild.required<ElementRef<HTMLDivElement>>('mapContainer');
+  private readonly mapContainer = viewChild<ElementRef<HTMLDivElement>>('mapContainer');
 
   ngAfterViewInit(): void {
-    this.store.setMapContainer(this.mapContainer().nativeElement);
+    const el = this.mapContainer()?.nativeElement;
+    if (el) {
+      this.store.setMapContainer(el);
+    }
   }
 
   ngOnDestroy(): void {
