@@ -24,6 +24,8 @@ import {
   formatInquiryStoredDateLabel,
   syncInquiryMetadataTable,
 } from './send-inquiry-modal.utils';
+import { InquiryBodyEditorComponent } from './inquiry-body-editor.component';
+import { InquiryDeadlinePickerComponent } from './inquiry-deadline-picker.component';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Send Inquiry Modal — Send RFQ emails to multiple port suppliers
@@ -116,7 +118,7 @@ export interface SendInquiryWhatsAppPayload {
 @Component({
   selector: 'app-send-inquiry-modal',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, EmailTagInputComponent],
+  imports: [FormsModule, EmailTagInputComponent, InquiryBodyEditorComponent, InquiryDeadlinePickerComponent],
   template: `
     @if (open()) {
       <!-- Backdrop -->
@@ -545,51 +547,14 @@ export interface SendInquiryWhatsAppPayload {
               />
             </div>
 
-            <div>
-              <div class="flex items-center justify-between gap-3">
-                <label for="inquiry-deadline" class="block text-sm font-medium text-gray-700">Response deadline</label>
-                <label class="inline-flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
-                    [ngModel]="responseDeadlineEnabled()"
-                    (ngModelChange)="onResponseDeadlineToggle($event)"
-                  />
-                  Enable deadline
-                </label>
-              </div>
-              <input
-                id="inquiry-deadline"
-                type="datetime-local"
-                class="mt-1 block w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
-                [ngModel]="responseDeadlineAt()"
-                (ngModelChange)="onDeadlineChange($event)"
-                [disabled]="!responseDeadlineEnabled()"
-              />
-              <div class="mt-3 flex items-start justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-3">
-                <div>
-                  <p class="text-sm font-medium text-gray-700">Automatic reminder</p>
-                  <p class="mt-1 text-xs leading-5 text-gray-500">Send one reminder before the deadline if the supplier has not replied.</p>
-                </div>
-                <label class="inline-flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 disabled:cursor-not-allowed"
-                    [ngModel]="reminderEnabled()"
-                    (ngModelChange)="onReminderToggle($event)"
-                    [disabled]="!responseDeadlineEnabled()"
-                  />
-                  Opt in
-                </label>
-              </div>
-              @if (responseDeadlineEnabled() && reminderEnabled()) {
-                <p class="mt-2 text-xs leading-5 text-gray-500">One reminder will be sent automatically before this deadline if the supplier has not replied.</p>
-              } @else if (responseDeadlineEnabled()) {
-                <p class="mt-2 text-xs leading-5 text-gray-500">No automatic reminder will be sent unless you opt in for this inquiry.</p>
-              } @else {
-                <p class="mt-2 text-xs leading-5 text-gray-500">No response deadline or automatic reminder will be sent for this inquiry.</p>
-              }
-            </div>
+            <app-inquiry-deadline-picker
+              [responseDeadlineAt]="responseDeadlineAt()"
+              [responseDeadlineEnabled]="responseDeadlineEnabled()"
+              [reminderEnabled]="reminderEnabled()"
+              (deadlineChange)="onDeadlineChange($event)"
+              (toggle)="onResponseDeadlineToggle($event)"
+              (reminderToggle)="onReminderToggle($event)"
+            />
 
             <!-- Additional recipients -->
             <div>
@@ -611,33 +576,10 @@ export interface SendInquiryWhatsAppPayload {
               <p class="mb-2 text-xs leading-5 text-gray-500">
                 The content you edit here is the email body that will be sent. Recipient placeholders like name, senderName, and companyName are resolved separately for each recipient when sending.
               </p>
-              <div class="border border-gray-300 rounded-lg overflow-hidden">
-                <!-- Toolbar -->
-                <div class="flex items-center gap-1 border-b border-gray-200 bg-gray-50 px-2 py-1.5">
-                  <button type="button" (click)="execCommand('bold')" class="toolbar-btn" title="Bold">
-                    <strong>B</strong>
-                  </button>
-                  <button type="button" (click)="execCommand('italic')" class="toolbar-btn" title="Italic">
-                    <em>I</em>
-                  </button>
-                  <button type="button" (click)="execCommand('underline')" class="toolbar-btn" title="Underline">
-                    <u>U</u>
-                  </button>
-                  <div class="w-px h-4 bg-gray-300 mx-1"></div>
-                  <button type="button" (click)="execCommand('insertUnorderedList')" class="toolbar-btn" title="Bullet list">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd" d="M6 4.75A.75.75 0 016.75 4h10.5a.75.75 0 010 1.5H6.75A.75.75 0 016 4.75zM6 10a.75.75 0 01.75-.75h10.5a.75.75 0 010 1.5H6.75A.75.75 0 016 10zm0 5.25a.75.75 0 01.75-.75h10.5a.75.75 0 010 1.5H6.75a.75.75 0 01-.75-.75zM1.99 4.75a1 1 0 011-1h.01a1 1 0 010 2h-.01a1 1 0 01-1-1zm0 5.25a1 1 0 011-1h.01a1 1 0 010 2h-.01a1 1 0 01-1-1zm0 5.25a1 1 0 011-1h.01a1 1 0 010 2h-.01a1 1 0 01-1-1z" clip-rule="evenodd" />
-                    </svg>
-                  </button>
-                </div>
-                <!-- Content editable area -->
-                <div
-                  #bodyEditor
-                  contenteditable="true"
-                  class="inquiry-email-canvas min-h-[200px] max-h-[300px] overflow-y-auto px-4 py-3 text-sm text-gray-900 focus:outline-none"
-                  (input)="onBodyInput()"
-                ></div>
-              </div>
+              <app-inquiry-body-editor
+                [htmlBody]="htmlBody()"
+                (htmlBodyChange)="htmlBody.set($event)"
+              />
             </div>
 
             @if (htmlBody() || whatsappPreviewText()) {
@@ -808,25 +750,6 @@ export interface SendInquiryWhatsAppPayload {
     }
   `,
   styles: [`
-    .toolbar-btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 4px;
-      padding: 4px;
-      font-size: 14px;
-      color: #4b5563;
-      min-width: 28px;
-      text-align: center;
-      cursor: pointer;
-      border: none;
-      background: transparent;
-      transition: background-color 0.15s, color 0.15s;
-    }
-    .toolbar-btn:hover {
-      background-color: #e5e7eb;
-      color: #111827;
-    }
     .inquiry-email-canvas {
       word-break: break-word;
     }
@@ -973,6 +896,7 @@ export class SendInquiryModalComponent {
   readonly addSupplierLoading = signal(false);
 
   readonly bodyEditor = viewChild<ElementRef<HTMLDivElement>>('bodyEditor');
+  readonly bodyEditorComponent = viewChild(InquiryBodyEditorComponent);
 
   readonly selectedCount = computed(() => this.suppliers().filter(s => s.selected).length);
   readonly totalRecipientCount = computed(() => this.selectedCount() + this.recipientTags().length);
@@ -1084,10 +1008,7 @@ export class SendInquiryModalComponent {
             this.htmlBody.set(syncedHtml);
             // Set the body editor content
             setTimeout(() => {
-              const editor = this.bodyEditor()?.nativeElement;
-              if (editor) {
-                editor.innerHTML = syncedHtml;
-              }
+              this.bodyEditorComponent()?.setContent(syncedHtml);
             });
           }
         },
@@ -1712,16 +1633,15 @@ export class SendInquiryModalComponent {
   }
 
   private syncInquiryBodyMetadata(): void {
-    const editor = this.bodyEditor()?.nativeElement;
-    const editorHtml = editor?.innerHTML ?? '';
-    const currentHtml = editorHtml.trim() ? editorHtml : this.htmlBody();
+    const editorComponent = this.bodyEditorComponent();
+    const currentHtml = this.htmlBody();
     const syncedHtml = this.syncInquiryBodyMetadataHtml(currentHtml);
     if (syncedHtml === currentHtml) return;
 
     this.htmlBody.set(syncedHtml);
-    if (editor && editor.innerHTML !== syncedHtml) {
-      editor.innerHTML = syncedHtml;
-    }
+    setTimeout(() => {
+      editorComponent?.setContent(syncedHtml);
+    });
   }
 
   private syncInquiryBodyMetadataHtml(html: string): string {
