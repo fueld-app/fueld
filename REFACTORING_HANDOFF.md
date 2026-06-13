@@ -26,11 +26,15 @@
   - Extracted `inquiry-deadline-picker.component.ts` (82 lines)
 - `integrations-page.component.ts` (1,747 → **106 lines**, -94%)
   - Replaced 6 inline cards with pre-existing extracted components
-  - Cards already existed: lli, smtp, microsoft, push, quickbooks, whatsapp
-  - Each handles own form state, API calls, and toast notifications
+- `order-detail-page.component.ts` (5,939 → **5,605 lines**, **-334 lines**)
+  - Extracted `order-payment-terms-card.component.ts`
+  - Extracted `order-notes-terms-card.component.ts`
+  - Extracted `order-delivery-card.component.ts`
+  - Extracted `order-payments-card.component.ts`
+  - Extracted `order-attachments-card.component.ts`
 
 ### Next candidates (by size)
-1. `order-detail-page.component.ts` (5,939 lines)
+1. `order-detail-page.component.ts` (5,605 lines — ~600 more inline to extract)
 2. `inquiries-list-page.component.ts` (1,196 lines)
 3. `reports-page.component.ts` (1,568 lines)
 
