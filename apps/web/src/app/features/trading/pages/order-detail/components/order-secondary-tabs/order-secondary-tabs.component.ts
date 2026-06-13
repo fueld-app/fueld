@@ -2,6 +2,7 @@ import {
   Component,
   ChangeDetectionStrategy,
   input,
+  output,
   signal,
   OnInit,
 } from '@angular/core';
@@ -18,12 +19,11 @@ export interface OrderSecondaryTab {
   template: `
     @if (visibleTabs().length > 0) {
       <div class="mt-6">
-        <!-- Tab bar -->
         <div class="flex items-center gap-1 border-b border-gray-200 overflow-x-auto scrollbar-none">
           @for (tab of visibleTabs(); track tab.id) {
             <button
               type="button"
-              (click)="activeTab.set(tab.id)"
+              (click)="selectTab(tab.id)"
               class="whitespace-nowrap px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px"
               [class]="activeTab() === tab.id
                 ? 'border-brand-600 text-brand-700'
@@ -31,28 +31,6 @@ export interface OrderSecondaryTab {
             >
               {{ tab.label }}
             </button>
-          }
-        </div>
-
-        <!-- Tab content -->
-        <div class="mt-4">
-          @if (activeTab() === 'comments') {
-            <ng-content select="[tab-comments]" />
-          }
-          @if (activeTab() === 'activity') {
-            <ng-content select="[tab-activity]" />
-          }
-          @if (activeTab() === 'email') {
-            <ng-content select="[tab-email]" />
-          }
-          @if (activeTab() === 'platts') {
-            <ng-content select="[tab-platts]" />
-          }
-          @if (activeTab() === 'suppliers') {
-            <ng-content select="[tab-suppliers]" />
-          }
-          @if (activeTab() === 'capture') {
-            <ng-content select="[tab-capture]" />
           }
         </div>
       </div>
@@ -67,11 +45,17 @@ export class OrderSecondaryTabsComponent implements OnInit {
   readonly suppliersVisible = input(false);
   readonly captureVisible = input(false);
   readonly defaultTab = input('comments');
+  readonly activeTabChange = output<string>();
 
   protected readonly activeTab = signal('comments');
 
   ngOnInit(): void {
     this.activeTab.set(this.defaultTab());
+  }
+
+  protected selectTab(id: string): void {
+    this.activeTab.set(id);
+    this.activeTabChange.emit(id);
   }
 
   protected readonly visibleTabs = () => {
