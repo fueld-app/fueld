@@ -343,6 +343,41 @@ export const routes: Routes = [
             (m) => m.PlaceDetailPageComponent,
           ),
         title: 'Places',
+        children: [
+          { path: '', redirectTo: 'overview', pathMatch: 'full' },
+          {
+            path: 'overview',
+            loadComponent: () =>
+              import('./features/admin/pages/place-detail/tabs/overview-tab/overview-tab.component').then(
+                (m) => m.PlaceOverviewTabComponent,
+              ),
+            title: 'Places > Overview',
+          },
+          {
+            path: 'traffic',
+            loadComponent: () =>
+              import('./features/admin/pages/place-detail/tabs/traffic-tab/traffic-tab.component').then(
+                (m) => m.PlaceTrafficTabComponent,
+              ),
+            title: 'Places > Traffic',
+          },
+          {
+            path: 'structure',
+            loadComponent: () =>
+              import('./features/admin/pages/place-detail/tabs/structure-tab/structure-tab.component').then(
+                (m) => m.PlaceStructureTabComponent,
+              ),
+            title: 'Places > Structure',
+          },
+          {
+            path: 'commercial',
+            loadComponent: () =>
+              import('./features/admin/pages/place-detail/tabs/commercial-tab/commercial-tab.component').then(
+                (m) => m.PlaceCommercialTabComponent,
+              ),
+            title: 'Places > Commercial',
+          },
+        ],
       },
       // ── Vessels ──
       {
