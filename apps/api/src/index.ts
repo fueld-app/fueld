@@ -546,12 +546,22 @@ export async function createApp(options: CreateAppOptions = {}) {
         }
 
         try {
-          const text =
-            typeof message === 'string'
-              ? message
-              : message instanceof Uint8Array || Buffer.isBuffer(message)
-                ? new TextDecoder().decode(message)
-                : String(message);
+          let text: string;
+          if (typeof message === 'string') {
+            text = message;
+          } else if (message instanceof Uint8Array || (typeof Buffer !== 'undefined' && Buffer.isBuffer(message))) {
+            text = new TextDecoder().decode(message);
+          } else if (message && typeof message === 'object' && typeof message.text === 'function') {
+            text = await message.text();
+          } else if (message && typeof message === 'object' && typeof message.data === 'string') {
+            text = message.data;
+          } else if (message && typeof message === 'object' && message.data instanceof Uint8Array) {
+            text = new TextDecoder().decode(message.data);
+          } else {
+            console.warn('[WS] Unknown message shape:', typeof message, Object.prototype.toString.call(message), Object.keys(message ?? {}));
+            ws.send(JSON.stringify({ type: 'error', message: 'Invalid message format' }));
+            return;
+          }
           const data = JSON.parse(text);
 
           switch (data.type) {
