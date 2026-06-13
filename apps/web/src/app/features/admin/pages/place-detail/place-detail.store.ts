@@ -352,7 +352,7 @@ export class PlaceDetailStore {
   // Map refs (managed by store; components render containers)
   private map: L.Map | null = null;
   private vesselLayer: L.LayerGroup | null = null;
-  private mapContainer: HTMLElement | null = null;
+  private readonly mapContainer = signal<HTMLElement | null>(null);
   private wsSubs: Subscription[] = [];
   private vesselRefreshInterval: ReturnType<typeof setInterval> | null = null;
   private localTimeInterval: ReturnType<typeof setInterval> | null = null;
@@ -371,15 +371,16 @@ export class PlaceDetailStore {
     effect(() => {
       const p = this.place();
       const enrichment = this.enrichment();
-      const container = this.mapContainer;
+      const container = this.mapContainer();
       console.log('[PlaceDetailStore] map effect triggered:', { hasPlace: !!p, lat: p?.lat, long: p?.long, hasContainer: !!container, hasMap: !!this.map });
       if (!p?.lat || !p?.long || !container || this.map) return;
       // Poll until the container has a non-zero size, then init the map
       let attempts = 0;
       const maxAttempts = 120; // ~2s at 60fps
       const tryInit = () => {
-        if (!this.mapContainer || this.map) return;
-        const rect = this.mapContainer.getBoundingClientRect();
+        const currentContainer = this.mapContainer();
+        if (!currentContainer || this.map) return;
+        const rect = currentContainer.getBoundingClientRect();
         attempts++;
         console.log(`[PlaceDetailStore] init attempt ${attempts}:`, rect.width, rect.height);
         if (rect.width === 0 || rect.height === 0) {
@@ -487,7 +488,7 @@ export class PlaceDetailStore {
   private cleanupResources(): void {
     this.map?.remove();
     this.map = null;
-    this.mapContainer = null;
+    this.mapContainer.set(null);
     this.wsSubs.forEach((s) => s.unsubscribe());
     this.wsSubs = [];
     if (this.vesselRefreshInterval) {
@@ -606,7 +607,7 @@ export class PlaceDetailStore {
 
   setMapContainer(el: HTMLElement | null): void {
     console.log('[PlaceDetailStore] setMapContainer:', el);
-    this.mapContainer = el;
+    this.mapContainer.set(el);
     if (!el) {
       this.map?.remove();
       this.map = null;
@@ -616,7 +617,7 @@ export class PlaceDetailStore {
 
   private initMap(): void {
     const p = this.place();
-    const el = this.mapContainer;
+    const el = this.mapContainer();
     console.log('[PlaceDetailStore] initMap called:', { hasPlace: !!p, lat: p?.lat, long: p?.long, hasEl: !!el, hasMap: !!this.map });
     if (!p?.lat || !p?.long || !el) return;
     if (this.map) return;
