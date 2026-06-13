@@ -34,7 +34,7 @@ import { PlaceDetailStore } from '../../place-detail.store';
                   }
                 </div>
                 @if (facility.text || facility.description) {
-                  <p class="mt-1 text-xs text-gray-500">{{ facility.text ?? facility.description }}</p>
+                  <p class="mt-1 text-xs text-gray-500">{{ facility.text || facility.description }}</p>
                 }
                 @if (facility.maxSize || facility.maxDwt || facility.capacity) {
                   <div class="mt-1.5 flex flex-wrap gap-2 text-[10px] text-gray-400">
