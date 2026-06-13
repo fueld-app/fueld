@@ -128,7 +128,7 @@ export class OrderPaymentTermsCardComponent {
   readonly showNote = input(false);
   readonly paymentTermOptions = input<DropdownOption[]>([]);
 
-  readonly paymentTermTypeChange = output<string>();
+  readonly paymentTermTypeChange = output<string | ''>();
   readonly creditDaysChange = output<number>();
   readonly noteChange = output<string>();
   readonly showNoteChange = output<boolean>();
