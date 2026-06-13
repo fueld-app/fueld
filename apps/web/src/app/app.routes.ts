@@ -382,10 +382,61 @@ export const routes: Routes = [
           {
             path: 'integrations',
             loadComponent: () =>
-              import('./features/admin/pages/integrations/integrations-page.component').then(
-                (m) => m.IntegrationsPageComponent,
+              import('./features/admin/pages/integrations/integrations-shell.component').then(
+                (m) => m.IntegrationsShellComponent,
               ),
             title: 'Admin > Integrations',
+            children: [
+              { path: '', redirectTo: 'lli', pathMatch: 'full' },
+              {
+                path: 'lli',
+                loadComponent: () =>
+                  import('./features/admin/pages/integrations/lli-integration-card.component').then(
+                    (m) => m.LliIntegrationCardComponent,
+                  ),
+                title: 'Admin > Integrations > LLI',
+              },
+              {
+                path: 'smtp',
+                loadComponent: () =>
+                  import('./features/admin/pages/integrations/smtp-integration-card.component').then(
+                    (m) => m.SmtpIntegrationCardComponent,
+                  ),
+                title: 'Admin > Integrations > SMTP',
+              },
+              {
+                path: 'microsoft',
+                loadComponent: () =>
+                  import('./features/admin/pages/integrations/microsoft-integration-card.component').then(
+                    (m) => m.MicrosoftIntegrationCardComponent,
+                  ),
+                title: 'Admin > Integrations > Microsoft 365',
+              },
+              {
+                path: 'push',
+                loadComponent: () =>
+                  import('./features/admin/pages/integrations/push-integration-card.component').then(
+                    (m) => m.PushIntegrationCardComponent,
+                  ),
+                title: 'Admin > Integrations > Web Push',
+              },
+              {
+                path: 'quickbooks',
+                loadComponent: () =>
+                  import('./features/admin/pages/integrations/quickbooks-integration-card.component').then(
+                    (m) => m.QuickBooksIntegrationCardComponent,
+                  ),
+                title: 'Admin > Integrations > QuickBooks',
+              },
+              {
+                path: 'whatsapp',
+                loadComponent: () =>
+                  import('./features/admin/pages/integrations/whatsapp-integration-card.component').then(
+                    (m) => m.WhatsAppIntegrationCardComponent,
+                  ),
+                title: 'Admin > Integrations > WhatsApp',
+              },
+            ],
           },
           {
             path: 'activity',
