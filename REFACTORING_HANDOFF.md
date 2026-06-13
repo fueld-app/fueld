@@ -24,11 +24,15 @@
 - `send-inquiry-modal.component.ts` (1,762 → 1,682 lines)
   - Extracted `inquiry-body-editor.component.ts` (114 lines)
   - Extracted `inquiry-deadline-picker.component.ts` (82 lines)
+- `integrations-page.component.ts` (1,747 → **106 lines**, -94%)
+  - Replaced 6 inline cards with pre-existing extracted components
+  - Cards already existed: lli, smtp, microsoft, push, quickbooks, whatsapp
+  - Each handles own form state, API calls, and toast notifications
 
 ### Next candidates (by size)
-1. `integrations-page.component.ts` (1,747 lines)
-2. `order-detail-page.component.ts` (5,939 lines)
-3. `inquiries-list-page.component.ts` (1,196 lines)
+1. `order-detail-page.component.ts` (5,939 lines)
+2. `inquiries-list-page.component.ts` (1,196 lines)
+3. `reports-page.component.ts` (1,568 lines)
 
 ### `/ship` command
 - Installed globally at `~/.pi/agent/extensions/ship-command.ts`
