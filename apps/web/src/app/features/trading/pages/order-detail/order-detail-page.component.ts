@@ -64,6 +64,8 @@ import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { OrderPaymentTermsCardComponent } from './components/order-payment-terms-card/order-payment-terms-card.component';
 import { OrderNotesTermsCardComponent } from './components/order-notes-terms-card/order-notes-terms-card.component';
+import { OrderDeliveryCardComponent } from './components/order-delivery-card/order-delivery-card.component';
+import { OrderPaymentsCardComponent } from './components/order-payments-card/order-payments-card.component';
 import { CommentsCardComponent } from '../../../../shared/components/comments-card/comments-card.component';
 import { PdfPreviewModalComponent } from '../../../../shared/components/pdf-preview-modal/pdf-preview-modal.component';
 import { ActivityTimelineComponent } from '../../../../shared/components/activity-timeline/activity-timeline.component';
@@ -214,6 +216,8 @@ interface PlattsSuggestionViewModel {
     CreditApplicationModalComponent,
     OrderPaymentTermsCardComponent,
     OrderNotesTermsCardComponent,
+    OrderDeliveryCardComponent,
+    OrderPaymentsCardComponent,
   ],
   template: `
     <app-trading-detail-header
@@ -1095,140 +1099,31 @@ interface PlattsSuggestionViewModel {
       }
     </div>
 
-    <!-- Delivery + Payments + Attachments + Comments -->
+    <!-- Delivery + Payments -->
     @if (allowDeliveredEdit() || orderId() || order()?.id) {
       <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         @if (allowDeliveredEdit()) {
-          <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[520px] flex flex-col">
-            <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Delivery Details</h3>
-            <div class="mt-3">
-              <label class="mb-1 block text-xs font-medium text-gray-500">
-                Delivered At
-                @if (hasMultipleOrderSuppliers() && activeOrderSupplier()) {
-                  <span class="text-gray-400">for {{ activeOrderSupplier()!.company?.name ?? 'selected supplier' }}</span>
-                }
-                @if (placeTimezoneAbbr()) {
-                  <span class="text-gray-400">({{ placeTimezoneAbbr() }})</span>
-                }
-              </label>
-              <input
-                type="date"
-                [ngModel]="deliveredAtLocal()"
-                (ngModelChange)="onDeliveredAtChange($event)"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm
-                       focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-              />
-            </div>
-            <p class="mt-3 text-xs text-gray-400">
-              Delivered quantities can be edited in the items grid above.
-              The final invoice will use delivered quantities.
-            </p>
-            @if (supplierNomination()) {
-              <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 p-4 text-sm text-amber-900">
-                <div class="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Supplier submission</div>
-                <div class="mt-2 space-y-2">
-                  <div>
-                    <div class="text-[11px] font-medium uppercase tracking-[0.14em] text-amber-700/80">Status</div>
-                    <div class="mt-1 font-semibold">{{ supplierNomination()!.status }}</div>
-                  </div>
-                  @if (supplierNomination()!.deliveryCompletedAt) {
-                    <div>
-                      <div class="text-[11px] font-medium uppercase tracking-[0.14em] text-amber-700/80">Supplier exact delivery time</div>
-                      <div class="mt-1 font-semibold">{{ supplierNomination()!.deliveryCompletedAt | date : 'medium' }}</div>
-                    </div>
-                  }
-                  @if (activeSupplierDeliveredAt()) {
-                    <div>
-                      <div class="text-[11px] font-medium uppercase tracking-[0.14em] text-amber-700/80">Internal delivered date</div>
-                      <div class="mt-1 font-semibold">{{ formatStoredDateOnlyLabel(activeSupplierDeliveredAt()) }}</div>
-                    </div>
-                  }
-                  @if (supplierNominationDateMismatch()) {
-                    <div class="rounded-lg border border-amber-300 bg-white/80 px-3 py-2 text-xs text-amber-800">
-                      Supplier-submitted delivery date differs from the internal delivered date.
-                    </div>
-                  }
-                  @if (supplierNomination()!.supplierReference) {
-                    <div>
-                      <div class="text-[11px] font-medium uppercase tracking-[0.14em] text-amber-700/80">Supplier reference</div>
-                      <div class="mt-1">{{ supplierNomination()!.supplierReference }}</div>
-                    </div>
-                  }
-                  @if (supplierNomination()!.attachments.length > 0) {
-                    <div>
-                      <div class="text-[11px] font-medium uppercase tracking-[0.14em] text-amber-700/80">Delivery docs uploaded</div>
-                      <div class="mt-1 font-semibold">{{ supplierNomination()!.attachments.length }}</div>
-                    </div>
-                  }
-                  @if (supplierNomination()!.supplierComment) {
-                    <div>
-                      <div class="text-[11px] font-medium uppercase tracking-[0.14em] text-amber-700/80">Comment</div>
-                      <div class="mt-1 whitespace-pre-line">{{ supplierNomination()!.supplierComment }}</div>
-                    </div>
-                  }
-                </div>
-              </div>
-            }
-          </div>
+          <app-order-delivery-card
+            [deliveredAtLocal]="deliveredAtLocal()"
+            [nomination]="supplierNomination()"
+            [internalDeliveredAt]="formatStoredDateOnlyLabel(activeSupplierDeliveredAt())"
+            [dateMismatch]="supplierNominationDateMismatch()"
+            [hasMultipleSuppliers]="hasMultipleOrderSuppliers()"
+            [supplierLabel]="activeOrderSupplier()?.company?.name ?? null"
+            [timezoneAbbr]="placeTimezoneAbbr()"
+            (deliveredAtChange)="onDeliveredAtChange($event)"
+          />
         }
         @if (orderId() || order()?.id) {
-        @if (auth.canSeePrices()) {
-        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[520px] flex flex-col">
-          <div class="flex items-center justify-between gap-4">
-            <div>
-              <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Payments</h3>
-              <p class="mt-1 text-xs text-gray-500">Total paid: {{ paymentsTotal() | number : '1.2-2' }} {{ order()?.currency ?? 'USD' }}</p>
-            </div>
-            <button
-              type="button"
-              (click)="openPaymentModal()"
-              [disabled]="!canRecordPayment()"
-              class="inline-flex items-center justify-center rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold
-                     text-white shadow-sm transition-colors hover:bg-brand-700 disabled:opacity-50"
-            >
-              Add payment
-            </button>
-          </div>
-          <div class="mt-4 flex-1 overflow-auto">
-            @if (paymentsLoading()) {
-              <p class="text-sm text-gray-400">Loading payments...</p>
-            } @else if (payments().length === 0) {
-              <p class="text-sm text-gray-400">No payments recorded yet.</p>
-            } @else {
-              <ul class="divide-y divide-gray-100">
-                @for (payment of payments(); track payment.id) {
-                  <li class="flex items-start justify-between gap-4 py-3 text-sm">
-                    <div>
-                      <div class="font-semibold text-gray-900">
-                        {{ payment.amount }} {{ payment.currency }}
-                      </div>
-                      <div class="mt-0.5 text-xs text-gray-500">
-                        {{ payment.receivedAt | date : 'mediumDate' }}
-                        @if (payment.method) { · {{ payment.method }} }
-                      </div>
-                      @if (payment.note) {
-                        <div class="mt-1 text-xs text-gray-600 whitespace-pre-line">{{ payment.note }}</div>
-                      }
-                    </div>
-                    <div class="text-xs text-gray-400">{{ payment.createdAt | date : 'short' }}</div>
-                  </li>
-                }
-              </ul>
-            }
-          </div>
-        </div>
-        } @else {
-        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[520px] flex flex-col">
-          <div class="flex items-center justify-between gap-4">
-            <div>
-              <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">Payments</h3>
-              <p class="mt-1 text-xs text-gray-500">Payment details hidden</p>
-            </div>
-          </div>
-          <div class="mt-4 flex-1 overflow-auto flex items-center justify-center">
-            <p class="text-sm text-gray-400 italic">Payment information is not available for your role.</p>
-          </div>
-        </div>
+          <app-order-payments-card
+            [payments]="payments()"
+            [paymentsTotal]="paymentsTotal()"
+            [currency]="order()?.currency ?? 'USD'"
+            [loading]="paymentsLoading()"
+            [canSeePrices]="auth.canSeePrices()"
+            [canRecordPayment]="canRecordPayment()"
+            (addPayment)="openPaymentModal()"
+          />
         }
         <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm h-full max-h-[520px] flex flex-col">
           <div class="flex items-center justify-between">
@@ -3232,7 +3127,8 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   onSupplierPaymentTermChange(value: string): void {
-    if (value === 'CREDIT' && !this.canUseSupplierCredit()) {
+    const ptt = value as any;
+    if (ptt === 'CREDIT' && !this.canUseSupplierCredit()) {
       this.showToast('error', 'No supplier credit line is available.');
       return;
     }
@@ -3240,8 +3136,8 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       this.order.update((order) => order
         ? {
             ...order,
-            supplierPaymentTermType: value || null,
-            supplierCreditDays: value === 'CREDIT' ? order.supplierCreditDays ?? null : null,
+            supplierPaymentTermType: ptt || null,
+            supplierCreditDays: ptt === 'CREDIT' ? order.supplierCreditDays ?? null : null,
           }
         : order);
       this.triggerAutosave();
@@ -3249,8 +3145,8 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     }
     this.updateActiveOrderSupplier((supplier) => ({
       ...supplier,
-      paymentTermType: value || null,
-      creditDays: value === 'CREDIT' ? supplier.creditDays ?? null : null,
+      paymentTermType: ptt || null,
+      creditDays: ptt === 'CREDIT' ? supplier.creditDays ?? null : null,
     }));
     this.triggerAutosave();
   }
