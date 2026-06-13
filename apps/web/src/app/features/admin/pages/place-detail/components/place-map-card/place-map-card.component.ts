@@ -74,7 +74,7 @@ export class PlaceMapCardComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    console.log('[PlaceMapCard] ngOnDestroy');
+    console.log('[PlaceMapCard] ngOnDestroy', new Error().stack);
     this.store.setMapContainer(null);
   }
 }

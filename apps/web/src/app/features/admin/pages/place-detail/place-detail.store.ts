@@ -606,7 +606,7 @@ export class PlaceDetailStore {
   // ─── Map ─────────────────────────────────────────────────────────
 
   setMapContainer(el: HTMLElement | null): void {
-    console.log('[PlaceDetailStore] setMapContainer:', el);
+    console.log('[PlaceDetailStore] setMapContainer:', el, new Error().stack);
     this.mapContainer.set(el);
     if (!el) {
       this.map?.remove();
