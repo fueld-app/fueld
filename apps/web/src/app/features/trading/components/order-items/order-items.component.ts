@@ -12,95 +12,32 @@ import {
   effect,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { DecimalPipe, SlicePipe } from '@angular/common';
-import { ProductType, PricingModel, type PlattsSuggestionsResponseDto } from '@fueld/types';
+import { DecimalPipe } from '@angular/common';
+
 import { Subscription } from 'rxjs';
 import {
   SearchableDropdownComponent,
   type DropdownOption,
 } from '../../../../shared/components/searchable-dropdown/searchable-dropdown.component';
 import { WebSocketService } from '../../../../core/websocket/websocket.service';
+import { OrderItemPricingComponent } from './order-item-pricing.component';
+import { OrderItemInventoryBandComponent } from './order-item-inventory-band.component';
 
-// ═══════════════════════════════════════════════════════════════════════
-//  Order Items Grid — Desktop table / Mobile card layout
-//
-//  Uses linkedSignal for live profit calculation with FX conversion
-// ═══════════════════════════════════════════════════════════════════════
-
-/** Local mutable model for an order item row. */
-export interface OrderItemRow {
-  id: string;
-  orderSupplierId?: string | null;
-  productType: string;
-  description: string;
-  quantity: number;
-  quantityMin: number | null;
-  quantityMax: number | null;
-  unit: string;
-  costUnit: string;
-  salesUnit: string;
-  costConversionFactor: number;
-  unitConversionFactor: number;
-  costPrice: number;
-  costCurrency: string;
-  salesPrice: number;
-  salesCurrency: string;
-  profit: number;
-  paymentTerms: string;
-  customerNote?: string | null;
-  deliveredQuantity?: number | null;
-  // Formula pricing — cost side
-  costPricingModel: PricingModel;
-  costReferenceId?: string | null;
-  costPlattsEntryId?: string | null;
-  costReferenceName?: string | null;
-  costPremium?: number | null;
-  costBarging?: number | null;
-  costBargingUnit?: string | null;
-  costCreditDays?: number | null;
-  costPriceFinalized?: boolean;
-  // Formula pricing — sell side
-  salesPricingModel: PricingModel;
-  salesReferenceId?: string | null;
-  salesPlattsEntryId?: string | null;
-  salesReferenceName?: string | null;
-  salesPremium?: number | null;
-  salesBarging?: number | null;
-  salesBargingUnit?: string | null;
-  salesCreditDays?: number | null;
-  salesPriceFinalized?: boolean;
-  // Inventory linkage (optional; only relevant when an inventory-enabled warehouse applies)
-  inventorySkuId?: string | null;
-  warehouseId?: string | null;
-  plannedInventoryAt?: string | null;
-  // Tax
-  taxRate?: number | null;
-  taxAmount?: number | null;
-}
-
-/** Availability status for a given order item, keyed by row id. */
-export interface OrderItemAvailability {
-  ok: boolean;
-  earliestAvailableAt: string | null;
-  shortageQuantity: string | null;
-  reason: string | null;
-}
-
-export interface OrderItemsEconomics {
-  totalQuantity: number;
-  totalCost: number;
-  totalRevenue: number;
-  totalGrossProfit: number;
-  totalFinancingCost: number;
-  financingCostPerMt: number | null;
-  totalNetProfit: number;
-  netMarginPct: number | null;
-}
+import {
+  PricingModel,
+  type PlattsSuggestionsResponseDto,
+  ProductType,
+} from '@fueld/types';
+import type {
+  OrderItemRow,
+  OrderItemAvailability,
+  OrderItemsEconomics,
+} from './order-item.types';
 
 @Component({
   selector: 'app-order-items',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, DecimalPipe, SlicePipe, SearchableDropdownComponent],
+  imports: [FormsModule, DecimalPipe, SearchableDropdownComponent, OrderItemPricingComponent, OrderItemInventoryBandComponent],
   template: `
     <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
       <!-- ═══════════════════════════════════════════════════════════ -->
@@ -293,332 +230,36 @@ export interface OrderItemsEconomics {
               @if (canSeePrices()) {
               <!-- Cost (price + currency) -->
               <td class="px-4 py-2 align-top">
-                @if (readonly()) {
-                  @if (row.costPricingModel === 'FORMULA') {
-                    <div class="text-right text-xs space-y-0.5">
-                      <span class="inline-flex items-center rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">Dynamic</span>
-                      <div class="text-gray-700">{{ row.costReferenceName || 'Ref' }}</div>
-                      @if (row.costPremium) { <div class="text-gray-500">+ {{ row.costPremium }} pmt</div> }
-                      @if (row.costBarging) { <div class="text-gray-500">barging {{ row.costBarging }} {{ row.costBargingUnit || 'l/s' }}</div> }
-                      @if (row.costCreditDays) { <div class="text-gray-500">{{ row.costCreditDays }} days</div> }
-                      @if (row.costPriceFinalized) {
-                        <div class="font-medium text-gray-900">→ {{ row.costPrice | number:'1.2-4' }} {{ row.costCurrency }}/{{ row.costUnit }}</div>
-                      } @else {
-                        <div class="italic text-amber-600">price TBD</div>
-                      }
-                    </div>
-                  } @else {
-                    <span class="block text-right tabular-nums">{{ row.costPrice | number:'1.2-4' }} {{ row.costCurrency }}/{{ row.costUnit }}</span>
-                    @if (row.unit !== row.costUnit) {
-                      <span class="block text-right text-xs text-gray-400">× {{ row.costConversionFactor | number:'1.2-4' }} {{ row.unit }}/{{ row.costUnit }}</span>
-                    }
-                  }
-                } @else {
-                  @if (row.costPricingModel === 'FORMULA') {
-                    <div class="space-y-1">
-                      <div class="flex items-center gap-1">
-                        <app-searchable-dropdown class="flex-1"
-                          [options]="priceRefOptions()"
-                          [selected]="row.costReferenceId ?? ''"
-                          placeholder="Reference..."
-                          (selectionChange)="updateField(i, 'costReferenceId', $event)"
-                        />
-                        <span class="order-item-inline-select-wrap">
-                          <select [ngModel]="row.costCurrency"
-                            (ngModelChange)="updateField(i, 'costCurrency', $event)"
-                            class="order-item-inline-select cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
-                                   hover:text-brand-600 focus:outline-none"
-                          >
-                            @for (c of currencyOptions(); track c.value) {
-                              <option [value]="c.value">{{ c.label }}</option>
-                            }
-                          </select>
-                          <svg
-                            class="pointer-events-none absolute right-0 top-1/2 h-3 w-3 -translate-y-1/2 text-gray-400"
-                            xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
-                          >
-                            <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
-                          </svg>
-                        </span>
-                        <span class="text-gray-400 text-xs shrink-0">/{{ row.costUnit }}</span>
-                      </div>
-                        @if (plattsMatches(row.id).length) {
-                          <div class="flex flex-wrap gap-1.5">
-                            @for (match of plattsMatches(row.id).slice(0, 2); track match.entryId) {
-                              <button
-                                type="button"
-                                (click)="selectPlattsMatch(i, 'cost', match.entryId)"
-                                [class]="isPlattsMatchSelected(row, 'cost', match.entryId) ? 'rounded-full border border-emerald-300 bg-emerald-50 px-2 py-1 text-left text-[10px] font-medium text-emerald-800' : 'rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-left text-[10px] font-medium text-gray-600 hover:border-brand-300 hover:text-brand-700'"
-                              >
-                                {{ match.priceRaw || 'Signal' }} {{ match.marketRegion || match.instrument || '' }}
-                              </button>
-                            }
-                          </div>
-                        }
-                      <div class="flex items-center gap-1">
-                        <span class="text-[10px] text-gray-500 shrink-0">+</span>
-                        <input type="number" step="0.01"
-                          [ngModel]="row.costPremium ?? 0"
-                          (ngModelChange)="updateField(i, 'costPremium', +$event)"
-                          placeholder="Premium"
-                          class="w-20 rounded border border-gray-200 px-1.5 py-1 text-xs tabular-nums
-                                 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
-                                 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20"
-                        />
-                        <span class="text-[10px] text-gray-400 shrink-0">/{{ row.costUnit }}</span>
-                        <span class="text-[10px] text-gray-500 shrink-0">barg.</span>
-                        <input type="number" step="0.01"
-                          [ngModel]="row.costBarging ?? 0"
-                          (ngModelChange)="updateField(i, 'costBarging', +$event)"
-                          class="w-16 rounded border border-gray-200 px-1.5 py-1 text-xs tabular-nums
-                                 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
-                                 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20"
-                        />
-                        <span class="text-[10px] text-gray-400 shrink-0">l/s</span>
-                      </div>
-                    </div>
-                  } @else {
-                    <div class="flex items-center gap-1">
-                      <input
-                        type="number" step="0.01" min="0"
-                        [ngModel]="row.costPrice"
-                        (ngModelChange)="updateField(i, 'costPrice', $event)"
-                        class="w-full min-w-[80px] rounded-lg border border-gray-300 px-3 py-1.5 text-right text-sm tabular-nums
-                               [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
-                               focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                      />
-                      <span class="order-item-inline-select-wrap">
-                        <select
-                          [ngModel]="row.costCurrency"
-                          (ngModelChange)="updateField(i, 'costCurrency', $event)"
-                          class="order-item-inline-select cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
-                                 hover:text-brand-600 focus:outline-none"
-                        >
-                          @for (c of currencyOptions(); track c.value) {
-                            <option [value]="c.value">{{ c.label }}</option>
-                          }
-                        </select>
-                        <svg
-                          class="pointer-events-none absolute right-0 top-1/2 h-3 w-3 -translate-y-1/2 text-gray-400"
-                          xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
-                        >
-                          <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
-                        </svg>
-                      </span>
-                      <span class="text-gray-400 text-xs shrink-0">/</span>
-                      <span class="order-item-inline-select-wrap">
-                        <select
-                          [ngModel]="row.costUnit"
-                          (ngModelChange)="updateField(i, 'costUnit', $event)"
-                          class="order-item-inline-select cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
-                                 hover:text-brand-600 focus:outline-none"
-                        >
-                          @for (u of unitOptions(); track u.value) {
-                            <option [value]="u.value">{{ u.label }}</option>
-                          }
-                        </select>
-                        <svg
-                          class="pointer-events-none absolute right-0 top-1/2 h-3 w-3 -translate-y-1/2 text-gray-400"
-                          xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
-                        >
-                          <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
-                        </svg>
-                      </span>
-                    </div>
-                    @if (row.unit !== row.costUnit) {
-                      <div class="mt-1 flex items-center gap-1 justify-end">
-                        <span class="text-[10px] text-gray-500">{{ conversionLabel(row.unit, row.costUnit) }}</span>
-                        <input
-                          type="number" step="0.0001" min="0"
-                          [ngModel]="row.costConversionFactor"
-                          (ngModelChange)="updateField(i, 'costConversionFactor', +$event)"
-                          class="w-14 rounded border border-gray-200 px-1 py-0.5 text-right text-[10px] tabular-nums
-                                 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
-                                 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20"
-                        />
-                        <span class="text-[10px] text-gray-400">{{ row.unit }}/{{ row.costUnit }}</span>
-                      </div>
-                    }
-                  }
-                  <!-- Pricing model toggle -->
-                  @if (formulaPricingEnabled()) {
-                    <div class="mt-1.5 flex gap-1">
-                      <button type="button"
-                        (click)="updateField(i, 'costPricingModel', 'FIXED')"
-                        [class]="row.costPricingModel === 'FORMULA' ? 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-500 hover:bg-gray-200' : 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-brand-100 text-brand-700'"
-                      >Fixed</button>
-                      <button type="button"
-                        (click)="updateField(i, 'costPricingModel', 'FORMULA')"
-                        [class]="row.costPricingModel === 'FORMULA' ? 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-violet-100 text-violet-700' : 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-500 hover:bg-gray-200'"
-                      >Dynamic</button>
-                    </div>
-                  }
-                }
+                <app-order-item-pricing
+                  [row]="row"
+                  side="cost"
+                  [readonly]="readonly()"
+                  [formulaPricingEnabled]="formulaPricingEnabled()"
+                  [priceRefOptions]="priceRefOptions()"
+                  [currencyOptions]="currencyOptions()"
+                  [unitOptions]="unitOptions()"
+                  [plattsMatches]="plattsMatches(row.id)"
+                  [plattsEntryId]="row.costPlattsEntryId"
+                  (fieldChange)="onPricingFieldChange(i, 'cost', $event)"
+                  (plattsSelect)="selectPlattsMatch(i, 'cost', $event)"
+                />
               </td>
 
               <!-- Sell (price + currency + unit) -->
               <td class="px-4 py-2 align-top">
-                @if (readonly()) {
-                  @if (row.salesPricingModel === 'FORMULA') {
-                    <div class="text-right text-xs space-y-0.5">
-                      <span class="inline-flex items-center rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">Dynamic</span>
-                      <div class="text-gray-700">{{ row.salesReferenceName || 'Ref' }}</div>
-                      @if (row.salesPremium) { <div class="text-gray-500">+ {{ row.salesPremium }} pmt</div> }
-                      @if (row.salesBarging) { <div class="text-gray-500">barging {{ row.salesBarging }} {{ row.salesBargingUnit || 'l/s' }}</div> }
-                      @if (row.salesCreditDays) { <div class="text-gray-500">{{ row.salesCreditDays }} days</div> }
-                      @if (row.salesPriceFinalized) {
-                        <div class="font-medium text-gray-900">→ {{ row.salesPrice | number:'1.2-4' }} {{ row.salesCurrency }}/{{ row.salesUnit }}</div>
-                      } @else {
-                        <div class="italic text-amber-600">price TBD</div>
-                      }
-                    </div>
-                  } @else {
-                    <span class="block text-right tabular-nums">{{ row.salesPrice | number:'1.2-4' }} {{ row.salesCurrency }}/{{ row.salesUnit }}</span>
-                    @if (row.unit !== row.salesUnit) {
-                      <span class="block text-right text-xs text-gray-400">× {{ row.unitConversionFactor | number:'1.2-4' }} {{ row.unit }}/{{ row.salesUnit }}</span>
-                    }
-                  }
-                } @else {
-                  @if (row.salesPricingModel === 'FORMULA') {
-                    <div class="space-y-1">
-                      <div class="flex items-center gap-1">
-                        <app-searchable-dropdown class="flex-1"
-                          [options]="priceRefOptions()"
-                          [selected]="row.salesReferenceId ?? ''"
-                          placeholder="Reference..."
-                          (selectionChange)="updateField(i, 'salesReferenceId', $event)"
-                        />
-                        <span class="order-item-inline-select-wrap">
-                          <select [ngModel]="row.salesCurrency"
-                            (ngModelChange)="updateField(i, 'salesCurrency', $event)"
-                            class="order-item-inline-select cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
-                                   hover:text-brand-600 focus:outline-none"
-                          >
-                            @for (c of currencyOptions(); track c.value) {
-                              <option [value]="c.value">{{ c.label }}</option>
-                            }
-                          </select>
-                          <svg
-                            class="pointer-events-none absolute right-0 top-1/2 h-3 w-3 -translate-y-1/2 text-gray-400"
-                            xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
-                          >
-                            <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
-                          </svg>
-                        </span>
-                        <span class="text-gray-400 text-xs shrink-0">/{{ row.salesUnit }}</span>
-                      </div>
-                        @if (plattsMatches(row.id).length) {
-                          <div class="flex flex-wrap gap-1.5">
-                            @for (match of plattsMatches(row.id).slice(0, 2); track match.entryId) {
-                              <button
-                                type="button"
-                                (click)="selectPlattsMatch(i, 'sales', match.entryId)"
-                                [class]="isPlattsMatchSelected(row, 'sales', match.entryId) ? 'rounded-full border border-emerald-300 bg-emerald-50 px-2 py-1 text-left text-[10px] font-medium text-emerald-800' : 'rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-left text-[10px] font-medium text-gray-600 hover:border-brand-300 hover:text-brand-700'"
-                              >
-                                {{ match.priceRaw || 'Signal' }} {{ match.marketRegion || match.instrument || '' }}
-                              </button>
-                            }
-                          </div>
-                        }
-                      <div class="flex items-center gap-1">
-                        <span class="text-[10px] text-gray-500 shrink-0">+</span>
-                        <input type="number" step="0.01"
-                          [ngModel]="row.salesPremium ?? 0"
-                          (ngModelChange)="updateField(i, 'salesPremium', +$event)"
-                          placeholder="Premium"
-                          class="w-20 rounded border border-gray-200 px-1.5 py-1 text-xs tabular-nums
-                                 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
-                                 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20"
-                        />
-                        <span class="text-[10px] text-gray-400 shrink-0">/{{ row.salesUnit }}</span>
-                        <span class="text-[10px] text-gray-500 shrink-0">barg.</span>
-                        <input type="number" step="0.01"
-                          [ngModel]="row.salesBarging ?? 0"
-                          (ngModelChange)="updateField(i, 'salesBarging', +$event)"
-                          class="w-16 rounded border border-gray-200 px-1.5 py-1 text-xs tabular-nums
-                                 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
-                                 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20"
-                        />
-                        <span class="text-[10px] text-gray-400 shrink-0">l/s</span>
-                      </div>
-                    </div>
-                  } @else {
-                    <div class="flex items-center gap-1">
-                      <input
-                        type="number" step="0.01" min="0"
-                        [ngModel]="row.salesPrice"
-                        (ngModelChange)="updateField(i, 'salesPrice', $event)"
-                        class="w-full min-w-[80px] rounded-lg border border-gray-300 px-3 py-1.5 text-right text-sm tabular-nums
-                               [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
-                               focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                      />
-                      <span class="order-item-inline-select-wrap">
-                        <select
-                          [ngModel]="row.salesCurrency"
-                          (ngModelChange)="updateField(i, 'salesCurrency', $event)"
-                          class="order-item-inline-select cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
-                                 hover:text-brand-600 focus:outline-none"
-                        >
-                          @for (c of currencyOptions(); track c.value) {
-                            <option [value]="c.value">{{ c.label }}</option>
-                          }
-                        </select>
-                        <svg
-                          class="pointer-events-none absolute right-0 top-1/2 h-3 w-3 -translate-y-1/2 text-gray-400"
-                          xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
-                        >
-                          <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
-                        </svg>
-                      </span>
-                      <span class="text-gray-400 text-xs shrink-0">/</span>
-                      <span class="order-item-inline-select-wrap">
-                        <select
-                          [ngModel]="row.salesUnit"
-                          (ngModelChange)="updateField(i, 'salesUnit', $event)"
-                          class="order-item-inline-select cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
-                                 hover:text-brand-600 focus:outline-none"
-                        >
-                          @for (u of unitOptions(); track u.value) {
-                            <option [value]="u.value">{{ u.label }}</option>
-                          }
-                        </select>
-                        <svg
-                          class="pointer-events-none absolute right-0 top-1/2 h-3 w-3 -translate-y-1/2 text-gray-400"
-                          xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
-                        >
-                          <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
-                        </svg>
-                      </span>
-                    </div>
-                  }
-                  <!-- Pricing model toggle + density -->
-                  @if (formulaPricingEnabled() || row.unit !== row.salesUnit) {
-                    <div class="mt-1.5 flex items-center gap-1 flex-wrap">
-                      @if (formulaPricingEnabled()) {
-                        <button type="button"
-                          (click)="updateField(i, 'salesPricingModel', 'FIXED')"
-                          [class]="row.salesPricingModel === 'FORMULA' ? 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-500 hover:bg-gray-200' : 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-brand-100 text-brand-700'"
-                        >Fixed</button>
-                        <button type="button"
-                          (click)="updateField(i, 'salesPricingModel', 'FORMULA')"
-                          [class]="row.salesPricingModel === 'FORMULA' ? 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-violet-100 text-violet-700' : 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-500 hover:bg-gray-200'"
-                        >Dynamic</button>
-                      }
-                      @if (row.unit !== row.salesUnit) {
-                        <span class="text-[10px] text-gray-500 ml-auto">{{ conversionLabel(row.unit, row.salesUnit) }}</span>
-                        <input
-                          type="number" step="0.0001" min="0"
-                          [ngModel]="row.unitConversionFactor"
-                          (ngModelChange)="updateField(i, 'unitConversionFactor', +$event)"
-                          class="w-14 rounded border border-gray-200 px-1 py-0.5 text-right text-[10px] tabular-nums
-                                 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
-                                 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20"
-                        />
-                        <span class="text-[10px] text-gray-400">{{ row.unit }}/{{ row.salesUnit }}</span>
-                      }
-                    </div>
-                  }
-                }
+                <app-order-item-pricing
+                  [row]="row"
+                  side="sales"
+                  [readonly]="readonly()"
+                  [formulaPricingEnabled]="formulaPricingEnabled()"
+                  [priceRefOptions]="priceRefOptions()"
+                  [currencyOptions]="currencyOptions()"
+                  [unitOptions]="unitOptions()"
+                  [plattsMatches]="plattsMatches(row.id)"
+                  [plattsEntryId]="row.salesPlattsEntryId"
+                  (fieldChange)="onPricingFieldChange(i, 'sales', $event)"
+                  (plattsSelect)="selectPlattsMatch(i, 'sales', $event)"
+                />
               </td>
 
               <!-- Gross Profit (auto-calculated) -->
@@ -688,70 +329,17 @@ export interface OrderItemsEconomics {
               }
             </tr>
 
-            <!-- Inventory band — only when warehouses exist for this order (e.g. own-company supplier with enabled warehouse). -->
+            <!-- Inventory band — only when warehouses exist for this order. -->
             @if (warehouseOptionsInput().length > 0) {
-              <tr class="border-b border-gray-100 bg-emerald-50/30">
-                <td [attr.colspan]="(readonly() ? 4 : 5) + (showSupplierColumn() ? 1 : 0) + (allowDeliveredEdit() ? 1 : 0) + (canSeePrices() ? 5 : 0)" class="px-4 py-2">
-                  <div class="flex flex-wrap items-end gap-3 text-xs">
-                    <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-700">
-                      Inventory
-                    </span>
-                    <label class="flex flex-col gap-0.5">
-                      <span class="text-[10px] font-medium uppercase tracking-wider text-gray-500">Warehouse</span>
-                      <select
-                        [ngModel]="row.warehouseId ?? ''"
-                        (ngModelChange)="updateField(i, 'warehouseId', $event || null)"
-                        [disabled]="readonly()"
-                        class="fueld-select-no-chevron appearance-none rounded-md border border-gray-300 px-2 py-1 text-xs disabled:opacity-60"
-                      >
-                        <option value="">— Not tracked —</option>
-                        @for (w of warehouseOptionsInput(); track w.value) {
-                          <option [value]="w.value">{{ w.label }}</option>
-                        }
-                      </select>
-                    </label>
-                    <label class="flex flex-col gap-0.5">
-                      <span class="text-[10px] font-medium uppercase tracking-wider text-gray-500">SKU</span>
-                      <select
-                        [ngModel]="row.inventorySkuId ?? ''"
-                        (ngModelChange)="updateField(i, 'inventorySkuId', $event || null)"
-                        [disabled]="readonly() || !row.warehouseId"
-                        class="fueld-select-no-chevron appearance-none rounded-md border border-gray-300 px-2 py-1 text-xs disabled:opacity-60"
-                      >
-                        <option value="">—</option>
-                        @for (s of inventorySkuOptionsInput(); track s.value) {
-                          <option [value]="s.value">{{ s.label }}</option>
-                        }
-                      </select>
-                    </label>
-                    <label class="flex flex-col gap-0.5">
-                      <span class="text-[10px] font-medium uppercase tracking-wider text-gray-500">Planned date</span>
-                      <input
-                        type="date"
-                        [ngModel]="formatDateInput(row.plannedInventoryAt)"
-                        (ngModelChange)="updateField(i, 'plannedInventoryAt', parseDateInput($event))"
-                        [disabled]="readonly() || !row.warehouseId"
-                        class="rounded-md border border-gray-300 px-2 py-1 text-xs disabled:opacity-60"
-                      />
-                    </label>
-                    @if (availabilityByRowId()[row.id]; as a) {
-                      @if (!a.ok) {
-                        <span class="ml-auto inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700"
-                          [title]="a.reason ?? 'Insufficient stock'">
-                          Short {{ a.shortageQuantity }}
-                          @if (a.earliestAvailableAt) {
-                            · earliest {{ a.earliestAvailableAt | slice:0:10 }}
-                          }
-                        </span>
-                      } @else if (row.warehouseId && row.inventorySkuId) {
-                        <span class="ml-auto inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
-                          Available
-                        </span>
-                      }
-                    }
-                  </div>
-                </td>
-              </tr>
+              <app-order-item-inventory-band
+                [row]="row"
+                [readonly]="readonly()"
+                [warehouseOptions]="warehouseOptionsInput()"
+                [inventorySkuOptions]="inventorySkuOptionsInput()"
+                [availability]="availabilityByRowId()[row.id]"
+                [colspan]="(readonly() ? 4 : 5) + (showSupplierColumn() ? 1 : 0) + (allowDeliveredEdit() ? 1 : 0) + (canSeePrices() ? 5 : 0)"
+                (fieldChange)="onInventoryFieldChange(i, $event)"
+              />
             }
           } @empty {
             <tr>
@@ -991,198 +579,37 @@ export interface OrderItemsEconomics {
             <!-- Cost -->
             <div>
               <label class="mb-1 block text-xs font-medium text-gray-500">Cost</label>
-              @if (readonly()) {
-                @if (row.costPricingModel === 'FORMULA') {
-                  <div class="text-xs space-y-0.5">
-                    <span class="inline-flex items-center rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">Dynamic</span>
-                    <div class="text-gray-700">{{ row.costReferenceName || 'Ref' }}</div>
-                    @if (row.costPremium) { <div class="text-gray-500">+ {{ row.costPremium }} pmt</div> }
-                    @if (row.costBarging) { <div class="text-gray-500">barging {{ row.costBarging }} {{ row.costBargingUnit || 'l/s' }}</div> }
-                    @if (row.costPriceFinalized) {
-                      <div class="font-medium text-gray-900">→ {{ row.costPrice | number:'1.2-4' }} {{ row.costCurrency }}/{{ row.costUnit }}</div>
-                    } @else {
-                      <div class="italic text-amber-600">price TBD</div>
-                    }
-                  </div>
-                } @else {
-                  <span class="text-sm tabular-nums">{{ row.costPrice | number:'1.2-4' }} {{ row.costCurrency }}/{{ row.costUnit }}</span>
-                }
-              } @else {
-                @if (formulaPricingEnabled()) {
-                  <div class="mb-1.5 flex gap-1">
-                    <button type="button" (click)="updateField(i, 'costPricingModel', 'FIXED')"
-                      [class]="row.costPricingModel === 'FORMULA' ? 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-500' : 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-brand-100 text-brand-700'"
-                    >Fixed</button>
-                    <button type="button" (click)="updateField(i, 'costPricingModel', 'FORMULA')"
-                      [class]="row.costPricingModel === 'FORMULA' ? 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-violet-100 text-violet-700' : 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-500'"
-                    >Dynamic</button>
-                  </div>
-                }
-                @if (row.costPricingModel === 'FORMULA') {
-                  <div class="space-y-1.5">
-                    <app-searchable-dropdown [options]="priceRefOptions()" [selected]="row.costReferenceId ?? ''" placeholder="Reference..." (selectionChange)="updateField(i, 'costReferenceId', $event)" />
-                    @if (plattsMatches(row.id).length) {
-                      <div class="flex flex-wrap gap-1.5">
-                        @for (match of plattsMatches(row.id).slice(0, 2); track match.entryId) {
-                          <button
-                            type="button"
-                            (click)="selectPlattsMatch(i, 'cost', match.entryId)"
-                            [class]="isPlattsMatchSelected(row, 'cost', match.entryId) ? 'rounded-full border border-emerald-300 bg-emerald-50 px-2 py-1 text-left text-[10px] font-medium text-emerald-800' : 'rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-left text-[10px] font-medium text-gray-600'"
-                          >
-                            {{ match.priceRaw || 'Signal' }} {{ match.marketRegion || match.instrument || '' }}
-                          </button>
-                        }
-                      </div>
-                    }
-                    <input type="number" step="0.01" [ngModel]="row.costPremium ?? 0" (ngModelChange)="updateField(i, 'costPremium', +$event)" placeholder="Premium pmt"
-                      class="w-full rounded border border-gray-200 px-2 py-1 text-xs tabular-nums focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20" />
-                    <div class="flex gap-1">
-                      <input type="number" step="0.01" [ngModel]="row.costBarging ?? 0" (ngModelChange)="updateField(i, 'costBarging', +$event)" placeholder="Barging"
-                        class="w-full rounded border border-gray-200 px-2 py-1 text-xs tabular-nums focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20" />
-                      <select [ngModel]="row.costBargingUnit ?? 'l/s'" (ngModelChange)="updateField(i, 'costBargingUnit', $event)"
-                        class="fueld-select-no-chevron w-14 appearance-none rounded border border-gray-200 px-1 py-1 text-[10px] text-gray-600 focus:border-brand-500 outline-none bg-white">
-                        <option value="l/s">l/s</option><option value="pmt">pmt</option>
-                      </select>
-                    </div>
-                    <input type="number" step="1" min="0" [ngModel]="row.costCreditDays ?? 0" (ngModelChange)="updateField(i, 'costCreditDays', +$event)" placeholder="Credit days"
-                      class="w-full rounded border border-gray-200 px-2 py-1 text-xs tabular-nums focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20" />
-                  </div>
-                } @else {
-                  <div class="flex items-center gap-2">
-                    <input type="number" step="0.01" min="0"
-                      [ngModel]="row.costPrice"
-                      (ngModelChange)="updateField(i, 'costPrice', $event)"
-                      class="min-w-0 w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
-                             [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
-                             focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                    />
-                    <select
-                      [ngModel]="row.costCurrency"
-                      (ngModelChange)="updateField(i, 'costCurrency', $event)"
-                      class="fueld-select-no-chevron w-20 appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-700
-                             focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
-                    >
-                      @for (c of currencyOptions(); track c.value) {
-                        <option [value]="c.value">{{ c.label }}</option>
-                      }
-                    </select>
-                  </div>
-                  @if (row.unit !== row.costUnit) {
-                    <div class="mt-1 flex items-center gap-1 text-xs text-gray-500">
-                      <span>{{ conversionLabel(row.unit, row.costUnit) }}</span>
-                      <input
-                        type="number" step="0.0001" min="0"
-                        [ngModel]="row.costConversionFactor"
-                        (ngModelChange)="updateField(i, 'costConversionFactor', +$event)"
-                        class="w-16 rounded border border-gray-200 px-1.5 py-0.5 text-right text-xs tabular-nums
-                               [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
-                               focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20"
-                      />
-                      <span class="text-gray-400">{{ row.unit }}/{{ row.costUnit }}</span>
-                    </div>
-                  }
-                }
-              }
+              <app-order-item-pricing
+                [row]="row"
+                side="cost"
+                [readonly]="readonly()"
+                [formulaPricingEnabled]="formulaPricingEnabled()"
+                [priceRefOptions]="priceRefOptions()"
+                [currencyOptions]="currencyOptions()"
+                [unitOptions]="unitOptions()"
+                [plattsMatches]="plattsMatches(row.id)"
+                [plattsEntryId]="row.costPlattsEntryId"
+                (fieldChange)="onPricingFieldChange(i, 'cost', $event)"
+                (plattsSelect)="selectPlattsMatch(i, 'cost', $event)"
+              />
             </div>
 
             <!-- Sell -->
             <div>
               <label class="mb-1 block text-xs font-medium text-gray-500">Sell</label>
-              @if (readonly()) {
-                @if (row.salesPricingModel === 'FORMULA') {
-                  <div class="text-xs space-y-0.5">
-                    <span class="inline-flex items-center rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">Dynamic</span>
-                    <div class="text-gray-700">{{ row.salesReferenceName || 'Ref' }}</div>
-                    @if (row.salesPremium) { <div class="text-gray-500">+ {{ row.salesPremium }} pmt</div> }
-                    @if (row.salesBarging) { <div class="text-gray-500">barging {{ row.salesBarging }} {{ row.salesBargingUnit || 'l/s' }}</div> }
-                    @if (row.salesPriceFinalized) {
-                      <div class="font-medium text-gray-900">→ {{ row.salesPrice | number:'1.2-4' }} {{ row.salesCurrency }}/{{ row.salesUnit }}</div>
-                    } @else {
-                      <div class="italic text-amber-600">price TBD</div>
-                    }
-                  </div>
-                } @else {
-                  <span class="text-sm tabular-nums">{{ row.salesPrice | number:'1.2-4' }} {{ row.salesCurrency }}/{{ row.salesUnit }}</span>
-                  @if (row.unit !== row.salesUnit) {
-                    <span class="block text-xs text-gray-400">× {{ row.unitConversionFactor | number:'1.2-4' }} {{ row.unit }}/{{ row.salesUnit }}</span>
-                  }
-                }
-              } @else {
-                @if (formulaPricingEnabled()) {
-                  <div class="mb-1.5 flex gap-1">
-                    <button type="button" (click)="updateField(i, 'salesPricingModel', 'FIXED')"
-                      [class]="row.salesPricingModel === 'FORMULA' ? 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-500' : 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-brand-100 text-brand-700'"
-                    >Fixed</button>
-                    <button type="button" (click)="updateField(i, 'salesPricingModel', 'FORMULA')"
-                      [class]="row.salesPricingModel === 'FORMULA' ? 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-violet-100 text-violet-700' : 'rounded px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-500'"
-                    >Dynamic</button>
-                  </div>
-                }
-                @if (row.salesPricingModel === 'FORMULA') {
-                  <div class="space-y-1.5">
-                    <app-searchable-dropdown [options]="priceRefOptions()" [selected]="row.salesReferenceId ?? ''" placeholder="Reference..." (selectionChange)="updateField(i, 'salesReferenceId', $event)" />
-                    @if (plattsMatches(row.id).length) {
-                      <div class="flex flex-wrap gap-1.5">
-                        @for (match of plattsMatches(row.id).slice(0, 2); track match.entryId) {
-                          <button
-                            type="button"
-                            (click)="selectPlattsMatch(i, 'sales', match.entryId)"
-                            [class]="isPlattsMatchSelected(row, 'sales', match.entryId) ? 'rounded-full border border-emerald-300 bg-emerald-50 px-2 py-1 text-left text-[10px] font-medium text-emerald-800' : 'rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-left text-[10px] font-medium text-gray-600'"
-                          >
-                            {{ match.priceRaw || 'Signal' }} {{ match.marketRegion || match.instrument || '' }}
-                          </button>
-                        }
-                      </div>
-                    }
-                    <input type="number" step="0.01" [ngModel]="row.salesPremium ?? 0" (ngModelChange)="updateField(i, 'salesPremium', +$event)" placeholder="Premium pmt"
-                      class="w-full rounded border border-gray-200 px-2 py-1 text-xs tabular-nums focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20" />
-                    <div class="flex gap-1">
-                      <input type="number" step="0.01" [ngModel]="row.salesBarging ?? 0" (ngModelChange)="updateField(i, 'salesBarging', +$event)" placeholder="Barging"
-                        class="w-full rounded border border-gray-200 px-2 py-1 text-xs tabular-nums focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20" />
-                      <select [ngModel]="row.salesBargingUnit ?? 'l/s'" (ngModelChange)="updateField(i, 'salesBargingUnit', $event)"
-                        class="fueld-select-no-chevron w-14 appearance-none rounded border border-gray-200 px-1 py-1 text-[10px] text-gray-600 focus:border-brand-500 outline-none bg-white">
-                        <option value="l/s">l/s</option><option value="pmt">pmt</option>
-                      </select>
-                    </div>
-                    <input type="number" step="1" min="0" [ngModel]="row.salesCreditDays ?? 0" (ngModelChange)="updateField(i, 'salesCreditDays', +$event)" placeholder="Credit days"
-                      class="w-full rounded border border-gray-200 px-2 py-1 text-xs tabular-nums focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20" />
-                  </div>
-                } @else {
-                  <div class="flex items-center gap-2">
-                    <input type="number" step="0.01" min="0"
-                      [ngModel]="row.salesPrice"
-                      (ngModelChange)="updateField(i, 'salesPrice', $event)"
-                      class="min-w-0 w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
-                             [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
-                             focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                    />
-                    <select
-                      [ngModel]="row.salesCurrency"
-                      (ngModelChange)="updateField(i, 'salesCurrency', $event)"
-                      class="fueld-select-no-chevron w-20 appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-700
-                             focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
-                    >
-                      @for (c of currencyOptions(); track c.value) {
-                        <option [value]="c.value">{{ c.label }}</option>
-                      }
-                    </select>
-                  </div>
-                  @if (row.unit !== row.salesUnit) {
-                    <div class="mt-1 flex items-center gap-1 text-xs text-gray-500">
-                      <span>{{ conversionLabel(row.unit, row.salesUnit) }}</span>
-                      <input
-                        type="number" step="0.0001" min="0"
-                        [ngModel]="row.unitConversionFactor"
-                        (ngModelChange)="updateField(i, 'unitConversionFactor', +$event)"
-                        class="w-16 rounded border border-gray-200 px-1.5 py-0.5 text-right text-xs tabular-nums
-                               [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
-                               focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20"
-                      />
-                      <span class="text-gray-400">{{ row.unit }}/{{ row.salesUnit }}</span>
-                    </div>
-                  }
-                }
-              }
+              <app-order-item-pricing
+                [row]="row"
+                side="sales"
+                [readonly]="readonly()"
+                [formulaPricingEnabled]="formulaPricingEnabled()"
+                [priceRefOptions]="priceRefOptions()"
+                [currencyOptions]="currencyOptions()"
+                [unitOptions]="unitOptions()"
+                [plattsMatches]="plattsMatches(row.id)"
+                [plattsEntryId]="row.salesPlattsEntryId"
+                (fieldChange)="onPricingFieldChange(i, 'sales', $event)"
+                (plattsSelect)="selectPlattsMatch(i, 'sales', $event)"
+              />
             </div>
 
             <!-- Gross Profit -->
@@ -1602,6 +1029,32 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
       return updated;
     });
     this.emitChange();
+  }
+
+  /** Handle field changes from the pricing child component. */
+  onPricingFieldChange(index: number, side: 'cost' | 'sales', event: { field: string; value: unknown }): void {
+    const prefix = side === 'cost' ? 'cost' : 'sales';
+    const fieldMap: Record<string, keyof OrderItemRow> = {
+      price: side === 'cost' ? 'costPrice' : 'salesPrice',
+      currency: side === 'cost' ? 'costCurrency' : 'salesCurrency',
+      unit: side === 'cost' ? 'costUnit' : 'salesUnit',
+      referenceId: side === 'cost' ? 'costReferenceId' : 'salesReferenceId',
+      premium: side === 'cost' ? 'costPremium' : 'salesPremium',
+      barging: side === 'cost' ? 'costBarging' : 'salesBarging',
+      pricingModel: side === 'cost' ? 'costPricingModel' : 'salesPricingModel',
+      conversionFactor: side === 'cost' ? 'costConversionFactor' : 'unitConversionFactor',
+      bargingUnit: side === 'cost' ? 'costBargingUnit' : 'salesBargingUnit',
+      creditDays: side === 'cost' ? 'costCreditDays' : 'salesCreditDays',
+    };
+    const field = fieldMap[event.field];
+    if (field) {
+      this.updateField(index, field, event.value);
+    }
+  }
+
+  /** Handle field changes from the inventory band child component. */
+  onInventoryFieldChange(index: number, event: { field: string; value: unknown }): void {
+    this.updateField(index, event.field as keyof OrderItemRow, event.value);
   }
 
   parseDecimalInput(value: unknown): number | null {

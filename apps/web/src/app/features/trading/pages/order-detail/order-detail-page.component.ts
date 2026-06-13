@@ -46,10 +46,12 @@ import {
 
 import {
   OrderItemsComponent,
-  type OrderItemRow,
-  type OrderItemsEconomics,
-  type OrderItemAvailability,
 } from '../../components/order-items/order-items.component';
+import type {
+  OrderItemRow,
+  OrderItemsEconomics,
+  OrderItemAvailability,
+} from '../../components/order-items/order-item.types';
 import { OrderFinancingSummaryComponent } from '../../components/order-financing-summary/order-financing-summary.component';
 import {
   HeaderActionsComponent,

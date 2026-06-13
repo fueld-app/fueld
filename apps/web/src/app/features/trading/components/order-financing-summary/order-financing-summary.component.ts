@@ -1,6 +1,6 @@
 import { Component, ChangeDetectionStrategy, input } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
-import type { OrderItemsEconomics } from '../order-items/order-items.component';
+import type { OrderItemsEconomics } from '../order-items/order-item.types';
 
 @Component({
   selector: 'app-order-financing-summary',
