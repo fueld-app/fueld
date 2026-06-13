@@ -558,8 +558,12 @@ export async function createApp(options: CreateAppOptions = {}) {
           } else if (message && typeof message === 'object' && message.data instanceof Uint8Array) {
             text = new TextDecoder().decode(message.data);
           } else {
-            console.warn('[WS] Unknown message shape:', typeof message, Object.prototype.toString.call(message), Object.keys(message ?? {}));
-            ws.send(JSON.stringify({ type: 'error', message: 'Invalid message format' }));
+            const preview =
+              message && typeof message === 'object'
+                ? JSON.stringify({ keys: Object.keys(message), toString: String(message), jsonStringify: JSON.stringify(message) })
+                : String(message);
+            console.warn('[WS] Unknown message shape:', typeof message, Object.prototype.toString.call(message), preview);
+            ws.send(JSON.stringify({ type: 'error', message: 'Invalid message format', details: preview }));
             return;
           }
           const data = JSON.parse(text);
