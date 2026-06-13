@@ -13,13 +13,15 @@ import { PlaceRemarkCardComponent } from '../../components/place-remark-card/pla
     PlaceRemarkCardComponent,
   ],
   template: `
-    <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
-      <div class="space-y-4 lg:col-span-2">
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-4">
+      <div class="lg:col-span-2">
         <app-place-orders-card />
-        <app-place-remark-card />
       </div>
       <div class="lg:col-span-1">
         <app-place-suppliers-card />
+      </div>
+      <div class="lg:col-span-1">
+        <app-place-remark-card />
       </div>
     </div>
   `,
