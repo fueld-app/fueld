@@ -1,6 +1,5 @@
 import { Component, ChangeDetectionStrategy, input, output, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
-import { RouterLink } from '@angular/router';
 
 interface HierarchyNode {
   level: number;
@@ -35,7 +34,7 @@ interface HierarchyResponse {
 @Component({
   selector: 'app-registration-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, RouterLink],
+  imports: [DatePipe],
   template: `
     <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-8 flex flex-col overflow-hidden">
       <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">

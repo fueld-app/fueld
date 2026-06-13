@@ -213,7 +213,7 @@ const PLACE_RULE_TYPE_OPTIONS: Array<{ value: CompanyPlaceSupplyRulePlaceType; l
                 </div>
               </div>
               @if (sp.contactName) { <div class="mt-1 text-xs text-gray-500">Contact: {{ sp.contactName }}</div> }
-              @if (sp.products?.length) {
+              @if (sp.products.length) {
                 <div class="flex flex-wrap gap-1 mt-1">
                   @for (prod of sp.products; track prod) {
                     <span class="inline-flex items-center rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-medium text-brand-700 ring-1 ring-brand-200">{{ prod }}</span>
