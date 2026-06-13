@@ -36,10 +36,20 @@ import { COUNTRIES, type Country } from '../../../../shared/data/countries';
 import { WebSocketService } from '../../../../core/websocket/websocket.service';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { ActivityTimelineComponent } from '../../../../shared/components/activity-timeline/activity-timeline.component';
-import { LastEditedBadgeComponent } from '../../../../shared/components/last-edited-badge/last-edited-badge.component';
 import { CommentsCardComponent } from '../../../../shared/components/comments-card/comments-card.component';
 import { CreditApplicationModalComponent } from '../../../credit/components/credit-application-modal.component';
 import { RiskMonitoringService } from '../../../../core/risk-monitoring/risk-monitoring.service';
+import { CompanyHeaderComponent } from './components/company-header/company-header.component';
+import { CompanyInfoCardComponent } from './components/company-info-card/company-info-card.component';
+import { ContactsCardComponent } from './components/contacts-card/contacts-card.component';
+import { SupplyPortsCardComponent } from './components/supply-ports-card/supply-ports-card.component';
+import { FilesCardComponent } from './components/files-card/files-card.component';
+import { SegmentsCardComponent } from './components/segments-card/segments-card.component';
+import { GroupStructureCardComponent } from './components/group-structure-card/group-structure-card.component';
+import { OrdersCardComponent } from './components/orders-card/orders-card.component';
+import { RegistrationCardComponent } from './components/registration-card/registration-card.component';
+import { NameHistoryCardComponent } from './components/name-history-card/name-history-card.component';
+import { RiskComplianceCardComponent } from './components/risk-compliance-card/risk-compliance-card.component';
 import type { RiskSummaryDto } from '@fueld/types';
 import { API } from '@app/core/config/api';
 
@@ -365,7 +375,20 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
 @Component({
   selector: 'app-company-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, DecimalPipe, FormsModule, RouterLink, ActivityTimelineComponent, LastEditedBadgeComponent, CommentsCardComponent, CreditApplicationModalComponent],
+  imports: [
+    DatePipe, DecimalPipe, FormsModule, RouterLink,
+    ActivityTimelineComponent, CommentsCardComponent, CreditApplicationModalComponent,
+    CompanyHeaderComponent, CompanyInfoCardComponent,
+    ContactsCardComponent,
+    SupplyPortsCardComponent,
+    FilesCardComponent,
+    SegmentsCardComponent,
+    GroupStructureCardComponent,
+    OrdersCardComponent,
+    RegistrationCardComponent,
+    NameHistoryCardComponent,
+    RiskComplianceCardComponent,
+  ],
   styles: [`
     :host ::ng-deep .leaflet-container { font-family: inherit; }
     .fleet-map-fullscreen {
@@ -411,1108 +434,60 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
           </svg>
         </div>
       } @else if (company()) {
-        <!-- Header -->
-        <div class="mb-6">
-          <div class="flex items-center gap-3 mb-1">
-            @if (companyFlag()) { <span class="text-2xl">{{ companyFlag() }}</span> }
-            <h1 class="text-2xl font-bold text-gray-900">{{ company()!.name }}</h1>
-            @for (t of companyTypes(); track t) {
-              <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium"
-                [class]="typeBadgeClass(t)">
-                {{ typeLabel(t) }}
-              </span>
-            }
-            @if (company()!.isSanctioned) {
-              <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700">
-                ⚠️ Sanctioned
-              </span>
-            }
-            @if (riskSummary()?.isFrozen) {
-              <button
-                type="button"
-                (click)="sanctionsTab.set('monitoring')"
-                class="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 transition-colors"
-              >
-                <span class="inline-flex h-2 w-2 rounded-full bg-red-500"></span>
-                Credit Frozen
-              </button>
-            } @else if ((riskSummary()?.activeHitCount ?? 0) > 0) {
-              <button
-                type="button"
-                (click)="sanctionsTab.set('monitoring')"
-                class="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-colors"
-              >
-                <span class="inline-flex h-2 w-2 rounded-full bg-amber-500"></span>
-                {{ riskSummary()!.activeHitCount }} Risk Signal{{ riskSummary()!.activeHitCount === 1 ? '' : 's' }}
-              </button>
-            }
-            @if (syncing()) {
-              <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-600">
-                <svg class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                </svg>
-                Syncing…
-              </span>
-            }
-            <div class="ml-auto flex items-center gap-2">
-              @if (company()!.seasearcherId) {
-                <a
-                  [href]="'https://www.seasearcher.com/company/' + company()!.seasearcherId"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
-                    <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
-                  </svg>
-                  Seasearcher
-                </a>
-              }
-              @if (canDeleteEntity()) {
-                <button
-                  (click)="deleteError.set(''); confirmDeleteOpen.set(true)"
-                  class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
-                >
-                  Delete
-                </button>
-              }
-            </div>
-          </div>
-          <div class="flex items-center gap-3">
-            @if (company()!.lastSynced) {
-              <span class="inline-flex items-center gap-1 text-xs text-gray-400" title="Last synced with Seasearcher">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" />
-                </svg>
-                Synced {{ company()!.lastSynced | date:'short' }}
-              </span>
-            }
-            <span class="text-xs text-gray-500">Responsible:</span>
-            <select
-              [ngModel]="responsibleUserId() ?? ''"
-              (ngModelChange)="onResponsibleUserChange($event)"
-              [disabled]="savingResponsible()"
-              class="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
-            >
-              <option value="">— None —</option>
-              @for (u of teamUsers(); track u.id) {
-                <option [value]="u.id">{{ u.name }}</option>
-              }
-            </select>
-            @if (savingResponsible()) {
-              <svg class="h-3.5 w-3.5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-              </svg>
-            }
-            <app-last-edited-badge entityType="company" [entityId]="company()!.id" />
-          </div>
-          @if (riskSummary()?.isFrozen) {
-            <button
-              type="button"
-              (click)="sanctionsTab.set('monitoring')"
-              class="mt-3 flex w-full items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-left shadow-sm transition-colors hover:bg-red-100/70"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="mt-0.5 h-5 w-5 flex-shrink-0 text-red-600" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
-              </svg>
-              <div class="min-w-0 flex-1">
-                <div class="flex flex-wrap items-center gap-2">
-                  <span class="text-sm font-semibold text-red-800">Credit frozen by monitoring</span>
-                  <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700">
-                    {{ riskSummary()!.activeHitCount }} active hit{{ riskSummary()!.activeHitCount === 1 ? '' : 's' }}
-                  </span>
-                </div>
-                <p class="mt-1 text-sm text-red-700">Open Monitoring to review provider hits, override state, and re-check options.</p>
-              </div>
-            </button>
-          }
-        </div>
-
-        <!-- Parent breadcrumb (shown when this is a child company) -->
-        @if (parentCompany()) {
-          <div class="mb-3 flex items-center gap-2 text-sm">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M4.083 9h1.946c.089-1.546.383-2.97.837-4.118A6.004 6.004 0 004.083 9zM10 2a8 8 0 100 16 8 8 0 000-16zm0 2c-.076 0-.232.032-.465.262-.238.234-.497.623-.737 1.182-.389.907-.673 2.142-.766 3.556h3.936c-.093-1.414-.377-2.649-.766-3.556-.24-.56-.5-.948-.737-1.182C10.232 4.032 10.076 4 10 4zm3.971 5c-.089-1.546-.383-2.97-.837-4.118A6.004 6.004 0 0115.917 9h-1.946zm-2.003 2H8.032c.093 1.414.377 2.649.766 3.556.24.56.5.948.737 1.182.233.23.389.262.465.262.076 0 .232-.032.465-.262.238-.234.497-.623.737-1.182.389-.907.673-2.142.766-3.556zm1.166 4.118c.454-1.147.748-2.572.837-4.118h1.946a6.004 6.004 0 01-2.783 4.118zm-6.268 0C6.412 13.97 6.118 12.546 6.029 11H4.083a6.004 6.004 0 002.783 4.118z" clip-rule="evenodd" />
-            </svg>
-            <span class="text-gray-400">Child of</span>
-            <a [routerLink]="['/companies', parentCompany()!.id]"
-               class="font-medium text-brand-600 hover:text-brand-700 hover:underline transition-colors">
-              {{ parentCompany()!.name }}
-            </a>
-            @if (parentCompany()!.country) {
-              <span class="text-xs text-gray-400">{{ parentCompany()!.country }}</span>
-            }
-            <button
-              (click)="removeOwnParent()"
-              [disabled]="unlinkingChildId() === company()!.id"
-              class="ml-1 rounded-md px-2 py-0.5 text-[11px] font-medium text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
-            >
-              @if (unlinkingChildId() === company()!.id) { Unlinking… } @else { Unlink }
-            </button>
-          </div>
-        }
-
-        <!-- Aggregated stats bar (shown when this is a parent with children) -->
-        @if (groupAggregate(); as agg) {
-          <div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
-              <div class="text-xs font-medium text-gray-500 mb-0.5">Group Credit Limit</div>
-              <div class="text-lg font-bold text-gray-900">{{ agg.totalCreditLimit | number:'1.0-0' }}</div>
-            </div>
-            <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
-              <div class="text-xs font-medium text-gray-500 mb-0.5">Group Credit Used</div>
-              <div class="text-lg font-bold text-gray-900">{{ agg.totalCreditUsed | number:'1.0-0' }}</div>
-            </div>
-            <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
-              <div class="text-xs font-medium text-gray-500 mb-0.5">Group Fleet</div>
-              <div class="text-lg font-bold text-gray-900">{{ agg.totalFleetSize }} vessels</div>
-            </div>
-            <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
-              <div class="text-xs font-medium text-gray-500 mb-0.5">Group Orders</div>
-              <div class="text-lg font-bold text-gray-900">{{ agg.totalOrders }}</div>
-            </div>
-          </div>
-        }
+        <app-company-header
+          [company]="company()!"
+          [companyFlag]="companyFlag()"
+          [companyTypes]="companyTypes()"
+          [riskSummary]="riskSummary()"
+          [syncing]="syncing()"
+          [canDeleteEntity]="canDeleteEntity()"
+          [teamUsers]="teamUsers()"
+          [responsibleUserId]="responsibleUserId()"
+          [savingResponsible]="savingResponsible()"
+          [parentCompany]="parentCompany()"
+          [groupAggregate]="groupAggregate()"
+          [unlinkingChildId]="unlinkingChildId()"
+          (responsibleUserChange)="onResponsibleUserChange($event)"
+          (deleteClick)="deleteError.set(''); confirmDeleteOpen.set(true)"
+          (monitoringClick)="sanctionsTab.set('monitoring')"
+          (syncClick)="syncFromSeasearcher()"
+          (seasearcherClick)="syncFromSeasearcher()"
+          (unlinkParentClick)="removeOwnParent()"
+        />
 
         <div class="company-card-grid grid grid-cols-1 gap-6 min-[900px]:grid-cols-2 min-[1600px]:grid-cols-3 min-[2000px]:grid-cols-4">
           <!-- Left column -->
           <div class="contents">
 
-            <!-- Company Info + Head Office -->
-            <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-1 flex flex-col overflow-hidden">
-              <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
-                <h2 class="text-sm font-semibold text-gray-700">Info</h2>
-                <div class="flex items-center gap-2">
-                  @if (!editing()) {
-                    @if (companyInfoTab() === 'info' || companyInfoTab() === 'headOffice' || companyInfoTab() === 'terms') {
-                      <button
-                        (click)="startEditing()"
-                        class="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-600 hover:bg-gray-100 transition-colors"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                          <path d="M2.695 14.763l-1.262 3.154a.5.5 0 00.65.65l3.155-1.262a4 4 0 001.343-.885L17.5 5.5a2.121 2.121 0 00-3-3L3.58 13.42a4 4 0 00-.885 1.343z" />
-                        </svg>
-                        Edit
-                      </button>
-                    }
-                    @if (companyInfoTab() === 'emails') {
-                      <button (click)="openAddEmail()"
-                        class="rounded-md bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 hover:bg-brand-100 transition-colors">
-                        + Add
-                      </button>
-                    }
-                  }
-                  @if (editing()) {
-                    <button
-                      (click)="cancelEditing()"
-                      class="rounded-md px-2 py-1 text-[11px] font-medium text-gray-500 hover:bg-gray-50 transition-colors"
-                    >Cancel</button>
-                    <button
-                      (click)="saveEditing()"
-                      [disabled]="editSaving()"
-                      class="rounded-md bg-brand-600 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
-                    >
-                      @if (editSaving()) { Saving… } @else { Save }
-                    </button>
-                  }
-                  <div class="flex gap-1">
-                  <button
-                    type="button"
-                    class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
-                    [class]="companyInfoTab() === 'info' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
-                    (click)="companyInfoTab.set('info')"
-                  >
-                    Info
-                  </button>
-                  <button
-                    type="button"
-                    class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
-                    [class]="companyInfoTab() === 'headOffice' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
-                    (click)="companyInfoTab.set('headOffice')"
-                  >
-                    Head Office
-                  </button>
-                  <button
-                    type="button"
-                    class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
-                    [class]="companyInfoTab() === 'offices' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
-                    (click)="companyInfoTab.set('offices')"
-                  >
-                    Offices
-                  </button>
-                  <button
-                    type="button"
-                    class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
-                    [class]="companyInfoTab() === 'terms' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
-                    (click)="companyInfoTab.set('terms')"
-                  >
-                    Terms
-                  </button>
-                  <button
-                    type="button"
-                    class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
-                    [class]="companyInfoTab() === 'emails' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
-                    (click)="companyInfoTab.set('emails')"
-                  >
-                    Emails
-                  </button>
-                </div>
-                </div>
-              </div>
-              <div class="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-4 text-sm">
-                @if (activeConflicts().length > 0) {
-                  <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 mb-2">
-                    <div class="flex items-center justify-between mb-2">
-                      <div class="flex items-center gap-2">
-                        <svg class="h-4 w-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-                        </svg>
-                        <span class="text-xs font-semibold text-amber-800">SeaSearcher has different values for {{ activeConflicts().length }} field{{ activeConflicts().length > 1 ? 's' : '' }}</span>
-                      </div>
-                      <button (click)="dismissConflicts()" class="text-xs text-amber-600 hover:text-amber-800 font-medium">Dismiss all</button>
-                    </div>
-                    <div class="space-y-2">
-                      @for (conflict of activeConflicts(); track conflict.field) {
-                        <div class="flex items-start justify-between gap-2 rounded-md bg-white/70 px-2.5 py-2 text-xs">
-                          <div class="min-w-0 flex-1">
-                            <span class="font-semibold text-gray-700">{{ FIELD_LABELS[conflict.field] || conflict.field }}</span>
-                            <div class="mt-0.5 text-gray-500">
-                              Yours: <span class="font-medium text-gray-700">{{ conflict.localValue || '(empty)' }}</span>
-                            </div>
-                            <div class="text-gray-500">
-                              SeaSearcher: <span class="font-medium text-amber-700">{{ conflict.seasearcherValue || '(empty)' }}</span>
-                            </div>
-                          </div>
-                          <div class="flex shrink-0 gap-1.5">
-                            <button
-                              (click)="acceptSeasearcherValue(conflict.field)"
-                              class="rounded bg-amber-100 px-2 py-1 text-[11px] font-medium text-amber-800 hover:bg-amber-200 transition-colors"
-                            >Accept</button>
-                            <button
-                              (click)="dismissConflict(conflict.field, conflict.seasearcherValue)"
-                              class="rounded bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-600 hover:bg-gray-200 transition-colors"
-                            >Keep mine</button>
-                          </div>
-                        </div>
-                      }
-                    </div>
-                  </div>
-                }
-                @if (dismissedConflictsCount() > 0) {
-                  <div class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 mb-2">
-                    <button (click)="showDismissedConflicts.set(!showDismissedConflicts())" class="flex items-center justify-between w-full text-xs text-gray-500 hover:text-gray-700">
-                      <span>{{ dismissedConflictsCount() }} dismissed SeaSearcher difference{{ dismissedConflictsCount() > 1 ? 's' : '' }}</span>
-                      <svg class="h-3.5 w-3.5 transition-transform" [class.rotate-180]="showDismissedConflicts()" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                      </svg>
-                    </button>
-                    @if (showDismissedConflicts()) {
-                      <div class="space-y-1.5 mt-2">
-                        @for (conflict of dismissedConflictsList(); track conflict.field) {
-                          <div class="flex items-center justify-between gap-2 rounded-md bg-white/70 px-2.5 py-1.5 text-xs text-gray-500">
-                            <div class="min-w-0 flex-1">
-                              <span class="font-medium text-gray-600">{{ FIELD_LABELS[conflict.field] || conflict.field }}</span>
-                              — SS: <span class="text-gray-500">{{ conflict.seasearcherValue || '(empty)' }}</span>
-                            </div>
-                            <button
-                              (click)="acceptSeasearcherValue(conflict.field)"
-                              class="rounded bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-500 hover:bg-gray-200 transition-colors"
-                            >Accept</button>
-                          </div>
-                        }
-                      </div>
-                    }
-                  </div>
-                }
-                @if (companyInfoTab() === 'info') {
-                  <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
-                    <div>
-                      <dt class="text-gray-500">Company Name</dt>
-                      @if (editing()) {
-                        <dd class="mt-0.5">
-                          <input
-                            type="text"
-                            [value]="editName()"
-                            (input)="editName.set($any($event.target).value)"
-                            class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                          />
-                        </dd>
-                      } @else {
-                        <dd class="mt-0.5 font-medium text-gray-900">{{ company()!.name }}</dd>
-                      }
-                    </div>
-                    <div>
-                      <dt class="text-gray-500">Type</dt>
-                      <dd class="mt-0.5 flex flex-wrap gap-1.5">
-                        @for (t of allTypes(); track t) {
-                          <button
-                            (click)="toggleType(t)"
-                            [disabled]="typeSaving()"
-                            class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition-all cursor-pointer"
-                            [class]="companyTypes().includes(t)
-                              ? typeBadgeClass(t)
-                              : 'bg-gray-50 text-gray-400 border border-dashed border-gray-300 hover:border-gray-400 hover:text-gray-500'"
-                          >
-                            {{ typeLabel(t) }}
-                          </button>
-                        }
-                        @if (typeSaving()) {
-                          <svg class="h-4 w-4 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                          </svg>
-                        }
-                      </dd>
-                    </div>
-                    <div>
-                      <dt class="text-gray-500">Country</dt>
-                      @if (editing()) {
-                        <dd class="mt-0.5 relative">
-                          <div class="flex items-center gap-2">
-                            @if (editCountryIso()) {
-                              <span class="text-lg">{{ countryFlag(editCountryIso()) }}</span>
-                            }
-                            <input
-                              type="text"
-                              [value]="countrySearchQuery()"
-                              (input)="onCountrySearch($any($event.target).value)"
-                              (focus)="showCountryDropdown.set(true)"
-                              placeholder="Search country…"
-                              class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                            />
-                          </div>
-                          @if (showCountryDropdown() && filteredCountries().length) {
-                            <div class="absolute z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-                              @for (c of filteredCountries(); track c.code) {
-                                <button
-                                  type="button"
-                                  (mousedown)="selectCountry(c)"
-                                  class="flex w-full items-center gap-2 px-3 py-2 text-sm text-left hover:bg-gray-50 transition-colors"
-                                >
-                                  <span>{{ countryFlag(c.code) }}</span>
-                                  <span class="font-medium text-gray-900">{{ c.name }}</span>
-                                  <span class="ml-auto text-xs text-gray-400 font-mono">{{ c.code }}</span>
-                                </button>
-                              }
-                            </div>
-                          }
-                        </dd>
-                      } @else {
-                        <dd class="mt-0.5 font-medium text-gray-900">
-                          @if (company()!.countryIso) {
-                            <span class="mr-1">{{ countryFlag(company()!.countryIso) }}</span>
-                          }
-                          {{ company()!.country ?? '—' }}
-                        </dd>
-                      }
-                    </div>
-                    <div>
-                      <dt class="text-gray-500">Country Code</dt>
-                      <dd class="mt-0.5 font-medium text-gray-900 font-mono">
-                        @if (editing()) {
-                          {{ editCountryIso() || '—' }}
-                        } @else {
-                          {{ company()!.countryIso ?? '—' }}
-                        }
-                      </dd>
-                    </div>
-                    <div>
-                      <dt class="text-gray-500">Year Formed</dt>
-                      @if (editing()) {
-                        <dd class="mt-0.5">
-                          <input
-                            type="number"
-                            [value]="editYearFormed() ?? ''"
-                            (input)="editYearFormed.set($any($event.target).value ? +$any($event.target).value : null)"
-                            placeholder="e.g. 1998"
-                            class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                          />
-                        </dd>
-                      } @else {
-                        <dd class="mt-0.5 font-medium text-gray-900">{{ company()!.yearFormed ?? '—' }}</dd>
-                      }
-                    </div>
-                    <div>
-                      <dt class="text-gray-500">Fleet Size</dt>
-                      @if (editing()) {
-                        <dd class="mt-0.5">
-                          <input
-                            type="number"
-                            [value]="editFleetSize() ?? ''"
-                            (input)="editFleetSize.set($any($event.target).value ? +$any($event.target).value : null)"
-                            placeholder="0"
-                            class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                          />
-                        </dd>
-                      } @else {
-                        <dd class="mt-0.5 font-medium text-gray-900">{{ company()!.fleetSize ?? '—' }}</dd>
-                      }
-                    </div>
-                    <div>
-                      <dt class="text-gray-500">Credit Limit</dt>
-                      @if (editing()) {
-                        <dd class="mt-0.5">
-                          <input
-                            type="text"
-                            [value]="editCreditLimit()"
-                            (input)="editCreditLimit.set($any($event.target).value)"
-                            placeholder="0"
-                            class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                          />
-                        </dd>
-                      } @else {
-                        <dd class="mt-0.5 font-medium text-gray-900">\${{ company()!.creditLimit }}</dd>
-                      }
-                      @if (!editing()) {
-                        <button (click)="showCreditApplicationModal.set(true)"
-                          class="mt-1 inline-flex items-center gap-1 rounded-md bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100 transition-colors">
-                          <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
-                          </svg>
-                          Request Credit
-                        </button>
-                      }
-                    </div>
-                    <div>
-                      <dt class="text-gray-500">Company IMO</dt>
-                      @if (editing()) {
-                        <dd class="mt-0.5">
-                          <input
-                            type="text"
-                            [value]="editCompanyImo()"
-                            (input)="editCompanyImo.set($any($event.target).value)"
-                            placeholder="IMO number"
-                            class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                          />
-                        </dd>
-                      } @else {
-                        <dd class="mt-0.5 font-medium text-gray-900">{{ company()!.companyImo ?? '—' }}</dd>
-                      }
-                    </div>
-                    <div>
-                      <dt class="text-gray-500">Seasearcher ID</dt>
-                      <dd class="mt-0.5 font-medium text-gray-900">{{ company()!.seasearcherId ?? '—' }}</dd>
-                    </div>
-                    <div>
-                      <dt class="text-gray-500">Sanctioned</dt>
-                      <dd class="mt-0.5">
-                        @if (company()!.isSanctioned) {
-                          <span class="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Yes</span>
-                        } @else {
-                          <span class="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">No</span>
-                        }
-                      </dd>
-                    </div>
-                    @if (companyTypes().includes('SUPPLIER')) {
-                      <div>
-                        <dt class="text-gray-500">Preferred Invoicing Company</dt>
-                        @if (editing()) {
-                          <dd class="mt-0.5">
-                            <select
-                              [ngModel]="editPreferredInvoicingCompanyId() ?? ''"
-                              (ngModelChange)="editPreferredInvoicingCompanyId.set($event || null)"
-                              class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                            >
-                              <option value="">— None —</option>
-                              @for (co of ownCompanies(); track co.id) {
-                                <option [value]="co.id">{{ co.name }}</option>
-                              }
-                            </select>
-                          </dd>
-                        } @else {
-                          <dd class="mt-0.5 font-medium text-gray-900">
-                            {{ company()!.preferredInvoicingCompanyName ?? '—' }}
-                          </dd>
-                        }
-                      </div>
-                    }
-                  </dl>
-                } @else if (companyInfoTab() === 'headOffice') {
-                  <div class="space-y-4">
-                    @if (
-                      editing() ||
-                      company()!.headOfficeAddress ||
-                      company()!.headOfficePhone ||
-                      company()!.headOfficeEmail ||
-                      company()!.website ||
-                      enrichment()?.headOffice?.faxNumbers?.length
-                    ) {
-                      <dl class="grid grid-cols-1 gap-y-3 text-sm">
-                        @if (editing() || company()!.headOfficeAddress) {
-                          <div>
-                            <dt class="text-gray-500">Address</dt>
-                            @if (editing()) {
-                              <dd class="mt-0.5">
-                                <textarea
-                                  [ngModel]="editHeadOfficeAddress()"
-                                  (ngModelChange)="editHeadOfficeAddress.set($event)"
-                                  rows="3"
-                                  class="block w-full rounded-md border border-gray-300 px-2 py-1 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
-                                  placeholder="Head office address"
-                                ></textarea>
-                              </dd>
-                            } @else {
-                              <dd class="mt-0.5 font-medium text-gray-900 whitespace-pre-line">{{ company()!.headOfficeAddress }}</dd>
-                            }
-                          </div>
-                        }
-                        @if (editing() || company()!.headOfficePhone) {
-                          <div>
-                            <dt class="text-gray-500">Phone</dt>
-                            @if (editing()) {
-                              <dd class="mt-0.5">
-                                <input
-                                  type="text"
-                                  [ngModel]="editHeadOfficePhone()"
-                                  (ngModelChange)="editHeadOfficePhone.set($event)"
-                                  class="block w-full rounded-md border border-gray-300 px-2 py-1 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
-                                  placeholder="Phone number"
-                                />
-                              </dd>
-                            } @else {
-                              <dd class="mt-0.5 font-medium text-gray-900">{{ company()!.headOfficePhone }}</dd>
-                            }
-                          </div>
-                        }
-                        @if (editing() || company()!.headOfficeEmail) {
-                          <div>
-                            <dt class="text-gray-500">Email</dt>
-                            @if (editing()) {
-                              <dd class="mt-0.5">
-                                <input
-                                  type="email"
-                                  [ngModel]="editHeadOfficeEmail()"
-                                  (ngModelChange)="editHeadOfficeEmail.set($event)"
-                                  class="block w-full rounded-md border border-gray-300 px-2 py-1 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
-                                  placeholder="Email address"
-                                />
-                              </dd>
-                            } @else {
-                              <dd class="mt-0.5">
-                                <a [href]="'mailto:' + company()!.headOfficeEmail" class="font-medium text-brand-600 hover:text-brand-800">
-                                  {{ company()!.headOfficeEmail }}
-                                </a>
-                              </dd>
-                            }
-                          </div>
-                        }
-                        @if (editing() || company()!.website) {
-                          <div>
-                            <dt class="text-gray-500">Website</dt>
-                            @if (editing()) {
-                              <dd class="mt-0.5">
-                                <input
-                                  type="url"
-                                  [ngModel]="editWebsite()"
-                                  (ngModelChange)="editWebsite.set($event)"
-                                  class="block w-full rounded-md border border-gray-300 px-2 py-1 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
-                                  placeholder="https://example.com"
-                                />
-                              </dd>
-                            } @else {
-                              <dd class="mt-0.5">
-                                <a [href]="websiteUrl()" target="_blank" rel="noopener noreferrer" class="font-medium text-brand-600 hover:text-brand-800">
-                                  {{ company()!.website }}
-                                </a>
-                              </dd>
-                            }
-                          </div>
-                        }
-                        @if (enrichment()?.headOffice?.faxNumbers?.length) {
-                          <div>
-                            <dt class="text-gray-500">Fax</dt>
-                            <dd class="mt-0.5 font-medium text-gray-900">{{ formatPhone(enrichment()!.headOffice!.faxNumbers!) }}</dd>
-                          </div>
-                        }
-                      </dl>
-                    }
-                    @if (enrichment()?.headOffice?.personnel?.length) {
-                      <div class="border-t border-gray-100 px-5 py-4">
-                        <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">Contact Persons</h3>
-                        <div class="space-y-2">
-                          @for (c of enrichment()!.headOffice!.personnel!; track c.name) {
-                            <div class="flex items-center gap-3">
-                              <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-600">
-                                {{ c.name.charAt(0) }}
-                              </div>
-                              <div>
-                                <span class="text-sm font-medium text-gray-900">{{ c.name }}</span>
-                                @if (c.jobTitle) {
-                                  <span class="ml-1.5 text-xs text-gray-500">{{ c.jobTitle }}</span>
-                                }
-                              </div>
-                            </div>
-                          }
-                        </div>
-                      </div>
-                    }
-                    @if (
-                      !company()!.headOfficeAddress &&
-                      !company()!.headOfficePhone &&
-                      !company()!.headOfficeEmail &&
-                      !company()!.website &&
-                      !enrichment()?.headOffice?.faxNumbers?.length &&
-                      !enrichment()?.headOffice?.personnel?.length
-                    ) {
-                      <div class="text-xs text-gray-500 text-center">Head office data unavailable</div>
-                    }
-                  </div>
-                } @else if (companyInfoTab() === 'offices') {
-                  @if (showAddOffice()) {
-                    <div class="-mx-5 -mt-4 border-b border-gray-100 px-5 py-4 bg-gray-50/50">
-                      <div class="space-y-2">
-                        <div class="grid grid-cols-2 gap-2">
-                          <div>
-                            <label class="block text-xs font-medium text-gray-500 mb-1">City *</label>
-                            <input
-                              [ngModel]="officeForm().city"
-                              (ngModelChange)="officeForm.set({ ...officeForm(), city: $event })"
-                              class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                              placeholder="e.g. Monaco"
-                            />
-                          </div>
-                          <div>
-                            <label class="block text-xs font-medium text-gray-500 mb-1">Country</label>
-                            <input
-                              [ngModel]="officeForm().country"
-                              (ngModelChange)="officeForm.set({ ...officeForm(), country: $event })"
-                              class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                              placeholder="e.g. Monaco"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label class="block text-xs font-medium text-gray-500 mb-1">Address</label>
-                          <input
-                            [ngModel]="officeForm().address"
-                            (ngModelChange)="officeForm.set({ ...officeForm(), address: $event })"
-                            class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                            placeholder="Street address"
-                          />
-                        </div>
-                        <div class="grid grid-cols-2 gap-2">
-                          <div>
-                            <label class="block text-xs font-medium text-gray-500 mb-1">Phone</label>
-                            <input
-                              [ngModel]="officeForm().phone"
-                              (ngModelChange)="officeForm.set({ ...officeForm(), phone: $event })"
-                              class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                              placeholder="+377 ..."
-                            />
-                          </div>
-                          <div>
-                            <label class="block text-xs font-medium text-gray-500 mb-1">Email</label>
-                            <input
-                              [ngModel]="officeForm().email"
-                              (ngModelChange)="officeForm.set({ ...officeForm(), email: $event })"
-                              class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                              placeholder="office&#64;example.com"
-                            />
-                          </div>
-                        </div>
-                        <div class="flex items-center justify-end gap-2 pt-1">
-                          <button (click)="cancelOfficeForm()"
-                            class="rounded-md px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100">
-                            Cancel
-                          </button>
-                          <button
-                            [disabled]="savingOffice() || !officeForm().city.trim()"
-                            (click)="saveCompanyOffice()"
-                            class="rounded-md bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50">
-                            {{ editingOfficeId() ? 'Update' : 'Add' }}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  } @else if (!companyOffices().length && !showAddOffice()) {
-                    <div class="flex flex-col items-center justify-center py-8">
-                      <p class="text-xs text-gray-500 mb-2">No offices on file</p>
-                      <button (click)="openAddOffice()" class="text-xs font-medium text-brand-600 hover:text-brand-700">+ Add office</button>
-                    </div>
-                  }
-                  @if (companyOffices().length) {
-                    <div class="divide-y divide-gray-50 -mx-5" [class.-mt-4]="!showAddOffice()">
-                      @for (office of companyOffices(); track office.id) {
-                        <div class="group px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors">
-                          <div class="flex items-start justify-between">
-                            <div>
-                              <span class="font-medium text-gray-900">{{ office.city }}</span>
-                              @if (office.country) {
-                                <span class="text-gray-400 ml-1">{{ office.country }}</span>
-                              }
-                              @if (office.address) {
-                                <p class="text-xs text-gray-500 mt-0.5">{{ office.address }}</p>
-                              }
-                              @if (office.phone || office.email) {
-                                <div class="flex items-center gap-3 mt-1 text-xs text-gray-400">
-                                  @if (office.phone) { <span>{{ office.phone }}</span> }
-                                  @if (office.email) { <span>{{ office.email }}</span> }
-                                </div>
-                              }
-                            </div>
-                            <div class="hidden group-hover:flex items-center gap-1 shrink-0 ml-2">
-                              <button (click)="openEditOffice(office)"
-                                class="rounded p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-                                title="Edit office">
-                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                  <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
-                                </svg>
-                              </button>
-                              <button (click)="deleteCompanyOffice(office.id)"
-                                class="rounded p-1 text-gray-400 hover:text-red-600 hover:bg-red-50"
-                                title="Delete office">
-                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                  <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                                </svg>
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      }
-                    </div>
-                    @if (!showAddOffice()) {
-                      <div class="px-5 py-2 border-t border-gray-100 -mx-5">
-                        <button (click)="openAddOffice()" class="text-xs font-medium text-brand-600 hover:text-brand-700">+ Add office</button>
-                      </div>
-                    }
-                  }
-                } @else if (companyInfoTab() === 'terms') {
-                  <div class="space-y-4">
-                    <div>
-                      <dt class="text-gray-500">Special Customer Terms</dt>
-                      <dd class="mt-0.5">
-                        @if (editing()) {
-                          <textarea
-                            [ngModel]="editSpecialCustomerTerms()"
-                            (ngModelChange)="editSpecialCustomerTerms.set($event)"
-                            rows="8"
-                            class="block w-full rounded-md border border-gray-300 px-2 py-1 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
-                            placeholder="Terms that apply when this company is the customer on an order. Takes precedence over the invoicing company's default customer terms."
-                          ></textarea>
-                        } @else {
-                          <div class="whitespace-pre-line text-sm text-gray-900">
-                            @if (company()!.specialCustomerTerms) {
-                              {{ company()!.specialCustomerTerms }}
-                            } @else {
-                              <span class="text-gray-400 italic">No special customer terms set. The invoicing company's default terms will be used.</span>
-                            }
-                          </div>
-                        }
-                      </dd>
-                    </div>
-                    <div class="rounded-md bg-blue-50 p-3 text-xs text-blue-700">
-                      <p class="font-medium mb-1">How this works:</p>
-                      <ul class="list-disc list-inside space-y-0.5">
-                        <li>These terms appear on Offer/Confirmation documents when this company is the customer.</li>
-                        <li>They override the invoicing company's default customer terms.</li>
-                        <li>Per-order terms (set on the order itself) still take highest precedence.</li>
-                      </ul>
-                    </div>
-                  </div>
-                } @else if (companyInfoTab() === 'emails') {
-                  @if (showAddEmail()) {
-                    <div class="-mx-5 -mt-4 border-b border-gray-100 px-5 py-4 bg-gray-50/50">
-                      <div class="space-y-2">
-                        <div class="grid grid-cols-2 gap-2">
-                          <div>
-                            <label class="block text-xs font-medium text-gray-500 mb-1">Type</label>
-                            <select
-                              [ngModel]="emailForm().emailType"
-                              (ngModelChange)="emailForm.set({ ...emailForm(), emailType: $event })"
-                              class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
-                              @for (type of emailTypeOptions; track type) {
-                                <option [ngValue]="type">{{ formatEmailType(type) }}</option>
-                              }
-                            </select>
-                          </div>
-                          <div>
-                            <label class="block text-xs font-medium text-gray-500 mb-1">Label (optional)</label>
-                            <input
-                              [ngModel]="emailForm().label"
-                              (ngModelChange)="emailForm.set({ ...emailForm(), label: $event })"
-                              placeholder="e.g. Main office"
-                              class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label class="block text-xs font-medium text-gray-500 mb-1">Email Address</label>
-                          <input
-                            type="email"
-                            [ngModel]="emailForm().email"
-                            (ngModelChange)="emailForm.set({ ...emailForm(), email: $event })"
-                            placeholder="email@example.com"
-                            class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                          />
-                        </div>
-                        <label class="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            [ngModel]="emailForm().isPrimary"
-                            (ngModelChange)="emailForm.set({ ...emailForm(), isPrimary: $event })"
-                            class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
-                          />
-                          <span class="text-xs text-gray-600">Set as primary for this type</span>
-                        </label>
-                        <div class="flex justify-end gap-2">
-                          <button (click)="cancelEmailForm()"
-                            class="rounded-md border border-gray-200 px-3 py-1 text-xs text-gray-600 hover:bg-gray-50 transition-colors">
-                            Cancel
-                          </button>
-                          <button (click)="saveCompanyEmail()"
-                            [disabled]="savingEmail() || !emailForm().email.trim()"
-                            class="rounded-md bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors">
-                            {{ editingEmailId() ? 'Update' : 'Add' }}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  }
-                  @if (emailsLoading()) {
-                    <div class="flex items-center justify-center py-6">
-                      <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                      </svg>
-                    </div>
-                  } @else if (!companyEmails().length && !showAddEmail()) {
-                    <div class="text-center text-gray-400">
-                      No emails added yet.
-                      <button (click)="openAddEmail()" class="text-brand-600 hover:text-brand-700 font-medium">Add one</button>
-                    </div>
-                  } @else {
-                    <div class="divide-y divide-gray-50 -mx-5">
-                      @for (e of companyEmails(); track e.id) {
-                        <div class="px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors group">
-                          <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-2">
-                              <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
-                                [class]="emailTypeBadgeClass(e.emailType)">
-                                {{ formatEmailType(e.emailType) }}
-                              </span>
-                              <a [href]="'mailto:' + e.email" class="font-medium text-brand-700 hover:text-brand-900 hover:underline">{{ e.email }}</a>
-                              @if (e.isPrimary) {
-                                <span class="inline-flex items-center rounded-full bg-green-50 px-1.5 py-0.5 text-[10px] font-medium text-green-600">Primary</span>
-                              }
-                            </div>
-                            <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button (click)="openEditEmail(e)"
-                                class="rounded p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors" title="Edit">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                                  <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                                </svg>
-                              </button>
-                              <button (click)="deleteCompanyEmail(e.id)"
-                                class="rounded p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Delete">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                                  <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
-                                </svg>
-                              </button>
-                            </div>
-                          </div>
-                          @if (e.label) {
-                            <p class="text-xs text-gray-500 mt-0.5">{{ e.label }}</p>
-                          }
-                          <p class="text-[10px] text-gray-400 mt-1">
-                            Added by {{ e.addedByName ?? 'Unknown' }} · {{ e.createdAt | date:'mediumDate' }}
-                          </p>
-                        </div>
-                      }
-                    </div>
-                  }
-                }
-              </div>
-            </div>
+            <app-company-info-card
+              class="min-[900px]:order-1"
+              [company]="company()!"
+              [enrichment]="enrichment()"
+              [syncConflicts]="syncConflicts()"
+              [ownCompanies]="ownCompanies()"
+              [allTypes]="allTypes()"
+              [companyTypes]="companyTypes()"
+              [companyOffices]="companyOffices()"
+              [companyEmails]="companyEmails()"
+              [emailsLoading]="emailsLoading()"
+              (companyChange)="onCompanyInfoSave($event)"
+              (typeToggle)="onTypeToggle($event)"
+              (conflictAccept)="acceptSeasearcherValue($event)"
+              (conflictDismiss)="dismissConflict($event.field, $event.seasearcherValue)"
+              (officeSave)="onOfficeSave($event)"
+              (officeDelete)="deleteCompanyOffice($event)"
+              (emailSave)="onEmailSave($event)"
+              (emailDelete)="deleteCompanyEmail($event)"
+              (requestCredit)="showCreditApplicationModal.set(true)"
+            />
 
             <!-- Contacts -->
-            <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-5">
-              <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                  <h2 class="text-sm font-semibold text-gray-700">Contacts</h2>
-                  @if (contacts().length) {
-                    <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
-                      {{ contacts().length }}
-                    </span>
-                  }
-                </div>
-                <button
-                  (click)="openAddContact()"
-                  class="inline-flex items-center gap-1 rounded-md bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 hover:bg-brand-100 transition-colors"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
-                  </svg>
-                  Add Contact
-                </button>
-              </div>
-              @if (contactsLoading()) {
-                <div class="flex items-center justify-center py-8">
-                  <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                  </svg>
-                </div>
-              } @else if (contacts().length) {
-                <div class="divide-y divide-gray-50 max-h-[600px] overflow-y-auto">
-                  @for (c of contacts(); track c.id) {
-                    <div class="px-5 py-3 flex items-start justify-between group">
-                      <div class="flex items-start gap-3 min-w-0">
-                        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold"
-                          [class]="c.source === 'seasearcher' ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600'">
-                          {{ c.name.charAt(0) }}
-                        </div>
-                        <div class="min-w-0">
-                          <div class="flex items-center gap-2">
-                            <span class="text-sm font-medium text-gray-900">{{ c.name }}</span>
-                            @if (c.role) {
-                              <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
-                                {{ c.role }}
-                              </span>
-                            }
-                            @if (c.source === 'seasearcher') {
-                              <span class="inline-flex items-center rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600">
-                                LLI
-                              </span>
-                            }
-                          </div>
-                          <div class="mt-0.5 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-500">
-                            @if (c.phone) {
-                              <span class="inline-flex items-center gap-1">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                                  <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
-                                </svg>
-                                {{ c.phone }}
-                              </span>
-                            }
-                            @if (c.fax) {
-                              <span class="inline-flex items-center gap-1">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                                  <path fill-rule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a2 2 0 002 2h6a2 2 0 002-2v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clip-rule="evenodd" />
-                                </svg>
-                                {{ c.fax }}
-                              </span>
-                            }
-                            @if (c.email) {
-                              <a [href]="'mailto:' + c.email" class="inline-flex items-center gap-1 text-brand-600 hover:text-brand-800">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                                  <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
-                                  <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
-                                </svg>
-                                {{ c.email }}
-                              </a>
-                            }
-                          </div>
-                          @if (c.notes) {
-                            <p class="mt-1 text-xs text-gray-400 italic">{{ c.notes }}</p>
-                          }
-                        </div>
-                      </div>
-                      <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2">
-                        <button (click)="openEditContact(c)" class="rounded-md p-1 text-gray-400 hover:text-brand-600 transition-colors" title="Edit">
-                          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
-                            <path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" />
-                          </svg>
-                        </button>
-                        <button (click)="confirmDeleteContact(c)" class="rounded-md p-1 text-gray-400 hover:text-red-500 transition-colors" title="Delete">
-                          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  }
-                </div>
-              } @else {
-                <div class="px-5 py-6 text-center text-sm text-gray-400">
-                  No contacts yet. Click "Add Contact" to add one.
-                </div>
-              }
-            </div>
-
-            <!-- Contact Modal -->
-            @if (showContactModal()) {
-              <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                <div class="rounded-xl bg-white p-6 shadow-xl w-full max-w-md mx-4" (click)="$event.stopPropagation()">
-                  <h3 class="text-lg font-semibold text-gray-900">{{ editingContactId() ? 'Edit' : 'Add' }} Contact</h3>
-
-                  @if (contactError()) {
-                    <div class="mt-3 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">{{ contactError() }}</div>
-                  }
-
-                  <div class="mt-4 space-y-3">
-                    <div>
-                      <label class="block text-sm font-medium text-gray-700">Name *</label>
-                      <input type="text" [ngModel]="contactForm().name" (ngModelChange)="updateContactField('name', $event)"
-                        class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
-                        placeholder="e.g. John Smith" />
-                    </div>
-                    <div>
-                      <label class="block text-sm font-medium text-gray-700">Role / Job Title</label>
-                      <input type="text" [ngModel]="contactForm().role" (ngModelChange)="updateContactField('role', $event)"
-                        class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
-                        placeholder="e.g. Bunker Manager" />
-                    </div>
-                    <div class="grid grid-cols-2 gap-3">
-                      <div>
-                        <label class="block text-sm font-medium text-gray-700">Phone</label>
-                        <input type="text" [ngModel]="contactForm().phone" (ngModelChange)="updateContactField('phone', $event)"
-                          class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
-                          placeholder="+1 905 467 7357" />
-                      </div>
-                      <div>
-                        <label class="block text-sm font-medium text-gray-700">Fax</label>
-                        <input type="text" [ngModel]="contactForm().fax" (ngModelChange)="updateContactField('fax', $event)"
-                          class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
-                          placeholder="+1 905 467 7358" />
-                      </div>
-                    </div>
-                    <div>
-                      <label class="block text-sm font-medium text-gray-700">Email</label>
-                      <input type="email" [ngModel]="contactForm().email" (ngModelChange)="updateContactField('email', $event)"
-                        class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
-                        placeholder="john@example.com" />
-                    </div>
-                    <div>
-                      <label class="block text-sm font-medium text-gray-700">Notes</label>
-                      <textarea [ngModel]="contactForm().notes" (ngModelChange)="updateContactField('notes', $event)"
-                        class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
-                        rows="2" placeholder="Any additional notes..."></textarea>
-                    </div>
-                  </div>
-
-                  <div class="mt-5 flex justify-end gap-2">
-                    <button (click)="showContactModal.set(false)"
-                      class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-                    <button (click)="saveContact()" [disabled]="contactSaving()"
-                      class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
-                      @if (contactSaving()) { Saving… } @else { {{ editingContactId() ? 'Update' : 'Add' }} }
-                    </button>
-                  </div>
-                </div>
-              </div>
-            }
-
-            <!-- Delete Contact Confirmation -->
-            @if (deleteContactTarget()) {
-              <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" (click)="deleteContactTarget.set(null)">
-                <div class="rounded-xl bg-white p-6 shadow-xl max-w-sm mx-4" (click)="$event.stopPropagation()">
-                  <h3 class="text-lg font-semibold text-gray-900">Delete contact?</h3>
-                  <p class="mt-2 text-sm text-gray-500">
-                    Are you sure you want to delete <strong>{{ deleteContactTarget()!.name }}</strong>?
-                  </p>
-                  <div class="mt-4 flex justify-end gap-2">
-                    <button (click)="deleteContactTarget.set(null)"
-                      class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-                    <button (click)="executeDeleteContact()"
-                      class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">Delete</button>
-                  </div>
-                </div>
-              </div>
-            }
+            <app-contacts-card
+              [contacts]="contacts()"
+              [contactsLoading]="contactsLoading()"
+              [companyId]="company()!.id"
+              (mutated)="loadContacts(company()!.id)"
+            />
 
             <!-- Delete Vessel Association Confirmation -->
             @if (confirmDeleteVesselAssoc()) {
@@ -1533,888 +508,53 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
               </div>
             }
 
-            <!-- Supplies At (ports where this company is a supplier) -->
-              <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-11">
-                <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between gap-3">
-                  <h2 class="text-sm font-semibold text-gray-700">
-                    Supplies At
-                    @if (supplyPorts().length) {
-                      <span class="ml-1 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
-                        {{ supplyPorts().length }}
-                      </span>
-                    }
-                  </h2>
-                  <div class="flex items-center gap-2">
-                    <button
-                      type="button"
-                      (click)="openPlaceSupplyRulesModal()"
-                      class="rounded-md border border-gray-200 px-2 py-1 text-[11px] font-medium text-gray-600 hover:bg-gray-50 transition-colors"
-                    >
-                      Coverage rules
-                    </button>
-                    <button
-                      type="button"
-                      (click)="openAddSupplyPort()"
-                      class="rounded-md bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 hover:bg-brand-100 transition-colors"
-                    >
-                      + Add place
-                    </button>
-                  </div>
-                </div>
-                @if (showAddSupplyPort()) {
-                  <div class="border-b border-gray-100 px-5 py-4 bg-gray-50/50">
-                    <div class="space-y-3">
-                      <div class="relative">
-                        @if (selectedSupplyPlace()) {
-                          <div class="flex items-center justify-between rounded-md border border-brand-300 bg-brand-50 px-3 py-2 text-sm">
-                            <div>
-                              <span class="font-medium text-brand-800">{{ selectedSupplyPlace()!.name }}</span>
-                              @if (selectedSupplyPlace()!.unlocode || selectedSupplyPlace()!.parentPlaceUnlocode) {
-                                <div class="mt-0.5 text-[11px] font-medium uppercase tracking-[0.12em] text-brand-700/80">{{ (selectedSupplyPlace()!.unlocode ?? selectedSupplyPlace()!.parentPlaceUnlocode)!.replaceAll(' ', '') }}</div>
-                              }
-                              @if (selectedSupplyPlace()!.country) {
-                                <span class="ml-1 text-xs text-brand-700/80">{{ selectedSupplyPlace()!.country }}</span>
-                              }
-                              @if (selectedSupplyPlace()!.source === 'lloyds') {
-                                <span class="ml-2 inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">Imported from Seasearcher</span>
-                              }
-                            </div>
-                            @if (!editingSupplyPortId()) {
-                              <button
-                                type="button"
-                                (click)="clearSelectedSupplyPlace()"
-                                class="ml-2 text-brand-400 hover:text-brand-600 transition-colors"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                                  <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                </svg>
-                              </button>
-                            }
-                          </div>
-                        } @else {
-                          <input
-                            [ngModel]="supplyPlaceSearch()"
-                            (ngModelChange)="onSupplyPlaceSearch($event)"
-                            placeholder="Search local place or import from Seasearcher..."
-                            class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                          />
-                          @if (supplyPlaceResults().length) {
-                            <div class="absolute z-10 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
-                              @for (place of supplyPlaceResults(); track place.id) {
-                                <button
-                                  type="button"
-                                  (click)="selectSupplyPlace(place)"
-                                  [disabled]="isImportingSupplyPlace(place)"
-                                  class="w-full px-3 py-2 text-left text-sm hover:bg-brand-50 transition-colors flex items-center justify-between disabled:cursor-wait disabled:opacity-60"
-                                >
-                                  <div class="min-w-0">
-                                    <div class="flex items-center gap-2">
-                                      <span class="font-medium text-gray-900">{{ place.name }}</span>
-                                      @if (place.source === 'lloyds') {
-                                        <span class="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">Seasearcher</span>
-                                      }
-                                    </div>
-                                    @if (place.unlocode || place.parentPlaceUnlocode) {
-                                      <div class="text-[11px] font-medium uppercase tracking-[0.12em] text-gray-500">{{ (place.unlocode ?? place.parentPlaceUnlocode)!.replaceAll(' ', '') }}</div>
-                                    }
-                                    @if (place.source === 'lloyds') {
-                                      <div class="text-[11px] text-gray-400">Import this place and add it as a supply port</div>
-                                    }
-                                  </div>
-                                  <div class="ml-3 flex shrink-0 items-center gap-2">
-                                    @if (place.country) {
-                                      <span class="text-xs text-gray-400">{{ place.country }}</span>
-                                    }
-                                    @if (isImportingSupplyPlace(place)) {
-                                      <svg class="h-3.5 w-3.5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
-                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                                      </svg>
-                                    }
-                                  </div>
-                                </button>
-                              }
-                            </div>
-                          }
-                        }
-                      </div>
+            <!-- Fake original contacts opening tag removed -->
+            <!-- Supplies At wrapped in component -->
+            <app-supply-ports-card
+              [companyId]="company()!.id"
+              [contacts]="contacts()"
+              [contactsLoading]="contactsLoading()"
+            />
 
-                      <div>
-                        <label class="block text-xs font-medium text-gray-500 mb-1">Contact Person</label>
-                        @if (contactsLoading()) {
-                          <div class="text-xs text-gray-400 py-1">Loading contacts...</div>
-                        } @else if (contacts().length) {
-                          <select
-                            [ngModel]="supplyPortForm().contactId"
-                            (ngModelChange)="supplyPortForm.set({ ...supplyPortForm(), contactId: $event || null })"
-                            class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                          >
-                            <option [ngValue]="null">— None —</option>
-                            @for (contact of contacts(); track contact.id) {
-                              <option [ngValue]="contact.id">{{ contact.name }}@if (contact.role) { ({{ contact.role }}) }</option>
-                            }
-                          </select>
-                        } @else {
-                          <div class="text-xs text-gray-400 py-1">No contacts on file</div>
-                        }
-                      </div>
+            <!-- app-files-card replaces inline file upload/list -->
+            <app-files-card [companyId]="company()!.id" />
 
-                      <div>
-                        <label class="block text-xs font-medium text-gray-500 mb-1">Products</label>
-                        <div class="flex flex-wrap gap-1.5">
-                          @for (prod of supplyPortProductOptions; track prod) {
-                            <button
-                              type="button"
-                              (click)="toggleSupplyPortProduct(prod)"
-                              [class]="supplyPortForm().products.includes(prod)
-                                ? 'rounded-full px-2.5 py-1 text-xs font-medium bg-brand-600 text-white ring-1 ring-brand-600 transition-colors'
-                                : 'rounded-full px-2.5 py-1 text-xs font-medium bg-white text-gray-600 ring-1 ring-gray-300 hover:ring-brand-400 hover:text-brand-700 transition-colors'"
-                            >
-                              {{ prod }}
-                            </button>
-                          }
-                        </div>
-                      </div>
-
-                      <textarea
-                        [ngModel]="supplyPortForm().note"
-                        (ngModelChange)="supplyPortForm.set({ ...supplyPortForm(), note: $event })"
-                        placeholder="Notes"
-                        rows="2"
-                        class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                      ></textarea>
-
-                      <div class="flex justify-end gap-2">
-                        <button
-                          type="button"
-                          (click)="cancelAddSupplyPort()"
-                          class="rounded-md border border-gray-200 px-3 py-1 text-xs text-gray-600 hover:bg-gray-50 transition-colors"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          (click)="saveSupplyPort()"
-                          [disabled]="savingSupplyPort() || !selectedSupplyPlace()"
-                          class="rounded-md bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
-                        >
-                          {{ savingSupplyPort() ? (editingSupplyPortId() ? 'Saving...' : 'Adding...') : (editingSupplyPortId() ? 'Save' : 'Add') }}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                }
-                @if (supplyPortsLoading()) {
-                  <div class="flex items-center justify-center py-6">
-                    <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                    </svg>
-                  </div>
-                } @else if (!supplyPorts().length) {
-                  <div class="px-5 py-6 text-center text-sm text-gray-400">No supply ports added for this company</div>
-                } @else {
-                  <div class="divide-y divide-gray-50 max-h-[420px] overflow-y-auto pb-2">
-                    @for (sp of supplyPorts(); track sp.id) {
-                      <div class="px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors">
-                        <div class="flex items-center justify-between">
-                          <div class="min-w-0">
-                            <a [routerLink]="['/places', sp.placeId]" class="font-medium text-brand-700 hover:text-brand-900 hover:underline">{{ sp.placeName }}</a>
-                            @if (sp.placeCode) {
-                              <div class="mt-0.5 text-[11px] font-medium uppercase tracking-[0.12em] text-gray-400">{{ sp.placeCode.replaceAll(' ', '') }}</div>
-                            }
-                          </div>
-                          <div class="ml-3 flex items-start gap-2">
-                            @if (sp.placeCountry) {
-                              <span class="inline-flex items-center gap-1.5 text-xs text-gray-500 whitespace-nowrap">
-                                @if (placeCountryFlag(sp.placeCountry)) {
-                                  <span>{{ placeCountryFlag(sp.placeCountry) }}</span>
-                                }
-                                <span>{{ placeCountryLabel(sp.placeCountry) }}</span>
-                              </span>
-                            }
-                            <div class="flex items-center gap-0.5 shrink-0">
-                              <button (click)="openEditSupplyPort(sp)" class="rounded-md p-1 text-gray-400 hover:text-brand-600 transition-colors" title="Edit supply location">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                                  <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
-                                  <path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" />
-                                </svg>
-                              </button>
-                              <button (click)="confirmDeleteSupplyPort(sp)" class="rounded-md p-1 text-gray-400 hover:text-red-500 transition-colors" title="Delete supply location">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                                  <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
-                                </svg>
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                        @if (sp.contactName) {
-                          <div class="mt-1 text-xs text-gray-500">Contact: {{ sp.contactName }}</div>
-                        }
-                        @if (sp.products && sp.products.length) {
-                          <div class="flex flex-wrap gap-1 mt-1">
-                            @for (prod of sp.products; track prod) {
-                              <span class="inline-flex items-center rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-medium text-brand-700 ring-1 ring-brand-200">{{ prod }}</span>
-                            }
-                          </div>
-                        }
-                        @if (sp.note) {
-                          <p class="text-xs text-gray-400 mt-0.5 italic">{{ sp.note }}</p>
-                        }
-                      </div>
-                    }
-                  </div>
-                }
-              </div>
-
-            @if (deleteSupplyPortTarget()) {
-              <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" (click)="deleteSupplyPortTarget.set(null)">
-                <div class="rounded-xl bg-white p-6 shadow-xl max-w-sm mx-4" (click)="$event.stopPropagation()">
-                  <h3 class="text-lg font-semibold text-gray-900">Delete supply location?</h3>
-                  <p class="mt-2 text-sm text-gray-500">
-                    Are you sure you want to remove <strong>{{ deleteSupplyPortTarget()!.placeName }}</strong> from this company's supply locations?
-                  </p>
-                  <div class="mt-4 flex justify-end gap-2">
-                    <button (click)="deleteSupplyPortTarget.set(null)"
-                      class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-                    <button (click)="executeDeleteSupplyPort()"
-                      class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">Delete</button>
-                  </div>
-                </div>
-              </div>
-            }
-
-            @if (showPlaceSupplyRulesModal()) {
-              <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" (click)="closePlaceSupplyRulesModal()">
-                <div class="mx-4 flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" (click)="$event.stopPropagation()">
-                  <div class="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-4">
-                    <div>
-                      <h3 class="text-lg font-semibold text-gray-900">Place Coverage Rules</h3>
-                      <p class="mt-1 text-sm text-gray-500">Create country and place-type rules that automatically add this supplier to existing and newly created local places.</p>
-                    </div>
-                    <button
-                      type="button"
-                      (click)="closePlaceSupplyRulesModal()"
-                      class="rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-                      </svg>
-                    </button>
-                  </div>
-
-                  <div class="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1.3fr)_360px]">
-                    <div class="min-h-0 overflow-y-auto border-b border-gray-100 lg:border-b-0 lg:border-r lg:border-gray-100">
-                      @if (placeSupplyRulesLoading()) {
-                        <div class="flex h-full min-h-[260px] items-center justify-center">
-                          <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                          </svg>
-                        </div>
-                      } @else if (!placeSupplyRules().length) {
-                        <div class="flex h-full min-h-[260px] items-center justify-center px-6 text-center text-sm text-gray-400">
-                          No coverage rules yet. Create one to auto-add this supplier to matching places.
-                        </div>
-                      } @else {
-                        <div class="divide-y divide-gray-100">
-                          @for (rule of placeSupplyRules(); track rule.id) {
-                            <div class="px-6 py-4">
-                              <div class="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-                                <div class="min-w-0">
-                                  <div class="flex flex-wrap items-center gap-2">
-                                    @if (countryFlag(rule.countryIso)) {
-                                      <span class="text-base">{{ countryFlag(rule.countryIso) }}</span>
-                                    }
-                                    <span class="font-medium text-gray-900">{{ placeCountryLabel(rule.countryIso) }}</span>
-                                    <span class="text-[11px] font-medium uppercase tracking-[0.12em] text-gray-400">{{ rule.countryIso }}</span>
-                                  </div>
-
-                                  <div class="mt-2 flex flex-wrap gap-1.5">
-                                    @for (placeType of rule.placeTypes; track placeType) {
-                                      <span class="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-blue-200">{{ placeSupplyRulePlaceTypeLabel(placeType) }}</span>
-                                    }
-                                  </div>
-
-                                  @if (rule.contactName) {
-                                    <div class="mt-2 text-xs text-gray-500">Contact: {{ rule.contactName }}</div>
-                                  }
-
-                                  @if (rule.products.length) {
-                                    <div class="mt-2 flex flex-wrap gap-1.5">
-                                      @for (product of rule.products; track product) {
-                                        <span class="inline-flex items-center rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-medium text-brand-700 ring-1 ring-brand-200">{{ product }}</span>
-                                      }
-                                    </div>
-                                  }
-
-                                  @if (rule.note) {
-                                    <p class="mt-2 text-xs italic text-gray-400">{{ rule.note }}</p>
-                                  }
-                                </div>
-
-                                <div class="flex shrink-0 flex-wrap items-center gap-2 xl:justify-end">
-                                  <button
-                                    type="button"
-                                    (click)="openEditPlaceSupplyRule(rule)"
-                                    class="rounded-md border border-gray-200 px-2.5 py-1 text-[11px] font-medium text-gray-600 hover:bg-gray-50 transition-colors"
-                                  >
-                                    Edit
-                                  </button>
-                                  <button
-                                    type="button"
-                                    (click)="reapplyPlaceSupplyRule(rule)"
-                                    [disabled]="reapplyingPlaceSupplyRuleId() === rule.id"
-                                    class="rounded-md border border-brand-200 bg-brand-50 px-2.5 py-1 text-[11px] font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50 transition-colors"
-                                  >
-                                    {{ reapplyingPlaceSupplyRuleId() === rule.id ? 'Applying...' : 'Reapply' }}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    (click)="deletePlaceSupplyRule(rule)"
-                                    class="rounded-md border border-red-200 px-2.5 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 transition-colors"
-                                  >
-                                    Delete
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          }
-                        </div>
-                      }
-                    </div>
-
-                    <div class="min-h-0 overflow-y-auto bg-gray-50/70 px-6 py-5">
-                      <div class="flex items-start justify-between gap-3">
-                        <div>
-                          <h4 class="text-sm font-semibold text-gray-800">{{ editingPlaceSupplyRuleId() ? 'Edit Rule' : 'New Rule' }}</h4>
-                          <p class="mt-1 text-xs text-gray-500">Create applies immediately. Editing only affects future matches until you reapply.</p>
-                        </div>
-                        @if (editingPlaceSupplyRuleId()) {
-                          <button
-                            type="button"
-                            (click)="resetPlaceSupplyRuleForm()"
-                            class="rounded-md border border-gray-200 px-2 py-1 text-[11px] font-medium text-gray-600 hover:bg-white transition-colors"
-                          >
-                            Clear
-                          </button>
-                        }
-                      </div>
-
-                      <div class="mt-4 space-y-4">
-                        <div>
-                          <label class="block text-xs font-medium text-gray-500 mb-1">Country</label>
-                          <select
-                            [ngModel]="placeSupplyRuleForm().countryIso"
-                            (ngModelChange)="placeSupplyRuleForm.set({ ...placeSupplyRuleForm(), countryIso: $event })"
-                            class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                          >
-                            <option value="">Select country…</option>
-                            @for (country of countries; track country.code) {
-                              <option [value]="country.code">{{ country.name }} ({{ country.code }})</option>
-                            }
-                          </select>
-                        </div>
-
-                        <div>
-                          <label class="block text-xs font-medium text-gray-500 mb-1">Place Types</label>
-                          <div class="flex flex-wrap gap-1.5">
-                            @for (option of placeSupplyRulePlaceTypeOptions; track option.value) {
-                              <button
-                                type="button"
-                                (click)="togglePlaceSupplyRulePlaceType(option.value)"
-                                [class]="placeSupplyRuleForm().placeTypes.includes(option.value)
-                                  ? 'rounded-full px-2.5 py-1 text-xs font-medium bg-brand-600 text-white ring-1 ring-brand-600 transition-colors'
-                                  : 'rounded-full px-2.5 py-1 text-xs font-medium bg-white text-gray-600 ring-1 ring-gray-300 hover:ring-brand-400 hover:text-brand-700 transition-colors'"
-                              >
-                                {{ option.label }}
-                              </button>
-                            }
-                          </div>
-                        </div>
-
-                        <div>
-                          <label class="block text-xs font-medium text-gray-500 mb-1">Contact Person</label>
-                          @if (contactsLoading()) {
-                            <div class="text-xs text-gray-400 py-1">Loading contacts...</div>
-                          } @else if (contacts().length) {
-                            <select
-                              [ngModel]="placeSupplyRuleForm().contactId"
-                              (ngModelChange)="placeSupplyRuleForm.set({ ...placeSupplyRuleForm(), contactId: $event || null })"
-                              class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                            >
-                              <option [ngValue]="null">— None —</option>
-                              @for (contact of contacts(); track contact.id) {
-                                <option [ngValue]="contact.id">{{ contact.name }}@if (contact.role) { ({{ contact.role }}) }</option>
-                              }
-                            </select>
-                          } @else {
-                            <div class="text-xs text-gray-400 py-1">No contacts on file</div>
-                          }
-                        </div>
-
-                        <div>
-                          <label class="block text-xs font-medium text-gray-500 mb-1">Products</label>
-                          <div class="flex flex-wrap gap-1.5">
-                            @for (product of supplyPortProductOptions; track product) {
-                              <button
-                                type="button"
-                                (click)="togglePlaceSupplyRuleProduct(product)"
-                                [class]="placeSupplyRuleForm().products.includes(product)
-                                  ? 'rounded-full px-2.5 py-1 text-xs font-medium bg-brand-600 text-white ring-1 ring-brand-600 transition-colors'
-                                  : 'rounded-full px-2.5 py-1 text-xs font-medium bg-white text-gray-600 ring-1 ring-gray-300 hover:ring-brand-400 hover:text-brand-700 transition-colors'"
-                              >
-                                {{ product }}
-                              </button>
-                            }
-                          </div>
-                        </div>
-
-                        <div>
-                          <label class="block text-xs font-medium text-gray-500 mb-1">Note</label>
-                          <textarea
-                            [ngModel]="placeSupplyRuleForm().note"
-                            (ngModelChange)="placeSupplyRuleForm.set({ ...placeSupplyRuleForm(), note: $event })"
-                            rows="3"
-                            placeholder="Notes"
-                            class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                          ></textarea>
-                        </div>
-
-                        <div class="flex justify-end gap-2 pt-2">
-                          <button
-                            type="button"
-                            (click)="closePlaceSupplyRulesModal()"
-                            class="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-white transition-colors"
-                          >
-                            Close
-                          </button>
-                          <button
-                            type="button"
-                            (click)="savePlaceSupplyRule()"
-                            [disabled]="savingPlaceSupplyRule() || !placeSupplyRuleForm().countryIso || !placeSupplyRuleForm().placeTypes.length"
-                            class="rounded-md bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
-                          >
-                            {{ savingPlaceSupplyRule() ? 'Saving...' : (editingPlaceSupplyRuleId() ? 'Save Rule' : 'Create Rule') }}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            }
-
-            <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-[10]">
-              <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between gap-3">
-                <div>
-                  <h2 class="text-sm font-semibold text-gray-700">Files</h2>
-                  <p class="mt-0.5 text-xs text-gray-400">Upload PDFs and spreadsheets with operational notes or supplier documentation.</p>
-                </div>
-              </div>
-              <div class="px-5 py-4 space-y-4">
-                <div class="rounded-lg border border-dashed border-gray-200 bg-gray-50/60 p-4">
-                  <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div class="min-w-0">
-                      <input
-                        #companyAttachmentInput
-                        type="file"
-                        (change)="onCompanyAttachmentSelected($event)"
-                        accept=".pdf,.xls,.xlsx,.csv,.png,.jpg,.jpeg,.gif,.webp,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,image/*"
-                        class="w-full text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-white file:px-3 file:py-2 file:text-sm file:font-medium file:text-gray-700 hover:file:bg-gray-100"
-                      />
-                      <p class="mt-2 text-xs text-gray-400">Accepted: PDF, XLS, XLSX, CSV or image files. Max 10 MB.</p>
-                      @if (selectedCompanyAttachment) {
-                        <p class="mt-1 text-xs text-gray-500">Ready to upload: {{ selectedCompanyAttachment!.name }}</p>
-                      }
-                    </div>
-                    <button
-                      type="button"
-                      (click)="uploadCompanyAttachment()"
-                      [disabled]="uploadingCompanyAttachment() || !selectedCompanyAttachment"
-                      class="inline-flex items-center justify-center rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-700 disabled:opacity-50"
-                    >
-                      {{ uploadingCompanyAttachment() ? 'Uploading...' : 'Upload file' }}
-                    </button>
-                  </div>
-                </div>
-
-                @if (companyAttachmentsLoading()) {
-                  <div class="flex items-center justify-center py-6">
-                    <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                    </svg>
-                  </div>
-                } @else if (!companyAttachments().length) {
-                  <div class="rounded-lg border border-gray-100 bg-white px-4 py-6 text-center text-sm text-gray-400">No files uploaded yet</div>
-                } @else {
-                  <div class="divide-y divide-gray-100 overflow-hidden rounded-lg border border-gray-100 bg-white">
-                    @for (attachment of companyAttachments(); track attachment.id) {
-                      <div class="flex items-start justify-between gap-3 px-4 py-3 text-sm hover:bg-gray-50/70 transition-colors">
-                        <div class="min-w-0 flex-1">
-                          <button
-                            type="button"
-                            (click)="openCompanyAttachment(attachment)"
-                            class="truncate max-w-full text-left font-medium text-brand-700 hover:text-brand-900 hover:underline"
-                          >
-                            {{ attachment.fileName }}
-                          </button>
-                          <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400">
-                            <span>{{ formatFileSize(attachment.fileSize) }}</span>
-                            <span>{{ attachment.createdAt | date:'mediumDate' }}</span>
-                            @if (attachment.mimeType) {
-                              <span>{{ attachment.mimeType }}</span>
-                            }
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          (click)="confirmDeleteCompanyAttachment(attachment)"
-                          class="rounded-md p-1 text-gray-400 hover:text-red-500 transition-colors"
-                          title="Delete file"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
-                          </svg>
-                        </button>
-                      </div>
-                    }
-                  </div>
-                }
-              </div>
-            </div>
-
-            @if (deleteCompanyAttachmentTarget()) {
-              <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" (click)="deleteCompanyAttachmentTarget.set(null)">
-                <div class="rounded-xl bg-white p-6 shadow-xl max-w-sm mx-4" (click)="$event.stopPropagation()">
-                  <h3 class="text-lg font-semibold text-gray-900">Delete file?</h3>
-                  <p class="mt-2 text-sm text-gray-500">
-                    Remove <strong>{{ deleteCompanyAttachmentTarget()!.fileName }}</strong> from this company?
-                  </p>
-                  <div class="mt-4 flex justify-end gap-2">
-                    <button (click)="deleteCompanyAttachmentTarget.set(null)"
-                      class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-                    <button (click)="executeDeleteCompanyAttachment()"
-                      class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">Delete</button>
-                  </div>
-                </div>
-              </div>
-            }
-
-            <!-- Company Segments -->
+            <!-- Segments card -->
             @if (segmentCategories().length > 0) {
-            <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-[11]">
-              <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
-                <h2 class="text-sm font-semibold text-gray-700">Segments</h2>
-                @if (segmentsSaving()) {
-                  <span class="text-xs text-gray-400">Saving…</span>
-                }
-              </div>
-              <div class="px-5 py-4 space-y-4">
-                @for (cat of segmentCategories(); track cat.key) {
-                  <div>
-                    <label class="text-xs font-medium text-gray-500 uppercase tracking-wide">{{ cat.label }}</label>
-                    @if (cat.mode === 'multi') {
-                      <div class="mt-1.5 flex flex-wrap gap-2">
-                        @for (opt of cat.options; track opt.key) {
-                          <button
-                            (click)="toggleSegment(cat.key, opt.key)"
-                            [class]="isSegmentSelected(cat.key, opt.key)
-                              ? 'rounded-full px-3 py-1 text-xs font-medium bg-violet-100 text-violet-800 ring-1 ring-violet-300'
-                              : 'rounded-full px-3 py-1 text-xs font-medium bg-gray-100 text-gray-600 ring-1 ring-gray-200 hover:bg-gray-200'"
-                          >{{ opt.label }}</button>
-                        }
-                      </div>
-                    } @else {
-                      <div class="mt-1.5 flex flex-wrap gap-2">
-                        @for (opt of cat.options; track opt.key) {
-                          <button
-                            (click)="selectSingleSegment(cat.key, opt.key)"
-                            [class]="getSegmentValue(cat.key) === opt.key
-                              ? 'rounded-full px-3 py-1 text-xs font-medium bg-violet-100 text-violet-800 ring-1 ring-violet-300'
-                              : 'rounded-full px-3 py-1 text-xs font-medium bg-gray-100 text-gray-600 ring-1 ring-gray-200 hover:bg-gray-200'"
-                          >{{ opt.label }}</button>
-                        }
-                      </div>
-                    }
-                  </div>
-                }
-              </div>
-            </div>
+              <app-segments-card
+                [categories]="segmentCategories()"
+                [segments]="companySegments()"
+                [saving]="segmentsSaving()"
+                (toggle)="onSegmentToggle($event)"
+              />
             }
 
-            <!-- Group Structure (parent/child hierarchy) -->
-            @if (!isChild()) {
-            <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-[12]">
-              <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
-                <h2 class="text-sm font-semibold text-gray-700">Group Structure</h2>
-                <div class="flex items-center gap-2">
-                  @if (isParent()) {
-                    <span class="inline-flex items-center rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-medium text-brand-700">
-                      Parent · {{ childCompanies().length }} {{ childCompanies().length === 1 ? 'child' : 'children' }}
-                    </span>
-                  }
-                  <button (click)="showLinkChildModal.set(true)"
-                    class="rounded-md bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 hover:bg-brand-100 transition-colors">
-                    + Add child
-                  </button>
-                </div>
-              </div>
-              <div class="px-5 py-4">
-                @if (isParent()) {
-                <!-- Visual tree diagram -->
-                <div class="space-y-1">
-                  <!-- Self as parent -->
-                  <div class="flex items-center gap-2 rounded-lg border border-brand-200 bg-brand-50/50 px-3 py-2">
-                    <div class="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-brand-700 text-[10px] font-bold">P</div>
-                    <span class="text-sm font-medium text-gray-900">{{ company()!.name }}</span>
-                    @if (company()!.country) {
-                      <span class="text-xs text-gray-400">{{ company()!.country }}</span>
-                    }
-                    <span class="ml-auto text-xs text-gray-500">Credit: {{ company()!.creditLimit | number:'1.0-0' }}</span>
-                    @if (company()!.fleetSize) {
-                      <span class="text-xs text-gray-500">Fleet: {{ company()!.fleetSize }}</span>
-                    }
-                  </div>
-                  <!-- Children -->
-                  @for (child of childCompanies(); track child.id) {
-                    <div class="ml-6 flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 group hover:bg-gray-100 transition-colors">
-                      <div class="h-4 border-l-2 border-gray-300 mr-1"></div>
-                      <div class="flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 text-gray-600 text-[10px] font-bold">C</div>
-                      <a [routerLink]="['/companies', child.id]"
-                         class="text-sm font-medium text-brand-600 hover:underline">{{ child.name }}</a>
-                      @if (child.country) {
-                        <span class="text-xs text-gray-400">{{ child.country }}</span>
-                      }
-                      <span class="ml-auto text-xs text-gray-500">Credit: {{ child.creditLimit | number:'1.0-0' }}</span>
-                      @if (child.fleetSize) {
-                        <span class="text-xs text-gray-500">Fleet: {{ child.fleetSize }}</span>
-                      }
-                      @if (child.isSanctioned) {
-                        <span class="text-[10px] text-red-600">⚠️</span>
-                      }
-                      <button
-                        (click)="unlinkChild(child.id); $event.stopPropagation()"
-                        [disabled]="unlinkingChildId() === child.id"
-                        class="invisible group-hover:visible rounded px-1.5 py-0.5 text-[10px] text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
-                      >
-                        @if (unlinkingChildId() === child.id) { … } @else { Unlink }
-                      </button>
-                    </div>
-                  }
-                </div>
-                } @else {
-                  <p class="text-sm text-gray-400">No child companies linked yet. Click "+ Add child" to create a group.</p>
-                }
-              </div>
-            </div>
-            }
+            <!-- Group structure card -->
+            <app-group-structure-card
+              [company]="company()!"
+              [childCompanies]="childCompanies()"
+              [parentCompany]="parentCompany()"
+              [isParent]="isParent()"
+              [isChild]="isChild()"
+              [linkingChildId]="linkingChildId()"
+              [unlinkingChildId]="unlinkingChildId()"
+              [linkChildResults]="linkChildResults()"
+              (linkChildRequest)="linkChild($event)"
+              (unlinkChild)="unlinkChild($event)"
+              (linkSearchChange)="onLinkChildSearch($event)"
+            />
 
-            @if (isChild()) {
-            <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-[12]">
-              <div class="border-b border-gray-100 px-5 py-3">
-                <h2 class="text-sm font-semibold text-gray-700">Group Structure</h2>
-              </div>
-              <div class="px-5 py-4">
-                <div class="space-y-1">
-                  <div class="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2">
-                    <div class="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-brand-700 text-[10px] font-bold">P</div>
-                    <a [routerLink]="['/companies', parentCompany()!.id]"
-                       class="text-sm font-medium text-brand-600 hover:underline">{{ parentCompany()!.name }}</a>
-                    @if (parentCompany()!.country) {
-                      <span class="text-xs text-gray-400">{{ parentCompany()!.country }}</span>
-                    }
-                  </div>
-                  <div class="ml-6 flex items-center gap-2 rounded-lg border border-brand-200 bg-brand-50/50 px-3 py-2">
-                    <div class="h-4 border-l-2 border-gray-300 mr-1"></div>
-                    <div class="flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 text-gray-600 text-[10px] font-bold">C</div>
-                    <span class="text-sm font-medium text-gray-900">{{ company()!.name }}</span>
-                    <span class="text-[10px] text-gray-400">(this company)</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            }
-
-            <!-- Link Child Modal -->
-            @if (showLinkChildModal()) {
-              <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" (click)="showLinkChildModal.set(false)">
-                <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl" (click)="$event.stopPropagation()">
-                  <h3 class="text-base font-semibold text-gray-900 mb-4">Add Child Company</h3>
-                  <p class="text-xs text-gray-500 mb-3">Search for an existing company to link as a child of <strong>{{ company()!.name }}</strong>.</p>
-                  <input
-                    type="text"
-                    [value]="linkChildSearch()"
-                    (input)="onLinkChildSearch($any($event.target).value)"
-                    placeholder="Search companies..."
-                    class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                    autofocus
-                  />
-                  @if (linkChildResults().length) {
-                    <div class="mt-2 max-h-48 overflow-y-auto divide-y divide-gray-50 rounded-lg border border-gray-100">
-                      @for (r of linkChildResults(); track r.id) {
-                        <button
-                          (click)="linkChild(r.id)"
-                          [disabled]="linkingChildId() === r.id"
-                          class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors disabled:opacity-50 flex items-center gap-2"
-                        >
-                          <span class="font-medium text-gray-900">{{ r.name }}</span>
-                          @if (r.country) { <span class="text-xs text-gray-400">{{ r.country }}</span> }
-                          @if (linkingChildId() === r.id) {
-                            <svg class="ml-auto h-4 w-4 animate-spin text-brand-500" viewBox="0 0 24 24" fill="none">
-                              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                            </svg>
-                          }
-                        </button>
-                      }
-                    </div>
-                  } @else if (linkChildSearch().length >= 2) {
-                    <div class="mt-2 text-center text-xs text-gray-400 py-3">No matching companies found</div>
-                  }
-                  <div class="mt-4 flex justify-end">
-                    <button (click)="showLinkChildModal.set(false)" class="rounded-md px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-50 transition-colors">Cancel</button>
-                  </div>
-                </div>
-              </div>
-            }
-
-            <!-- Orders -->
-            <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-[13]">
-              <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                  <h2 class="text-sm font-semibold text-gray-700">Orders</h2>
-                  @if (isParent()) {
-                    <div class="flex gap-1">
-                      <button
-                        (click)="toggleOrdersMode()"
-                        class="rounded-md px-2 py-0.5 text-[10px] font-medium transition-colors"
-                        [class]="groupOrdersMode() === 'own' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
-                      >Own</button>
-                      <button
-                        (click)="toggleOrdersMode()"
-                        class="rounded-md px-2 py-0.5 text-[10px] font-medium transition-colors"
-                        [class]="groupOrdersMode() === 'group' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
-                      >Group</button>
-                    </div>
-                  }
-                </div>
-                @if (groupOrdersMode() === 'group' ? groupOrders().length : companyOrders().length) {
-                  <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
-                    {{ groupOrdersMode() === 'group' ? groupOrders().length : companyOrders().length }}
-                  </span>
-                }
-              </div>
-
-              <!-- Own orders mode -->
-              @if (groupOrdersMode() === 'own') {
-                @if (ordersLoading()) {
-                  <div class="flex items-center justify-center py-8">
-                    <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                    </svg>
-                  </div>
-                } @else if (companyOrders().length) {
-                  <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                      <thead>
-                        <tr class="border-b border-gray-100 bg-gray-50/60">
-                          <th class="px-5 py-2 text-left font-medium text-gray-500">Vessel</th>
-                          <th class="px-5 py-2 text-left font-medium text-gray-500">Place</th>
-                          <th class="px-5 py-2 text-left font-medium text-gray-500">Status</th>
-                          <th class="px-5 py-2 text-left font-medium text-gray-500">Created</th>
-                        </tr>
-                      </thead>
-                      <tbody class="divide-y divide-gray-50">
-                        @for (order of companyOrders(); track order.id) {
-                          <tr class="hover:bg-gray-50/50 cursor-pointer transition-colors" (click)="goToOrder(order.id, order.status)">
-                            <td class="px-5 py-2.5">
-                              <span class="font-medium text-gray-900">{{ order.vesselName }}</span>
-                              @if (order.vesselImo) {
-                                <span class="ml-1 text-xs text-gray-400">{{ order.vesselImo }}</span>
-                              }
-                            </td>
-                            <td class="px-5 py-2.5 text-gray-600">
-                              {{ order.placeName }}
-                              @if (order.placeCountry) {
-                                <span class="text-xs text-gray-400 ml-1">{{ order.placeCountry }}</span>
-                              }
-                            </td>
-                            <td class="px-5 py-2.5">
-                              <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                                [class]="statusBadge(order.status)">
-                                {{ order.status }}
-                              </span>
-                            </td>
-                            <td class="px-5 py-2.5 text-gray-500">{{ order.createdAt | date:'mediumDate' }}</td>
-                          </tr>
-                        }
-                      </tbody>
-                    </table>
-                  </div>
-                } @else {
-                  <div class="px-5 py-6 text-center text-sm text-gray-400">No orders found for this company</div>
-                }
-              }
-
-              <!-- Group orders mode -->
-              @if (groupOrdersMode() === 'group') {
-                @if (groupOrdersLoading()) {
-                  <div class="flex items-center justify-center py-8">
-                    <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                    </svg>
-                  </div>
-                } @else if (groupOrders().length) {
-                  <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                      <thead>
-                        <tr class="border-b border-gray-100 bg-gray-50/60">
-                          <th class="px-5 py-2 text-left font-medium text-gray-500">Client</th>
-                          <th class="px-5 py-2 text-left font-medium text-gray-500">Vessel</th>
-                          <th class="px-5 py-2 text-left font-medium text-gray-500">Place</th>
-                          <th class="px-5 py-2 text-left font-medium text-gray-500">Status</th>
-                          <th class="px-5 py-2 text-left font-medium text-gray-500">Created</th>
-                        </tr>
-                      </thead>
-                      <tbody class="divide-y divide-gray-50">
-                        @for (order of groupOrders(); track order.id) {
-                          <tr class="hover:bg-gray-50/50 cursor-pointer transition-colors" (click)="goToOrder(order.id, order.status)">
-                            <td class="px-5 py-2.5">
-                              <span class="text-gray-700">{{ order.clientName || '—' }}</span>
-                            </td>
-                            <td class="px-5 py-2.5">
-                              <span class="font-medium text-gray-900">{{ order.vesselName }}</span>
-                              @if (order.vesselImo) {
-                                <span class="ml-1 text-xs text-gray-400">{{ order.vesselImo }}</span>
-                              }
-                            </td>
-                            <td class="px-5 py-2.5 text-gray-600">
-                              {{ order.placeName }}
-                              @if (order.placeCountry) {
-                                <span class="text-xs text-gray-400 ml-1">{{ order.placeCountry }}</span>
-                              }
-                            </td>
-                            <td class="px-5 py-2.5">
-                              <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                                [class]="statusBadge(order.status)">
-                                {{ order.status }}
-                              </span>
-                            </td>
-                            <td class="px-5 py-2.5 text-gray-500">{{ order.createdAt | date:'mediumDate' }}</td>
-                          </tr>
-                        }
-                      </tbody>
-                    </table>
-                  </div>
-                } @else {
-                  <div class="px-5 py-6 text-center text-sm text-gray-400">No group orders found</div>
-                }
-              }
-            </div>
+            <!-- Orders card -->
+            <app-orders-card
+              [ownOrders]="companyOrders()"
+              [groupOrders]="groupOrders()"
+              [ordersLoading]="ordersLoading()"
+              [groupOrdersLoading]="groupOrdersLoading()"
+              [mode]="groupOrdersMode()"
+              [isParent]="isParent()"
+              (modeToggle)="toggleOrdersMode()"
+              (orderClick)="goToOrder($event.id, $event.status)"
+            />
 
             <!-- Fleet Map -->
             @if (fleetVesselsWithPosition().length || (groupFleetMode() === 'group' && groupFleetLoading())) {
@@ -2849,521 +989,45 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
             } @else if (enrichment()) {
 
 
-              <!-- Registration + Ownership -->
-              <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-8 flex flex-col overflow-hidden">
-                <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
-                  <h2 class="text-sm font-semibold text-gray-700">Registration & Ownership</h2>
-                  <div class="flex gap-1">
-                    <button
-                      type="button"
-                      class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
-                      [class]="registrationTab() === 'ownership' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
-                      (click)="registrationTab.set('ownership')"
-                    >
-                      Ownership Structure
-                    </button>
-                    <button
-                      type="button"
-                      class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
-                      [class]="registrationTab() === 'registration' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
-                      (click)="registrationTab.set('registration')"
-                    >
-                      Registration
-                    </button>
-                  </div>
-                </div>
-                <div class="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3 text-sm">
-                  @if (registrationTab() === 'registration') {
-                    @if (enrichment()!.companyRegistration) {
-                      <div class="space-y-2">
-                        @if (enrichment()!.companyRegistration!.localName) {
-                          <div class="flex justify-between">
-                            <span class="text-gray-500">Local Name</span>
-                            <span class="font-medium text-gray-900">{{ enrichment()!.companyRegistration!.localName }}</span>
-                          </div>
-                        }
-                        @if (enrichment()!.companyRegistration!.registryName) {
-                          <div class="flex justify-between">
-                            <span class="text-gray-500">Registry</span>
-                            <span class="font-medium text-gray-900">{{ enrichment()!.companyRegistration!.registryName }}</span>
-                          </div>
-                        }
-                        @if (enrichment()!.companyRegistration!.incorporationDate) {
-                          <div class="flex justify-between">
-                            <span class="text-gray-500">Incorporated</span>
-                            <span class="font-medium text-gray-900">{{ enrichment()!.companyRegistration!.incorporationDate | date:'mediumDate' }}</span>
-                          </div>
-                        }
-                        @for (reg of enrichment()!.companyRegistration!.registrationNumbers; track $index) {
-                          @if (reg.value) {
-                            <div class="flex justify-between">
-                              <span class="text-gray-500">{{ reg.typeDescription ?? 'Reg #' }}</span>
-                              <span class="font-medium text-gray-900 font-mono text-xs">{{ reg.value }}</span>
-                            </div>
-                          }
-                        }
-                      </div>
-                    } @else {
-                      <div class="text-xs text-gray-500 text-center">Registration data unavailable</div>
-                    }
-                  } @else {
-                    @if (hierarchy()) {
-                      <div class="p-5 max-h-[500px] overflow-y-auto">
-                        @if (flatHierarchy().length) {
-                          <div class="space-y-1">
-                            @for (node of flatHierarchy(); track $index) {
-                              <div class="flex items-center gap-2 text-sm" [style.padding-left.px]="(node.level - 1) * 20">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-gray-300 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                                  @if (node.level === 1) {
-                                    <path fill-rule="evenodd" d="M4.083 9h1.946c.089-1.546.383-2.97.837-4.118A6.004 6.004 0 004.083 9zM10 2a8 8 0 100 16 8 8 0 000-16zm0 2c-.076 0-.232.032-.465.262-.238.234-.497.623-.737 1.182-.389.907-.673 2.142-.766 3.556h3.936c-.093-1.414-.377-2.649-.766-3.556-.24-.56-.5-.948-.737-1.182C10.232 4.032 10.076 4 10 4zm3.971 5c-.089-1.546-.383-2.97-.837-4.118A6.004 6.004 0 0115.917 9h-1.946zm-2.003 2H8.032c.093 1.414.377 2.649.766 3.556.24.56.5.948.737 1.182.233.23.389.262.465.262.076 0 .232-.032.465-.262.238-.234.497-.623.737-1.182.389-.907.673-2.142.766-3.556zm1.166 4.118c.454-1.147.748-2.572.837-4.118h1.946a6.004 6.004 0 01-2.783 4.118zm-6.268 0C6.412 13.97 6.118 12.546 6.029 11H4.083a6.004 6.004 0 002.783 4.118z" clip-rule="evenodd" />
-                                  } @else {
-                                    <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-2a1 1 0 00-1-1H9a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clip-rule="evenodd" />
-                                  }
-                                </svg>
-                                @if (node.companyId === company()!.seasearcherId) {
-                                  <span class="font-medium text-brand-600">{{ node.companyName }}</span>
-                                } @else {
-                                  <button
-                                    (click)="navigateToCompany(node.companyId)"
-                                    [disabled]="navigatingCompanyId() === node.companyId"
-                                    class="font-medium text-gray-900 hover:text-brand-600 hover:underline text-left disabled:opacity-50"
-                                  >
-                                    @if (navigatingCompanyId() === node.companyId) {
-                                      <svg class="inline h-3 w-3 animate-spin mr-0.5" viewBox="0 0 24 24" fill="none">
-                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                                      </svg>
-                                    }
-                                    {{ node.companyName }}
-                                  </button>
-                                }
-                                @if (node.isSanctioned) {
-                                  <span class="text-xs text-red-600">⚠️</span>
-                                }
-                                @if (!node.active) {
-                                  <span class="text-xs text-gray-400">(inactive)</span>
-                                }
-                                <span class="text-xs text-gray-400 ml-auto">
-                                  {{ hierarchyRoles(node) }}
-                                </span>
-                              </div>
-                            }
-                          </div>
-                        } @else {
-                          <p class="text-sm text-gray-400 text-center">No hierarchy data</p>
-                        }
-                      </div>
-                    } @else {
-                      <div class="text-xs text-gray-500 text-center">Ownership data unavailable</div>
-                    }
-                  }
-                </div>
-              </div>
+              <!-- Registration + Ownership card -->
+              <app-registration-card
+                [enrichment]="enrichment()"
+                [hierarchy]="hierarchy()"
+                [seasearcherId]="company()!.seasearcherId"
+                [navigatingCompanyId]="navigatingCompanyId()"
+                (navigateToCompany)="navigateToCompany($event)"
+              />
 
-              <!-- Name History -->
+              <!-- Name History card -->
               @if (enrichment()!.companyNameHistory.length) {
-                <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-12">
-                  <div class="border-b border-gray-100 px-5 py-3">
-                    <h2 class="text-sm font-semibold text-gray-700">Name History</h2>
-                  </div>
-                  <div class="divide-y divide-gray-50">
-                    @for (entry of enrichment()!.companyNameHistory; track $index) {
-                      <div class="px-5 py-2.5 flex justify-between text-sm">
-                        <span class="text-gray-900">{{ entry.name }}</span>
-                        <span class="text-xs text-gray-400">{{ entry.fromDate | date:'mediumDate' }}</span>
-                      </div>
-                    }
-                  </div>
-                </div>
+                <app-name-history-card [entries]="enrichment()!.companyNameHistory" />
               }
 
-              <!-- Counterparty Risk + Sanctions + Seizures -->
-              <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-2 flex flex-col overflow-hidden">
-                <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
-                  <h2 class="text-sm font-semibold text-gray-700">Risk & Compliance</h2>
-                  <div class="flex gap-1">
-                    <button
-                      type="button"
-                      class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
-                      [class]="sanctionsTab() === 'monitoring'
-                        ? (riskSummary()?.isFrozen ? 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200' : 'bg-brand-50 text-brand-700')
-                        : (riskSummary()?.isFrozen ? 'text-red-600 hover:text-red-700' : 'text-gray-400 hover:text-gray-600')"
-                      (click)="sanctionsTab.set('monitoring'); loadRiskSummary()"
-                    >
-                      Monitoring
-                      @if (riskSummary()?.isFrozen) {
-                        <span class="ml-1 inline-flex items-center rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
-                          {{ riskSummary()!.activeHitCount || 1 }}
-                        </span>
-                      } @else if ((riskSummary()?.activeHitCount ?? 0) > 0) {
-                        <span class="ml-1 inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
-                          {{ riskSummary()!.activeHitCount }}
-                        </span>
-                      }
-                    </button>
-                    @if (enrichment()!.counterpartyRiskReportMetadata) {
-                      <button
-                        type="button"
-                        class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
-                        [class]="sanctionsTab() === 'risk' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
-                        (click)="sanctionsTab.set('risk')"
-                      >
-                        Counterparty Risk
-                      </button>
-                    }
-                    <button
-                      type="button"
-                      class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
-                      [class]="sanctionsTab() === 'sanctions' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
-                      (click)="sanctionsTab.set('sanctions')"
-                    >
-                      Sanctions
-                    </button>
-                    <button
-                      type="button"
-                      class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
-                      [class]="sanctionsTab() === 'seizures' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
-                      (click)="sanctionsTab.set('seizures')"
-                    >
-                      Seizures / Arrests
-                    </button>
-                  </div>
-                </div>
-                <div class="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3 text-sm">
-                  @if (sanctionsTab() === 'risk') {
-                    @if (enrichment()!.counterpartyRiskReportMetadata) {
-                      <div class="space-y-3">
-                        <div class="flex justify-between">
-                          <span class="text-gray-500">Overall Rating</span>
-                          <span class="font-medium text-gray-900">{{ enrichment()!.counterpartyRiskReportMetadata!.overallRating?.text ?? '—' }}</span>
-                        </div>
-                        <div class="flex justify-between">
-                          <span class="text-gray-500">Overall Performance</span>
-                          <span class="font-medium text-gray-900">{{ enrichment()!.counterpartyRiskReportMetadata!.overallPerformance?.text ?? '—' }}</span>
-                        </div>
-                        <div class="flex justify-between">
-                          <span class="text-gray-500">Payment Performance</span>
-                          <span class="font-medium text-gray-900">{{ enrichment()!.counterpartyRiskReportMetadata!.paymentPerformance?.text ?? '—' }}</span>
-                        </div>
-                        @if (enrichment()!.counterpartyRiskReportMetadata!.creditOpinion) {
-                          <div>
-                            <span class="text-gray-500">Credit Opinion</span>
-                            <p class="mt-1 text-gray-700">{{ enrichment()!.counterpartyRiskReportMetadata!.creditOpinion }}</p>
-                          </div>
-                        }
-                        <div class="text-xs text-gray-400">
-                          Rated {{ enrichment()!.counterpartyRiskReportMetadata!.ratingDate | date:'mediumDate' }}
-                        </div>
-                        <a
-                          [href]="'https://www.seasearcher.com/company/' + company()!.seasearcherId + '/counterparty-risk-report'"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          class="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-brand-600" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
-                            <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
-                          </svg>
-                          View Full Report
-                        </a>
-                      </div>
-                    }
-                  } @else if (sanctionsTab() === 'sanctions') {
-                    @if (sanctionsLoading()) {
-                      <div class="flex items-center justify-center py-6">
-                        <svg class="h-4 w-4 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
-                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                        </svg>
-                      </div>
-                    } @else if (sanctions()?.length) {
-                      <div class="divide-y divide-gray-50">
-                        @for (s of sanctions()!; track $index) {
-                          <div class="px-5 py-3 text-sm">
-                            <div class="flex items-center gap-2">
-                              <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
-                                {{ s.sanctionSource ?? s.source ?? 'Sanction' }}
-                              </span>
-                              @if (s.listedDate ?? s.startDate) {
-                                <span class="text-xs text-gray-400">{{ (s.listedDate ?? s.startDate) | date:'mediumDate' }}</span>
-                              }
-                            </div>
-                            @if (s.sanctionType ?? s.type ?? s.description) {
-                              <p class="mt-1 text-xs text-gray-600">{{ s.sanctionType ?? s.type ?? s.description }}</p>
-                            }
-                          </div>
-                        }
-                      </div>
-                    } @else {
-                      <div class="px-5 py-5 text-center">
-                        <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">
-                          No sanctions on record
-                        </span>
-                      </div>
-                    }
-                  } @else if (sanctionsTab() === 'seizures') {
-                    @if (seizuresLoading()) {
-                      <div class="flex items-center justify-center py-6">
-                        <svg class="h-4 w-4 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
-                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                        </svg>
-                      </div>
-                    } @else if (seizures()?.results?.length) {
-                      <div class="divide-y divide-gray-50">
-                        @for (s of seizures()!.results; track $index) {
-                          <div class="px-5 py-3 text-sm">
-                            <div class="flex items-center justify-between">
-                              <span class="font-medium text-gray-900">{{ s.vesselName ?? s.name ?? 'Unknown vessel' }}</span>
-                              @if (s.imo) {
-                                <span class="text-xs text-gray-400 font-mono">{{ s.imo }}</span>
-                              }
-                            </div>
-                            <div class="flex items-center gap-2 mt-1 text-xs text-gray-500">
-                              @if (s.port ?? s.location) {
-                                <span>{{ s.port ?? s.location }}</span>
-                              }
-                              @if (s.seizureDate ?? s.date) {
-                                <span>&middot; {{ (s.seizureDate ?? s.date) | date:'mediumDate' }}</span>
-                              }
-                              @if (s.releaseDate) {
-                                <span>&middot; Released {{ s.releaseDate | date:'mediumDate' }}</span>
-                              }
-                            </div>
-                          </div>
-                        }
-                      </div>
-                    } @else {
-                      <div class="px-5 py-5 text-center">
-                        <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">
-                          No seizures on record
-                        </span>
-                      </div>
-                    }
-                  } @else if (sanctionsTab() === 'monitoring') {
-                    @if (riskSummaryLoading()) {
-                      <div class="flex items-center justify-center py-6">
-                        <svg class="h-4 w-4 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
-                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                        </svg>
-                      </div>
-                    } @else if (riskSummary()) {
-                      <div class="space-y-4">
-                        <!-- Frozen banner -->
-                        @if (riskSummary()!.isFrozen) {
-                          <div class="rounded-lg bg-red-50 border border-red-200 px-4 py-3">
-                            <div class="flex items-center gap-2">
-                              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-600 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
-                              </svg>
-                              <div>
-                                <p class="text-sm font-semibold text-red-800">Credit Frozen</p>
-                                <p class="text-xs text-red-600">{{ riskSummary()!.activeHitCount }} active risk signal(s) detected. Customer credit is unavailable.</p>
-                              </div>
-                            </div>
-                          </div>
-                        }
-
-                        @if (riskSummary()!.hasActiveOverride) {
-                          <div class="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3">
-                            <p class="text-sm font-medium text-amber-800">Override Active</p>
-                            <p class="text-xs text-amber-600">Credit temporarily unfrozen until {{ riskSummary()!.overrideExpiresAt | date:'medium' }}</p>
-                          </div>
-                        }
-
-                        @if (ignoredCreditEnforcementVessels().length) {
-                          <div class="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3">
-                            <p class="text-sm font-medium text-sky-900">Ignored Vessel Credit Exceptions</p>
-                            <p class="mt-1 text-xs text-sky-700">
-                              The following linked vessel{{ ignoredCreditEnforcementVessels().length === 1 ? '' : 's are' }} excluded from maritime credit enforcement.
-                              Re-check monitoring after changing these exceptions so provider hits and freeze state can refresh.
-                            </p>
-                            <div class="mt-2 flex flex-wrap gap-2">
-                              @for (vessel of ignoredCreditEnforcementVessels(); track vessel.id) {
-                                <span class="inline-flex items-center rounded-full border border-sky-200 bg-white px-2.5 py-1 text-xs font-medium text-sky-800">
-                                  {{ vessel.vesselName || vessel.vesselImo || 'Unknown vessel' }}
-                                  @if (vessel.vesselImo) {
-                                    <span class="ml-1 text-sky-600">IMO {{ vessel.vesselImo }}</span>
-                                  }
-                                </span>
-                              }
-                            </div>
-                          </div>
-                        }
-
-                        @if (pendingRiskOverride(); as pendingOverride) {
-                          <div class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 space-y-3">
-                            <div>
-                              <p class="text-sm font-medium text-blue-900">Override Pending Approval</p>
-                              <p class="text-xs text-blue-700">
-                                Requested by {{ pendingOverride.requestedByUserName }} on {{ pendingOverride.createdAt | date:'medium' }}.
-                              </p>
-                              <p class="mt-1 text-sm text-blue-900">{{ pendingOverride.reason }}</p>
-                            </div>
-
-                            @if (pendingOverride.approvals.length) {
-                              <div class="space-y-1">
-                                <p class="text-[11px] font-semibold uppercase tracking-wide text-blue-700">Recorded Decisions</p>
-                                @for (approval of pendingOverride.approvals; track approval.id) {
-                                  <div class="flex items-center justify-between gap-3 rounded-md border border-blue-100 bg-white/70 px-3 py-2">
-                                    <div>
-                                      <p class="text-xs font-medium text-gray-900">{{ approval.userName }}</p>
-                                      @if (approval.comment) {
-                                        <p class="text-xs text-gray-500">{{ approval.comment }}</p>
-                                      }
-                                    </div>
-                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold"
-                                      [class]="approval.decision === 'APPROVED' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'">
-                                      {{ approval.decision }}
-                                    </span>
-                                  </div>
-                                }
-                              </div>
-                            }
-
-                            @if (canManageRiskOverrides()) {
-                              <div class="flex items-center gap-2 pt-1">
-                                @if (!hasVotedOnOverride(pendingOverride)) {
-                                  <button
-                                    type="button"
-                                    class="inline-flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs font-medium text-green-700 hover:bg-green-100 transition-colors disabled:opacity-50"
-                                    [disabled]="overrideDecisionLoadingId() === pendingOverride.id"
-                                    (click)="decideOverride(pendingOverride, 'APPROVED')"
-                                  >
-                                    Approve Override
-                                  </button>
-                                  <button
-                                    type="button"
-                                    class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-100 transition-colors disabled:opacity-50"
-                                    [disabled]="overrideDecisionLoadingId() === pendingOverride.id"
-                                    (click)="decideOverride(pendingOverride, 'REJECTED')"
-                                  >
-                                    Reject Override
-                                  </button>
-                                } @else {
-                                  <p class="text-xs text-blue-700">You have already recorded a decision for this override.</p>
-                                }
-                              </div>
-                            }
-                          </div>
-                        }
-
-                        <!-- Provider statuses -->
-                        <div class="space-y-2">
-                          <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Provider Checks</h4>
-                          @for (ps of riskSummary()!.providerStatuses; track ps.providerName) {
-                            <div class="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2">
-                              <div class="flex items-center gap-2">
-                                <span class="inline-flex h-2 w-2 rounded-full"
-                                  [class]="ps.status === 'CLEAR' ? 'bg-green-400' : ps.status === 'HIT' ? 'bg-red-400' : ps.status === 'ERROR' ? 'bg-yellow-400' : 'bg-gray-300'">
-                                </span>
-                                <span class="text-sm font-medium text-gray-700">{{ ps.providerName }}</span>
-                              </div>
-                              <div class="flex items-center gap-2">
-                                @if (ps.hitCount > 0) {
-                                  <span class="text-xs font-medium text-red-600">{{ ps.hitCount }} hit(s)</span>
-                                }
-                                @if (ps.checkedAt) {
-                                  <span class="text-xs text-gray-400">{{ ps.checkedAt | date:'short' }}</span>
-                                }
-                              </div>
-                            </div>
-                          }
-                          @if (!riskSummary()!.providerStatuses.length) {
-                            <p class="text-xs text-gray-400">No checks have run yet.</p>
-                          }
-                        </div>
-
-                        <!-- Active hits -->
-                        @if (riskSummary()!.activeHits.length) {
-                          <div class="space-y-2">
-                            <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Active Signals</h4>
-                            @for (hit of riskSummary()!.activeHits; track hit.id) {
-                              <div class="rounded-lg border px-3 py-2"
-                                [class]="hit.severity === 'CRITICAL' ? 'border-red-200 bg-red-50' : hit.severity === 'HIGH' ? 'border-orange-200 bg-orange-50' : 'border-yellow-200 bg-yellow-50'">
-                                <div class="flex items-center gap-2">
-                                  <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold"
-                                    [class]="hit.severity === 'CRITICAL' ? 'bg-red-100 text-red-700' : hit.severity === 'HIGH' ? 'bg-orange-100 text-orange-700' : 'bg-yellow-100 text-yellow-700'">
-                                    {{ hit.severity }}
-                                  </span>
-                                  <span class="text-xs font-medium text-gray-500">{{ hit.signalType }}</span>
-                                </div>
-                                @if (canNavigateToRiskHitVessel(hit)) {
-                                  <button
-                                    type="button"
-                                    class="mt-1 text-left text-sm font-medium text-brand-700 hover:text-brand-900 hover:underline disabled:opacity-60"
-                                    [disabled]="navigatingRiskHitId() === hit.id"
-                                    (click)="openRiskHitVessel(hit)"
-                                  >
-                                    @if (navigatingRiskHitId() === hit.id) {
-                                      Opening vessel...
-                                    } @else {
-                                      {{ hit.title }}
-                                    }
-                                  </button>
-                                } @else {
-                                  <p class="mt-1 text-sm font-medium text-gray-900">{{ hit.title }}</p>
-                                }
-                                @if (hit.detail) {
-                                  <p class="mt-0.5 text-xs text-gray-600">{{ hit.detail }}</p>
-                                }
-                                @if (hit.sourceUrl) {
-                                  <a [href]="hit.sourceUrl" target="_blank" rel="noopener noreferrer" class="mt-1 inline-flex text-xs text-brand-600 hover:underline">View source</a>
-                                }
-                              </div>
-                            }
-                          </div>
-                        }
-
-                        <!-- Actions -->
-                        <div class="flex items-center gap-2 pt-2 border-t border-gray-100">
-                          @if (canManageRiskOverrides()) {
-                            <button
-                              type="button"
-                              class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
-                              [disabled]="riskCheckRunning()"
-                              (click)="runManualCheck()"
-                            >
-                              @if (riskCheckRunning()) {
-                                <svg class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
-                                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                                </svg>
-                                Checking…
-                              } @else {
-                                Re-check Now
-                              }
-                            </button>
-                          }
-                          @if (riskSummary()!.isFrozen && canManageRiskOverrides()) {
-                            <button
-                              type="button"
-                              class="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700 hover:bg-amber-100 transition-colors disabled:opacity-50"
-                              [disabled]="overrideRequesting()"
-                              (click)="requestOverride()"
-                            >
-                              Request Override
-                            </button>
-                          }
-                        </div>
-                      </div>
-                    } @else {
-                      <div class="px-5 py-5 text-center">
-                        <p class="text-sm text-gray-400">Risk monitoring not yet checked for this company.</p>
-                        <button
-                          type="button"
-                          class="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
-                          [disabled]="riskCheckRunning()"
-                          (click)="runManualCheck()"
-                        >
-                          Run First Check
-                        </button>
-                      </div>
-                    }
-                  }
-                </div>
-              </div>
+              <!-- Risk & Compliance card -->
+              <app-risk-compliance-card
+                [tab]="sanctionsTab()"
+                [enrichment]="enrichment()"
+                [seasearcherId]="company()!.seasearcherId"
+                [riskSummary]="riskSummary()"
+                [riskSummaryLoading]="riskSummaryLoading()"
+                [riskCheckRunning]="riskCheckRunning()"
+                [overrideRequesting]="overrideRequesting()"
+                [overrideDecisionLoading]="!!overrideDecisionLoadingId()"
+                [pendingOverride]="pendingRiskOverride()"
+                [canManageRiskOverrides]="canManageRiskOverrides()"
+                [hasVotedOnOverride]="pendingRiskOverride() ? hasVotedOnOverride(pendingRiskOverride()!) : false"
+                [ignoredCreditVessels]="ignoredCreditEnforcementVessels()"
+                [navigatingRiskHitId]="navigatingRiskHitId()"
+                [sanctions]="sanctions()"
+                [sanctionsLoading]="sanctionsLoading()"
+                [seizures]="seizures()"
+                [seizuresLoading]="seizuresLoading()"
+                (tabChange)="onSanctionsTabChange($event)"
+                (runCheck)="runManualCheck()"
+                (requestOverride)="requestOverride()"
+                (decideOverride)="decideOverride($event.override, $event.decision)"
+                (openRiskHitVessel)="openRiskHitVessel($event)"
+              />
 
             }
           </div>
@@ -3473,6 +1137,12 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly responsibleUserId = signal<string | null>(null);
   readonly savingResponsible = signal(false);
   readonly toast = signal<{ type: 'success' | 'error'; message: string } | null>(null);
+  readonly editing = signal(false);
+  readonly companyInfoTab = signal<'info' | 'headOffice' | 'offices' | 'terms' | 'emails'>('info');
+  readonly countrySearchQuery = signal('');
+  readonly showCountryDropdown = signal(false);
+  readonly editCountry = signal('');
+  readonly editCountryIso = signal('');
 
   // Credit application
   readonly showCreditApplicationModal = signal(false);
@@ -3518,42 +1188,18 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly ignoredCreditEnforcementVessels = computed(() =>
     this.companyVessels().filter((vesselCompany) => vesselCompany.ignoreForCreditEnforcement === true),
   );
-  // Inline editing state
-  readonly editing = signal(false);
-  readonly editSaving = signal(false);
-  readonly editName = signal('');
-  readonly editCountry = signal('');
-  readonly editCountryIso = signal('');
-  readonly editYearFormed = signal<number | null>(null);
-  readonly editFleetSize = signal<number | null>(null);
-  readonly editCreditLimit = signal('');
-  readonly editCompanyImo = signal('');
-  readonly editHeadOfficeAddress = signal('');
-  readonly editHeadOfficePhone = signal('');
-  readonly editHeadOfficeEmail = signal('');
-  readonly editWebsite = signal('');
-  readonly editSpecialCustomerTerms = signal('');
-  readonly editPreferredInvoicingCompanyId = signal<string | null>(null);
-
   // Own companies (for preferred invoicing company selector)
   readonly ownCompanies = signal<OwnCompanyDto[]>([]);
 
   // Sync conflict state
   readonly syncConflicts = signal<{ field: string; localValue: any; seasearcherValue: any; dismissed: boolean }[]>([]);
-  readonly showDismissedConflicts = signal(false);
-  readonly activeConflicts = computed(() => this.syncConflicts().filter(c => !c.dismissed));
+  readonly activeConflicts = computed(() => this.syncConflicts().filter((c) => !c.dismissed));
   readonly dismissedConflictsCount = computed(() => this.syncConflicts().filter(c => c.dismissed).length);
   readonly dismissedConflictsList = computed(() => this.syncConflicts().filter(c => c.dismissed));
-  // Country typeahead
-  readonly countrySearchQuery = signal('');
-  readonly showCountryDropdown = signal(false);
-  readonly filteredCountries = computed(() => {
-    const q = this.countrySearchQuery().toLowerCase().trim();
-    if (!q) return COUNTRIES.slice(0, 20);
-    return COUNTRIES.filter(c =>
-      c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q)
-    ).slice(0, 20);
-  });
+
+  // Parent/child hierarchy state
+  readonly parentCompany = signal<CompanyParentSummaryDto | null>(null);
+  readonly groupAggregate = signal<CompanyGroupAggregateDto | null>(null);
   // New data signals
   readonly fleet = signal<FleetResponse | null>(null);
   readonly fleetLoading = signal(false);
@@ -3577,7 +1223,6 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly overrideRequesting = signal(false);
   readonly overrideDecisionLoadingId = signal<string | null>(null);
   readonly pendingRiskOverride = computed(() => this.riskOverrides().find((override) => override.status === 'PENDING') ?? null);
-  readonly companyInfoTab = signal<'info' | 'headOffice' | 'offices' | 'emails' | 'fleet' | 'roles' | 'terms'>('info');
   readonly fleetRolesTab = signal<'fleet' | 'roles'>('fleet');
 
   // Contacts
@@ -3641,20 +1286,19 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   readonly showAddOffice = signal(false);
   readonly officeForm = signal<{ city: string; country: string; address: string; phone: string; email: string }>({ city: '', country: '', address: '', phone: '', email: '' });
   readonly editingOfficeId = signal<string | null>(null);
-  readonly savingOffice = signal(false);
 
-  // Parent / Child hierarchy
-  readonly parentCompany = signal<CompanyParentSummaryDto | null>(null);
+  // Parent/child hierarchy and group orders
   readonly childCompanies = signal<CompanyChildSummaryDto[]>([]);
-  readonly groupAggregate = signal<CompanyGroupAggregateDto | null>(null);
   readonly childrenLoading = signal(false);
-  readonly groupOrdersMode = signal<'own' | 'group'>('own');
-  readonly groupOrders = signal<(CompanyOrder & { clientName?: string })[]>([]);
-  readonly groupOrdersLoading = signal(false);
   readonly linkChildSearch = signal('');
-  readonly linkChildResults = signal<{ id: string; name: string; country: string | null }[]>([]);
+  readonly linkChildResults = signal<{ id: string; name: string; country: string | null; parentId: string | null }[]>([]);
   readonly linkingChildId = signal<string | null>(null);
   readonly showLinkChildModal = signal(false);
+  readonly groupOrders = signal<(CompanyOrder & { clientName?: string })[]>([]);
+  readonly groupOrdersLoading = signal(false);
+  readonly groupOrdersMode = signal<'own' | 'group'>('own');
+
+  // Group fleet
   readonly groupFleetMode = signal<'own' | 'group'>('own');
   readonly groupVessels = signal<GroupVesselRow[]>([]);
   readonly groupFleet = signal<GroupFleetResponse | null>(null);
@@ -3786,6 +1430,41 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     });
   }
 
+  private loadUsers(): void {
+    // Keep current user selection support even when user lookup is unavailable.
+    this.teamUsers.set([]);
+  }
+
+  private loadRoleOptions(): void {
+    // Role options are initialized as defaults in state.
+  }
+
+  private loadCompanyTypes(): void {
+    // Company types are initialized as defaults in state.
+  }
+
+  onCreditApplicationSubmitted(): void {
+    this.showCreditApplicationModal.set(false);
+  }
+
+  goToOrder(orderId: string, _status: string): void {
+    this.router.navigate(['/orders', orderId]);
+  }
+
+  onSegmentToggle(event: { catKey: string; optKey: string; mode: 'multi' | 'single' }): void {
+    if (event.mode === 'multi') {
+      this.toggleSegment(event.catKey, event.optKey);
+    } else {
+      this.selectSingleSegment(event.catKey, event.optKey);
+    }
+  }
+
+  onSanctionsTabChange(tab: string): void {
+    const t = tab as 'risk' | 'sanctions' | 'seizures' | 'monitoring';
+    this.sanctionsTab.set(t);
+    if (t === 'monitoring') this.loadRiskSummary();
+  }
+
   ngOnDestroy(): void {
     if (this.fleetMap) {
       this.fleetMap.remove();
@@ -3851,12 +1530,19 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
         this.http.get<ApiResponse<CounterpartyDto>>(`${API}/companies/local/${id}`),
       );
       if (res.success && res.data) {
+        this.showAddVessel.set(false);
+        this.editingVesselAssocId.set(null);
+        this.selectedVessel.set(null);
+        this.vesselSearch.set('');
+        this.vesselSearchResults.set([]);
         this.company.set(res.data);
-        this.companySegments.set((res.data as any).segments ?? {});
+        this.pageTitle.setTitle(`${res.data.name} | Company`);
+
         this.responsibleUserId.set(res.data.responsibleUserId ?? null);
-        this.pageTitle.setTitle(`Fueld | Companies > ${res.data.name}`);
-        this.wsService.sendPresence(this.router.url, this.pageTitle.getTitle());
-        // Load orders & enrichment in parallel
+        this.editCountry.set(res.data.country ?? '');
+        this.editCountryIso.set(res.data.countryIso ?? '');
+        this.countrySearchQuery.set(res.data.country ?? '');
+
         this.loadOrders(id);
         this.loadCompanyVessels(id);
         this.loadContacts(id);
@@ -4640,90 +2326,54 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  startEditing(): void {
-    const c = this.company();
-    if (!c) return;
-    this.editName.set(c.name);
-    this.editCountry.set(c.country ?? '');
-    this.editCountryIso.set(c.countryIso ?? '');
-    this.editYearFormed.set(c.yearFormed ?? null);
-    this.editFleetSize.set(c.fleetSize ?? null);
-    this.editCreditLimit.set(c.creditLimit ?? '0');
-    this.editCompanyImo.set(c.companyImo ?? '');
-    this.editHeadOfficeAddress.set(c.headOfficeAddress ?? '');
-    this.editHeadOfficePhone.set(c.headOfficePhone ?? '');
-    this.editHeadOfficeEmail.set(c.headOfficeEmail ?? '');
-    this.editWebsite.set(c.website ?? '');
-    this.editSpecialCustomerTerms.set(c.specialCustomerTerms ?? '');
-    this.editPreferredInvoicingCompanyId.set(c.preferredInvoicingCompanyId ?? null);
-    this.countrySearchQuery.set(c.country ?? '');
-    this.showCountryDropdown.set(false);
-    this.editing.set(true);
+  onTypeToggle(type: string): Promise<void> {
+    return this.toggleType(type);
   }
 
-  cancelEditing(): void {
-    this.editing.set(false);
-    this.showCountryDropdown.set(false);
-  }
-
-  async saveEditing(): Promise<void> {
+  async onCompanyInfoSave(body: Record<string, any>): Promise<void> {
     const c = this.company();
     if (!c) return;
 
-    this.editSaving.set(true);
     try {
-      const body: Record<string, any> = {};
-      if (this.editName() !== c.name) body['name'] = this.editName();
-      if (this.editCountry() !== (c.country ?? '')) body['country'] = this.editCountry() || null;
-      if (this.editCountryIso() !== (c.countryIso ?? '')) body['countryIso'] = this.editCountryIso() || null;
-      if (this.editCreditLimit() !== (c.creditLimit ?? '0')) body['creditLimit'] = this.editCreditLimit() || null;
-      if (this.editYearFormed() !== c.yearFormed) body['yearFormed'] = this.editYearFormed();
-      if (this.editFleetSize() !== c.fleetSize) body['fleetSize'] = this.editFleetSize();
-      if (this.editCompanyImo() !== (c.companyImo ?? '')) body['companyImo'] = this.editCompanyImo() || null;
-      if (this.editHeadOfficeAddress() !== (c.headOfficeAddress ?? '')) body['headOfficeAddress'] = this.editHeadOfficeAddress() || null;
-      if (this.editHeadOfficePhone() !== (c.headOfficePhone ?? '')) body['headOfficePhone'] = this.editHeadOfficePhone() || null;
-      if (this.editHeadOfficeEmail() !== (c.headOfficeEmail ?? '')) body['headOfficeEmail'] = this.editHeadOfficeEmail() || null;
-      if (this.editWebsite() !== (c.website ?? '')) body['website'] = this.editWebsite() || null;
-      if (this.editSpecialCustomerTerms() !== (c.specialCustomerTerms ?? '')) body['specialCustomerTerms'] = this.editSpecialCustomerTerms() || null;
-      if (this.editPreferredInvoicingCompanyId() !== (c.preferredInvoicingCompanyId ?? null)) body['preferredInvoicingCompanyId'] = this.editPreferredInvoicingCompanyId();
-
-      if (Object.keys(body).length === 0) {
-        this.editing.set(false);
-        return;
-      }
-
       const res = await firstValueFrom(
         this.http.patch<ApiResponse<CounterpartyDto>>(`${API}/companies/local/${c.id}`, body),
       );
       if (res.success && res.data) {
         this.company.set(res.data);
       }
-      this.editing.set(false);
     } catch (err) {
       console.error('Failed to update company:', err);
-    } finally {
-      this.editSaving.set(false);
     }
   }
 
-  goToOrder(orderId: string, status?: string): void {
-    const baseRoute = status === 'INQUIRY' || status === 'OFFER'
-      ? '/trading/inquiries'
-      : status === 'PAID'
-        ? '/trading/completed-orders'
-        : status === 'CANCELLED'
-          ? '/trading/cancelled-orders'
-          : '/trading/orders';
-    this.router.navigate([baseRoute, orderId]);
+  async onResponsibleUserChange(userId: string): Promise<void> {
+    const c = this.company();
+    if (!c || this.savingResponsible()) return;
+
+    this.savingResponsible.set(true);
+    try {
+      const nextUserId = userId || null;
+      const res = await firstValueFrom(
+        this.http.patch<ApiResponse<CounterpartyDto>>(`${API}/companies/local/${c.id}`, {
+          responsibleUserId: nextUserId,
+        }),
+      );
+      if (res.success && res.data) {
+        this.company.set(res.data);
+        this.responsibleUserId.set(res.data.responsibleUserId ?? null);
+      }
+    } catch (err) {
+      console.error('Failed to update responsible user:', err);
+    } finally {
+      this.savingResponsible.set(false);
+    }
   }
 
   goBack(): void {
     this.router.navigate(['/companies']);
   }
 
-  // ─── Conflict resolution ──────────────────────────────────────────
-
-  readonly FIELD_LABELS: Record<string, string> = {
+  readonly fieldLabels: Record<string, string> = {
     name: 'Company Name',
     country: 'Country',
     countryIso: 'Country Code',
@@ -4738,8 +2388,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   };
 
   dismissConflicts(): void {
-    const active = this.activeConflicts();
-    for (const conflict of active) {
+    for (const conflict of this.activeConflicts()) {
       this.dismissConflict(conflict.field, conflict.seasearcherValue);
     }
   }
@@ -4753,7 +2402,6 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
       );
       if (res.success && res.data) {
         this.company.set(res.data);
-        // Remove this conflict from the list
         this.syncConflicts.update((conflicts) => conflicts.filter((cf) => cf.field !== field));
       }
     } catch (err) {
@@ -4764,9 +2412,8 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
   async dismissConflict(field: string, seasearcherValue: any): Promise<void> {
     const c = this.company();
     if (!c) return;
-    // Optimistically mark as dismissed in the UI
     this.syncConflicts.update((conflicts) =>
-      conflicts.map((cf) => cf.field === field ? { ...cf, dismissed: true } : cf),
+      conflicts.map((cf) => (cf.field === field ? { ...cf, dismissed: true } : cf)),
     );
     try {
       await firstValueFrom(
@@ -4880,8 +2527,6 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
       if (imported?.success && imported.data) {
         this.router.navigate(['/vessels', imported.data.id]);
       }
-    } catch (err) {
-      console.error('Failed to navigate to vessel:', err);
     } finally {
       this.navigatingVesselId.set(null);
     }
@@ -4897,17 +2542,19 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
 
     this.navigatingRiskHitId.set(hit.id);
     try {
-      const linkedVessel = this.findLinkedVesselByName(vesselName);
-      if (linkedVessel?.vesselId) {
-        await this.router.navigate(['/vessels', linkedVessel.vesselId]);
+      const linked = this.findLinkedVesselByName(vesselName);
+      if (linked?.vesselId) {
+        await this.router.navigate(['/vessels', linked.vesselId]);
         return;
       }
 
-      const searchResults = await firstValueFrom(
-        this.http.get<ApiResponse<VesselSearchResult[]>>(`${API}/vessels/search`, { params: { term: vesselName } }),
-      );
-      const match = searchResults.success ? this.pickBestRiskHitVesselMatch(vesselName, searchResults.data ?? []) : null;
+      const search = await firstValueFrom(
+        this.http.get<ApiResponse<VesselSearchResult[]>>(
+          `${API}/vessels/search?term=${encodeURIComponent(vesselName)}`,
+        ),
+      ).catch(() => null);
 
+      const match = this.pickBestRiskHitVesselMatch(vesselName, search?.success ? (search.data ?? []) : []);
       if (!match) {
         this.showToast('error', `Could not find a vessel match for ${vesselName}.`);
         return;
@@ -5076,6 +2723,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
         email: form.email.trim() || undefined,
         notes: form.notes.trim() || undefined,
       };
+
       if (this.editingContactId()) {
         await firstValueFrom(
           this.http.patch(`${API}/companies/contacts/${this.editingContactId()}`, body),
@@ -5085,10 +2733,9 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
           this.http.post(`${API}/companies/local/${companyId}/contacts`, body),
         );
       }
+
       this.showContactModal.set(false);
       await this.loadContacts(companyId);
-    } catch {
-      this.contactError.set('Failed to save contact.');
     } finally {
       this.contactSaving.set(false);
     }
@@ -5771,6 +3418,35 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     }
   }
 
+  async onEmailSave(payload: { emailType: CompanyEmailType; email: string; label: string; isPrimary: boolean; editId?: string }): Promise<void> {
+    const c = this.company();
+    if (!c) return;
+    try {
+      if (payload.editId) {
+        await firstValueFrom(
+          this.http.patch(`${API}/companies/emails/${payload.editId}`, {
+            emailType: payload.emailType,
+            email: payload.email.trim(),
+            label: payload.label.trim() || undefined,
+            isPrimary: payload.isPrimary,
+          }),
+        );
+      } else {
+        await firstValueFrom(
+          this.http.post(`${API}/companies/local/${c.id}/emails`, {
+            emailType: payload.emailType,
+            email: payload.email.trim(),
+            label: payload.label.trim() || undefined,
+            isPrimary: payload.isPrimary,
+          }),
+        );
+      }
+      this.loadCompanyEmails(c.id);
+    } catch (err) {
+      console.error('Failed to save company email:', err);
+    }
+  }
+
   // ─── Offices CRUD ────────────────────────────────────────────────────
 
   private async loadCompanyOffices(companyId: string): Promise<void> {
@@ -5786,60 +3462,34 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  openAddOffice(): void {
-    this.officeForm.set({ city: '', country: '', address: '', phone: '', email: '' });
-    this.editingOfficeId.set(null);
-    this.showAddOffice.set(true);
-  }
-
-  openEditOffice(o: CompanyOfficeDto): void {
-    this.officeForm.set({ city: o.city, country: o.country ?? '', address: o.address ?? '', phone: o.phone ?? '', email: o.email ?? '' });
-    this.editingOfficeId.set(o.id);
-    this.showAddOffice.set(true);
-  }
-
-  cancelOfficeForm(): void {
-    this.showAddOffice.set(false);
-    this.editingOfficeId.set(null);
-  }
-
-  async saveCompanyOffice(): Promise<void> {
+  async onOfficeSave(payload: { city: string; country: string; address: string; phone: string; email: string; editId?: string }): Promise<void> {
     const c = this.company();
     if (!c) return;
-    const form = this.officeForm();
-    if (!form.city.trim()) return;
-
-    this.savingOffice.set(true);
     try {
-      const editId = this.editingOfficeId();
-      if (editId) {
+      if (payload.editId) {
         await firstValueFrom(
-          this.http.patch(`${API}/companies/offices/${editId}`, {
-            city: form.city.trim(),
-            country: form.country.trim() || undefined,
-            address: form.address.trim() || undefined,
-            phone: form.phone.trim() || undefined,
-            email: form.email.trim() || undefined,
+          this.http.patch(`${API}/companies/offices/${payload.editId}`, {
+            city: payload.city.trim(),
+            country: payload.country.trim() || undefined,
+            address: payload.address.trim() || undefined,
+            phone: payload.phone.trim() || undefined,
+            email: payload.email.trim() || undefined,
           }),
         );
       } else {
         await firstValueFrom(
           this.http.post(`${API}/companies/local/${c.id}/offices`, {
-            city: form.city.trim(),
-            country: form.country.trim() || undefined,
-            address: form.address.trim() || undefined,
-            phone: form.phone.trim() || undefined,
-            email: form.email.trim() || undefined,
+            city: payload.city.trim(),
+            country: payload.country.trim() || undefined,
+            address: payload.address.trim() || undefined,
+            phone: payload.phone.trim() || undefined,
+            email: payload.email.trim() || undefined,
           }),
         );
       }
-      this.showAddOffice.set(false);
-      this.editingOfficeId.set(null);
       this.loadCompanyOffices(c.id);
     } catch (err) {
       console.error('Failed to save company office:', err);
-    } finally {
-      this.savingOffice.set(false);
     }
   }
 
@@ -5856,75 +3506,9 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  // ─── Responsible User ─────────────────────────────────────────────────
-
-  private async loadUsers(): Promise<void> {
-    try {
-      const res = await firstValueFrom(
-        this.http.get<ApiResponse<UserOption[]>>(`${API}/lloyds/users`),
-      );
-      if (res.success && res.data) {
-        this.teamUsers.set(res.data);
-      }
-    } catch (err) {
-      console.error('Failed to load users:', err);
-    }
-  }
-
-  private async loadRoleOptions(): Promise<void> {
-    try {
-      const res = await firstValueFrom(
-        this.http.get<ApiResponse<{ roles: VesselCompanyRoleOption[] }>>(`${API}/admin/settings/vessel-company-roles/options`),
-      );
-      if (res.success && res.data?.roles?.length) {
-        this.roleOptions.set(res.data.roles);
-      }
-    } catch {
-      // Keep defaults if fetch fails
-    }
-  }
-
-  private async loadCompanyTypes(): Promise<void> {
-    try {
-      const res = await firstValueFrom(
-        this.http.get<ApiResponse<{ companyTypes: string[] }>>(`${API}/admin/settings/my-company-types`),
-      );
-      if (res.success && res.data?.companyTypes?.length) {
-        this.allTypes.set(res.data.companyTypes);
-      }
-    } catch {
-      // Keep defaults if fetch fails
-    }
-  }
-
-  async onResponsibleUserChange(userId: string): Promise<void> {
-    const c = this.company();
-    if (!c) return;
-
-    this.savingResponsible.set(true);
-    try {
-      await firstValueFrom(
-        this.http.patch(`${API}/companies/local/${c.id}/responsible-user`, {
-          userId: userId || null,
-        }),
-      );
-      this.responsibleUserId.set(userId || null);
-    } catch (err) {
-      console.error('Failed to update responsible user:', err);
-    } finally {
-      this.savingResponsible.set(false);
-    }
-  }
-
-  onCreditApplicationSubmitted() {
-    this.showToast('success', 'Credit application submitted successfully');
-  }
-
-  // ─── Risk Monitoring ──────────────────────────────────────────────
-
   async loadRiskSummary(): Promise<void> {
     const c = this.company();
-    if (!c || this.riskSummaryLoading()) return;
+    if (!c) return;
     this.riskSummaryLoading.set(true);
     try {
       const [summary, overrides] = await Promise.all([
