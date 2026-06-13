@@ -60,3 +60,4 @@ export class PlaceMapCardComponent implements AfterViewInit, OnDestroy {
     this.store.setMapContainer(null);
   }
 }
+
