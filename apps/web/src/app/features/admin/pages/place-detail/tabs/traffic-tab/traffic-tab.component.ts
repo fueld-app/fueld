@@ -17,10 +17,8 @@ import { PlaceFacilitiesCardComponent } from '../../components/place-facilities-
       <div class="lg:col-span-2">
         <app-place-traffic-card />
       </div>
-      <div class="space-y-4">
-        <app-place-hierarchy-card />
-        <app-place-facilities-card />
-      </div>
+      <app-place-hierarchy-card />
+      <app-place-facilities-card />
     </div>
   `,
 })
