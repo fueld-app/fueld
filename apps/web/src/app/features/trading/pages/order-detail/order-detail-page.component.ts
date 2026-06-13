@@ -66,6 +66,8 @@ import { OrderPaymentTermsCardComponent } from './components/order-payment-terms
 import { OrderNotesTermsCardComponent } from './components/order-notes-terms-card/order-notes-terms-card.component';
 import { OrderDeliveryCardComponent } from './components/order-delivery-card/order-delivery-card.component';
 import { OrderAttachmentsCardComponent } from './components/order-attachments-card/order-attachments-card.component';
+import { OrderSettingsDropdownComponent } from './components/order-settings-dropdown/order-settings-dropdown.component';
+import { OrderPlattsSignalsComponent } from './components/order-platts-signals/order-platts-signals.component';
 import { OrderPaymentsCardComponent } from './components/order-payments-card/order-payments-card.component';
 import { CommentsCardComponent } from '../../../../shared/components/comments-card/comments-card.component';
 import { PdfPreviewModalComponent } from '../../../../shared/components/pdf-preview-modal/pdf-preview-modal.component';
@@ -220,6 +222,8 @@ interface PlattsSuggestionViewModel {
     OrderDeliveryCardComponent,
     OrderPaymentsCardComponent,
     OrderAttachmentsCardComponent,
+    OrderSettingsDropdownComponent,
+    OrderPlattsSignalsComponent,
   ],
   template: `
     <app-trading-detail-header
@@ -262,52 +266,14 @@ interface PlattsSuggestionViewModel {
           [isAdmin]="auth.isAdmin()"
           (actionTriggered)="onAction($event)"
         />
-        <div class="relative">
-          <button
-            (click)="toggleSettings($event)"
-            class="inline-flex items-center rounded-lg border border-gray-300 bg-white p-2 text-sm
-                   text-gray-500 shadow-sm hover:bg-gray-50 hover:text-gray-700 transition-colors"
-            title="Settings"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path fill-rule="evenodd" d="M7.84 1.804A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.804l.331 1.652a6.993 6.993 0 0 1 1.929 1.115l1.598-.54a1 1 0 0 1 1.186.447l1.18 2.044a1 1 0 0 1-.205 1.251l-1.267 1.113a7.047 7.047 0 0 1 0 2.228l1.267 1.113a1 1 0 0 1 .206 1.25l-1.18 2.045a1 1 0 0 1-1.187.447l-1.598-.54a6.993 6.993 0 0 1-1.929 1.115l-.33 1.652a1 1 0 0 1-.98.804H8.82a1 1 0 0 1-.98-.804l-.331-1.652a6.993 6.993 0 0 1-1.929-1.115l-1.598.54a1 1 0 0 1-1.186-.447l-1.18-2.044a1 1 0 0 1 .205-1.251l1.267-1.114a7.05 7.05 0 0 1 0-2.227L1.821 7.773a1 1 0 0 1-.206-1.25l1.18-2.045a1 1 0 0 1 1.187-.447l1.598.54A6.993 6.993 0 0 1 7.51 3.456l.33-1.652ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd" />
-            </svg>
-          </button>
-
-          @if (settingsOpen()) {
-            <div class="fixed inset-0 z-40" (click)="settingsOpen.set(false)"></div>
-            <div
-              [style.top.px]="settingsDropdownTop()"
-              [style.left.px]="settingsDropdownLeft()"
-              class="fixed z-50 w-48 rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
-              <label class="mb-1 block text-xs font-medium text-gray-500">Currency</label>
-              <select
-                [ngModel]="order()?.currency ?? 'USD'"
-                (ngModelChange)="onCurrencyChange($event); settingsOpen.set(false)"
-                class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900
-                       outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-              >
-                @for (c of configuredCurrencies(); track c.value) {
-                  <option [value]="c.value">{{ c.label }}</option>
-                }
-              </select>
-              <label class="mt-2 mb-1 block text-xs font-medium text-gray-500">Category</label>
-              <select
-                [ngModel]="order()?.categoryKey ?? ''"
-                (ngModelChange)="onCategoryChange($event); settingsOpen.set(false)"
-                class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900
-                       outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-              >
-                <option value="">— None —</option>
-                @for (c of orderCategories(); track c.key) {
-                  <option [value]="c.key">{{ c.label }}</option>
-                }
-              </select>
-            </div>
-          }
-        </div>
-      </div>
-    </app-trading-detail-header>
+        <app-order-settings-dropdown
+            [currency]="order()?.currency ?? 'USD'"
+            [category]="order()?.categoryKey ?? ''"
+            [currencyOptions]="configuredCurrencies()"
+            [categoryOptions]="orderCategories()"
+            (currencyChange)="onCurrencyChange($event)"
+            (categoryChange)="onCategoryChange($event)"
+          /></app-trading-detail-header>
 
     @if (isInternalTransfer()) {
       <div class="mt-4">
@@ -992,114 +958,14 @@ interface PlattsSuggestionViewModel {
       }
 
       <div
-        class="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
-        [style.max-height.px]="plattsSignalsMaxHeight()"
-      >
-      <div class="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 class="text-sm font-semibold uppercase tracking-wider text-gray-700">Platts Signals</h3>
-          <p class="mt-1 text-xs text-gray-500">
-            Canonical Platts matches for the current line items.
-            @if (plattsSuggestionsMeta()) {
-              <span>
-                Using {{ plattsSuggestionsMeta()!.matchedPublicationDate ?? plattsSuggestionsMeta()!.requestedPublicationDate }}
-                @if (plattsSuggestionsMeta()!.usedFallbackReport) {
-                  <span>(closest available canonical report)</span>
-                }
-              </span>
-            }
-          </p>
-        </div>
-        <div class="flex items-center gap-2">
-          @if (plattsSuggestionsMeta()?.reportTitle && plattsSuggestionsMeta()?.reportId) {
-            <button
-              type="button"
-              (click)="openPlattsReport(plattsSuggestionsMeta()!.reportId!)"
-              class="inline-flex items-center rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:border-brand-300 hover:text-brand-700"
-            >
-              Open source report
-            </button>
-          }
-          <button
-            type="button"
-            (click)="loadPlattsSuggestions()"
-            [disabled]="plattsSuggestionsLoading()"
-            class="inline-flex items-center rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {{ plattsSuggestionsLoading() ? 'Refreshing...' : 'Refresh signals' }}
-          </button>
-        </div>
-      </div>
-
-      @if (plattsSuggestionsError()) {
-        <div class="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-          {{ plattsSuggestionsError() }}
-        </div>
-      } @else if (plattsSuggestionsLoading() && !plattsSuggestionItems().length) {
-        <div class="mt-4 text-sm text-gray-500">Loading Platts matches...</div>
-      } @else if (!plattsSuggestionItems().length) {
-        <div class="mt-4 text-sm text-gray-500">No Platts suggestions available for the current items yet.</div>
-      } @else {
-        <div class="mt-4 grid min-h-0 flex-1 gap-3 overflow-y-auto pr-1">
-          @for (item of plattsSuggestionItems(); track item.key) {
-            <div class="rounded-xl border border-gray-200 p-4">
-              <div class="flex items-start justify-between gap-3">
-                <div>
-                  <div class="text-sm font-semibold text-gray-900">{{ item.productType }}</div>
-                  @if (item.description) {
-                    <div class="mt-1 text-xs text-gray-500">{{ item.description }}</div>
-                  }
-                </div>
-                <div class="text-[11px] uppercase tracking-wide text-gray-400">{{ item.matches.length }} match{{ item.matches.length === 1 ? '' : 'es' }}</div>
-              </div>
-
-              @if (!item.matches.length) {
-                <div class="mt-3 text-sm text-gray-500">No canonical Platts entries matched this line item.</div>
-              } @else {
-                <div class="mt-3 space-y-2">
-                  @for (match of item.matches; track match.entryId) {
-                    <button
-                      type="button"
-                      (click)="openPlattsReport(match.reportId)"
-                      class="block w-full rounded-lg border border-gray-200 px-3 py-3 text-left transition-colors hover:border-brand-300 hover:bg-brand-50/40"
-                    >
-                      <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
-                        <span class="font-semibold text-gray-700">{{ match.company || 'Market' }}</span>
-                        @if (match.action) {
-                          <span>{{ match.action }}</span>
-                        }
-                        @if (match.counterparty) {
-                          <span>vs {{ match.counterparty }}</span>
-                        }
-                        @if (match.priceRaw) {
-                          <span>{{ match.priceRaw }}</span>
-                        }
-                        @if (match.quantityRaw) {
-                          <span>{{ match.quantityRaw }}</span>
-                        }
-                      </div>
-                      <div class="mt-1 text-sm text-gray-800">{{ match.rawText }}</div>
-                      <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-gray-500">
-                        @if (match.instrument) {
-                          <span>{{ match.instrument }}</span>
-                        }
-                        @if (match.windowLabel) {
-                          <span>{{ match.windowLabel }}</span>
-                        }
-                        @if (match.marketRegion) {
-                          <span>{{ match.marketRegion }}</span>
-                        }
-                        <span>score {{ match.score }}</span>
-                      </div>
-                    </button>
-                  }
-                </div>
-              }
-            </div>
-          }
-        </div>
-      }
-    </div>
+        <app-order-platts-signals
+            [items]="plattsSuggestionItems()"
+            [meta]="plattsSuggestionsMeta()"
+            [loading]="plattsSuggestionsLoading()"
+            [error]="plattsSuggestionsError()"
+            (refresh)="loadPlattsSuggestions()"
+            (openReport)="openPlattsReport($event)"
+          />
 
     <!-- Delivery + Payments -->
     @if (allowDeliveredEdit() || orderId() || order()?.id) {
@@ -1621,9 +1487,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly noteTab = signal<'customer' | 'supplier'>('customer');
   readonly showCustomerPaymentNote = signal(false);
   readonly showSupplierPaymentNote = signal(false);
-  readonly settingsOpen = signal(false);
-  readonly settingsDropdownTop = signal(0);
-  readonly settingsDropdownLeft = signal(0);
   readonly showConvertToOrderModal = signal(false);
   readonly showCancelInquiryModal = signal(false);
   readonly convertingToOrder = signal(false);
