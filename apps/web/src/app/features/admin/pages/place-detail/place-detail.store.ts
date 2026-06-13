@@ -604,6 +604,10 @@ export class PlaceDetailStore {
     if (!p?.lat || !p?.long || !el) return;
     if (this.map) return;
 
+    // Ensure the container has a non-zero size before Leaflet measures it
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+
     delete (L.Icon.Default.prototype as any)._getIconUrl;
     L.Icon.Default.mergeOptions({
       iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
