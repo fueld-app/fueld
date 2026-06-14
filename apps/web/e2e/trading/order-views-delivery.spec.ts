@@ -46,8 +46,8 @@ test('order routes request expected backend statuses', async ({ page }) => {
     password: process.env['E2E_TRADER5_USER_PASSWORD'] ?? 'trader5password123',
   });
 
-  await expectStatusesForRoute(page, '/trading/orders', 'CONFIRMED,DELIVERED,INVOICED');
-  await expectStatusesForRoute(page, '/trading/orders/completed', 'PAID');
-  await expectStatusesForRoute(page, '/trading/orders/cancelled', 'CANCELLED');
+  await expectStatusesForRoute(page, '/trading/orders', 'CONFIRMED,INVOICED');
+  await expectStatusesForRoute(page, '/trading/completed-orders', 'PAID');
+  await expectStatusesForRoute(page, '/trading/cancelled-orders', 'CANCELLED');
   await expectStatusesForRoute(page, '/trading/inquiries', 'INQUIRY,OFFER');
 });
