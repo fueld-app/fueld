@@ -3241,140 +3241,38 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   // ── Open compose modal for any document type ───────────────────
 
   openSendInquiryModal(): void {
-    if (!this.hasLineItems()) {
-      this.showToast('error', 'Add at least one line item before sending inquiries.');
-      return;
-    }
-    if (!this.hasEta()) {
-      this.showToast('error', 'Set an ETA before sending inquiries.');
-      return;
-    }
-    this.inquiryModal()?.show();
+    this.commSvc.openSendInquiryModal(
+      this.orderId(),
+      this.hasLineItems(),
+      this.hasEta(),
+      this.inquiryModal(),
+      (type, msg) => this.showToast(type, msg),
+    );
   }
 
   onSendInquiry(payload: SendInquiryPayload): void {
-    const id = this.orderId();
-    if (!id) return;
-
-    this.http
-      .post<{ success: boolean; message: string; data: Array<{ recipientId: string; recipientName: string; email: string; success: boolean; error?: string }> }>(
-        `${API_URL}/orders/${id}/inquiry/send`,
-        {
-          suppliers: payload.suppliers,
-          recipientEmails: payload.recipientEmails,
-          subject: payload.subject,
-          htmlBody: payload.htmlBody,
-          eta: payload.eta ?? null,
-          etd: payload.etd ?? null,
-          responseDeadlineAt: payload.responseDeadlineAt,
-          reminderEnabled: payload.reminderEnabled ?? false,
-        },
-      )
-      .subscribe({
-        next: (res) => {
-          this.inquiryModal()?.done();
-          if (res.success) {
-            const successCount = res.data?.filter((r: any) => r.success).length ?? 0;
-            const total = res.data?.length ?? 0;
-            this.showToast('success', `Inquiry sent to ${successCount}/${total} recipients`);
-            if (successCount > 0) {
-              void Promise.all([
-                this.inquirySvc.loadReplies(this.orderId()).then((r) => this.inquiryReplies.set(r)),
-                this.inquirySvc.loadSupplierContext(this.orderId()).then((s) => this.inquirySupplierContext.set(s)),
-              ]);
-              this.inquiryModal()?.close();
-            }
-          } else {
-            this.showToast('error', res.message || 'Failed to send inquiries');
-          }
-        },
-        error: () => {
-          this.inquiryModal()?.done();
-          this.showToast('error', 'Failed to send inquiry emails. Check SMTP settings in Admin.');
-        },
-      });
+    this.commSvc.onSendInquiry(
+      payload,
+      this.orderId(),
+      this.inquiryModal(),
+      (type, msg) => this.showToast(type, msg),
+      () => {
+        void Promise.all([
+          this.inquirySvc.loadReplies(this.orderId()).then((r) => this.inquiryReplies.set(r)),
+          this.inquirySvc.loadSupplierContext(this.orderId()).then((s) => this.inquirySupplierContext.set(s)),
+        ]);
+        this.inquiryModal()?.close();
+      },
+    );
   }
 
   openSendEmailModal(docType: DocumentEmailType): void {
-    const id = this.orderId();
-    if (!id) return;
-
     this.emailDocumentType.set(docType);
-    const orderSupplierId = docType === 'NOMINATION' ? this.activeOrderSupplier()?.id ?? null : null;
-
-    // Fetch pre-filled email defaults from the API
-    this.http
-      .post<ApiResponse<{
-        recipientEmail: string;
-        recipientName: string;
-        ccEmails: string[];
-        bccEmails: string[];
-        defaultCcEmails: Array<{ email: string; label: string | null }>;
-        defaultBccEmails: Array<{ email: string; label: string | null }>;
-        subject: string;
-        htmlBody: string;
-        senderName: string;
-        senderEmail: string;
-      }>>(`${API_URL}/orders/${id}/email-defaults`, { documentType: docType, orderSupplierId })
-      .subscribe({
-        next: (res) => {
-          if (!res.success || !res.data) {
-            this.showToast('error', 'Failed to load email defaults.');
-            return;
-          }
-          const d = res.data;
-          this.emailPdfFileName.set(
-            docType === 'PORT_DOCUMENTATION'
-              ? ''
-              : `${docType}_${this.order()?.orderNumber ?? id.slice(0, 8)}.pdf`,
-          );
-
-          // Open the compose modal with the pre-filled data
-          this.emailModal()?.showWith({
-            recipientEmail: d.recipientEmail,
-            ccEmails: d.ccEmails,
-            bccEmails: d.bccEmails ?? [],
-            defaultCcEmails: d.defaultCcEmails ?? [],
-            defaultBccEmails: d.defaultBccEmails ?? [],
-            subject: d.subject,
-            htmlBody: d.htmlBody,
-          });
-        },
-        error: () => {
-          this.showToast('error', 'Failed to load email defaults.');
-        },
-      });
+    this.commSvc.openSendEmailModal(docType, this.orderId(), this.activeOrderSupplier()?.id ?? null, this.emailModal(), this.order()?.orderNumber ?? null, (type, msg) => this.showToast(type, msg));
   }
 
   onSendEmail(payload: SendEmailPayload): void {
-    const id = this.orderId();
-    if (!id) return;
-
-    this.http
-      .post<ApiResponse<{ success: boolean; message: string; channel: string; pdfFileName: string }>>(
-        `${API_URL}/orders/${id}/send-email`,
-        {
-          documentType: payload.documentType,
-          orderSupplierId: payload.orderSupplierId ?? null,
-          recipientEmail: payload.recipientEmail,
-          ccEmails: payload.ccEmails,
-          bccEmails: payload.bccEmails,
-          subject: payload.subject,
-          htmlBody: payload.htmlBody,
-          attachmentIds: payload.attachmentIds,
-        },
-      )
-      .subscribe({
-        next: (res) => {
-          this.emailModal()?.done();
-          const channel = res.data?.channel === 'GRAPH' ? 'via Outlook' : 'via email';
-          this.showToast('success', `${payload.documentType} sent to ${payload.recipientEmail} ${channel}`);
-        },
-        error: () => {
-          this.emailModal()?.done();
-          this.showToast('error', 'Failed to send email. Please check that SMTP is configured in Admin → Settings → Integrations.');
-        },
-      });
+    this.commSvc.onSendEmail(payload, this.orderId(), this.emailModal(), (type, msg) => this.showToast(type, msg));
   }
 
   // ─── WhatsApp send handlers ──────────────────────────────────────
