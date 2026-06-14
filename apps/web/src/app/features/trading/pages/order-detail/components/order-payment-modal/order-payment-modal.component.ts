@@ -28,8 +28,11 @@ import { API_URL } from '@app/core/config/api';
           <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label class="text-xs font-medium text-gray-500">Amount</label>
-              <input type="number" min="0" [ngModel]="amount()" (ngModelChange)="amount.set($event)"
+              <input type="number" min="0" [ngModel]="amount()" (ngModelChange)="amount.set($event); validationError.set('')"
                 class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20" />
+              @if (validationError()) {
+                <p class="mt-1 text-xs text-red-500">{{ validationError() }}</p>
+              }
             </div>
             <div>
               <label class="text-xs font-medium text-gray-500">Currency</label>
@@ -82,6 +85,7 @@ export class OrderPaymentModalComponent {
 
   readonly open = signal(false);
   readonly saving = signal(false);
+  readonly validationError = signal('');
   readonly amount = signal<number | string>('');
   readonly currency = signal('USD');
   readonly receivedAt = signal('');
@@ -105,7 +109,10 @@ export class OrderPaymentModalComponent {
   async submit(): Promise<void> {
     const id = this.orderId();
     const amountStr = String(this.amount() ?? '').trim();
-    if (!amountStr) return;
+    if (!amountStr) {
+      this.validationError.set('Amount is required.');
+      return;
+    }
 
     this.saving.set(true);
     try {

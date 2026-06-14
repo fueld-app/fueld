@@ -13,11 +13,12 @@ async function expectStatusesForRoute(
     try {
       const url = new URL(res.url());
       if (!url.pathname.endsWith('/orders')) return false;
-      return url.searchParams.get('statuses') === expectedStatuses;
+      const params = new URLSearchParams(url.search);
+      return params.get('statuses') === expectedStatuses;
     } catch {
       return false;
     }
-  });
+  }, { timeout: 15_000 });
 
   await page.goto(route);
   await responsePromise;
