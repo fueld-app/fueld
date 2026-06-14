@@ -955,22 +955,28 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       this.itemRows.set(r.items);
       this.saveSvc.draftItemIds.set(new Set());
       await this.normalizeDetailRoute(r.order.status, id);
-      await this.financialSvc.loadCustomerCreditLines(r.order.clientId);
-      await this.financialSvc.loadSupplierCreditLines(this.activeOrderSupplier()?.companyId ?? r.order.supplierId);
-      await this.loadReferenceData();
-      await this.loadPlattsSuggestions();
-      this.scheduleAvailabilityChecks();
-      if (r.order.orderKind === 'INTERNAL_TRANSFER') {
-        await this.loadInternalTransfer();
-      } else {
+      // Parallelize independent API calls for faster page load
+      await Promise.all([
+        this.financialSvc.loadCustomerCreditLines(r.order.clientId),
+        this.financialSvc.loadSupplierCreditLines(this.activeOrderSupplier()?.companyId ?? r.order.supplierId),
+        this.loadReferenceData(),
+        this.loadPlattsSuggestions(),
+        this.scheduleAvailabilityChecks(),
+        r.order.orderKind === 'INTERNAL_TRANSFER' ? this.loadInternalTransfer() : Promise.resolve(),
+        this.loadCompanyContacts('customer', r.order.clientId).catch(() => {}),
+        (() => { const id = this.activeOrderSupplier()?.companyId ?? r.order.supplierId; return id ? this.loadCompanyContacts('supplier', id).catch(() => {}) : Promise.resolve(); })(),
+        r.order.brokerId ? this.loadCompanyContacts('broker', r.order.brokerId).catch(() => {}) : Promise.resolve(),
+        r.order.agentId ? this.loadCompanyContacts('agent', r.order.agentId).catch(() => {}) : Promise.resolve(),
+        this.inquirySvc.loadSupplierContext(this.orderId()),
+        this.inquirySvc.loadReplies(this.orderId()),
+        this.loadAttachments(),
+        this.loadPayments(),
+        this.portDocSvc.load(this.orderId()),
+        this.loadSupplierNominationSummary(),
+      ]);
+      if (r.order.orderKind !== 'INTERNAL_TRANSFER') {
         this.transfer.set(null);
       }
-      await this.loadCompanyContacts('customer', r.order.clientId);
-      const supplierCompanyId = this.activeOrderSupplier()?.companyId ?? r.order.supplierId;
-      if (supplierCompanyId) await this.loadCompanyContacts('supplier', supplierCompanyId);
-      if (r.order.brokerId) await this.loadCompanyContacts('broker', r.order.brokerId);
-      if (r.order.agentId) await this.loadCompanyContacts('agent', r.order.agentId);
-      await Promise.all([await this.inquirySvc.loadSupplierContext(this.orderId()), await this.inquirySvc.loadReplies(this.orderId())]);
       let invoicingId = this.order()?.invoicingCompanyId ?? null;
       if (r.ownCompanies.length) {
         this.ownCompanies.set(r.ownCompanies);
@@ -980,10 +986,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       else this.bankAccounts.set([]);
       if (this.order()?.customerNote) this.showCustomerPaymentNote.set(true);
       if (this.order()?.supplierNote) this.showSupplierPaymentNote.set(true);
-      await this.loadAttachments();
-      await this.loadPayments();
-      await this.portDocSvc.load(this.orderId());
-      await this.loadSupplierNominationSummary();
     } catch { this.showToast('error', 'Failed to load order.'); }
     this._initialLoadComplete = true;
   }
