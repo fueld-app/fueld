@@ -95,6 +95,7 @@ import { OrderSearchService } from './services/order-search.service';
 import { OrderSaveService } from './services/order-save.service';
 import { OrderInventoryService } from './services/order-inventory.service';
 import { OrderBrokerService } from './services/order-broker.service';
+import { OrderAgentService } from './services/order-agent.service';
 import { OrderActionService } from './services/order-action.service';
 import { CreditApplicationModalComponent } from '../../../credit/components/credit-application-modal.component';
 
@@ -180,6 +181,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   protected readonly saveSvc = inject(OrderSaveService);
   protected readonly inventorySvc = inject(OrderInventoryService);
   protected readonly brokerSvc = inject(OrderBrokerService);
+  protected readonly agentSvc = inject(OrderAgentService);
   protected readonly actionSvc = inject(OrderActionService);
   private readonly riskService = inject(RiskMonitoringService);
 
@@ -207,11 +209,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly order = signal<OrderDto | null>(null);
   readonly client = signal<CounterpartyDto | null>(null);
   readonly supplier = signal<CounterpartyDto | null>(null);
-  readonly agent = signal<CounterpartyDto | null>(null);
+  readonly agent = this.agentSvc.agent;
   readonly vessel = signal<VesselDto | null>(null);
   readonly port = signal<PlaceDto | null>(null);
   readonly suppliers = signal<CounterpartyDto[]>([]);
-  readonly agents = signal<CounterpartyDto[]>([]);
+  readonly agents = this.agentSvc.agents;
   readonly clients = signal<CounterpartyDto[]>([]);
   readonly vessels = signal<VesselDto[]>([]);
   readonly places = signal<PlaceDto[]>([]);
@@ -288,7 +290,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly bankAccounts = signal<BankAccountDto[]>([]);
   readonly clientSearchLoading = signal(false);
   readonly supplierSearchLoading = signal(false);
-  readonly agentSearchLoading = signal(false);
+  readonly agentSearchLoading = this.agentSvc.agentSearchLoading;
   readonly vesselSearchLoading = signal(false);
   readonly placeSearchLoading = signal(false);
   readonly attachments = signal<OrderAttachmentDto[]>([]);
@@ -366,10 +368,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   readonly customerContact = signal<CompanyContactDto | null>(null);
   readonly supplierContact = signal<CompanyContactDto | null>(null);
-  readonly agentContact = signal<CompanyContactDto | null>(null);
+  readonly agentContact = this.agentSvc.agentContact;
   readonly customerContacts = signal<CompanyContactDto[]>([]);
   readonly supplierContacts = signal<CompanyContactDto[]>([]);
-  readonly agentContacts = signal<CompanyContactDto[]>([]);
+  readonly agentContacts = this.agentSvc.agentContacts;
   readonly brokerContact = this.brokerSvc.brokerContact;
   readonly brokerContacts = this.brokerSvc.brokerContacts;
 
@@ -434,23 +436,22 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly brokerName = this.brokerSvc.brokerName;
   readonly brokerDropdownOptions = this.brokerSvc.brokerDropdownOptions;
   readonly brokerContactDropdownOptions = this.brokerSvc.brokerContactDropdownOptions;
-  readonly agentName = computed(() => {
-    const id = this.order()?.agentId;
-    if (!id) return '—';
-    return this.agent()?.name ?? this.agents().find((a) => a.id === id)?.name ?? '—';
-  });
+  readonly agentName = this.agentSvc.agentName;
+  readonly agentDropdownOptions = this.agentSvc.agentDropdownOptions;
+  readonly agentContactDropdownOptions = this.agentSvc.agentContactDropdownOptions;
   readonly vesselName = computed(() => this.vessel()?.name ?? '—');
   readonly portName = computed(() => this.port()?.name ?? '—');
   readonly subtitle = computed(() => '');
-  readonly isInquiryContext = computed(() => {
-    const status = this.order()?.status;
-    return status === OrderStatus.Inquiry || status === OrderStatus.Offer;
-  });
   readonly invoicingCompanyName = computed(() => {
     const id = this.order()?.invoicingCompanyId;
     if (!id) return '—';
     const co = this.ownCompanies().find((c) => c.id === id);
     return co?.name ?? '—';
+  });
+
+  readonly isInquiryContext = computed(() => {
+    const status = this.order()?.status;
+    return status === OrderStatus.Inquiry || status === OrderStatus.Offer;
   });
 
   readonly isReadonly = computed(() => {
@@ -608,17 +609,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   readonly supplierContactDropdownOptions = computed(() =>
     this.supplierContacts().map((c) => ({
-      value: c.id,
-      label: c.name + (c.role ? ` (${c.role})` : ''),
-    })),
-  );
-
-  readonly agentDropdownOptions = computed<DropdownOption[]>(() =>
-    this.agents().map((a) => ({ value: a.id, label: a.name })),
-  );
-
-  readonly agentContactDropdownOptions = computed(() =>
-    this.agentContacts().map((c) => ({
       value: c.id,
       label: c.name + (c.role ? ` (${c.role})` : ''),
     })),
@@ -963,8 +953,9 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       this.brokerContact.set(r.brokerContact);
       this.agentContact.set(r.agentContact);
       this.brokers.set(r.broker ? [r.broker] : []);
-      this.agent.set(r.agent);
-      if (r.agent) this.agents.set([r.agent]);
+      this.agentSvc.agent.set(r.agent ?? null);
+      this.agentSvc.agents.set(r.agent ? [r.agent] : []);
+      this.agentSvc.agentContact.set(r.agentContact ?? null);
       this.client.set(r.client);
       if (r.client) this.clients.set([r.client]);
       this.supplier.set(r.supplier);
@@ -1378,7 +1369,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         if (side === 'customer') this.customerContacts.set(res.data ?? []);
         else if (side === 'supplier') this.supplierContacts.set(res.data ?? []);
         else if (side === 'broker') this.brokerContacts.set(res.data ?? []);
-        else this.agentContacts.set(res.data ?? []);
+        else if (side === 'agent') this.agentSvc.setAgentContacts(res.data ?? []);
       }
     } catch {
       // silently ignore
@@ -1404,9 +1395,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   onAgentContactChange(contactId: string): void {
-    this.order.update((o) => (o ? { ...o, agentContactId: contactId || null } : o));
-    const contact = this.agentContacts().find((c) => c.id === contactId) ?? null;
-    this.agentContact.set(contact);
+    this.agentSvc.onAgentContactChange(
+      contactId,
+      (updater) => { this.order.update((o) => (o ? updater(o) : o)); },
+    );
   }
 
   // ─── Broker handlers ─────────────────────────────────────────────
@@ -1438,44 +1430,15 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   async searchAgents(term: string): Promise<void> {
-    this.agentSearchLoading.set(true);
-    try {
-      const res = await firstValueFrom(
-        this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
-          `${API_URL}/companies/local?search=${encodeURIComponent(term)}&limit=20`,
-        ),
-      );
-      const localResults = res.success ? res.data.companies : [];
-      const currentId = this.order()?.agentId ?? '';
-      const currentAgent = currentId
-        ? this.agent() ?? this.agents().find((company) => company.id === currentId) ?? null
-        : null;
-      const mergedLocal = currentId && !localResults.find((company) => company.id === currentId)
-        ? [currentAgent, ...localResults].filter(Boolean)
-        : localResults;
-      this.agents.set(mergedLocal as CounterpartyDto[]);
-    } catch {
-      // silently ignore
-    } finally {
-      this.agentSearchLoading.set(false);
-    }
+    await this.agentSvc.searchAgents(term);
   }
 
   onAgentChange(agentId: string): void {
-    if (!agentId) {
-      this.order.update((o) => (o ? { ...o, agentId: null, agentContactId: null } : o));
-      this.agent.set(null);
-      this.agentContact.set(null);
-      this.agentContacts.set([]);
-      return;
-    }
-
-    this.order.update((o) => (o ? { ...o, agentId, agentContactId: null } : o));
-    const agentData = this.agents().find((company) => company.id === agentId)
-      ?? (this.agent()?.id === agentId ? this.agent() : null);
-    this.agent.set(agentData ?? null);
-    this.agentContact.set(null);
-    void this.loadCompanyContacts('agent', agentId);
+    this.agentSvc.onAgentChange(
+      agentId,
+      (updater) => { this.order.update((o) => (o ? updater(o) : o)); },
+      (companyId) => { void this.loadCompanyContacts('agent', companyId); },
+    );
   }
 
   onTermsChange(value: string): void {
