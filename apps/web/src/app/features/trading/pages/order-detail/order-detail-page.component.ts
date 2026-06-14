@@ -86,6 +86,7 @@ import { InternalTransferSummaryComponent } from '../../components/internal-tran
 import { InternalTransferSidesComponent } from '../../components/internal-transfer-sides/internal-transfer-sides.component';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { OrderReferenceDataService } from './services/order-reference-data.service';
+import { OrderReplyService } from './services/order-reply.service';
 import { CreditApplicationModalComponent } from '../../../credit/components/credit-application-modal.component';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -755,6 +756,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   private readonly http = inject(HttpClient);
   protected readonly auth = inject(AuthService);
   protected readonly refData = inject(OrderReferenceDataService);
+  protected readonly replySvc = inject(OrderReplyService);
   private readonly riskService = inject(RiskMonitoringService);
 
   readonly emailModal = viewChild(SendEmailModalComponent);
@@ -916,19 +918,9 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly inquirySupplierContextLoading = signal(false);
   readonly inquirySupplierContext = signal<InquirySupplierComparisonRow[]>([]);
   readonly inquiryRepliesLoading = signal(false);
-  readonly inquiryRepliesSavingId = signal<string | null>(null);
+  readonly inquiryRepliesSavingId = this.replySvc.replySavingId;
   readonly inquiryReplies = signal<SupplierInquiryReplyRow[]>([]);
-  readonly editingInquiryReplyId = signal<string | null>(null);
-  readonly inquiryReplyStatuses = ['SENT', 'QUOTED', 'DECLINED', 'NO_REPLY'] as const;
-  readonly inquiryReplyStatus = signal<'SENT' | 'QUOTED' | 'DECLINED' | 'NO_REPLY'>('SENT');
-  readonly inquiryReplyRespondedAt = signal('');
-  readonly inquiryReplyDeclineReason = signal('');
-  readonly inquiryReplyPrices = signal<Record<string, string>>({});
-  readonly inquiryReplyNotes = signal<Record<string, string>>({});
-  readonly inquiryReplyQuoteValidUntil = signal('');
-  readonly inquiryReplyDeliveryWindow = signal('');
-  readonly inquiryReplySupplierPaymentTerms = signal('');
-  readonly inquiryReplySupplierComment = signal('');
+  readonly editingInquiryReplyId = this.replySvc.editingReplyId;
 
   // ─── Terms UI (collapsed by default) ─────────────────────────────
 
@@ -3389,156 +3381,14 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     this.order.update((order) => order ? { ...order, deliveredAt: latestDeliveredAt ?? order.deliveredAt ?? null } : order);
   }
 
-  openInquiryReplyEditor(row: SupplierInquiryReplyRow): void {
-    this.editingInquiryReplyId.set(row.id);
-    this.inquiryReplyStatus.set(row.status);
-    this.inquiryReplyRespondedAt.set(this.formatDateTimeInput(row.respondedAt));
-    this.inquiryReplyDeclineReason.set(row.declineReason ?? '');
-    this.inquiryReplyPrices.set(
-      Object.fromEntries(row.items.map((item) => [item.orderItemId, item.price ?? ''])),
-    );
-    this.inquiryReplyNotes.set(
-      Object.fromEntries(row.items.map((item) => [item.orderItemId, item.note ?? ''])),
-    );
-    this.inquiryReplyQuoteValidUntil.set(this.formatDateTimeInput(row.quoteValidUntil));
-    this.inquiryReplyDeliveryWindow.set(row.deliveryWindow ?? '');
-    this.inquiryReplySupplierPaymentTerms.set(row.supplierPaymentTerms ?? '');
-    this.inquiryReplySupplierComment.set(row.supplierComment ?? '');
-  }
-
-  cancelInquiryReplyEditor(): void {
-    this.editingInquiryReplyId.set(null);
-    this.inquiryReplyStatus.set('SENT');
-    this.inquiryReplyRespondedAt.set('');
-    this.inquiryReplyDeclineReason.set('');
-    this.inquiryReplyPrices.set({});
-    this.inquiryReplyNotes.set({});
-    this.inquiryReplyQuoteValidUntil.set('');
-    this.inquiryReplyDeliveryWindow.set('');
-    this.inquiryReplySupplierPaymentTerms.set('');
-    this.inquiryReplySupplierComment.set('');
-  }
-
-  isEditingInquiryReply(row: SupplierInquiryReplyRow): boolean {
-    return this.editingInquiryReplyId() === row.id;
-  }
-
-  setInquiryReplyStatus(status: 'SENT' | 'QUOTED' | 'DECLINED' | 'NO_REPLY'): void {
-    this.inquiryReplyStatus.set(status);
-    if (status === 'SENT' || status === 'NO_REPLY') {
-      this.inquiryReplyRespondedAt.set('');
-      this.inquiryReplyDeclineReason.set('');
-    }
-    if (status !== 'DECLINED') {
-      this.inquiryReplyDeclineReason.set('');
-    }
-  }
-
-  setInquiryReplyPrice(orderItemId: string, value: string): void {
-    this.inquiryReplyPrices.update((current) => ({ ...current, [orderItemId]: String(value ?? '') }));
-  }
-
-  setInquiryReplyNote(orderItemId: string, value: string): void {
-    this.inquiryReplyNotes.update((current) => ({ ...current, [orderItemId]: String(value ?? '') }));
-  }
-
-  canSaveInquiryReply(row: SupplierInquiryReplyRow): boolean {
-    const status = this.inquiryReplyStatus();
-    if (status === 'QUOTED') {
-      return !!this.inquiryReplyRespondedAt()
-        && row.items.some((item) => String(this.inquiryReplyPrices()[item.orderItemId] ?? '').trim().length > 0);
-    }
-    if (status === 'DECLINED') {
-      return !!this.inquiryReplyRespondedAt() && this.inquiryReplyDeclineReason().trim().length > 0;
-    }
-    return true;
-  }
-
-  async saveInquiryReply(row: SupplierInquiryReplyRow): Promise<void> {
-    const id = this.orderId();
-    if (!id) return;
-
-    this.inquiryRepliesSavingId.set(row.id);
-    try {
-      const status = this.inquiryReplyStatus();
-      const res = await firstValueFrom(
-        this.http.patch<ApiResponse<{ updated: boolean }>>(`${API_URL}/orders/${id}/inquiry/sent/${row.id}`, {
-          status,
-          respondedAt: status === 'QUOTED' || status === 'DECLINED'
-            ? this.toIsoFromDateTimeInput(this.inquiryReplyRespondedAt())
-            : null,
-          declineReason: status === 'DECLINED' ? this.inquiryReplyDeclineReason().trim() : null,
-          quoteValidUntil: status === 'QUOTED' ? this.toIsoFromDateTimeInput(this.inquiryReplyQuoteValidUntil()) : null,
-          deliveryWindow: status === 'QUOTED' ? this.inquiryReplyDeliveryWindow().trim() : null,
-          supplierPaymentTerms: status === 'QUOTED' ? this.inquiryReplySupplierPaymentTerms().trim() : null,
-          supplierComment: status === 'QUOTED' ? this.inquiryReplySupplierComment().trim() : null,
-          items: status === 'QUOTED'
-            ? row.items.map((item) => ({
-              orderItemId: item.orderItemId,
-              price: String(this.inquiryReplyPrices()[item.orderItemId] ?? '').trim() || null,
-              note: String(this.inquiryReplyNotes()[item.orderItemId] ?? '').trim() || null,
-            }))
-            : [],
-        }),
-      );
-      if (!res.success) {
-        this.showToast('error', res.message ?? 'Failed to save supplier reply.');
-        return;
-      }
-
-      await Promise.all([
-        this.loadInquiryReplies(),
-        this.loadInquirySupplierContext(),
-      ]);
-      this.cancelInquiryReplyEditor();
-      this.showToast('success', `Updated supplier reply for ${row.supplierName}.`);
-    } catch {
-      this.showToast('error', 'Failed to save supplier reply.');
-    } finally {
-      this.inquiryRepliesSavingId.set(null);
-    }
-  }
-
-  statusBadgeClass(status: string): string {
-    switch (status) {
-      case 'SENT': return 'bg-blue-100 text-blue-700';
-      case 'QUOTED': return 'bg-green-100 text-green-700';
-      case 'DECLINED': return 'bg-red-100 text-red-700';
-      case 'NO_REPLY': return 'bg-gray-100 text-gray-500';
-      default: return 'bg-gray-100 text-gray-500';
-    }
-  }
-
-  formatHistoryDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
-  }
-
-  formatHistoryDateTime(iso: string): string {
-    return new Date(iso).toLocaleString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  }
-
-  quoteRateLabel(performance: InquirySupplierPerformance): string {
-    if (performance.sentCount <= 0 || performance.quotedCount <= 0) return '';
-    return `${Math.round((performance.quotedCount / performance.sentCount) * 100)}% quote rate`;
-  }
-
-  averageResponseLabel(performance: InquirySupplierPerformance): string {
-    if (performance.averageResponseHours == null || performance.respondedCount <= 0) return '';
-    if (performance.averageResponseHours >= 24) {
-      return `${Number((performance.averageResponseHours / 24).toFixed(1))}d avg reply`;
-    }
-    return `${Number(performance.averageResponseHours.toFixed(1))}h avg reply`;
-  }
+  openInquiryReplyEditor(row: SupplierInquiryReplyRow): void { this.replySvc.openEditor(row); }
+  cancelInquiryReplyEditor(): void { this.replySvc.cancelEditor(); }
+  isEditingInquiryReply(row: SupplierInquiryReplyRow): boolean { return this.replySvc.isEditing(row); }
+  statusBadgeClass = this.replySvc.statusBadgeClass.bind(this.replySvc);
+  formatHistoryDateTime = this.replySvc.fmtDateTime.bind(this.replySvc);
+  quoteRateLabel = this.replySvc.quoteRateLabel.bind(this.replySvc);
+  averageResponseLabel = this.replySvc.avgResponseLabel.bind(this.replySvc);
+  responseHoursLabel = this.replySvc.responseHoursLabel.bind(this.replySvc);
 
   deliverabilityLabel(performance: InquirySupplierPerformance): string {
     const responseCount = performance.deliverableCount + performance.nonDeliverableCount;
