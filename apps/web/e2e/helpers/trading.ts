@@ -33,10 +33,7 @@ async function ensureOwnCompanyBankAccount(
   const createBankAccountRes = await page.request.post(
     `http://localhost:3000/admin/settings/companies/${invoicingCompanyId}/bank-accounts`,
     {
-      headers: {
-        ...headers,
-        'Content-Type': 'application/json',
-      },
+      headers: { ...headers, 'Content-Type': 'application/json' },
       data: {
         label: 'E2E Default USD',
         bankName: 'E2E Bank',
@@ -142,4 +139,65 @@ export async function createInquiryViaApi(page: Page): Promise<string> {
   }
 
   return inquiryId;
+}
+
+/** Create an inquiry and link supplier companies to it so multi-supplier tabs appear. */
+export async function createMultiSupplierInquiryViaApi(
+  page: Page,
+): Promise<{ inquiryId: string; supplierIds: string[] }> {
+  const inquiryId = await createInquiryViaApi(page);
+
+  const accessToken = await page.evaluate(() => localStorage.getItem('fueld_access_token'));
+  if (!accessToken) throw new Error('Missing access token');
+
+  const headers = {
+    Authorization: `Bearer ${accessToken}`,
+    Accept: 'application/json',
+  };
+
+  // Fetch existing supplier companies to link to this inquiry
+  const suppliersRes = await page.request.get(
+    'http://localhost:3000/companies/local?type=SUPPLIER&limit=5',
+    { headers },
+  );
+  const suppliersJson = await suppliersRes.json() as ApiResponse<{ companies: CompanyDto[] }>;
+  const supplierCompanies = suppliersJson.data?.companies ?? [];
+
+  // We need at least 2 supplier companies
+  if (supplierCompanies.length < 2) {
+    // Create a second supplier company via the local endpoint
+    const createRes = await page.request.post('http://localhost:3000/companies/local', {
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      data: {
+        name: `E2E Supplier ${Date.now()}`,
+        types: ['SUPPLIER'],
+      },
+    });
+    const createJson = await createRes.json() as ApiResponse<{ id: string }>;
+    if (createJson.success && createJson.data) {
+      supplierCompanies.push({ id: createJson.data.id });
+    }
+  }
+
+  const linkedSupplierIds: string[] = [];
+
+  // Link each supplier company to the order via POST /orders/:id/suppliers
+  for (let i = 0; i < Math.min(supplierCompanies.length, 3); i++) {
+    const companyId = supplierCompanies[i]!.id;
+    const addRes = await page.request.post(
+      `http://localhost:3000/orders/${inquiryId}/suppliers`,
+      {
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        data: {
+          companyId,
+          isPrimary: i === 0,
+        },
+      },
+    );
+    if (addRes.ok()) {
+      linkedSupplierIds.push(companyId);
+    }
+  }
+
+  return { inquiryId, supplierIds: linkedSupplierIds };
 }
