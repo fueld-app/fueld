@@ -408,13 +408,16 @@ export class AuthService {
 
   // ─── Passkey Authentication ─────────────────────────────────────────
 
-  /** Passwordless login using a registered passkey (real WebAuthn). */
-  async loginWithPasskey(email: string): Promise<LoginResponseDto> {
+  /** Passwordless login using a registered passkey (real WebAuthn).
+   * If email is provided, narrows the challenge to that user's credentials.
+   * If omitted, uses discoverable credentials (browser picks the identity). */
+  async loginWithPasskey(email?: string): Promise<LoginResponseDto> {
     // Step 1: Get authentication options (challenge) from server
     const optionsRes = await firstValueFrom(
-      this.http.post<ApiResponse<any>>(
+      this.http.post<ApiResponse<{ options: any; sessionId: string }>>(
         `${API_URL}/auth/passkeys/auth-options`,
-        { email },
+        // Only send email if provided (for discoverable flow, omit it)
+        email ? { email } : {},
       ),
     );
 
@@ -422,10 +425,12 @@ export class AuthService {
       throw new Error(optionsRes.message ?? 'Failed to get passkey options');
     }
 
+    const { options, sessionId } = optionsRes.data;
+
     // Step 2: Trigger the browser's WebAuthn prompt (biometric / security key)
     let assertionResponse;
     try {
-      assertionResponse = await startAuthentication({ optionsJSON: optionsRes.data });
+      assertionResponse = await startAuthentication({ optionsJSON: options });
     } catch (err) {
       throw friendlyWebAuthnError(err, 'Passkey sign-in');
     }
@@ -434,7 +439,7 @@ export class AuthService {
     const res = await firstValueFrom(
       this.http.post<ApiResponse<LoginResponseDto>>(
         `${API_URL}/auth/login/passkey`,
-        { email, assertionResponse },
+        { email, assertionResponse, sessionId },
       ),
     );
 
@@ -453,7 +458,7 @@ export class AuthService {
   async verify2faWithPasskey(tempToken: string): Promise<LoginResponseDto> {
     // Step 1: Get authentication options (challenge) from server
     const optionsRes = await firstValueFrom(
-      this.http.post<ApiResponse<any>>(
+      this.http.post<ApiResponse<{ options: any; sessionId: string }>>(
         `${API_URL}/auth/passkeys/auth-options-2fa`,
         { tempToken },
       ),
@@ -463,10 +468,12 @@ export class AuthService {
       throw new Error(optionsRes.message ?? 'Failed to get passkey options');
     }
 
+    const { options, sessionId } = optionsRes.data;
+
     // Step 2: Trigger the browser's WebAuthn prompt (biometric / security key)
     let assertionResponse;
     try {
-      assertionResponse = await startAuthentication({ optionsJSON: optionsRes.data });
+      assertionResponse = await startAuthentication({ optionsJSON: options });
     } catch (err) {
       throw friendlyWebAuthnError(err, 'Passkey verification');
     }
@@ -475,7 +482,7 @@ export class AuthService {
     const res = await firstValueFrom(
       this.http.post<ApiResponse<LoginResponseDto>>(
         `${API_URL}/auth/verify-passkey`,
-        { tempToken, assertionResponse },
+        { tempToken, assertionResponse, sessionId },
       ),
     );
 

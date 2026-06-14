@@ -36,7 +36,7 @@ import {
   type SupplierNominationSummaryDto,
   type WarehouseDto,
   type InventorySkuDto,
-  type InventoryAvailabilityResultDto,
+  
   type OrderTransferDto,
   type OrderPortDocumentDto,
   type DeliveryDocumentationSettingsDto,
@@ -48,7 +48,6 @@ import {
 import type {
   OrderItemRow,
   OrderItemsEconomics,
-  OrderItemAvailability,
 } from '../../components/order-items/order-item.types';
 import { OrderFinancingSummaryComponent } from '../../components/order-financing-summary/order-financing-summary.component';
 import {
@@ -95,6 +94,7 @@ import { OrderPdfService } from './services/order-pdf.service';
 import { OrderCommunicationService } from './services/order-communication.service';
 import { OrderSearchService } from './services/order-search.service';
 import { OrderSaveService } from './services/order-save.service';
+import { OrderInventoryService } from './services/order-inventory.service';
 import { CreditApplicationModalComponent } from '../../../credit/components/credit-application-modal.component';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -277,6 +277,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   protected readonly commSvc = inject(OrderCommunicationService);
   protected readonly searchSvc = inject(OrderSearchService);
   protected readonly saveSvc = inject(OrderSaveService);
+  protected readonly inventorySvc = inject(OrderInventoryService);
   private readonly riskService = inject(RiskMonitoringService);
 
   readonly emailModal = viewChild(SendEmailModalComponent);
@@ -317,12 +318,8 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   );
 
   // ─── Inventory (physical-ops) state ─────────────────────────────────
-  /** All warehouses (loaded once on init); filtered to relevant ones via `availableWarehouses`. */
-  /** Inventory SKUs (loaded once). */
-  /** Live availability check results keyed by item row id. */
-  readonly availabilityByRowId = signal<Record<string, OrderItemAvailability>>({});
-  /** Debounce timers per row id for availability checks. */
-  private readonly availabilityTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  /** Delegate availability checks to the inventory service. */
+  readonly availabilityByRowId = this.inventorySvc.availabilityByRowId;
 
   /** Warehouses tied to the current order's client or supplier (so inventory pickers show useful options only). */
   readonly availableWarehouses = computed<WarehouseDto[]>(() => {
@@ -2068,29 +2065,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   // ─── Inventory availability ──────────────────────────────────────
   /** Schedule an availability check for each tracked line; debounced per row. */
   private scheduleAvailabilityChecks(): void {
-    const rows = this.itemRows();
-    const trackedIds = new Set<string>();
-    for (const row of rows) {
-      if (!row.warehouseId || !row.inventorySkuId) continue;
-      trackedIds.add(row.id);
-
-      // Debounce 300ms per row to avoid hammering the API while editing quantity.
-      const existing = this.availabilityTimers.get(row.id);
-      if (existing) clearTimeout(existing);
-      this.availabilityTimers.set(row.id, setTimeout(() => {
-        this.availabilityTimers.delete(row.id);
-        void this.runAvailabilityCheck(row.id);
-      }, 300));
-    }
-
-    // Drop stale entries for rows that are no longer tracked or were removed.
-    this.availabilityByRowId.update((current) => {
-      const next: Record<string, OrderItemAvailability> = {};
-      for (const [rowId, value] of Object.entries(current)) {
-        if (trackedIds.has(rowId)) next[rowId] = value;
-      }
-      return next;
-    });
+    this.inventorySvc.scheduleChecks(this.itemRows(), this.order());
   }
 
   /** Load the internal-transfer extension (source/destination companies + warehouses). */
@@ -2108,45 +2083,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       }
     } catch {
       // non-fatal: a missing transfer extension just hides the summary card.
-    }
-  }
-
-  private async runAvailabilityCheck(rowId: string): Promise<void> {
-    const row = this.itemRows().find((r) => r.id === rowId);
-    if (!row || !row.warehouseId || !row.inventorySkuId) return;
-    const quantity = row.quantity > 0 ? row.quantity : 0;
-    if (quantity <= 0) {
-      this.availabilityByRowId.update((m) => {
-        const next = { ...m };
-        delete next[rowId];
-        return next;
-      });
-      return;
-    }
-
-    // Resolve the planned date — explicit field wins; otherwise fall back to ETA, then now.
-    const neededAt = row.plannedInventoryAt
-      ?? this.order()?.eta
-      ?? new Date().toISOString();
-
-    try {
-      const res = await firstValueFrom(
-        this.http.post<ApiResponse<InventoryAvailabilityResultDto>>(
-          `${API_URL}/inventory/check-availability`,
-          {
-            warehouseId: row.warehouseId,
-            skuId: row.inventorySkuId,
-            quantity: String(quantity),
-            unit: row.unit,
-            neededAt,
-          },
-        ),
-      );
-      if (res.success) {
-        this.availabilityByRowId.update((m) => ({ ...m, [rowId]: res.data }));
-      }
-    } catch {
-      // Silent — availability is advisory; backend still enforces at confirmation.
     }
   }
 
