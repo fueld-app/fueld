@@ -449,237 +449,12 @@ interface PlattsSuggestionViewModel {
     </app-trading-detail-meta-cards>
 
     @if (isInquiryContext() && !isInternalTransfer()) {
-      <div class="mt-4 grid gap-4 lg:grid-cols-2 lg:items-stretch">
-        <div class="flex h-full flex-col overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-emerald-50 shadow-sm lg:order-1">
-        <div class="border-b border-slate-200/70 px-5 py-4">
-          <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div>
-              <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Inquiry intelligence</div>
-              <h3 class="mt-1 text-base font-semibold text-slate-900">Supplier Comparison Context</h3>
-              <p class="mt-1 text-sm text-slate-500">Delivery history and quote hit-rate for suppliers at this port.</p>
-            </div>
-            <div class="flex flex-wrap items-center gap-2 text-xs">
-              <span class="inline-flex items-center rounded-full border border-slate-200 bg-white/80 px-2.5 py-1 font-medium text-slate-600">
-                {{ rankedInquirySuppliers().length }} supplier{{ rankedInquirySuppliers().length === 1 ? '' : 's' }} ranked
-              </span>
-              @if (selectedSupplierComparison()) {
-                <span class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700">
-                  Reviewing {{ selectedSupplierComparison()!.supplierName }}
-                </span>
-              }
-            </div>
-          </div>
-        </div>
+      <!-- Moved to Suppliers tab — lazy-loaded -->
+      <div class="hidden"></div>
 
-        @if (inquirySupplierContextLoading()) {
-          <div class="px-5 py-5 text-sm text-slate-400">Loading supplier comparison context...</div>
-        } @else if (rankedInquirySuppliers().length === 0) {
-          <div class="px-5 py-5 text-sm text-slate-400">No supplier history available for this inquiry yet.</div>
-        } @else {
-          <div class="grid gap-3 px-5 py-5 lg:grid-cols-2">
-            @for (supplier of rankedInquirySuppliers(); track supplier.supplierId) {
-              <div
-                class="rounded-2xl border px-4 py-3 shadow-sm transition-all"
-                [class.border-emerald-300]="selectedSupplierComparison()?.supplierId === supplier.supplierId"
-                [class.bg-emerald-50/80]="selectedSupplierComparison()?.supplierId === supplier.supplierId"
-                [class.border-slate-200]="selectedSupplierComparison()?.supplierId !== supplier.supplierId"
-                [class.bg-white]="selectedSupplierComparison()?.supplierId !== supplier.supplierId"
-              >
-                <div class="flex items-start justify-between gap-3">
-                  <div class="min-w-0">
-                    <div class="flex flex-wrap items-center gap-2">
-                      <span class="truncate text-sm font-semibold text-slate-900">{{ supplier.supplierName }}</span>
-                      @if (isTopInquirySupplier(supplier)) {
-                        <span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">Best history here</span>
-                      }
-                      @if (selectedSupplierComparison()?.supplierId === supplier.supplierId) {
-                        <span class="inline-flex items-center rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Selected</span>
-                      }
-                    </div>
-                    @if (supplier.products.length) {
-                      <div class="mt-1 flex flex-wrap gap-1">
-                        @for (product of supplier.products; track product) {
-                          <span class="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">{{ product }}</span>
-                        }
-                      </div>
-                    }
-                  </div>
-                  @if (supplier.inquiryStatus) {
-                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
-                      [class]="statusBadgeClass(supplier.inquiryStatus)">
-                      {{ supplier.inquiryStatus }}
-                    </span>
-                  }
-                </div>
-
-                <div class="mt-3 flex flex-wrap gap-1.5">
-                  @if (supplier.performance.deliveredCountOverall > 0) {
-                    <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-200">{{ supplier.performance.deliveredCountOverall }} delivered</span>
-                  }
-                  @if (supplier.performance.deliveredCountAtPlace > 0) {
-                    <span class="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-blue-200">{{ supplier.performance.deliveredCountAtPlace }} at this place</span>
-                  }
-                  @if (quoteRateLabel(supplier.performance)) {
-                    <span class="inline-flex items-center rounded-full bg-fuchsia-50 px-2 py-0.5 text-[10px] font-medium text-fuchsia-700 ring-1 ring-fuchsia-200">{{ quoteRateLabel(supplier.performance) }}</span>
-                  }
-                  @if (averageResponseLabel(supplier.performance)) {
-                    <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-amber-200">{{ averageResponseLabel(supplier.performance) }}</span>
-                  }
-                  @if (deliverabilityLabel(supplier.performance)) {
-                    <span class="inline-flex items-center rounded-full bg-teal-50 px-2 py-0.5 text-[10px] font-medium text-teal-700 ring-1 ring-teal-200">{{ deliverabilityLabel(supplier.performance) }}</span>
-                  }
-                  @if (supplierPerformanceSummary(supplier.performance)) {
-                    <span class="inline-flex items-center rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-600 ring-1 ring-slate-200">{{ supplierPerformanceSummary(supplier.performance) }}</span>
-                  }
-                </div>
-
-                @if (supplier.inquirySentAt) {
-                  <div class="mt-3 border-t border-slate-200/70 pt-2 text-[11px] text-slate-400">Inquiry sent {{ formatHistoryDate(supplier.inquirySentAt) }}</div>
-                }
-
-                @if (!isReadonly()) {
-                  <div class="mt-3 flex justify-end">
-                    <button
-                      type="button"
-                      (click)="applyComparisonSupplier(supplier)"
-                      [disabled]="selectedSupplierComparison()?.supplierId === supplier.supplierId"
-                      class="inline-flex items-center rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors"
-                      [class.bg-brand-600]="selectedSupplierComparison()?.supplierId !== supplier.supplierId"
-                      [class.text-white]="selectedSupplierComparison()?.supplierId !== supplier.supplierId"
-                      [class.hover:bg-brand-700]="selectedSupplierComparison()?.supplierId !== supplier.supplierId"
-                      [class.bg-slate-100]="selectedSupplierComparison()?.supplierId === supplier.supplierId"
-                      [class.text-slate-500]="selectedSupplierComparison()?.supplierId === supplier.supplierId"
-                    >
-                      {{ selectedSupplierComparison()?.supplierId === supplier.supplierId ? 'Selected supplier' : 'Set as supplier' }}
-                    </button>
-                  </div>
-                }
-              </div>
-            }
-          </div>
-        }
-        </div>
-
-      @if (sortedInquiryReplies().length > 0) {
-        <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm lg:order-3 lg:col-span-2">
-          <div class="border-b border-slate-200 px-5 py-4">
-          <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div>
-              <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Line comparison</div>
-              <h3 class="mt-1 text-base font-semibold text-slate-900">Quote Matrix</h3>
-              <p class="mt-1 text-sm text-slate-500">Compare all supplier responses by line item in one grid.</p>
-            </div>
-            <div class="flex flex-wrap items-center gap-2 text-xs">
-              <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 font-medium text-slate-600">
-                {{ sortedInquiryReplies().length }} repl{{ sortedInquiryReplies().length === 1 ? 'y' : 'ies' }}
-              </span>
-              <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 font-medium text-slate-600">
-                {{ inquiryQuoteMatrixRows().length }} line{{ inquiryQuoteMatrixRows().length === 1 ? '' : 's' }}
-              </span>
-            </div>
-          </div>
-          </div>
-
-          <div class="overflow-x-auto px-5 py-4">
-            <table class="min-w-full border-separate border-spacing-0 text-sm">
-              <thead>
-                <tr>
-                  <th class="sticky left-0 z-10 min-w-64 border-b border-slate-200 bg-white px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Line item</th>
-                  @for (reply of sortedInquiryReplies(); track reply.id) {
-                    <th class="min-w-52 border-b border-slate-200 px-4 py-3 text-left align-top"
-                      [class.bg-slate-50]="order()?.supplierId === reply.supplierId">
-                      <div class="flex items-center gap-2">
-                        <span class="font-semibold text-slate-900">{{ reply.supplierName }}</span>
-                        @if (order()?.supplierId === reply.supplierId) {
-                          <span class="inline-flex items-center rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Selected</span>
-                        }
-                      </div>
-                      <div class="mt-2 flex flex-wrap gap-1.5">
-                        @if (inquiryReplyRecommendation(reply.id)?.bestOverall) {
-                          <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 ring-1 ring-emerald-200">Best overall</span>
-                        }
-                        @if (inquiryReplyRecommendation(reply.id)?.lowestComparable) {
-                          <span class="inline-flex items-center rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-700 ring-1 ring-sky-200">Lowest total</span>
-                        }
-                        @if (inquiryReplyRecommendation(reply.id)?.mostComplete) {
-                          <span class="inline-flex items-center rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-700 ring-1 ring-violet-200">Most complete</span>
-                        }
-                        @if (inquiryReplyRecommendation(reply.id)?.fastest) {
-                          <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 ring-1 ring-amber-200">Fastest</span>
-                        }
-                      </div>
-                      <div class="mt-1 text-[11px] text-slate-500">{{ inquiryReplySummary(reply) }}</div>
-                      <div class="mt-1 text-[11px] text-slate-400">Score {{ inquiryReplyRecommendation(reply.id)?.score ?? 0 | number : '1.0-1' }}</div>
-                      @if (reply.responseHours !== null) {
-                        <div class="mt-1 text-[11px] text-slate-400">{{ responseHoursLabel(reply.responseHours) }} response</div>
-                      }
-                    </th>
-                  }
-                </tr>
-              </thead>
-              <tbody>
-                @for (matrixRow of inquiryQuoteMatrixRows(); track matrixRow.orderItemId) {
-                  <tr>
-                    <td class="sticky left-0 z-10 border-b border-slate-100 bg-white px-4 py-3 align-top">
-                      <div class="font-semibold text-slate-900">{{ matrixRow.productType }}</div>
-                      <div class="mt-1 text-xs text-slate-500">{{ formatQty(matrixRow.quantity, matrixRow.quantityMin) }} {{ matrixRow.unit }}@if (matrixRow.description) { · {{ matrixRow.description }} }</div>
-                    </td>
-                    @for (cell of matrixRow.cells; track cell.supplierInquiryId) {
-                      <td class="border-b border-slate-100 px-4 py-3 align-top"
-                        [class.bg-slate-50]="cell.isSelectedSupplier">
-                        @if (cell.price !== null && auth.canSeePrices()) {
-                          <div class="font-semibold text-slate-900">{{ cell.price }} {{ cell.currency }}</div>
-                          @if (cell.note) {
-                            <div class="mt-1 text-xs text-slate-500">{{ cell.note }}</div>
-                          }
-                        } @else if (cell.price !== null && !auth.canSeePrices()) {
-                          <div class="font-medium text-slate-400 italic">Hidden</div>
-                        } @else {
-                          <div class="font-medium text-slate-500">{{ cell.note || inquiryQuoteMatrixCellLabel(cell.status) }}</div>
-                        }
-                      </td>
-                    }
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-        </div>
-      }
-
-        <div class="flex h-full flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm lg:order-2">
-        <div class="border-b border-slate-200 px-5 py-4">
-          <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div>
-              <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Manual capture</div>
-              <h3 class="mt-1 text-base font-semibold text-slate-900">Supplier Replies</h3>
-              <p class="mt-1 text-sm text-slate-500">Record manual supplier replies and line-item quotes so future ranking reflects actual responsiveness.</p>
-            </div>
-            <div class="flex flex-wrap items-center gap-2 text-xs">
-              <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 font-medium text-slate-600">
-                {{ sortedInquiryReplies().length }} supplier{{ sortedInquiryReplies().length === 1 ? '' : 's' }} contacted
-              </span>
-            </div>
-          </div>
-        </div>
-
-        @if (inquiryRepliesLoading()) {
-          <div class="px-5 py-5 text-sm text-slate-400">Loading supplier replies...</div>
-        } @else if (sortedInquiryReplies().length === 0) {
-          <div class="px-5 py-5 text-sm text-slate-400">No supplier inquiries have been sent yet.</div>
-        } @else {
-          <div class="flex-1 space-y-3 px-5 py-5">
-            @for (reply of sortedInquiryReplies(); track reply.id) {
-              <div class="rounded-2xl border border-slate-200 bg-gradient-to-b from-white to-slate-50/50 p-4 shadow-sm">
-                <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div class="min-w-0">
-                    <div class="flex flex-wrap items-center gap-2">
-                      <span class="text-sm font-semibold text-slate-900">{{ reply.supplierName }}</span>
-                      <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium" [class]="statusBadgeClass(reply.status)">{{ reply.status }}</span>
-                      @if (order()?.supplierId === reply.supplierId) {
-                        <span class="inline-flex items-center rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Selected supplier</span>
-                      }
-                    </div>
+      <!-- Quote Matrix + Supplier Replies moved to Suppliers tab -->
+      <div class="hidden"></div>
+    }
                     <div class="mt-1 text-xs text-slate-500">
                       {{ reply.email }}
                       @if (reply.contactName) {
@@ -1043,51 +818,140 @@ interface PlattsSuggestionViewModel {
       @if (activeDetailTab() === 'suppliers') {
         <div class="mt-4">
           @if (isInquiryContext()) {
-            <div class="text-sm text-gray-500">
-              @if (inquirySupplierContextLoading()) {
-                <p>Loading supplier comparison context...</p>
-              } @else if (rankedInquirySuppliers().length === 0) {
-                <p>No supplier history available for this inquiry yet.</p>
-              } @else {
-                <p class="mb-3">{{ rankedInquirySuppliers().length }} supplier{{ rankedInquirySuppliers().length === 1 ? '' : 's' }} ranked at this port</p>
-                <div class="grid gap-3 lg:grid-cols-2">
-                  @for (supplier of rankedInquirySuppliers(); track supplier.supplierId) {
-                    <div class="rounded-2xl border px-4 py-3 shadow-sm transition-all"
-                      [class.border-emerald-300]="selectedSupplierComparison()?.supplierId === supplier.supplierId"
-                      [class.bg-emerald-50/80]="selectedSupplierComparison()?.supplierId === supplier.supplierId"
-                      [class.border-slate-200]="selectedSupplierComparison()?.supplierId !== supplier.supplierId"
-                      [class.bg-white]="selectedSupplierComparison()?.supplierId !== supplier.supplierId"
-                    >
-                      <span class="font-semibold text-gray-900">{{ supplier.supplierName }}</span>
-                      <div class="mt-2 flex flex-wrap gap-1.5">
-                        @if (supplier.performance.deliveredCountOverall > 0) {
-                          <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-200">{{ supplier.performance.deliveredCountOverall }} delivered</span>
+            <!-- Supplier Comparison Context -->
+            <div class="rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-emerald-50 shadow-sm">
+              <div class="border-b border-slate-200/70 px-5 py-4">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Inquiry intelligence</div>
+                    <h3 class="mt-1 text-base font-semibold text-slate-900">Supplier Comparison Context</h3>
+                    <p class="text-sm text-slate-500">Delivery history and quote hit-rate for suppliers at this port.</p>
+                  </div>
+                  <div class="flex flex-wrap items-center gap-2 text-xs">
+                    <span class="rounded-full border border-slate-200 bg-white/80 px-2.5 py-1 font-medium text-slate-600">{{ rankedInquirySuppliers().length }} supplier{{ rankedInquirySuppliers().length === 1 ? '' : 's' }} ranked</span>
+                    @if (selectedSupplierComparison()) {
+                      <span class="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700">Reviewing {{ selectedSupplierComparison()!.supplierName }}</span>
+                    }
+                  </div>
+                </div>
+              </div>
+              <div class="px-5 py-5">
+                @if (inquirySupplierContextLoading()) {
+                  <p class="text-sm text-slate-400">Loading supplier comparison context...</p>
+                } @else if (rankedInquirySuppliers().length === 0) {
+                  <p class="text-sm text-slate-400">No supplier history available for this inquiry yet.</p>
+                } @else {
+                  <div class="grid gap-3 lg:grid-cols-2">
+                    @for (supplier of rankedInquirySuppliers(); track supplier.supplierId) {
+                      <div class="rounded-2xl border px-4 py-3 shadow-sm transition-all"
+                        [class.border-emerald-300]="selectedSupplierComparison()?.supplierId === supplier.supplierId"
+                        [class.bg-emerald-50/80]="selectedSupplierComparison()?.supplierId === supplier.supplierId"
+                        [class.border-slate-200]="selectedSupplierComparison()?.supplierId !== supplier.supplierId"
+                        [class.bg-white]="selectedSupplierComparison()?.supplierId !== supplier.supplierId"
+                      >
+                        <div class="flex flex-wrap items-center gap-2">
+                          <span class="text-sm font-semibold text-slate-900">{{ supplier.supplierName }}</span>
+                          @if (isTopInquirySupplier(supplier)) { <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">Best here</span> }
+                          @if (selectedSupplierComparison()?.supplierId === supplier.supplierId) { <span class="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white">Selected</span> }
+                        </div>
+                        @if (supplier.products.length) {
+                          <div class="mt-1 flex flex-wrap gap-1">
+                            @for (product of supplier.products; track product) { <span class="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">{{ product }}</span> }
+                          </div>
                         }
-                        @if (supplier.performance.deliveredCountAtPlace > 0) {
-                          <span class="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-blue-200">{{ supplier.performance.deliveredCountAtPlace }} at this place</span>
-                        }
-                        @if (quoteRateLabel(supplier.performance)) {
-                          <span class="rounded-full bg-fuchsia-50 px-2 py-0.5 text-[10px] font-medium text-fuchsia-700 ring-1 ring-fuchsia-200">{{ quoteRateLabel(supplier.performance) }}</span>
+                        <div class="mt-2 flex flex-wrap gap-1.5">
+                          @if (supplier.performance.deliveredCountOverall > 0) { <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-200">{{ supplier.performance.deliveredCountOverall }} delivered</span> }
+                          @if (supplier.performance.deliveredCountAtPlace > 0) { <span class="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-blue-200">{{ supplier.performance.deliveredCountAtPlace }} at this place</span> }
+                          @if (quoteRateLabel(supplier.performance)) { <span class="rounded-full bg-fuchsia-50 px-2 py-0.5 text-[10px] font-medium text-fuchsia-700 ring-1 ring-fuchsia-200">{{ quoteRateLabel(supplier.performance) }}</span> }
+                          @if (averageResponseLabel(supplier.performance)) { <span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-amber-200">{{ averageResponseLabel(supplier.performance) }}</span> }
+                        </div>
+                        @if (!isReadonly()) {
+                          <button (click)="applyComparisonSupplier(supplier)"
+                            [disabled]="selectedSupplierComparison()?.supplierId === supplier.supplierId"
+                            class="mt-3 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors"
+                            [class.bg-brand-600]="selectedSupplierComparison()?.supplierId !== supplier.supplierId"
+                            [class.text-white]="selectedSupplierComparison()?.supplierId !== supplier.supplierId"
+                            [class.bg-slate-100]="selectedSupplierComparison()?.supplierId === supplier.supplierId"
+                            [class.text-slate-500]="selectedSupplierComparison()?.supplierId === supplier.supplierId"
+                          >{{ selectedSupplierComparison()?.supplierId === supplier.supplierId ? 'Selected' : 'Set as supplier' }}</button>
                         }
                       </div>
-                      @if (!isReadonly()) {
-                        <button (click)="applyComparisonSupplier(supplier)"
-                          [disabled]="selectedSupplierComparison()?.supplierId === supplier.supplierId"
-                          class="mt-3 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors"
-                          [class.bg-brand-600]="selectedSupplierComparison()?.supplierId !== supplier.supplierId"
-                          [class.text-white]="selectedSupplierComparison()?.supplierId !== supplier.supplierId"
-                          [class.bg-slate-100]="selectedSupplierComparison()?.supplierId === supplier.supplierId"
-                          [class.text-slate-500]="selectedSupplierComparison()?.supplierId === supplier.supplierId"
-                        >
-                          {{ selectedSupplierComparison()?.supplierId === supplier.supplierId ? 'Selected' : 'Set as supplier' }}
-                        </button>
-                      }
-                    </div>
-                  }
-                </div>
-              }
+                    }
+                  </div>
+                }
+              </div>
             </div>
+
+            <!-- Quote Matrix -->
+            @if (sortedInquiryReplies().length > 0) {
+              <div class="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                <div class="border-b border-slate-200 px-5 py-4">
+                  <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Line comparison</div>
+                      <h3 class="text-base font-semibold text-slate-900">Quote Matrix</h3>
+                      <p class="text-sm text-slate-500">Compare all supplier responses by line item.</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 text-xs">
+                      <span class="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 font-medium text-slate-600">{{ sortedInquiryReplies().length }} repl{{ sortedInquiryReplies().length === 1 ? 'y' : 'ies' }}</span>
+                      <span class="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 font-medium text-slate-600">{{ inquiryQuoteMatrixRows().length }} line{{ inquiryQuoteMatrixRows().length === 1 ? '' : 's' }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="overflow-x-auto px-5 py-4">
+                  <table class="min-w-full border-separate border-spacing-0 text-sm">
+                    <thead>
+                      <tr>
+                        <th class="sticky left-0 z-10 min-w-64 border-b border-slate-200 bg-white px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Line item</th>
+                        @for (reply of sortedInquiryReplies(); track reply.id) {
+                          <th class="min-w-52 border-b border-slate-200 px-4 py-3 text-left align-top" [class.bg-slate-50]="order()?.supplierId === reply.supplierId">
+                            <div class="flex items-center gap-2">
+                              <span class="font-semibold text-slate-900">{{ reply.supplierName }}</span>
+                              @if (order()?.supplierId === reply.supplierId) { <span class="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white">Selected</span> }
+                            </div>
+                            <div class="mt-2 flex flex-wrap gap-1.5">
+                              @if (inquiryReplyRecommendation(reply.id)?.bestOverall) { <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-200">Best overall</span> }
+                              @if (inquiryReplyRecommendation(reply.id)?.lowestComparable) { <span class="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700 ring-1 ring-sky-200">Lowest total</span> }
+                              @if (inquiryReplyRecommendation(reply.id)?.mostComplete) { <span class="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-700 ring-1 ring-violet-200">Most complete</span> }
+                              @if (inquiryReplyRecommendation(reply.id)?.fastest) { <span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 ring-1 ring-amber-200">Fastest</span> }
+                            </div>
+                            <div class="mt-1 text-[11px] text-slate-500">{{ inquiryReplySummary(reply) }}</div>
+                            @if (reply.responseHours !== null) { <div class="mt-1 text-[11px] text-slate-400">{{ responseHoursLabel(reply.responseHours) }} response</div> }
+                          </th>
+                        }
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (matrixRow of inquiryQuoteMatrixRows(); track matrixRow.orderItemId) {
+                        <tr>
+                          <td class="sticky left-0 z-10 border-b border-slate-100 bg-white px-4 py-3 align-top">
+                            <div class="font-semibold text-slate-900">{{ matrixRow.productType }}</div>
+                            <div class="mt-1 text-xs text-slate-500">{{ formatQty(matrixRow.quantity, matrixRow.quantityMin) }} {{ matrixRow.unit }}@if (matrixRow.description) { · {{ matrixRow.description }} }</div>
+                          </td>
+                          @for (cell of matrixRow.cells; track cell.supplierInquiryId) {
+                            <td class="border-b border-slate-100 px-4 py-3 align-top" [class.bg-slate-50]="cell.isSelectedSupplier">
+                              @if (cell.price !== null && auth.canSeePrices()) {
+                                <div class="font-semibold text-slate-900">{{ cell.price }} {{ cell.currency }}</div>
+                                @if (cell.note) { <div class="mt-1 text-xs text-slate-500">{{ cell.note }}</div> }
+                              } @else if (cell.price !== null && !auth.canSeePrices()) {
+                                <div class="font-medium text-slate-400 italic">Hidden</div>
+                              } @else {
+                                <div class="font-medium text-slate-500">{{ cell.note || inquiryQuoteMatrixCellLabel(cell.status) }}</div>
+                              }
+                            </td>
+                          }
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            }
           } @else {
+            <div class="py-8 text-center text-sm text-gray-400">Supplier context is only available for inquiries.</div>
+          }
+        </div>
+      } @else {
             <div class="py-8 text-center text-sm text-gray-400">Supplier context is only available for inquiries.</div>
           }
         </div>
