@@ -1,45 +1,124 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import type { ApiResponse, OrderDto, OrderSupplierDto } from '@fueld/types';
+import type { ApiResponse, OrderDto } from '@fueld/types';
+import type { OrderItemRow } from '../../../components/order-items/order-item.types';
 import { API_URL } from '@app/core/config/api';
 
 @Injectable({ providedIn: 'root' })
 export class OrderSaveService {
   private readonly http = inject(HttpClient);
 
+  // ─── Autosave state ────────────────────────────────────────────
+
   readonly autoSaving = signal(false);
+  readonly saving = signal(false);
   readonly lastSaved = signal<Date | null>(null);
-  private saveTimer: ReturnType<typeof setTimeout> | null = null;
-  private version = 0;
+  readonly changeVersion = signal(0);
+  private autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // ─── Draft tracking ────────────────────────────────────────────
+
+  readonly draftItemIds = signal<Set<string>>(new Set());
+
+  isIncompleteDraftItem(
+    row: OrderItemRow,
+    hasMultipleOrderSuppliers: () => boolean,
+  ): boolean {
+    if (!this.draftItemIds().has(row.id)) return false;
+    if (!row.productType?.trim()) return true;
+    return !this.hasResolvedItemSupplierSelection(row, hasMultipleOrderSuppliers);
+  }
+
+  getAutoSaveRows(
+    rows: OrderItemRow[],
+    hasMultipleOrderSuppliers: () => boolean,
+  ): OrderItemRow[] {
+    return rows.filter((row) => !this.isIncompleteDraftItem(row, hasMultipleOrderSuppliers));
+  }
+
+  hasIncompleteDraftItems(
+    rows: OrderItemRow[],
+    hasMultipleOrderSuppliers: () => boolean,
+  ): boolean {
+    return rows.some((row) => this.isIncompleteDraftItem(row, hasMultipleOrderSuppliers));
+  }
+
+  clearSavedDraftItemIds(rows: OrderItemRow[]): void {
+    if (rows.length === 0) return;
+    const savedIds = new Set(rows.map((row) => row.id));
+    this.draftItemIds.update((current) => {
+      if (current.size === 0) return current;
+      const next = new Set(current);
+      let changed = false;
+      for (const id of savedIds) {
+        if (next.delete(id)) changed = true;
+      }
+      return changed ? next : current;
+    });
+  }
+
+  /** Track new rows as drafts during normalizeIncomingItemRows. */
+  trackNewDraftItems(
+    normalizedItems: OrderItemRow[],
+    previousIds: Set<string>,
+  ): void {
+    this.draftItemIds.update((current) => {
+      const nextIds = new Set(normalizedItems.map((item) => item.id));
+      const next = new Set([...current].filter((id) => nextIds.has(id)));
+      for (const item of normalizedItems) {
+        if (!previousIds.has(item.id)) {
+          next.add(item.id);
+        }
+      }
+      return next;
+    });
+  }
+
+  // ─── Autosave scheduling ───────────────────────────────────────
 
   triggerSave(isPaidOrCancelled: () => boolean): void {
     if (isPaidOrCancelled()) return;
-    this.version++;
-    if (this.saveTimer) clearTimeout(this.saveTimer);
-    this.saveTimer = setTimeout(() => this.perform(), 2000);
+    this.changeVersion.update((v) => v + 1);
   }
 
-  cancelTimer(): void {
-    if (this.saveTimer) clearTimeout(this.saveTimer);
+  scheduleAutoSave(
+    onSave: () => Promise<void>,
+    delayMs = 1500,
+  ): void {
+    if (this.autoSaveTimer) clearTimeout(this.autoSaveTimer);
+    this.autoSaveTimer = setTimeout(async () => {
+      await onSave();
+    }, delayMs);
   }
 
-  isDirty(): boolean {
-    return this.version > 0;
+  cancelAutoSave(): void {
+    if (this.autoSaveTimer) {
+      clearTimeout(this.autoSaveTimer);
+      this.autoSaveTimer = null;
+    }
   }
 
-  private async perform(): Promise<void> {
-    // The actual save is orchestrated by the component since it owns the data
-    this.version = 0;
-  }
+  // ─── Full order save (used by auto-save and manual save) ────────
 
-  async performSave(
+  async saveOrder(
     id: string,
     o: OrderDto,
-    syncSuppliers: (id: string) => Promise<void>,
-    showError: (msg: string) => void,
-  ): Promise<void> {
-    this.autoSaving.set(true);
+    options: {
+      itemRows: () => OrderItemRow[];
+      hasMultipleOrderSuppliers: () => boolean;
+      buildItemPayload: (rows: OrderItemRow[], opts?: { fillMissingDeliveredQuantity?: boolean }) => Record<string, string | null>[];
+      syncSupplierRecords: (orderId: string) => Promise<void>;
+      clearSavedDraftIds: (rows: OrderItemRow[]) => void;
+      loadCustomerCreditLines: (clientId: string) => Promise<void>;
+      loadSupplierCreditLines: (supplierCompanyId?: string | null) => Promise<void>;
+      activeSupplierCompanyId: () => string | null;
+    },
+    onError?: (msg: string) => void,
+  ): Promise<boolean> {
+    const rows = options.itemRows();
+    const autoSaveRows = this.getAutoSaveRows(rows, options.hasMultipleOrderSuppliers);
+
     try {
       const orderRes = await firstValueFrom(
         this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}`, {
@@ -64,10 +143,39 @@ export class OrderSaveService {
           deliveredAt: o.deliveredAt ?? null,
         }),
       );
-      if (!orderRes.success) { showError('Failed to save order.'); return; }
-      await syncSuppliers(id);
-      this.lastSaved.set(new Date());
-    } catch { showError('Failed to save order.'); }
-    finally { this.autoSaving.set(false); }
+      if (!orderRes.success) { onError?.('Failed to save order.'); return false; }
+
+      await options.syncSupplierRecords(id);
+
+      const itemPayload = options.buildItemPayload(autoSaveRows).map((item: Record<string, string | null>) => ({
+        ...item,
+        costCurrency: item['costCurrency'] ?? o.currency,
+        salesCurrency: item['salesCurrency'] ?? o.currency,
+      }));
+
+      const itemsRes = await firstValueFrom(
+        this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}/items`, { items: itemPayload }),
+      );
+      if (!itemsRes.success) { onError?.('Failed to save items.'); return false; }
+
+      options.clearSavedDraftIds(autoSaveRows);
+      await options.loadCustomerCreditLines(o.clientId);
+      await options.loadSupplierCreditLines(options.activeSupplierCompanyId() ?? o.supplierId);
+      return true;
+    } catch {
+      onError?.('Failed to save order.');
+      return false;
+    }
+  }
+
+  /** Check whether a row has a resolved supplier selection. */
+  private hasResolvedItemSupplierSelection(
+    row: OrderItemRow,
+    hasMultipleOrderSuppliers: () => boolean,
+  ): boolean {
+    if (!hasMultipleOrderSuppliers()) return true;
+    if (!row.orderSupplierId) return false;
+    if (!row.orderSupplierId.startsWith('temp:')) return true;
+    return false;
   }
 }

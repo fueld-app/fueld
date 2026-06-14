@@ -380,12 +380,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   // ─── Autosave ────────────────────────────────────────────────────
 
-  readonly autoSaving = signal(false);
-  readonly lastSaved = signal<Date | null>(null);
-  private readonly draftItemIds = signal<Set<string>>(new Set());
-  private autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  readonly autoSaving = this.saveSvc.autoSaving;
+  readonly lastSaved = this.saveSvc.lastSaved;
+  readonly draftItemIds = this.saveSvc.draftItemIds;
   private plattsSuggestionTimer: ReturnType<typeof setTimeout> | null = null;
-  private changeVersion = signal(0);
 
   // ─── Computed ────────────────────────────────────────────────────
 
@@ -868,16 +866,8 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   constructor() {
     effect(() => {
-      const version = this.changeVersion();
-      if (version === 0) return;
-
-      if (this.autoSaveTimer) {
-        clearTimeout(this.autoSaveTimer);
-      }
-
-      this.autoSaveTimer = setTimeout(() => {
-        this.performAutoSave();
-      }, 1500);
+      this.saveSvc.changeVersion();
+      this.saveSvc.scheduleAutoSave(() => this.performAutoSave(), 1500);
     });
 
     effect(() => {
@@ -900,9 +890,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   ngOnDestroy(): void {
-    if (this.autoSaveTimer) {
-      clearTimeout(this.autoSaveTimer);
-    }
+    this.saveSvc.cancelAutoSave();
     if (this.plattsSuggestionTimer) {
       clearTimeout(this.plattsSuggestionTimer);
     }
@@ -978,7 +966,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       if (r.vessel) { this.vessel.set(r.vessel); this.vessels.set([r.vessel]); }
       if (r.port) { this.port.set(r.port); this.places.set([r.port]); }
       this.itemRows.set(r.items);
-      this.draftItemIds.set(new Set());
+      this.saveSvc.draftItemIds.set(new Set());
       await this.normalizeDetailRoute(r.order.status, id);
       await this.financialSvc.loadCustomerCreditLines(r.order.clientId);
       await this.financialSvc.loadSupplierCreditLines(this.activeOrderSupplier()?.companyId ?? r.order.supplierId);
@@ -1650,57 +1638,9 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       };
     });
 
-    this.draftItemIds.update((current) => {
-      const next = new Set([...current].filter((id) => nextIds.has(id)));
-      for (const item of normalizedItems) {
-        if (!previousIds.has(item.id)) {
-          next.add(item.id);
-        }
-      }
-      return next;
-    });
+    this.saveSvc.trackNewDraftItems(normalizedItems, previousIds);
 
     return normalizedItems;
-  }
-
-  private hasResolvedItemSupplierSelection(row: OrderItemRow): boolean {
-    if (!this.hasMultipleOrderSuppliers()) return true;
-    if (!row.orderSupplierId) return false;
-    if (!this.isTemporaryOrderSupplierId(row.orderSupplierId)) return true;
-
-    const supplier = this.orderSuppliers().find((candidate) => candidate.id === row.orderSupplierId);
-    return !!supplier?.companyId;
-  }
-
-  private isIncompleteDraftItem(row: OrderItemRow): boolean {
-    if (!this.draftItemIds().has(row.id)) return false;
-    if (!row.productType?.trim()) return true;
-    return !this.hasResolvedItemSupplierSelection(row);
-  }
-
-  private getAutoSaveRows(rows: OrderItemRow[]): OrderItemRow[] {
-    return rows.filter((row) => !this.isIncompleteDraftItem(row));
-  }
-
-  private hasIncompleteDraftItems(rows: OrderItemRow[]): boolean {
-    return rows.some((row) => this.isIncompleteDraftItem(row));
-  }
-
-  private clearSavedDraftItemIds(rows: OrderItemRow[]): void {
-    if (rows.length === 0) return;
-
-    const savedIds = new Set(rows.map((row) => row.id));
-    this.draftItemIds.update((current) => {
-      if (current.size === 0) return current;
-
-      const next = new Set(current);
-      let changed = false;
-      for (const id of savedIds) {
-        if (next.delete(id)) changed = true;
-      }
-
-      return changed ? next : current;
-    });
   }
 
   private rebindTemporaryItemSupplierIds(previousSuppliers: OrderSupplierDto[], nextSuppliers: OrderSupplierDto[]): void {
@@ -2612,8 +2552,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
 
   private triggerAutosave(): void {
-    if (this.isPaidOrCancelled()) return;
-    this.changeVersion.update((v) => v + 1);
+    this.saveSvc.triggerSave(() => this.isPaidOrCancelled());
   }
 
   private async performAutoSave(): Promise<void> {
@@ -2622,63 +2561,18 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     if (!id || !o || this.isPaidOrCancelled()) return;
 
     this.autoSaving.set(true);
-    try {
-      const orderRes = await firstValueFrom(
-        this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}`, {
-          clientId: o.clientId,
-          vesselId: o.vesselId,
-          placeId: o.placeId,
-          salesRepId: o.salesRepId ?? null,
-          invoicingCompanyId: o.invoicingCompanyId,
-          bankAccountId: o.bankAccountId ?? null,
-          currency: o.currency,
-          customerPaymentTermType: o.customerPaymentTermType ?? null,
-          customerCreditDays: o.customerCreditDays ?? null,
-          customerNote: o.customerNote ?? null,
-          purchaseOrderNumber: o.purchaseOrderNumber ?? null,
-          customerContactId: o.customerContactId ?? null,
-          supplierId: o.supplierId ?? null,
-          supplierPaymentTermType: o.supplierPaymentTermType ?? null,
-          supplierCreditDays: o.supplierCreditDays ?? null,
-          supplierNote: o.supplierNote ?? null,
-          supplierContactId: o.supplierContactId ?? null,
-          brokerId: o.brokerId ?? null,
-          brokerContactId: o.brokerContactId ?? null,
-          brokerGetsAll: o.brokerGetsAll ?? false,
-          agentId: o.agentId ?? null,
-          agentContactId: o.agentContactId ?? null,
-          termsAndConditions: o.termsAndConditions ?? null,
-          categoryKey: o.categoryKey ?? null,
-          eta: o.eta,
-          etd: o.etd,
-          deliveredAt: o.deliveredAt ?? null,
-        }),
-      );
-      this.requireApiSuccess(orderRes, 'Failed to save order.');
-
-      await this.syncOrderSupplierRecords(id);
-
-      const autoSaveRows = this.getAutoSaveRows(this.itemRows());
-
-      const itemPayload = this.buildItemPayload(autoSaveRows).map((item: Record<string, string | null>) => ({
-        ...item,
-        costCurrency: item['costCurrency'] ?? o.currency,
-        salesCurrency: item['salesCurrency'] ?? o.currency,
-      }));
-
-      const itemsRes = await firstValueFrom(
-        this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}/items`, { items: itemPayload }),
-      );
-      this.requireApiSuccess(itemsRes, 'Failed to save items.');
-      this.clearSavedDraftItemIds(autoSaveRows);
-      await this.financialSvc.loadCustomerCreditLines(o.clientId);
-      await this.financialSvc.loadSupplierCreditLines(this.activeOrderSupplier()?.companyId ?? o.supplierId);
-      this.lastSaved.set(new Date());
-    } catch {
-      // Quietly fail - manual save still available
-    } finally {
-      this.autoSaving.set(false);
-    }
+    const success = await this.saveSvc.saveOrder(id, o, {
+      itemRows: () => this.itemRows(),
+      hasMultipleOrderSuppliers: () => this.hasMultipleOrderSuppliers(),
+      buildItemPayload: (rows, opts) => this.buildItemPayload(rows, opts),
+      syncSupplierRecords: (oid) => this.syncOrderSupplierRecords(oid),
+      clearSavedDraftIds: (rows) => this.saveSvc.clearSavedDraftItemIds(rows),
+      loadCustomerCreditLines: (cid) => this.financialSvc.loadCustomerCreditLines(cid),
+      loadSupplierCreditLines: (scid) => this.financialSvc.loadSupplierCreditLines(scid),
+      activeSupplierCompanyId: () => this.activeOrderSupplier()?.companyId ?? null,
+    });
+    if (success) this.lastSaved.set(new Date());
+    this.autoSaving.set(false);
   }
 
   // ─── Actions ─────────────────────────────────────────────────────
@@ -2718,7 +2612,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       hasDeliveryDocumentation: () => self.hasDeliveryDocumentation(),
       hasInventoryShortage: () => self.hasInventoryShortage(),
       hasEnoughPaymentsForMarkPaid: () => self.hasEnoughPaymentsForMarkPaid(),
-      hasIncompleteDraftItems: (rows) => self.hasIncompleteDraftItems(rows),
+      hasIncompleteDraftItems: (rows) => self.saveSvc.hasIncompleteDraftItems(rows, () => self.hasMultipleOrderSuppliers()),
       activeOrderSupplier: () => self.activeOrderSupplier(),
       hasMultipleOrderSuppliers: () => self.hasMultipleOrderSuppliers(),
       invoiceNumber: () => self.invoiceNumber(),
@@ -2733,7 +2627,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       openSendEmailModal: (dt: string) => self.openSendEmailModal(dt as any),
       openSendInquiryModal: () => self.openSendInquiryModal(),
       syncOrderSupplierRecords: (oid) => self.syncOrderSupplierRecords(oid),
-      clearSavedDraftItemIds: (rows) => self.clearSavedDraftItemIds(rows),
+      clearSavedDraftItemIds: (rows) => self.saveSvc.clearSavedDraftItemIds(rows),
       normalizeDetailRoute: (s, id) => self.normalizeDetailRoute(s, id),
       updateOrder: (updater) => { self.order.update((o) => (o ? updater(o) : o)); },
       setConvertingToOrder: (v) => self.convertingToOrder.set(v),
