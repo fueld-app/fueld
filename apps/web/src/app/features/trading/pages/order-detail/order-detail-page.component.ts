@@ -81,7 +81,7 @@ import { InternalTransferSidesComponent } from '../../components/internal-transf
 import { AuthService } from '../../../../core/auth/auth.service';
 import { OrderReferenceDataService } from './services/order-reference-data.service';
 import { OrderReplyService } from './services/order-reply.service';
-import { buildItemPayload } from './services/order-utils';
+import { buildItemPayload, normalizeTimeZone, parseFixedOffsetMinutes, getTimeZoneOffset, toUtcIsoFromZonedInput, formatDateTimeInput, toIsoFromDateTimeInput, formatStoredDateOnlyForInput, parseDecimalValue } from './services/order-utils';
 import { OrderLoaderService } from './services/order-loader.service';
 import { OrderPortDocumentationService } from './services/order-port-documentation.service';
 import { OrderInquiryService } from './services/order-inquiry.service';
@@ -477,7 +477,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly deliveredAtLocal = computed(() => {
     const iso = this.activeSupplierDeliveredAt();
     if (!iso) return '';
-    return this.formatStoredDateOnlyForInput(iso);
+    return formatStoredDateOnlyForInput(iso);
   });
 
   readonly deliveredQtyComplete = computed(() =>
@@ -628,7 +628,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly etaMinDateTime = computed(() => {
     const eta = this.order()?.eta;
     if (!eta) return '';
-    return this.formatStoredDateOnlyForInput(eta);
+    return formatStoredDateOnlyForInput(eta);
   });
 
   readonly paymentsTotal = computed(() =>
@@ -796,7 +796,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   });
 
   formatDateTimeForInput(date: Date, timeZone: string): string {
-    const fixedOffset = this.parseFixedOffsetMinutes(timeZone);
+    const fixedOffset = parseFixedOffsetMinutes(timeZone);
     if (fixedOffset !== null) {
       const shifted = new Date(date.getTime() + fixedOffset * 60_000);
       const year = String(shifted.getUTCFullYear()).padStart(4, '0');
@@ -807,7 +807,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       return `${year}-${month}-${day}T${hour}:${minute}`;
     }
 
-    const safeTimeZone = this.normalizeTimeZone(timeZone);
+    const safeTimeZone = normalizeTimeZone(timeZone);
     const parts = new Intl.DateTimeFormat('en-CA', {
       timeZone: safeTimeZone,
       year: 'numeric',
@@ -842,15 +842,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     }).format(date);
   }
 
-  private formatStoredDateOnlyForInput(iso: string | null): string {
-    if (!iso) return '';
-    const date = new Date(iso);
-    if (Number.isNaN(date.getTime())) return '';
-    const year = String(date.getUTCFullYear()).padStart(4, '0');
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(date.getUTCDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }
+  // Replaced by import from order-utils.ts — was private formatStoredDateOnlyForInput
 
   private _initialLoadComplete = false;
 
@@ -1508,60 +1500,16 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     return `${value.toFixed(idx === 0 ? 0 : 1)} ${units[idx]}`;
   }
 
-  private getTimeZoneOffset(date: Date, timeZone: string): number {
-    const fixedOffset = this.parseFixedOffsetMinutes(timeZone);
-    if (fixedOffset !== null) return fixedOffset;
+  // Replaced by import from order-utils.ts — was private getTimeZoneOffset
 
-    const safeTimeZone = this.normalizeTimeZone(timeZone);
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: safeTimeZone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    }).formatToParts(date);
-    const map = new Map(parts.map((p) => [p.type, p.value]));
-    const year = Number(map.get('year') ?? 0);
-    const month = Number(map.get('month') ?? 1) - 1;
-    const day = Number(map.get('day') ?? 1);
-    const hour = Number(map.get('hour') ?? 0);
-    const minute = Number(map.get('minute') ?? 0);
-    const second = Number(map.get('second') ?? 0);
-    const asUtc = Date.UTC(year, month, day, hour, minute, second);
-    return (asUtc - date.getTime()) / 60000;
-  }
+  // Replaced by import from order-utils.ts — was private toUtcIsoFromZonedInput
 
-  private toUtcIsoFromZonedInput(value: string, timeZone: string): string {
-    const [datePart, timePart] = value.split('T');
-    const [year, month, day] = datePart.split('-').map(Number);
-    const [hour, minute] = timePart.split(':').map(Number);
-    const utcGuess = Date.UTC(year, month - 1, day, hour, minute, 0);
-    const offset = this.getTimeZoneOffset(new Date(utcGuess), timeZone);
-    const utcTime = utcGuess - offset * 60_000;
-    return new Date(utcTime).toISOString();
-  }
-
-  private parseDecimalValue(value: unknown): number | null {
-    if (typeof value === 'number') {
-      return Number.isFinite(value) ? value : null;
-    }
-
-    if (typeof value !== 'string') return null;
-
-    const normalized = value.trim().replace(/\s+/g, '').replace(',', '.');
-    if (!normalized) return null;
-
-    const parsed = Number(normalized);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
+  // Replaced by import from order-utils.ts — was private parseDecimalValue
 
   private getEffectiveDeliveredQuantity(row: OrderItemRow): number | null {
-    const deliveredQuantity = this.parseDecimalValue(row.deliveredQuantity);
+    const deliveredQuantity = parseDecimalValue(row.deliveredQuantity);
     if (deliveredQuantity !== null) return deliveredQuantity;
-    return this.parseDecimalValue(row.quantity);
+    return parseDecimalValue(row.quantity);
   }
 
   private buildItemPayload(rows: OrderItemRow[], options?: { fillMissingDeliveredQuantity?: boolean }) {
@@ -1781,26 +1729,9 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     }
   }
 
-  private normalizeTimeZone(timeZone: string): string {
-    try {
-      new Intl.DateTimeFormat('en-US', { timeZone }).format(new Date());
-      return timeZone;
-    } catch {
-      return 'UTC';
-    }
-  }
+  // Replaced by import from order-utils.ts — was private normalizeTimeZone
 
-  private parseFixedOffsetMinutes(timeZone: string): number | null {
-    const match = timeZone.match(/([+-])\s*(\d{1,2})(?::(\d{2}))?/);
-    if (!match) return null;
-
-    const sign = match[1] === '-' ? -1 : 1;
-    const hours = Number(match[2]);
-    const minutes = Number(match[3] ?? '0');
-    if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
-
-    return sign * (hours * 60 + minutes);
-  }
+  // Replaced by import from order-utils.ts — was private parseFixedOffsetMinutes
 
   // ─── Item grid events ────────────────────────────────────────────
 
@@ -2284,23 +2215,9 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       + Math.floor(lastOverall / 86400000 / 10);
   }
 
-  private formatDateTimeInput(iso: string | null): string {
-    if (!iso) return '';
-    const date = new Date(iso);
-    if (Number.isNaN(date.getTime())) return '';
-    const year = String(date.getFullYear()).padStart(4, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
-  }
+  // Replaced by import from order-utils.ts — was private formatDateTimeInput
 
-  private toIsoFromDateTimeInput(value: string): string | null {
-    if (!value) return null;
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? null : date.toISOString();
-  }
+  // Replaced by import from order-utils.ts — was private toIsoFromDateTimeInput
 
   onVesselChange(vesselId: string): void {
     if (!vesselId) return;
