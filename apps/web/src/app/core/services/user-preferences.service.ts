@@ -1,19 +1,26 @@
-import { Injectable, signal, inject } from '@angular/core';
+import { Injectable, signal, inject, effect } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { API } from '@app/core/config/api';
 import type { ApiResponse, UserUiPreferences } from '@fueld/types';
-
-// ═══════════════════════════════════════════════════════════════════════
-//  User Preferences Service — cross-device UI preferences
-// ═══════════════════════════════════════════════════════════════════════
 
 @Injectable({ providedIn: 'root' })
 export class UserPreferencesService {
   private readonly http = inject(HttpClient);
 
   readonly preferences = signal<UserUiPreferences>({});
-  private saveTimeout: ReturnType<typeof setTimeout> | null = null;
+  private _loaded = false;
+
+  constructor() {
+    // Reactive autosave — watches preferences; debounces to backend
+    effect((onCleanup) => {
+      const prefs = this.preferences();
+      if (!this._loaded) return;
+
+      const timer = setTimeout(() => this.save(prefs), 500);
+      onCleanup(() => clearTimeout(timer));
+    });
+  }
 
   /** Load preferences from backend (call once after auth). */
   async load(): Promise<void> {
@@ -27,16 +34,13 @@ export class UserPreferencesService {
     } catch {
       // silently ignore — local defaults will apply
     }
+    this._loaded = true;
   }
 
-  /** Patch preferences (shallow merge) and debounce-save to backend. */
+  /** Patch preferences (shallow merge) — save happens reactively via effect. */
   patch(patch: Partial<UserUiPreferences>): void {
     const current = this.preferences();
-    const next = { ...current, ...patch };
-    this.preferences.set(next);
-
-    if (this.saveTimeout) clearTimeout(this.saveTimeout);
-    this.saveTimeout = setTimeout(() => this.save(next), 500);
+    this.preferences.set({ ...current, ...patch });
   }
 
   private async save(prefs: UserUiPreferences): Promise<void> {
