@@ -799,9 +799,6 @@ interface PlattsSuggestionViewModel {
                 }
               </div>
             </div>
-          } @else {
-            <div class="py-8 text-center text-sm text-gray-400">Supplier replies are only tracked for inquiries.</div>
-          }
         </div>
       }
     }
@@ -832,7 +829,7 @@ interface PlattsSuggestionViewModel {
       [orderId]="orderId()"
       [currencyOptions]="configuredCurrencies()"
       [defaultCurrency]="order()?.currency ?? 'USD'"
-      [todayLocal]="formatDateForInput(new Date(), placeTimezone())"
+      [todayLocal]="todayLocalDateString()"
       (saved)="loadPayments()"
     />
 
@@ -1061,6 +1058,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly showCustomerPaymentNote = signal(false);
   readonly showSupplierPaymentNote = signal(false);
   readonly paymentModalRef = viewChild(OrderPaymentModalComponent);
+  readonly todayLocalDateString = () => this.formatDateForInput(new Date(), this.placeTimezone());
   readonly convertModalRef = viewChild(OrderConvertModalComponent);
   readonly cancelModalRef = viewChild(OrderCancelModalComponent);
   readonly remarkPromptRef = viewChild(OrderPlaceRemarkPromptComponent);
@@ -2149,7 +2147,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     }
   }
 
-  private async loadPayments(): Promise<void> {
+  async loadPayments(): Promise<void> {
     const id = this.orderId();
     if (!id) return;
     this.paymentsLoading.set(true);
@@ -2234,7 +2232,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   openPaymentModal(): void {
-    this.paymentModalRef?.openModal();
+    this.paymentModalRef()?.openModal();
   }
 
 
@@ -3956,7 +3954,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     const newDefault = placeData?.orderRemark ?? null;
     if ((newDefault ?? '') !== (previousRemark ?? '')) {
       this.pendingPlaceRemark.set(newDefault);
-      this.remarkPromptRef?.show();
+      this.remarkPromptRef()?.show();
     }
   }
 
@@ -4268,7 +4266,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       this.showToast('error', 'Add at least one line item before converting to order.');
       return;
     }
-    this.convertModalRef?.show();
+    this.convertModalRef()?.show();
   }
 
   openCancelInquiryModal(): void {
@@ -4287,7 +4285,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       this.showToast('error', 'No cancellation reasons configured.');
       return;
     }
-    this.cancelModalRef?.show();
+    this.cancelModalRef()?.show();
   }
 
   async confirmConvertToOrder(): Promise<void> {
@@ -4311,7 +4309,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       );
       if (res.success) {
         this.order.update((o) => (o ? { ...o, status: OrderStatus.Confirmed } : o));
-        this.convertModalRef?.close();
+        this.convertModalRef()?.close();
         this.showToast('success', 'Inquiry converted to order.');
         await this.router.navigate(['/trading/orders', id]);
       } else {
@@ -4327,6 +4325,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   async confirmCancelInquiry(event: { reason: string; reasonOther?: string }): Promise<void> {
     const id = this.orderId();
     if (!id) return;
+    const isInquiry = this.isInquiryContext();
 
     const reason = event.reason.trim();
     if (!reason) return;
@@ -4352,7 +4351,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
           await this.loadCustomerCreditLines(updatedOrder.clientId);
         }
         await this.loadSupplierCreditLines(this.activeOrderSupplier()?.companyId ?? updatedOrder?.supplierId);
-        this.cancelModalRef?.close();
+        this.cancelModalRef()?.close();
         this.showToast('success', `${isInquiry ? 'Inquiry' : 'Order'} cancelled.`);
         await this.normalizeDetailRoute(OrderStatus.Cancelled, id);
       } else {

@@ -9,7 +9,8 @@ import {
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import type { ApiResponse, CustomerPaymentDto, DropdownOption } from '@fueld/types';
+import type { ApiResponse, CustomerPaymentDto } from '@fueld/types';
+import type { DropdownOption } from '@app/shared/components/searchable-dropdown/searchable-dropdown.component';
 import { API_URL } from '@app/core/config/api';
 
 @Component({
