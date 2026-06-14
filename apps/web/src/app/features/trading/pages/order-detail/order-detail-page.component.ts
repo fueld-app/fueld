@@ -1180,7 +1180,9 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   openPaymentModal(): void {
-    this.paymentModalRef()?.openModal();
+    const modal = this.paymentModalRef();
+    if (modal) { modal.openModal(); return; }
+    setTimeout(() => this.paymentModalRef()?.openModal(), 200);
   }
 
 
@@ -2237,7 +2239,9 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     const newDefault = placeData?.orderRemark ?? null;
     if ((newDefault ?? '') !== (previousRemark ?? '')) {
       this.pendingPlaceRemark.set(newDefault);
-      this.remarkPromptRef()?.show();
+      const prompt = this.remarkPromptRef();
+      if (prompt) { prompt.show(); return; }
+      setTimeout(() => this.remarkPromptRef()?.show(), 200);
     }
   }
 

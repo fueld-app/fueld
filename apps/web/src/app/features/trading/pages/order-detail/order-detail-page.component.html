@@ -49,11 +49,13 @@
     </div>
   </app-trading-detail-header>
 
+@defer (on idle) {
 @if (isInternalTransfer()) {
   <div class="mt-4">
     <app-internal-transfer-summary [transfer]="transfer()" />
   </div>
 }
+} @placeholder { <div></div> }
 
 <app-trading-detail-meta-cards
   [clientName]="clientName()"
@@ -254,6 +256,7 @@
   (displayCurrencyChange)="itemDisplayCurrency.set($event)"
 />
 
+@defer (on idle) {
 @if (isInternalTransfer()) {
   <div class="mt-4">
     <app-internal-transfer-sides
@@ -262,9 +265,11 @@
     />
   </div>
 }
+} @placeholder { <div></div> }
 
 
 <!--  Financing Summary (always visible when user can see prices) -->
+@defer (on idle) {
 @if (auth.canSeePrices()) {
   <div class="mt-4">
     <app-order-financing-summary
@@ -276,10 +281,12 @@
     />
   </div>
 }
+} @placeholder { <div></div> }
 
 <!-- Delivery + Payments + Attachments + Comments -->
 @if (allowDeliveredEdit() || orderId() || order()?.id) {
   <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+@defer (on idle) {
     @if (allowDeliveredEdit()) {
       <app-order-delivery-card
         [deliveredAtLocal]="deliveredAtLocal()"
@@ -292,6 +299,8 @@
         (deliveredAtChange)="onDeliveredAtChange($event)"
       />
     }
+} @placeholder { <div></div> }
+@defer (on idle) {
     @if (orderId() || order()?.id) {
       <app-order-payments-card
         [payments]="payments()"
@@ -300,9 +309,11 @@
         [loading]="paymentsLoading()"
         [canSeePrices]="auth.canSeePrices()"
         [canRecordPayment]="canRecordPayment()"
-        (addPayment)="paymentModal.openModal()"
+        (addPayment)="openPaymentModal()"
       />
     }
+} @placeholder { <div></div> }
+@defer (on idle) {
     <app-order-attachments-card
       [attachments]="attachments()"
       [attachmentTypes]="refData.configuredAttachmentTypes()"
@@ -314,6 +325,7 @@
       (delete)="deleteAttachment($event)"
       (fileSelected)="onAttachmentSelected($event)"
     />
+} @placeholder { <div></div> }
 
   </div>
 }
