@@ -96,6 +96,7 @@ import { OrderSearchService } from './services/order-search.service';
 import { OrderSaveService } from './services/order-save.service';
 import { OrderInventoryService } from './services/order-inventory.service';
 import { OrderBrokerService } from './services/order-broker.service';
+import { OrderActionService } from './services/order-action.service';
 import { CreditApplicationModalComponent } from '../../../credit/components/credit-application-modal.component';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -280,6 +281,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   protected readonly saveSvc = inject(OrderSaveService);
   protected readonly inventorySvc = inject(OrderInventoryService);
   protected readonly brokerSvc = inject(OrderBrokerService);
+  protected readonly actionSvc = inject(OrderActionService);
   private readonly riskService = inject(RiskMonitoringService);
 
   readonly emailModal = viewChild(SendEmailModalComponent);
@@ -2783,462 +2785,65 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   // ─── Actions ─────────────────────────────────────────────────────
 
   async onAction(action: HeaderAction): Promise<void> {
-    switch (action) {
-      case 'generate-invoice':
-        if (!this.hasLineItems()) {
-          this.showToast('error', 'Add at least one line item before viewing Invoice/Proforma.');
-          break;
-        }
-        if (!this.hasBankAccount()) {
-          this.showToast('error', 'Select a bank account before viewing Invoice/Proforma.');
-          break;
-        }
-        this.viewInvoicePdf();
-        break;
-      case 'view-offer':
-        if (!this.hasLineItems()) {
-          this.showToast('error', 'Add at least one line item before generating Confirmation PDF.');
-          break;
-        }
-        if (!this.hasInvoicingCompany()) {
-          this.showToast('error', 'Select an invoicing company before generating Confirmation PDF.');
-          break;
-        }
-        if (!this.hasEta()) {
-          this.showToast('error', 'Set an ETA before generating Confirmation PDF.');
-          break;
-        }
-        this.viewOfferPdf();
-        break;
-      case 'view-proforma':
-        if (!this.hasLineItems()) {
-          this.showToast('error', 'Add at least one line item before generating Nomination PDF.');
-          break;
-        }
-        if (!this.hasSupplier()) {
-          this.showToast('error', 'Select a supplier before generating Nomination PDF.');
-          break;
-        }
-        if (!this.hasInvoicingCompany()) {
-          this.showToast('error', 'Select an invoicing company before generating Nomination PDF.');
-          break;
-        }
-        if (!this.hasEta()) {
-          this.showToast('error', 'Set an ETA before generating Nomination PDF.');
-          break;
-        }
-        this.viewProformaPdf();
-        break;
-      case 'convert-to-order':
-        this.openConvertToOrderModal();
-        break;
-      case 'cancel-inquiry':
-        this.openCancelInquiryModal();
-        break;
-      case 'cancel-order':
-        this.openCancelInquiryModal();
-        break;
-      case 'send-email':
-        if (!this.isResponsibleUser()) {
-          this.showToast('error', 'Only the responsible user can send this email.');
-          break;
-        }
-        this.openSendEmailModal('INVOICE');
-        break;
-      case 'send-offer':
-        if (!this.hasEta()) { this.showToast('error', 'Set an ETA before sending.'); break; }
-        this.openSendEmailModal('OFFER');
-        break;
-      case 'send-confirmation':
-        if (!this.hasEta()) { this.showToast('error', 'Set an ETA before sending.'); break; }
-        this.openSendEmailModal('CONFIRMATION');
-        break;
-      case 'send-nomination':
-        if (!this.hasEta()) { this.showToast('error', 'Set an ETA before sending.'); break; }
-        this.openSendEmailModal('NOMINATION');
-        break;
-      case 'send-proforma':
-        if (!this.hasEta()) { this.showToast('error', 'Set an ETA before sending.'); break; }
-        this.openSendEmailModal('PROFORMA');
-        break;
-      case 'send-invoice':
-        this.openSendEmailModal('INVOICE');
-        break;
-      case 'send-port-documentation':
-        if (!(await this.ensurePortDocumentationReadyForSend())) {
-          break;
-        }
-        this.openSendEmailModal('PORT_DOCUMENTATION');
-        break;
-      case 'send-inquiry':
-        this.openSendInquiryModal();
-        break;
-      case 'mark-paid':
-        this.markPaid();
-        break;
-      case 'mark-delivered':
-        this.markDelivered();
-        break;
-      case 'reopen-order':
-        this.reopenOrder();
-        break;
-    }
-  }
-
-  private async ensurePortDocumentationReadyForSend(): Promise<boolean> {
-    const ready = await this.portDocSvc.ensureReadyForSend(this.orderId());
-    if (!ready) {
-      const ctx = this.portDocSvc.portDocumentationContext();
-      if (ctx && !ctx.enabled) {
-        this.showToast('error', 'Port Documentation is not enabled for this order.');
-      } else {
-        const warnings = ctx?.readinessWarnings ?? [];
-        this.showToast('error', warnings[0] ?? 'Port Documentation could not be prepared automatically.');
-      }
-    }
-    return ready;
-  }
-
-  openConvertToOrderModal(): void {
-    if (!this.hasLineItems()) {
-      this.showToast('error', 'Add at least one line item before converting to order.');
-      return;
-    }
-    this.convertModalRef()?.show();
-  }
-
-  openCancelInquiryModal(): void {
-    const status = this.order()?.status;
-    const canCancel =
-      status === OrderStatus.Inquiry
-      || status === OrderStatus.Offer
-      || status === OrderStatus.Confirmed
-      || status === OrderStatus.Delivered
-      || status === OrderStatus.Invoiced;
-    if (!canCancel) {
-      this.showToast('error', 'This record cannot be cancelled from this action.');
-      return;
-    }
-    if (!this.availableInquiryCancelReasons().length) {
-      this.showToast('error', 'No cancellation reasons configured.');
-      return;
-    }
-    this.cancelModalRef()?.show();
+    await this.actionSvc.onAction(action, this.buildActionContext());
   }
 
   async confirmConvertToOrder(): Promise<void> {
-    if (this.convertingToOrder()) return;
-    const id = this.orderId();
-    if (!id) return;
-    if (!this.hasLineItems()) {
-      this.showToast('error', 'Add at least one line item before converting to order.');
-      return;
-    }
-    // Block confirmation when any inventory-tracked line currently fails availability.
-    if (this.hasInventoryShortage()) {
-      this.showToast('error', 'One or more tracked line items are short on inventory. Adjust quantity, warehouse, or planned date before confirming.');
-      return;
-    }
-
-    this.convertingToOrder.set(true);
-    try {
-      const res = await firstValueFrom(
-        this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}/status`, { status: 'CONFIRMED' }),
-      );
-      if (res.success) {
-        this.order.update((o) => (o ? { ...o, status: OrderStatus.Confirmed } : o));
-        this.convertModalRef()?.close();
-        this.showToast('success', 'Inquiry converted to order.');
-        await this.router.navigate(['/trading/orders', id]);
-      } else {
-        this.showToast('error', res.message ?? 'Failed to convert inquiry.');
-      }
-    } catch {
-      this.showToast('error', 'Failed to convert inquiry.');
-    } finally {
-      this.convertingToOrder.set(false);
-    }
+    await this.actionSvc.confirmConvertToOrder(this.buildActionContext());
   }
 
   async confirmCancelInquiry(event: { reason: string; reasonOther?: string }): Promise<void> {
-    const id = this.orderId();
-    if (!id) return;
-    const isInquiry = this.isInquiryContext();
-
-    const reason = event.reason.trim();
-    if (!reason) return;
-
-    let lossReason = reason;
-    if (reason === 'Other') {
-      if (!event.reasonOther?.trim()) return;
-      lossReason = `Other: ${event.reasonOther.trim()}`;
-    }
-
-    this.cancellingInquiry.set(true);
-    try {
-      const res = await firstValueFrom(
-        this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}/status`, {
-          status: 'CANCELLED',
-          lossReason,
-        }),
-      );
-      if (res.success) {
-        this.order.update((o) => (o ? { ...o, status: OrderStatus.Cancelled, lossReason } : o));
-        const updatedOrder = this.order();
-        if (updatedOrder?.clientId) {
-          await this.financialSvc.loadCustomerCreditLines(updatedOrder.clientId);
-        }
-        await this.financialSvc.loadSupplierCreditLines(this.activeOrderSupplier()?.companyId ?? updatedOrder?.supplierId);
-        this.cancelModalRef()?.close();
-        this.showToast('success', `${isInquiry ? 'Inquiry' : 'Order'} cancelled.`);
-        await this.normalizeDetailRoute(OrderStatus.Cancelled, id);
-      } else {
-        this.showToast('error', res.message ?? `Failed to cancel ${isInquiry ? 'inquiry' : 'order'}.`);
-      }
-    } catch {
-      this.showToast('error', `Failed to cancel ${isInquiry ? 'inquiry' : 'order'}.`);
-    } finally {
-      this.cancellingInquiry.set(false);
-    }
-  }
-
-  private async markDelivered(): Promise<void> {
-    const status = this.order()?.status;
-    const id = this.orderId();
-    if (status !== OrderStatus.Confirmed) {
-      this.showToast('error', 'Only confirmed orders can be marked as delivered.');
-      return;
-    }
-    if (!id) return;
-    if (!this.hasLineItems()) {
-      this.showToast('error', 'Add at least one line item before marking delivered.');
-      return;
-    }
-    if (!this.order()?.deliveredAt) {
-      this.showToast('error', 'Enter delivered date before marking delivered.');
-      return;
-    }
-    if (!this.deliveredQtyComplete()) {
-      this.showToast('error', 'Enter delivered quantity for every line item before marking delivered.');
-      return;
-    }
-    const docSettings = this.refData.deliveryDocumentationSettings();
-    if (docSettings.requireDeliveryDocumentation && !this.hasDeliveryDocumentation()) {
-      this.showToast('error', 'Upload required delivery documentation before marking delivered.');
-      return;
-    }
-
-    const normalizedRows = this.itemRows().map((row) => ({
-      ...row,
-      deliveredQuantity: this.getEffectiveDeliveredQuantity(row),
-    }));
-
-    try {
-      const itemsRes = await firstValueFrom(
-        this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}/items`, {
-          items: this.buildItemPayload(normalizedRows, { fillMissingDeliveredQuantity: true }),
-        }),
-      );
-      this.requireApiSuccess(itemsRes, 'Failed to save delivered quantities.');
-      this.itemRows.set(normalizedRows);
-    } catch {
-      this.showToast('error', 'Failed to save delivered quantities.');
-      return;
-    }
-
-    await this.setOrderStatus(OrderStatus.Delivered);
-  }
-
-  private async reopenOrder(): Promise<void> {
-    const status = this.order()?.status;
-    if (status !== OrderStatus.Delivered && status !== OrderStatus.Invoiced) {
-      this.showToast('error', 'Only delivered or invoiced orders can be reopened.');
-      return;
-    }
-    await this.setOrderStatus(OrderStatus.Confirmed);
-    this.showToast('success', 'Order reopened for editing.');
+    await this.actionSvc.confirmCancelInquiry(this.buildActionContext(), event);
   }
 
   async saveOrder(): Promise<void> {
-    const id = this.orderId();
-    const o = this.order();
-    if (!id || !o) return;
-    if (this.hasIncompleteDraftItems(this.itemRows())) {
-      this.showToast('error', 'Complete supplier and product on new line items before saving.');
-      return;
-    }
-
-    this.saving.set(true);
-    try {
-      const orderRes = await firstValueFrom(
-        this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}`, {
-          clientId: o.clientId,
-          vesselId: o.vesselId,
-          placeId: o.placeId,
-          salesRepId: o.salesRepId ?? null,
-          invoicingCompanyId: o.invoicingCompanyId,
-          bankAccountId: o.bankAccountId ?? null,
-          currency: o.currency,
-          customerPaymentTermType: o.customerPaymentTermType ?? null,
-          customerCreditDays: o.customerCreditDays ?? null,
-          customerNote: o.customerNote ?? null,
-          purchaseOrderNumber: o.purchaseOrderNumber ?? null,
-          customerContactId: o.customerContactId ?? null,
-          supplierId: o.supplierId ?? null,
-          supplierPaymentTermType: o.supplierPaymentTermType ?? null,
-          supplierCreditDays: o.supplierCreditDays ?? null,
-          supplierNote: o.supplierNote ?? null,
-          supplierContactId: o.supplierContactId ?? null,
-          brokerId: o.brokerId ?? null,
-          brokerContactId: o.brokerContactId ?? null,
-          brokerGetsAll: o.brokerGetsAll ?? false,
-          agentId: o.agentId ?? null,
-          agentContactId: o.agentContactId ?? null,
-          termsAndConditions: o.termsAndConditions ?? null,
-          categoryKey: o.categoryKey ?? null,
-          eta: o.eta,
-          etd: o.etd,
-          deliveredAt: o.deliveredAt ?? null,
-        }),
-      );
-      this.requireApiSuccess(orderRes, 'Failed to save order.');
-
-      await this.syncOrderSupplierRecords(id);
-
-      const itemRows = this.itemRows();
-
-      const itemPayload = this.buildItemPayload(itemRows).map((item: Record<string, string | null>) => ({
-        ...item,
-        costCurrency: item['costCurrency'] ?? o.currency,
-        salesCurrency: item['salesCurrency'] ?? o.currency,
-      }));
-
-      const itemsRes = await firstValueFrom(
-        this.http.put<ApiResponse<any>>(`${API_URL}/orders/${id}/items`, { items: itemPayload }),
-      );
-      this.requireApiSuccess(itemsRes, 'Failed to save items.');
-      this.clearSavedDraftItemIds(itemRows);
-      await this.financialSvc.loadCustomerCreditLines(o.clientId);
-      await this.financialSvc.loadSupplierCreditLines(this.activeOrderSupplier()?.companyId ?? o.supplierId);
-      this.showToast('success', 'Order saved successfully.');
-    } catch {
-      this.showToast('error', 'Failed to save order.');
-    } finally {
-      this.saving.set(false);
-    }
+    await this.actionSvc.saveOrder(this.buildActionContext());
   }
 
-  private async viewInvoicePdf(): Promise<void> {
-    const id = this.orderId();
-    if (!id) return;
-    if (!this.hasLineItems()) {
-      this.showToast('error', 'Add at least one line item before viewing Invoice/Proforma.');
-      return;
-    }
-    if (!this.hasBankAccount()) {
-      this.showToast('error', 'Select a bank account before viewing Invoice/Proforma.');
-      return;
-    }
-    const status = this.order()?.status;
-    const isFinalInvoice = status === OrderStatus.Delivered
-      || status === OrderStatus.Invoiced
-      || status === OrderStatus.Paid;
-    const documentTitle = isFinalInvoice ? 'Invoice' : 'Proforma Invoice';
-    const endpoint = isFinalInvoice
-      ? `${API_URL}/orders/${id}/invoice/pdf`
-      : `${API_URL}/orders/${id}/proforma/pdf`;
-    const fileName = isFinalInvoice
-      ? `Fueld_Invoice_${this.invoiceNumber()}.pdf`
-      : `Proforma_Invoice_${this.order()?.orderNumber ?? id}.pdf`;
-    const modal = this.pdfModal();
-    if (!modal) return;
-    modal.showLoading(documentTitle);
-    try {
-      const res = await firstValueFrom(
-        this.http.get(endpoint, { responseType: 'blob', observe: 'response' }),
-      );
-      const blob = res.body;
-      if (!blob) throw new Error('Missing PDF body');
-      modal.setBlob(
-        blob,
-        fileName,
-        this.buildVerifyUrlFromResponse(res),
-      );
-    } catch {
-      modal.showError();
-      this.showToast('error', `Failed to generate ${documentTitle.toLowerCase()} PDF.`);
-    }
+  private buildActionContext(): import('./services/order-action.service').OrderActionContext {
+    const self = this;
+    return {
+      order: () => self.order(),
+      orderId: () => self.orderId(),
+      itemRows: () => self.itemRows(),
+      hasLineItems: () => self.hasLineItems(),
+      hasBankAccount: () => self.hasBankAccount(),
+      hasInvoicingCompany: () => self.hasInvoicingCompany(),
+      hasEta: () => self.hasEta(),
+      hasSupplier: () => self.hasSupplier(),
+      isReadonly: () => self.isReadonly(),
+      isInquiryContext: () => self.isInquiryContext(),
+      isResponsibleUser: () => self.isResponsibleUser(),
+      isPaidOrCancelled: () => self.isPaidOrCancelled(),
+      deliveredQtyComplete: () => self.deliveredQtyComplete(),
+      hasDeliveryDocumentation: () => self.hasDeliveryDocumentation(),
+      hasInventoryShortage: () => self.hasInventoryShortage(),
+      hasEnoughPaymentsForMarkPaid: () => self.hasEnoughPaymentsForMarkPaid(),
+      hasIncompleteDraftItems: (rows) => self.hasIncompleteDraftItems(rows),
+      activeOrderSupplier: () => self.activeOrderSupplier(),
+      hasMultipleOrderSuppliers: () => self.hasMultipleOrderSuppliers(),
+      invoiceNumber: () => self.invoiceNumber(),
+      availableInquiryCancelReasons: () => self.availableInquiryCancelReasons(),
+      deliveryDocumentationSettings: () => self.refData.deliveryDocumentationSettings(),
+      getEffectiveDeliveredQuantity: (row) => self.getEffectiveDeliveredQuantity(row),
+      buildItemPayload: (rows, opts) => self.buildItemPayload(rows, opts),
+      pdfModal: () => self.pdfModal() ?? null,
+      convertModalRef: () => self.convertModalRef() ?? null,
+      cancelModalRef: () => self.cancelModalRef() ?? null,
+      openPaymentModal: () => self.openPaymentModal(),
+      openSendEmailModal: (dt: string) => self.openSendEmailModal(dt as any),
+      openSendInquiryModal: () => self.openSendInquiryModal(),
+      syncOrderSupplierRecords: (oid) => self.syncOrderSupplierRecords(oid),
+      clearSavedDraftItemIds: (rows) => self.clearSavedDraftItemIds(rows),
+      normalizeDetailRoute: (s, id) => self.normalizeDetailRoute(s, id),
+      updateOrder: (updater) => { self.order.update((o) => (o ? updater(o) : o)); },
+      setConvertingToOrder: (v) => self.convertingToOrder.set(v),
+      setCancellingInquiry: (v) => self.cancellingInquiry.set(v),
+      setItemRows: (rows) => self.itemRows.set(rows),
+      setSaving: (v) => self.saving.set(v),
+      showToast: (t, m) => self.showToast(t, m),
+    };
   }
-
-  private async viewOfferPdf(): Promise<void> {
-    const id = this.orderId();
-    if (!id) return;
-    const isInquiry = this.isInquiryContext();
-    const documentName = isInquiry ? 'Offer' : 'Confirmation';
-    if (!this.hasLineItems()) {
-      this.showToast('error', `Add at least one line item before generating ${documentName} PDF.`);
-      return;
-    }
-    if (!this.hasInvoicingCompany()) {
-      this.showToast('error', `Select an invoicing company before generating ${documentName} PDF.`);
-      return;
-    }
-    const modal = this.pdfModal();
-    if (!modal) return;
-    modal.showLoading(documentName);
-    try {
-      const res = await firstValueFrom(
-        this.http.get(`${API_URL}/orders/${id}/offer/pdf`, { responseType: 'blob', observe: 'response' }),
-      );
-      const blob = res.body;
-      if (!blob) throw new Error('Missing PDF body');
-      modal.setBlob(blob, `${documentName}_${this.order()?.orderNumber ?? id}.pdf`, this.buildVerifyUrlFromResponse(res));
-    } catch {
-      modal.showError();
-      this.showToast('error', `Failed to generate ${documentName.toLowerCase()} PDF.`);
-    }
-  }
-
-  private async viewProformaPdf(): Promise<void> {
-    const id = this.orderId();
-    if (!id) return;
-    if (!this.hasLineItems()) {
-      this.showToast('error', 'Add at least one line item before generating Nomination PDF.');
-      return;
-    }
-    if (!this.hasSupplier()) {
-      this.showToast('error', 'Select a supplier before generating Nomination PDF.');
-      return;
-    }
-    if (!this.hasInvoicingCompany()) {
-      this.showToast('error', 'Select an invoicing company before generating Nomination PDF.');
-      return;
-    }
-    const modal = this.pdfModal();
-    if (!modal) return;
-    modal.showLoading('Nomination');
-    const supplierQuery = this.hasMultipleOrderSuppliers() && this.activeOrderSupplier()?.id
-      ? `?orderSupplierId=${encodeURIComponent(this.activeOrderSupplier()!.id)}`
-      : '';
-    try {
-      const res = await firstValueFrom(
-        this.http.get(`${API_URL}/orders/${id}/nomination/pdf${supplierQuery}`, { responseType: 'blob', observe: 'response' }),
-      );
-      const blob = res.body;
-      if (!blob) throw new Error('Missing PDF body');
-      modal.setBlob(blob, `Nomination_${this.order()?.orderNumber ?? id}.pdf`, this.buildVerifyUrlFromResponse(res));
-    } catch {
-      modal.showError();
-      this.showToast('error', 'Failed to generate nomination PDF.');
-    }
-  }
-
-  private buildVerifyUrlFromResponse(res: HttpResponse<Blob>): string | null {
-    const token = res.headers.get('X-Document-Verify-Token')?.trim();
-    return token ? toAbsoluteUrl(`${API_URL}/verify/token/${token}`) : null;
-  }
-
-  // ── Open compose modal for any document type ───────────────────
 
   openSendInquiryModal(): void {
     this.commSvc.openSendInquiryModal(
