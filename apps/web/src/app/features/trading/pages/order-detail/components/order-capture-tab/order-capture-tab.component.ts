@@ -37,7 +37,7 @@ import type { SupplierInquiryReplyRow } from '../../order-detail-page.component'
                     <div>
                       <div class="flex flex-wrap items-center gap-2">
                         <span class="text-sm font-semibold text-slate-900">{{ reply.supplierName }}</span>
-                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium" [class]="badgeClass(reply.status)">{{ reply.status }}</span>
+                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium" [class]="badgeClass()(reply.status)">{{ reply.status }}</span>
                         @if (selectedSupplierId() === reply.supplierId) {
                           <span class="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white">Selected supplier</span>
                         }
@@ -49,12 +49,12 @@ import type { SupplierInquiryReplyRow } from '../../order-detail-page.component'
                         </div>
                       }
                       @if (reply.sentAt) {
-                        <div class="mt-1 text-[11px] text-slate-400">Sent {{ formatDateTime(reply.sentAt) }}</div>
+                        <div class="mt-1 text-[11px] text-slate-400">Sent {{ formatDateTime()(reply.sentAt) }}</div>
                       }
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
                       @if (reply.responseHours !== null) {
-                        <span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-amber-200">{{ responseHoursLabel(reply.responseHours) }} response</span>
+                        <span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-amber-200">{{ responseHoursLabel()(reply.responseHours) }} response</span>
                       }
                       @if (reply.canDeliver === true) {
                         <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-200">Can deliver</span>
@@ -68,7 +68,7 @@ import type { SupplierInquiryReplyRow } from '../../order-detail-page.component'
                     </div>
                   </div>
                   <div class="mt-3 rounded-xl border border-slate-200/80 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                    {{ summary(reply) }}
+                    {{ summary()(reply) }}
                   </div>
                 </div>
               }

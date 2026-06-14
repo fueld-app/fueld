@@ -7,9 +7,9 @@ import type {
   SendEmailPayload,
   DocumentEmailType,
   SendWhatsAppPayload,
-} from '../../components/send-email-modal/send-email-modal.component';
-import type { SendInquiryPayload, SendInquiryWhatsAppPayload } from '../../components/send-inquiry-modal/send-inquiry-modal.component';
-import type { SendEmailAttachmentOption } from '../../components/send-email-modal/send-email-modal.component';
+} from '../../../components/send-email-modal/send-email-modal.component';
+import type { SendInquiryPayload, SendInquiryWhatsAppPayload } from '../../../components/send-inquiry-modal/send-inquiry-modal.component';
+import type { SendEmailAttachmentOption } from '../../../components/send-email-modal/send-email-modal.component';
 
 @Injectable({ providedIn: 'root' })
 export class OrderCommunicationService {

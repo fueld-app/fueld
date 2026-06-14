@@ -1,4 +1,4 @@
-import type { OrderItemRow } from '../order-item.types';
+import type { OrderItemRow } from '../../../components/order-items/order-item.types';
 import type { OrderSupplierDto } from '@fueld/types';
 
 export function buildItemPayload(rows: OrderItemRow[], fillMissingDeliveredQuantity = false): Record<string, string | null>[] {
@@ -28,14 +28,14 @@ export function buildItemPayload(rows: OrderItemRow[], fillMissingDeliveredQuant
       costPremium: r.costPremium != null ? String(r.costPremium) : null,
       costBarging: r.costBarging != null ? String(r.costBarging) : null,
       costBargingUnit: r.costBargingUnit ?? null,
-      costCreditDays: r.costCreditDays ?? null,
+      costCreditDays: r.costCreditDays != null ? String(r.costCreditDays) : null,
       salesPricingModel: r.salesPricingModel ?? 'FIXED',
       salesReferenceId: r.salesReferenceId ?? null,
       salesPlattsEntryId: r.salesPlattsEntryId ?? null,
       salesPremium: r.salesPremium != null ? String(r.salesPremium) : null,
       salesBarging: r.salesBarging != null ? String(r.salesBarging) : null,
       salesBargingUnit: r.salesBargingUnit ?? null,
-      salesCreditDays: r.salesCreditDays ?? null,
+      salesCreditDays: r.salesCreditDays != null ? String(r.salesCreditDays) : null,
       inventorySkuId: r.inventorySkuId ?? null,
       warehouseId: r.warehouseId ?? null,
       plannedInventoryAt: r.plannedInventoryAt ?? null,

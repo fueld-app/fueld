@@ -44,7 +44,7 @@ import type { InquirySupplierComparisonRow, InquiryQuoteMatrixRow, SupplierInqui
                 >
                   <div class="flex flex-wrap items-center gap-2">
                     <span class="text-sm font-semibold text-slate-900">{{ supplier.supplierName }}</span>
-                    @if (isTopSupplier(supplier)) { <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">Best here</span> }
+                    @if (isTopSupplier()(supplier)) { <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">Best here</span> }
                     @if (selectedSupplierId() === supplier.supplierId) { <span class="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white">Selected</span> }
                   </div>
                   @if (supplier.products.length) {
@@ -55,8 +55,8 @@ import type { InquirySupplierComparisonRow, InquiryQuoteMatrixRow, SupplierInqui
                   <div class="mt-2 flex flex-wrap gap-1.5">
                     @if (supplier.performance.deliveredCountOverall > 0) { <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-200">{{ supplier.performance.deliveredCountOverall }} delivered</span> }
                     @if (supplier.performance.deliveredCountAtPlace > 0) { <span class="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-blue-200">{{ supplier.performance.deliveredCountAtPlace }} at this place</span> }
-                    @if (supplier.performance.quotedCount > 0) { <span class="rounded-full bg-fuchsia-50 px-2 py-0.5 text-[10px] font-medium text-fuchsia-700 ring-1 ring-fuchsia-200">{{ quoteRateLabel(supplier.performance) }}</span> }
-                    @if (supplier.performance.averageResponseHours !== null) { <span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-amber-200">{{ averageResponseLabel(supplier.performance) }}</span> }
+                    @if (supplier.performance.quotedCount > 0) { <span class="rounded-full bg-fuchsia-50 px-2 py-0.5 text-[10px] font-medium text-fuchsia-700 ring-1 ring-fuchsia-200">{{ quoteRateLabel()(supplier.performance) }}</span> }
+                    @if (supplier.performance.averageResponseHours !== null) { <span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-amber-200">{{ averageResponseLabel()(supplier.performance) }}</span> }
                   </div>
                   @if (!readonly()) {
                     <button (click)="select.emit(supplier)"
@@ -103,13 +103,13 @@ import type { InquirySupplierComparisonRow, InquiryQuoteMatrixRow, SupplierInqui
                         @if (selectedReplySupplierId() === reply.supplierId) { <span class="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white">Selected</span> }
                       </div>
                       <div class="mt-2 flex flex-wrap gap-1.5">
-                        @if (recommendation(reply.id)?.bestOverall) { <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-200">Best overall</span> }
-                        @if (recommendation(reply.id)?.lowestComparable) { <span class="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700 ring-1 ring-sky-200">Lowest total</span> }
-                        @if (recommendation(reply.id)?.mostComplete) { <span class="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-700 ring-1 ring-violet-200">Most complete</span> }
-                        @if (recommendation(reply.id)?.fastest) { <span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 ring-1 ring-amber-200">Fastest</span> }
+                        @if (recommendation()(reply.id)?.bestOverall) { <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-200">Best overall</span> }
+                        @if (recommendation()(reply.id)?.lowestComparable) { <span class="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700 ring-1 ring-sky-200">Lowest total</span> }
+                        @if (recommendation()(reply.id)?.mostComplete) { <span class="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-700 ring-1 ring-violet-200">Most complete</span> }
+                        @if (recommendation()(reply.id)?.fastest) { <span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 ring-1 ring-amber-200">Fastest</span> }
                       </div>
-                      <div class="mt-1 text-[11px] text-slate-500">{{ summary(reply) }}</div>
-                      @if (reply.responseHours !== null) { <div class="mt-1 text-[11px] text-slate-400">{{ responseHoursLabel(reply.responseHours) }} response</div> }
+                      <div class="mt-1 text-[11px] text-slate-500">{{ summary()(reply) }}</div>
+                      @if (reply.responseHours !== null) { <div class="mt-1 text-[11px] text-slate-400">{{ responseHoursLabel()(reply.responseHours) }} response</div> }
                     </th>
                   }
                 </tr>

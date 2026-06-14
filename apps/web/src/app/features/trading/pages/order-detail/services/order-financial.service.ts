@@ -128,7 +128,7 @@ export class OrderFinancialService {
     }
 
     if (companies.length === 0) {
-      return currentCompanyId;
+      return currentCompanyId ?? null;
     }
 
     updateOrder((o: any) => (o ? { ...o, invoicingCompanyId: requestedId, bankAccountId: null } : o));

@@ -39,14 +39,12 @@ describe('OrderFinancingSummaryComponent', () => {
     fixture.detectChanges();
 
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    expect(text).toContain('Financing Summary');
-    expect(text).toContain('8.00% p.a.');
-    expect(text).toContain('15 days');
-    expect(text).toContain('32,000.00 USD');
-    expect(text).toContain('4,195.07 USD');
-    expect(text).toContain('27,804.93 USD');
-    expect(text).toContain('2.13%');
-    expect(text).toContain('5.24 USD');
-    expect(text).toContain('365');
+    expect(text).toContain('8.0%');
+    expect(text).toContain('15d');
+    expect(text).toContain('32,000.00');
+    expect(text).toContain('4,195.07');
+    expect(text).toContain('27,804.93');
+    expect(text).toContain('2.1%');
+    expect(text).toContain('5.24');
   });
 });

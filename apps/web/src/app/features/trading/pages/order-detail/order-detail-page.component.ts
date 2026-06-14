@@ -85,6 +85,7 @@ import { InternalTransferSidesComponent } from '../../components/internal-transf
 import { AuthService } from '../../../../core/auth/auth.service';
 import { OrderReferenceDataService } from './services/order-reference-data.service';
 import { OrderReplyService } from './services/order-reply.service';
+import { buildItemPayload } from './services/order-utils';
 import { OrderLoaderService } from './services/order-loader.service';
 import { OrderPortDocumentationService } from './services/order-port-documentation.service';
 import { OrderInquiryService } from './services/order-inquiry.service';
@@ -333,7 +334,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     for (const supplier of this.orderSuppliers()) {
       if (supplier.companyId) relevantCompanyIds.add(supplier.companyId);
     }
-    return this.allWarehouses().filter((w) =>
+    return this.refData.allWarehouses().filter((w) =>
       w.active && w.inventoryEnabled && relevantCompanyIds.has(w.ownerCompanyId),
     );
   });
@@ -346,7 +347,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   );
 
   readonly inventorySkuDropdownOptions = computed<DropdownOption[]>(() =>
-    this.inventorySkus()
+    this.refData.inventorySkus()
       .filter((s) => s.active && s.inventoryTracked)
       .map((s) => ({
         value: s.id,
@@ -421,7 +422,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly convertingToOrder = signal(false);
   readonly cancellingInquiry = signal(false);
   readonly availableInquiryCancelReasons = computed(() =>
-    this.inquiryCancelReasons().map((reason) => reason.trim()).filter(Boolean),
+    this.refData.inquiryCancelReasons().map((reason: string) => reason.trim()).filter(Boolean),
   );
   readonly cancellationTargetLabel = computed(() => {
     const status = this.order()?.status;
@@ -593,11 +594,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   });
 
   readonly hasDeliveryDocumentation = computed(() => {
-    const allowedTypes = this.deliveryDocumentationSettings().deliveryDocumentationTypes;
+    const allowedTypes = this.refData.deliveryDocumentationSettings().deliveryDocumentationTypes;
     return this.attachments().some((att) => allowedTypes.includes((att.type ?? '').toUpperCase()));
   });
   readonly invoiceEmailAttachmentOptions = computed<SendEmailAttachmentOption[]>(() => {
-    const allowedTypes = this.deliveryDocumentationSettings().deliveryDocumentationTypes;
+    const allowedTypes = this.refData.deliveryDocumentationSettings().deliveryDocumentationTypes;
     return this.attachments()
       .filter((att) => allowedTypes.includes((att.type ?? '').toUpperCase()))
       .map((att) => ({
@@ -699,7 +700,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   );
 
   readonly responsibleUserOptions = computed<DropdownOption[]>(() =>
-    this.teamUsers().map((u) => ({ value: u.id, label: u.name })),
+    this.refData.teamUsers().map((u: { id: string; name: string }) => ({ value: u.id, label: u.name })),
   );
 
   readonly customerContactDropdownOptions = computed(() =>
@@ -1130,18 +1131,25 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   async previewBunkerInstructions(): Promise<void> {
     await this.portDocSvc.previewBunkerInstructions(this.orderId());
+    await this.loadPortDocumentationContext();
   }
 
   async generateBunkerInstructions(): Promise<void> {
     await this.portDocSvc.generateBunkerInstructions(this.orderId());
+    await this.loadPortDocumentationContext();
+    this.showToast('success', 'Bunker Instructions generated.');
   }
 
   async generateGateList(): Promise<void> {
     await this.portDocSvc.generateGateList(this.orderId());
+    await this.loadPortDocumentationContext();
+    this.showToast('success', 'Gate List generated.');
   }
 
   async includeFlangeWorksheetDocument(): Promise<void> {
     await this.portDocSvc.includeFlangeWorksheetDocument(this.orderId());
+    await this.loadPortDocumentationContext();
+    this.showToast('success', 'Flange Worksheet included on the order.');
   }
 
   async downloadPortDocumentationDocument(doc: OrderPortDocumentDto): Promise<void> {
@@ -2655,10 +2663,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   supplierPerformanceSummary(performance: InquirySupplierPerformance): string {
     if (performance.lastDeliveredAtPlace) {
-      return `Last here ${this.formatHistoryDate(performance.lastDeliveredAtPlace)}`;
+      return `Last here ${this.formatHistoryDateTime(performance.lastDeliveredAtPlace)}`;
     }
     if (performance.lastDeliveredAtOverall) {
-      return `Last served ${this.formatHistoryDate(performance.lastDeliveredAtOverall)}`;
+      return `Last served ${this.formatHistoryDateTime(performance.lastDeliveredAtOverall)}`;
     }
     if (performance.noReplyCount > 0) {
       return `${performance.noReplyCount} no reply`;
@@ -2856,10 +2864,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
       const autoSaveRows = this.getAutoSaveRows(this.itemRows());
 
-      const itemPayload = this.buildItemPayload(autoSaveRows).map((item) => ({
+      const itemPayload = this.buildItemPayload(autoSaveRows).map((item: Record<string, string | null>) => ({
         ...item,
-        costCurrency: item.costCurrency ?? o.currency,
-        salesCurrency: item.salesCurrency ?? o.currency,
+        costCurrency: item['costCurrency'] ?? o.currency,
+        salesCurrency: item['salesCurrency'] ?? o.currency,
       }));
 
       const itemsRes = await firstValueFrom(
@@ -2962,7 +2970,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         this.openSendEmailModal('INVOICE');
         break;
       case 'send-port-documentation':
-        if (!(await this.portDocSvc.ensureReadyForSend(this.orderId()))) {
+        if (!(await this.ensurePortDocumentationReadyForSend())) {
           break;
         }
         this.openSendEmailModal('PORT_DOCUMENTATION');
@@ -3119,7 +3127,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       this.showToast('error', 'Enter delivered quantity for every line item before marking delivered.');
       return;
     }
-    const docSettings = this.deliveryDocumentationSettings();
+    const docSettings = this.refData.deliveryDocumentationSettings();
     if (docSettings.requireDeliveryDocumentation && !this.hasDeliveryDocumentation()) {
       this.showToast('error', 'Upload required delivery documentation before marking delivered.');
       return;
@@ -3204,10 +3212,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
       const itemRows = this.itemRows();
 
-      const itemPayload = this.buildItemPayload(itemRows).map((item) => ({
+      const itemPayload = this.buildItemPayload(itemRows).map((item: Record<string, string | null>) => ({
         ...item,
-        costCurrency: item.costCurrency ?? o.currency,
-        salesCurrency: item.salesCurrency ?? o.currency,
+        costCurrency: item['costCurrency'] ?? o.currency,
+        salesCurrency: item['salesCurrency'] ?? o.currency,
       }));
 
       const itemsRes = await firstValueFrom(
