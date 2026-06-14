@@ -74,6 +74,7 @@ import { OrderConvertModalComponent } from './components/order-convert-modal/ord
 import { OrderCancelModalComponent } from './components/order-cancel-modal/order-cancel-modal.component';
 import { OrderPlaceRemarkPromptComponent } from './components/order-place-remark-prompt/order-place-remark-prompt.component';
 import { OrderSuppliersTabComponent } from './components/order-suppliers-tab/order-suppliers-tab.component';
+import { OrderCaptureTabComponent } from './components/order-capture-tab/order-capture-tab.component';
 import { OrderPaymentsCardComponent } from './components/order-payments-card/order-payments-card.component';
 import { CommentsCardComponent } from '../../../../shared/components/comments-card/comments-card.component';
 import { PdfPreviewModalComponent } from '../../../../shared/components/pdf-preview-modal/pdf-preview-modal.component';
@@ -236,6 +237,7 @@ interface PlattsSuggestionViewModel {
     OrderCancelModalComponent,
     OrderPlaceRemarkPromptComponent,
     OrderSuppliersTabComponent,
+    OrderCaptureTabComponent,
   ],
   template: `
     <app-trading-detail-header
@@ -621,73 +623,18 @@ interface PlattsSuggestionViewModel {
         />
       }
       @if (activeDetailTab() === 'capture') {
-        <div class="mt-4">
-          <div class="rounded-3xl border border-slate-200 bg-white shadow-sm">
-              <div class="border-b border-slate-200 px-5 py-4">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Manual capture</div>
-                    <h3 class="text-base font-semibold text-slate-900">Supplier Replies</h3>
-                    <p class="text-sm text-slate-500">Record manual supplier replies so future ranking reflects actual responsiveness.</p>
-                  </div>
-                  <span class="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600">
-                    {{ sortedInquiryReplies().length }} supplier{{ sortedInquiryReplies().length === 1 ? '' : 's' }} contacted
-                  </span>
-                </div>
-              </div>
-              <div class="px-5 py-5">
-                @if (inquiryRepliesLoading()) {
-                  <p class="text-sm text-slate-400">Loading supplier replies...</p>
-                } @else if (sortedInquiryReplies().length === 0) {
-                  <p class="text-sm text-slate-400">No supplier inquiries have been sent yet.</p>
-                } @else {
-                  <div class="space-y-3">
-                    @for (reply of sortedInquiryReplies(); track reply.id) {
-                      <div class="rounded-2xl border border-slate-200 bg-gradient-to-b from-white to-slate-50/50 p-4 shadow-sm">
-                        <div class="flex flex-wrap items-start justify-between gap-3">
-                          <div>
-                            <div class="flex flex-wrap items-center gap-2">
-                              <span class="text-sm font-semibold text-slate-900">{{ reply.supplierName }}</span>
-                              <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium" [class]="statusBadgeClass(reply.status)">{{ reply.status }}</span>
-                              @if (order()?.supplierId === reply.supplierId) {
-                                <span class="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white">Selected supplier</span>
-                              }
-                            </div>
-                            @if (reply.email || reply.contactName) {
-                              <div class="mt-1 text-xs text-slate-500">
-                                {{ reply.email }}
-                                @if (reply.contactName) { <span> • {{ reply.contactName }}</span> }
-                              </div>
-                            }
-                            @if (reply.sentAt) {
-                              <div class="mt-1 text-[11px] text-slate-400">Sent {{ formatHistoryDateTime(reply.sentAt) }}</div>
-                            }
-                          </div>
-                          <div class="flex flex-wrap items-center gap-2">
-                            @if (reply.responseHours !== null) {
-                              <span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-amber-200">{{ responseHoursLabel(reply.responseHours) }} response</span>
-                            }
-                            @if (reply.canDeliver === true) {
-                              <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-200">Can deliver</span>
-                            }
-                            @if (!isReadonly()) {
-                              <button (click)="isEditingInquiryReply(reply) ? cancelInquiryReplyEditor() : openInquiryReplyEditor(reply)"
-                                class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:border-slate-300 hover:text-slate-900">
-                                {{ isEditingInquiryReply(reply) ? 'Close editor' : 'Record reply' }}
-                              </button>
-                            }
-                          </div>
-                        </div>
-                        <div class="mt-3 rounded-xl border border-slate-200/80 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                          {{ inquiryReplySummary(reply) }}
-                        </div>
-                      </div>
-                    }
-                  </div>
-                }
-              </div>
-            </div>
-        </div>
+        <app-order-capture-tab
+          [replies]="sortedInquiryReplies()"
+          [loading]="inquiryRepliesLoading()"
+          [readonly]="isReadonly()"
+          [selectedSupplierId]="order()?.supplierId ?? null"
+          [editingReplyId]="editingInquiryReplyId()"
+          [badgeClass]="statusBadgeClass"
+          [formatDateTime]="formatHistoryDateTime"
+          [responseHoursLabel]="responseHoursLabel"
+          [summary]="inquiryReplySummary"
+          (toggleEditor)="isEditingInquiryReply($event) ? cancelInquiryReplyEditor() : openInquiryReplyEditor($event)"
+        />
       }
     }
 
