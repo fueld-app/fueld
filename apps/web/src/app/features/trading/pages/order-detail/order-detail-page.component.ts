@@ -743,8 +743,9 @@ interface PlattsSuggestionViewModel {
           </div>
         </div>
       }
-      </app-order-secondary-tabs>
-    }<!-- Toast notification -->
+    }
+
+    <!-- Toast notification -->
     @if (toast()) {
       <div
         class="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-lg border px-4 py-3 text-sm font-medium shadow-lg transition-all"
