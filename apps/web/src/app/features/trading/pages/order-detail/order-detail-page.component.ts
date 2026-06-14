@@ -87,6 +87,7 @@ import { InternalTransferSidesComponent } from '../../components/internal-transf
 import { AuthService } from '../../../../core/auth/auth.service';
 import { OrderReferenceDataService } from './services/order-reference-data.service';
 import { OrderReplyService } from './services/order-reply.service';
+import { OrderLoaderService } from './services/order-loader.service';
 import { CreditApplicationModalComponent } from '../../../credit/components/credit-application-modal.component';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -757,6 +758,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   protected readonly auth = inject(AuthService);
   protected readonly refData = inject(OrderReferenceDataService);
   protected readonly replySvc = inject(OrderReplyService);
+  private readonly orderLoader = inject(OrderLoaderService);
   private readonly riskService = inject(RiskMonitoringService);
 
   readonly emailModal = viewChild(SendEmailModalComponent);
@@ -1551,190 +1553,58 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   private async loadOrder(): Promise<void> {
     const id = this.orderId();
     if (!id) return;
-
     try {
-      const [orderRes, ownRes] = await Promise.all([
-        firstValueFrom(this.http.get<ApiResponse<any>>(`${API_URL}/orders/${id}`)),
-        firstValueFrom(this.http.get<ApiResponse<OwnCompanyDto[]>>(`${API_URL}/companies/own`)),
-      ]);
-
-      if (orderRes.success && orderRes.data) {
-        const d = orderRes.data;
-        this.order.set({
-          id: d.id,
-          orderNumber: d.orderNumber ?? null,
-          tenantId: d.tenantId,
-          clientId: d.clientId,
-          vesselId: d.vesselId,
-          placeId: d.placeId,
-          salesRepId: d.salesRepId,
-          invoicingCompanyId: d.invoicingCompanyId,
-          bankAccountId: d.bankAccountId ?? null,
-          currency: d.currency ?? 'USD',
-          status: d.status,
-          eta: d.eta,
-          etd: d.etd,
-          customerPaymentTermType: d.customerPaymentTermType ?? null,
-          customerCreditDays: d.customerCreditDays ?? null,
-          customerNote: d.customerNote ?? null,
-          purchaseOrderNumber: d.purchaseOrderNumber ?? null,
-          customerContactId: d.customerContactId ?? null,
-          supplierId: d.supplierId ?? null,
-          supplierPaymentTermType: d.supplierPaymentTermType ?? null,
-          supplierCreditDays: d.supplierCreditDays ?? null,
-          supplierNote: d.supplierNote ?? null,
-          supplierContactId: d.supplierContactId ?? null,
-          brokerId: d.brokerId ?? null,
-          brokerContactId: d.brokerContactId ?? null,
-          brokerGetsAll: d.brokerGetsAll ?? false,
-          agentId: d.agentId ?? null,
-          agentContactId: d.agentContactId ?? null,
-          termsAndConditions: d.termsAndConditions ?? null,
-          lossReason: d.lossReason,
-          financingRateAnnual: d.financingRateAnnual ?? 0.08,
-          financingDayCountConvention: d.financingDayCountConvention ?? 365,
-          financingDays: d.financingDays ?? 0,
-          totalFinancingCost: d.totalFinancingCost ?? '0.0000',
-          financingCostPerMt: d.financingCostPerMt ?? null,
-          totalNetProfit: d.totalNetProfit ?? '0.0000',
-          netMarginPct: d.netMarginPct ?? null,
-          categoryKey: d.categoryKey ?? null,
-          closedAt: d.closedAt,
-          deliveredAt: d.deliveredAt ?? null,
-          createdAt: d.createdAt,
-          updatedAt: d.updatedAt,
-        });
-
-        await this.normalizeDetailRoute(d.status, id);
-
-        if (d.customerContact) this.customerContact.set(d.customerContact);
-        if (d.supplierContact) this.supplierContact.set(d.supplierContact);
-        if (d.brokerContact) this.brokerContact.set(d.brokerContact);
-        if (d.agentContact) this.agentContact.set(d.agentContact);
-        if (d.broker) this.brokers.set([d.broker]);
-        this.agent.set(d.agent ?? null);
-        if (d.agent) this.agents.set([d.agent]);
-
-        if (d.client) this.client.set(d.client);
-        if (d.client) this.clients.set([d.client]);
-        this.supplier.set(d.supplier ?? null);
-        this.mergeKnownSuppliers([
-          d.supplier ?? null,
-          ...(d.orderSuppliers?.map((supplier: OrderSupplierDto) => supplier.company) ?? []),
-        ]);
-        this.orderSuppliers.set(d.orderSuppliers ?? []);
-        this.activeOrderSupplierId.set(
-          d.orderSuppliers?.find((supplier: OrderSupplierDto) => supplier.isPrimary)?.id
-            ?? d.orderSuppliers?.[0]?.id
-            ?? null,
-        );
-        if (d.vessel) {
-          this.vessel.set(d.vessel);
-          this.vessels.set([d.vessel]);
-        }
-        if (d.place) {
-          this.port.set(d.place);
-          this.places.set([d.place]);
-        }
-
-        this.itemRows.set(
-          (d.items ?? []).map((item: any) => ({
-            id: item.id,
-            orderSupplierId: item.orderSupplierId ?? null,
-            productType: item.productType ?? '',
-            description: item.description ?? '',
-            quantity: parseFloat(item.quantity) || 0,
-            quantityMin: item.quantityMin ? parseFloat(item.quantityMin) : null,
-            quantityMax: item.quantityMax ? parseFloat(item.quantityMax) : null,
-            unit: item.unit ?? 'MT',
-            costUnit: item.costUnit ?? item.unit ?? 'MT',
-            salesUnit: item.salesUnit ?? item.unit ?? 'MT',
-            costConversionFactor: parseFloat(item.costConversionFactor) || 1,
-            unitConversionFactor: parseFloat(item.unitConversionFactor) || 1,
-            costPrice: parseFloat(item.costPrice) || 0,
-            costCurrency: item.costCurrency ?? d.currency ?? 'USD',
-            salesPrice: parseFloat(item.salesPrice) || 0,
-            salesCurrency: item.salesCurrency ?? d.currency ?? 'USD',
-            profit: parseFloat(item.profit) || 0,
-            paymentTerms: item.paymentTerms ?? '',
-            customerNote: item.customerNote ?? '',
-            deliveredQuantity: item.deliveredQuantity != null ? parseFloat(item.deliveredQuantity) : null,
-            // Formula pricing
-            costPricingModel: item.costPricingModel ?? PricingModel.Fixed,
-            costReferenceId: item.costReferenceId ?? null,
-            costPlattsEntryId: item.costPlattsEntryId ?? null,
-            costReferenceName: item.costReferenceName ?? null,
-            costPremium: item.costPremium != null ? parseFloat(item.costPremium) : null,
-            costBarging: item.costBarging != null ? parseFloat(item.costBarging) : null,
-            costBargingUnit: item.costBargingUnit ?? null,
-            costCreditDays: item.costCreditDays ?? null,
-            costPriceFinalized: item.costPriceFinalized ?? false,
-            salesPricingModel: item.salesPricingModel ?? PricingModel.Fixed,
-            salesReferenceId: item.salesReferenceId ?? null,
-            salesPlattsEntryId: item.salesPlattsEntryId ?? null,
-            salesReferenceName: item.salesReferenceName ?? null,
-            salesPremium: item.salesPremium != null ? parseFloat(item.salesPremium) : null,
-            salesBarging: item.salesBarging != null ? parseFloat(item.salesBarging) : null,
-            salesBargingUnit: item.salesBargingUnit ?? null,
-            salesCreditDays: item.salesCreditDays ?? null,
-            salesPriceFinalized: item.salesPriceFinalized ?? false,
-            // Inventory linkage (optional, only present when admin enabled inventory for this order's warehouse)
-            inventorySkuId: item.inventorySkuId ?? null,
-            warehouseId: item.warehouseId ?? null,
-            plannedInventoryAt: item.plannedInventoryAt ?? null,
-            // Tax
-            taxRate: item.taxRate != null ? parseFloat(item.taxRate) : null,
-            taxAmount: item.taxAmount != null ? parseFloat(item.taxAmount) : null,
-          })),
-        );
-        this.draftItemIds.set(new Set());
-
-        await this.loadCustomerCreditLines(d.clientId);
-        await this.loadSupplierCreditLines(this.activeOrderSupplier()?.companyId ?? d.supplierId);
-        await this.loadReferenceData();
-        await this.loadPlattsSuggestions();
-        // Reference data (incl. warehouses + SKUs) is now loaded; run an initial
-        // availability check for any tracked lines that came back from the server.
-        this.scheduleAvailabilityChecks();
-        if (d.orderKind === 'INTERNAL_TRANSFER') {
-          await this.loadInternalTransfer();
-        } else {
-          this.transfer.set(null);
-        }
-        await this.loadCompanyContacts('customer', d.clientId);
-        if (this.activeOrderSupplier()?.companyId ?? d.supplierId) {
-          await this.loadCompanyContacts('supplier', this.activeOrderSupplier()?.companyId ?? d.supplierId);
-        }
-        if (d.brokerId) await this.loadCompanyContacts('broker', d.brokerId);
-        if (d.agentId) await this.loadCompanyContacts('agent', d.agentId);
-        await Promise.all([
-          this.loadInquirySupplierContext(),
-          this.loadInquiryReplies(),
-        ]);
-      }
-
-      let invoicingId = this.order()?.invoicingCompanyId ?? null;
-      if (ownRes.success) {
-        this.ownCompanies.set(ownRes.data);
-        invoicingId = this.applyPreferredInvoicingCompanySelection(ownRes.data);
-      }
-
-      if (invoicingId) {
-        await this.loadBankAccounts(invoicingId, { autoSelect: true });
+      const r = await this.orderLoader.load(id);
+      if (!r.order) { this.showToast('error', 'Failed to load order.'); return; }
+      this.order.set(r.order);
+      this.customerContact.set(r.customerContact);
+      this.supplierContact.set(r.supplierContact);
+      this.brokerContact.set(r.brokerContact);
+      this.agentContact.set(r.agentContact);
+      this.brokers.set(r.broker ? [r.broker] : []);
+      this.agent.set(r.agent);
+      if (r.agent) this.agents.set([r.agent]);
+      this.client.set(r.client);
+      if (r.client) this.clients.set([r.client]);
+      this.supplier.set(r.supplier);
+      this.mergeKnownSuppliers([r.supplier, ...(r.orderSuppliers?.map((s) => s.company) ?? [])]);
+      this.orderSuppliers.set(r.orderSuppliers ?? []);
+      this.activeOrderSupplierId.set(r.orderSuppliers?.find((s) => s.isPrimary)?.id ?? r.orderSuppliers?.[0]?.id ?? null);
+      if (r.vessel) { this.vessel.set(r.vessel); this.vessels.set([r.vessel]); }
+      if (r.port) { this.port.set(r.port); this.places.set([r.port]); }
+      this.itemRows.set(r.items);
+      this.draftItemIds.set(new Set());
+      await this.normalizeDetailRoute(r.order.status, id);
+      await this.loadCustomerCreditLines(r.order.clientId);
+      await this.loadSupplierCreditLines(this.activeOrderSupplier()?.companyId ?? r.order.supplierId);
+      await this.loadReferenceData();
+      await this.loadPlattsSuggestions();
+      this.scheduleAvailabilityChecks();
+      if (r.order.orderKind === 'INTERNAL_TRANSFER') {
+        await this.loadInternalTransfer();
       } else {
-        this.bankAccounts.set([]);
+        this.transfer.set(null);
       }
-
+      await this.loadCompanyContacts('customer', r.order.clientId);
+      const supplierCompanyId = this.activeOrderSupplier()?.companyId ?? r.order.supplierId;
+      if (supplierCompanyId) await this.loadCompanyContacts('supplier', supplierCompanyId);
+      if (r.order.brokerId) await this.loadCompanyContacts('broker', r.order.brokerId);
+      if (r.order.agentId) await this.loadCompanyContacts('agent', r.order.agentId);
+      await Promise.all([this.loadInquirySupplierContext(), this.loadInquiryReplies()]);
+      let invoicingId = this.order()?.invoicingCompanyId ?? null;
+      if (r.ownCompanies.length) {
+        this.ownCompanies.set(r.ownCompanies);
+        invoicingId = this.applyPreferredInvoicingCompanySelection(r.ownCompanies);
+      }
+      if (invoicingId) await this.loadBankAccounts(invoicingId, { autoSelect: true });
+      else this.bankAccounts.set([]);
       if (this.order()?.customerNote) this.showCustomerPaymentNote.set(true);
       if (this.order()?.supplierNote) this.showSupplierPaymentNote.set(true);
-
       await this.loadAttachments();
       await this.loadPayments();
       await this.loadPortDocumentationContext();
       await this.loadSupplierNominationSummary();
-    } catch {
-      this.showToast('error', 'Failed to load order.');
-    }
+    } catch { this.showToast('error', 'Failed to load order.'); }
   }
 
   private async loadPortDocumentationContext(): Promise<void> {
