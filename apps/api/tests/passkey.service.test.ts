@@ -129,6 +129,7 @@ describe('passkey.service', () => {
     const verified = await passkeyService.verifyPasskeyAuthentication(
       seeded.user.id,
       { id: 'cred-test-1' } as any,
+      byEmail!.sessionId,
     );
     expect(verified?.userId).toBe(seeded.user.id);
     expect(verified?.email).toBe(seeded.user.email);
@@ -136,6 +137,7 @@ describe('passkey.service', () => {
     const missingChallenge = await passkeyService.verifyPasskeyAuthentication(
       seeded.user.id,
       { id: 'cred-test-1' } as any,
+      byEmail!.sessionId,
     );
     expect(missingChallenge).toBeNull();
 
@@ -145,20 +147,65 @@ describe('passkey.service', () => {
     const noKeys = await passkeyService.generatePasskeyAuthenticationOptions({ userId: '123e4567-e89b-12d3-a456-426614174000' });
     expect(noKeys).toBeNull();
 
-    await passkeyService.generatePasskeyAuthenticationOptions({ userId: seeded.user.id });
+    const byUserId = await passkeyService.generatePasskeyAuthenticationOptions({ userId: seeded.user.id });
     const wrongCredential = await passkeyService.verifyPasskeyAuthentication(
       seeded.user.id,
       { id: 'wrong-credential-id' } as any,
+      byUserId!.sessionId,
     );
     expect(wrongCredential).toBeNull();
 
-    await passkeyService.generatePasskeyAuthenticationOptions({ userId: seeded.user.id });
+    const byUserId2 = await passkeyService.generatePasskeyAuthenticationOptions({ userId: seeded.user.id });
     authShouldThrow = true;
     const thrownVerify = await passkeyService.verifyPasskeyAuthentication(
       seeded.user.id,
       { id: 'cred-test-1' } as any,
+      byUserId2!.sessionId,
     );
     expect(thrownVerify).toBeNull();
+  });
+
+  it('covers discoverable passkey flow (no email/userId identifier)', async () => {
+    const seeded = await seedBasics();
+
+    // Register a passkey first
+    await passkeyService.generatePasskeyRegistrationOptions(
+      seeded.user.id,
+      seeded.user.email,
+      seeded.user.name,
+    );
+    await passkeyService.verifyAndStorePasskey(
+      seeded.user.id,
+      'Discoverable Key',
+      { id: 'cred-discoverable-1' } as any,
+    );
+
+    // Generate auth options WITHOUT identifier — discoverable flow
+    const result = await passkeyService.generatePasskeyAuthenticationOptions(undefined);
+    expect(result).not.toBeNull();
+    expect(result!.userId).toBeNull(); // no user ID known ahead of time
+    expect(result!.sessionId).toBeTruthy();
+    expect(String(result!.options?.challenge ?? '')).toContain('auth-challenge-');
+    // allowCredentials should be undefined (browser picks from discoverable creds)
+    expect((result!.options as any)?.allowCredentials).toBeUndefined();
+
+    // Verify the assertion — must look up user by credential ID
+    const verified = await passkeyService.verifyPasskeyAuthentication(
+      null, // userId unknown; service looks it up via credential ID
+      { id: 'cred-test-1' } as any,
+      result!.sessionId,
+    );
+    expect(verified).not.toBeNull();
+    expect(verified!.userId).toBe(seeded.user.id);
+    expect(verified!.email).toBe(seeded.user.email);
+
+    // Second consumption of same sessionId should fail
+    const replayed = await passkeyService.verifyPasskeyAuthentication(
+      null,
+      { id: 'cred-test-1' } as any,
+      result!.sessionId,
+    );
+    expect(replayed).toBeNull();
   });
 
   it('covers rename/delete and missing registration-challenge error branch', async () => {

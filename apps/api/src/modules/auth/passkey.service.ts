@@ -34,14 +34,14 @@ const RP_ORIGIN = process.env['WEBAUTHN_ORIGIN'] ?? (RP_ID === 'localhost' ? 'ht
 const challengeStore = new Map<string, { challenge: string; expiresAt: number }>();
 const CHALLENGE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-function storeChallenge(userId: string, challenge: string): void {
-  challengeStore.set(userId, { challenge, expiresAt: Date.now() + CHALLENGE_TTL_MS });
+function storeChallenge(key: string, challenge: string): void {
+  challengeStore.set(key, { challenge, expiresAt: Date.now() + CHALLENGE_TTL_MS });
 }
 
-function getAndConsumeChallenge(userId: string): string | null {
-  const entry = challengeStore.get(userId);
+function getAndConsumeChallenge(key: string): string | null {
+  const entry = challengeStore.get(key);
   if (!entry) return null;
-  challengeStore.delete(userId);
+  challengeStore.delete(key);
   if (Date.now() > entry.expiresAt) return null;
   return entry.challenge;
 }
@@ -150,7 +150,7 @@ export async function generatePasskeyRegistrationOptions(
     attestationType: 'none', // Don't require attestation — simplifies UX
     excludeCredentials,
     authenticatorSelection: {
-      residentKey: 'preferred',
+      residentKey: 'required',
       userVerification: 'preferred',
       authenticatorAttachment: 'platform', // Prefer platform (Touch ID / Face ID / Windows Hello)
     },
@@ -224,39 +224,46 @@ export async function verifyAndStorePasskey(
 
 /**
  * Step 1: Generate authentication options (challenge) for the browser.
- * For passwordless: pass email to look up user and their credentials.
+ * For passwordless with email: pass email to look up user and their credentials.
  * For 2FA: pass userId directly.
+ * For discoverable (no email): omit identifier; the browser picks the credential.
+ * Returns a sessionId for challenge retrieval in the verification step.
  */
 export async function generatePasskeyAuthenticationOptions(
-  identifier: { email: string } | { userId: string },
-): Promise<{ options: Record<string, unknown>; userId: string } | null> {
-  let userId: string;
+  identifier: { email: string } | { userId: string } | undefined,
+): Promise<{ options: Record<string, unknown>; userId: string | null; sessionId: string } | null> {
+  let userId: string | null = null;
+  let allowCredentials: { id: string; transports: AuthenticatorTransportFuture[] }[] | undefined;
 
-  if ('email' in identifier) {
+  if (identifier && 'email' in identifier) {
     const user = await db.query.users.findFirst({
       where: eq(users.email, identifier.email.toLowerCase()),
     });
     if (!user || !user.isActive) return null;
     userId = user.id;
-  } else {
+  } else if (identifier && 'userId' in identifier) {
     userId = identifier.userId;
   }
 
-  // Get user's credentials to allow
-  const userPasskeys = await db
-    .select({
-      credentialId: passkeys.credentialId,
-      transports: passkeys.transports,
-    })
-    .from(passkeys)
-    .where(eq(passkeys.userId, userId));
+  // If we know the user, restrict to their credentials
+  if (userId) {
+    const userPasskeys = await db
+      .select({
+        credentialId: passkeys.credentialId,
+        transports: passkeys.transports,
+      })
+      .from(passkeys)
+      .where(eq(passkeys.userId, userId));
 
-  if (userPasskeys.length === 0) return null;
+    if (userPasskeys.length === 0) return null;
 
-  const allowCredentials = userPasskeys.map((c) => ({
-    id: c.credentialId,
-    transports: (c.transports?.split(',') ?? []) as AuthenticatorTransportFuture[],
-  }));
+    allowCredentials = userPasskeys.map((c) => ({
+      id: c.credentialId,
+      transports: (c.transports?.split(',') ?? []) as AuthenticatorTransportFuture[],
+    }));
+  }
+  // For discoverable flow (no identifier), omit allowCredentials — the browser
+  // will show all discoverable credentials registered for this RP.
 
   const options = await generateAuthenticationOptions({
     rpID: RP_ID,
@@ -264,22 +271,39 @@ export async function generatePasskeyAuthenticationOptions(
     userVerification: 'preferred',
   });
 
-  // Store the challenge for verification in step 2
-  storeChallenge(userId, options.challenge);
+  // Use the challenge itself as the storage key (it's cryptographically random).
+  // For the discoverable flow we don't know userId yet, so the challenge string
+  // serves as a unique key we can retrieve later when the credential ID tells us who the user is.
+  const sessionId = options.challenge;
+  storeChallenge(sessionId, options.challenge);
 
-  return { options: options as unknown as Record<string, unknown>, userId };
+  return { options: options as unknown as Record<string, unknown>, userId, sessionId };
 }
 
 /**
  * Step 2: Verify the authentication response from the browser.
+ * For the email-based / 2FA flow: pass userId + sessionId.
+ * For the discoverable flow: pass only sessionId (userId is looked up from credential).
  * Returns the authenticated user info or null on failure.
  */
 export async function verifyPasskeyAuthentication(
-  userId: string,
+  userId: string | null,
   response: AuthenticationResponseJSON,
+  sessionId: string,
 ): Promise<{ userId: string; email: string; name: string; role: string; tenantId: string | null; isActive: boolean } | null> {
-  const expectedChallenge = getAndConsumeChallenge(userId);
+  const expectedChallenge = getAndConsumeChallenge(sessionId);
   if (!expectedChallenge) return null;
+
+  // For discoverable flow, look up the user by the credential ID returned in the assertion
+  if (!userId) {
+    const credentialOwner = await db
+      .select({ userId: passkeys.userId })
+      .from(passkeys)
+      .where(eq(passkeys.credentialId, response.id))
+      .limit(1);
+    if (credentialOwner.length === 0) return null;
+    userId = credentialOwner[0]!.userId;
+  }
 
   // Look up the credential in the DB
   const credentialRow = await db
@@ -293,7 +317,7 @@ export async function verifyPasskeyAuthentication(
     .from(passkeys)
     .where(
       and(
-        eq(passkeys.userId, userId),
+        eq(passkeys.userId, userId!),
         eq(passkeys.credentialId, response.id),
       ),
     )

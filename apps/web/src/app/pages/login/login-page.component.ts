@@ -289,16 +289,13 @@ export class LoginPageComponent {
   }
 
   async onPasskeyLogin(): Promise<void> {
-    if (!this.email) {
-      this.errorMessage.set('Please enter your email to sign in with a passkey.');
-      return;
-    }
-
+    // If user has entered an email, pass it to narrow the credential list.
+    // If not, use discoverable credentials (browser handles identity resolution).
     this.passkeyLoading.set(true);
     this.errorMessage.set('');
 
     try {
-      await this.auth.loginWithPasskey(this.email);
+      await this.auth.loginWithPasskey(this.email || undefined);
       await this.router.navigateByUrl(this.returnUrl);
     } catch (err: unknown) {
       const msg =

@@ -357,7 +357,7 @@ export const authController = new Elysia({ prefix: '/auth' })
           } satisfies ApiResponse<null>;
         }
 
-        const verified = await verifyPasskeyAuthentication(userId, body.assertionResponse);
+        const verified = await verifyPasskeyAuthentication(userId, body.assertionResponse, body.sessionId);
         if (!verified) {
           return {
             success: false,
@@ -397,6 +397,7 @@ export const authController = new Elysia({ prefix: '/auth' })
       body: t.Object({
         tempToken: t.String(),
         assertionResponse: t.Any(),
+        sessionId: t.String(),
       }),
       detail: {
         tags: ['Auth'],
@@ -420,11 +421,20 @@ export const authController = new Elysia({ prefix: '/auth' })
           } satisfies ApiResponse<null>;
         }
 
-        const result = await generatePasskeyAuthenticationOptions({ email: body.email });
+        // If email is provided, use the narrowed (email-bound) flow.
+        // If not, generate discoverable credential options (no allowCredentials).
+        const identifier = body.email ? { email: body.email } : undefined;
+        const result = await generatePasskeyAuthenticationOptions(identifier);
         if (!result) {
           return { success: false, data: null, message: 'No passkeys registered for this account' } satisfies ApiResponse<null>;
         }
-        return { success: true, data: result.options } satisfies ApiResponse<typeof result.options>;
+        return {
+          success: true,
+          data: {
+            options: result.options,
+            sessionId: result.sessionId,
+          },
+        } satisfies ApiResponse<{ options: Record<string, unknown>; sessionId: string }>;
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to generate passkey options';
         return { success: false, data: null, message } satisfies ApiResponse<null>;
@@ -432,7 +442,7 @@ export const authController = new Elysia({ prefix: '/auth' })
     },
     {
       body: t.Object({
-        email: t.String({ format: 'email' }),
+        email: t.Optional(t.String({ format: 'email' })),
       }),
       detail: {
         tags: ['Auth'],
@@ -471,7 +481,13 @@ export const authController = new Elysia({ prefix: '/auth' })
         if (!result) {
           return { success: false, data: null, message: 'No passkeys registered for this account' } satisfies ApiResponse<null>;
         }
-        return { success: true, data: result.options } satisfies ApiResponse<typeof result.options>;
+        return {
+          success: true,
+          data: {
+            options: result.options,
+            sessionId: result.sessionId,
+          },
+        } satisfies ApiResponse<{ options: Record<string, unknown>; sessionId: string }>;
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to generate passkey options';
         return { success: false, data: null, message } satisfies ApiResponse<null>;
@@ -503,25 +519,31 @@ export const authController = new Elysia({ prefix: '/auth' })
           } satisfies ApiResponse<null>;
         }
 
-        // Look up user by email
-        const userRecord = await findUserByEmail(body.email);
-        if (!userRecord) {
-          return {
-            success: false,
-            data: null,
-            message: 'User not found',
-          } satisfies ApiResponse<null>;
+        // For the discoverable flow, email is optional — the credential ID
+        // in the assertion tells us who the user is.
+        let userId: string | null = null;
+
+        if (body.email) {
+          // Narrowed flow: look up user by email
+          const found = await findUserByEmail(body.email);
+          if (!found) {
+            return {
+              success: false,
+              data: null,
+              message: 'User not found',
+            } satisfies ApiResponse<null>;
+          }
+          if (!found.isActive) {
+            return {
+              success: false,
+              data: null,
+              message: 'Your account has been deactivated. Contact an admin.',
+            } satisfies ApiResponse<null>;
+          }
+          userId = found.id;
         }
 
-        if (!userRecord.isActive) {
-          return {
-            success: false,
-            data: null,
-            message: 'Your account has been deactivated. Contact an admin.',
-          } satisfies ApiResponse<null>;
-        }
-
-        const verified = await verifyPasskeyAuthentication(userRecord.id, body.assertionResponse);
+        const verified = await verifyPasskeyAuthentication(userId, body.assertionResponse, body.sessionId);
         if (!verified) {
           return {
             success: false,
@@ -530,7 +552,15 @@ export const authController = new Elysia({ prefix: '/auth' })
           } satisfies ApiResponse<null>;
         }
 
-        const user = await findUserById(userRecord.id);
+        if (!verified.isActive) {
+          return {
+            success: false,
+            data: null,
+            message: 'Your account has been deactivated. Contact an admin.',
+          } satisfies ApiResponse<null>;
+        }
+
+        const user = await findUserById(verified.userId);
         if (!user) {
           return {
             success: false,
@@ -561,8 +591,9 @@ export const authController = new Elysia({ prefix: '/auth' })
     },
     {
       body: t.Object({
-        email: t.String({ format: 'email' }),
+        email: t.Optional(t.String({ format: 'email' })),
         assertionResponse: t.Any(),
+        sessionId: t.String(),
       }),
       detail: {
         tags: ['Auth'],
