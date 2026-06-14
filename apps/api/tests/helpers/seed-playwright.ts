@@ -121,10 +121,12 @@ async function ensureCompanyOfficesCompat(): Promise<void> {
     ALTER COLUMN city SET NOT NULL
   `;
 
-  await sql`
-    ALTER TABLE company_offices
-    ALTER COLUMN label DROP NOT NULL
-  `;
+  // label column was removed from the schema in a prior migration
+  try {
+    await sql`ALTER TABLE company_offices ALTER COLUMN label DROP NOT NULL`;
+  } catch {
+    // column already gone — fine
+  }
 }
 
 async function ensureVesselsCompat(): Promise<void> {
