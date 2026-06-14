@@ -69,6 +69,7 @@ import { OrderAttachmentsCardComponent } from './components/order-attachments-ca
 import { OrderSettingsDropdownComponent } from './components/order-settings-dropdown/order-settings-dropdown.component';
 import { OrderPlattsSignalsComponent } from './components/order-platts-signals/order-platts-signals.component';
 import { OrderSecondaryTabsComponent } from './components/order-secondary-tabs/order-secondary-tabs.component';
+import { OrderPaymentModalComponent } from './components/order-payment-modal/order-payment-modal.component';
 import { OrderPaymentsCardComponent } from './components/order-payments-card/order-payments-card.component';
 import { CommentsCardComponent } from '../../../../shared/components/comments-card/comments-card.component';
 import { PdfPreviewModalComponent } from '../../../../shared/components/pdf-preview-modal/pdf-preview-modal.component';
@@ -226,6 +227,7 @@ interface PlattsSuggestionViewModel {
     OrderSettingsDropdownComponent,
     OrderPlattsSignalsComponent,
     OrderSecondaryTabsComponent,
+    OrderPaymentModalComponent,
   ],
   template: `
     <app-trading-detail-header
@@ -532,7 +534,7 @@ interface PlattsSuggestionViewModel {
             [loading]="paymentsLoading()"
             [canSeePrices]="auth.canSeePrices()"
             [canRecordPayment]="canRecordPayment()"
-            (addPayment)="openPaymentModal()"
+            (addPayment)="paymentModal.openModal()"
           />
         }
         <app-order-attachments-card
@@ -823,99 +825,14 @@ interface PlattsSuggestionViewModel {
       </div>
     }
 
-    @defer (when paymentModalOpen()) {
-      @if (paymentModalOpen()) {
-      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-        <div class="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
-          <div class="flex items-center justify-between">
-            <h3 class="text-lg font-semibold text-gray-900">Record payment</h3>
-            <button
-              type="button"
-              (click)="closePaymentModal()"
-              class="text-gray-400 hover:text-gray-600"
-            >
-              ✕
-            </button>
-          </div>
-          <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <label class="text-xs font-medium text-gray-500">Amount</label>
-              <input
-                type="number"
-                min="0"
-                [ngModel]="paymentAmount()"
-                (ngModelChange)="paymentAmount.set($event)"
-                class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
-                       focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-              />
-            </div>
-            <div>
-              <label class="text-xs font-medium text-gray-500">Currency</label>
-              <select
-                [ngModel]="paymentCurrency()"
-                (ngModelChange)="paymentCurrency.set($event)"
-                class="fueld-select-no-chevron mt-1 w-full appearance-none rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 uppercase
-                       focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 bg-white"
-              >
-                @for (c of configuredCurrencies(); track c.value) {
-                  <option [value]="c.value">{{ c.label }}</option>
-                }
-              </select>
-            </div>
-            <div>
-              <label class="text-xs font-medium text-gray-500">Received at</label>
-              <input
-                type="date"
-                [ngModel]="paymentReceivedAt()"
-                (ngModelChange)="paymentReceivedAt.set($event)"
-                class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
-                       focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-              />
-            </div>
-            <div>
-              <label class="text-xs font-medium text-gray-500">Method</label>
-              <input
-                type="text"
-                [ngModel]="paymentMethod()"
-                (ngModelChange)="paymentMethod.set($event)"
-                placeholder="Wire, ACH, card"
-                class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
-                       focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-              />
-            </div>
-          </div>
-          <div class="mt-3">
-            <label class="text-xs font-medium text-gray-500">Note</label>
-            <textarea
-              rows="3"
-              [ngModel]="paymentNote()"
-              (ngModelChange)="paymentNote.set($event)"
-              class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
-                     focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-            ></textarea>
-          </div>
-          <div class="mt-5 flex items-center justify-end gap-3">
-            <button
-              type="button"
-              (click)="closePaymentModal()"
-              class="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              (click)="submitPayment()"
-              [disabled]="paymentSaving()"
-              class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white
-                     shadow-sm transition-colors hover:bg-brand-700 disabled:opacity-50"
-            >
-              Record payment
-            </button>
-          </div>
-        </div>
-      </div>
-      }
-    }
+    <app-order-payment-modal
+      #paymentModal
+      [orderId]="orderId()"
+      [currencyOptions]="configuredCurrencies()"
+      [defaultCurrency]="order()?.currency ?? 'USD'"
+      [todayLocal]="formatDateForInput(new Date(), placeTimezone())"
+      (saved)="loadPayments()"
+    />
 
     @defer (when showConvertToOrderModal()) {
     @if (showConvertToOrderModal()) {
@@ -1266,16 +1183,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly customerCreditFrozen = signal(false);
   readonly supplierCreditLines = signal<CreditLineDto[]>([]);
   readonly supplierCreditLoading = signal(false);
-  readonly paymentModalOpen = signal(false);
-  readonly paymentSaving = signal(false);
-  readonly paymentAmount = signal('');
-  readonly paymentCurrency = signal('USD');
-  readonly paymentReceivedAt = signal('');
-  readonly paymentMethod = signal('');
-  readonly paymentNote = signal('');
   readonly noteTab = signal<'customer' | 'supplier'>('customer');
   readonly showCustomerPaymentNote = signal(false);
   readonly showSupplierPaymentNote = signal(false);
+  readonly paymentModalRef = viewChild(OrderPaymentModalComponent);
   readonly activeDetailTab = signal('comments');
   readonly showConvertToOrderModal = signal(false);
   readonly showCancelInquiryModal = signal(false);
@@ -2450,57 +2361,9 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   openPaymentModal(): void {
-    const currency = this.order()?.currency ?? 'USD';
-    this.paymentAmount.set('');
-    this.paymentCurrency.set(currency);
-    this.paymentReceivedAt.set(this.formatDateForInput(new Date(), this.placeTimezone()));
-    this.paymentMethod.set('');
-    this.paymentNote.set('');
-    this.paymentModalOpen.set(true);
+    this.paymentModalRef?.openModal();
   }
 
-  closePaymentModal(): void {
-    this.paymentModalOpen.set(false);
-  }
-
-  async submitPayment(): Promise<void> {
-    const id = this.orderId();
-    if (!id) return;
-    const amountValue = this.paymentAmount();
-    const amount = (typeof amountValue === 'string' ? amountValue : String(amountValue ?? '')).trim();
-    if (!amount) {
-      this.showToast('error', 'Amount is required.');
-      return;
-    }
-
-    this.paymentSaving.set(true);
-    try {
-      const receivedDate = this.paymentReceivedAt();
-      const receivedIso = receivedDate ? new Date(`${receivedDate}T12:00:00`).toISOString() : undefined;
-      const currency = this.paymentCurrency().trim() || (this.order()?.currency ?? 'USD');
-      const res = await firstValueFrom(
-        this.http.post<ApiResponse<CustomerPaymentDto>>(`${API_URL}/orders/${id}/payments`, {
-          amount,
-          currency,
-          receivedAt: receivedIso,
-          method: this.paymentMethod() || null,
-          note: this.paymentNote() || null,
-        }),
-      );
-      if (res.success) {
-        await this.loadPayments();
-        this.closePaymentModal();
-        await this.setOrderStatus(OrderStatus.Paid);
-        this.showToast('success', 'Payment recorded. Order marked as paid.');
-      } else {
-        this.showToast('error', res.message ?? 'Failed to record payment.');
-      }
-    } catch {
-      this.showToast('error', 'Failed to record payment.');
-    } finally {
-      this.paymentSaving.set(false);
-    }
-  }
 
   private async loadReferenceData(): Promise<void> {
     try {
