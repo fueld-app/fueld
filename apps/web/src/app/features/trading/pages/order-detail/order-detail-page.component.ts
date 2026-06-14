@@ -864,10 +864,18 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     return `${year}-${month}-${day}`;
   }
 
+  private _initialLoadComplete = false;
+
   constructor() {
-    effect(() => {
-      this.saveSvc.changeVersion();
-      this.saveSvc.scheduleAutoSave(() => this.performAutoSave(), 1500);
+    // Reactive autosave — watches mutable signals; fires on any change
+    effect((onCleanup) => {
+      this.order();
+      this.itemRows();
+      this.orderSuppliers();
+      if (!this._initialLoadComplete) return;
+
+      const timer = setTimeout(() => this.performAutoSave(), 1500);
+      onCleanup(() => clearTimeout(timer));
     });
 
     effect(() => {
@@ -998,6 +1006,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       await this.portDocSvc.load(this.orderId());
       await this.loadSupplierNominationSummary();
     } catch { this.showToast('error', 'Failed to load order.'); }
+    this._initialLoadComplete = true;
   }
 
   private async loadPortDocumentationContext(): Promise<void> {
@@ -1247,7 +1256,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       if (value !== 'CREDIT') next.customerCreditDays = null;
       return next;
     });
-    this.triggerAutosave();
   }
 
   renderCompanyTerms(template: string | null | undefined, context: 'customer' | 'supplier'): string {
@@ -1293,7 +1301,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     } else {
       this.order.update((o) => (o ? { ...o, customerCreditDays: nextDays } : o));
     }
-    this.triggerAutosave();
   }
 
   onSupplierPaymentTermChange(value: string): void {
@@ -1310,7 +1317,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
             supplierCreditDays: ptt === 'CREDIT' ? order.supplierCreditDays ?? null : null,
           }
         : order);
-      this.triggerAutosave();
       return;
     }
     this.updateActiveOrderSupplier((supplier) => ({
@@ -1318,7 +1324,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       paymentTermType: ptt || null,
       creditDays: ptt === 'CREDIT' ? supplier.creditDays ?? null : null,
     }));
-    this.triggerAutosave();
   }
 
   onSupplierCreditDaysChange(value: number | string): void {
@@ -1332,7 +1337,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       } else {
         this.order.update((order) => order ? { ...order, supplierCreditDays: nextDays } : order);
       }
-      this.triggerAutosave();
       return;
     }
     if (maxDays !== null && nextDays !== null && nextDays > maxDays) {
@@ -1341,32 +1345,26 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     } else {
       this.updateActiveOrderSupplier((supplier) => ({ ...supplier, creditDays: nextDays }));
     }
-    this.triggerAutosave();
   }
 
   onSupplierNoteChange(value: string): void {
     if (this.orderSuppliers().length === 0) {
       this.order.update((order) => order ? { ...order, supplierNote: value } : order);
-      this.triggerAutosave();
       return;
     }
     this.updateActiveOrderSupplier((supplier) => ({ ...supplier, note: value }));
-    this.triggerAutosave();
   }
 
   onCustomerNoteChange(value: string): void {
     this.order.update((o) => (o ? { ...o, customerNote: value } : o));
-    this.triggerAutosave();
   }
 
   onPurchaseOrderNumberChange(value: string): void {
     this.order.update((o) => (o ? { ...o, purchaseOrderNumber: value || null } : o));
-    this.triggerAutosave();
   }
 
   onResponsibleUserChange(userId: string): void {
     this.order.update((o) => (o ? { ...o, salesRepId: userId || null } : o));
-    this.triggerAutosave();
   }
 
   // ─── Contact person handlers ─────────────────────────────────────
@@ -1391,7 +1389,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     this.order.update((o) => (o ? { ...o, customerContactId: contactId || null } : o));
     const contact = this.customerContacts().find((c) => c.id === contactId) ?? null;
     this.customerContact.set(contact);
-    this.triggerAutosave();
   }
 
   onActiveSupplierContactChange(contactId: string): void {
@@ -1399,20 +1396,17 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       this.order.update((order) => order ? { ...order, supplierContactId: contactId || null } : order);
       const contact = this.supplierContacts().find((c) => c.id === contactId) ?? null;
       this.supplierContact.set(contact);
-      this.triggerAutosave();
       return;
     }
     this.updateActiveOrderSupplier((supplier) => ({ ...supplier, contactId: contactId || null }));
     const contact = this.supplierContacts().find((c) => c.id === contactId) ?? null;
     this.supplierContact.set(contact);
-    this.triggerAutosave();
   }
 
   onAgentContactChange(contactId: string): void {
     this.order.update((o) => (o ? { ...o, agentContactId: contactId || null } : o));
     const contact = this.agentContacts().find((c) => c.id === contactId) ?? null;
     this.agentContact.set(contact);
-    this.triggerAutosave();
   }
 
   // ─── Broker handlers ─────────────────────────────────────────────
@@ -1424,7 +1418,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   onBrokerChange(brokerId: string): void {
     this.brokerSvc.onBrokerChange(
       brokerId,
-      (updater) => { this.order.update((o) => (o ? updater(o) : o)); this.triggerAutosave(); },
+      (updater) => { this.order.update((o) => (o ? updater(o) : o)); },
       (companyId) => { void this.loadCompanyContacts('broker', companyId); },
     );
   }
@@ -1432,14 +1426,14 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   onBrokerContactChange(contactId: string): void {
     this.brokerSvc.onBrokerContactChange(
       contactId,
-      (updater) => { this.order.update((o) => (o ? updater(o) : o)); this.triggerAutosave(); },
+      (updater) => { this.order.update((o) => (o ? updater(o) : o)); },
     );
   }
 
   onBrokerGetsAllChange(value: boolean): void {
     this.brokerSvc.onBrokerGetsAllChange(
       value,
-      (updater) => { this.order.update((o) => (o ? updater(o) : o)); this.triggerAutosave(); },
+      (updater) => { this.order.update((o) => (o ? updater(o) : o)); },
     );
   }
 
@@ -1473,7 +1467,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       this.agent.set(null);
       this.agentContact.set(null);
       this.agentContacts.set([]);
-      this.triggerAutosave();
       return;
     }
 
@@ -1483,12 +1476,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     this.agent.set(agentData ?? null);
     this.agentContact.set(null);
     void this.loadCompanyContacts('agent', agentId);
-    this.triggerAutosave();
   }
 
   onTermsChange(value: string): void {
     this.order.update((o) => (o ? { ...o, termsAndConditions: value || null } : o));
-    this.triggerAutosave();
   }
 
   onAttachmentSelected(file: File): void {
@@ -1765,7 +1756,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       this.supplierContact.set(null);
       this.supplierContacts.set([]);
       this.supplierCreditLines.set([]);
-      this.triggerAutosave();
       return;
     }
 
@@ -1859,7 +1849,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     this.itemRows.set(this.normalizeIncomingItemRows(items));
     this.queuePlattsSuggestionsLoad();
     this.scheduleAvailabilityChecks();
-    this.triggerAutosave();
   }
 
   // ─── Inventory availability ──────────────────────────────────────
@@ -1950,7 +1939,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     this.order.update((o) => o ? { ...o, invoicingCompanyId: nextCompanyId, bankAccountId: null } : o);
     this.bankAccounts.set([]);
     if (nextCompanyId) void this.loadBankAccounts(nextCompanyId, { autoSelect: true });
-    this.triggerAutosave();
   }
 
   onBankAccountChange(bankAccountId: string): void {
@@ -1962,7 +1950,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     }
 
     this.order.update((o) => o ? { ...o, bankAccountId: nextBankAccountId } : o);
-    this.triggerAutosave();
   }
 
   private async loadBankAccounts(companyId: string, options?: { autoSelect?: boolean }): Promise<void> {
@@ -1996,7 +1983,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     this.order.update((order) => (order
       ? { ...order, invoicingCompanyId: nextCompanyId, bankAccountId: null }
       : order));
-    this.triggerAutosave();
     return nextCompanyId;
   }
 
@@ -2008,7 +1994,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     }
 
     this.order.update((order) => (order ? { ...order, bankAccountId: preferredBankAccountId } : order));
-    this.triggerAutosave();
   }
 
   private getPreferredBankAccount(accounts: BankAccountDto[]): BankAccountDto | null {
@@ -2192,12 +2177,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         const summary = this.customerCreditSummary();
         if (summary && !this.customerCreditFrozen()) {
           this.order.update((o) => (o ? { ...o, customerPaymentTermType: PaymentTermType.Credit, customerCreditDays: summary.maxDays } : o));
-          this.triggerAutosave();
         }
       }
     });
     void this.loadCompanyContacts('customer', clientId);
-    this.triggerAutosave();
   }
 
   onActiveSupplierCompanyChange(supplierId: string): void {
@@ -2220,7 +2203,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       void this.financialSvc.loadSupplierCreditLines(supplierId);
       void this.loadCompanyContacts('supplier', supplierId);
       this.applyPreferredInvoicingCompanyFromSupplier(supplierData);
-      this.triggerAutosave();
       return;
     }
     this.updateActiveOrderSupplier((supplier) => ({
@@ -2235,7 +2217,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     void this.financialSvc.loadSupplierCreditLines(supplierId);
     void this.loadCompanyContacts('supplier', supplierId);
     this.applyPreferredInvoicingCompanyFromSupplier(supplierData);
-    this.triggerAutosave();
   }
 
   private applyPreferredInvoicingCompanyFromSupplier(supplierData: CounterpartyDto | null): void {
@@ -2466,7 +2447,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     this.order.update((o) => (o ? { ...o, vesselId } : o));
     const vesselData = this.vessels().find((v) => v.id === vesselId);
     this.vessel.set(vesselData ?? null);
-    this.triggerAutosave();
   }
 
   onPortChange(placeId: string): void {
@@ -2475,7 +2455,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     this.order.update((o) => (o ? { ...o, placeId } : o));
     const placeData = this.places().find((p) => p.id === placeId);
     this.port.set(placeData ?? null);
-    this.triggerAutosave();
 
     // Prompt user if the new place has a different default remark
     const newDefault = placeData?.orderRemark ?? null;
@@ -2487,7 +2466,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   onPlaceRemarkChange(value: string): void {
     this.order.update((o) => (o ? { ...o, placeRemark: value || null } : o));
-    this.triggerAutosave();
   }
 
   applyNewPlaceRemark(): void {
@@ -2495,7 +2473,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     this.order.update((o) => (o ? { ...o, placeRemark: remark } : o));
     this.showPlaceRemarkPrompt.set(false);
     this.pendingPlaceRemark.set(null);
-    this.triggerAutosave();
   }
 
   dismissPlaceRemarkPrompt(): void {
@@ -2507,24 +2484,20 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     const iso = eta ? `${eta}T12:00:00.000Z` : null;
     this.order.update((o) => (o ? { ...o, eta: iso } : o));
     this.queuePlattsSuggestionsLoad();
-    this.triggerAutosave();
   }
 
   onEtdChange(etd: string): void {
     const iso = etd ? `${etd}T12:00:00.000Z` : null;
     this.order.update((o) => (o ? { ...o, etd: iso } : o));
-    this.triggerAutosave();
   }
 
   onDeliveredAtChange(value: string): void {
     const iso = value ? `${value}T12:00:00.000Z` : null;
     if (this.orderSuppliers().length === 0) {
       this.order.update((order) => order ? { ...order, deliveredAt: iso } : order);
-      this.triggerAutosave();
       return;
     }
     this.updateActiveOrderSupplier((supplier) => ({ ...supplier, deliveredAt: iso }));
-    this.triggerAutosave();
   }
 
   onItemEconomicsChange(economics: OrderItemsEconomics): void {
@@ -2541,19 +2514,14 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         void this.loadBankAccounts(invoicingCompanyId, { autoSelect: true });
       }
     }
-    this.triggerAutosave();
   }
 
   onCategoryChange(categoryKey: string): void {
     this.order.update((o) => (o ? { ...o, categoryKey: categoryKey || null } : o));
-    this.triggerAutosave();
   }
 
 
 
-  private triggerAutosave(): void {
-    this.saveSvc.triggerSave(() => this.isPaidOrCancelled());
-  }
 
   private async performAutoSave(): Promise<void> {
     const id = this.orderId();
