@@ -512,11 +512,11 @@ describe('OrderDetailPageComponent', () => {
       },
     });
 
-    await component.previewBunkerInstructions();
+    await component.portDocSvc.previewBunkerInstructions();
 
-    expect(component.bunkerInstructionsPreview()?.warnings).toEqual(['Agent is missing on the order.']);
-    expect(component.bunkerInstructionsPreview()?.sections[0]?.title).toBe('Order');
-    expect(component.portDocumentationAction()).toBeNull();
+    expect(component.portDocSvc.bunkerInstructionsPreview()?.warnings).toEqual(['Agent is missing on the order.']);
+    expect(component.portDocSvc.bunkerInstructionsPreview()?.sections[0]?.title).toBe('Order');
+    expect(component.portDocSvc.portDocumentationAction()).toBeNull();
   });
 
   it('uses the loaded order UUID for port documentation requests when the route uses an order number', async () => {
@@ -544,7 +544,7 @@ describe('OrderDetailPageComponent', () => {
       orderNumber: '20260512-000005',
     } as any);
 
-    await component.previewBunkerInstructions();
+    await component.portDocSvc.previewBunkerInstructions();
 
     expect(getCalls.some((url) => url.includes('/orders/00000000-0000-4000-8000-000000000005/port-documentation/bunker-instructions/preview'))).toBe(true);
     expect(getCalls.some((url) => url.includes('/orders/20260512-000005/port-documentation/bunker-instructions/preview'))).toBe(false);
@@ -561,7 +561,7 @@ describe('OrderDetailPageComponent', () => {
     });
 
     const refreshSpy = vi.spyOn(component as any, 'loadPortDocumentationContext').mockImplementation(async () => {
-      component.portDocumentationContext.set({
+      component.portDocSvc.portDocumentationContext.set({
         orderId: 'order-1',
         enabled: true,
         gateListCount: 1,
@@ -590,13 +590,13 @@ describe('OrderDetailPageComponent', () => {
       } as any);
     });
 
-    await component.generateBunkerInstructions();
+    await component.portDocSvc.generateBunkerInstructions();
 
     expect(postCalls.some((call) => call.url.includes('/orders/order-1/port-documentation/bunker-instructions/generate'))).toBe(true);
     expect(refreshSpy).toHaveBeenCalled();
     expect(component.portDocumentationContext()?.documents).toHaveLength(1);
     expect(component.toast()).toEqual({ type: 'success', message: 'Bunker Instructions generated.' });
-    expect(component.portDocumentationAction()).toBeNull();
+    expect(component.portDocSvc.portDocumentationAction()).toBeNull();
   });
 
   it('auto-prepares port documentation and opens send modal when no files exist yet', async () => {
@@ -609,7 +609,7 @@ describe('OrderDetailPageComponent', () => {
       },
     });
 
-    component.portDocumentationContext.set({
+    component.portDocSvc.portDocumentationContext.set({
       orderId: 'order-1',
       enabled: true,
       gateListCount: 1,
@@ -635,7 +635,7 @@ describe('OrderDetailPageComponent', () => {
     } as any);
 
     const refreshSpy = vi.spyOn(component as any, 'loadPortDocumentationContext').mockImplementation(async () => {
-      component.portDocumentationContext.set({
+      component.portDocSvc.portDocumentationContext.set({
         orderId: 'order-1',
         enabled: true,
         gateListCount: 1,
@@ -672,13 +672,13 @@ describe('OrderDetailPageComponent', () => {
     expect(postCalls.some((call) => call.url.includes('/orders/order-1/port-documentation/flange-worksheet/include'))).toBe(true);
     expect(refreshSpy).toHaveBeenCalled();
     expect(modalSpy).toHaveBeenCalledWith('PORT_DOCUMENTATION');
-    expect(component.portDocumentationAction()).toBeNull();
+    expect(component.portDocSvc.portDocumentationAction()).toBeNull();
   });
 
   it('shows the first readiness warning when port documentation cannot be prepared automatically', async () => {
     const { component } = await createComponent();
 
-    component.portDocumentationContext.set({
+    component.portDocSvc.portDocumentationContext.set({
       orderId: 'order-1',
       enabled: true,
       gateListCount: 0,
@@ -688,7 +688,7 @@ describe('OrderDetailPageComponent', () => {
     } as any);
 
     const refreshSpy = vi.spyOn(component as any, 'loadPortDocumentationContext').mockImplementation(async () => {
-      component.portDocumentationContext.set({
+      component.portDocSvc.portDocumentationContext.set({
         orderId: 'order-1',
         enabled: true,
         gateListCount: 0,
@@ -704,7 +704,7 @@ describe('OrderDetailPageComponent', () => {
     expect(refreshSpy).toHaveBeenCalled();
     expect(modalSpy).not.toHaveBeenCalled();
     expect(component.toast()).toEqual({ type: 'error', message: 'Agent is missing on the order.' });
-    expect(component.portDocumentationAction()).toBeNull();
+    expect(component.portDocSvc.portDocumentationAction()).toBeNull();
   });
 
   it('defaults new rows to the active supplier and skips incomplete drafts during autosave', async () => {

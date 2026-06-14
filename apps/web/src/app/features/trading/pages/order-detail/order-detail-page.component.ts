@@ -268,14 +268,14 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   protected readonly refData = inject(OrderReferenceDataService);
   protected readonly replySvc = inject(OrderReplyService);
   private readonly orderLoader = inject(OrderLoaderService);
-  private readonly portDocSvc = inject(OrderPortDocumentationService);
-  private readonly inquirySvc = inject(OrderInquiryService);
-  private readonly financialSvc = inject(OrderFinancialService);
-  private readonly supplierSvc = inject(OrderSupplierService);
-  private readonly pdfSvc = inject(OrderPdfService);
-  private readonly commSvc = inject(OrderCommunicationService);
-  private readonly searchSvc = inject(OrderSearchService);
-  private readonly saveSvc = inject(OrderSaveService);
+  protected readonly portDocSvc = inject(OrderPortDocumentationService);
+  protected readonly inquirySvc = inject(OrderInquiryService);
+  protected readonly financialSvc = inject(OrderFinancialService);
+  protected readonly supplierSvc = inject(OrderSupplierService);
+  protected readonly pdfSvc = inject(OrderPdfService);
+  protected readonly commSvc = inject(OrderCommunicationService);
+  protected readonly searchSvc = inject(OrderSearchService);
+  protected readonly saveSvc = inject(OrderSaveService);
   private readonly riskService = inject(RiskMonitoringService);
 
   readonly emailModal = viewChild(SendEmailModalComponent);
@@ -2636,8 +2636,8 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     return 'Awaiting reply';
   }
 
-  inquiryReplyRecommendation(inquiryId: string): InquiryReplyRecommendation | null {
-    return this.inquiryReplyRecommendations().get(inquiryId) ?? null;
+  inquiryReplyRecommendation(inquiryId: string): InquiryReplyRecommendation | undefined {
+    return this.inquiryReplyRecommendations().get(inquiryId) ?? undefined;
   }
 
 
