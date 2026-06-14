@@ -427,6 +427,7 @@
   </div>
 }
 
+@defer (on idle) {
 <app-order-payment-modal
   #paymentModal
   [orderId]="orderId()"
@@ -435,13 +436,17 @@
   [todayLocal]="todayLocalDateString()"
   (saved)="loadPayments()"
 />
+} @placeholder { <div></div> }
 
+@defer (on idle) {
 <app-order-convert-modal
   #convertModal
   [saving]="convertingToOrder()"
   (confirmed)="confirmConvertToOrder()"
 />
+} @placeholder { <div></div> }
 
+@defer (on idle) {
 <app-order-cancel-modal
   #cancelModal
   [saving]="cancellingInquiry()"
@@ -449,13 +454,16 @@
   [reasons]="availableInquiryCancelReasons()"
   (confirmed)="confirmCancelInquiry($event)"
 />
+} @placeholder { <div></div> }
 
+@defer (on idle) {
 <app-order-place-remark-prompt
   #remarkPrompt
   [pendingRemark]="pendingPlaceRemark()"
   (applied)="applyNewPlaceRemark()"
   (dismissed)="dismissPlaceRemarkPrompt()"
 />
+} @placeholder { <div></div> }
 
 <!-- Send Email Modal -->
 <app-send-email-modal
@@ -471,6 +479,7 @@
   (sendEmail)="onSendEmail($event)"
   (sendWhatsApp)="onSendInvoiceWhatsApp($event)"
 />
+
 
 <!-- Send Inquiry Modal -->
 <app-send-inquiry-modal
@@ -489,8 +498,10 @@
   (sendWhatsAppInquiry)="onSendInquiryWhatsApp($event)"
 />
 
+
 <!-- PDF Preview Modal -->
 <app-pdf-preview-modal [waLinked]="waLinked()" [defaultPhone]="customerContact()?.phone ?? null" (sendWhatsApp)="onSendPdfWhatsApp($event)" />
+
 
 <!-- Credit Application Modal -->
 @if (order()?.clientId) {
