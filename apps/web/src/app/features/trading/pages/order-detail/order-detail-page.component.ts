@@ -565,8 +565,8 @@ interface PlattsSuggestionViewModel {
         [activityVisible]="true"
         [emailVisible]="true"
         [plattsVisible]="plattsSuggestionItems().length > 0 || plattsSuggestionsLoading()"
-        [suppliersVisible]="isInquiryContext()"
-        [captureVisible]="isInquiryContext()"
+        [suppliersVisible]="true"
+        [captureVisible]="true"
         defaultTab="comments"
         (activeTabChange)="activeDetailTab.set($event)"
       />
@@ -600,8 +600,7 @@ interface PlattsSuggestionViewModel {
       }
       @if (activeDetailTab() === 'suppliers') {
         <div class="mt-4">
-          @if (isInquiryContext()) {
-            <!-- Supplier Comparison Context -->
+          <!-- Supplier Comparison Context -->
             <div class="rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-emerald-50 shadow-sm">
               <div class="border-b border-slate-200/70 px-5 py-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
@@ -730,15 +729,12 @@ interface PlattsSuggestionViewModel {
                 </div>
               </div>
             }
-          } @else {
-            <div class="py-8 text-center text-sm text-gray-400">Supplier context is only available for inquiries.</div>
-          }
+
         </div>
       }
       @if (activeDetailTab() === 'capture') {
         <div class="mt-4">
-          @if (isInquiryContext()) {
-            <div class="rounded-3xl border border-slate-200 bg-white shadow-sm">
+          <div class="rounded-3xl border border-slate-200 bg-white shadow-sm">
               <div class="border-b border-slate-200 px-5 py-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                   <div>
