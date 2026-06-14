@@ -268,7 +268,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   protected readonly refData = inject(OrderReferenceDataService);
   protected readonly replySvc = inject(OrderReplyService);
   private readonly orderLoader = inject(OrderLoaderService);
-  protected readonly portDocSvc = inject(OrderPortDocumentationService);
+  readonly portDocSvc = inject(OrderPortDocumentationService);
   protected readonly inquirySvc = inject(OrderInquiryService);
   protected readonly financialSvc = inject(OrderFinancialService);
   protected readonly supplierSvc = inject(OrderSupplierService);
