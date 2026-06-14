@@ -2379,6 +2379,8 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   openSendInquiryModal(): void {
+    const modal = this.inquiryModal();
+    if (!modal) { setTimeout(() => this.openSendInquiryModal(), 200); return; }
     this.commSvc.openSendInquiryModal(
       this.orderId(),
       this.hasLineItems(),
@@ -2406,6 +2408,8 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   openSendEmailModal(docType: DocumentEmailType): void {
     this.emailDocumentType.set(docType);
+    const modal = this.emailModal();
+    if (!modal) { setTimeout(() => this.openSendEmailModal(docType), 200); return; }
     this.commSvc.openSendEmailModal(docType, this.orderId(), this.activeOrderSupplier()?.id ?? null, this.emailModal(), this.order()?.orderNumber ?? null, (type, msg) => this.showToast(type, msg));
   }
 

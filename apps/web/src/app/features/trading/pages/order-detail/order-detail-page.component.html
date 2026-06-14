@@ -481,6 +481,7 @@
 />
 
 
+
 <!-- Send Inquiry Modal -->
 <app-send-inquiry-modal
   [orderId]="orderId()"
@@ -499,8 +500,11 @@
 />
 
 
+
 <!-- PDF Preview Modal -->
+@defer (on idle) {
 <app-pdf-preview-modal [waLinked]="waLinked()" [defaultPhone]="customerContact()?.phone ?? null" (sendWhatsApp)="onSendPdfWhatsApp($event)" />
+} @placeholder { <div></div> }
 
 
 <!-- Credit Application Modal -->
