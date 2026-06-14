@@ -433,7 +433,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly plattsSignalsMaxHeight = signal<number | null>(null);
 
   /** Whether the user has linked WhatsApp in Settings */
-  readonly waLinked = signal(false);
+  readonly waLinked = this.commSvc.waLinked;
   readonly inquirySupplierContextLoading = signal(false);
   readonly inquirySupplierContext = signal<InquirySupplierComparisonRow[]>([]);
   readonly inquiryRepliesLoading = signal(false);
@@ -3295,47 +3295,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       });
   }
 
-  async onSendInquiryWhatsApp(payload: SendInquiryWhatsAppPayload): Promise<void> {
-    const id = this.orderId();
-    if (!id || payload.recipients.length === 0) return;
-
-    try {
-      const res = await firstValueFrom(
-        this.http.post<ApiResponse<Array<{ success: boolean }>>>(`${API_URL}/orders/${id}/inquiry/send-whatsapp`, {
-          recipients: payload.recipients,
-          subject: payload.subject,
-          eta: payload.eta ?? null,
-          etd: payload.etd ?? null,
-          responseDeadlineAt: payload.responseDeadlineAt ?? null,
-          reminderEnabled: payload.reminderEnabled ?? false,
-        }),
-      );
-      this.inquiryModal()?.waDone();
-
-      if (!res.success) {
-        this.showToast('error', res.message || 'Failed to send inquiry via WhatsApp. Is your device linked?');
-        return;
-      }
-
-      const successCount = res.data?.filter((result: any) => result.success).length ?? 0;
-
-      if (successCount > 0) {
-        this.showToast('success', `Inquiry sent via WhatsApp to ${successCount}/${payload.recipients.length} recipients`);
-        this.inquiryModal()?.close();
-        void Promise.all([
-          await this.inquirySvc.loadReplies(this.orderId()),
-          await this.inquirySvc.loadSupplierContext(this.orderId()),
-        ]);
-        return;
-      }
-
-      this.showToast('error', 'Failed to send inquiry via WhatsApp. Is your device linked?');
-    } catch {
-      this.inquiryModal()?.waDone();
-      this.showToast('error', 'Failed to send inquiry via WhatsApp. Is your device linked?');
-    }
-  }
-
   openSendEmailModal(docType: DocumentEmailType): void {
     const id = this.orderId();
     if (!id) return;
@@ -3422,101 +3381,54 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   /** Check if the current user has linked WhatsApp */
   private async checkWhatsAppLinked(): Promise<void> {
-    try {
-      const res = await firstValueFrom(
-        this.http.get<ApiResponse<{ linked: boolean; whatsappEnabled?: boolean }>>(`${API_URL}/whatsapp/status`),
-      );
-      if (res.success && res.data?.linked && res.data?.whatsappEnabled !== false) {
-        this.waLinked.set(true);
-      }
-    } catch {
-      // Not linked — keep default false
-    }
+    await this.commSvc.checkWhatsAppLinked();
   }
 
   /** Send document PDF via WhatsApp from the email modal */
   async onSendInvoiceWhatsApp(payload: SendWhatsAppPayload): Promise<void> {
-    const id = this.orderId();
-    if (!id) return;
-
-    const pdfEndpoints: Record<DocumentEmailType, string> = {
-      OFFER: 'offer',
-      CONFIRMATION: 'offer',
-      NOMINATION: 'nomination',
-      PROFORMA: 'proforma',
-      INVOICE: 'invoice',
-      PORT_DOCUMENTATION: 'invoice',
-    };
-    const docLabels: Record<DocumentEmailType, string> = {
-      OFFER: 'Offer',
-      CONFIRMATION: 'Confirmation',
-      NOMINATION: 'Nomination',
-      PROFORMA: 'Proforma Invoice',
-      INVOICE: 'Invoice',
-      PORT_DOCUMENTATION: 'Port Documentation',
-    };
-
-    try {
-      const nominationQuery = payload.documentType === 'NOMINATION' && this.activeOrderSupplier()?.id
-        ? `?orderSupplierId=${encodeURIComponent(this.activeOrderSupplier()!.id)}`
-        : '';
-      const blob = await firstValueFrom(
-        this.http.get(`${API_URL}/orders/${id}/${pdfEndpoints[payload.documentType]}/pdf${nominationQuery}`, { responseType: 'blob' }),
-      );
-      const base64 = await this.blobToBase64(blob);
-      const orderNum = this.order()?.orderNumber ?? id;
-      const label = docLabels[payload.documentType];
-      const fileName = `${label.replace(/\s+/g, '_')}_${orderNum}.pdf`;
-
-      await firstValueFrom(
-        this.http.post<ApiResponse<{ success: boolean }>>(`${API_URL}/whatsapp/send`, {
-          phone: payload.phone,
-          message: payload.bodyText || `${label} — ${orderNum}`,
-          pdfBase64: base64,
-          pdfFileName: fileName,
-        }),
-      );
-      this.emailModal()?.waDone();
-      this.showToast('success', `${label} sent via WhatsApp to ${payload.phone}`);
-    } catch {
-      this.emailModal()?.waDone();
-      this.showToast('error', 'Failed to send via WhatsApp. Is your device linked?');
-    }
+    await this.commSvc.onSendInvoiceWhatsApp(
+      payload,
+      this.orderId(),
+      this.order()?.orderNumber ?? null,
+      this.activeOrderSupplier()?.id ?? null,
+      this.emailModal(),
+      (type, msg) => this.showToast(type, msg),
+    );
   }
-
-
 
   /** Send an already-loaded PDF via WhatsApp from the PDF preview modal */
   async onSendPdfWhatsApp(ev: { phone: string; blob: Blob; fileName: string }): Promise<void> {
-    try {
-      const base64 = await this.blobToBase64(ev.blob);
-      await firstValueFrom(
-        this.http.post<ApiResponse<{ success: boolean }>>(`${API_URL}/whatsapp/send`, {
-          phone: ev.phone,
-          message: `${ev.fileName} — Order ${this.order()?.orderNumber ?? ''}`,
-          pdfBase64: base64,
-          pdfFileName: ev.fileName,
-        }),
-      );
-      this.pdfModal()?.waDone();
-      this.showToast('success', `PDF sent via WhatsApp to ${ev.phone}`);
-    } catch {
-      this.pdfModal()?.waDone();
-      this.showToast('error', 'Failed to send via WhatsApp. Is your device linked?');
-    }
+    await this.commSvc.onSendPdfWhatsApp(
+      ev,
+      this.order()?.orderNumber ?? null,
+      this.pdfModal(),
+      (type, msg) => this.showToast(type, msg),
+    );
   }
 
-  private blobToBase64(blob: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = reader.result as string;
-        // strip the data:…;base64, prefix
-        resolve(result.split(',')[1] ?? result);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
+  /** Send inquiry via WhatsApp */
+  async onSendInquiryWhatsApp(payload: SendInquiryWhatsAppPayload): Promise<void> {
+    const id = this.orderId();
+    if (!id || payload.recipients.length === 0) return;
+
+    try {
+      await this.commSvc.onSendInquiryWhatsApp(
+        payload,
+        id,
+        this.inquiryModal(),
+        (type, msg) => this.showToast(type, msg),
+        () => {
+          this.inquiryModal()?.close();
+          void Promise.all([
+            this.inquirySvc.loadReplies(this.orderId()),
+            this.inquirySvc.loadSupplierContext(this.orderId()),
+          ]);
+        },
+      );
+    } catch {
+      this.inquiryModal()?.waDone();
+      this.showToast('error', 'Failed to send inquiry via WhatsApp. Is your device linked?');
+    }
   }
 
   private markPaid(): void {
