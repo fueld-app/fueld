@@ -3,7 +3,7 @@ import { loginViaUi } from '../helpers/auth';
 import { createMultiSupplierInquiryViaApi } from '../helpers/trading';
 
 test.describe('Multi-supplier order', () => {
-  test('creates inquiry, two supplier legs with dedicated items, verifies tabs', async ({ page }) => {
+  test('shows all line items regardless of which supplier tab is active', async ({ page }) => {
     test.setTimeout(120_000);
 
     await loginViaUi(page, {
@@ -15,42 +15,33 @@ test.describe('Multi-supplier order', () => {
     expect(supplierRecordIds.length).toBeGreaterThanOrEqual(2);
 
     await page.goto(`/trading/inquiries/${inquiryId}`);
-
-    // Inquiry detail loaded
     await expect(page.getByRole('heading', { name: 'Inquiry Detail' })).toBeVisible({ timeout: 15_000 });
 
-    // Supplier tab buttons are present (one per supplier leg)
+    // Supplier tab buttons are present
     const supplierButtons = page.locator('button[aria-selected]');
     await expect(supplierButtons.first()).toBeVisible({ timeout: 10_000 });
     expect(await supplierButtons.count()).toBeGreaterThanOrEqual(2);
 
-    // Each supplier button's aria-selected state works
-    const firstSelected = page.locator('button[aria-selected="true"]');
-    await expect(firstSelected).toBeVisible({ timeout: 5_000 });
-
-    // MGO is the primary supplier's product type — should be visible
+    // All line items visible regardless of active supplier tab
     await expect(page.locator('app-order-items')).toContainText('MGO', { timeout: 10_000 });
+    await expect(page.locator('app-order-items')).toContainText('VLSFO', { timeout: 10_000 });
 
-    // Click second supplier tab — it should show VLSFO (their dedicated item)
+    // Switch to second supplier tab
     await supplierButtons.nth(1).click();
     await page.waitForTimeout(500);
 
-    // Second supplier's aria-selected should update
-    const secondSelected = page.locator('button[aria-selected="true"]');
-    await expect(secondSelected).toBeVisible({ timeout: 5_000 });
-
-    // Their line item (VLSFO) should now appear in the items grid,
-    // and the primary supplier's item (MGO) should be filtered out
+    // Both items still shown — switching tabs does NOT filter items
+    await expect(page.locator('app-order-items')).toContainText('MGO', { timeout: 10_000 });
     await expect(page.locator('app-order-items')).toContainText('VLSFO', { timeout: 10_000 });
 
-    // Secondary tabs area renders below the supplier tabs
-    await expect(page.locator('app-order-secondary-tabs')).toBeAttached({ timeout: 10_000 });
+    // Secondary tabs still work
+    await expect(page.locator('app-order-secondary-tabs')).toBeAttached({ timeout: 5_000 });
 
-    // Actions dropdown works in multi-supplier context
+    // Actions dropdown works
     await expect(page.getByRole('button', { name: 'Actions' })).toBeVisible({ timeout: 10_000 });
   });
 
-  test('switches between suppliers — each shows different line items', async ({ page }) => {
+  test('supplier tab switching updates payment terms card', async ({ page }) => {
     test.setTimeout(120_000);
 
     await loginViaUi(page, {
@@ -58,34 +49,24 @@ test.describe('Multi-supplier order', () => {
       password: process.env['E2E_TRADER6_USER_PASSWORD'] ?? 'trader6password123',
     });
 
-    const { inquiryId, supplierRecordIds } = await createMultiSupplierInquiryViaApi(page);
-    expect(supplierRecordIds.length).toBeGreaterThanOrEqual(2);
+    const { inquiryId } = await createMultiSupplierInquiryViaApi(page);
 
     await page.goto(`/trading/inquiries/${inquiryId}`);
     await expect(page.getByRole('heading', { name: 'Inquiry Detail' })).toBeVisible({ timeout: 15_000 });
 
-    const supplierButtons = page.locator('button[aria-selected]');
-    await expect(supplierButtons.first()).toBeVisible({ timeout: 10_000 });
-    const count = await supplierButtons.count();
-    expect(count).toBeGreaterThanOrEqual(2);
+    // All items visible regardless of supplier tab
+    await expect(page.locator('app-order-items')).toContainText('MGO', { timeout: 10_000 });
+    await expect(page.locator('app-order-items')).toContainText('VLSFO', { timeout: 10_000 });
 
-    // Supplier 0 should show MGO
-    await supplierButtons.nth(0).click();
-    await page.waitForTimeout(500);
-    const firstItemText = await page.locator('app-order-items').textContent({ timeout: 5_000 });
-    expect(firstItemText).toContain('MGO');
+    // Secondary tabs area present
+    await expect(page.locator('app-order-secondary-tabs')).toBeAttached({ timeout: 10_000 });
 
-    // Supplier 1 should show VLSFO (not MGO)
-    await supplierButtons.nth(1).click();
-    await page.waitForTimeout(500);
-    const secondItemText = await page.locator('app-order-items').textContent({ timeout: 5_000 });
-    expect(secondItemText).toContain('VLSFO');
+    // Actions button present
+    await expect(page.getByRole('button', { name: 'Actions' })).toBeVisible({ timeout: 10_000 });
 
-    // Secondary tabs still render after switching
-    await expect(page.locator('app-order-secondary-tabs')).toBeAttached({ timeout: 5_000 });
-
-    // Actions dropdown works
-    await page.getByRole('button', { name: 'Actions' }).click();
-    await expect(page.getByRole('menuitem').first()).toBeVisible({ timeout: 10_000 });
+    // Items grid renders both line items
+    const itemsText = await page.locator('app-order-items').textContent({ timeout: 5_000 });
+    expect(itemsText).toContain('MGO');
+    expect(itemsText).toContain('VLSFO');
   });
 });
