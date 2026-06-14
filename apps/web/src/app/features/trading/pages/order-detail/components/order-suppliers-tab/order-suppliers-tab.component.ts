@@ -4,7 +4,7 @@ import {
   input,
   output,
 } from '@angular/core';
-import type { InquirySupplierComparisonRow, InquiryQuoteMatrixRow, SupplierInquiryReplyRow, InquiryReplyRecommendation } from '../../order-detail-page.component';
+import type { InquirySupplierComparisonRow, InquiryQuoteMatrixRow, SupplierInquiryReplyRow, InquiryReplyRecommendation } from '../../order-detail.types';
 
 @Component({
   selector: 'app-order-suppliers-tab',

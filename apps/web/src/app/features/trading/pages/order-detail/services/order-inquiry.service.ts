@@ -2,23 +2,9 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import type { ApiResponse } from '@fueld/types';
-import { API_URL } from '@app/core/config/api';
-import type { InquirySupplierComparisonRow, SupplierInquiryReplyRow } from '../order-detail-page.component';
+import type { InquirySupplierComparisonRow, SupplierInquiryReplyRow, InquirySupplierPerformance } from '../order-detail.types';
 
-export interface InquirySupplierPerformance {
-  deliveredCountOverall: number;
-  deliveredCountAtPlace: number;
-  lastDeliveredAtOverall: string | null;
-  lastDeliveredAtPlace: string | null;
-  sentCount: number;
-  quotedCount: number;
-  declinedCount: number;
-  noReplyCount: number;
-  respondedCount: number;
-  deliverableCount: number;
-  nonDeliverableCount: number;
-  averageResponseHours: number | null;
-}
+import { API_URL } from '@app/core/config/api';
 
 @Injectable({ providedIn: 'root' })
 export class OrderInquiryService {

@@ -13,7 +13,6 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClient, type HttpResponse } from '@angular/common/http';
-import { DatePipe, DecimalPipe } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
 import {
@@ -100,128 +99,28 @@ import { OrderActionService } from './services/order-action.service';
 import { CreditApplicationModalComponent } from '../../../credit/components/credit-application-modal.component';
 
 // ═══════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════
 //  Order Detail Page — Full order view with editable items grid
 // ═══════════════════════════════════════════════════════════════════════
 
 import { API_URL, toAbsoluteUrl } from '@app/core/config/api';
 import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring.service';
-
-interface TeamUserOption {
-  id: string;
-  name: string;
-  email: string;
-}
-
-interface InquirySupplierPerformance {
-  deliveredCountOverall: number;
-  deliveredCountAtPlace: number;
-  lastDeliveredAtOverall: string | null;
-  lastDeliveredAtPlace: string | null;
-  sentCount: number;
-  quotedCount: number;
-  declinedCount: number;
-  noReplyCount: number;
-  respondedCount: number;
-  deliverableCount: number;
-  nonDeliverableCount: number;
-  averageResponseHours: number | null;
-}
-
-export interface InquirySupplierComparisonRow {
-  portSupplierId: string;
-  supplierId: string;
-  supplierName: string;
-  contactId: string | null;
-  contactName: string | null;
-  phone?: string | null;
-  products: string[];
-  note: string | null;
-  email: string | null;
-  inquiryStatus: string | null;
-  inquirySentAt: string | null;
-  performance: InquirySupplierPerformance;
-}
-
-interface SupplierInquiryReplyItem {
-  orderItemId: string;
-  productType: string;
-  quantity: string;
-  unit: string;
-  description: string | null;
-  price: string | null;
-  currency: string;
-  note: string | null;
-}
-
-export interface SupplierInquiryReplyRow {
-  id: string;
-  supplierId: string;
-  supplierName: string;
-  contactId: string | null;
-  contactName: string | null;
-  email: string;
-  status: 'SENT' | 'QUOTED' | 'DECLINED' | 'NO_REPLY';
-  sentAt: string | null;
-  responseDeadlineAt: string | null;
-  reminderSentAt: string | null;
-  reminderCount: number;
-  respondedAt: string | null;
-  quotedAt: string | null;
-  canDeliver: boolean | null;
-  declineReason: string | null;
-  quoteValidUntil: string | null;
-  deliveryWindow: string | null;
-  supplierPaymentTerms: string | null;
-  supplierComment: string | null;
-  responseHours: number | null;
-  quoteLineCount: number;
-  items: SupplierInquiryReplyItem[];
-}
-
-interface InquiryQuoteMatrixCell {
-  supplierInquiryId: string;
-  supplierId: string;
-  supplierName: string;
-  status: SupplierInquiryReplyRow['status'];
-  price: string | null;
-  currency: string;
-  note: string | null;
-  responseHours: number | null;
-  isSelectedSupplier: boolean;
-}
-
-export interface InquiryQuoteMatrixRow {
-  orderItemId: string;
-  productType: string;
-  quantity: string;
-  quantityMin: string | null;
-  unit: string;
-  description: string | null;
-  cells: InquiryQuoteMatrixCell[];
-}
-
-export interface InquiryReplyRecommendation {
-  bestOverall: boolean;
-  lowestComparable: boolean;
-  mostComplete: boolean;
-  fastest: boolean;
-  score: number;
-}
-
-interface PlattsSuggestionViewModel {
-  key: string;
-  productType: PlattsSuggestionsResponseDto['items'][number]['productType'];
-  description: string | null;
-  matches: PlattsSuggestionsResponseDto['items'][number]['matches'];
-}
+import type {
+  InquirySupplierPerformance,
+  InquirySupplierComparisonRow,
+  InquiryQuoteMatrixRow,
+  SupplierInquiryReplyRow,
+  SupplierInquiryReplyItem,
+  InquiryReplyRecommendation,
+  PlattsSuggestionViewModel,
+} from './order-detail.types';
 
 @Component({
   selector: 'app-order-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
-    DatePipe,
-    DecimalPipe,
     OrderItemsComponent,
     OrderFinancingSummaryComponent,
     HeaderActionsComponent,

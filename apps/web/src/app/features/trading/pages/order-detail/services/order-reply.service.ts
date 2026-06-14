@@ -2,21 +2,8 @@ import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import type { ApiResponse } from '@fueld/types';
-import type { SupplierInquiryReplyRow } from '../order-detail-page.component';
+import type { SupplierInquiryReplyRow, InquirySupplierPerformance } from '../order-detail.types';
 import { API_URL } from '@app/core/config/api';
-
-export interface InquirySupplierPerformance {
-  deliveredCountOverall: number;
-  deliveredCountAtPlace: number;
-  sentCount: number;
-  quotedCount: number;
-  declinedCount: number;
-  noReplyCount: number;
-  respondedCount: number;
-  deliverableCount: number;
-  nonDeliverableCount: number;
-  averageResponseHours: number | null;
-}
 
 @Injectable({ providedIn: 'root' })
 export class OrderReplyService {

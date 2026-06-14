@@ -4,7 +4,7 @@ import {
   input,
   output,
 } from '@angular/core';
-import type { SupplierInquiryReplyRow } from '../../order-detail-page.component';
+import type { SupplierInquiryReplyRow } from '../../order-detail.types';
 
 @Component({
   selector: 'app-order-capture-tab',
