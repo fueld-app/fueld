@@ -30,12 +30,10 @@ import {
   type CreditLineDto,
   type CompanyContactDto,
   type BankAccountDto,
-  type PlattsSuggestionsResponseDto,
   type OrderSupplierDto,
   type SupplierNominationSummaryDto,
   type WarehouseDto,
   type InventorySkuDto,
-  
   type OrderTransferDto,
   type OrderPortDocumentDto,
   type DeliveryDocumentationSettingsDto,
@@ -94,6 +92,7 @@ import { OrderCommunicationService } from './services/order-communication.servic
 import { OrderSearchService } from './services/order-search.service';
 import { OrderSaveService } from './services/order-save.service';
 import { OrderInventoryService } from './services/order-inventory.service';
+import { OrderPlattsService } from './services/order-platts.service';
 import { OrderBrokerService } from './services/order-broker.service';
 import { OrderAgentService } from './services/order-agent.service';
 import { OrderActionService } from './services/order-action.service';
@@ -114,7 +113,6 @@ import type {
   SupplierInquiryReplyRow,
   SupplierInquiryReplyItem,
   InquiryReplyRecommendation,
-  PlattsSuggestionViewModel,
 } from './order-detail.types';
 
 @Component({
@@ -182,6 +180,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   protected readonly inventorySvc = inject(OrderInventoryService);
   protected readonly brokerSvc = inject(OrderBrokerService);
   protected readonly agentSvc = inject(OrderAgentService);
+  protected readonly plattsSvc = inject(OrderPlattsService);
   protected readonly actionSvc = inject(OrderActionService);
   private readonly riskService = inject(RiskMonitoringService);
 
@@ -330,10 +329,12 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     const status = this.order()?.status;
     return status === OrderStatus.Inquiry || status === OrderStatus.Offer ? 'inquiry' : 'order';
   });
-  readonly plattsSuggestions = signal<PlattsSuggestionsResponseDto | null>(null);
-  readonly plattsSuggestionsLoading = signal(false);
-  readonly plattsSuggestionsError = signal<string | null>(null);
-  readonly plattsSignalsMaxHeight = signal<number | null>(null);
+  readonly plattsSuggestions = this.plattsSvc.suggestions;
+  readonly plattsSuggestionsLoading = this.plattsSvc.loading;
+  readonly plattsSuggestionsError = this.plattsSvc.error;
+  readonly plattsSignalsMaxHeight = this.plattsSvc.maxHeight;
+  readonly plattsSuggestionItems = this.plattsSvc.suggestionItems;
+  readonly plattsSuggestionsMeta = this.plattsSvc.suggestions;
 
   /** Whether the user has linked WhatsApp in Settings */
   readonly waLinked = this.commSvc.waLinked;
@@ -385,7 +386,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly autoSaving = this.saveSvc.autoSaving;
   readonly lastSaved = this.saveSvc.lastSaved;
   readonly draftItemIds = this.saveSvc.draftItemIds;
-  private plattsSuggestionTimer: ReturnType<typeof setTimeout> | null = null;
 
   // ─── Computed ────────────────────────────────────────────────────
 
@@ -530,8 +530,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     return status === OrderStatus.Paid || status === OrderStatus.Cancelled;
   });
 
-  readonly plattsSuggestionsMeta = computed(() => this.plattsSuggestions());
-  readonly plattsSuggestionItems = computed<PlattsSuggestionViewModel[]>(() => this.plattsSuggestions()?.items ?? []);
 
   readonly canRecordPayment = computed(() => this.order()?.status !== OrderStatus.Cancelled);
 
@@ -889,9 +887,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   ngOnDestroy(): void {
     this.saveSvc.cancelAutoSave();
-    if (this.plattsSuggestionTimer) {
-      clearTimeout(this.plattsSuggestionTimer);
-    }
+    this.plattsSvc.cancelTimer();
   }
 
 
@@ -1839,56 +1835,15 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   async loadPlattsSuggestions(): Promise<void> {
-    const items = this.itemRows()
-      .filter((item) => item.productType)
-      .map((item) => ({
-        key: item.id,
-        productType: item.productType,
-        description: item.description?.trim() || null,
-      }));
-
-    if (items.length === 0) {
-      this.plattsSuggestions.set(null);
-      this.plattsSuggestionsError.set(null);
-      return;
-    }
-
-    const publicationDate = (this.order()?.eta ?? new Date().toISOString()).slice(0, 10);
-    this.plattsSuggestionsLoading.set(true);
-    this.plattsSuggestionsError.set(null);
-
-    try {
-      const res = await firstValueFrom(
-        this.http.post<ApiResponse<PlattsSuggestionsResponseDto>>(`${API_URL}/platts/suggestions`, {
-          publicationDate,
-          items,
-          limitPerItem: 3,
-        }),
-      );
-
-      if (res.success) {
-        this.plattsSuggestions.set(res.data);
-      } else {
-        this.plattsSuggestions.set(null);
-        this.plattsSuggestionsError.set(res.message || 'Failed to load Platts signals.');
-      }
-    } catch {
-      this.plattsSuggestions.set(null);
-      this.plattsSuggestionsError.set('Failed to load Platts signals.');
-    } finally {
-      this.plattsSuggestionsLoading.set(false);
-    }
+    await this.plattsSvc.load(this.itemRows(), this.order());
   }
 
   openPlattsReport(reportId: string): void {
-    void this.router.navigate(['/resources/platts', reportId]);
+    this.plattsSvc.openReport(reportId);
   }
 
   private queuePlattsSuggestionsLoad(): void {
-    if (this.plattsSuggestionTimer) clearTimeout(this.plattsSuggestionTimer);
-    this.plattsSuggestionTimer = setTimeout(() => {
-      void this.loadPlattsSuggestions();
-    }, 250);
+    this.plattsSvc.queueLoad(() => this.itemRows(), () => this.order());
   }
 
   onInvoicingCompanyChange(companyId: string): void {
