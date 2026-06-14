@@ -85,6 +85,7 @@ import { TradingDetailMetaCardsComponent } from '../../components/detail-meta-ca
 import { InternalTransferSummaryComponent } from '../../components/internal-transfer-summary/internal-transfer-summary.component';
 import { InternalTransferSidesComponent } from '../../components/internal-transfer-sides/internal-transfer-sides.component';
 import { AuthService } from '../../../../core/auth/auth.service';
+import { OrderReferenceDataService } from './services/order-reference-data.service';
 import { CreditApplicationModalComponent } from '../../../credit/components/credit-application-modal.component';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -261,7 +262,7 @@ interface PlattsSuggestionViewModel {
           class="fueld-select-no-chevron appearance-none rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
         >
           <option value="">— None —</option>
-          @for (u of teamUsers(); track u.id) {
+          @for (u of refData.teamUsers(); track u.id) {
             <option [value]="u.id">{{ u.name }}</option>
           }
         </select>
@@ -283,8 +284,8 @@ interface PlattsSuggestionViewModel {
         <app-order-settings-dropdown
             [currency]="order()?.currency ?? 'USD'"
             [category]="order()?.categoryKey ?? ''"
-            [currencyOptions]="configuredCurrencies()"
-            [categoryOptions]="orderCategories()"
+            [currencyOptions]="refData.configuredCurrencies()"
+            [categoryOptions]="refData.orderCategories()"
             (currencyChange)="onCurrencyChange($event)"
             (categoryChange)="onCategoryChange($event)"
           />
@@ -479,17 +480,17 @@ interface PlattsSuggestionViewModel {
       [financingRateAnnual]="financingRateAnnual()"
       [financingDays]="financingDays()"
       [financingDayCountConvention]="financingDayCountConvention()"
-      [productOptionsInput]="configuredProducts()"
-      [unitOptionsInput]="configuredUnits()"
-      [unitConversionsInput]="configuredUnitConversions()"
-      [currencyOptionsInput]="configuredCurrencies()"
-      [priceReferencesInput]="configuredPriceReferences()"
+      [productOptionsInput]="refData.configuredProducts()"
+      [unitOptionsInput]="refData.configuredUnits()"
+      [unitConversionsInput]="refData.configuredUnitConversions()"
+      [currencyOptionsInput]="refData.configuredCurrencies()"
+      [priceReferencesInput]="refData.configuredPriceReferences()"
       [plattsSuggestionsInput]="plattsSuggestionItems()"
       [warehouseOptionsInput]="warehouseDropdownOptions()"
       [inventorySkuOptionsInput]="inventorySkuDropdownOptions()"
-      [catalogItemsInput]="catalogItems()"
-      [defaultUnitInput]="defaultUnit()"
-      [taxRatesInput]="taxRates()"
+      [catalogItemsInput]="refData.catalogItems()"
+      [defaultUnitInput]="refData.defaultUnit()"
+      [taxRatesInput]="refData.taxRates()"
       [availabilityByRowId]="availabilityByRowId()"
       (itemsChange)="onItemsChange($event)"
       (economicsChange)="onItemEconomicsChange($event)"
@@ -549,7 +550,7 @@ interface PlattsSuggestionViewModel {
         }
         <app-order-attachments-card
           [attachments]="attachments()"
-          [attachmentTypes]="configuredAttachmentTypes()"
+          [attachmentTypes]="refData.configuredAttachmentTypes()"
           [(attachmentType)]="attachmentType"
           [uploading]="uploadingAttachment()"
           [hasFile]="!!selectedAttachment"
@@ -662,7 +663,7 @@ interface PlattsSuggestionViewModel {
     <app-order-payment-modal
       #paymentModal
       [orderId]="orderId()"
-      [currencyOptions]="configuredCurrencies()"
+      [currencyOptions]="refData.configuredCurrencies()"
       [defaultCurrency]="order()?.currency ?? 'USD'"
       [todayLocal]="todayLocalDateString()"
       (saved)="loadPayments()"
@@ -753,6 +754,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   private readonly router = inject(Router);
   private readonly http = inject(HttpClient);
   protected readonly auth = inject(AuthService);
+  protected readonly refData = inject(OrderReferenceDataService);
   private readonly riskService = inject(RiskMonitoringService);
 
   readonly emailModal = viewChild(SendEmailModalComponent);
@@ -794,9 +796,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   // ─── Inventory (physical-ops) state ─────────────────────────────────
   /** All warehouses (loaded once on init); filtered to relevant ones via `availableWarehouses`. */
-  readonly allWarehouses = signal<WarehouseDto[]>([]);
   /** Inventory SKUs (loaded once). */
-  readonly inventorySkus = signal<InventorySkuDto[]>([]);
   /** Live availability check results keyed by item row id. */
   readonly availabilityByRowId = signal<Record<string, OrderItemAvailability>>({});
   /** Debounce timers per row id for availability checks. */
@@ -864,7 +864,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     return this.ownCompanies().find((c) => c.id === id) ?? null;
   });
   readonly bankAccounts = signal<BankAccountDto[]>([]);
-  readonly teamUsers = signal<TeamUserOption[]>([]);
   readonly clientSearchLoading = signal(false);
   readonly supplierSearchLoading = signal(false);
   readonly agentSearchLoading = signal(false);
@@ -900,7 +899,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly activeDetailTab = signal('comments');
   readonly convertingToOrder = signal(false);
   readonly cancellingInquiry = signal(false);
-  readonly inquiryCancelReasons = signal<string[]>([]);
   readonly availableInquiryCancelReasons = computed(() =>
     this.inquiryCancelReasons().map((reason) => reason.trim()).filter(Boolean),
   );
@@ -908,20 +906,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     const status = this.order()?.status;
     return status === OrderStatus.Inquiry || status === OrderStatus.Offer ? 'inquiry' : 'order';
   });
-  readonly configuredProducts = signal<DropdownOption[]>([]);
-  readonly configuredUnits = signal<DropdownOption[]>([]);
-  readonly configuredUnitConversions = signal<{ productType?: string; fromUnit: string; toUnit: string; factor: number }[]>([]);
-  readonly configuredCurrencies = signal<DropdownOption[]>([]);
-  readonly configuredPriceReferences = signal<{ id: string; name: string; code: string }[]>([]);
-  readonly configuredAttachmentTypes = signal<string[]>(['BDR', 'OTHER']);
-  readonly deliveryDocumentationSettings = signal<DeliveryDocumentationSettingsDto>({
-    requireDeliveryDocumentation: true,
-    deliveryDocumentationTypes: ['BDR'],
-  });
-  readonly catalogItems = signal<{ name: string; description?: string; defaultUnit?: string; defaultCostPrice?: number; defaultSalesPrice?: number }[]>([]);
-  readonly defaultUnit = signal<string>('MT');
-  readonly orderCategories = signal<{ key: string; label: string }[]>([]);
-  readonly taxRates = signal<{ id: string; name: string; rate: number }[]>([]);
   readonly plattsSuggestions = signal<PlattsSuggestionsResponseDto | null>(null);
   readonly plattsSuggestionsLoading = signal(false);
   readonly plattsSuggestionsError = signal<string | null>(null);
@@ -2072,108 +2056,9 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
 
   private async loadReferenceData(): Promise<void> {
-    try {
-      const [suppliersRes, usersRes, productsRes, catalogRes, defaultUnitRes, orderCategoriesRes, taxRatesRes, unitsRes, unitConversionsRes, currenciesRes, attachmentTypesRes, deliveryDocRes, cancelReasonsRes, priceRefsRes, warehousesRes, skusRes] = await Promise.all([
-        firstValueFrom(
-          this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
-            `${API_URL}/companies/local?type=SUPPLIER&limit=100`,
-          ),
-        ),
-        firstValueFrom(
-          this.http.get<ApiResponse<TeamUserOption[]>>(`${API_URL}/lloyds/users`),
-        ),
-        firstValueFrom(
-          this.http.get<ApiResponse<{ products: string[] }>>(`${API_URL}/admin/settings/my-products`),
-        ),
-        firstValueFrom(
-          this.http.get<ApiResponse<{ items: { name: string; description?: string; defaultUnit?: string; defaultCostPrice?: number; defaultSalesPrice?: number }[] }>>(`${API_URL}/admin/settings/catalog`),
-        ),
-        firstValueFrom(
-          this.http.get<ApiResponse<{ defaultUnit: string }>>(`${API_URL}/admin/settings/default-unit`),
-        ),
-        firstValueFrom(
-          this.http.get<ApiResponse<{ categories: { key: string; label: string }[] }>>(`${API_URL}/admin/settings/order-categories`),
-        ),
-        firstValueFrom(
-          this.http.get<ApiResponse<{ rates: { id: string; name: string; rate: number }[] }>>(`${API_URL}/admin/settings/tax-rates`),
-        ),
-        firstValueFrom(
-          this.http.get<ApiResponse<{ units: string[] }>>(`${API_URL}/admin/settings/my-units`),
-        ),
-        firstValueFrom(
-          this.http.get<ApiResponse<{ conversions: { fromUnit: string; toUnit: string; factor: number }[] }>>(`${API_URL}/admin/settings/my-unit-conversions`),
-        ),
-        firstValueFrom(
-          this.http.get<ApiResponse<{ currencies: string[] }>>(`${API_URL}/admin/settings/my-currencies`),
-        ),
-        firstValueFrom(
-          this.http.get<ApiResponse<{ attachmentTypes: string[] }>>(`${API_URL}/admin/settings/my-attachment-types`),
-        ),
-        firstValueFrom(
-          this.http.get<ApiResponse<DeliveryDocumentationSettingsDto>>(`${API_URL}/admin/settings/my-delivery-documentation`),
-        ),
-        firstValueFrom(
-          this.http.get<ApiResponse<{ reasons: string[] }>>(`${API_URL}/admin/settings/my-inquiry-cancel-reasons`),
-        ),
-        firstValueFrom(
-          this.http.get<ApiResponse<{ references: { id: string; name: string; code: string }[] }>>(`${API_URL}/admin/settings/my-price-references`),
-        ),
-        firstValueFrom(
-          this.http.get<ApiResponse<WarehouseDto[]>>(`${API_URL}/inventory/warehouses?activeOnly=true&inventoryEnabledOnly=true`),
-        ),
-        firstValueFrom(
-          this.http.get<ApiResponse<InventorySkuDto[]>>(`${API_URL}/inventory/skus`),
-        ),
-      ]);
-      if (suppliersRes.success) {
-        const currentSupplierId = this.order()?.supplierId ?? '';
-        const currentSupplier = currentSupplierId
-          ? this.supplier() ?? this.suppliers().find((supplier) => supplier.id === currentSupplierId) ?? null
-          : null;
-        const mergedSuppliers = currentSupplier && !suppliersRes.data.companies.find((supplier) => supplier.id === currentSupplierId)
-          ? [currentSupplier, ...suppliersRes.data.companies]
-          : suppliersRes.data.companies;
-        this.suppliers.set(mergedSuppliers);
-      }
-      if (usersRes.success) this.teamUsers.set(usersRes.data ?? []);
-      if (productsRes.success) this.configuredProducts.set(
-        productsRes.data.products.map((p) => ({ value: p, label: p })),
-      );
-      if (catalogRes.success) this.catalogItems.set(catalogRes.data.items ?? []);
-      if (defaultUnitRes.success) this.defaultUnit.set(defaultUnitRes.data.defaultUnit ?? 'MT');
-      if (orderCategoriesRes.success) this.orderCategories.set(orderCategoriesRes.data.categories ?? []);
-      if (taxRatesRes.success) this.taxRates.set(taxRatesRes.data.rates ?? []);
-      if (unitsRes.success) this.configuredUnits.set(
-        unitsRes.data.units.map((u) => ({ value: u, label: u })),
-      );
-      if (unitConversionsRes.success) this.configuredUnitConversions.set(unitConversionsRes.data.conversions);
-      if (currenciesRes.success) this.configuredCurrencies.set(
-        currenciesRes.data.currencies.map((c) => ({ value: c, label: c })),
-      );
-      if (attachmentTypesRes.success && attachmentTypesRes.data.attachmentTypes.length) {
-        this.configuredAttachmentTypes.set(attachmentTypesRes.data.attachmentTypes);
-        if (!attachmentTypesRes.data.attachmentTypes.includes(this.attachmentType())) {
-          this.attachmentType.set(attachmentTypesRes.data.attachmentTypes[0]!);
-        }
-      }
-      if (deliveryDocRes.success) {
-        this.deliveryDocumentationSettings.set(deliveryDocRes.data);
-      }
-      if (cancelReasonsRes.success) {
-        this.inquiryCancelReasons.set(cancelReasonsRes.data.reasons ?? []);
-      }
-      if (priceRefsRes.success) {
-        this.configuredPriceReferences.set(priceRefsRes.data.references ?? []);
-      }
-      if (warehousesRes.success) {
-        this.allWarehouses.set(warehousesRes.data ?? []);
-      }
-      if (skusRes.success) {
-        this.inventorySkus.set(skusRes.data ?? []);
-      }
-    } catch {
-      // silently ignore
-    }
+    await this.refData.loadAll();
+    // Copy supplier data from service to component signal
+    // Other signals are read directly from refData service
   }
 
   readonly paymentTermOptions: DropdownOption[] = [
