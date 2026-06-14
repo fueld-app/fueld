@@ -30,8 +30,13 @@ export class OrderReferenceDataService {
   readonly allWarehouses = signal<WarehouseDto[]>([]);
   readonly inventorySkus = signal<InventorySkuDto[]>([]);
 
-  /** Load reference data needed immediately for page render. */
+  private _eagerLoaded = false;
+  private _lazyLoaded = false;
+
+  /** Load reference data needed immediately for page render. Skips API if already cached. */
   async loadEager(): Promise<void> {
+    if (this._eagerLoaded) return;
+    this._eagerLoaded = true;
     try {
       const [usersRes, productsRes, unitsRes, currenciesRes, categoriesRes, attachmentTypesRes, deliveryDocRes] = await Promise.all([
         firstValueFrom(this.http.get<ApiResponse<TeamUserOption[]>>(`${API_URL}/lloyds/users`)),
@@ -53,8 +58,10 @@ export class OrderReferenceDataService {
     } catch { /* silently ignore */ }
   }
 
-  /** Load remaining reference data (catalog, prices, warehouses, etc.) — less critical for initial render. */
+  /** Load remaining reference data. Skips API if already cached. */
   async loadLazy(): Promise<void> {
+    if (this._lazyLoaded) return;
+    this._lazyLoaded = true;
     try {
       const [catalogRes, defaultUnitRes, taxRatesRes, unitConversionsRes, cancelReasonsRes, priceRefsRes, warehousesRes, skusRes] = await Promise.all([
         firstValueFrom(this.http.get<ApiResponse<{ items: any[] }>>(`${API_URL}/admin/settings/catalog`)),
@@ -81,5 +88,11 @@ export class OrderReferenceDataService {
   /** Load all reference data (backward compat). */
   async loadAll(currentSupplierId?: string, currentSupplier?: CounterpartyDto | null, existingSuppliers?: CounterpartyDto[]): Promise<void> {
     await Promise.all([this.loadEager(), this.loadLazy()]);
+  }
+
+  /** Reset cache (e.g. after settings update). */
+  invalidateCache(): void {
+    this._eagerLoaded = false;
+    this._lazyLoaded = false;
   }
 }

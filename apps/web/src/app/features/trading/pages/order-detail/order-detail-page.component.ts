@@ -842,7 +842,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     }).format(date);
   }
 
-  // Replaced by import from order-utils.ts — was private formatStoredDateOnlyForInput
 
   private _initialLoadComplete = false;
 
@@ -861,7 +860,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     effect(() => {
       const orderId = this.orderId();
       const activeSupplier = this.activeOrderSupplier();
-      if (!orderId || !activeSupplier) return;
+      if (!orderId || !activeSupplier || !this._initialLoadComplete) return;
       void this.financialSvc.loadSupplierCreditLines(activeSupplier.companyId);
       void this.loadCompanyContacts('supplier', activeSupplier.companyId);
       void this.loadSupplierNominationSummary();
@@ -1503,11 +1502,8 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     return `${value.toFixed(idx === 0 ? 0 : 1)} ${units[idx]}`;
   }
 
-  // Replaced by import from order-utils.ts — was private getTimeZoneOffset
 
-  // Replaced by import from order-utils.ts — was private toUtcIsoFromZonedInput
 
-  // Replaced by import from order-utils.ts — was private parseDecimalValue
 
   private getEffectiveDeliveredQuantity(row: OrderItemRow): number | null {
     const deliveredQuantity = parseDecimalValue(row.deliveredQuantity);
@@ -1732,9 +1728,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     }
   }
 
-  // Replaced by import from order-utils.ts — was private normalizeTimeZone
 
-  // Replaced by import from order-utils.ts — was private parseFixedOffsetMinutes
 
   // ─── Item grid events ────────────────────────────────────────────
 
@@ -2216,9 +2210,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       + Math.floor(lastOverall / 86400000 / 10);
   }
 
-  // Replaced by import from order-utils.ts — was private formatDateTimeInput
 
-  // Replaced by import from order-utils.ts — was private toIsoFromDateTimeInput
 
   onVesselChange(vesselId: string): void {
     if (!vesselId) return;
