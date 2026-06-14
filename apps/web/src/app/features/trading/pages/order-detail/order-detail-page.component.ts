@@ -557,7 +557,7 @@ interface PlattsSuggestionViewModel {
         [activityVisible]="true"
         [emailVisible]="true"
         [plattsVisible]="plattsSuggestionItems().length > 0 || plattsSuggestionsLoading()"
-        [suppliersVisible]="isInquiryContext() && rankedInquirySuppliers().length > 0"
+        [suppliersVisible]="isInquiryContext()"
         defaultTab="comments"
         (activeTabChange)="activeDetailTab.set($event)"
       />
