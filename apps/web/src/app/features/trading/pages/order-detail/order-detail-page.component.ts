@@ -95,6 +95,7 @@ import { OrderCommunicationService } from './services/order-communication.servic
 import { OrderSearchService } from './services/order-search.service';
 import { OrderSaveService } from './services/order-save.service';
 import { OrderInventoryService } from './services/order-inventory.service';
+import { OrderBrokerService } from './services/order-broker.service';
 import { CreditApplicationModalComponent } from '../../../credit/components/credit-application-modal.component';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -278,6 +279,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   protected readonly searchSvc = inject(OrderSearchService);
   protected readonly saveSvc = inject(OrderSaveService);
   protected readonly inventorySvc = inject(OrderInventoryService);
+  protected readonly brokerSvc = inject(OrderBrokerService);
   private readonly riskService = inject(RiskMonitoringService);
 
   readonly emailModal = viewChild(SendEmailModalComponent);
@@ -463,17 +465,17 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   readonly customerContact = signal<CompanyContactDto | null>(null);
   readonly supplierContact = signal<CompanyContactDto | null>(null);
-  readonly brokerContact = signal<CompanyContactDto | null>(null);
   readonly agentContact = signal<CompanyContactDto | null>(null);
   readonly customerContacts = signal<CompanyContactDto[]>([]);
   readonly supplierContacts = signal<CompanyContactDto[]>([]);
-  readonly brokerContacts = signal<CompanyContactDto[]>([]);
   readonly agentContacts = signal<CompanyContactDto[]>([]);
+  readonly brokerContact = this.brokerSvc.brokerContact;
+  readonly brokerContacts = this.brokerSvc.brokerContacts;
 
   // ─── Broker search ──────────────────────────────────────────────
 
-  readonly brokers = signal<CounterpartyDto[]>([]);
-  readonly brokerSearchLoading = signal(false);
+  readonly brokers = this.brokerSvc.brokers;
+  readonly brokerSearchLoading = this.brokerSvc.brokerSearchLoading;
 
   // ─── Autosave ────────────────────────────────────────────────────
 
@@ -530,11 +532,9 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     label: supplier.company?.name ?? `Supplier ${index + 1}`,
     isPrimary: supplier.isPrimary,
   })));
-  readonly brokerName = computed(() => {
-    const id = this.order()?.brokerId;
-    if (!id) return '—';
-    return this.brokers().find((b) => b.id === id)?.name ?? '—';
-  });
+  readonly brokerName = this.brokerSvc.brokerName;
+  readonly brokerDropdownOptions = this.brokerSvc.brokerDropdownOptions;
+  readonly brokerContactDropdownOptions = this.brokerSvc.brokerContactDropdownOptions;
   readonly agentName = computed(() => {
     const id = this.order()?.agentId;
     if (!id) return '—';
@@ -714,19 +714,8 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     })),
   );
 
-  readonly brokerDropdownOptions = computed<DropdownOption[]>(() =>
-    this.brokers().map((b) => ({ value: b.id, label: b.name })),
-  );
-
   readonly agentDropdownOptions = computed<DropdownOption[]>(() =>
     this.agents().map((a) => ({ value: a.id, label: a.name })),
-  );
-
-  readonly brokerContactDropdownOptions = computed(() =>
-    this.brokerContacts().map((c) => ({
-      value: c.id,
-      label: c.name + (c.role ? ` (${c.role})` : ''),
-    })),
   );
 
   readonly agentContactDropdownOptions = computed(() =>
@@ -1540,59 +1529,29 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   // ─── Broker handlers ─────────────────────────────────────────────
 
   async searchBrokers(term: string): Promise<void> {
-    this.brokerSearchLoading.set(true);
-    try {
-      let res = await firstValueFrom(
-        this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
-          `${API_URL}/companies/local?type=BROKER&search=${encodeURIComponent(term)}&limit=20`,
-        ),
-      );
-      let localResults = res.success ? res.data.companies : [];
-      if (localResults.length === 0 && term.trim()) {
-        res = await firstValueFrom(
-          this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
-            `${API_URL}/companies/local?search=${encodeURIComponent(term)}&limit=20`,
-          ),
-        );
-        localResults = res.success ? res.data.companies : [];
-      }
-      const currentId = this.order()?.brokerId ?? '';
-      const mergedLocal = currentId && !localResults.find((c) => c.id === currentId)
-        ? [this.brokers().find((b) => b.id === currentId) ?? null, ...localResults].filter(Boolean)
-        : localResults;
-      this.brokers.set(mergedLocal as CounterpartyDto[]);
-    } catch {
-      // silently ignore
-    } finally {
-      this.brokerSearchLoading.set(false);
-    }
+    await this.brokerSvc.searchBrokers(term);
   }
 
   onBrokerChange(brokerId: string): void {
-    if (!brokerId) {
-      // Clearing broker — also clear contact and toggle
-      this.order.update((o) => (o ? { ...o, brokerId: null, brokerContactId: null, brokerGetsAll: false } : o));
-      this.brokerContact.set(null);
-      this.brokerContacts.set([]);
-      this.triggerAutosave();
-      return;
-    }
-    this.order.update((o) => (o ? { ...o, brokerId, brokerContactId: null } : o));
-    this.brokerContact.set(null);
-    void this.loadCompanyContacts('broker', brokerId);
-    this.triggerAutosave();
+    this.brokerSvc.onBrokerChange(
+      brokerId,
+      (updater) => { this.order.update((o) => (o ? updater(o) : o)); this.triggerAutosave(); },
+      (companyId) => { void this.loadCompanyContacts('broker', companyId); },
+    );
   }
 
   onBrokerContactChange(contactId: string): void {
-    this.order.update((o) => (o ? { ...o, brokerContactId: contactId || null } : o));
-    const contact = this.brokerContacts().find((c) => c.id === contactId) ?? null;
-    this.brokerContact.set(contact);
-    this.triggerAutosave();
+    this.brokerSvc.onBrokerContactChange(
+      contactId,
+      (updater) => { this.order.update((o) => (o ? updater(o) : o)); this.triggerAutosave(); },
+    );
   }
 
   onBrokerGetsAllChange(value: boolean): void {
-    this.order.update((o) => (o ? { ...o, brokerGetsAll: value } : o));
-    this.triggerAutosave();
+    this.brokerSvc.onBrokerGetsAllChange(
+      value,
+      (updater) => { this.order.update((o) => (o ? updater(o) : o)); this.triggerAutosave(); },
+    );
   }
 
   async searchAgents(term: string): Promise<void> {
