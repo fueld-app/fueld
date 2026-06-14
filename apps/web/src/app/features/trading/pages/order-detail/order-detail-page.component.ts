@@ -823,7 +823,8 @@ interface PlattsSuggestionViewModel {
       </div>
     }
 
-    @if (paymentModalOpen()) {
+    @defer (when paymentModalOpen()) {
+      @if (paymentModalOpen()) {
       <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
         <div class="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
           <div class="flex items-center justify-between">
@@ -913,8 +914,10 @@ interface PlattsSuggestionViewModel {
           </div>
         </div>
       </div>
+      }
     }
 
+    @defer (when showConvertToOrderModal()) {
     @if (showConvertToOrderModal()) {
       <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
         <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
@@ -951,7 +954,9 @@ interface PlattsSuggestionViewModel {
         </div>
       </div>
     }
+    }
 
+    @defer (when showCancelInquiryModal()) {
     @if (showCancelInquiryModal()) {
       <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
         <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
@@ -1014,8 +1019,10 @@ interface PlattsSuggestionViewModel {
         </div>
       </div>
     }
+    }
 
     <!-- Place Remark Change Prompt -->
+    @defer (when showPlaceRemarkPrompt()) {
     @if (showPlaceRemarkPrompt()) {
       <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
         <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
