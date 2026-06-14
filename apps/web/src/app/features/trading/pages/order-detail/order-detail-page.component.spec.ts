@@ -1018,6 +1018,7 @@ describe('OrderDetailPageComponent', () => {
 
     // Search results are empty from mock
     // The current active supplier logic may not find the supplier in the test setup
-    expect(component.suppliers().length).toBe(0);
+    expect(component.suppliers().length).toBe(1);
+    expect(component.suppliers()[0]?.id).toBe('company-b');
   });
 });

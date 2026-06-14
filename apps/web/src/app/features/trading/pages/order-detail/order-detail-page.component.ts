@@ -1977,26 +1977,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   async searchClients(term: string): Promise<void> {
     this.clientSearchLoading.set(true);
     try {
-      let res = await firstValueFrom(
-        this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
-          `${API_URL}/companies/local?type=CLIENT&search=${encodeURIComponent(term)}&limit=20`,
-        ),
-      );
-      let localResults = res.success ? res.data.companies : [];
-      // Fallback: if no results with type filter, retry without type
-      if (localResults.length === 0 && term.trim()) {
-        res = await firstValueFrom(
-          this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
-            `${API_URL}/companies/local?search=${encodeURIComponent(term)}&limit=20`,
-          ),
-        );
-        localResults = res.success ? res.data.companies : [];
-      }
-      const current = this.client();
-      const mergedLocal = current && !localResults.find((c) => c.id === current.id)
-        ? [current, ...localResults]
-        : localResults;
-      this.clients.set(mergedLocal);
+      this.clients.set(await this.searchSvc.searchClients(term, this.client()));
     } catch {
       // silently ignore
     } finally {
@@ -2007,32 +1988,13 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   async searchSuppliers(term: string): Promise<void> {
     this.supplierSearchLoading.set(true);
     try {
-      let res = await firstValueFrom(
-        this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
-          `${API_URL}/companies/local?type=SUPPLIER&search=${encodeURIComponent(term)}&limit=20`,
-        ),
-      );
-      let localResults = res.success ? res.data.companies : [];
-      // Fallback: if no results with type filter, retry without type
-      if (localResults.length === 0 && term.trim()) {
-        res = await firstValueFrom(
-          this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
-            `${API_URL}/companies/local?search=${encodeURIComponent(term)}&limit=20`,
-          ),
-        );
-        localResults = res.success ? res.data.companies : [];
-      }
-      const currentId = this.activeSupplierCompanyId();
-      const currentSupplier = currentId
-        ? this.activeOrderSupplier()?.company
-          ?? this.supplier()
-          ?? this.suppliers().find((supplier) => supplier.id === currentId)
-          ?? null
-        : null;
-      const mergedLocal = currentId && !localResults.find((c) => c.id === currentId)
-        ? [currentSupplier, ...localResults].filter(Boolean)
-        : localResults;
-      this.suppliers.set(mergedLocal as CounterpartyDto[]);
+      this.suppliers.set(await this.searchSvc.searchSuppliers(
+        term,
+        this.activeSupplierCompanyId(),
+        this.activeOrderSupplier()?.company ?? null,
+        this.supplier(),
+        this.suppliers(),
+      ));
     } catch {
       // silently ignore
     } finally {
@@ -2043,17 +2005,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   async searchVessels(term: string): Promise<void> {
     this.vesselSearchLoading.set(true);
     try {
-      const res = await firstValueFrom(
-        this.http.get<ApiResponse<{ vessels: VesselDto[]; total: number }>>(
-          `${API_URL}/vessels/local?search=${encodeURIComponent(term)}&limit=20`,
-        ),
-      );
-      const current = this.vessel();
-      const localResults = res.success ? res.data.vessels : [];
-      const mergedLocal = current && !localResults.find((v) => v.id === current.id)
-        ? [current, ...localResults]
-        : localResults;
-      this.vessels.set(mergedLocal);
+      this.vessels.set(await this.searchSvc.searchVessels(term, this.vessel()));
     } catch {
       // silently ignore
     } finally {
@@ -2064,17 +2016,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   async searchPlaces(term: string): Promise<void> {
     this.placeSearchLoading.set(true);
     try {
-      const res = await firstValueFrom(
-        this.http.get<ApiResponse<{ places: PlaceDto[]; total: number }>>(
-          `${API_URL}/lloyds/places/local?search=${encodeURIComponent(term)}&limit=20`,
-        ),
-      );
-      const current = this.port();
-      const localResults = res.success ? res.data.places : [];
-      const mergedLocal = current && !localResults.find((p) => p.id === current.id)
-        ? [current, ...localResults]
-        : localResults;
-      this.places.set(mergedLocal);
+      this.places.set(await this.searchSvc.searchPlaces(term, this.port()));
     } catch {
       // silently ignore
     } finally {
