@@ -5,6 +5,7 @@ import type { ApiResponse, CreditLineDto, BankAccountDto, OwnCompanyDto } from '
 import { PaymentTermType } from '@fueld/types';
 import { API_URL } from '@app/core/config/api';
 import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring.service';
+import { normalizeCurrencyCode } from './order-utils';
 
 export interface CreditSummary {
   currency: string;
@@ -154,9 +155,9 @@ export class OrderFinancialService {
   private getPreferredBankAccount(accounts: BankAccountDto[], currency?: string | null): BankAccountDto | null {
     if (accounts.length === 0) return null;
 
-    const orderCurrency = this.normalizeCurrencyCode(currency);
+    const orderCurrency = normalizeCurrencyCode(currency);
     if (orderCurrency) {
-      const currencyMatches = accounts.filter((a) => this.normalizeCurrencyCode(a.currency) === orderCurrency);
+      const currencyMatches = accounts.filter((a) => normalizeCurrencyCode(a.currency) === orderCurrency);
       if (currencyMatches.length > 0) {
         return currencyMatches.find((a) => a.isDefault) ?? currencyMatches[0];
       }
@@ -206,9 +207,5 @@ export class OrderFinancialService {
     }
 
     return this.getPreferredBankAccount(accounts, currency)?.id ?? null;
-  }
-
-  private normalizeCurrencyCode(currency: string | null | undefined): string {
-    return (currency ?? '').trim().toUpperCase();
   }
 }

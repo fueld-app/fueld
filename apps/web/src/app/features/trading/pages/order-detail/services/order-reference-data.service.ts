@@ -30,43 +30,56 @@ export class OrderReferenceDataService {
   readonly allWarehouses = signal<WarehouseDto[]>([]);
   readonly inventorySkus = signal<InventorySkuDto[]>([]);
 
-  /** Load all reference data in parallel. */
-  async loadAll(currentSupplierId?: string, currentSupplier?: CounterpartyDto | null, existingSuppliers?: CounterpartyDto[]): Promise<void> {
+  /** Load reference data needed immediately for page render. */
+  async loadEager(): Promise<void> {
     try {
-      const [suppliersRes, usersRes, productsRes, catalogRes, defaultUnitRes, orderCategoriesRes, taxRatesRes, unitsRes, unitConversionsRes, currenciesRes, attachmentTypesRes, deliveryDocRes, cancelReasonsRes, priceRefsRes, warehousesRes, skusRes] = await Promise.all([
-        firstValueFrom(this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(`${API_URL}/companies/local?type=SUPPLIER&limit=100`)),
+      const [usersRes, productsRes, unitsRes, currenciesRes, categoriesRes, attachmentTypesRes, deliveryDocRes] = await Promise.all([
         firstValueFrom(this.http.get<ApiResponse<TeamUserOption[]>>(`${API_URL}/lloyds/users`)),
         firstValueFrom(this.http.get<ApiResponse<{ products: string[] }>>(`${API_URL}/admin/settings/my-products`)),
-        firstValueFrom(this.http.get<ApiResponse<{ items: any[] }>>(`${API_URL}/admin/settings/catalog`)),
-        firstValueFrom(this.http.get<ApiResponse<{ defaultUnit: string }>>(`${API_URL}/admin/settings/default-unit`)),
-        firstValueFrom(this.http.get<ApiResponse<{ categories: any[] }>>(`${API_URL}/admin/settings/order-categories`)),
-        firstValueFrom(this.http.get<ApiResponse<{ rates: any[] }>>(`${API_URL}/admin/settings/tax-rates`)),
         firstValueFrom(this.http.get<ApiResponse<{ units: string[] }>>(`${API_URL}/admin/settings/my-units`)),
-        firstValueFrom(this.http.get<ApiResponse<{ conversions: any[] }>>(`${API_URL}/admin/settings/my-unit-conversions`)),
         firstValueFrom(this.http.get<ApiResponse<{ currencies: string[] }>>(`${API_URL}/admin/settings/my-currencies`)),
+        firstValueFrom(this.http.get<ApiResponse<{ categories: any[] }>>(`${API_URL}/admin/settings/order-categories`)),
         firstValueFrom(this.http.get<ApiResponse<{ attachmentTypes: string[] }>>(`${API_URL}/admin/settings/my-attachment-types`)),
         firstValueFrom(this.http.get<ApiResponse<DeliveryDocumentationSettingsDto>>(`${API_URL}/admin/settings/my-delivery-documentation`)),
+      ]);
+
+      if (usersRes.success) this.teamUsers.set(usersRes.data ?? []);
+      if (productsRes.success) this.configuredProducts.set(productsRes.data.products.map((p: string) => ({ value: p, label: p })));
+      if (unitsRes.success) this.configuredUnits.set(unitsRes.data.units.map((u: string) => ({ value: u, label: u })));
+      if (currenciesRes.success) this.configuredCurrencies.set(currenciesRes.data.currencies.map((c: string) => ({ value: c, label: c })));
+      if (categoriesRes.success) this.orderCategories.set(categoriesRes.data.categories ?? []);
+      if (attachmentTypesRes.success && attachmentTypesRes.data.attachmentTypes.length) this.configuredAttachmentTypes.set(attachmentTypesRes.data.attachmentTypes);
+      if (deliveryDocRes.success) this.deliveryDocumentationSettings.set(deliveryDocRes.data);
+    } catch { /* silently ignore */ }
+  }
+
+  /** Load remaining reference data (catalog, prices, warehouses, etc.) — less critical for initial render. */
+  async loadLazy(): Promise<void> {
+    try {
+      const [catalogRes, defaultUnitRes, taxRatesRes, unitConversionsRes, cancelReasonsRes, priceRefsRes, warehousesRes, skusRes] = await Promise.all([
+        firstValueFrom(this.http.get<ApiResponse<{ items: any[] }>>(`${API_URL}/admin/settings/catalog`)),
+        firstValueFrom(this.http.get<ApiResponse<{ defaultUnit: string }>>(`${API_URL}/admin/settings/default-unit`)),
+        firstValueFrom(this.http.get<ApiResponse<{ rates: any[] }>>(`${API_URL}/admin/settings/tax-rates`)),
+        firstValueFrom(this.http.get<ApiResponse<{ conversions: any[] }>>(`${API_URL}/admin/settings/my-unit-conversions`)),
         firstValueFrom(this.http.get<ApiResponse<{ reasons: string[] }>>(`${API_URL}/admin/settings/my-inquiry-cancel-reasons`)),
         firstValueFrom(this.http.get<ApiResponse<{ references: any[] }>>(`${API_URL}/admin/settings/my-price-references`)),
         firstValueFrom(this.http.get<ApiResponse<WarehouseDto[]>>(`${API_URL}/inventory/warehouses?activeOnly=true&inventoryEnabledOnly=true`)),
         firstValueFrom(this.http.get<ApiResponse<InventorySkuDto[]>>(`${API_URL}/inventory/skus`)),
       ]);
 
-      if (usersRes.success) this.teamUsers.set(usersRes.data ?? []);
-      if (productsRes.success) this.configuredProducts.set(productsRes.data.products.map((p: string) => ({ value: p, label: p })));
       if (catalogRes.success) this.catalogItems.set(catalogRes.data.items ?? []);
       if (defaultUnitRes.success) this.defaultUnit.set(defaultUnitRes.data.defaultUnit ?? 'MT');
-      if (orderCategoriesRes.success) this.orderCategories.set(orderCategoriesRes.data.categories ?? []);
       if (taxRatesRes.success) this.taxRates.set(taxRatesRes.data.rates ?? []);
-      if (unitsRes.success) this.configuredUnits.set(unitsRes.data.units.map((u: string) => ({ value: u, label: u })));
       if (unitConversionsRes.success) this.configuredUnitConversions.set(unitConversionsRes.data.conversions);
-      if (currenciesRes.success) this.configuredCurrencies.set(currenciesRes.data.currencies.map((c: string) => ({ value: c, label: c })));
-      if (attachmentTypesRes.success && attachmentTypesRes.data.attachmentTypes.length) this.configuredAttachmentTypes.set(attachmentTypesRes.data.attachmentTypes);
-      if (deliveryDocRes.success) this.deliveryDocumentationSettings.set(deliveryDocRes.data);
       if (cancelReasonsRes.success) this.inquiryCancelReasons.set(cancelReasonsRes.data.reasons ?? []);
       if (priceRefsRes.success) this.configuredPriceReferences.set(priceRefsRes.data.references ?? []);
       if (warehousesRes.success) this.allWarehouses.set(warehousesRes.data ?? []);
       if (skusRes.success) this.inventorySkus.set(skusRes.data ?? []);
     } catch { /* silently ignore */ }
+  }
+
+  /** Load all reference data (backward compat). */
+  async loadAll(currentSupplierId?: string, currentSupplier?: CounterpartyDto | null, existingSuppliers?: CounterpartyDto[]): Promise<void> {
+    await Promise.all([this.loadEager(), this.loadLazy()]);
   }
 }

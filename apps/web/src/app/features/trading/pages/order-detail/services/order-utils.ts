@@ -259,3 +259,7 @@ export function toIsoFromDateTimeInput(value: string): string | null {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
+
+export function normalizeCurrencyCode(currency: string | null | undefined): string {
+  return (currency ?? '').trim().toUpperCase();
+}

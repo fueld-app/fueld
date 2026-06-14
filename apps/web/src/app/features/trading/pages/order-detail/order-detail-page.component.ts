@@ -81,7 +81,7 @@ import { InternalTransferSidesComponent } from '../../components/internal-transf
 import { AuthService } from '../../../../core/auth/auth.service';
 import { OrderReferenceDataService } from './services/order-reference-data.service';
 import { OrderReplyService } from './services/order-reply.service';
-import { buildItemPayload, normalizeTimeZone, parseFixedOffsetMinutes, getTimeZoneOffset, toUtcIsoFromZonedInput, formatDateTimeInput, toIsoFromDateTimeInput, formatStoredDateOnlyForInput, parseDecimalValue } from './services/order-utils';
+import { buildItemPayload, normalizeTimeZone, parseFixedOffsetMinutes, getTimeZoneOffset, toUtcIsoFromZonedInput, formatDateTimeInput, toIsoFromDateTimeInput, formatStoredDateOnlyForInput, parseDecimalValue, normalizeTerms, normalizeCurrencyCode } from './services/order-utils';
 import { OrderLoaderService } from './services/order-loader.service';
 import { OrderPortDocumentationService } from './services/order-port-documentation.service';
 import { OrderInquiryService } from './services/order-inquiry.service';
@@ -955,13 +955,13 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       this.itemRows.set(r.items);
       this.saveSvc.draftItemIds.set(new Set());
       await this.normalizeDetailRoute(r.order.status, id);
+      this.scheduleAvailabilityChecks();
       // Parallelize independent API calls for faster page load
       await Promise.all([
         this.financialSvc.loadCustomerCreditLines(r.order.clientId),
         this.financialSvc.loadSupplierCreditLines(this.activeOrderSupplier()?.companyId ?? r.order.supplierId),
         this.loadReferenceData(),
-        this.loadPlattsSuggestions(),
-        this.scheduleAvailabilityChecks(),
+        this.inquirySvc.loadSupplierContext(this.orderId()),
         r.order.orderKind === 'INTERNAL_TRANSFER' ? this.loadInternalTransfer() : Promise.resolve(),
         this.loadCompanyContacts('customer', r.order.clientId).catch(() => {}),
         (() => { const id = this.activeOrderSupplier()?.companyId ?? r.order.supplierId; return id ? this.loadCompanyContacts('supplier', id).catch(() => {}) : Promise.resolve(); })(),
@@ -1189,7 +1189,9 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
 
   private async loadReferenceData(): Promise<void> {
-    await this.refData.loadAll();
+    await this.refData.loadEager();
+    // Lazy-load less critical data after render
+    queueMicrotask(() => this.refData.loadLazy());
     // Copy supplier data from service to component signal
     // Other signals are read directly from refData service
   }
@@ -1250,15 +1252,15 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       companyName: (this.selectedOwnCompany()?.name ?? '').trim(),
       documentName,
       offerOrConfirmation: documentName,
-      paymentTerms: this.normalizeTermsReplacement(
+      paymentTerms: normalizeTerms(
         context === 'customer' ? this.formatCustomerPaymentTerms() : this.formatSupplierPaymentTerms(),
       ),
-      customerNote: this.normalizeTermsReplacement(this.order()?.customerNote ?? ''),
-      supplierNote: this.normalizeTermsReplacement(this.order()?.supplierNote ?? ''),
-      invoiceNumber: this.normalizeTermsReplacement(this.invoiceNumber()),
-      orderNumber: this.normalizeTermsReplacement(this.order()?.orderNumber ?? ''),
-      vesselName: this.normalizeTermsReplacement(this.vessel()?.name ?? ''),
-      portName: this.normalizeTermsReplacement(this.port()?.name ?? ''),
+      customerNote: normalizeTerms(this.order()?.customerNote ?? ''),
+      supplierNote: normalizeTerms(this.order()?.supplierNote ?? ''),
+      invoiceNumber: normalizeTerms(this.invoiceNumber()),
+      orderNumber: normalizeTerms(this.order()?.orderNumber ?? ''),
+      vesselName: normalizeTerms(this.vessel()?.name ?? ''),
+      portName: normalizeTerms(this.port()?.name ?? ''),
     };
 
     let rendered = raw;
@@ -1269,10 +1271,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     return rendered;
   }
 
-  private normalizeTermsReplacement(value: string | null | undefined): string {
-    const trimmed = String(value ?? '').trim();
-    return trimmed === '-' ? '' : trimmed;
-  }
+
 
   onCustomerCreditDaysChange(value: number | string): void {
     const days = typeof value === 'string' ? Number(value) : value;
@@ -1852,9 +1851,9 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   private getPreferredBankAccount(accounts: BankAccountDto[]): BankAccountDto | null {
     if (accounts.length === 0) return null;
 
-    const orderCurrency = this.normalizeCurrencyCode(this.order()?.currency);
+    const orderCurrency = normalizeCurrencyCode(this.order()?.currency);
     if (orderCurrency) {
-      const currencyMatches = accounts.filter((account) => this.normalizeCurrencyCode(account.currency) === orderCurrency);
+      const currencyMatches = accounts.filter((account) => normalizeCurrencyCode(account.currency) === orderCurrency);
       if (currencyMatches.length > 0) {
         return currencyMatches.find((account) => account.isDefault) ?? currencyMatches[0];
       }
@@ -1905,9 +1904,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     return this.getPreferredBankAccount(accounts)?.id ?? null;
   }
 
-  private normalizeCurrencyCode(currency: string | null | undefined): string {
-    return (currency ?? '').trim().toUpperCase();
-  }
+
 
   async searchClients(term: string): Promise<void> {
     this.clientSearchLoading.set(true);
