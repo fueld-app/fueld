@@ -1,7 +1,7 @@
 import type { OrderItemRow } from '../order-item.types';
 import type { OrderSupplierDto } from '@fueld/types';
 
-export function buildItemPayload(rows: OrderItemRow[], fillMissingDeliveredQuantity = false) {
+export function buildItemPayload(rows: OrderItemRow[], fillMissingDeliveredQuantity = false): Record<string, string | null>[] {
   return rows.map((r) => {
     const deliveredQuantity = fillMissingDeliveredQuantity
       ? getEffectiveDeliveredQuantity(r)
@@ -102,4 +102,160 @@ export function deliverabilityLabel(perf: {
     ? Math.round((perf.deliverableCount / (perf.deliverableCount + perf.nonDeliverableCount)) * 100)
     : 0;
   return `${rate}% deliverable (${perf.deliverableCount}/${perf.deliverableCount + perf.nonDeliverableCount})`;
+}
+
+// ─── Timezone / Date formatting ───────────────────────────────────
+
+export function normalizeTimeZone(timeZone: string): string {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone }).format(new Date());
+    return timeZone;
+  } catch {
+    return 'UTC';
+  }
+}
+
+export function parseFixedOffsetMinutes(timeZone: string): number | null {
+  const match = timeZone.match(/([+-])\s*(\d{1,2})(?::(\d{2}))?/);
+  if (!match) return null;
+
+  const sign = match[1] === '-' ? -1 : 1;
+  const hours = Number(match[2]);
+  const minutes = Number(match[3] ?? '0');
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+
+  return sign * (hours * 60 + minutes);
+}
+
+export function getTimeZoneOffset(date: Date, timeZone: string): number {
+  const fixedOffset = parseFixedOffsetMinutes(timeZone);
+  if (fixedOffset !== null) return fixedOffset;
+
+  const safeTimeZone = normalizeTimeZone(timeZone);
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: safeTimeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+  const map = new Map(parts.map((p) => [p.type, p.value]));
+  const year = Number(map.get('year') ?? 0);
+  const month = Number(map.get('month') ?? 1) - 1;
+  const day = Number(map.get('day') ?? 1);
+  const hour = Number(map.get('hour') ?? 0);
+  const minute = Number(map.get('minute') ?? 0);
+  const second = Number(map.get('second') ?? 0);
+  const asUtc = Date.UTC(year, month, day, hour, minute, second);
+  return (asUtc - date.getTime()) / 60000;
+}
+
+export function toUtcIsoFromZonedInput(value: string, timeZone: string): string {
+  const [datePart, timePart] = value.split('T');
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hour, minute] = timePart.split(':').map(Number);
+  const utcGuess = Date.UTC(year, month - 1, day, hour, minute, 0);
+  const offset = getTimeZoneOffset(new Date(utcGuess), timeZone);
+  const utcTime = utcGuess - offset * 60_000;
+  return new Date(utcTime).toISOString();
+}
+
+export function formatDateTimeForInput(date: Date, timeZone: string): string {
+  const fixedOffset = parseFixedOffsetMinutes(timeZone);
+  if (fixedOffset !== null) {
+    const shifted = new Date(date.getTime() + fixedOffset * 60_000);
+    const year = String(shifted.getUTCFullYear()).padStart(4, '0');
+    const month = String(shifted.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(shifted.getUTCDate()).padStart(2, '0');
+    const hour = String(shifted.getUTCHours()).padStart(2, '0');
+    const minute = String(shifted.getUTCMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hour}:${minute}`;
+  }
+
+  const safeTimeZone = normalizeTimeZone(timeZone);
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: safeTimeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+  const map = new Map(parts.map((p) => [p.type, p.value]));
+  const year = map.get('year') ?? '0000';
+  const month = map.get('month') ?? '01';
+  const day = map.get('day') ?? '01';
+  const hour = map.get('hour') ?? '00';
+  const minute = map.get('minute') ?? '00';
+  return `${year}-${month}-${day}T${hour}:${minute}`;
+}
+
+export function formatDateForInput(date: Date, timeZone: string): string {
+  return formatDateTimeForInput(date, timeZone).split('T')[0] ?? '';
+}
+
+export function formatStoredDateOnlyLabel(iso: string | null): string {
+  if (!iso) return '-';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '-';
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'UTC',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(date);
+}
+
+export function formatStoredDateOnlyForInput(iso: string | null): string {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  const year = String(date.getUTCFullYear()).padStart(4, '0');
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function formatFileSize(size: number): string {
+  if (!size) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const idx = Math.min(Math.floor(Math.log(size) / Math.log(1024)), units.length - 1);
+  const value = size / Math.pow(1024, idx);
+  return `${value.toFixed(idx === 0 ? 0 : 1)} ${units[idx]}`;
+}
+
+export function parseDecimalValue(value: unknown): number | null {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value !== 'string') return null;
+
+  const normalized = value.trim().replace(/\s+/g, '').replace(',', '.');
+  if (!normalized) return null;
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function formatDateTimeInput(iso: string | null): string {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  const year = String(date.getFullYear()).padStart(4, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+export function toIsoFromDateTimeInput(value: string): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }

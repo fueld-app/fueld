@@ -2,8 +2,8 @@ import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import type { ApiResponse, CounterpartyDto, WarehouseDto, InventorySkuDto, DeliveryDocumentationSettingsDto } from '@fueld/types';
-import type { DropdownOption } from '../../../shared/components/searchable-dropdown/searchable-dropdown.component';
-import { API_URL } from '../../core/config/api';
+import type { DropdownOption } from '@app/shared/components/searchable-dropdown/searchable-dropdown.component';
+import { API_URL } from '@app/core/config/api';
 
 export interface TeamUserOption { id: string; name: string; email?: string }
 
@@ -19,9 +19,8 @@ export class OrderReferenceDataService {
   readonly configuredPriceReferences = signal<{ id: string; name: string; code: string }[]>([]);
   readonly configuredAttachmentTypes = signal<string[]>(['BDR', 'OTHER']);
   readonly deliveryDocumentationSettings = signal<DeliveryDocumentationSettingsDto>({
-    enabled: false,
+    requireDeliveryDocumentation: false,
     deliveryDocumentationTypes: [],
-    portAuthorityEnabled: false,
   });
   readonly catalogItems = signal<{ name: string; description?: string; defaultUnit?: string; defaultCostPrice?: number; defaultSalesPrice?: number }[]>([]);
   readonly defaultUnit = signal<string>('MT');

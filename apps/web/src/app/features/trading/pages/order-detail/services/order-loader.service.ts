@@ -4,7 +4,7 @@ import { firstValueFrom } from 'rxjs';
 import type { ApiResponse, OrderDto, OwnCompanyDto, OrderSupplierDto, CounterpartyDto } from '@fueld/types';
 import { PricingModel } from '@fueld/types';
 import { API_URL } from '@app/core/config/api';
-import type { OrderItemRow } from '../../components/order-items/order-item.types';
+import type { OrderItemRow } from '../../../components/order-items/order-item.types';
 
 export interface OrderLoadResult {
   order: OrderDto | null;

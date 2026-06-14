@@ -39,8 +39,6 @@ import {
   type InventoryAvailabilityResultDto,
   type OrderTransferDto,
   type OrderPortDocumentDto,
-  type BunkerInstructionsPreviewDto,
-  type PortDocumentationOrderContextDto,
   type DeliveryDocumentationSettingsDto,
 } from '@fueld/types';
 
@@ -88,6 +86,14 @@ import { AuthService } from '../../../../core/auth/auth.service';
 import { OrderReferenceDataService } from './services/order-reference-data.service';
 import { OrderReplyService } from './services/order-reply.service';
 import { OrderLoaderService } from './services/order-loader.service';
+import { OrderPortDocumentationService } from './services/order-port-documentation.service';
+import { OrderInquiryService } from './services/order-inquiry.service';
+import { OrderFinancialService } from './services/order-financial.service';
+import { OrderSupplierService } from './services/order-supplier.service';
+import { OrderPdfService } from './services/order-pdf.service';
+import { OrderCommunicationService } from './services/order-communication.service';
+import { OrderSearchService } from './services/order-search.service';
+import { OrderSaveService } from './services/order-save.service';
 import { CreditApplicationModalComponent } from '../../../credit/components/credit-application-modal.component';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -242,504 +248,7 @@ interface PlattsSuggestionViewModel {
     OrderSuppliersTabComponent,
     OrderCaptureTabComponent,
   ],
-  template: `
-    <app-trading-detail-header
-      [title]="isInquiryContext() ? 'Inquiry Detail' : 'Order Detail'"
-      [breadcrumbLabel]="isInquiryContext() ? 'Inquiries' : 'Orders'"
-      [breadcrumbLink]="isInquiryContext() ? '/trading/inquiries' : '/trading/orders'"
-      [entityNumber]="order()?.orderNumber ?? null"
-      [fallbackId]="orderId()"
-      [status]="order()?.status ?? 'INQUIRY'"
-      [subtitle]="subtitle()"
-      [showSave]="false"
-      [showAutosave]="true"
-      [autoSaving]="autoSaving()"
-      [lastSaved]="lastSaved()"
-    >
-      <span subtitle-extra class="flex items-center gap-2">
-        <span class="text-xs text-gray-500">Responsible:</span>
-        <select
-          [ngModel]="order()?.salesRepId ?? ''"
-          (ngModelChange)="onResponsibleUserChange($event)"
-          class="fueld-select-no-chevron appearance-none rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-        >
-          <option value="">— None —</option>
-          @for (u of refData.teamUsers(); track u.id) {
-            <option [value]="u.id">{{ u.name }}</option>
-          }
-        </select>
-      </span>
-      <div detail-actions class="flex flex-wrap items-center gap-2">
-        <app-header-actions
-          [orderId]="orderId()"
-          [status]="order()?.status ?? null"
-          [hasInvoicingCompany]="hasInvoicingCompany()"
-          [hasSupplier]="hasSupplier()"
-          [hasBankAccount]="hasBankAccount()"
-          [hasLineItems]="hasLineItems()"
-          [hasEnoughPayments]="hasEnoughPaymentsForMarkPaid()"
-          [hasPortDocumentationDocuments]="(portDocumentationContext()?.documents?.length ?? 0) > 0"
-          [portDocumentationEnabled]="portDocumentationContext()?.enabled ?? false"
-          [isAdmin]="auth.isAdmin()"
-          (actionTriggered)="onAction($event)"
-        />
-        <app-order-settings-dropdown
-            [currency]="order()?.currency ?? 'USD'"
-            [category]="order()?.categoryKey ?? ''"
-            [currencyOptions]="refData.configuredCurrencies()"
-            [categoryOptions]="refData.orderCategories()"
-            (currencyChange)="onCurrencyChange($event)"
-            (categoryChange)="onCategoryChange($event)"
-          />
-        </div>
-      </app-trading-detail-header>
-
-    @if (isInternalTransfer()) {
-      <div class="mt-4">
-        <app-internal-transfer-summary [transfer]="transfer()" />
-      </div>
-    }
-
-    <app-trading-detail-meta-cards
-      [clientName]="clientName()"
-      [supplierName]="supplierName()"
-      [vesselName]="vesselName()"
-      [placeName]="portName()"
-      [clientId]="order()?.clientId ?? ''"
-      [supplierId]="activeSupplierCompanyId()"
-      [vesselId]="order()?.vesselId ?? ''"
-      [placeId]="order()?.placeId ?? ''"
-      [clientOptions]="clientDropdownOptions()"
-      [supplierOptions]="supplierDropdownOptions()"
-      [vesselOptions]="vesselDropdownOptions()"
-      [placeOptions]="placeDropdownOptions()"
-      [clientLoading]="clientSearchLoading()"
-      [supplierLoading]="supplierSearchLoading()"
-      [vesselLoading]="vesselSearchLoading()"
-      [placeLoading]="placeSearchLoading()"
-      [canEditClient]="canEditClient()"
-      [isReadonly]="isReadonly()"
-      [eta]="order()?.eta ?? null"
-      [etd]="order()?.etd ?? null"
-      [etaMinDateTime]="etaMinDateTime()"
-      [timezone]="placeTimezone()"
-      [invoicingCompanyId]="order()?.invoicingCompanyId ?? ''"
-      [invoicingCompanyName]="invoicingCompanyName()"
-      [ownCompanies]="ownCompanies()"
-      [allowBankAccountEdit]="allowBankAccountEdit()"
-      [responsibleUserId]="order()?.salesRepId ?? ''"
-      [responsibleOptions]="responsibleUserOptions()"
-      (clientSearch)="searchClients($event)"
-      (clientChange)="onClientChange($event)"
-      (supplierSearch)="searchSuppliers($event)"
-      (supplierChange)="onActiveSupplierCompanyChange($event)"
-      (vesselSearch)="searchVessels($event)"
-      (vesselChange)="onVesselChange($event)"
-      (placeSearch)="searchPlaces($event)"
-      (placeChange)="onPortChange($event)"
-      (etaChange)="onEtaChange($event)"
-      (etdChange)="onEtdChange($event)"
-      (invoicingCompanyChange)="onInvoicingCompanyChange($event)"
-      [bankAccountId]="order()?.bankAccountId ?? ''"
-      [bankAccountOptions]="bankAccounts()"
-      (bankAccountChange)="onBankAccountChange($event)"
-      (responsibleChange)="onResponsibleUserChange($event)"
-      [customerContactId]="order()?.customerContactId ?? ''"
-      [supplierContactId]="activeSupplierContactId()"
-      [customerContactName]="customerContact()?.name ?? ''"
-      [supplierContactName]="activeSupplierContactName()"
-      [customerContactOptions]="customerContactDropdownOptions()"
-      [supplierContactOptions]="supplierContactDropdownOptions()"
-      [purchaseOrderNumber]="order()?.purchaseOrderNumber ?? ''"
-      (customerContactChange)="onCustomerContactChange($event)"
-      (supplierContactChange)="onActiveSupplierContactChange($event)"
-      (purchaseOrderNumberChange)="onPurchaseOrderNumberChange($event)"
-      [brokerId]="order()?.brokerId ?? ''"
-      [brokerName]="brokerName()"
-      [brokerOptions]="brokerDropdownOptions()"
-      [brokerLoading]="brokerSearchLoading()"
-      [brokerContactId]="order()?.brokerContactId ?? ''"
-      [brokerContactName]="brokerContact()?.name ?? ''"
-      [brokerContactOptions]="brokerContactDropdownOptions()"
-      [brokerGetsAll]="order()?.brokerGetsAll ?? false"
-      [agentId]="order()?.agentId ?? ''"
-      [agentName]="agentName()"
-      [agentOptions]="agentDropdownOptions()"
-      [agentLoading]="agentSearchLoading()"
-      [agentContactId]="order()?.agentContactId ?? ''"
-      [agentContactName]="agentContact()?.name ?? ''"
-      [agentContactOptions]="agentContactDropdownOptions()"
-      (brokerSearch)="searchBrokers($event)"
-      (brokerChange)="onBrokerChange($event)"
-      (brokerContactChange)="onBrokerContactChange($event)"
-      (brokerGetsAllChange)="onBrokerGetsAllChange($event)"
-      (agentSearch)="searchAgents($event)"
-      (agentChange)="onAgentChange($event)"
-      (agentContactChange)="onAgentContactChange($event)"
-    >
-      <div supplierHeaderTabs>
-        @if (orderSupplierTabs().length > 0 && !isInternalTransfer()) {
-          <div class="grid min-w-0 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-            <div class="scrollbar-none min-w-0 flex-1 overflow-x-auto">
-              <div class="flex min-w-max items-center gap-1">
-                @for (supplierTab of orderSupplierTabs(); track supplierTab.id) {
-                  <button
-                    type="button"
-                    (click)="selectOrderSupplierTab(supplierTab.id)"
-                    [attr.aria-selected]="activeOrderSupplierId() === supplierTab.id"
-                    class="inline-flex min-w-0 items-center gap-2 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
-                    [class]="activeOrderSupplierId() === supplierTab.id
-                      ? 'bg-brand-50 text-brand-700'
-                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'"
-                  >
-                    <span class="max-w-[9rem] truncate">{{ supplierTab.label }}</span>
-                  </button>
-                }
-              </div>
-            </div>
-            @if (!isReadonly() && activeOrderSupplier()) {
-              <button
-                type="button"
-                (click)="addSupplierTab()"
-                class="inline-flex shrink-0 items-center gap-1 rounded-md bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 transition-colors hover:bg-brand-100"
-              >
-                + Add
-              </button>
-            }
-          </div>
-        }
-      </div>
-      <!-- Customer Payment (projected into client card) -->
-      <div customerPayment>
-        <app-order-payment-terms-card
-          side="customer"
-          [readonly]="isReadonly()"
-          [paymentTermType]="order()?.customerPaymentTermType ?? ''"
-          [creditDays]="order()?.customerCreditDays ?? null"
-          [creditSummary]="customerCreditSummary()"
-          [creditLoading]="customerCreditLoading()"
-          [creditFrozen]="customerCreditFrozen()"
-          [canUseCredit]="canUseCustomerCredit()"
-          [note]="order()?.customerNote ?? null"
-          [showNote]="showCustomerPaymentNote()"
-          [paymentTermOptions]="paymentTermOptions"
-          (paymentTermTypeChange)="onCustomerPaymentTermChange($event)"
-          (creditDaysChange)="onCustomerCreditDaysChange($event)"
-          (noteChange)="onCustomerNoteChange($event)"
-          (showNoteChange)="showCustomerPaymentNote.set($event)"
-          (requestCredit)="showCreditApplicationModal.set(true)"
-        />
-      </div>
-      <!-- Supplier Payment (projected into supplier card) -->
-      <div supplierPayment>
-        <app-order-payment-terms-card
-          side="supplier"
-          [readonly]="isReadonly()"
-          [paymentTermType]="activeSupplierPaymentTermType() ?? ''"
-          [creditDays]="activeSupplierCreditDays() ?? null"
-          [creditSummary]="supplierCreditSummary()"
-          [creditLoading]="supplierCreditLoading()"
-          [canUseCredit]="canUseSupplierCredit()"
-          [note]="activeSupplierNote() ?? null"
-          [showNote]="showSupplierPaymentNote()"
-          [paymentTermOptions]="paymentTermOptions"
-          (paymentTermTypeChange)="onSupplierPaymentTermChange($event)"
-          (creditDaysChange)="onSupplierCreditDaysChange($event)"
-          (noteChange)="onSupplierNoteChange($event)"
-          (showNoteChange)="showSupplierPaymentNote.set($event)"
-        />
-      </div>
-      <!-- Notes + T&C (projected into invoicing card) -->
-      <div notesAndTerms>
-        <app-order-notes-terms-card
-          [readonly]="isPaidOrCancelled()"
-          [placeRemark]="order()?.placeRemark ?? null"
-          [customerTermsText]="customerTermsText()"
-          [supplierTermsText]="supplierTermsText()"
-          [hasOrderTermsOverride]="!!order()?.termsAndConditions"
-          [clientSpecialTermsLabel]="client()?.specialCustomerTerms ? (client()?.name + ' special terms') : null"
-          (placeRemarkChange)="onPlaceRemarkChange($event)"
-        />
-      </div>
-    </app-trading-detail-meta-cards>
-
-    @if (isInquiryContext() && !isInternalTransfer()) {
-      <!-- Moved to Suppliers tab — lazy-loaded -->
-      <div class="hidden"></div>
-
-      <!-- Quote Matrix + Supplier Replies moved to Suppliers tab -->
-      <div class="hidden"></div>
-    }
-
-
-<app-order-items
-      class="mt-4 block"
-      [items]="itemRows()"
-      [readonly]="isReadonly()"
-      [allowDeliveredEdit]="allowDeliveredEdit()"
-      [canSeePrices]="auth.canSeePrices()"
-      [supplierOptionsInput]="itemSupplierOptions()"
-      [financingRateAnnual]="financingRateAnnual()"
-      [financingDays]="financingDays()"
-      [financingDayCountConvention]="financingDayCountConvention()"
-      [productOptionsInput]="refData.configuredProducts()"
-      [unitOptionsInput]="refData.configuredUnits()"
-      [unitConversionsInput]="refData.configuredUnitConversions()"
-      [currencyOptionsInput]="refData.configuredCurrencies()"
-      [priceReferencesInput]="refData.configuredPriceReferences()"
-      [plattsSuggestionsInput]="plattsSuggestionItems()"
-      [warehouseOptionsInput]="warehouseDropdownOptions()"
-      [inventorySkuOptionsInput]="inventorySkuDropdownOptions()"
-      [catalogItemsInput]="refData.catalogItems()"
-      [defaultUnitInput]="refData.defaultUnit()"
-      [taxRatesInput]="refData.taxRates()"
-      [availabilityByRowId]="availabilityByRowId()"
-      (itemsChange)="onItemsChange($event)"
-      (economicsChange)="onItemEconomicsChange($event)"
-      (displayCurrencyChange)="itemDisplayCurrency.set($event)"
-    />
-
-    @if (isInternalTransfer()) {
-      <div class="mt-4">
-        <app-internal-transfer-sides
-          [orderId]="orderId()"
-          [readonly]="isReadonly()"
-        />
-      </div>
-    }
-
-    <!-- ═════════════════════════════════════════════════════════════ -->
-        <!-- ═════════════════════════════════════════════════════════════ -->
-    <!--  Financing Summary (always visible when user can see prices) -->
-    <!-- ═════════════════════════════════════════════════════════════ -->
-    @if (auth.canSeePrices()) {
-      <div class="mt-4">
-        <app-order-financing-summary
-          [baseCurrency]="itemDisplayCurrency()"
-          [financingRateAnnual]="financingRateAnnual()"
-          [financingDays]="financingDays()"
-          [financingDayCountConvention]="financingDayCountConvention()"
-          [economics]="itemEconomics()"
-        />
-      </div>
-    }
-
-    <!-- Delivery + Payments + Attachments + Comments -->
-    @if (allowDeliveredEdit() || orderId() || order()?.id) {
-      <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        @if (allowDeliveredEdit()) {
-          <app-order-delivery-card
-            [deliveredAtLocal]="deliveredAtLocal()"
-            [nomination]="supplierNomination()"
-            [internalDeliveredAt]="formatStoredDateOnlyLabel(activeSupplierDeliveredAt())"
-            [dateMismatch]="supplierNominationDateMismatch()"
-            [hasMultipleSuppliers]="hasMultipleOrderSuppliers()"
-            [supplierLabel]="activeOrderSupplier()?.company?.name ?? null"
-            [timezoneAbbr]="placeTimezoneAbbr()"
-            (deliveredAtChange)="onDeliveredAtChange($event)"
-          />
-        }
-        @if (orderId() || order()?.id) {
-          <app-order-payments-card
-            [payments]="payments()"
-            [paymentsTotal]="paymentsTotal()"
-            [currency]="order()?.currency ?? 'USD'"
-            [loading]="paymentsLoading()"
-            [canSeePrices]="auth.canSeePrices()"
-            [canRecordPayment]="canRecordPayment()"
-            (addPayment)="paymentModal.openModal()"
-          />
-        }
-        <app-order-attachments-card
-          [attachments]="attachments()"
-          [attachmentTypes]="refData.configuredAttachmentTypes()"
-          [(attachmentType)]="attachmentType"
-          [uploading]="uploadingAttachment()"
-          [hasFile]="!!selectedAttachment"
-          (upload)="uploadAttachment()"
-          (open)="openAttachment($event)"
-          (delete)="deleteAttachment($event)"
-          (fileSelected)="onAttachmentSelected($event)"
-        />
-
-      </div>
-    }
-
-    <!-- Secondary tabs — components are lazily created only when their tab is active -->
-    @if (order()?.id) {
-      <app-order-secondary-tabs
-        [commentsVisible]="true"
-        [activityVisible]="true"
-        [emailVisible]="true"
-        [plattsVisible]="plattsSuggestionItems().length > 0 || plattsSuggestionsLoading()"
-        [suppliersVisible]="true"
-        [captureVisible]="true"
-        defaultTab="comments"
-        (activeTabChange)="activeDetailTab.set($event)"
-      />
-
-      @if (activeDetailTab() === 'comments') {
-        <div class="mt-4">
-          <app-comments-card entityType="order" [entityId]="orderId()" [enableFollowUp]="false" />
-        </div>
-      }
-      @if (activeDetailTab() === 'activity') {
-        <div class="mt-4">
-          <app-activity-timeline entityType="order" [entityId]="order()!.id" />
-        </div>
-      }
-      @if (activeDetailTab() === 'email') {
-        <div class="mt-4">
-          <app-email-history-card [orderId]="order()!.id" />
-        </div>
-      }
-      @if (activeDetailTab() === 'platts') {
-        <div class="mt-4">
-          <app-order-platts-signals
-            [items]="plattsSuggestionItems()"
-            [meta]="plattsSuggestionsMeta()"
-            [loading]="plattsSuggestionsLoading()"
-            [error]="plattsSuggestionsError()"
-            (refresh)="loadPlattsSuggestions()"
-            (openReport)="openPlattsReport($event)"
-          />
-        </div>
-      }
-      @if (activeDetailTab() === 'suppliers') {
-        <app-order-suppliers-tab
-          [suppliers]="rankedInquirySuppliers()"
-          [loading]="inquirySupplierContextLoading()"
-          [readonly]="isReadonly()"
-          [selectedSupplierId]="selectedSupplierComparison()?.supplierId ?? null"
-          [selectedSupplierName]="selectedSupplierComparison()?.supplierName ?? ''"
-          [isTopSupplier]="isTopInquirySupplier"
-          [quoteRateLabel]="quoteRateLabel"
-          [averageResponseLabel]="averageResponseLabel"
-          [replies]="sortedInquiryReplies()"
-          [matrixRows]="inquiryQuoteMatrixRows()"
-          [selectedReplySupplierId]="order()?.supplierId ?? null"
-          [showPrices]="auth.canSeePrices()"
-          [recommendation]="inquiryReplyRecommendation"
-          [summary]="inquiryReplySummary"
-          [responseHoursLabel]="responseHoursLabel"
-          (select)="applyComparisonSupplier($event)"
-        />
-      }
-      @if (activeDetailTab() === 'capture') {
-        <app-order-capture-tab
-          [replies]="sortedInquiryReplies()"
-          [loading]="inquiryRepliesLoading()"
-          [readonly]="isReadonly()"
-          [selectedSupplierId]="order()?.supplierId ?? null"
-          [editingReplyId]="editingInquiryReplyId()"
-          [badgeClass]="statusBadgeClass"
-          [formatDateTime]="formatHistoryDateTime"
-          [responseHoursLabel]="responseHoursLabel"
-          [summary]="inquiryReplySummary"
-          (toggleEditor)="isEditingInquiryReply($event) ? cancelInquiryReplyEditor() : openInquiryReplyEditor($event)"
-        />
-      }
-    }
-
-    <!-- Toast notification -->
-    @if (toast()) {
-      <div
-        class="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-lg border px-4 py-3 text-sm font-medium shadow-lg transition-all"
-        [class]="toast()!.type === 'success'
-          ? 'border-green-200 bg-green-50 text-green-800'
-          : 'border-red-200 bg-red-50 text-red-800'"
-      >
-        @if (toast()!.type === 'success') {
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-            <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd" />
-          </svg>
-        } @else {
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-            <path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd" />
-          </svg>
-        }
-        {{ toast()!.message }}
-      </div>
-    }
-
-    <app-order-payment-modal
-      #paymentModal
-      [orderId]="orderId()"
-      [currencyOptions]="refData.configuredCurrencies()"
-      [defaultCurrency]="order()?.currency ?? 'USD'"
-      [todayLocal]="todayLocalDateString()"
-      (saved)="loadPayments()"
-    />
-
-    <app-order-convert-modal
-      #convertModal
-      [saving]="convertingToOrder()"
-      (confirmed)="confirmConvertToOrder()"
-    />
-
-    <app-order-cancel-modal
-      #cancelModal
-      [saving]="cancellingInquiry()"
-      [targetLabel]="cancellationTargetLabel()"
-      [reasons]="availableInquiryCancelReasons()"
-      (confirmed)="confirmCancelInquiry($event)"
-    />
-
-    <app-order-place-remark-prompt
-      #remarkPrompt
-      [pendingRemark]="pendingPlaceRemark()"
-      (applied)="applyNewPlaceRemark()"
-      (dismissed)="dismissPlaceRemarkPrompt()"
-    />
-
-    <!-- Send Email Modal -->
-    <app-send-email-modal
-      [documentType]="emailDocumentType()"
-      [senderName]="auth.userName()"
-      [senderEmail]="auth.userEmail()"
-      [pdfFileName]="emailPdfFileName()"
-      [orderId]="orderId()"
-      [nominationOrderSupplierId]="nominationOrderSupplierId()"
-      [extraAttachments]="emailAttachmentOptions()"
-      [waLinked]="waLinked()"
-      [defaultPhone]="emailModalDefaultPhone()"
-      (sendEmail)="onSendEmail($event)"
-      (sendWhatsApp)="onSendInvoiceWhatsApp($event)"
-    />
-
-    <!-- Send Inquiry Modal -->
-    <app-send-inquiry-modal
-      [orderId]="orderId()"
-      [senderName]="auth.userName()"
-      [companyName]="invoicingCompanyName()"
-      [placeId]="order()?.placeId ?? ''"
-      [portName]="port()?.name ?? ''"
-      [waLinked]="waLinked()"
-      [vesselName]="vesselName()"
-      [vesselImo]="vessel()?.imo ?? null"
-      [eta]="order()?.eta ?? null"
-      [etd]="order()?.etd ?? null"
-      [items]="inquiryItems()"
-      (sendInquiry)="onSendInquiry($event)"
-      (sendWhatsAppInquiry)="onSendInquiryWhatsApp($event)"
-    />
-
-    <!-- PDF Preview Modal -->
-    <app-pdf-preview-modal [waLinked]="waLinked()" [defaultPhone]="customerContact()?.phone ?? null" (sendWhatsApp)="onSendPdfWhatsApp($event)" />
-
-    <!-- Credit Application Modal -->
-    @if (order()?.clientId) {
-      <app-credit-application-modal
-        [open]="showCreditApplicationModal()"
-        [counterpartyId]="order()!.clientId"
-        [counterpartyName]="clientName()"
-        [orderId]="order()!.id"
-        defaultType="CUSTOMER"
-        (closed)="showCreditApplicationModal.set(false)"
-        (submitted)="onCreditApplicationSubmitted()"
-      />
-    }
-  `,
+  templateUrl: 'order-detail-page.component.html',
   styles: [
     `
       .fueld-clamp-1 {
@@ -759,6 +268,14 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   protected readonly refData = inject(OrderReferenceDataService);
   protected readonly replySvc = inject(OrderReplyService);
   private readonly orderLoader = inject(OrderLoaderService);
+  private readonly portDocSvc = inject(OrderPortDocumentationService);
+  private readonly inquirySvc = inject(OrderInquiryService);
+  private readonly financialSvc = inject(OrderFinancialService);
+  private readonly supplierSvc = inject(OrderSupplierService);
+  private readonly pdfSvc = inject(OrderPdfService);
+  private readonly commSvc = inject(OrderCommunicationService);
+  private readonly searchSvc = inject(OrderSearchService);
+  private readonly saveSvc = inject(OrderSaveService);
   private readonly riskService = inject(RiskMonitoringService);
 
   readonly emailModal = viewChild(SendEmailModalComponent);
@@ -882,11 +399,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   selectedAttachment: File | null = null;
   readonly payments = signal<CustomerPaymentDto[]>([]);
   readonly paymentsLoading = signal(false);
-  readonly portDocumentationContext = signal<PortDocumentationOrderContextDto | null>(null);
-  readonly portDocumentationLoading = signal(false);
-  readonly portDocumentationError = signal('');
-  readonly portDocumentationAction = signal<string | null>(null);
-  readonly bunkerInstructionsPreview = signal<BunkerInstructionsPreviewDto | null>(null);
+  readonly portDocumentationContext = computed(() => this.portDocSvc.portDocumentationContext());
+  readonly portDocumentationLoading = computed(() => this.portDocSvc.portDocumentationLoading());
+  readonly portDocumentationError = computed(() => this.portDocSvc.portDocumentationError());
+  readonly portDocumentationAction = computed(() => this.portDocSvc.portDocumentationAction());
+  readonly bunkerInstructionsPreview = computed(() => this.portDocSvc.bunkerInstructionsPreview());
   readonly customerCreditLines = signal<CreditLineDto[]>([]);
   readonly customerCreditLoading = signal(false);
   readonly customerCreditFrozen = signal(false);
@@ -1096,8 +613,8 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       .map((doc) => ({
         id: doc.id,
         fileName: doc.fileName,
-        label: `${this.humanizePortDocumentKind(doc.documentKind)} · ${this.humanizePortDocumentSource(doc.sourceType)}`,
-        previewUrl: `${API_URL}/orders/${this.getPortDocumentationOrderId()}/port-documentation/documents/${doc.id}/download`,
+        label: `${this.portDocSvc.humanizeDocumentKind(doc.documentKind)} · ${this.portDocSvc.humanizeDocumentSource(doc.sourceType)}`,
+        previewUrl: `${API_URL}/orders/${this.order()?.id ?? this.orderId()}/port-documentation/documents/${doc.id}/download`,
       })),
   );
   readonly emailAttachmentOptions = computed<SendEmailAttachmentOption[]>(() => {
@@ -1479,7 +996,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       const orderId = this.orderId();
       const activeSupplier = this.activeOrderSupplier();
       if (!orderId || !activeSupplier) return;
-      void this.loadSupplierCreditLines(activeSupplier.companyId);
+      void this.financialSvc.loadSupplierCreditLines(activeSupplier.companyId);
       void this.loadCompanyContacts('supplier', activeSupplier.companyId);
       void this.loadSupplierNominationSummary();
     });
@@ -1575,8 +1092,8 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       this.itemRows.set(r.items);
       this.draftItemIds.set(new Set());
       await this.normalizeDetailRoute(r.order.status, id);
-      await this.loadCustomerCreditLines(r.order.clientId);
-      await this.loadSupplierCreditLines(this.activeOrderSupplier()?.companyId ?? r.order.supplierId);
+      await this.financialSvc.loadCustomerCreditLines(r.order.clientId);
+      await this.financialSvc.loadSupplierCreditLines(this.activeOrderSupplier()?.companyId ?? r.order.supplierId);
       await this.loadReferenceData();
       await this.loadPlattsSuggestions();
       this.scheduleAvailabilityChecks();
@@ -1590,7 +1107,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       if (supplierCompanyId) await this.loadCompanyContacts('supplier', supplierCompanyId);
       if (r.order.brokerId) await this.loadCompanyContacts('broker', r.order.brokerId);
       if (r.order.agentId) await this.loadCompanyContacts('agent', r.order.agentId);
-      await Promise.all([this.loadInquirySupplierContext(), this.loadInquiryReplies()]);
+      await Promise.all([await this.inquirySvc.loadSupplierContext(this.orderId()), await this.inquirySvc.loadReplies(this.orderId())]);
       let invoicingId = this.order()?.invoicingCompanyId ?? null;
       if (r.ownCompanies.length) {
         this.ownCompanies.set(r.ownCompanies);
@@ -1602,154 +1119,33 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       if (this.order()?.supplierNote) this.showSupplierPaymentNote.set(true);
       await this.loadAttachments();
       await this.loadPayments();
-      await this.loadPortDocumentationContext();
+      await this.portDocSvc.load(this.orderId());
       await this.loadSupplierNominationSummary();
     } catch { this.showToast('error', 'Failed to load order.'); }
   }
 
   private async loadPortDocumentationContext(): Promise<void> {
-    const id = this.getPortDocumentationOrderId();
-    if (!id) return;
-
-    this.portDocumentationLoading.set(true);
-    this.portDocumentationError.set('');
-    this.bunkerInstructionsPreview.set(null);
-
-    try {
-      const res = await firstValueFrom(
-        this.http.get<ApiResponse<PortDocumentationOrderContextDto>>(`${API_URL}/orders/${id}/port-documentation`),
-      );
-      if (res.success) {
-        this.portDocumentationContext.set(res.data);
-      } else {
-        this.portDocumentationContext.set(null);
-        this.portDocumentationError.set(res.message ?? 'Port Documentation is not available on this deployment yet.');
-      }
-    } catch {
-      this.portDocumentationContext.set(null);
-      this.portDocumentationError.set('Port Documentation is not available on this deployment yet.');
-    } finally {
-      this.portDocumentationLoading.set(false);
-    }
+    await this.portDocSvc.load(this.orderId());
   }
 
   async previewBunkerInstructions(): Promise<void> {
-    const id = this.getPortDocumentationOrderId();
-    if (!id) return;
-
-    this.portDocumentationAction.set('preview-bunker');
-    try {
-      const res = await firstValueFrom(
-        this.http.get<ApiResponse<BunkerInstructionsPreviewDto>>(`${API_URL}/orders/${id}/port-documentation/bunker-instructions/preview`),
-      );
-      if (!res.success) {
-        this.showToast('error', res.message ?? 'Failed to load bunker instructions preview.');
-        return;
-      }
-      this.bunkerInstructionsPreview.set(res.data);
-    } catch {
-      this.showToast('error', 'Failed to load bunker instructions preview.');
-    } finally {
-      this.portDocumentationAction.set(null);
-    }
+    await this.portDocSvc.previewBunkerInstructions(this.orderId());
   }
 
   async generateBunkerInstructions(): Promise<void> {
-    await this.runPortDocumentationMutation(
-      'generate-bunker',
-      'Bunker Instructions generated.',
-      'Failed to generate Bunker Instructions.',
-      () => this.postPortDocumentationDocument('bunker-instructions/generate'),
-    );
+    await this.portDocSvc.generateBunkerInstructions(this.orderId());
   }
 
   async generateGateList(): Promise<void> {
-    await this.runPortDocumentationMutation(
-      'generate-gate-list',
-      'Gate List generated.',
-      'Failed to generate Gate List.',
-      () => this.postPortDocumentationDocument('gate-list/generate'),
-    );
+    await this.portDocSvc.generateGateList(this.orderId());
   }
 
   async includeFlangeWorksheetDocument(): Promise<void> {
-    await this.runPortDocumentationMutation(
-      'include-flange',
-      'Flange Worksheet included on the order.',
-      'Failed to include Flange Worksheet.',
-      () => this.postPortDocumentationDocument('flange-worksheet/include'),
-    );
+    await this.portDocSvc.includeFlangeWorksheetDocument(this.orderId());
   }
 
   async downloadPortDocumentationDocument(doc: OrderPortDocumentDto): Promise<void> {
-    const id = this.getPortDocumentationOrderId();
-    if (!id) return;
-
-    this.portDocumentationAction.set(`download-${doc.id}`);
-    try {
-      const response = await firstValueFrom(
-        this.http.get(`${API_URL}/orders/${id}/port-documentation/documents/${doc.id}/download`, {
-          responseType: 'blob',
-          observe: 'response',
-        }),
-      );
-      this.downloadResponseBlob(response, doc.fileName);
-    } catch {
-      this.showToast('error', 'Failed to download Port Documentation file.');
-    } finally {
-      this.portDocumentationAction.set(null);
-    }
-  }
-
-  private async postPortDocumentationDocument(pathSuffix: string): Promise<void> {
-    const id = this.getPortDocumentationOrderId();
-    if (!id) throw new Error('Order not found');
-
-    const res = await firstValueFrom(
-      this.http.post<ApiResponse<OrderPortDocumentDto>>(`${API_URL}/orders/${id}/port-documentation/${pathSuffix}`, {}),
-    );
-    if (!res.success) {
-      throw new Error(res.message ?? 'Request failed');
-    }
-  }
-
-  private async runPortDocumentationMutation(
-    actionKey: string,
-    successMessage: string,
-    errorMessage: string,
-    operation: () => Promise<void>,
-  ): Promise<void> {
-    this.portDocumentationAction.set(actionKey);
-    try {
-      await operation();
-      await this.loadPortDocumentationContext();
-      this.showToast('success', successMessage);
-    } catch {
-      this.showToast('error', errorMessage);
-    } finally {
-      this.portDocumentationAction.set(null);
-    }
-  }
-
-  private getPortDocumentationOrderId(): string {
-    return this.order()?.id ?? this.orderId();
-  }
-
-  private downloadResponseBlob(response: HttpResponse<Blob>, fallbackFileName: string): void {
-    const blob = response.body;
-    if (!blob) throw new Error('Missing file body');
-
-    const objectUrl = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = objectUrl;
-    anchor.download = this.extractFilenameFromDisposition(response.headers.get('Content-Disposition')) ?? fallbackFileName;
-    anchor.click();
-    setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
-  }
-
-  private extractFilenameFromDisposition(header: string | null): string | null {
-    const match = header?.match(/filename="?([^";]+)"?/i);
-    return match?.[1] ?? null;
+    await this.portDocSvc.downloadDocument(this.orderId(), doc);
   }
 
   private async loadAttachments(): Promise<void> {
@@ -2577,7 +1973,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       this.activeOrderSupplierId.set(nextActive?.id ?? null);
       this.supplier.set(nextActive?.company ?? null);
       this.supplierContact.set(nextActive?.contact ?? null);
-      await this.loadSupplierCreditLines(nextActive?.companyId ?? null);
+      await this.financialSvc.loadSupplierCreditLines(nextActive?.companyId ?? null);
       if (nextActive?.companyId) {
         await this.loadCompanyContacts('supplier', nextActive.companyId);
       } else {
@@ -2620,7 +2016,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         : order);
       this.supplier.set(nextActive?.company ?? null);
       this.supplierContact.set(nextActive?.contact ?? null);
-      await this.loadSupplierCreditLines(nextActive?.companyId ?? null);
+      await this.financialSvc.loadSupplierCreditLines(nextActive?.companyId ?? null);
       if (nextActive?.companyId) {
         await this.loadCompanyContacts('supplier', nextActive.companyId);
       } else {
@@ -3045,7 +2441,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     const clientData = this.clients().find((c) => c.id === clientId);
     this.client.set(clientData ?? null);
     this.customerContact.set(null);
-    void this.loadCustomerCreditLines(clientId).then(() => {
+    void this.financialSvc.loadCustomerCreditLines(clientId).then(() => {
       // Auto-default to CREDIT if client has credit lines and no payment term is set
       const currentOrder = this.order();
       if (currentOrder && !currentOrder.customerPaymentTermType) {
@@ -3077,7 +2473,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         : order);
       this.supplier.set(supplierData ?? null);
       this.supplierContact.set(null);
-      void this.loadSupplierCreditLines(supplierId);
+      void this.financialSvc.loadSupplierCreditLines(supplierId);
       void this.loadCompanyContacts('supplier', supplierId);
       this.applyPreferredInvoicingCompanyFromSupplier(supplierData);
       this.triggerAutosave();
@@ -3092,7 +2488,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     }));
     this.supplier.set(supplierData ?? null);
     this.supplierContact.set(null);
-    void this.loadSupplierCreditLines(supplierId);
+    void this.financialSvc.loadSupplierCreditLines(supplierId);
     void this.loadCompanyContacts('supplier', supplierId);
     this.applyPreferredInvoicingCompanyFromSupplier(supplierData);
     this.triggerAutosave();
@@ -3244,13 +2640,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     return this.inquiryReplyRecommendations().get(inquiryId) ?? null;
   }
 
-  responseHoursLabel(hours: number | null): string {
-    if (hours == null) return '';
-    if (hours >= 24) {
-      return `${Number((hours / 24).toFixed(1))} days`;
-    }
-    return `${Number(hours.toFixed(1))} hours`;
-  }
 
   /** Strip trailing zeros from a numeric string, show min-max spread if applicable. */
   formatQty(qty: string | null, qtyMin?: string | null): string {
@@ -3478,8 +2867,8 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       );
       this.requireApiSuccess(itemsRes, 'Failed to save items.');
       this.clearSavedDraftItemIds(autoSaveRows);
-      await this.loadCustomerCreditLines(o.clientId);
-      await this.loadSupplierCreditLines(this.activeOrderSupplier()?.companyId ?? o.supplierId);
+      await this.financialSvc.loadCustomerCreditLines(o.clientId);
+      await this.financialSvc.loadSupplierCreditLines(this.activeOrderSupplier()?.companyId ?? o.supplierId);
       this.lastSaved.set(new Date());
     } catch {
       // Quietly fail - manual save still available
@@ -3573,7 +2962,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         this.openSendEmailModal('INVOICE');
         break;
       case 'send-port-documentation':
-        if (!(await this.ensurePortDocumentationReadyForSend())) {
+        if (!(await this.portDocSvc.ensureReadyForSend(this.orderId()))) {
           break;
         }
         this.openSendEmailModal('PORT_DOCUMENTATION');
@@ -3594,65 +2983,17 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   private async ensurePortDocumentationReadyForSend(): Promise<boolean> {
-    let currentContext = this.portDocumentationContext();
-    if (!currentContext) {
-      await this.loadPortDocumentationContext();
-      currentContext = this.portDocumentationContext();
-    }
-
-    if (this.getActivePortDocumentationDocumentCount(currentContext) > 0) return true;
-
-    if (!currentContext?.enabled) {
-      this.showToast('error', 'Port Documentation is not enabled for this order.');
-      return false;
-    }
-
-    const generatedCount = await this.preparePortDocumentationForSend();
-    if (generatedCount > 0) {
-      return true;
-    }
-
-    const warnings = this.portDocumentationContext()?.readinessWarnings ?? [];
-    const readinessMessage = warnings[0] ?? 'Port Documentation could not be prepared automatically.';
-    this.showToast('error', readinessMessage);
-    return false;
-  }
-
-  private async preparePortDocumentationForSend(): Promise<number> {
-    const context = this.portDocumentationContext();
-    const operations: Array<() => Promise<void>> = [];
-
-    operations.push(() => this.postPortDocumentationDocument('bunker-instructions/generate'));
-    if ((context?.gateListCount ?? 0) > 0) {
-      operations.push(() => this.postPortDocumentationDocument('gate-list/generate'));
-    }
-    if (context?.currentFlangeWorksheet) {
-      operations.push(() => this.postPortDocumentationDocument('flange-worksheet/include'));
-    }
-
-    this.portDocumentationAction.set('prepare-send');
-    try {
-      let successCount = 0;
-      for (const operation of operations) {
-        try {
-          await operation();
-          successCount += 1;
-        } catch {
-          // Continue so one missing document type doesn't block the rest.
-        }
+    const ready = await this.portDocSvc.ensureReadyForSend(this.orderId());
+    if (!ready) {
+      const ctx = this.portDocSvc.portDocumentationContext();
+      if (ctx && !ctx.enabled) {
+        this.showToast('error', 'Port Documentation is not enabled for this order.');
+      } else {
+        const warnings = ctx?.readinessWarnings ?? [];
+        this.showToast('error', warnings[0] ?? 'Port Documentation could not be prepared automatically.');
       }
-
-      await this.loadPortDocumentationContext();
-      return this.getActivePortDocumentationDocumentCount(this.portDocumentationContext());
-    } finally {
-      this.portDocumentationAction.set(null);
     }
-  }
-
-  private getActivePortDocumentationDocumentCount(context: PortDocumentationOrderContextDto | null | undefined): number {
-    return (context?.documents ?? [])
-      .filter((doc) => String(doc.status ?? '').toUpperCase() === 'ACTIVE')
-      .length;
+    return ready;
   }
 
   openConvertToOrderModal(): void {
@@ -3742,9 +3083,9 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         this.order.update((o) => (o ? { ...o, status: OrderStatus.Cancelled, lossReason } : o));
         const updatedOrder = this.order();
         if (updatedOrder?.clientId) {
-          await this.loadCustomerCreditLines(updatedOrder.clientId);
+          await this.financialSvc.loadCustomerCreditLines(updatedOrder.clientId);
         }
-        await this.loadSupplierCreditLines(this.activeOrderSupplier()?.companyId ?? updatedOrder?.supplierId);
+        await this.financialSvc.loadSupplierCreditLines(this.activeOrderSupplier()?.companyId ?? updatedOrder?.supplierId);
         this.cancelModalRef()?.close();
         this.showToast('success', `${isInquiry ? 'Inquiry' : 'Order'} cancelled.`);
         await this.normalizeDetailRoute(OrderStatus.Cancelled, id);
@@ -3874,8 +3215,8 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       );
       this.requireApiSuccess(itemsRes, 'Failed to save items.');
       this.clearSavedDraftItemIds(itemRows);
-      await this.loadCustomerCreditLines(o.clientId);
-      await this.loadSupplierCreditLines(this.activeOrderSupplier()?.companyId ?? o.supplierId);
+      await this.financialSvc.loadCustomerCreditLines(o.clientId);
+      await this.financialSvc.loadSupplierCreditLines(this.activeOrderSupplier()?.companyId ?? o.supplierId);
       this.showToast('success', 'Order saved successfully.');
     } catch {
       this.showToast('error', 'Failed to save order.');
@@ -4035,8 +3376,8 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
             this.showToast('success', `Inquiry sent to ${successCount}/${total} recipients`);
             if (successCount > 0) {
               void Promise.all([
-                this.loadInquiryReplies(),
-                this.loadInquirySupplierContext(),
+                this.inquirySvc.loadReplies(this.orderId()).then((r) => this.inquiryReplies.set(r)),
+                this.inquirySvc.loadSupplierContext(this.orderId()).then((s) => this.inquirySupplierContext.set(s)),
               ]);
               this.inquiryModal()?.close();
             }
@@ -4079,8 +3420,8 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
         this.showToast('success', `Inquiry sent via WhatsApp to ${successCount}/${payload.recipients.length} recipients`);
         this.inquiryModal()?.close();
         void Promise.all([
-          this.loadInquiryReplies(),
-          this.loadInquirySupplierContext(),
+          await this.inquirySvc.loadReplies(this.orderId()),
+          await this.inquirySvc.loadSupplierContext(this.orderId()),
         ]);
         return;
       }
@@ -4240,21 +3581,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     }
   }
 
-  private humanizePortDocumentKind(value: string | null | undefined): string {
-    return String(value ?? '')
-      .split('_')
-      .filter(Boolean)
-      .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
-      .join(' ');
-  }
 
-  private humanizePortDocumentSource(value: string | null | undefined): string {
-    return String(value ?? '')
-      .split('_')
-      .filter(Boolean)
-      .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
-      .join(' ');
-  }
 
   /** Send an already-loaded PDF via WhatsApp from the PDF preview modal */
   async onSendPdfWhatsApp(ev: { phone: string; blob: Blob; fileName: string }): Promise<void> {
@@ -4308,7 +3635,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
   onCreditApplicationSubmitted(): void {
     // Reload credit lines after application is submitted
-    this.loadCustomerCreditLines(this.order()?.clientId);
+    this.financialSvc.loadCustomerCreditLines(this.order()?.clientId);
   }
 
   private requireApiSuccess<T>(response: ApiResponse<T>, fallbackMessage: string): T {

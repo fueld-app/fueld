@@ -1,7 +1,8 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import type { ApiResponse, SupplierInquiryReplyRow } from '../order-detail-page.component';
+import type { ApiResponse } from '@fueld/types';
+import type { SupplierInquiryReplyRow } from '../order-detail-page.component';
 import { API_URL } from '@app/core/config/api';
 
 export interface InquirySupplierPerformance {
