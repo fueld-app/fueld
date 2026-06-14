@@ -725,10 +725,6 @@ interface PlattsSuggestionViewModel {
             <div class="py-8 text-center text-sm text-gray-400">Supplier context is only available for inquiries.</div>
           }
         </div>
-      } @else {
-            <div class="py-8 text-center text-sm text-gray-400">Supplier context is only available for inquiries.</div>
-          }
-        </div>
       }
       @if (activeDetailTab() === 'capture') {
         <div class="mt-4">
