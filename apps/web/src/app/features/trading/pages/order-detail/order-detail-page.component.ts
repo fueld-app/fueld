@@ -2496,53 +2496,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   private buildItemPayload(rows: OrderItemRow[], options?: { fillMissingDeliveredQuantity?: boolean }) {
-    const fillMissingDeliveredQuantity = options?.fillMissingDeliveredQuantity ?? false;
-
-    return rows.map((r) => {
-      const deliveredQuantity = fillMissingDeliveredQuantity
-        ? this.getEffectiveDeliveredQuantity(r)
-        : this.parseDecimalValue(r.deliveredQuantity);
-
-      return {
-        orderSupplierId: r.orderSupplierId ?? null,
-        productType: r.productType,
-        quantity: String(r.quantity),
-        quantityMin: r.quantityMin != null ? String(r.quantityMin) : null,
-        quantityMax: String(r.quantity),
-        unit: r.unit,
-        costUnit: r.costUnit,
-        salesUnit: r.salesUnit,
-        costConversionFactor: r.costConversionFactor != null ? String(r.costConversionFactor) : '1',
-        unitConversionFactor: r.unitConversionFactor != null ? String(r.unitConversionFactor) : '1',
-        description: r.description || null,
-        costPrice: r.costPrice ? String(r.costPrice) : null,
-        costCurrency: r.costCurrency,
-        salesPrice: r.salesPrice ? String(r.salesPrice) : null,
-        salesCurrency: r.salesCurrency,
-        paymentTerms: r.paymentTerms || null,
-        customerNote: r.customerNote ?? null,
-        deliveredQuantity: deliveredQuantity != null ? String(deliveredQuantity) : null,
-        costPricingModel: r.costPricingModel ?? 'FIXED',
-        costReferenceId: r.costReferenceId ?? null,
-        costPlattsEntryId: r.costPlattsEntryId ?? null,
-        costPremium: r.costPremium != null ? String(r.costPremium) : null,
-        costBarging: r.costBarging != null ? String(r.costBarging) : null,
-        costBargingUnit: r.costBargingUnit ?? null,
-        costCreditDays: r.costCreditDays ?? null,
-        salesPricingModel: r.salesPricingModel ?? 'FIXED',
-        salesReferenceId: r.salesReferenceId ?? null,
-        salesPlattsEntryId: r.salesPlattsEntryId ?? null,
-        salesPremium: r.salesPremium != null ? String(r.salesPremium) : null,
-        salesBarging: r.salesBarging != null ? String(r.salesBarging) : null,
-        salesBargingUnit: r.salesBargingUnit ?? null,
-        salesCreditDays: r.salesCreditDays ?? null,
-        // Inventory linkage — only persisted when the line is tracked.
-        inventorySkuId: r.inventorySkuId ?? null,
-        warehouseId: r.warehouseId ?? null,
-        plannedInventoryAt: r.plannedInventoryAt ?? null,
-        taxRate: r.taxRate != null ? String(r.taxRate) : null,
-      };
-    });
+    return buildItemPayload(rows, options?.fillMissingDeliveredQuantity);
   }
 
   private normalizeIncomingItemRows(items: OrderItemRow[]): OrderItemRow[] {
