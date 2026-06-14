@@ -10,6 +10,7 @@ interface CompanyDto { id: string }
 interface VesselDto { id: string }
 interface PlaceDto { id: string }
 interface BankAccountDto { id: string }
+interface OrderSupplierRecordDto { id: string; companyId: string }
 
 async function ensureOwnCompanyBankAccount(
   page: Page,
@@ -141,12 +142,10 @@ export async function createInquiryViaApi(page: Page): Promise<string> {
   return inquiryId;
 }
 
-/** Create an inquiry and link supplier companies to it so multi-supplier tabs appear. */
+/** Create an inquiry with 2+ supplier legs, each with their own dedicated line item. */
 export async function createMultiSupplierInquiryViaApi(
   page: Page,
-): Promise<{ inquiryId: string; supplierIds: string[] }> {
-  const inquiryId = await createInquiryViaApi(page);
-
+): Promise<{ inquiryId: string; supplierRecordIds: string[] }> {
   const accessToken = await page.evaluate(() => localStorage.getItem('fueld_access_token'));
   if (!accessToken) throw new Error('Missing access token');
 
@@ -155,49 +154,80 @@ export async function createMultiSupplierInquiryViaApi(
     Accept: 'application/json',
   };
 
-  // Fetch existing supplier companies to link to this inquiry
-  const suppliersRes = await page.request.get(
-    'http://localhost:3000/companies/local?type=SUPPLIER&limit=5',
-    { headers },
-  );
-  const suppliersJson = await suppliersRes.json() as ApiResponse<{ companies: CompanyDto[] }>;
-  const supplierCompanies = suppliersJson.data?.companies ?? [];
+  // Step 1: create inquiry (no items yet — we'll add per-supplier items)
+  const [clientsRes, vesselsRes, placesRes] = await Promise.all([
+    page.request.get('http://localhost:3000/companies/local?type=CLIENT&limit=1', { headers }),
+    page.request.get('http://localhost:3000/vessels/local?limit=1', { headers }),
+    page.request.get('http://localhost:3000/lloyds/places/local?limit=1', { headers }),
+  ]);
 
-  // We need at least 2 supplier companies
+  if (!clientsRes.ok() || !vesselsRes.ok() || !placesRes.ok()) {
+    throw new Error('Failed to fetch seeded entities.');
+  }
+
+  const clientId = ((await clientsRes.json()) as ApiResponse<{ companies: CompanyDto[] }>).data?.companies?.[0]?.id;
+  const vesselId = ((await vesselsRes.json()) as ApiResponse<{ vessels: VesselDto[] }>).data?.vessels?.[0]?.id;
+  const placeId = ((await placesRes.json()) as ApiResponse<{ places: PlaceDto[] }>).data?.places?.[0]?.id;
+
+  const ownCompaniesRes = await page.request.get('http://localhost:3000/companies/own', { headers });
+  const invoicingCompanyId = ((await ownCompaniesRes.json()) as ApiResponse<CompanyDto[]>).data?.[0]?.id ?? null;
+  const bankAccountId = invoicingCompanyId ? await ensureOwnCompanyBankAccount(page, headers, invoicingCompanyId) : null;
+
+  if (!clientId || !vesselId || !placeId) throw new Error('Unable to resolve seeded entities.');
+
+  const createRes = await page.request.post('http://localhost:3000/orders', {
+    headers,
+    data: { clientId, vesselId, placeId, ...(invoicingCompanyId ? { invoicingCompanyId } : {}), ...(bankAccountId ? { bankAccountId } : {}) },
+  });
+  const createJson = await createRes.json() as ApiResponse<{ id: string }>;
+  const inquiryId = createJson.data?.id;
+  if (!createJson.success || !inquiryId) throw new Error('Failed to create inquiry via API.');
+
+  // Step 2: fetch or create supplier companies, link them, capture record ids
+  const suppliersRes = await page.request.get('http://localhost:3000/companies/local?type=SUPPLIER&limit=5', { headers });
+  const supplierCompanies: CompanyDto[] = ((await suppliersRes.json()) as ApiResponse<{ companies: CompanyDto[] }>).data?.companies ?? [];
+
   if (supplierCompanies.length < 2) {
-    // Create a second supplier company via the local endpoint
     const createRes = await page.request.post('http://localhost:3000/companies/local', {
       headers: { ...headers, 'Content-Type': 'application/json' },
-      data: {
-        name: `E2E Supplier ${Date.now()}`,
-        types: ['SUPPLIER'],
-      },
+      data: { name: `E2E Supplier ${Date.now()}`, types: ['SUPPLIER'] },
     });
     const createJson = await createRes.json() as ApiResponse<{ id: string }>;
-    if (createJson.success && createJson.data) {
-      supplierCompanies.push({ id: createJson.data.id });
-    }
+    if (createJson.success && createJson.data) supplierCompanies.push({ id: createJson.data.id });
   }
 
-  const linkedSupplierIds: string[] = [];
+  const supplierRecordIds: string[] = [];
 
-  // Link each supplier company to the order via POST /orders/:id/suppliers
   for (let i = 0; i < Math.min(supplierCompanies.length, 3); i++) {
     const companyId = supplierCompanies[i]!.id;
-    const addRes = await page.request.post(
-      `http://localhost:3000/orders/${inquiryId}/suppliers`,
-      {
-        headers: { ...headers, 'Content-Type': 'application/json' },
-        data: {
-          companyId,
-          isPrimary: i === 0,
-        },
-      },
-    );
+    const addRes = await page.request.post(`http://localhost:3000/orders/${inquiryId}/suppliers`, {
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      data: { companyId, isPrimary: i === 0 },
+    });
     if (addRes.ok()) {
-      linkedSupplierIds.push(companyId);
+      const addJson = await addRes.json() as ApiResponse<OrderSupplierRecordDto>;
+      if (addJson.success && addJson.data?.id) {
+        supplierRecordIds.push(addJson.data.id);
+      }
     }
   }
 
-  return { inquiryId, supplierIds: linkedSupplierIds };
+  // Step 3: seed per-supplier line items with orderSupplierId pointing to each supplier record
+  if (supplierRecordIds.length >= 1) {
+    const items = supplierRecordIds.map((recordId, idx) => ({
+      orderSupplierId: recordId,
+      productType: idx === 0 ? 'MGO' : 'VLSFO',
+      quantity: '100',
+      unit: 'MT',
+      salesPrice: '500',
+      customerNote: `Seeded for supplier ${idx + 1}`,
+    }));
+
+    await page.request.put(`http://localhost:3000/orders/${inquiryId}/items`, {
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      data: { items },
+    });
+  }
+
+  return { inquiryId, supplierRecordIds };
 }
