@@ -70,6 +70,9 @@ import { OrderSettingsDropdownComponent } from './components/order-settings-drop
 import { OrderPlattsSignalsComponent } from './components/order-platts-signals/order-platts-signals.component';
 import { OrderSecondaryTabsComponent } from './components/order-secondary-tabs/order-secondary-tabs.component';
 import { OrderPaymentModalComponent } from './components/order-payment-modal/order-payment-modal.component';
+import { OrderConvertModalComponent } from './components/order-convert-modal/order-convert-modal.component';
+import { OrderCancelModalComponent } from './components/order-cancel-modal/order-cancel-modal.component';
+import { OrderPlaceRemarkPromptComponent } from './components/order-place-remark-prompt/order-place-remark-prompt.component';
 import { OrderPaymentsCardComponent } from './components/order-payments-card/order-payments-card.component';
 import { CommentsCardComponent } from '../../../../shared/components/comments-card/comments-card.component';
 import { PdfPreviewModalComponent } from '../../../../shared/components/pdf-preview-modal/pdf-preview-modal.component';
@@ -228,6 +231,9 @@ interface PlattsSuggestionViewModel {
     OrderPlattsSignalsComponent,
     OrderSecondaryTabsComponent,
     OrderPaymentModalComponent,
+    OrderConvertModalComponent,
+    OrderCancelModalComponent,
+    OrderPlaceRemarkPromptComponent,
   ],
   template: `
     <app-trading-detail-header
@@ -834,154 +840,26 @@ interface PlattsSuggestionViewModel {
       (saved)="loadPayments()"
     />
 
-    @defer (when showConvertToOrderModal()) {
-    @if (showConvertToOrderModal()) {
-      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-        <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-          <div class="flex items-center justify-between">
-            <h3 class="text-lg font-semibold text-gray-900">Convert to Order?</h3>
-            <button
-              type="button"
-              (click)="closeConvertToOrderModal()"
-              class="text-gray-400 hover:text-gray-600"
-            >
-              ✕
-            </button>
-          </div>
-          <p class="mt-3 text-sm text-gray-600">
-            This will change the status from inquiry to confirmed order.
-          </p>
-          <div class="mt-5 flex items-center justify-end gap-3">
-            <button
-              type="button"
-              (click)="closeConvertToOrderModal()"
-              class="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              (click)="confirmConvertToOrder()"
-              [disabled]="convertingToOrder()"
-              class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-700 disabled:opacity-50"
-            >
-              Confirm Convert
-            </button>
-          </div>
-        </div>
-      </div>
-    }
-    }
+    <app-order-convert-modal
+      #convertModal
+      [saving]="convertingToOrder()"
+      (confirmed)="confirmConvertToOrder()"
+    />
 
-    @defer (when showCancelInquiryModal()) {
-    @if (showCancelInquiryModal()) {
-      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-        <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-          <div class="flex items-center justify-between">
-            <h3 class="text-lg font-semibold text-gray-900">Cancel {{ cancellationTargetLabel() }}</h3>
-            <button
-              type="button"
-              (click)="closeCancelInquiryModal()"
-              class="text-gray-400 hover:text-gray-600"
-            >
-              ✕
-            </button>
-          </div>
-          <p class="mt-3 text-sm text-gray-600">
-            Select a reason for cancelling this {{ cancellationTargetLabel() }}.
-          </p>
-          <div class="mt-4">
-            <label class="text-xs font-medium text-gray-500">Cancellation reason</label>
-            <select
-              [ngModel]="selectedInquiryCancelReason()"
-              (ngModelChange)="selectedInquiryCancelReason.set($event)"
-              class="fueld-select-no-chevron mt-1 w-full appearance-none rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
-                     focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 bg-white"
-            >
-              @for (reason of availableInquiryCancelReasons(); track reason) {
-                <option [value]="reason">{{ reason }}</option>
-              }
-            </select>
-          </div>
-          @if (selectedInquiryCancelReason() === 'Other') {
-            <div class="mt-3">
-              <label class="text-xs font-medium text-gray-500">Please specify</label>
-              <textarea
-                [ngModel]="cancelReasonOtherDetail()"
-                (ngModelChange)="cancelReasonOtherDetail.set($event)"
-                placeholder="e.g. Adani is exclusive at Mundra - direct with client"
-                rows="3"
-                class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
-                       focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-              ></textarea>
-            </div>
-          }
-          <div class="mt-5 flex items-center justify-end gap-3">
-            <button
-              type="button"
-              (click)="closeCancelInquiryModal()"
-              class="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              (click)="confirmCancelInquiry()"
-              [disabled]="cancellingInquiry()"
-              class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-700 disabled:opacity-50"
-            >
-              Confirm Cancel
-            </button>
-          </div>
-        </div>
-      </div>
-    }
-    }
+    <app-order-cancel-modal
+      #cancelModal
+      [saving]="cancellingInquiry()"
+      [targetLabel]="cancellationTargetLabel()"
+      [reasons]="availableInquiryCancelReasons()"
+      (confirmed)="confirmCancelInquiry($event)"
+    />
 
-    <!-- Place Remark Change Prompt -->
-    @defer (when showPlaceRemarkPrompt()) {
-    @if (showPlaceRemarkPrompt()) {
-      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-        <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-          <div class="flex items-center justify-between">
-            <h3 class="text-lg font-semibold text-gray-900">Update place remark?</h3>
-            <button
-              type="button"
-              (click)="dismissPlaceRemarkPrompt()"
-              class="text-gray-400 hover:text-gray-600"
-            >
-              ✕
-            </button>
-          </div>
-          <p class="mt-3 text-sm text-gray-600">
-            The new place has a different default remark. Would you like to update the order's place remark to match?
-          </p>
-          @if (pendingPlaceRemark()) {
-            <div class="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700 whitespace-pre-line max-h-32 overflow-y-auto">
-              {{ pendingPlaceRemark() }}
-            </div>
-          } @else {
-            <p class="mt-3 text-sm text-gray-400 italic">The new place has no default remark.</p>
-          }
-          <div class="mt-5 flex items-center justify-end gap-3">
-            <button
-              type="button"
-              (click)="dismissPlaceRemarkPrompt()"
-              class="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600"
-            >
-              Keep current
-            </button>
-            <button
-              type="button"
-              (click)="applyNewPlaceRemark()"
-              class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-700"
-            >
-              {{ pendingPlaceRemark() ? 'Use new remark' : 'Clear remark' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    }
+    <app-order-place-remark-prompt
+      #remarkPrompt
+      [pendingRemark]="pendingPlaceRemark()"
+      (applied)="applyNewPlaceRemark()"
+      (dismissed)="dismissPlaceRemarkPrompt()"
+    />
 
     <!-- Send Email Modal -->
     <app-send-email-modal
@@ -1187,14 +1065,13 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly showCustomerPaymentNote = signal(false);
   readonly showSupplierPaymentNote = signal(false);
   readonly paymentModalRef = viewChild(OrderPaymentModalComponent);
+  readonly convertModalRef = viewChild(OrderConvertModalComponent);
+  readonly cancelModalRef = viewChild(OrderCancelModalComponent);
+  readonly remarkPromptRef = viewChild(OrderPlaceRemarkPromptComponent);
   readonly activeDetailTab = signal('comments');
-  readonly showConvertToOrderModal = signal(false);
-  readonly showCancelInquiryModal = signal(false);
   readonly convertingToOrder = signal(false);
   readonly cancellingInquiry = signal(false);
   readonly inquiryCancelReasons = signal<string[]>([]);
-  readonly selectedInquiryCancelReason = signal('');
-  readonly cancelReasonOtherDetail = signal('');
   readonly availableInquiryCancelReasons = computed(() =>
     this.inquiryCancelReasons().map((reason) => reason.trim()).filter(Boolean),
   );
@@ -4083,7 +3960,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     const newDefault = placeData?.orderRemark ?? null;
     if ((newDefault ?? '') !== (previousRemark ?? '')) {
       this.pendingPlaceRemark.set(newDefault);
-      this.showPlaceRemarkPrompt.set(true);
+      this.remarkPromptRef?.show();
     }
   }
 
@@ -4395,11 +4272,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       this.showToast('error', 'Add at least one line item before converting to order.');
       return;
     }
-    this.showConvertToOrderModal.set(true);
-  }
-
-  closeConvertToOrderModal(): void {
-    this.showConvertToOrderModal.set(false);
+    this.convertModalRef?.show();
   }
 
   openCancelInquiryModal(): void {
@@ -4414,21 +4287,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       this.showToast('error', 'This record cannot be cancelled from this action.');
       return;
     }
-
-    const reasons = this.availableInquiryCancelReasons();
-    if (!reasons.length) {
-      this.showToast('error', 'No cancellation reasons configured. Please ask admin to configure reasons in Settings.');
+    if (!this.availableInquiryCancelReasons().length) {
+      this.showToast('error', 'No cancellation reasons configured.');
       return;
     }
-
-    this.selectedInquiryCancelReason.set(reasons[0]!);
-    this.cancelReasonOtherDetail.set('');
-    this.showCancelInquiryModal.set(true);
-  }
-
-  closeCancelInquiryModal(): void {
-    if (this.cancellingInquiry()) return;
-    this.showCancelInquiryModal.set(false);
+    this.cancelModalRef?.show();
   }
 
   async confirmConvertToOrder(): Promise<void> {
@@ -4452,7 +4315,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       );
       if (res.success) {
         this.order.update((o) => (o ? { ...o, status: OrderStatus.Confirmed } : o));
-        this.closeConvertToOrderModal();
+        this.convertModalRef?.close();
         this.showToast('success', 'Inquiry converted to order.');
         await this.router.navigate(['/trading/orders', id]);
       } else {
@@ -4465,32 +4328,17 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     }
   }
 
-  async confirmCancelInquiry(): Promise<void> {
+  async confirmCancelInquiry(event: { reason: string; reasonOther?: string }): Promise<void> {
     const id = this.orderId();
     if (!id) return;
 
-    const status = this.order()?.status;
-    const isInquiry = status === OrderStatus.Inquiry || status === OrderStatus.Offer;
-    const canCancel = isInquiry || status === OrderStatus.Confirmed || status === OrderStatus.Delivered || status === OrderStatus.Invoiced;
-    if (!canCancel) {
-      this.showToast('error', 'This record cannot be cancelled from this action.');
-      return;
-    }
-
-    const reason = this.selectedInquiryCancelReason().trim();
-    if (!reason) {
-      this.showToast('error', 'Select a cancellation reason.');
-      return;
-    }
+    const reason = event.reason.trim();
+    if (!reason) return;
 
     let lossReason = reason;
     if (reason === 'Other') {
-      const detail = this.cancelReasonOtherDetail().trim();
-      if (!detail) {
-        this.showToast('error', 'Please specify a reason.');
-        return;
-      }
-      lossReason = `Other: ${detail}`;
+      if (!event.reasonOther?.trim()) return;
+      lossReason = `Other: ${event.reasonOther.trim()}`;
     }
 
     this.cancellingInquiry.set(true);
@@ -4508,7 +4356,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
           await this.loadCustomerCreditLines(updatedOrder.clientId);
         }
         await this.loadSupplierCreditLines(this.activeOrderSupplier()?.companyId ?? updatedOrder?.supplierId);
-        this.showCancelInquiryModal.set(false);
+        this.cancelModalRef?.close();
         this.showToast('success', `${isInquiry ? 'Inquiry' : 'Order'} cancelled.`);
         await this.normalizeDetailRoute(OrderStatus.Cancelled, id);
       } else {

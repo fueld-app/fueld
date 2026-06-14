@@ -1,0 +1,43 @@
+import {
+  Component,
+  ChangeDetectionStrategy,
+  input,
+  output,
+  signal,
+} from '@angular/core';
+
+@Component({
+  selector: 'app-order-convert-modal',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    @if (open()) {
+      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-gray-900">Convert to Order?</h3>
+            <button type="button" (click)="close()" class="text-gray-400 hover:text-gray-600">✕</button>
+          </div>
+          <p class="mt-3 text-sm text-gray-600">This will change the status from inquiry to confirmed order.</p>
+          <div class="mt-5 flex items-center justify-end gap-3">
+            <button type="button" (click)="close()"
+              class="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600">Cancel</button>
+            <button type="button" (click)="confirm()" [disabled]="saving()"
+              class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-700 disabled:opacity-50">
+              Confirm Convert
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+  `,
+})
+export class OrderConvertModalComponent {
+  readonly saving = input(false);
+  readonly open = signal(false);
+  readonly confirmed = output<void>();
+  readonly closed = output<void>();
+
+  show(): void { this.open.set(true); }
+  close(): void { this.open.set(false); this.closed.emit(); }
+  protected confirm(): void { this.confirmed.emit(); }
+}
