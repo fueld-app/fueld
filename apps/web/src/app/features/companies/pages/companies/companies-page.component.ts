@@ -17,6 +17,8 @@ import { flagFromIso3 } from '../../../../shared/utils/flags';
 import { PaginationComponent, SortHeaderComponent } from '../../../../shared/components';
 import type { SortChangeEvent } from '../../../../shared/components';
 import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring.service';
+import { CompaniesCreateModalComponent } from './companies-create-modal.component';
+import { CompaniesDeleteModalComponent } from './companies-delete-modal.component';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Companies Page — Browse, search, import from Seasearcher, create
@@ -40,7 +42,7 @@ interface CompanySearchResult {
 @Component({
   selector: 'app-companies-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, PaginationComponent, SortHeaderComponent],
+  imports: [FormsModule, PaginationComponent, SortHeaderComponent, CompaniesCreateModalComponent, CompaniesDeleteModalComponent],
   template: `
     <div>
       <!-- Header -->
@@ -321,97 +323,30 @@ interface CompanySearchResult {
       }
 
       <!-- Delete confirmation modal -->
-      @if (deleteTarget()) {
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" (click)="deleteTarget.set(null)">
-          <div class="rounded-xl bg-white p-6 shadow-xl max-w-sm mx-4" (click)="$event.stopPropagation()">
-            <h3 class="text-lg font-semibold text-gray-900">Delete company?</h3>
-            <p class="mt-2 text-sm text-gray-500">
-              Are you sure you want to delete <strong>{{ deleteTarget()!.name }}</strong>?
-              This cannot be undone.
-            </p>
-            @if (deleteError()) {
-              <p class="mt-2 text-sm text-red-600">{{ deleteError() }}</p>
-            }
-            <div class="mt-4 flex justify-end gap-2">
-              <button
-                (click)="deleteTarget.set(null); deleteError.set('')"
-                class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >Cancel</button>
-              <button
-                (click)="executeDelete()"
-                [disabled]="deleting()"
-                class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
-              >
-                @if (deleting()) { Deleting… } @else { Delete }
-              </button>
-            </div>
-          </div>
-        </div>
-      }
+      <app-companies-delete-modal
+        [open]="!!deleteTarget()"
+        [companyName]="deleteTarget()?.name ?? ''"
+        [deleting]="deleting()"
+        [error]="deleteError()"
+        (cancel)="deleteTarget.set(null); deleteError.set('')"
+        (confirm)="executeDelete()"
+      />
 
       <!-- Create manually modal -->
-      @if (showCreateModal()) {
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div class="rounded-xl bg-white p-6 shadow-xl w-full max-w-lg mx-4" (click)="$event.stopPropagation()">
-            <h3 class="text-lg font-semibold text-gray-900">Create Company</h3>
-            <p class="mt-1 text-sm text-gray-500">Add a company manually that isn't in Seasearcher.</p>
-
-            @if (createError()) {
-              <div class="mt-3 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
-                {{ createError() }}
-              </div>
-            }
-
-            <div class="mt-4 space-y-4">
-              <div class="grid grid-cols-2 gap-4">
-                <div class="col-span-2">
-                  <label class="block text-sm font-medium text-gray-700">Name *</label>
-                  <input type="text" [ngModel]="createForm().name" (ngModelChange)="updateCreateForm('name', $event)"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
-                    placeholder="Company name" />
-                </div>
-                <div class="col-span-2">
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Type(s) *</label>
-                  <div class="flex flex-wrap gap-3">
-                    @for (opt of typeOptions(); track opt.value) {
-                      <label class="inline-flex items-center gap-1.5 cursor-pointer">
-                        <input type="checkbox" [checked]="createForm().types.includes(opt.value)"
-                          (change)="toggleType(opt.value)"
-                          class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
-                        <span class="text-sm text-gray-700">{{ opt.label }}</span>
-                      </label>
-                    }
-                  </div>
-                </div>
-                <div class="col-span-2 sm:col-span-1">
-                  <label class="block text-sm font-medium text-gray-700">Country</label>
-                  <select [ngModel]="createForm().countryIso" (ngModelChange)="onCountryChange($event)"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white">
-                    <option value="">Select country…</option>
-                    @for (c of countries; track c.code) {
-                      <option [value]="c.code">{{ c.name }}</option>
-                    }
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div class="mt-5 flex justify-end gap-2">
-              <button
-                (click)="showCreateModal.set(false)"
-                class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >Cancel</button>
-              <button
-                (click)="createManually()"
-                [disabled]="!createForm().name || !createForm().types.length || creating()"
-                class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-              >
-                @if (creating()) { Creating… } @else { Create Company }
-              </button>
-            </div>
-          </div>
-        </div>
-      }
+      <!-- Create Company Modal -->
+      <app-companies-create-modal
+        [open]="showCreateModal()"
+        [creating]="creating()"
+        [error]="createError()"
+        [form]="createForm()"
+        [typeOptions]="typeOptions()"
+        [countries]="countries"
+        (cancel)="showCreateModal.set(false)"
+        (save)="createManually()"
+        (toggleType)="toggleType($event)"
+        (countryChange)="onCountryChange($event)"
+        (formChange)="onCreateFormChange($event)"
+      />
     </div>
   `,
 })
@@ -707,8 +642,8 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
     this.showCreateModal.set(true);
   }
 
-  updateCreateForm(field: string, value: string): void {
-    this.createForm.update((f) => ({ ...f, [field]: value }));
+  onCreateFormChange(partial: Partial<{ name: string; types: string[]; country: string; countryIso: string }>): void {
+    this.createForm.update((f) => ({ ...f, ...partial }));
   }
 
   toggleType(type: string): void {
