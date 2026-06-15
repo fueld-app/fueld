@@ -18,11 +18,12 @@ import type {
 
 import { API } from '@app/core/config/api';
 import { SettingsToastService } from './settings-toast.service';
+import { CompaniesSettingsTypeListCardComponent } from './companies-settings-type-list-card.component';
 
 @Component({
   selector: 'app-companies-settings-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule],
+  imports: [FormsModule, CompaniesSettingsTypeListCardComponent],
   template: `
     <div>
       <!-- Header -->
@@ -46,152 +47,38 @@ import { SettingsToastService } from './settings-toast.service';
           <!-- ════════════════════════════════════════════════════════ -->
           <!--  Company Types                                          -->
           <!-- ════════════════════════════════════════════════════════ -->
-          <div class="app-panel">
-            <div class="app-panel-header app-panel-header--violet">
-              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--violet">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-violet-600" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
-                </svg>
-              </div>
-              <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-semibold text-gray-900">Company Types</h3>
-                <p class="text-xs text-gray-500">Configure which types can be assigned to companies (e.g. Client, Supplier).</p>
-              </div>
-            </div>
-
-            <div class="app-panel-body space-y-3 flex-1 min-h-0 overflow-y-auto">
-              @for (ct of companyTypes(); track $index; let i = $index) {
-                <div class="flex items-center gap-2">
-                  <div class="flex flex-col gap-0.5 shrink-0">
-                    <button (click)="moveCompanyTypeUp(i)" [disabled]="i === 0" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move up">
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
-                    </button>
-                    <button (click)="moveCompanyTypeDown(i)" [disabled]="i === companyTypes().length - 1" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move down">
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
-                    </button>
-                  </div>
-                  <input
-                    type="text"
-                    [value]="ct"
-                    (input)="updateCompanyType(i, $any($event.target).value)"
-                    class="app-input-mono-uppercase flex-1"
-                  />
-                  <button
-                    (click)="removeCompanyType(i)"
-                    [disabled]="companyTypes().length <= 1"
-                    class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 transition-colors shrink-0"
-                    title="Remove type"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-                    </svg>
-                  </button>
-                </div>
-              }
-              <button
-                (click)="addCompanyType()"
-                class="app-button-add"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
-                </svg>
-                Add Type
-              </button>
-
-              <div class="flex items-center gap-3 pt-2">
-                <button
-                  (click)="saveCompanyTypes()"
-                  [disabled]="companyTypesSaving()"
-                  class="app-button-primary"
-                >
-                  @if (companyTypesSaving()) { Saving… } @else { Save Types }
-                </button>
-                @if (companyTypesSaved()) {
-                  <span class="text-sm text-green-600 flex items-center gap-1">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
-                    </svg>
-                    Saved
-                  </span>
-                }
-              </div>
-            </div>
-          </div>
+          <app-companies-settings-type-list-card
+            title="Company Types"
+            description="Configure which types can be assigned to companies (e.g. Client, Supplier)."
+            [items]="companyTypes()"
+            [saving]="companyTypesSaving()"
+            [saved]="companyTypesSaved()"
+            (moveUp)="moveCompanyTypeUp($event)"
+            (moveDown)="moveCompanyTypeDown($event)"
+            (itemChange)="updateCompanyType($event.index, $event.value)"
+            (remove)="removeCompanyType($event)"
+            (add)="addCompanyType()"
+            (save)="saveCompanyTypes()"
+          />
 
           <!-- ════════════════════════════════════════════════════════ -->
           <!--  Vessel Types                                           -->
           <!-- ════════════════════════════════════════════════════════ -->
-          <div class="app-panel">
-            <div class="app-panel-header app-panel-header--teal">
-              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--teal">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-teal-600" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-                </svg>
-              </div>
-              <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-semibold text-gray-900">Vessel Types</h3>
-                <p class="text-xs text-gray-500">Configure which vessel types appear in vessel dropdowns.</p>
-              </div>
-            </div>
-
-            <div class="app-panel-body space-y-3 flex-1 min-h-0 overflow-y-auto">
-              @for (vt of vesselTypes(); track $index; let i = $index) {
-                <div class="flex items-center gap-2">
-                  <div class="flex flex-col gap-0.5 shrink-0">
-                    <button (click)="moveVesselTypeUp(i)" [disabled]="i === 0" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move up">
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
-                    </button>
-                    <button (click)="moveVesselTypeDown(i)" [disabled]="i === vesselTypes().length - 1" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move down">
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
-                    </button>
-                  </div>
-                  <input
-                    type="text"
-                    [value]="vt"
-                    (input)="updateVesselType(i, $any($event.target).value)"
-                    class="app-input-mono-uppercase flex-1"
-                  />
-                  <button
-                    (click)="removeVesselType(i)"
-                    [disabled]="vesselTypes().length <= 1"
-                    class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 transition-colors shrink-0"
-                    title="Remove type"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-                    </svg>
-                  </button>
-                </div>
-              }
-              <button
-                (click)="addVesselType()"
-                class="app-button-add"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
-                </svg>
-                Add Type
-              </button>
-
-              <div class="flex items-center gap-3 pt-2">
-                <button
-                  (click)="saveVesselTypes()"
-                  [disabled]="vesselTypesSaving()"
-                  class="app-button-primary"
-                >
-                  @if (vesselTypesSaving()) { Saving… } @else { Save Types }
-                </button>
-                @if (vesselTypesSaved()) {
-                  <span class="text-sm text-green-600 flex items-center gap-1">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
-                    </svg>
-                    Saved
-                  </span>
-                }
-              </div>
-            </div>
-          </div>
+          <app-companies-settings-type-list-card
+            title="Vessel Types"
+            description="Configure which vessel types appear in vessel dropdowns."
+            headerClass="app-panel-header--teal"
+            iconShellClass="app-panel-icon-shell--teal"
+            [items]="vesselTypes()"
+            [saving]="vesselTypesSaving()"
+            [saved]="vesselTypesSaved()"
+            (moveUp)="moveVesselTypeUp($event)"
+            (moveDown)="moveVesselTypeDown($event)"
+            (itemChange)="updateVesselType($event.index, $event.value)"
+            (remove)="removeVesselType($event)"
+            (add)="addVesselType()"
+            (save)="saveVesselTypes()"
+          />
 
           <!-- ════════════════════════════════════════════════════════ -->
           <!--  Vessel–Company Role Options                            -->
