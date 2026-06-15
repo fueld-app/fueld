@@ -16,11 +16,12 @@ import { AuthService } from '../../../../core/auth/auth.service';
 import { WebSocketService } from '../../../../core/websocket/websocket.service';
 
 import { API } from '@app/core/config/api';
+import { UsersInviteModalComponent } from './users-invite-modal.component';
 
 @Component({
   selector: 'app-users-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule],
+  imports: [FormsModule, UsersInviteModalComponent],
   template: `
     <div>
       <!-- Header -->
@@ -572,120 +573,20 @@ import { API } from '@app/core/config/api';
       }
 
       <!-- Invite Modal -->
-      @if (showInviteModal()) {
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div
-            class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
-            (click)="$event.stopPropagation()"
-          >
-            <h2 class="text-lg font-bold text-gray-900 mb-4">Invite New User</h2>
-
-            @if (inviteSuccess()) {
-              <!-- Success state with invite link -->
-              <div class="space-y-4">
-                <div class="rounded-lg bg-green-50 border border-green-200 p-4">
-                  <div class="flex items-start gap-3">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-600 mt-0.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd" />
-                    </svg>
-                    <div>
-                      <p class="text-sm font-medium text-green-800">Invitation created!</p>
-                      <p class="mt-1 text-sm text-green-700">Share this link with <strong>{{ inviteForm.email }}</strong> to complete their signup:</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="flex items-center gap-2">
-                  <input
-                    type="text"
-                    [value]="inviteLinkResult()"
-                    readonly
-                    class="app-input-mono flex-1 bg-gray-50 text-xs text-gray-700"
-                  />
-                  <button
-                    (click)="copyInviteLink()"
-                    class="app-button-primary shrink-0 px-3 py-2 text-sm"
-                  >
-                    {{ copied() ? 'Copied!' : 'Copy' }}
-                  </button>
-                </div>
-
-                <div class="flex justify-end pt-2">
-                  <button
-                    (click)="closeInviteModal()"
-                    class="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 transition-colors"
-                  >
-                    Done
-                  </button>
-                </div>
-              </div>
-            } @else {
-              <!-- Form state -->
-              <div class="space-y-4">
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                  <input
-                    type="text"
-                    [(ngModel)]="inviteForm.name"
-                    placeholder="e.g. Jane Smith"
-                    class="app-input w-full"
-                  />
-                </div>
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                  <input
-                    type="email"
-                    [(ngModel)]="inviteForm.email"
-                    placeholder="e.g. jane@company.com"
-                    class="app-input w-full"
-                  />
-                </div>
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                  <select
-                    [(ngModel)]="inviteForm.role"
-                    class="app-input w-full"
-                  >
-                    @for (r of roles; track r.value) {
-                      <option [value]="r.value">{{ r.label }}</option>
-                    }
-                  </select>
-                </div>
-
-                @if (inviteError()) {
-                  <div class="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
-                    {{ inviteError() }}
-                  </div>
-                }
-
-                <div class="flex justify-end gap-2 pt-2">
-                  <button
-                    (click)="closeInviteModal()"
-                    class="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    (click)="sendInvite()"
-                    [disabled]="inviting()"
-                    class="app-button-primary disabled:opacity-50"
-                  >
-                    @if (inviting()) {
-                      <svg class="h-4 w-4 animate-spin inline mr-1" viewBox="0 0 24 24" fill="none">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                      </svg>
-                      Sending…
-                    } @else {
-                      Send Invite
-                    }
-                  </button>
-                </div>
-              </div>
-            }
-          </div>
-        </div>
-      }
+      <app-users-invite-modal
+        [open]="showInviteModal()"
+        [success]="inviteSuccess()"
+        [sending]="inviting()"
+        [copied]="copied()"
+        [error]="inviteError()"
+        [inviteLink]="inviteLinkResult()"
+        [roles]="roles"
+        [form]="inviteForm"
+        (close)="closeInviteModal()"
+        (send)="sendInvite()"
+        (copy)="copyInviteLink()"
+        (formChange)="inviteForm = $event"
+      />
 
       <!-- IP Restriction Modal -->
       @if (ipModalUser()) {
