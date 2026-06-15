@@ -26,6 +26,8 @@ import { ActivityTimelineComponent } from '../../../../shared/components/activit
 import { LastEditedBadgeComponent } from '../../../../shared/components/last-edited-badge/last-edited-badge.component';
 import { CommentsCardComponent } from '../../../../shared/components/comments-card/comments-card.component';
 import { VesselDetailCompaniesCardComponent } from './vessel-detail-companies-card.component';
+import { VesselDetailDeleteModalComponent } from './vessel-detail-delete-modal.component';
+import { VesselDetailMergeModalComponent } from './vessel-detail-merge-modal.component';
 
 interface OwnershipEntry {
   type: string;
@@ -120,7 +122,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
 @Component({
   selector: 'app-vessel-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, DecimalPipe, FormsModule, RouterLink, ActivityTimelineComponent, LastEditedBadgeComponent, CommentsCardComponent, VesselDetailCompaniesCardComponent],
+  imports: [DatePipe, DecimalPipe, FormsModule, RouterLink, ActivityTimelineComponent, LastEditedBadgeComponent, CommentsCardComponent, VesselDetailCompaniesCardComponent, VesselDetailDeleteModalComponent, VesselDetailMergeModalComponent],
   styles: [`
     :host ::ng-deep .leaflet-container { font-family: inherit; }
   `],
@@ -970,95 +972,23 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
       </div>
 
       <!-- Delete Confirmation -->
-      @if (confirmDeleteOpen() && canDeleteEntity()) {
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div class="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
-            <h3 class="text-lg font-semibold text-gray-900">Delete Vessel</h3>
-            <p class="mt-2 text-sm text-gray-600">
-              Are you sure you want to delete <strong>{{ vessel()!.name }}</strong>?
-            </p>
-            @if (deleteError()) {
-              <p class="mt-2 text-sm text-red-600">{{ deleteError() }}</p>
-            }
-            <div class="mt-4 flex justify-end gap-3">
-              <button (click)="confirmDeleteOpen.set(false)" class="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-              <button (click)="executeDelete()" [disabled]="deleting()" class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
-                @if (deleting()) { Deleting… } @else { Delete }
-              </button>
-            </div>
-          </div>
-        </div>
-      }
+      <app-vessel-detail-delete-modal
+        [open]="confirmDeleteOpen() && canDeleteEntity()"
+        [vesselName]="vessel()!.name"
+        [deleting]="deleting()"
+        [error]="deleteError()"
+        (cancel)="confirmDeleteOpen.set(false)"
+        (confirm)="executeDelete()"
+      />
 
       <!-- Seasearcher Merge Prompt -->
-      @if (showMergePrompt() && seasearcherMatch()) {
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <div class="flex items-center gap-3 mb-4">
-              <div class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
-                  <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
-                </svg>
-              </div>
-              <h3 class="text-lg font-semibold text-gray-900">Seasearcher Match Found</h3>
-            </div>
-            <p class="text-sm text-gray-600 mb-4">
-              A vessel matching IMO <strong>{{ seasearcherMatch()!.imo }}</strong> was found in Seasearcher.
-              Would you like to link this vessel to sync data automatically?
-            </p>
-            <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 mb-4">
-              <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                <div>
-                  <span class="text-gray-500">Name</span>
-                  <div class="font-medium text-gray-900">{{ seasearcherMatch()!.name }}</div>
-                </div>
-                @if (seasearcherMatch()!.type) {
-                  <div>
-                    <span class="text-gray-500">Type</span>
-                    <div class="font-medium text-gray-900">{{ seasearcherMatch()!.type }}</div>
-                  </div>
-                }
-                @if (seasearcherMatch()!.flag) {
-                  <div>
-                    <span class="text-gray-500">Flag</span>
-                    <div class="font-medium text-gray-900">{{ seasearcherMatch()!.flag }}</div>
-                  </div>
-                }
-                @if (seasearcherMatch()!.dwt) {
-                  <div>
-                    <span class="text-gray-500">DWT</span>
-                    <div class="font-medium text-gray-900">{{ seasearcherMatch()!.dwt | number }}</div>
-                  </div>
-                }
-                @if (seasearcherMatch()!.grossTonnage) {
-                  <div>
-                    <span class="text-gray-500">Gross Tonnage</span>
-                    <div class="font-medium text-gray-900">{{ seasearcherMatch()!.grossTonnage | number }}</div>
-                  </div>
-                }
-                @if (seasearcherMatch()!.buildYear) {
-                  <div>
-                    <span class="text-gray-500">Build Year</span>
-                    <div class="font-medium text-gray-900">{{ seasearcherMatch()!.buildYear }}</div>
-                  </div>
-                }
-              </div>
-            </div>
-            <p class="text-xs text-gray-500 mb-4">
-              Company associations, orders and comments will be preserved. Vessel details will be updated from Seasearcher.
-            </p>
-            <div class="flex justify-end gap-3">
-              <button (click)="dismissMerge()" class="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
-                Dismiss
-              </button>
-              <button (click)="confirmMerge()" [disabled]="merging()" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
-                @if (merging()) { Merging… } @else { Merge &amp; Sync }
-              </button>
-            </div>
-          </div>
-        </div>
-      }
+      <app-vessel-detail-merge-modal
+        [open]="showMergePrompt() && !!seasearcherMatch()"
+        [merging]="merging()"
+        [match]="seasearcherMatch()!"
+        (dismiss)="dismissMerge()"
+        (confirm)="confirmMerge()"
+      />
 
       @if (toast()) {
         <div
