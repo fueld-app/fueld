@@ -10,6 +10,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import type { ApiResponse, OwnCompanyDto, CounterpartyDto, BankAccountDto } from '@fueld/types';
+import { OurCompaniesBankAccountModalComponent, emptyBankAccountForm, bankAccountToForm, type BankAccountFormData } from './our-companies-bank-account-modal.component';
 
 import { API } from '@app/core/config/api';
 
@@ -33,7 +34,7 @@ interface CompanySearchResultOption {
 @Component({
   selector: 'app-our-companies-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, OurCompaniesBankAccountModalComponent],
   template: `
     <div>
       <!-- Header -->
@@ -394,104 +395,17 @@ interface CompanySearchResultOption {
         </div>
       }
 
-      <!-- Bank Account Modal (Create / Edit) -->
-      @if (bankAccountModalOpen()) {
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div class="rounded-xl bg-white p-6 shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto" (click)="$event.stopPropagation()">
-            <h3 class="text-lg font-semibold text-gray-900">{{ editingBankAccount() ? 'Edit' : 'Add' }} Bank Account</h3>
-            <form class="mt-4 space-y-4" (ngSubmit)="saveBankAccount()">
-              <div class="grid grid-cols-2 gap-4">
-                <div class="col-span-2">
-                  <label class="block text-xs font-medium text-gray-600">Label *</label>
-                  <input type="text" [(ngModel)]="baForm.label" name="label" required placeholder="e.g. USD Main Account"
-                    class="app-input mt-1 w-full" />
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-600">Bank Name *</label>
-                  <input type="text" [(ngModel)]="baForm.bankName" name="bankName" required placeholder="e.g. HSBC"
-                    class="app-input mt-1 w-full" />
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-600">Currency *</label>
-                  <select [(ngModel)]="baForm.currency" name="currency" required
-                    class="app-input-mono-uppercase mt-1 w-full bg-white">
-                    @for (c of configuredCurrencies(); track c) {
-                      <option [value]="c">{{ c }}</option>
-                    }
-                  </select>
-                </div>
-                <div class="col-span-2">
-                  <label class="block text-xs font-medium text-gray-600">Beneficiary Name</label>
-                  <input type="text" [(ngModel)]="baForm.accountName" name="accountName" placeholder="Account holder name"
-                    class="app-input mt-1 w-full" />
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-600">IBAN</label>
-                  <input type="text" [(ngModel)]="baForm.iban" name="iban" placeholder="e.g. AE07033\u2026"
-                    class="app-input-mono mt-1 w-full" />
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-600">Account Number</label>
-                  <input type="text" [(ngModel)]="baForm.accountNumber" name="accountNumber"
-                    class="app-input-mono mt-1 w-full" />
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-600">SWIFT / BIC</label>
-                  <input type="text" [(ngModel)]="baForm.swiftBic" name="swiftBic" placeholder="e.g. BBMEAEAD"
-                    class="app-input-mono mt-1 w-full" />
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-600">Sort Code</label>
-                  <input type="text" [(ngModel)]="baForm.sortCode" name="sortCode"
-                    class="app-input-mono mt-1 w-full" />
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-600">Routing Number</label>
-                  <input type="text" [(ngModel)]="baForm.routingNumber" name="routingNumber"
-                    class="app-input-mono mt-1 w-full" />
-                </div>
-                <div class="col-span-2">
-                  <label class="block text-xs font-medium text-gray-600">Intermediary Bank</label>
-                  <input type="text" [(ngModel)]="baForm.intermediaryBank" name="intermediaryBank" placeholder="e.g. SWIFT BSUIFRPP / CACIB"
-                    class="app-input-mono mt-1 w-full" />
-                </div>
-                <div class="col-span-2">
-                  <label class="block text-xs font-medium text-gray-600">Branch Address</label>
-                  <input type="text" [(ngModel)]="baForm.branchAddress" name="branchAddress"
-                    class="app-input mt-1 w-full" />
-                </div>
-                <div class="col-span-2">
-                  <label class="block text-xs font-medium text-gray-600">Notes</label>
-                  <textarea [(ngModel)]="baForm.notes" name="notes" rows="2"
-                    class="app-input mt-1 w-full resize-none"></textarea>
-                </div>
-                <div class="col-span-2 flex items-center gap-2">
-                  <input type="checkbox" id="isDefault" [(ngModel)]="baForm.isDefault" name="isDefault"
-                    class="rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
-                  <label for="isDefault" class="text-sm text-gray-700">Set as default account for this company</label>
-                </div>
-              </div>
-
-              @if (bankAccountError()) {
-                <p class="text-sm text-red-600">{{ bankAccountError() }}</p>
-              }
-
-              <div class="flex justify-end gap-2 pt-2">
-                <button type="button" (click)="bankAccountModalOpen.set(false)"
-                  class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-                <button type="submit" [disabled]="savingBankAccount()"
-                  class="app-button-primary disabled:opacity-50">
-                  @if (savingBankAccount()) {
-                    Saving\u2026
-                  } @else {
-                    {{ editingBankAccount() ? 'Update' : 'Create' }}
-                  }
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      }
+      <!-- Bank Account Modal -->
+      <app-our-companies-bank-account-modal
+        [open]="bankAccountModalOpen()"
+        [editing]="!!editingBankAccount()"
+        [saving]="savingBankAccount()"
+        [error]="bankAccountError()"
+        [currencies]="configuredCurrencies()"
+        [initialForm]="bankAccountFormData()"
+        (cancel)="bankAccountModalOpen.set(false)"
+        (save)="onBankAccountSave($event)"
+      />
 
       <!-- Remove company confirmation -->
       @if (removeTarget()) {
@@ -572,22 +486,7 @@ export class OurCompaniesPageComponent implements OnInit {
   readonly deleteBankAccountTarget = signal<BankAccountDto | null>(null);
   readonly bankAccountCounts = signal<Record<string, number>>({});
 
-  // Bank account form
-  baForm = {
-    label: '',
-    bankName: '',
-    accountName: '',
-    accountNumber: '',
-    iban: '',
-    swiftBic: '',
-    currency: '',
-    branchAddress: '',
-    sortCode: '',
-    routingNumber: '',
-    intermediaryBank: '',
-    notes: '',
-    isDefault: false,
-  };
+  readonly bankAccountFormData = signal<BankAccountFormData>(emptyBankAccountForm());
   private baCompanyId = '';
 
   // Logo
@@ -856,11 +755,7 @@ export class OurCompaniesPageComponent implements OnInit {
     this.baCompanyId = companyId;
     this.editingBankAccount.set(null);
     this.bankAccountError.set('');
-    this.baForm = {
-      label: '', bankName: '', accountName: '', accountNumber: '',
-      iban: '', swiftBic: '', currency: '', branchAddress: '',
-      sortCode: '', routingNumber: '', intermediaryBank: '', notes: '', isDefault: false,
-    };
+    this.bankAccountFormData.set(emptyBankAccountForm());
     this.bankAccountModalOpen.set(true);
   }
 
@@ -868,26 +763,12 @@ export class OurCompaniesPageComponent implements OnInit {
     this.baCompanyId = ba.counterpartyId;
     this.editingBankAccount.set(ba);
     this.bankAccountError.set('');
-    this.baForm = {
-      label: ba.label,
-      bankName: ba.bankName,
-      accountName: ba.accountName ?? '',
-      accountNumber: ba.accountNumber ?? '',
-      iban: ba.iban ?? '',
-      swiftBic: ba.swiftBic ?? '',
-      currency: ba.currency,
-      branchAddress: ba.branchAddress ?? '',
-      sortCode: ba.sortCode ?? '',
-      routingNumber: ba.routingNumber ?? '',
-      intermediaryBank: (ba as any).intermediaryBank ?? '',
-      notes: ba.notes ?? '',
-      isDefault: ba.isDefault,
-    };
+    this.bankAccountFormData.set(bankAccountToForm(ba));
     this.bankAccountModalOpen.set(true);
   }
 
-  async saveBankAccount(): Promise<void> {
-    if (!this.baForm.label || !this.baForm.bankName || !this.baForm.currency) {
+  async onBankAccountSave(formData: BankAccountFormData): Promise<void> {
+    if (!formData.label || !formData.bankName || !formData.currency) {
       this.bankAccountError.set('Label, bank name, and currency are required.');
       return;
     }
@@ -895,19 +776,19 @@ export class OurCompaniesPageComponent implements OnInit {
     this.bankAccountError.set('');
 
     const body: Record<string, unknown> = {
-      label: this.baForm.label,
-      bankName: this.baForm.bankName,
-      currency: this.baForm.currency,
-      accountName: this.baForm.accountName || null,
-      accountNumber: this.baForm.accountNumber || null,
-      iban: this.baForm.iban || null,
-      swiftBic: this.baForm.swiftBic || null,
-      branchAddress: this.baForm.branchAddress || null,
-      sortCode: this.baForm.sortCode || null,
-      routingNumber: this.baForm.routingNumber || null,
-      intermediaryBank: this.baForm.intermediaryBank || null,
-      notes: this.baForm.notes || null,
-      isDefault: this.baForm.isDefault,
+      label: formData.label,
+      bankName: formData.bankName,
+      currency: formData.currency,
+      accountName: formData.accountName || null,
+      accountNumber: formData.accountNumber || null,
+      iban: formData.iban || null,
+      swiftBic: formData.swiftBic || null,
+      branchAddress: formData.branchAddress || null,
+      sortCode: formData.sortCode || null,
+      routingNumber: formData.routingNumber || null,
+      intermediaryBank: formData.intermediaryBank || null,
+      notes: formData.notes || null,
+      isDefault: formData.isDefault,
     };
 
     try {
