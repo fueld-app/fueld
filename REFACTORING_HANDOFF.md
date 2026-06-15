@@ -4,14 +4,14 @@
 
 ### Steps followed
 1. Read the full component to understand structure
-2. Identify self-contained sections (inventory band, pricing editor)
+2. Identify self-contained sections (inventory band, pricing editor, new-inquiry modal)
 3. Create child component(s) with explicit `input()` / `output()`
 4. Extract shared interfaces to a `*.types.ts` file to avoid circular deps
 5. Update parent to use child components
 6. Update all files that imported from the old location
 
 ### Rules established
-- **Shared types** → `order-item.types.ts` (never import types from a `.component.ts`)
+- **Shared types** → `*.types.ts` (never import types from a `.component.ts`)
 - **Child components** → same directory as parent, named `parent-child.component.ts`
 - **Pricing component** (`app-order-item-pricing`) — reusable for cost/sell, accepts `side: 'cost' | 'sales'`
 - **All components** use `ChangeDetectionStrategy.OnPush` + signals
@@ -26,17 +26,27 @@
   - Extracted `inquiry-deadline-picker.component.ts` (82 lines)
 - `integrations-page.component.ts` (1,747 → **106 lines**, -94%)
   - Replaced 6 inline cards with pre-existing extracted components
-- `order-detail-page.component.ts` (5,939 → **5,605 lines**, **-334 lines**)
-  - Extracted `order-payment-terms-card.component.ts`
-  - Extracted `order-notes-terms-card.component.ts`
-  - Extracted `order-delivery-card.component.ts`
-  - Extracted `order-payments-card.component.ts`
-  - Extracted `order-attachments-card.component.ts`
+- `order-detail-page.component.ts` (5,939 → **2,505 lines**)
+  - Extracted 12 child components + 17 services
+- `inquiries-list-page.component.ts` (1,196 → **668 lines**, -528, -44%)
+  - Extracted `inquiries-list-new-inquiry-modal.component.ts` (579 lines)
+  - Fully self-contained modal with search/import/credit/creation logic
+  - Modal loads its own initial data via `loadInitialData()`
 
-### Next candidates (by size)
-1. `order-detail-page.component.ts` (5,605 lines — ~600 more inline to extract)
-2. `inquiries-list-page.component.ts` (1,196 lines)
-3. `reports-page.component.ts` (1,568 lines)
+### Remaining candidates (by size)
+| # | Component | Lines | Status |
+|---|---|---|---|
+| 1 | `dashboard-page.component.ts` | 1,007 | Next up |
+| 2 | `our-companies-page.component.ts` | 1,014 | |
+| 3 | `customer-credit-page.component.ts` | 1,013 | |
+| 4 | `two-factor-setup-page.component.ts` | 1,051 | |
+| 5 | `llm-page.component.ts` | 1,155 | Already has store |
+| 6 | `company-info-card.component.ts` | 1,116 | Already a card |
+| 7 | `documents-settings-page.component.ts` | 950 | |
+
+### CI Verification
+- Local: `bun run typecheck` + `bun run test` + `bun run build`
+- CI: GitHub Actions `.github/workflows/test.yml` (web-unit, web-typecheck, web-build)
 
 ### `/ship` command
 - Installed globally at `~/.pi/agent/extensions/ship-command.ts`
