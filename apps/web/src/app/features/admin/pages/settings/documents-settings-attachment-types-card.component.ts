@@ -1,7 +1,8 @@
 import { Component, ChangeDetectionStrategy, input, output } from '@angular/core';
+import type { AttachmentTypeEvent } from './documents-settings.types';
 
 @Component({
-  selector: 'app-attachment-types-card',
+  selector: 'app-documents-settings-attachment-types-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="app-panel">
@@ -71,7 +72,7 @@ import { Component, ChangeDetectionStrategy, input, output } from '@angular/core
     </div>
   `,
 })
-export class AttachmentTypesCardComponent {
+export class DocumentsSettingsAttachmentTypesCardComponent {
   readonly types = input<string[]>([]);
   readonly saving = input(false);
   readonly saved = input(false);

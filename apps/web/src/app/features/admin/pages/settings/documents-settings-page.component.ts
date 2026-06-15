@@ -18,7 +18,7 @@ import type {
 
 import { API } from '@app/core/config/api';
 import { SettingsToastService } from './settings-toast.service';
-import { AttachmentTypesCardComponent } from './attachment-types-card.component';
+import { DocumentsSettingsAttachmentTypesCardComponent } from './documents-settings-attachment-types-card.component';
 
 interface InquirySettingsDto {
   supplierResponseUrlEnabled: boolean;
@@ -32,7 +32,7 @@ interface InquirySettingsDto {
 @Component({
   selector: 'app-documents-settings-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, AttachmentTypesCardComponent],
+  imports: [FormsModule, DocumentsSettingsAttachmentTypesCardComponent],
   template: `
     <div>
       <!-- Header -->
@@ -56,7 +56,7 @@ interface InquirySettingsDto {
           <!-- ════════════════════════════════════════════════════════ -->
           <!--  Attachment Types                                       -->
           <!-- ════════════════════════════════════════════════════════ -->
-          <app-attachment-types-card
+          <app-documents-settings-attachment-types-card
             [types]="attachmentTypes()"
             [saving]="attachmentTypesSaving()"
             [saved]="attachmentTypesSaved()"
