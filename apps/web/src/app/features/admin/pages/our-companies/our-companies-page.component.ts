@@ -10,7 +10,8 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import type { ApiResponse, OwnCompanyDto, CounterpartyDto, BankAccountDto } from '@fueld/types';
-import { OurCompaniesBankAccountModalComponent, emptyBankAccountForm, bankAccountToForm, type BankAccountFormData } from './our-companies-bank-account-modal.component';
+import { OurCompaniesBankAccountModalComponent } from './our-companies-bank-account-modal.component';
+import { emptyBankAccountForm, bankAccountToForm, type BankAccountFormData } from './our-companies.types';
 
 import { API } from '@app/core/config/api';
 

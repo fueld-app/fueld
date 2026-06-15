@@ -1,0 +1,1 @@
+export {}; // placeholder - profile card uses built-in types only

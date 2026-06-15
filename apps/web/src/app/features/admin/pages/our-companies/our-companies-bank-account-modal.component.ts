@@ -7,59 +7,8 @@ import {
   effect,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import type { BankAccountDto } from '@fueld/types';
-
-export interface BankAccountFormData {
-  label: string;
-  bankName: string;
-  accountName: string;
-  accountNumber: string;
-  iban: string;
-  swiftBic: string;
-  currency: string;
-  branchAddress: string;
-  sortCode: string;
-  routingNumber: string;
-  intermediaryBank: string;
-  notes: string;
-  isDefault: boolean;
-}
-
-export function emptyBankAccountForm(): BankAccountFormData {
-  return {
-    label: '',
-    bankName: '',
-    accountName: '',
-    accountNumber: '',
-    iban: '',
-    swiftBic: '',
-    currency: '',
-    branchAddress: '',
-    sortCode: '',
-    routingNumber: '',
-    intermediaryBank: '',
-    notes: '',
-    isDefault: false,
-  };
-}
-
-export function bankAccountToForm(ba: BankAccountDto): BankAccountFormData {
-  return {
-    label: ba.label,
-    bankName: ba.bankName,
-    accountName: ba.accountName ?? '',
-    accountNumber: ba.accountNumber ?? '',
-    iban: ba.iban ?? '',
-    swiftBic: ba.swiftBic ?? '',
-    currency: ba.currency,
-    branchAddress: ba.branchAddress ?? '',
-    sortCode: ba.sortCode ?? '',
-    routingNumber: ba.routingNumber ?? '',
-    intermediaryBank: (ba as any).intermediaryBank ?? '',
-    notes: ba.notes ?? '',
-    isDefault: ba.isDefault,
-  };
-}
+import type { BankAccountFormData } from './our-companies.types';
+import { emptyBankAccountForm } from './our-companies.types';
 
 @Component({
   selector: 'app-our-companies-bank-account-modal',

@@ -20,6 +20,7 @@ import { ColumnPickerComponent, type ColumnOption } from '../../../../shared/com
 import type { SortChangeEvent } from '../../../../shared/components';
 import type { ApiResponse, CounterpartyDto, OrderListRowDto, UserUiPreferences } from '@fueld/types';
 import { InquiriesListNewInquiryModalComponent } from './inquiries-list-new-inquiry-modal.component';
+import type { TeamUserOption } from './inquiries-list.types';
 import { DecimalPipe, DatePipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
 
@@ -32,11 +33,7 @@ import { AuthService } from '@app/core/auth/auth.service';
 import { UserPreferencesService } from '@app/core/services/user-preferences.service';
 import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.service';
 
-interface TeamUserOption {
-  id: string;
-  name: string;
-  email: string;
-}
+// TeamUserOption is defined in inquiries-list.types.ts
 
 @Component({
   selector: 'app-inquiries-list-page',

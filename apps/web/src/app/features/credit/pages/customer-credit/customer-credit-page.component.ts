@@ -24,7 +24,8 @@ import type {
 import { API } from '@app/core/config/api';
 import { AuthService } from '@app/core/auth/auth.service';
 import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring.service';
-import { CustomerCreditModalComponent, emptyCreditLineForm, type CreditLineForm, type CounterpartyOption } from './customer-credit-modal.component';
+import { CustomerCreditModalComponent } from './customer-credit-modal.component';
+import { emptyCreditLineForm, type CreditLineForm, type CounterpartyOption } from './customer-credit.types';
 
 interface CompanySearchResult {
   source: 'local' | 'seasearcher';
