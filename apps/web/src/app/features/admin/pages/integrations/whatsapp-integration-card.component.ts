@@ -407,8 +407,8 @@ export class WhatsAppIntegrationCardComponent implements OnInit {
   readonly waRulesEditTemplate = signal('');
   readonly waRulesEditGroupJid = signal<string | null>(null);
 
-  readonly waTemplatePlaceholder = 'Use {{variable}} for dynamic values. Use {{#variable}}...{{/variable}} for conditional blocks.';
-  readonly waTemplateHelp = 'Available: {{orderNumber}}, {{vesselName}}, {{vesselImo}}, {{portName}}, {{customerName}}, {{supplierName}}, {{companyName}}, {{status}}, {{eta}}, {{etd}}, {{products}}, {{poNumber}}, {{notes}}, {{supplierCount}}, {{suppliers}}, {{sentBy}}, {{traderEmail}}, {{currency}}, {{amount}}. Products: {{productCount}}, {{product1}}, {{product1Qty}}, {{product1Unit}}, {{product2}}… (up to 10). Conditionals: {{#eta}}...{{/eta}}';
+  readonly waTemplatePlaceholder = 'Use {{variable}} for dynamic values. Use {{#variable}}...{{/variable}} for conditionals or iteration.';
+  readonly waTemplateHelp = 'Available: {{orderNumber}}, {{vesselName}}, {{vesselImo}}, {{portName}}, {{customerName}}, {{supplierName}}, {{companyName}}, {{status}}, {{eta}}, {{etd}}, {{products}}, {{poNumber}}, {{notes}}, {{supplierCount}}, {{suppliers}}, {{sentBy}}, {{traderEmail}}, {{currency}}, {{amount}}. Iterate products: {{#items}} {{productType}} {{quantity}} {{unit}} {{/items}}. Conditionals: {{#eta}}...{{/eta}}';
 
   ngOnInit(): void {
     this.loadWhatsAppSettings();

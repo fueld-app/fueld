@@ -1828,7 +1828,7 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       if (!rule.enabled) throw new Error('Rule is disabled');
 
       // Send a test message with sample data
-      const testContext: Record<string, string | number | undefined> = {
+      const testContext: Record<string, string | number | undefined | Array<Record<string, string | number | undefined>>> = {
         orderNumber: 'TEST-123',
         vesselName: 'Test Vessel',
         portName: 'Test Port',
@@ -1841,6 +1841,10 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
         amount: '10000',
         products: '100 MT VLSFO, 50 MT MGO',
         productCount: '2',
+        items: [
+          { productType: 'VLSFO', quantity: '100', unit: 'MT', description: 'Low sulfur' },
+          { productType: 'MGO', quantity: '50', unit: 'MT', description: '' },
+        ],
         product1: 'VLSFO',
         product1Qty: '100',
         product1Unit: 'MT',

@@ -471,21 +471,43 @@ export async function sendWhatsAppGroupMessage(
 
 // ─── Templated Group Message ────────────────────────────────────────
 
+type TemplateContext = Record<string, string | number | undefined | Array<Record<string, string | number | undefined>>>;
+
 /**
  * Interpolate template variables in a message template.
  * Variables: {{key}} → value from context object.
- * Conditional blocks: {{#key}}...{{/key}} → only rendered if key has a truthy value.
+ * Sections:
+ *   {{#key}}...{{/key}} — if key is an array, iterates (inner vars resolve against each element).
+ *   {{#key}}...{{/key}} — if key is scalar, conditional: rendered only if truthy.
  */
-function interpolateTemplate(template: string, context: Record<string, string | number | undefined>): string {
-  // First, handle conditional blocks: {{#key}}...{{/key}}
+function interpolateTemplate(template: string, context: TemplateContext): string {
+  // First, handle sections: {{#key}}...{{/key}}
   let result = template.replace(/\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_, key, body) => {
     const val = context[key];
+
+    // Iteration: value is an array of objects
+    if (Array.isArray(val)) {
+      return val.map((item) => {
+        // Resolve inner variables against the item, falling back to parent context
+        return body.replace(/\{\{(\w+)\}\}/g, (__: string, innerKey: string) => {
+          const innerVal = (item as Record<string, string | number | undefined>)[innerKey];
+          if (innerVal !== undefined && innerVal !== null) return String(innerVal);
+          // Fall back to parent context
+          const parentVal = context[innerKey];
+          if (parentVal !== undefined && parentVal !== null && !Array.isArray(parentVal)) return String(parentVal);
+          return `{{${innerKey}}}`;
+        });
+      }).join('');
+    }
+
+    // Conditional: scalar value
     return val !== undefined && val !== null && val !== '' ? body : '';
   });
 
   // Then, replace simple variables: {{key}}
   result = result.replace(/\{\{(\w+)\}\}/g, (_, key) => {
     const val = context[key];
+    if (Array.isArray(val)) return `{{${key}}}`; // arrays only work inside sections
     return val !== undefined && val !== null ? String(val) : `{{${key}}}`;
   });
 
@@ -500,22 +522,33 @@ function interpolateTemplate(template: string, context: Record<string, string | 
  */
 export function buildProductTemplateVariables(
   items: { productType: string; quantity: string | number; quantityMin?: string | number | null; unit: string; description?: string | null }[],
-): Record<string, string> {
-  const vars: Record<string, string> = {};
+): Record<string, string | number | undefined | Array<Record<string, string | number | undefined>>> {
+  const vars: Record<string, string | number | undefined | Array<Record<string, string | number | undefined>>> = {};
   vars['productCount'] = String(items.length);
 
-  items.slice(0, 10).forEach((item, i) => {
-    const n = i + 1;
+  // Build an items array for {{#items}} iteration
+  vars['items'] = items.slice(0, 20).map((item) => {
     const qty = parseFloat(String(item.quantity ?? ''));
     const qtyMin = item.quantityMin != null ? parseFloat(String(item.quantityMin)) : null;
     const qtyStr = qtyMin != null && qtyMin !== qty
       ? `${qtyMin} - ${qty}`
       : String(qty);
 
-    vars[`product${n}`] = item.productType;
-    vars[`product${n}Qty`] = qtyStr;
-    vars[`product${n}Unit`] = item.unit;
-    if (item.description) vars[`product${n}Desc`] = item.description;
+    return {
+      productType: item.productType,
+      quantity: qtyStr,
+      unit: item.unit,
+      description: item.description ?? '',
+    };
+  });
+
+  // Also keep numbered variables for backward compatibility
+  (vars['items'] as Array<Record<string, string | number | undefined>>).forEach((item, i) => {
+    const n = i + 1;
+    vars[`product${n}`] = item.productType as string;
+    vars[`product${n}Qty`] = item.quantity as string;
+    vars[`product${n}Unit`] = item.unit as string;
+    if (item.description) vars[`product${n}Desc`] = item.description as string;
   });
 
   return vars;
@@ -529,7 +562,7 @@ export function buildProductTemplateVariables(
 export async function sendTemplatedGroupMessage(
   tenantId: string,
   eventType: string,
-  context: Record<string, string | number | undefined>,
+  context: TemplateContext,
 ): Promise<{ success: boolean; message: string }> {
   // 1. Find the rule
   const [rule] = await db

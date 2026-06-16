@@ -11,7 +11,7 @@ import { sendTemplatedGroupMessage } from '../whatsapp/whatsapp.service';
 export async function notifyCreditApplicationWhatsApp(
   tenantId: string,
   eventType: 'credit_application_submitted' | 'credit_application_processed',
-  context: Record<string, string | number | undefined>,
+  context: Record<string, string | number | undefined | Array<Record<string, string | number | undefined>>>,
 ): Promise<void> {
   const result = await sendTemplatedGroupMessage(tenantId, eventType, context);
   if (!result.success) {
