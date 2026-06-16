@@ -7,7 +7,7 @@ import { eq, and, isNull } from 'drizzle-orm';
 import { db } from '../../db';
 import { orders, orderItems, orderAttachments, vessels, places, counterparties } from '../../db/schema';
 import { logActivity } from '../activity/activity.service';
-import { sendTemplatedGroupMessage } from '../whatsapp/whatsapp.service';
+import { sendTemplatedGroupMessage, buildProductTemplateVariables } from '../whatsapp/whatsapp.service';
 
 export async function updateOrderStatus(
   id: string,
@@ -114,8 +114,22 @@ export async function updateOrderStatus(
         .where(eq(orders.id, id))
         .limit(1);
 
+      const items = await db
+        .select({
+          productType: orderItems.productType,
+          quantity: orderItems.quantity,
+          quantityMin: orderItems.quantityMin,
+          unit: orderItems.unit,
+          description: orderItems.description,
+        })
+        .from(orderItems)
+        .where(eq(orderItems.orderId, id));
+
       if (orderDetails) {
+        const productVars = buildProductTemplateVariables(items);
+
         sendTemplatedGroupMessage(orderDetails.tenantId, eventType, {
+          ...productVars,
           orderNumber: orderDetails.orderNumber ?? id.slice(0, 8),
           vesselName: orderDetails.vesselName ?? 'Unknown Vessel',
           portName: orderDetails.placeName ?? 'Unknown Port',

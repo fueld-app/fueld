@@ -493,6 +493,35 @@ function interpolateTemplate(template: string, context: Record<string, string | 
 }
 
 /**
+ * Build product-specific template variables from order items.
+ * Adds up to 10 products: {{product1}}, {{product1Qty}}, {{product1Unit}},
+ * {{product2}}, {{product2Qty}}, {{product2Unit}}, etc. (1-indexed).
+ * Also adds {{productCount}} with the total number of items.
+ */
+export function buildProductTemplateVariables(
+  items: { productType: string; quantity: string | number; quantityMin?: string | number | null; unit: string; description?: string | null }[],
+): Record<string, string> {
+  const vars: Record<string, string> = {};
+  vars['productCount'] = String(items.length);
+
+  items.slice(0, 10).forEach((item, i) => {
+    const n = i + 1;
+    const qty = parseFloat(String(item.quantity ?? ''));
+    const qtyMin = item.quantityMin != null ? parseFloat(String(item.quantityMin)) : null;
+    const qtyStr = qtyMin != null && qtyMin !== qty
+      ? `${qtyMin} - ${qty}`
+      : String(qty);
+
+    vars[`product${n}`] = item.productType;
+    vars[`product${n}Qty`] = qtyStr;
+    vars[`product${n}Unit`] = item.unit;
+    if (item.description) vars[`product${n}Desc`] = item.description;
+  });
+
+  return vars;
+}
+
+/**
  * Send a templated WhatsApp group message based on a notification rule.
  * Looks up the rule for the tenant + event type, interpolates the template,
  * and sends to the configured group (or tenant default).

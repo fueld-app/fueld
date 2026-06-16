@@ -6,7 +6,7 @@ import { sendDocumentEmail, buildDocumentEmailHtml, buildDocumentEmailSubject, b
 import { resolveOrderId, getOrderById } from '../orders/orders.service';
 import { getPortSuppliers } from '../lloyds/lli.service';
 import { logActivity } from '../activity/activity.service';
-import { sendWhatsAppGroupMessage, sendWhatsAppMessage, sendTemplatedGroupMessage } from '../whatsapp/whatsapp.service';
+import { sendWhatsAppGroupMessage, sendWhatsAppMessage, sendTemplatedGroupMessage, buildProductTemplateVariables } from '../whatsapp/whatsapp.service';
 import { db } from '../../db';
 import { users, counterparties, invoices as invoicesTable, companyContacts, companyEmails, supplierInquiries, supplierInquiryItemQuotes, portSuppliers, emailLog, tenants, orders, orderAttachments, orderPortDocuments, orderSuppliers, orderTransferSides } from '../../db/schema';
 import { getEmailTemplate, getApplicableEmailRules, renderTemplate, type TemplateVariables } from '../admin/email-settings.service';
@@ -1703,7 +1703,10 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             return `${qty} ${i.unit} ${i.productType}${i.description ? ' – ' + i.description : ''}`;
           }).join(', ');
 
+          const productVars = buildProductTemplateVariables(order.items);
+
           sendTemplatedGroupMessage(auth.tenantId, 'inquiry_sent', {
+            ...productVars,
             vesselName,
             vesselImo,
             portName,
