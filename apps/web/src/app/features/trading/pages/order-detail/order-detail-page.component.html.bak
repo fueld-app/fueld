@@ -1,0 +1,494 @@
+<app-trading-detail-header
+  [title]="isInquiryContext() ? 'Inquiry Detail' : 'Order Detail'"
+  [breadcrumbLabel]="isInquiryContext() ? 'Inquiries' : 'Orders'"
+  [breadcrumbLink]="isInquiryContext() ? '/trading/inquiries' : '/trading/orders'"
+  [entityNumber]="order()?.orderNumber ?? null"
+  [fallbackId]="orderId()"
+  [status]="order()?.status ?? 'INQUIRY'"
+  [subtitle]="subtitle()"
+  [showSave]="false"
+  [showAutosave]="true"
+  [autoSaving]="autoSaving()"
+  [lastSaved]="lastSaved()"
+>
+  <span subtitle-extra class="flex items-center gap-2">
+    <span class="text-xs text-gray-500">Responsible:</span>
+    <select
+      [ngModel]="order()?.salesRepId ?? ''"
+      (ngModelChange)="onResponsibleUserChange($event)"
+      class="fueld-select-no-chevron appearance-none rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+    >
+      <option value="">— None —</option>
+      @for (u of refData.teamUsers(); track u.id) {
+        <option [value]="u.id">{{ u.name }}</option>
+      }
+    </select>
+  </span>
+  <div detail-actions class="flex flex-wrap items-center gap-2">
+    <app-header-actions
+      [orderId]="orderId()"
+      [status]="order()?.status ?? null"
+      [hasInvoicingCompany]="hasInvoicingCompany()"
+      [hasSupplier]="hasSupplier()"
+      [hasBankAccount]="hasBankAccount()"
+      [hasLineItems]="hasLineItems()"
+      [hasEnoughPayments]="hasEnoughPaymentsForMarkPaid()"
+      [hasPortDocumentationDocuments]="(portDocSvc.portDocumentationContext()?.documents?.length ?? 0) > 0"
+      [portDocumentationEnabled]="portDocSvc.portDocumentationContext()?.enabled ?? false"
+      [isAdmin]="auth.isAdmin()"
+      (actionTriggered)="onAction($event)"
+    />
+    <app-order-settings-dropdown
+        [currency]="order()?.currency ?? 'USD'"
+        [category]="order()?.categoryKey ?? ''"
+        [currencyOptions]="refData.configuredCurrencies()"
+        [categoryOptions]="refData.orderCategories()"
+        (currencyChange)="onCurrencyChange($event)"
+        (categoryChange)="onCategoryChange($event)"
+      />
+    </div>
+  </app-trading-detail-header>
+
+@if (isInternalTransfer()) {
+  <div class="mt-4">
+    <app-internal-transfer-summary [transfer]="transfer()" />
+  </div>
+}
+
+<app-trading-detail-meta-cards
+  [clientName]="clientName()"
+  [supplierName]="supplierName()"
+  [vesselName]="vesselName()"
+  [placeName]="portName()"
+  [clientId]="order()?.clientId ?? ''"
+  [supplierId]="activeSupplierCompanyId()"
+  [vesselId]="order()?.vesselId ?? ''"
+  [placeId]="order()?.placeId ?? ''"
+  [clientOptions]="clientDropdownOptions()"
+  [supplierOptions]="supplierDropdownOptions()"
+  [vesselOptions]="vesselDropdownOptions()"
+  [placeOptions]="placeDropdownOptions()"
+  [clientLoading]="clientSearchLoading()"
+  [supplierLoading]="supplierSearchLoading()"
+  [vesselLoading]="vesselSearchLoading()"
+  [placeLoading]="placeSearchLoading()"
+  [canEditClient]="canEditClient()"
+  [isReadonly]="isReadonly()"
+  [eta]="order()?.eta ?? null"
+  [etd]="order()?.etd ?? null"
+  [etaMinDateTime]="etaMinDateTime()"
+  [timezone]="placeTimezone()"
+  [invoicingCompanyId]="order()?.invoicingCompanyId ?? ''"
+  [invoicingCompanyName]="invoicingCompanyName()"
+  [ownCompanies]="ownCompanies()"
+  [allowBankAccountEdit]="allowBankAccountEdit()"
+  [responsibleUserId]="order()?.salesRepId ?? ''"
+  [responsibleOptions]="responsibleUserOptions()"
+  (clientSearch)="searchClients($event)"
+  (clientChange)="onClientChange($event)"
+  (supplierSearch)="searchSuppliers($event)"
+  (supplierChange)="onActiveSupplierCompanyChange($event)"
+  (vesselSearch)="searchVessels($event)"
+  (vesselChange)="onVesselChange($event)"
+  (placeSearch)="searchPlaces($event)"
+  (placeChange)="onPortChange($event)"
+  (etaChange)="onEtaChange($event)"
+  (etdChange)="onEtdChange($event)"
+  (invoicingCompanyChange)="onInvoicingCompanyChange($event)"
+  [bankAccountId]="order()?.bankAccountId ?? ''"
+  [bankAccountOptions]="bankAccounts()"
+  (bankAccountChange)="onBankAccountChange($event)"
+  (responsibleChange)="onResponsibleUserChange($event)"
+  [customerContactId]="order()?.customerContactId ?? ''"
+  [supplierContactId]="activeSupplierContactId()"
+  [customerContactName]="customerContact()?.name ?? ''"
+  [supplierContactName]="activeSupplierContactName()"
+  [customerContactOptions]="customerContactDropdownOptions()"
+  [supplierContactOptions]="supplierContactDropdownOptions()"
+  [purchaseOrderNumber]="order()?.purchaseOrderNumber ?? ''"
+  (customerContactChange)="onCustomerContactChange($event)"
+  (supplierContactChange)="onActiveSupplierContactChange($event)"
+  (purchaseOrderNumberChange)="onPurchaseOrderNumberChange($event)"
+  [brokerId]="order()?.brokerId ?? ''"
+  [brokerName]="brokerName()"
+  [brokerOptions]="brokerDropdownOptions()"
+  [brokerLoading]="brokerSearchLoading()"
+  [brokerContactId]="order()?.brokerContactId ?? ''"
+  [brokerContactName]="brokerContact()?.name ?? ''"
+  [brokerContactOptions]="brokerContactDropdownOptions()"
+  [brokerGetsAll]="order()?.brokerGetsAll ?? false"
+  [agentId]="order()?.agentId ?? ''"
+  [agentName]="agentName()"
+  [agentOptions]="agentDropdownOptions()"
+  [agentLoading]="agentSearchLoading()"
+  [agentContactId]="order()?.agentContactId ?? ''"
+  [agentContactName]="agentContact()?.name ?? ''"
+  [agentContactOptions]="agentContactDropdownOptions()"
+  (brokerSearch)="searchBrokers($event)"
+  (brokerChange)="onBrokerChange($event)"
+  (brokerContactChange)="onBrokerContactChange($event)"
+  (brokerGetsAllChange)="onBrokerGetsAllChange($event)"
+  (agentSearch)="searchAgents($event)"
+  (agentChange)="onAgentChange($event)"
+  (agentContactChange)="onAgentContactChange($event)"
+>
+  <div supplierHeaderTabs>
+    @if (orderSupplierTabs().length > 0 && !isInternalTransfer()) {
+      <div class="grid min-w-0 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+        <div class="scrollbar-none min-w-0 flex-1 overflow-x-auto">
+          <div class="flex min-w-max items-center gap-1">
+            @for (supplierTab of orderSupplierTabs(); track supplierTab.id) {
+              <button
+                type="button"
+                (click)="selectOrderSupplierTab(supplierTab.id)"
+                [attr.aria-selected]="activeOrderSupplierId() === supplierTab.id"
+                class="inline-flex min-w-0 items-center gap-2 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
+                [class]="activeOrderSupplierId() === supplierTab.id
+                  ? 'bg-brand-50 text-brand-700'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'"
+              >
+                <span class="max-w-[9rem] truncate">{{ supplierTab.label }}</span>
+              </button>
+            }
+          </div>
+        </div>
+        @if (!isReadonly() && activeOrderSupplier()) {
+          <button
+            type="button"
+            (click)="addSupplierTab()"
+            class="inline-flex shrink-0 items-center gap-1 rounded-md bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 transition-colors hover:bg-brand-100"
+          >
+            + Add
+          </button>
+        }
+      </div>
+    }
+  </div>
+  <!-- Customer Payment (projected into client card) -->
+  <div customerPayment>
+    <app-order-payment-terms-card
+      side="customer"
+      [readonly]="isReadonly()"
+      [paymentTermType]="order()?.customerPaymentTermType ?? ''"
+      [creditDays]="order()?.customerCreditDays ?? null"
+      [creditSummary]="customerCreditSummary()"
+      [creditLoading]="customerCreditLoading()"
+      [creditFrozen]="customerCreditFrozen()"
+      [canUseCredit]="canUseCustomerCredit()"
+      [note]="order()?.customerNote ?? null"
+      [showNote]="showCustomerPaymentNote()"
+      [paymentTermOptions]="paymentTermOptions"
+      (paymentTermTypeChange)="onCustomerPaymentTermChange($event)"
+      (creditDaysChange)="onCustomerCreditDaysChange($event)"
+      (noteChange)="onCustomerNoteChange($event)"
+      (showNoteChange)="showCustomerPaymentNote.set($event)"
+      (requestCredit)="showCreditApplicationModal.set(true)"
+    />
+  </div>
+  <!-- Supplier Payment (projected into supplier card) -->
+  <div supplierPayment>
+    <app-order-payment-terms-card
+      side="supplier"
+      [readonly]="isReadonly()"
+      [paymentTermType]="activeSupplierPaymentTermType() ?? ''"
+      [creditDays]="activeSupplierCreditDays() ?? null"
+      [creditSummary]="supplierCreditSummary()"
+      [creditLoading]="supplierCreditLoading()"
+      [canUseCredit]="canUseSupplierCredit()"
+      [note]="activeSupplierNote() ?? null"
+      [showNote]="showSupplierPaymentNote()"
+      [paymentTermOptions]="paymentTermOptions"
+      (paymentTermTypeChange)="onSupplierPaymentTermChange($event)"
+      (creditDaysChange)="onSupplierCreditDaysChange($event)"
+      (noteChange)="onSupplierNoteChange($event)"
+      (showNoteChange)="showSupplierPaymentNote.set($event)"
+    />
+  </div>
+  <!-- Notes + T&C (projected into invoicing card) -->
+  <div notesAndTerms>
+    <app-order-notes-terms-card
+      [readonly]="isPaidOrCancelled()"
+      [placeRemark]="order()?.placeRemark ?? null"
+      [customerTermsText]="customerTermsText()"
+      [supplierTermsText]="supplierTermsText()"
+      [hasOrderTermsOverride]="!!order()?.termsAndConditions"
+      [clientSpecialTermsLabel]="client()?.specialCustomerTerms ? (client()?.name + ' special terms') : null"
+      (placeRemarkChange)="onPlaceRemarkChange($event)"
+    />
+  </div>
+</app-trading-detail-meta-cards>
+
+@if (isInquiryContext() && !isInternalTransfer()) {
+  <!-- Moved to Suppliers tab — lazy-loaded -->
+  <div class="hidden"></div>
+
+  <!-- Quote Matrix + Supplier Replies moved to Suppliers tab -->
+  <div class="hidden"></div>
+}
+
+
+<app-order-items
+  class="mt-4 block"
+  [items]="itemRows()"
+  [readonly]="isReadonly()"
+  [allowDeliveredEdit]="allowDeliveredEdit()"
+  [canSeePrices]="auth.canSeePrices()"
+  [supplierOptionsInput]="itemSupplierOptions()"
+  [financingRateAnnual]="financingRateAnnual()"
+  [financingDays]="financingDays()"
+  [financingDayCountConvention]="financingDayCountConvention()"
+  [productOptionsInput]="refData.configuredProducts()"
+  [unitOptionsInput]="refData.configuredUnits()"
+  [unitConversionsInput]="refData.configuredUnitConversions()"
+  [currencyOptionsInput]="refData.configuredCurrencies()"
+  [priceReferencesInput]="refData.configuredPriceReferences()"
+  [plattsSuggestionsInput]="plattsSuggestionItems()"
+  [warehouseOptionsInput]="warehouseDropdownOptions()"
+  [inventorySkuOptionsInput]="inventorySkuDropdownOptions()"
+  [catalogItemsInput]="refData.catalogItems()"
+  [defaultUnitInput]="refData.defaultUnit()"
+  [taxRatesInput]="refData.taxRates()"
+  [availabilityByRowId]="availabilityByRowId()"
+  (itemsChange)="onItemsChange($event)"
+  (economicsChange)="onItemEconomicsChange($event)"
+  (displayCurrencyChange)="itemDisplayCurrency.set($event)"
+/>
+
+@if (isInternalTransfer()) {
+  <div class="mt-4">
+    <app-internal-transfer-sides
+      [orderId]="orderId()"
+      [readonly]="isReadonly()"
+    />
+  </div>
+}
+
+
+<!--  Financing Summary (always visible when user can see prices) -->
+@if (auth.canSeePrices()) {
+  <div class="mt-4">
+    <app-order-financing-summary
+      [baseCurrency]="itemDisplayCurrency()"
+      [financingRateAnnual]="financingRateAnnual()"
+      [financingDays]="financingDays()"
+      [financingDayCountConvention]="financingDayCountConvention()"
+      [economics]="itemEconomics()"
+    />
+  </div>
+}
+
+<!-- Delivery + Payments + Attachments + Comments -->
+@if (allowDeliveredEdit() || orderId() || order()?.id) {
+  <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    @if (allowDeliveredEdit()) {
+      <app-order-delivery-card
+        [deliveredAtLocal]="deliveredAtLocal()"
+        [nomination]="supplierNomination()"
+        [internalDeliveredAt]="formatStoredDateOnlyLabel(activeSupplierDeliveredAt())"
+        [dateMismatch]="supplierNominationDateMismatch()"
+        [hasMultipleSuppliers]="hasMultipleOrderSuppliers()"
+        [supplierLabel]="activeOrderSupplier()?.company?.name ?? null"
+        [timezoneAbbr]="placeTimezoneAbbr()"
+        (deliveredAtChange)="onDeliveredAtChange($event)"
+      />
+    }
+    @if (orderId() || order()?.id) {
+      <app-order-payments-card
+        [payments]="payments()"
+        [paymentsTotal]="paymentsTotal()"
+        [currency]="order()?.currency ?? 'USD'"
+        [loading]="paymentsLoading()"
+        [canSeePrices]="auth.canSeePrices()"
+        [canRecordPayment]="canRecordPayment()"
+        (addPayment)="paymentModal.openModal()"
+      />
+    }
+    <app-order-attachments-card
+      [attachments]="attachments()"
+      [attachmentTypes]="refData.configuredAttachmentTypes()"
+      [(attachmentType)]="attachmentType"
+      [uploading]="uploadingAttachment()"
+      [hasFile]="!!selectedAttachment"
+      (upload)="uploadAttachment()"
+      (open)="openAttachment($event)"
+      (delete)="deleteAttachment($event)"
+      (fileSelected)="onAttachmentSelected($event)"
+    />
+
+  </div>
+}
+
+<!-- Secondary tabs — components are lazily created only when their tab is active -->
+@if (order()?.id) {
+  <app-order-secondary-tabs
+    [commentsVisible]="true"
+    [activityVisible]="true"
+    [emailVisible]="true"
+    [plattsVisible]="plattsSuggestionItems().length > 0 || plattsSuggestionsLoading()"
+    [suppliersVisible]="true"
+    [captureVisible]="true"
+    defaultTab="comments"
+    (activeTabChange)="activeDetailTab.set($event)"
+  />
+
+  @if (activeDetailTab() === 'comments') {
+    <div class="mt-4">
+      <app-comments-card entityType="order" [entityId]="orderId()" [enableFollowUp]="false" />
+    </div>
+  }
+  @if (activeDetailTab() === 'activity') {
+    <div class="mt-4">
+      <app-activity-timeline entityType="order" [entityId]="order()!.id" />
+    </div>
+  }
+  @if (activeDetailTab() === 'email') {
+    <div class="mt-4">
+      <app-email-history-card [orderId]="order()!.id" />
+    </div>
+  }
+  @if (activeDetailTab() === 'platts') {
+    <div class="mt-4">
+      <app-order-platts-signals
+        [items]="plattsSuggestionItems()"
+        [meta]="plattsSuggestionsMeta()"
+        [loading]="plattsSuggestionsLoading()"
+        [error]="plattsSuggestionsError()"
+        (refresh)="loadPlattsSuggestions()"
+        (openReport)="openPlattsReport($event)"
+      />
+    </div>
+  }
+  @if (activeDetailTab() === 'suppliers') {
+    <app-order-suppliers-tab
+      [suppliers]="rankedInquirySuppliers()"
+      [loading]="inquirySupplierContextLoading()"
+      [readonly]="isReadonly()"
+      [selectedSupplierId]="selectedSupplierComparison()?.supplierId ?? null"
+      [selectedSupplierName]="selectedSupplierComparison()?.supplierName ?? ''"
+      [isTopSupplier]="isTopInquirySupplier"
+      [quoteRateLabel]="quoteRateLabel"
+      [averageResponseLabel]="averageResponseLabel"
+      [replies]="sortedInquiryReplies()"
+      [matrixRows]="inquiryQuoteMatrixRows()"
+      [selectedReplySupplierId]="order()?.supplierId ?? null"
+      [showPrices]="auth.canSeePrices()"
+      [recommendation]="inquiryReplyRecommendation"
+      [summary]="inquiryReplySummary"
+      [responseHoursLabel]="responseHoursLabel"
+      (select)="applyComparisonSupplier($event)"
+    />
+  }
+  @if (activeDetailTab() === 'capture') {
+    <app-order-capture-tab
+      [replies]="sortedInquiryReplies()"
+      [loading]="inquiryRepliesLoading()"
+      [readonly]="isReadonly()"
+      [selectedSupplierId]="order()?.supplierId ?? null"
+      [editingReplyId]="editingInquiryReplyId()"
+      [badgeClass]="statusBadgeClass"
+      [formatDateTime]="formatHistoryDateTime"
+      [responseHoursLabel]="responseHoursLabel"
+      [summary]="inquiryReplySummary"
+      (toggleEditor)="isEditingInquiryReply($event) ? cancelInquiryReplyEditor() : openInquiryReplyEditor($event)"
+    />
+  }
+}
+
+<!-- Toast notification -->
+@if (toast()) {
+  <div
+    class="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-lg border px-4 py-3 text-sm font-medium shadow-lg transition-all"
+    [class]="toast()!.type === 'success'
+      ? 'border-green-200 bg-green-50 text-green-800'
+      : 'border-red-200 bg-red-50 text-red-800'"
+  >
+    @if (toast()!.type === 'success') {
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd" />
+      </svg>
+    } @else {
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        <path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd" />
+      </svg>
+    }
+    {{ toast()!.message }}
+  </div>
+}
+
+<app-order-payment-modal
+  #paymentModal
+  [orderId]="orderId()"
+  [currencyOptions]="refData.configuredCurrencies()"
+  [defaultCurrency]="order()?.currency ?? 'USD'"
+  [todayLocal]="todayLocalDateString()"
+  (saved)="loadPayments()"
+/>
+
+<app-order-convert-modal
+  #convertModal
+  [saving]="convertingToOrder()"
+  (confirmed)="confirmConvertToOrder()"
+/>
+
+<app-order-cancel-modal
+  #cancelModal
+  [saving]="cancellingInquiry()"
+  [targetLabel]="cancellationTargetLabel()"
+  [reasons]="availableInquiryCancelReasons()"
+  (confirmed)="confirmCancelInquiry($event)"
+/>
+
+<app-order-place-remark-prompt
+  #remarkPrompt
+  [pendingRemark]="pendingPlaceRemark()"
+  (applied)="applyNewPlaceRemark()"
+  (dismissed)="dismissPlaceRemarkPrompt()"
+/>
+
+<!-- Send Email Modal -->
+<app-send-email-modal
+  [documentType]="emailDocumentType()"
+  [senderName]="auth.userName()"
+  [senderEmail]="auth.userEmail()"
+  [pdfFileName]="emailPdfFileName()"
+  [orderId]="orderId()"
+  [nominationOrderSupplierId]="nominationOrderSupplierId()"
+  [extraAttachments]="emailAttachmentOptions()"
+  [waLinked]="waLinked()"
+  [defaultPhone]="emailModalDefaultPhone()"
+  (sendEmail)="onSendEmail($event)"
+  (sendWhatsApp)="onSendInvoiceWhatsApp($event)"
+/>
+
+<!-- Send Inquiry Modal -->
+<app-send-inquiry-modal
+  [orderId]="orderId()"
+  [senderName]="auth.userName()"
+  [companyName]="invoicingCompanyName()"
+  [placeId]="order()?.placeId ?? ''"
+  [portName]="port()?.name ?? ''"
+  [waLinked]="waLinked()"
+  [vesselName]="vesselName()"
+  [vesselImo]="vessel()?.imo ?? null"
+  [eta]="order()?.eta ?? null"
+  [etd]="order()?.etd ?? null"
+  [items]="inquiryItems()"
+  (sendInquiry)="onSendInquiry($event)"
+  (sendWhatsAppInquiry)="onSendInquiryWhatsApp($event)"
+/>
+
+<!-- PDF Preview Modal -->
+<app-pdf-preview-modal [waLinked]="waLinked()" [defaultPhone]="customerContact()?.phone ?? null" (sendWhatsApp)="onSendPdfWhatsApp($event)" />
+
+<!-- Credit Application Modal -->
+@if (order()?.clientId) {
+  <app-credit-application-modal
+    [open]="showCreditApplicationModal()"
+    [counterpartyId]="order()!.clientId"
+    [counterpartyName]="clientName()"
+    [orderId]="order()!.id"
+    defaultType="CUSTOMER"
+    (closed)="showCreditApplicationModal.set(false)"
+    (submitted)="onCreditApplicationSubmitted()"
+  />
+}
