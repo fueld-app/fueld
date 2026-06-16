@@ -39,3 +39,10 @@ apps/*/.netlify/
 
 # Local doc-generation scratch artifacts (e.g. exported PDFs from manual runs)
 tmp/*.pdf
+
+# Pi coding agent local config
+.pi/
+
+# Google Cloud SDK (local dev tooling)
+google-cloud-sdk/
+google-cloud-cli-*.tar.gz
