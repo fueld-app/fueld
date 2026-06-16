@@ -474,12 +474,22 @@ export async function sendWhatsAppGroupMessage(
 /**
  * Interpolate template variables in a message template.
  * Variables: {{key}} → value from context object.
+ * Conditional blocks: {{#key}}...{{/key}} → only rendered if key has a truthy value.
  */
 function interpolateTemplate(template: string, context: Record<string, string | number | undefined>): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+  // First, handle conditional blocks: {{#key}}...{{/key}}
+  let result = template.replace(/\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_, key, body) => {
+    const val = context[key];
+    return val !== undefined && val !== null && val !== '' ? body : '';
+  });
+
+  // Then, replace simple variables: {{key}}
+  result = result.replace(/\{\{(\w+)\}\}/g, (_, key) => {
     const val = context[key];
     return val !== undefined && val !== null ? String(val) : `{{${key}}}`;
   });
+
+  return result;
 }
 
 /**

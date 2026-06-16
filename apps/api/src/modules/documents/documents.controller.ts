@@ -1714,6 +1714,8 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             suppliers: supplierList,
             sentBy: senderName,
             orderNumber: order.orderNumber ?? order.id.slice(0, 8),
+            poNumber: order.purchaseOrderNumber ?? '',
+            notes: order.customerNote ?? '',
           }).catch((err) => {
             console.error('[Documents] Failed to send templated WhatsApp group notification:', err);
           });

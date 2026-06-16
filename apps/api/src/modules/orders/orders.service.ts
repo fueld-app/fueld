@@ -1866,6 +1866,8 @@ export async function updateOrderStatus(
           vesselName: vessels.name,
           placeName: places.name,
           customerName: counterparties.name,
+          purchaseOrderNumber: orders.purchaseOrderNumber,
+          customerNote: orders.customerNote,
         })
         .from(orders)
         .leftJoin(vessels, eq(orders.vesselId, vessels.id))
@@ -1881,6 +1883,8 @@ export async function updateOrderStatus(
           portName: orderDetails.placeName ?? 'Unknown Port',
           customerName: orderDetails.customerName ?? 'Unknown Customer',
           status: newStatus,
+          poNumber: orderDetails.purchaseOrderNumber ?? '',
+          notes: orderDetails.customerNote ?? '',
         }).catch((err) => {
           console.error(`[orders] WhatsApp ${eventType} notification failed:`, err);
         });

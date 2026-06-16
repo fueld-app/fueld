@@ -407,8 +407,8 @@ export class WhatsAppIntegrationCardComponent implements OnInit {
   readonly waRulesEditTemplate = signal('');
   readonly waRulesEditGroupJid = signal<string | null>(null);
 
-  readonly waTemplatePlaceholder = 'Use {{variable}} for dynamic values';
-  readonly waTemplateHelp = 'Available variables depend on event type. Common: {{orderNumber}}, {{vesselName}}, {{portName}}, {{customerName}}, {{status}}';
+  readonly waTemplatePlaceholder = 'Use {{variable}} for dynamic values. Use {{#variable}}...{{/variable}} for conditional blocks.';
+  readonly waTemplateHelp = 'Available: {{orderNumber}}, {{vesselName}}, {{vesselImo}}, {{portName}}, {{customerName}}, {{supplierName}}, {{companyName}}, {{status}}, {{eta}}, {{etd}}, {{products}}, {{poNumber}}, {{notes}}, {{supplierCount}}, {{suppliers}}, {{sentBy}}, {{traderEmail}}, {{currency}}, {{amount}}. Conditionals: {{#eta}}...{{/eta}}';
 
   ngOnInit(): void {
     this.loadWhatsAppSettings();
