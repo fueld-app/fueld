@@ -19,6 +19,7 @@ import type {
 import { Role } from '@fueld/types';
 import { API } from '@app/core/config/api';
 import { ReportsSavedViewsCardComponent } from './reports-saved-views-card.component';
+import { ReportsScheduleFormComponent } from './reports-schedule-form.component';
 
 type ExportKind = 'trader-performance' | 'invoice-aging' | 'commercial-summary' | 'margin-analysis' | 'exceptions';
 type ExportFormat = 'csv' | 'xlsx';
@@ -27,7 +28,7 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
 @Component({
   selector: 'app-reports-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, ReportsSavedViewsCardComponent],
+  imports: [RouterLink, ReportsSavedViewsCardComponent, ReportsScheduleFormComponent],
   template: `
     <div class="space-y-6 pb-8">
       <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -739,72 +740,38 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
                 <p class="text-sm text-gray-500">Email report summaries on a daily UTC hour.</p>
               </div>
               @if (reportData.access.canManageSchedules) {
-                <div class="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[520px]">
-                  <div class="grid gap-3 sm:grid-cols-2">
-                    <input type="text" data-testid="reports-schedule-name" [value]="scheduleName()" (input)="scheduleName.set(($any($event.target).value || '').trimStart())" placeholder="Schedule name" class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100" />
-                    <input type="text" data-testid="reports-schedule-description" [value]="scheduleDescription()" (input)="scheduleDescription.set(($any($event.target).value || '').trimStart())" placeholder="Description (optional)" class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100" />
-                    <select data-testid="reports-schedule-mode" [value]="scheduleMode()" (change)="scheduleMode.set($any($event.target).value)" class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
-                      <option value="SUMMARY">Summary</option>
-                      <option value="EXCEPTIONS">Exceptions</option>
-                    </select>
-                    <select data-testid="reports-schedule-report-type" [value]="scheduleReportType()" (change)="scheduleReportType.set($any($event.target).value)" class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
-                      <option value="SUMMARY">Summary</option>
-                      <option value="MARGIN_ANALYSIS">Margin analysis</option>
-                    </select>
-                    <select data-testid="reports-schedule-delivery-mode" [value]="scheduleDeliveryMode()" (change)="scheduleDeliveryMode.set($any($event.target).value)" class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
-                      <option value="HTML">HTML summary</option>
-                      <option value="CSV">CSV attachment</option>
-                      <option value="XLSX">XLSX attachment</option>
-                      <option value="CSV_XLSX">CSV + XLSX</option>
-                    </select>
-                    <select data-testid="reports-schedule-body-mode" [value]="scheduleBodyMode()" (change)="scheduleBodyMode.set($any($event.target).value)" class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
-                      <option value="HTML_SUMMARY">Include HTML summary</option>
-                      <option value="ATTACHMENT_ONLY">Attachment only email</option>
-                    </select>
-                    <select data-testid="reports-schedule-hour" [value]="scheduleHourValue()" (change)="onScheduleHourChange($event)" class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
-                      @for (hour of utcHours; track hour) {
-                        <option [value]="hour">{{ hour }}:00 UTC</option>
-                      }
-                    </select>
-                    <input type="text" data-testid="reports-schedule-extra-emails" [value]="scheduleExtraEmails()" (input)="scheduleExtraEmails.set(($any($event.target).value || '').trimStart())" placeholder="Extra emails, comma-separated" class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100" />
-                  </div>
-                  @if (scheduleMode() === 'EXCEPTIONS') {
-                    <div class="flex flex-wrap gap-2">
-                      @for (type of ['NEGATIVE_NET_PROFIT_ORDER', 'SEVERELY_OVERDUE_INVOICE', 'LOW_MARGIN_CUSTOMER']; track type) {
-                        <button type="button" [attr.data-testid]="'reports-schedule-exception-type-' + type" (click)="toggleScheduleExceptionType($any(type))" class="rounded-full border px-3 py-1.5 text-sm font-medium transition-colors" [class.border-red-600]="scheduleExceptionTypeSelected($any(type))" [class.bg-red-600]="scheduleExceptionTypeSelected($any(type))" [class.text-white]="scheduleExceptionTypeSelected($any(type))" [class.border-gray-300]="!scheduleExceptionTypeSelected($any(type))" [class.bg-white]="!scheduleExceptionTypeSelected($any(type))" [class.text-gray-700]="!scheduleExceptionTypeSelected($any(type))">
-                          {{ exceptionTypeLabel($any(type)) }}
-                        </button>
-                      }
-                    </div>
-                    <label class="flex items-center gap-2 text-sm text-gray-600">
-                      <input data-testid="reports-schedule-send-only-non-empty" type="checkbox" [checked]="scheduleSendOnlyWhenNonEmpty()" (change)="scheduleSendOnlyWhenNonEmpty.set(($any($event.target).checked))" class="rounded border-gray-300" />
-                      Send only when exceptions exist
-                    </label>
-                  }
-                  @if (editingScheduleId()) {
-                    <label class="flex items-center gap-2 text-sm text-gray-600">
-                      <input type="checkbox" [checked]="scheduleActive()" (change)="scheduleActive.set(($any($event.target).checked))" class="rounded border-gray-300" />
-                      Active schedule
-                    </label>
-                  }
-                  <div class="flex flex-wrap gap-2">
-                    @for (role of scheduleRoleOptions; track role) {
-                      <button type="button" (click)="toggleScheduleRole(role)" class="rounded-full border px-3 py-1.5 text-sm font-medium transition-colors" [class.border-gray-900]="scheduleRoleSelected(role)" [class.bg-gray-900]="scheduleRoleSelected(role)" [class.text-white]="scheduleRoleSelected(role)" [class.border-gray-300]="!scheduleRoleSelected(role)" [class.bg-white]="!scheduleRoleSelected(role)" [class.text-gray-700]="!scheduleRoleSelected(role)">
-                        {{ roleLabel(role) }}
-                      </button>
-                    }
-                  </div>
-                  <div class="flex gap-2">
-                    <button type="button" data-testid="reports-save-schedule" (click)="saveSchedule()" [disabled]="savingSchedule() || !scheduleName().trim() || scheduleRecipientRoles().length === 0" class="inline-flex items-center justify-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60">
-                      {{ savingSchedule() ? 'Saving…' : editingScheduleId() ? 'Update schedule' : 'Create schedule' }}
-                    </button>
-                    @if (editingScheduleId()) {
-                      <button type="button" (click)="resetScheduleEditor()" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50">
-                        Cancel
-                      </button>
-                    }
-                  </div>
-                </div>
+                <app-reports-schedule-form
+                  [editing]="!!editingScheduleId()"
+                  [saving]="savingSchedule()"
+                  [name]="scheduleName()"
+                  [description]="scheduleDescription()"
+                  [mode]="scheduleMode()"
+                  [reportType]="scheduleReportType()"
+                  [deliveryMode]="scheduleDeliveryMode()"
+                  [bodyMode]="scheduleBodyMode()"
+                  [hourUtc]="scheduleHourUtc()"
+                  [recipientRoles]="scheduleRecipientRoles()"
+                  [extraEmails]="scheduleExtraEmails()"
+                  [exceptionTypes]="scheduleExceptionTypes()"
+                  [sendOnlyWhenNonEmpty]="scheduleSendOnlyWhenNonEmpty()"
+                  [isActive]="scheduleActive()"
+                  [utcHours]="utcHours"
+                  [roleOptions]="scheduleRoleOptions"
+                  (nameChange)="scheduleName.set($event)"
+                  (descriptionChange)="scheduleDescription.set($event)"
+                  (modeChange)="scheduleMode.set($event)"
+                  (reportTypeChange)="scheduleReportType.set($event)"
+                  (deliveryModeChange)="scheduleDeliveryMode.set($event)"
+                  (bodyModeChange)="scheduleBodyMode.set($event)"
+                  (hourUtcChange)="scheduleHourUtc.set($event)"
+                  (recipientRolesChange)="scheduleRecipientRoles.set($event)"
+                  (extraEmailsChange)="scheduleExtraEmails.set($event)"
+                  (exceptionTypesChange)="scheduleExceptionTypes.set($event)"
+                  (sendOnlyWhenNonEmptyChange)="scheduleSendOnlyWhenNonEmpty.set($event)"
+                  (isActiveChange)="scheduleActive.set($event)"
+                  (save)="saveSchedule()"
+                  (cancel)="resetScheduleEditor()"
+                />
               }
             </div>
 
@@ -914,7 +881,6 @@ export class ReportsPageComponent {
   readonly scheduleBodyMode = signal<ReportScheduleBodyMode>('HTML_SUMMARY');
   readonly scheduleHourUtc = signal(8);
   readonly scheduleRecipientRoles = signal<Role[]>([Role.Admin, Role.Finance]);
-  readonly scheduleHourValue = computed(() => `${this.scheduleHourUtc()}`);
   readonly scheduleExtraEmails = signal('');
   readonly scheduleExceptionTypes = signal<ReportExceptionType[]>([]);
   readonly scheduleSendOnlyWhenNonEmpty = signal(true);
@@ -1256,33 +1222,6 @@ export class ReportsPageComponent {
   closeDrilldown(): void {
     this.drilldownData.set(null);
     this.drilldownError.set(null);
-  }
-
-  toggleScheduleRole(role: Role): void {
-    const current = this.scheduleRecipientRoles();
-    this.scheduleRecipientRoles.set(current.includes(role)
-      ? current.filter((value) => value !== role)
-      : [...current, role]);
-  }
-
-  scheduleRoleSelected(role: Role): boolean {
-    return this.scheduleRecipientRoles().includes(role);
-  }
-
-  toggleScheduleExceptionType(type: ReportExceptionType): void {
-    const current = this.scheduleExceptionTypes();
-    this.scheduleExceptionTypes.set(current.includes(type)
-      ? current.filter((value) => value !== type)
-      : [...current, type]);
-  }
-
-  scheduleExceptionTypeSelected(type: ReportExceptionType): boolean {
-    return this.scheduleExceptionTypes().includes(type);
-  }
-
-  onScheduleHourChange(event: Event): void {
-    const value = Number((event.target as HTMLSelectElement | null)?.value ?? 8);
-    this.scheduleHourUtc.set(Number.isFinite(value) ? value : 8);
   }
 
   describeScope(scope: ReleaseTwoReportsDto['access']['scope']): string {
