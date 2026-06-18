@@ -278,6 +278,20 @@ body {
 
 /* ─── Shared surfaces ────────────────────────────────────────────── */
 
+@utility fueld-clamp-1 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  overflow: hidden;
+}
+
+@utility fueld-clamp-2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
 @layer components {
   .app-panel {
     @apply flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm;

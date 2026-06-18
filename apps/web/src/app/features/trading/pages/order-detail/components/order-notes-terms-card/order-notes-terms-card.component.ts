@@ -25,7 +25,7 @@ import { FormsModule } from '@angular/forms';
       } @else if (placeRemark()) {
         <p
           class="mt-1 text-sm text-gray-700 whitespace-pre-line"
-          [class.fueld-clamp-1]="!showPlaceRemarkFull()"
+          [class.fueld-clamp-2]="!showPlaceRemarkFull()"
         >{{ placeRemark() }}</p>
         <button
           type="button"
