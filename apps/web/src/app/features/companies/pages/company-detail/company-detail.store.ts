@@ -1163,8 +1163,8 @@ export class CompanyDetailStore {
     this.savingResponsible.set(true);
     try {
       const res = await firstValueFrom(
-        this.http.patch<ApiResponse<CounterpartyDto>>(`${API}/companies/local/${c.id}`, {
-          responsibleUserId: userId || null,
+        this.http.patch<ApiResponse<CounterpartyDto>>(`${API}/companies/local/${c.id}/responsible-user`, {
+          userId: userId || null,
         }),
       );
       if (res.success && res.data) {
