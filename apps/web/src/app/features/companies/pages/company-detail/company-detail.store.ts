@@ -571,6 +571,7 @@ export class CompanyDetailStore {
         this.loadCompanyOffices(id);
         this.loadParentChildData(id);
         this.loadOwnCompanies();
+        this.loadTeamUsers();
         this.loadRiskSummary();
         if (data.seasearcherId) {
           this.syncing.set(true);
@@ -848,6 +849,15 @@ export class CompanyDetailStore {
       if (res.success) this.ownCompanies.set(res.data ?? []);
     } catch (err) {
       console.error('Failed to load own companies:', err);
+    }
+  }
+
+  async loadTeamUsers(): Promise<void> {
+    try {
+      const res = await firstValueFrom(this.http.get<ApiResponse<Array<{ id: string; name: string; email: string }>>>(`${API}/lloyds/users`));
+      if (res.success && res.data) this.teamUsers.set(res.data);
+    } catch (err) {
+      console.error('Failed to load team users:', err);
     }
   }
 
