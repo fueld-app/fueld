@@ -17,6 +17,7 @@ export const COUNTRIES: Country[] = [
   { code: 'AIA', name: 'Anguilla' },
   { code: 'ATA', name: 'Antarctica' },
   { code: 'ATG', name: 'Antigua & Barbuda' },
+  { code: 'ARG', name: 'Argentina' },
   { code: 'ARM', name: 'Armenia' },
   { code: 'ABW', name: 'Aruba' },
   { code: 'AUS', name: 'Australia' },
