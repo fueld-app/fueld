@@ -48,7 +48,7 @@ import { FormsModule } from '@angular/forms';
       @if (customerTermsText()) {
         <p
           class="mt-1 text-sm text-gray-700 whitespace-pre-line"
-          [class.fueld-clamp-1]="!showCustomerTermsFull()"
+          [class.fueld-clamp-2]="!showCustomerTermsFull()"
         >{{ customerTermsText() }}</p>
         <button
           type="button"
@@ -64,7 +64,7 @@ import { FormsModule } from '@angular/forms';
       @if (supplierTermsText()) {
         <p
           class="mt-1 text-sm text-gray-700 whitespace-pre-line"
-          [class.fueld-clamp-1]="!showSupplierTermsFull()"
+          [class.fueld-clamp-2]="!showSupplierTermsFull()"
         >{{ supplierTermsText() }}</p>
         <button
           type="button"

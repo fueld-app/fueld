@@ -158,6 +158,12 @@ import type {
         -webkit-line-clamp: 1;
         overflow: hidden;
       }
+      .fueld-clamp-2 {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        overflow: hidden;
+      }
     `,
   ],
 })
