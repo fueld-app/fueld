@@ -34,11 +34,15 @@ export class OrderPortDocumentationService {
         this.portDocumentationContext.set(res.data);
       } else {
         this.portDocumentationContext.set(null);
-        this.portDocumentationError.set(res.message ?? 'Port Documentation is not available on this deployment yet.');
+        const msg = res.message ?? 'Port Documentation is not available on this deployment yet.';
+        this.portDocumentationError.set(msg);
+        console.warn('[PortDocumentation] Load failed:', msg, { orderId });
       }
-    } catch {
+    } catch (err) {
       this.portDocumentationContext.set(null);
-      this.portDocumentationError.set('Port Documentation is not available on this deployment yet.');
+      const msg = 'Port Documentation is not available on this deployment yet.';
+      this.portDocumentationError.set(msg);
+      console.warn('[PortDocumentation] Load error:', err, { orderId });
     } finally {
       this.portDocumentationLoading.set(false);
     }

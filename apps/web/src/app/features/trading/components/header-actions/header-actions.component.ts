@@ -261,7 +261,6 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
     const hasSupplier = this.hasSupplier();
     const hasBankAccount = this.hasBankAccount();
     const hasLineItems = this.hasLineItems();
-    const hasPortDocumentationDocuments = this.hasPortDocumentationDocuments();
     const portDocumentationEnabled = this.portDocumentationEnabled();
     const isAdmin = this.isAdmin();
     const canReopen = isAdmin && (status === OrderStatus.Delivered || status === OrderStatus.Invoiced);
