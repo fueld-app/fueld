@@ -653,10 +653,15 @@ export function getPortDocumentAbsolutePath(filePath: string): string {
 }
 
 async function assertOrderBelongsToTenant(tenantId: string, orderId: string): Promise<void> {
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId);
+  const condition = isUuid
+    ? eq(orders.id, orderId)
+    : eq(orders.orderNumber, orderId);
+
   const [order] = await db
     .select({ id: orders.id })
     .from(orders)
-    .where(and(eq(orders.id, orderId), eq(orders.tenantId, tenantId)))
+    .where(and(condition, eq(orders.tenantId, tenantId)))
     .limit(1);
 
   if (!order) throw new Error('Order not found');
