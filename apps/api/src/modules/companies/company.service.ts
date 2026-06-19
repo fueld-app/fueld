@@ -4,7 +4,7 @@
 
 import { eq, ilike, or, and, sql, asc, desc, inArray, isNull, ne } from 'drizzle-orm';
 import { db } from '../../db';
-import { counterparties, companyAttachments, companyContacts, companyEmails, companyOffices, orders, orderSuppliers, vessels, places, users, vesselCompanies, customerPayments, creditApplications, portSuppliers, companyPlaceSupplyRules } from '../../db/schema';
+import { counterparties, companyAttachments, companyContacts, companyEmails, companyOffices, orders, orderSuppliers, vessels, places, users, vesselCompanies, customerPayments, creditApplications, portSuppliers, companyPlaceSupplyRules, creditLines, creditLineCounterparties } from '../../db/schema';
 import type { CompanyEmailType } from '@fueld/types';
 import { matchLocalVessels } from '../vessels/vessel.service';
 import {
@@ -561,7 +561,20 @@ export async function getCompanyById(id: string) {
     responsibleUserName = userRow?.name ?? null;
   }
 
-  return { ...row, responsibleUserName };
+  // Compute credit limit from actual credit lines (not just the manual column).
+  // The counterparties.creditLimit column is only synced when a credit application
+  // is approved. If credit lines were created directly, we need to aggregate them.
+  const creditLineRows = await db
+    .select({ creditAmount: creditLines.creditAmount })
+    .from(creditLines)
+    .innerJoin(creditLineCounterparties, eq(creditLineCounterparties.creditLineId, creditLines.id))
+    .where(eq(creditLineCounterparties.counterpartyId, id));
+  const computedCreditLimit = creditLineRows.reduce((sum, r) => sum + (parseFloat(r.creditAmount) || 0), 0);
+  const manualCreditLimit = parseFloat(row.creditLimit ?? '0') || 0;
+  // Use the higher of: manual column or sum of credit lines
+  const effectiveCreditLimit = Math.max(computedCreditLimit, manualCreditLimit);
+
+  return { ...row, responsibleUserName, creditLimit: effectiveCreditLimit.toFixed(2) };
 }
 
 // ═══════════════════════════════════════════════════════════════════════
