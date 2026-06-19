@@ -13,7 +13,6 @@ import { dirname, join } from 'node:path';
 import { db } from '../../db';
 import { bankAccounts, orders, orderItems, counterparties, vessels, places, invoices, users, priceReferences, tenants } from '../../db/schema';
 import type { TenantSettings } from '../../db/schema';
-import { createPdfBuffer } from './document-pdf.service';
 import {
   getCompanyRegistrationNumber, loadBankDetails, tryLoadLogoDataUrl,
   formatCustomerPaymentTerms, formatStoredDateOnlyForDisplay,

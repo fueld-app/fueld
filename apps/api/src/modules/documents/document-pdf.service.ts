@@ -41,7 +41,7 @@ export function createPdfBuffer(docDefinition: TDocumentDefinitions): Promise<Bu
 export function phoneTextNode(
   label: string,
   phone: string,
-  opts: { fontSize?: number; margin?: number[] } = {},
+  opts: { fontSize?: number; margin?: [number, number, number, number] } = {},
 ): Content {
   return {
     text: `${label}: ${phone}`,
@@ -53,7 +53,7 @@ export function phoneTextNode(
 export function emailTextNode(
   label: string,
   email: string,
-  opts: { fontSize?: number; margin?: number[] } = {},
+  opts: { fontSize?: number; margin?: [number, number, number, number] } = {},
 ): Content {
   return {
     text: `${label}: ${email}`,
