@@ -220,6 +220,29 @@ export function formatStoredDateOnlyForInput(iso: string | null): string {
   return `${year}-${month}-${day}`;
 }
 
+/**
+ * Format a stored UTC ISO date as a date-only input value (YYYY-MM-DD)
+ * interpreted in the given timezone rather than UTC.
+ */
+export function formatStoredDateOnlyForInputZoned(iso: string | null, timeZone: string): string {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  // Use the existing formatDateTimeForInput and strip the time part
+  return formatDateTimeForInput(date, timeZone).split('T')[0] ?? '';
+}
+
+/**
+ * Convert a date-only input value (YYYY-MM-DD) interpreted in the given
+ * timezone to a UTC ISO string.  Noon in that timezone is used to avoid
+ * midnight edge cases.
+ */
+export function toUtcIsoFromZonedDateInput(dateStr: string, timeZone: string): string {
+  if (!dateStr) return '';
+  // Interpret the date as noon in the given timezone
+  return toUtcIsoFromZonedInput(`${dateStr}T12:00`, timeZone);
+}
+
 export function formatFileSize(size: number): string {
   if (!size) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB'];

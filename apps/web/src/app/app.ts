@@ -2,6 +2,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { AppUpdateService } from './core/pwa/app-update.service';
 import { PushService } from './core/pwa/push.service';
+import { DateFormatService } from './core/services/date-format.service';
 
 @Component({
   selector: 'app-root',
@@ -12,11 +13,13 @@ import { PushService } from './core/pwa/push.service';
 export class App implements OnInit {
   private readonly appUpdate = inject(AppUpdateService);
   private readonly push = inject(PushService);
+  private readonly dateFormatSvc = inject(DateFormatService);
 
   ngOnInit(): void {
     this.initViewportHeightFix();
     this.appUpdate.init();
     this.push.init();
+    this.dateFormatSvc.load();
   }
 
   private initViewportHeightFix(): void {

@@ -16,11 +16,12 @@ import { WebSocketService } from '../../core/websocket/websocket.service';
 import { API_URL } from '../../core/config/api';
 import type { PasskeyDto, ApiResponse } from '@fueld/types';
 import { TwoFactorSetupProfileCardComponent } from './two-factor-setup-profile-card.component';
+import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
 
 @Component({
   selector: 'app-two-factor-setup-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, DatePipe, TwoFactorSetupProfileCardComponent],
+  imports: [DateLabelPipe, FormsModule, DatePipe, TwoFactorSetupProfileCardComponent],
   template: `
     <div class="mx-auto">
       @if (auth.mfaSetupRequired()) {
@@ -440,9 +441,9 @@ import { TwoFactorSetupProfileCardComponent } from './two-factor-setup-profile-c
                     } @else {
                       <p class="text-sm font-medium text-gray-900 truncate">{{ pk.friendlyName }}</p>
                       <p class="text-xs text-gray-500">
-                        Added {{ pk.createdAt | date:'mediumDate' }}
+                        Added {{ pk.createdAt | dateLabel }}
                         @if (pk.lastUsedAt) {
-                           · Last used {{ pk.lastUsedAt | date:'mediumDate' }}
+                           · Last used {{ pk.lastUsedAt | dateLabel }}
                         }
                         @if (pk.backedUp) {
                           <span class="ml-1 inline-flex items-center rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">Synced</span>

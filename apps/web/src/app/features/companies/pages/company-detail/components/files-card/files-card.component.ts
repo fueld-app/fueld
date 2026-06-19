@@ -6,11 +6,12 @@ import { DatePipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
 import type { ApiResponse, CompanyAttachmentDto } from '@fueld/types';
 import { API } from '@app/core/config/api';
+import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
 
 @Component({
   selector: 'app-files-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe],
+  imports: [DateLabelPipe, DatePipe],
   template: `
     <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-[10]">
       <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
@@ -60,7 +61,7 @@ import { API } from '@app/core/config/api';
                     class="truncate max-w-full text-left font-medium text-brand-700 hover:text-brand-900 hover:underline">{{ a.fileName }}</button>
                   <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400">
                     <span>{{ formatFileSize(a.fileSize) }}</span>
-                    <span>{{ a.createdAt | date:'mediumDate' }}</span>
+                    <span>{{ a.createdAt | dateLabel }}</span>
                     @if (a.mimeType) { <span>{{ a.mimeType }}</span> }
                   </div>
                 </div>

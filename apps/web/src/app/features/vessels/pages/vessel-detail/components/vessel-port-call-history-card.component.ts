@@ -1,11 +1,12 @@
 import { Component, ChangeDetectionStrategy, input, output } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { flagFromIso3 } from '@app/shared/utils/flags';
+import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
 
 @Component({
   selector: 'app-vessel-port-call-history-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe],
+  imports: [DateLabelPipe, DatePipe],
   template: `
     <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:h-[449px] min-[900px]:flex min-[900px]:flex-col overflow-hidden">
       <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
@@ -50,8 +51,8 @@ import { flagFromIso3 } from '@app/shared/utils/flags';
                     }
                   </td>
                   <td class="px-5 py-2.5 text-gray-600">{{ movementFlag(m) }} {{ m.countryName ?? m.place?.country?.name ?? '—' }}</td>
-                  <td class="px-5 py-2.5 text-gray-600">{{ m.from ? (m.from | date:'mediumDate') : '—' }}</td>
-                  <td class="px-5 py-2.5 text-gray-600">{{ m.to ? (m.to | date:'mediumDate') : '—' }}</td>
+                  <td class="px-5 py-2.5 text-gray-600">{{ m.from ? (m.from | dateLabel) : '—' }}</td>
+                  <td class="px-5 py-2.5 text-gray-600">{{ m.to ? (m.to | dateLabel) : '—' }}</td>
                   <td class="px-5 py-2.5 text-gray-600">
                     @if (m.durationHumanized) {
                       {{ m.durationHumanized }}

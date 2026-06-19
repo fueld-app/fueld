@@ -240,6 +240,7 @@ import type {
                   [unitOptions]="unitOptions()"
                   [plattsMatches]="plattsMatches(row.id)"
                   [plattsEntryId]="row.costPlattsEntryId"
+                  [decimalPrecision]="decimalPrecisionInput()"
                   (fieldChange)="onPricingFieldChange(i, 'cost', $event)"
                   (plattsSelect)="selectPlattsMatch(i, 'cost', $event)"
                 />
@@ -257,6 +258,7 @@ import type {
                   [unitOptions]="unitOptions()"
                   [plattsMatches]="plattsMatches(row.id)"
                   [plattsEntryId]="row.salesPlattsEntryId"
+                  [decimalPrecision]="decimalPrecisionInput()"
                   (fieldChange)="onPricingFieldChange(i, 'sales', $event)"
                   (plattsSelect)="selectPlattsMatch(i, 'sales', $event)"
                 />
@@ -302,12 +304,26 @@ import type {
               >
                 @if (isFormulaUnfinalized(row)) {
                   <span class="italic text-amber-600 text-xs">TBD</span>
-                } @else {
+                } @else if (readonly()) {
                   @if (row.taxRate != null) {
                     <span class="text-xs text-gray-500">{{ row.taxRate | number:'1.2-2' }}%</span>
                     <div>{{ row.taxAmount ?? 0 | number:'1.2-2' }}</div>
                   } @else {
                     <span class="text-gray-400 text-xs">—</span>
+                  }
+                } @else {
+                  <select
+                    [ngModel]="row.taxRate ?? ''"
+                    (ngModelChange)="onTaxRateChange(i, $event)"
+                    class="order-item-inline-select cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-700 hover:text-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-500/20 rounded"
+                  >
+                    <option value="">None</option>
+                    @for (rate of taxRatesInput(); track rate.id) {
+                      <option [value]="rate.rate">{{ rate.name }} ({{ rate.rate | number:'1.2-2' }}%)</option>
+                    }
+                  </select>
+                  @if (row.taxRate != null) {
+                    <div class="text-xs text-gray-500">{{ row.taxAmount ?? 0 | number:'1.2-2' }}</div>
                   }
                 }
               </td>
@@ -589,6 +605,7 @@ import type {
                 [unitOptions]="unitOptions()"
                 [plattsMatches]="plattsMatches(row.id)"
                 [plattsEntryId]="row.costPlattsEntryId"
+                [decimalPrecision]="decimalPrecisionInput()"
                 (fieldChange)="onPricingFieldChange(i, 'cost', $event)"
                 (plattsSelect)="selectPlattsMatch(i, 'cost', $event)"
               />
@@ -607,6 +624,7 @@ import type {
                 [unitOptions]="unitOptions()"
                 [plattsMatches]="plattsMatches(row.id)"
                 [plattsEntryId]="row.salesPlattsEntryId"
+                [decimalPrecision]="decimalPrecisionInput()"
                 (fieldChange)="onPricingFieldChange(i, 'sales', $event)"
                 (plattsSelect)="selectPlattsMatch(i, 'sales', $event)"
               />
@@ -651,6 +669,37 @@ import type {
                 >
                   {{ netProfitForRow(row) | number:'1.2-2' }}
                 </span>
+              }
+            </div>
+            }
+
+            <!-- Tax (mobile) -->
+            @if (canSeePrices()) {
+            <div>
+              <label class="mb-1 block text-xs font-medium text-gray-500">Tax</label>
+              @if (isFormulaUnfinalized(row)) {
+                <span class="text-xs italic text-amber-600">TBD</span>
+              } @else if (readonly()) {
+                @if (row.taxRate != null) {
+                  <span class="text-xs text-gray-500">{{ row.taxRate | number:'1.2-2' }}%</span>
+                  <span class="block text-sm font-medium tabular-nums">{{ row.taxAmount ?? 0 | number:'1.2-2' }}</span>
+                } @else {
+                  <span class="text-gray-400 text-xs">—</span>
+                }
+              } @else {
+                <select
+                  [ngModel]="row.taxRate ?? ''"
+                  (ngModelChange)="onTaxRateChange(i, $event)"
+                  class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm bg-white focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                >
+                  <option value="">None</option>
+                  @for (rate of taxRatesInput(); track rate.id) {
+                    <option [value]="rate.rate">{{ rate.name }} ({{ rate.rate | number:'1.2-2' }}%)</option>
+                  }
+                </select>
+                @if (row.taxRate != null) {
+                  <span class="block text-xs text-gray-500 mt-1">{{ row.taxAmount ?? 0 | number:'1.2-2' }} {{ baseCurrency() }}</span>
+                }
               }
             </div>
             }
@@ -757,6 +806,7 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
   readonly catalogItemsInput = input<{ name: string; description?: string; defaultUnit?: string; defaultCostPrice?: number; defaultSalesPrice?: number; defaultTaxRateId?: string }[]>([]);
   readonly defaultUnitInput = input<string>('MT');
   readonly taxRatesInput = input<{ id: string; name: string; rate: number }[]>([]);
+  readonly decimalPrecisionInput = input<number>(5);
   /** Map of order-item row id → availability check result (controlled by parent). */
   readonly availabilityByRowId = input<Record<string, OrderItemAvailability>>({});
   readonly itemsChange = output<OrderItemRow[]>();
@@ -978,6 +1028,22 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
 
   removeRow(index: number): void {
     this.rows.update((prev) => prev.filter((_, i) => i !== index));
+    this.emitChange();
+  }
+
+  /** Handle tax-rate dropdown change — stores the numeric rate and recalculates tax amount. */
+  onTaxRateChange(index: number, value: string | number): void {
+    const rate = value === '' || value == null ? null : Number(value);
+    this.rows.update((prev) => {
+      const updated = [...prev];
+      const row = { ...updated[index]! };
+      row.taxRate = rate;
+      // Recalculate tax amount if we have a profit base
+      const base = this.computeRevenueBase(row) - this.computeCostBase(row);
+      row.taxAmount = rate != null ? +(base * rate).toFixed(2) : null;
+      updated[index] = row;
+      return updated;
+    });
     this.emitChange();
   }
 

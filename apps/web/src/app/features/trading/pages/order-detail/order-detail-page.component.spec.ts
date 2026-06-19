@@ -287,23 +287,28 @@ describe('OrderDetailPageComponent', () => {
     expect(payload[0]?.quantityMax).toBe('300');
   });
 
-  it('keeps ETA min date aligned with the stored calendar day for positive-offset ports', async () => {
+  it('formats ETA min date in the port timezone for positive-offset ports', async () => {
     const { component } = await createComponent();
 
     component.port.set({ timezone: 'Pacific/Fiji' } as any);
     component.order.set({ eta: '2026-04-11T12:00:00.000Z' } as any);
 
-    expect(component.etaMinDateTime()).toBe('2026-04-11');
+    // Pacific/Fiji is UTC+12, so 2026-04-11T12:00:00Z = 2026-04-12T00:00 in Fiji.
+    // The date input should show the local (Fiji) calendar day, not the UTC day.
+    expect(component.etaMinDateTime()).toBe('2026-04-12');
   });
 
-  it('keeps delivered-at input aligned with the stored calendar day for positive-offset ports', async () => {
+  it('formats delivered-at input in the port timezone for positive-offset ports', async () => {
     const { component } = await createComponent();
 
     component.port.set({ timezone: 'Pacific/Fiji' } as any);
     component.order.set({ deliveredAt: '2026-04-11T12:00:00.000Z' } as any);
 
-    expect(component.deliveredAtLocal()).toBe('2026-04-11');
-    expect(component.formatStoredDateOnlyLabel('2026-04-11T12:00:00.000Z')).toBe('11 Apr 2026');
+    // Pacific/Fiji is UTC+12, so 2026-04-11T12:00:00Z = 2026-04-12T00:00 in Fiji.
+    // The date input should show the local (Fiji) calendar day, not the UTC day.
+    expect(component.deliveredAtLocal()).toBe('2026-04-12');
+    // formatStoredDateOnlyLabel uses the DateFormatService (defaults to ISO).
+    expect(component.formatStoredDateOnlyLabel('2026-04-11T12:00:00.000Z')).toBe('2026-04-11');
   });
 
   it('passes the current order eta into the send inquiry modal defaults request', async () => {

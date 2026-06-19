@@ -25,6 +25,8 @@ import {
   updateFollowUpSettings,
   getTimezoneSettings,
   updateTimezoneSettings,
+  getCostSalesDecimalPrecision,
+  updateCostSalesDecimalPrecision,
   getVesselCompanyRoleSettings,
   updateVesselCompanyRoleSettings,
   getUserCompanyAccess,
@@ -423,4 +425,37 @@ export const settingsOperationsController = new Elysia()
     }
   }, {
     detail: { tags: ['Admin Settings'], summary: 'Get timezone setting for current tenant' },
+  })
+
+  // ═════════════════════════════════════════════════════════════
+  //  COST / SALES DECIMAL PRECISION
+  // ═════════════════════════════════════════════════════════════
+
+  .get('/cost-sales-precision', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getCostSalesDecimalPrecision();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get cost/sales decimal precision' },
+  })
+
+  .put('/cost-sales-precision', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateCostSalesDecimalPrecision(body);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      precision: t.Number({ minimum: 0, maximum: 10 }),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update cost/sales decimal precision' },
   });

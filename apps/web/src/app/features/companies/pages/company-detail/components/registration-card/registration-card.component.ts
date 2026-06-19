@@ -1,5 +1,6 @@
 import { Component, ChangeDetectionStrategy, input, output, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
 
 interface HierarchyNode {
   level: number;
@@ -34,7 +35,7 @@ interface HierarchyResponse {
 @Component({
   selector: 'app-registration-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe],
+  imports: [DateLabelPipe, DatePipe],
   template: `
     <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-8 flex flex-col overflow-hidden">
       <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
@@ -61,7 +62,7 @@ interface HierarchyResponse {
                 <div class="flex justify-between"><span class="text-gray-500">Registry</span><span class="font-medium text-gray-900">{{ reg.registryName }}</span></div>
               }
               @if (reg.incorporationDate) {
-                <div class="flex justify-between"><span class="text-gray-500">Incorporated</span><span class="font-medium text-gray-900">{{ reg.incorporationDate | date:'mediumDate' }}</span></div>
+                <div class="flex justify-between"><span class="text-gray-500">Incorporated</span><span class="font-medium text-gray-900">{{ reg.incorporationDate | dateLabel }}</span></div>
               }
               @for (r of reg.registrationNumbers; track $index) {
                 @if (r.value) {

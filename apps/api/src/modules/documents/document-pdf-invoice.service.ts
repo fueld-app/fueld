@@ -22,6 +22,7 @@ import {
   formatPhoneDisplay, splitAddressLines, computeDueDate, formatIssuedAtUtc,
 } from './document-utils.service';
 import { createDocumentRevision, getRevisionAbsolutePath, mapRevisionInfo } from './document-revision.service';
+import { getDateFormatSettings, getCostSalesDecimalPrecision } from '../admin/settings.service';
 import type { DocumentRevisionInfo, BankDetails, DocumentPrintMeta, DocumentType } from './document.types';
 import { DEFAULT_BANK_DETAILS } from './document.types';
 
@@ -99,7 +100,7 @@ export function buildInvoiceDocument(data: {
       { text: item.productType },
       { text: formatNumberCompact(item.quantity, 3), alignment: 'right' },
       { text: item.unit },
-      { text: formatNumber(item.salesPrice, 4), alignment: 'right' },
+      { text: formatNumber(item.salesPrice, 2, data.costSalesDecimalPrecision ?? undefined), alignment: 'right' },
       { text: formatNumber(String(lineTotal), 2), alignment: 'right' },
     ];
   });
@@ -380,7 +381,7 @@ export function buildInvoiceDocument(data: {
             margin: [0, 6, 0, 0] as [number, number, number, number],
           },
           ...(data.printMeta ? [{
-            text: `Issued (UTC): ${formatIssuedAtUtc(data.printMeta.issuedAt)}   Revision: ${data.printMeta.revisionNumber}   Ref: ${data.printMeta.verificationRef}   Fingerprint: ${data.printMeta.fingerprintShort}`,
+            text: `Issued (UTC): ${formatIssuedAtUtc(data.printMeta.issuedAt, data.dateFormat ?? undefined)}   Revision: ${data.printMeta.revisionNumber}   Ref: ${data.printMeta.verificationRef}   Fingerprint: ${data.printMeta.fingerprintShort}`,
             fontSize: 7,
             color: '#6b7280',
             alignment: 'center',
@@ -423,6 +424,8 @@ export function buildInvoiceDocument(data: {
 export async function generateInvoicePdfBuffer(invoiceId: string): Promise<Buffer> {
   const invoice = await fetchInvoiceData(invoiceId);
   const order = invoice.order;
+  const { dateFormat } = await getDateFormatSettings();
+  const { precision: costSalesDecimalPrecision } = await getCostSalesDecimalPrecision();
 
   const bank = await loadOrderBankDetails(order.bankAccountId, order.invoicingCompanyId);
 
@@ -472,6 +475,8 @@ export async function generateInvoicePdfBuffer(invoiceId: string): Promise<Buffe
     eta: order.eta?.toISOString() ?? null,
     etd: order.etd?.toISOString() ?? null,
     timezone: order.place.timezone ?? null,
+    dateFormat: dateFormat,
+    costSalesDecimalPrecision: costSalesDecimalPrecision,
     currency: order.currency ?? 'USD',
     fromName: order.salesRep?.name ?? null,
     fromEmail: order.salesRep?.email ?? null,
@@ -535,6 +540,8 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
   revision: DocumentRevisionInfo;
 }> {
   const order = await fetchOrderForInvoice(orderId);
+  const { dateFormat } = await getDateFormatSettings();
+  const { precision: costSalesDecimalPrecision } = await getCostSalesDecimalPrecision();
 
   // Find the first invoice or generate a preview number
   const invoice = order.invoices?.[0];
@@ -612,6 +619,8 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
     eta: order.eta?.toISOString() ?? null,
     etd: order.etd?.toISOString() ?? null,
     timezone: order.place.timezone ?? null,
+    dateFormat: dateFormat,
+    costSalesDecimalPrecision: costSalesDecimalPrecision,
     currency: order.currency ?? 'USD',
     fromName: order.salesRep?.name ?? null,
     fromEmail: order.salesRep?.email ?? null,
@@ -724,6 +733,8 @@ export function buildProformaDocument(data: {
   eta: string | null;
   etd: string | null;
   timezone: string | null;
+  dateFormat: string | null;
+  costSalesDecimalPrecision: number | null;
   currency: string;
   fromName: string | null;
   fromEmail: string | null;
@@ -852,10 +863,10 @@ export function buildProformaDocument(data: {
   let deliveryDateStr = '';
   if (data.eta) {
     const hasRange = !!data.etd;
-    const fmtEta = formatDateTimeForDisplay(data.eta, data.timezone, hasRange);
+    const fmtEta = formatDateTimeForDisplay(data.eta, data.timezone, hasRange, data.dateFormat ?? undefined);
     deliveryDateStr = fmtEta ?? data.eta;
     if (data.etd) {
-      const fmtEtd = formatDateTimeForDisplay(data.etd, data.timezone);
+      const fmtEtd = formatDateTimeForDisplay(data.etd, data.timezone, false, data.dateFormat ?? undefined);
       deliveryDateStr += ` to ${fmtEtd ?? data.etd}`;
     }
   }
@@ -948,7 +959,7 @@ export function buildProformaDocument(data: {
           margin: [0, 8, 0, 0] as [number, number, number, number],
         },
         ...(data.printMeta ? [{
-          text: `Issued (UTC): ${formatIssuedAtUtc(data.printMeta.issuedAt)}   Revision: ${data.printMeta.revisionNumber}   Ref: ${data.printMeta.verificationRef}   Fingerprint: ${data.printMeta.fingerprintShort}`,
+          text: `Issued (UTC): ${formatIssuedAtUtc(data.printMeta.issuedAt, data.dateFormat ?? undefined)}   Revision: ${data.printMeta.revisionNumber}   Ref: ${data.printMeta.verificationRef}   Fingerprint: ${data.printMeta.fingerprintShort}`,
           fontSize: 7,
           color: '#6b7280',
           alignment: 'center',
@@ -1167,6 +1178,8 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
   revision: DocumentRevisionInfo;
 }> {
   const order = await fetchOrderForInvoice(orderId);
+  const { dateFormat } = await getDateFormatSettings();
+  const { precision: costSalesDecimalPrecision } = await getCostSalesDecimalPrecision();
   const existingRevision = await getLatestDocumentRevisionByStream({
     documentType: 'PROFORMA_INVOICE',
     orderId: order.id,
@@ -1227,6 +1240,8 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
     eta: order.eta?.toISOString() ?? null,
     etd: order.etd?.toISOString() ?? null,
     timezone: order.place.timezone ?? null,
+    dateFormat: dateFormat,
+    costSalesDecimalPrecision: costSalesDecimalPrecision,
     currency: order.currency ?? 'USD',
     fromName: order.salesRep?.name ?? null,
     fromEmail: order.salesRep?.email ?? null,

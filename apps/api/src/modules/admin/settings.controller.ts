@@ -80,6 +80,10 @@ import {
   updateFollowUpSettings,
   getTimezoneSettings,
   updateTimezoneSettings,
+  getCostSalesDecimalPrecision,
+  updateCostSalesDecimalPrecision,
+  getDateFormatSettings,
+  updateDateFormatSettings,
 } from './settings.service';
 import { reloadCurrencies } from '../prices/price.service';
 import {
@@ -599,6 +603,18 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     }
   }, {
     detail: { tags: ['Admin Settings'], summary: 'Get timezone setting for current tenant' },
+  })
+
+  .get('/my-cost-sales-precision', async () => {
+    try {
+      const data = await getCostSalesDecimalPrecision();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get cost/sales decimal precision for current tenant' },
   })
 
   // ── Integrations ────────────────────────────────────────────────
@@ -2199,4 +2215,82 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       defaultTimezone: t.Optional(t.Nullable(t.String())),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update timezone setting' },
+  })
+
+  // ═════════════════════════════════════════════════════════════
+  //  COST / SALES DECIMAL PRECISION
+  // ═════════════════════════════════════════════════════════════
+
+  .get('/cost-sales-precision', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getCostSalesDecimalPrecision();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get cost/sales decimal precision' },
+  })
+
+  .put('/cost-sales-precision', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateCostSalesDecimalPrecision(body);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      precision: t.Number({ minimum: 0, maximum: 10 }),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update cost/sales decimal precision' },
+  })
+
+  // ═════════════════════════════════════════════════════════════
+  //  DATE FORMAT SETTINGS
+  // ═════════════════════════════════════════════════════════════
+
+  .get('/date-format', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getDateFormatSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get date format setting' },
+  })
+
+  .put('/date-format', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateDateFormatSettings(body);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      dateFormat: t.Union([t.Literal('AMERICAN'), t.Literal('EUROPEAN'), t.Literal('ISO')]),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update date format setting' },
+  })
+
+  .get('/my-date-format', async () => {
+    try {
+      const data = await getDateFormatSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get date format for current tenant' },
   });

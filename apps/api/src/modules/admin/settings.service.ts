@@ -1288,6 +1288,9 @@ export const DEFAULT_RESPONSE_DEADLINE_HOURS = 48;
 export const DEFAULT_NOTIFY_QUOTE_SUBMIT_EMAIL = false;
 export const DEFAULT_NOTIFY_QUOTE_SUBMIT_PUSH = false;
 export const DEFAULT_NOTIFY_QUOTE_SUBMIT_WHATSAPP = false;
+export const DEFAULT_COST_SALES_DECIMAL_PRECISION = 5;
+export const DEFAULT_DATE_FORMAT = 'ISO' as const;
+export type DateFormatSetting = 'AMERICAN' | 'EUROPEAN' | 'ISO';
 
 export interface InquirySettings {
   supplierResponseUrlEnabled: boolean;
@@ -1929,4 +1932,38 @@ export async function updateTimezoneSettings(data: { defaultTimezone?: string | 
     .where(eq(tenants.id, tenant.id));
 
   return getTimezoneSettings();
+}
+
+export async function getCostSalesDecimalPrecision(): Promise<{ precision: number }> {
+  const [tenant] = await db.select({ id: tenants.id, settings: tenants.settings }).from(tenants).limit(1);
+  const settings = (tenant?.settings ?? {}) as TenantSettings;
+  return { precision: settings.costSalesDecimalPrecision ?? DEFAULT_COST_SALES_DECIMAL_PRECISION };
+}
+
+export async function updateCostSalesDecimalPrecision(data: { precision?: number }): Promise<{ precision: number }> {
+  const [tenant] = await db.select({ id: tenants.id, settings: tenants.settings }).from(tenants).limit(1);
+  const settings = (tenant?.settings ?? {}) as TenantSettings;
+  settings.costSalesDecimalPrecision = data.precision ?? DEFAULT_COST_SALES_DECIMAL_PRECISION;
+  await db
+    .update(tenants)
+    .set({ settings, updatedAt: new Date() })
+    .where(eq(tenants.id, tenant.id));
+  return getCostSalesDecimalPrecision();
+}
+
+export async function getDateFormatSettings(): Promise<{ dateFormat: DateFormatSetting }> {
+  const [tenant] = await db.select({ id: tenants.id, settings: tenants.settings }).from(tenants).limit(1);
+  const settings = (tenant?.settings ?? {}) as TenantSettings;
+  return { dateFormat: (settings.dateFormat as DateFormatSetting) ?? DEFAULT_DATE_FORMAT };
+}
+
+export async function updateDateFormatSettings(data: { dateFormat?: DateFormatSetting }): Promise<{ dateFormat: DateFormatSetting }> {
+  const [tenant] = await db.select({ id: tenants.id, settings: tenants.settings }).from(tenants).limit(1);
+  const settings = (tenant?.settings ?? {}) as TenantSettings;
+  settings.dateFormat = data.dateFormat ?? DEFAULT_DATE_FORMAT;
+  await db
+    .update(tenants)
+    .set({ settings, updatedAt: new Date() })
+    .where(eq(tenants.id, tenant.id));
+  return getDateFormatSettings();
 }

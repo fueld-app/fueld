@@ -29,6 +29,7 @@ import {
 } from '../../core/runtime/app-health.service';
 
 import { API } from '@app/core/config/api';
+import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
 
 interface CommodityPrice {
   ticker: string;
@@ -283,7 +284,7 @@ const NAVIGATION: NavItem[] = [
 @Component({
   selector: 'app-main-layout',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, UserMenuComponent, DecimalPipe, DatePipe],
+  imports: [DateLabelPipe, RouterOutlet, RouterLink, RouterLinkActive, UserMenuComponent, DecimalPipe, DatePipe],
   template: `
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <!--  Mobile Overlay Backdrop                                       -->
@@ -735,7 +736,7 @@ const NAVIGATION: NavItem[] = [
                   @if (rfq.eta) {
                     <div class="flex items-center gap-1.5 text-sm">
                       <span class="text-gray-400 w-4 text-center">📅</span>
-                      <span class="text-gray-700">{{ rfq.eta | date:'mediumDate' }}</span>
+                      <span class="text-gray-700">{{ rfq.eta | dateLabel }}</span>
                     </div>
                   }
                 </div>

@@ -48,13 +48,26 @@ export class OrderPortDocumentationService {
     }
   }
 
-  async previewBunkerInstructions(orderId: string): Promise<void> {
+  private bunkerSupplierQuery(orderSupplierId?: string | null): string {
+    return orderSupplierId ? `?orderSupplierId=${encodeURIComponent(orderSupplierId)}` : '';
+  }
+
+  private async postGenerateBunker(orderId: string, orderSupplierId?: string | null): Promise<void> {
+    const res = await firstValueFrom(
+      this.http.post<ApiResponse<OrderPortDocumentDto>>(`${API_URL}/orders/${orderId}/port-documentation/bunker-instructions/generate${this.bunkerSupplierQuery(orderSupplierId)}`, {}),
+    );
+    if (!res.success) {
+      throw new Error(res.message ?? 'Request failed');
+    }
+  }
+
+  async previewBunkerInstructions(orderId: string, orderSupplierId?: string | null): Promise<void> {
     if (!orderId) return;
 
     this.portDocumentationAction.set('preview-bunker');
     try {
       const res = await firstValueFrom(
-        this.http.get<ApiResponse<BunkerInstructionsPreviewDto>>(`${API_URL}/orders/${orderId}/port-documentation/bunker-instructions/preview`),
+        this.http.get<ApiResponse<BunkerInstructionsPreviewDto>>(`${API_URL}/orders/${orderId}/port-documentation/bunker-instructions/preview${this.bunkerSupplierQuery(orderSupplierId)}`),
       );
       if (!res.success) {
         return;
@@ -67,13 +80,13 @@ export class OrderPortDocumentationService {
     }
   }
 
-  async generateBunkerInstructions(orderId: string): Promise<void> {
+  async generateBunkerInstructions(orderId: string, orderSupplierId?: string | null): Promise<void> {
     await this.runMutation(
       orderId,
       'generate-bunker',
       'Bunker Instructions generated.',
       'Failed to generate Bunker Instructions.',
-      () => this.postDocument(orderId, 'bunker-instructions/generate'),
+      () => this.postGenerateBunker(orderId, orderSupplierId),
     );
   }
 
@@ -116,20 +129,32 @@ export class OrderPortDocumentationService {
     }
   }
 
-  async ensureReadyForSend(orderId: string): Promise<boolean> {
+  async ensureReadyForSend(orderId: string, orderSupplierId?: string | null): Promise<boolean> {
     let currentContext = this.portDocumentationContext();
     if (!currentContext) {
       await this.load(orderId);
       currentContext = this.portDocumentationContext();
     }
 
-    if (this.getActiveDocumentCount(currentContext) > 0) return true;
+    if (this.getActiveDocumentCount(currentContext) > 0) {
+      // Documents already exist. When a specific supplier tab is active, refresh
+      // the bunker instructions so the sent Excel reflects that supplier rather
+      // than the previously-generated (possibly primary-supplier) document.
+      if (orderSupplierId) {
+        try {
+          await this.postGenerateBunker(orderId, orderSupplierId);
+        } catch {
+          // ignore — keep the existing document
+        }
+      }
+      return true;
+    }
 
     if (!currentContext?.enabled) {
       return false;
     }
 
-    const generatedCount = await this.prepareForSend(orderId);
+    const generatedCount = await this.prepareForSend(orderId, orderSupplierId);
     if (generatedCount > 0) {
       return true;
     }
@@ -137,11 +162,11 @@ export class OrderPortDocumentationService {
     return false;
   }
 
-  private async prepareForSend(orderId: string): Promise<number> {
+  private async prepareForSend(orderId: string, orderSupplierId?: string | null): Promise<number> {
     const context = this.portDocumentationContext();
     const operations: Array<() => Promise<void>> = [];
 
-    operations.push(() => this.postDocument(orderId, 'bunker-instructions/generate'));
+    operations.push(() => this.postGenerateBunker(orderId, orderSupplierId));
     if ((context?.gateListCount ?? 0) > 0) {
       operations.push(() => this.postDocument(orderId, 'gate-list/generate'));
     }

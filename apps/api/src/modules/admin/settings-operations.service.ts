@@ -29,6 +29,9 @@ export const DEFAULT_RESPONSE_DEADLINE_HOURS = 48;
 export const DEFAULT_NOTIFY_QUOTE_SUBMIT_EMAIL = false;
 export const DEFAULT_NOTIFY_QUOTE_SUBMIT_PUSH = false;
 export const DEFAULT_NOTIFY_QUOTE_SUBMIT_WHATSAPP = false;
+export const DEFAULT_COST_SALES_DECIMAL_PRECISION = 5;
+export const DEFAULT_DATE_FORMAT = 'ISO' as const;
+export type DateFormatSetting = 'AMERICAN' | 'EUROPEAN' | 'ISO';
 
 // ─── Order Number Settings ─────────────────────────────────────────
 
@@ -246,4 +249,22 @@ export async function getTimezoneSettings(): Promise<{ defaultTimezone: string |
 
 export async function updateTimezoneSettings(data: { defaultTimezone?: string | null }): Promise<{ defaultTimezone: string | null }> {
   return { defaultTimezone: await updateTenantField('defaultTimezone', data.defaultTimezone ?? null) };
+}
+
+export async function getCostSalesDecimalPrecision(): Promise<{ precision: number }> {
+  const { settings } = await getTenantSettingsRow();
+  return { precision: settings.costSalesDecimalPrecision ?? DEFAULT_COST_SALES_DECIMAL_PRECISION };
+}
+
+export async function updateCostSalesDecimalPrecision(data: { precision?: number }): Promise<{ precision: number }> {
+  return { precision: await updateTenantField('costSalesDecimalPrecision', data.precision ?? DEFAULT_COST_SALES_DECIMAL_PRECISION) };
+}
+
+export async function getDateFormatSettings(): Promise<{ dateFormat: DateFormatSetting }> {
+  const { settings } = await getTenantSettingsRow();
+  return { dateFormat: (settings.dateFormat as DateFormatSetting) ?? DEFAULT_DATE_FORMAT };
+}
+
+export async function updateDateFormatSettings(data: { dateFormat?: DateFormatSetting }): Promise<{ dateFormat: DateFormatSetting }> {
+  return { dateFormat: await updateTenantField('dateFormat', data.dateFormat ?? DEFAULT_DATE_FORMAT) };
 }

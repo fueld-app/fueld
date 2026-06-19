@@ -215,10 +215,10 @@ export const portDocumentationController = new Elysia()
     detail: { tags: ['Port Documentation'], summary: 'Get Port Documentation order context' },
   })
 
-  .get('/orders/:id/port-documentation/bunker-instructions/preview', async ({ auth, params }) => {
+  .get('/orders/:id/port-documentation/bunker-instructions/preview', async ({ auth, params, query }) => {
     try {
       await assertPortDocumentationEnabled(auth.tenantId);
-      const data = await getBunkerInstructionsPreview(auth.tenantId, params.id);
+      const data = await getBunkerInstructionsPreview(auth.tenantId, params.id, query.orderSupplierId || undefined);
       return { success: true, data } satisfies ApiResponse<unknown>;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed';
@@ -226,13 +226,14 @@ export const portDocumentationController = new Elysia()
     }
   }, {
     params: t.Object({ id: t.String() }),
+    query: t.Object({ orderSupplierId: t.Optional(t.String()) }),
     detail: { tags: ['Port Documentation'], summary: 'Preview bunker instructions content for an order' },
   })
 
-  .post('/orders/:id/port-documentation/bunker-instructions/generate', async ({ auth, params }) => {
+  .post('/orders/:id/port-documentation/bunker-instructions/generate', async ({ auth, params, query }) => {
     try {
       await assertPortDocumentationEnabled(auth.tenantId);
-      const data = await generateBunkerInstructionsDocument(auth.tenantId, params.id, auth.sub);
+      const data = await generateBunkerInstructionsDocument(auth.tenantId, params.id, auth.sub, query.orderSupplierId || undefined);
       await logActivity({
         tenantId: auth.tenantId,
         userId: auth.sub,
@@ -240,7 +241,7 @@ export const portDocumentationController = new Elysia()
         entityType: 'order_port_document',
         entityId: data.document.id,
         entityName: data.fileName,
-        metadata: { documentKind: 'BUNKER_INSTRUCTIONS', orderId: params.id },
+        metadata: { documentKind: 'BUNKER_INSTRUCTIONS', orderId: params.id, orderSupplierId: query.orderSupplierId ?? null },
       });
       return { success: true, data: data.document } satisfies ApiResponse<unknown>;
     } catch (err) {
@@ -249,6 +250,7 @@ export const portDocumentationController = new Elysia()
     }
   }, {
     params: t.Object({ id: t.String() }),
+    query: t.Object({ orderSupplierId: t.Optional(t.String()) }),
     detail: { tags: ['Port Documentation'], summary: 'Generate bunker instructions XLSX for an order' },
   })
 

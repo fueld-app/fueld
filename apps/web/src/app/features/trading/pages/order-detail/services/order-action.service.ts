@@ -139,7 +139,7 @@ export class OrderActionService {
   }
 
   private async ensurePortDocumentationReadyForSend(ctx: OrderActionContext): Promise<boolean> {
-    const ready = await this.portDocSvc.ensureReadyForSend(ctx.orderId());
+    const ready = await this.portDocSvc.ensureReadyForSend(ctx.orderId(), ctx.activeOrderSupplier()?.id ?? null);
     if (!ready) {
       const enabled = this.portDocSvc.portDocumentationContext()?.enabled;
       if (enabled === false) {

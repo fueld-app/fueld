@@ -10,8 +10,16 @@ import { bankAccounts } from '../../db/schema';
 import { isIanaTimezone } from '../../utils/timezone';
 import type { BankDetails } from './document.types';
 
-export function formatIssuedAtUtc(date: Date): string {
-  return date.toISOString().replace(/\.\d{3}Z$/, 'Z');
+export function formatIssuedAtUtc(date: Date, dateFormat?: string): string {
+  const y = String(date.getUTCFullYear()).padStart(4, '0');
+  const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(date.getUTCDate()).padStart(2, '0');
+  switch (dateFormat) {
+    case 'AMERICAN':  return `${m}/${d}/${y}`;
+    case 'EUROPEAN':  return `${d}/${m}/${y}`;
+    case 'ISO':
+    default:          return date.toISOString().replace(/\.\d{3}Z$/, 'Z');
+  }
 }
 
 export function trimTrailingSlash(value: string): string {
@@ -36,10 +44,11 @@ export function getPublicApiBaseUrl(): string {
   return 'http://localhost:3000';
 }
 
-export function formatNumber(val: string | null | undefined, decimals = 2): string {
+export function formatNumber(val: string | null | undefined, decimals = 2, precision?: number): string {
   if (!val) return '';
   const num = Number(val);
-  return Number.isFinite(num) ? num.toFixed(decimals) : val;
+  const dp = precision != null ? precision : decimals;
+  return Number.isFinite(num) ? num.toFixed(dp) : val;
 }
 
 export function formatNumberCompact(val: string | null | undefined, maxDecimals = 3): string {

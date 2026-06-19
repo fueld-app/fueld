@@ -7,6 +7,7 @@ import {
   OnInit,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import type { ApiResponse, OrderNumberSettingsDto } from '@fueld/types';
@@ -17,7 +18,7 @@ import { SettingsToastService } from './settings-toast.service';
 @Component({
   selector: 'app-general-settings-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule],
+  imports: [FormsModule, DecimalPipe],
   template: `
     <div>
       <!-- Header -->
@@ -188,6 +189,113 @@ import { SettingsToastService } from './settings-toast.service';
           </div>
 
           <!-- ════════════════════════════════════════════════════════ -->
+          <!--  Cost / Sales Decimal Precision                          -->
+          <!-- ════════════════════════════════════════════════════════ -->
+          <div class="app-panel">
+            <div class="app-panel-header app-panel-header--green">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--green">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-semibold text-gray-900">Cost / Sales Decimal Precision</h3>
+                <p class="text-xs text-gray-500">Controls how many decimal places are displayed for cost and sales prices in order lines and documents.</p>
+              </div>
+            </div>
+
+            <div class="app-panel-body space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Decimal places</label>
+                <select
+                  [ngModel]="costSalesPrecision()"
+                  (ngModelChange)="costSalesPrecision.set(+$event)"
+                  class="app-input w-full max-w-xs bg-white"
+                >
+                  @for (p of [0, 1, 2, 3, 4, 5, 6, 7, 8]; track p) {
+                    <option [value]="p">{{ p }} ({{ p === 5 ? 'default' : p === 0 ? 'integer' : p + ' dp' }})</option>
+                  }
+                </select>
+                <p class="mt-1 text-xs text-gray-500">
+                  Example at {{ costSalesPrecision() }} dp:
+                  <span class="font-mono font-semibold text-gray-700">{{ 123.456789 | number:'1.0-' + costSalesPrecision() }}</span>
+                </p>
+              </div>
+
+              <div class="flex items-center gap-3 pt-2">
+                <button
+                  (click)="saveCostSalesPrecision()"
+                  [disabled]="costSalesPrecisionSaving()"
+                  class="app-button-primary"
+                >
+                  @if (costSalesPrecisionSaving()) { Saving… } @else { Save Precision }
+                </button>
+                @if (costSalesPrecisionSaved()) {
+                  <span class="text-sm text-green-600 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                    </svg>
+                    Saved
+                  </span>
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- ════════════════════════════════════════════════════════ -->
+          <!--  Date Format                                            -->
+          <!-- ════════════════════════════════════════════════════════ -->
+          <div class="app-panel">
+            <div class="app-panel-header app-panel-header--purple">
+              <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--purple">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-purple-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M5.75 2a.75.75 0 01.75.75V4h7V2.75a.75.75 0 011.5 0V4h.25A2.75 2.75 0 0118 6.75v8.5A2.75 2.75 0 0115.25 18H4.75A2.75 2.75 0 012 15.25v-8.5A2.75 2.75 0 014.75 4H5V2.75A.75.75 0 015.75 2zM4.75 5.5c-.69 0-1.25.56-1.25 1.25v8.5c0 .69.56 1.25 1.25 1.25h10.5c.69 0 1.25-.56 1.25-1.25v-8.5c0-.69-.56-1.25-1.25-1.25H4.75z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-sm font-semibold text-gray-900">Date Format</h3>
+                <p class="text-xs text-gray-500">Controls how dates are displayed across the application.</p>
+              </div>
+            </div>
+
+            <div class="app-panel-body space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Format</label>
+                <select
+                  [ngModel]="dateFormat()"
+                  (ngModelChange)="dateFormat.set($event)"
+                  class="app-input w-full max-w-xs bg-white"
+                >
+                  <option value="ISO">ISO (YYYY-MM-DD) — default</option>
+                  <option value="AMERICAN">American (MM/DD/YYYY)</option>
+                  <option value="EUROPEAN">European (DD/MM/YYYY)</option>
+                </select>
+                <p class="mt-1 text-xs text-gray-500">
+                  Example: <span class="font-mono font-semibold text-gray-700">{{ dateFormatExample() }}</span>
+                </p>
+              </div>
+
+              <div class="flex items-center gap-3 pt-2">
+                <button
+                  (click)="saveDateFormat()"
+                  [disabled]="dateFormatSaving()"
+                  class="app-button-primary"
+                >
+                  @if (dateFormatSaving()) { Saving… } @else { Save Date Format }
+                </button>
+                @if (dateFormatSaved()) {
+                  <span class="text-sm text-green-600 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                    </svg>
+                    Saved
+                  </span>
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- ════════════════════════════════════════════════════════ -->
           <!--  Role Dashboards                                        -->
           <!-- ════════════════════════════════════════════════════════ -->
           <div class="app-panel">
@@ -333,6 +441,25 @@ export class GeneralSettingsPageComponent implements OnInit {
   readonly followUpSaving = signal(false);
   readonly followUpSaved = signal(false);
 
+  readonly costSalesPrecision = signal(5);
+  readonly costSalesPrecisionSaving = signal(false);
+  readonly costSalesPrecisionSaved = signal(false);
+
+  readonly dateFormat = signal<'AMERICAN' | 'EUROPEAN' | 'ISO'>('ISO');
+  readonly dateFormatSaving = signal(false);
+  readonly dateFormatSaved = signal(false);
+  readonly dateFormatExample = computed(() => {
+    const d = new Date('2026-04-11T12:00:00Z');
+    const y = '2026';
+    const m = '04';
+    const day = '11';
+    switch (this.dateFormat()) {
+      case 'AMERICAN': return `${m}/${day}/${y}`;
+      case 'EUROPEAN': return `${day}/${m}/${y}`;
+      default: return `${y}-${m}-${day}`;
+    }
+  });
+
   readonly commonTimezones = signal<{ value: string; label: string }[]>([
     { value: 'America/Chicago', label: 'America/Chicago (Houston, CST/CDT)' },
     { value: 'Europe/Copenhagen', label: 'Europe/Copenhagen (CET/CEST)' },
@@ -399,6 +526,8 @@ export class GeneralSettingsPageComponent implements OnInit {
   ngOnInit(): void {
     this.loadSettings();
     this.loadTimezoneSettings();
+    this.loadCostSalesPrecision();
+    this.loadDateFormat();
     this.loadRoleDashboards();
     this.loadFollowUpSettings();
   }
@@ -486,6 +615,78 @@ export class GeneralSettingsPageComponent implements OnInit {
       this.toastService.show('error', 'Failed to save timezone settings.');
     } finally {
       this.timezoneSaving.set(false);
+    }
+  }
+
+  private async loadCostSalesPrecision(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ precision: number }>>(`${API}/admin/settings/cost-sales-precision`),
+      );
+      if (res.success) {
+        this.costSalesPrecision.set(res.data.precision ?? 5);
+      }
+    } catch {
+      // ignore – default works fine
+    }
+  }
+
+  async saveCostSalesPrecision(): Promise<void> {
+    this.costSalesPrecisionSaving.set(true);
+    this.costSalesPrecisionSaved.set(false);
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<{ precision: number }>>(`${API}/admin/settings/cost-sales-precision`, {
+          precision: this.costSalesPrecision(),
+        }),
+      );
+      if (res.success) {
+        this.costSalesPrecision.set(res.data.precision ?? 5);
+        this.costSalesPrecisionSaved.set(true);
+        setTimeout(() => this.costSalesPrecisionSaved.set(false), 3000);
+      } else {
+        this.toastService.show('error', (res as any).message ?? 'Failed to save.');
+      }
+    } catch {
+      this.toastService.show('error', 'Failed to save decimal precision setting.');
+    } finally {
+      this.costSalesPrecisionSaving.set(false);
+    }
+  }
+
+  private async loadDateFormat(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ dateFormat: string }>>(`${API}/admin/settings/date-format`),
+      );
+      if (res.success) {
+        this.dateFormat.set((res.data.dateFormat as any) ?? 'ISO');
+      }
+    } catch {
+      // ignore – default works fine
+    }
+  }
+
+  async saveDateFormat(): Promise<void> {
+    this.dateFormatSaving.set(true);
+    this.dateFormatSaved.set(false);
+    try {
+      const res = await firstValueFrom(
+        this.http.put<ApiResponse<{ dateFormat: string }>>(`${API}/admin/settings/date-format`, {
+          dateFormat: this.dateFormat(),
+        }),
+      );
+      if (res.success) {
+        this.dateFormat.set((res.data.dateFormat as any) ?? 'ISO');
+        this.dateFormatSaved.set(true);
+        setTimeout(() => this.dateFormatSaved.set(false), 3000);
+      } else {
+        this.toastService.show('error', (res as any).message ?? 'Failed to save.');
+      }
+    } catch {
+      this.toastService.show('error', 'Failed to save date format setting.');
+    } finally {
+      this.dateFormatSaving.set(false);
     }
   }
 

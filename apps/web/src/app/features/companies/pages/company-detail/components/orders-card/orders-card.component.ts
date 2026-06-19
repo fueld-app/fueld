@@ -1,5 +1,6 @@
 import { Component, ChangeDetectionStrategy, input, output } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
 
 interface CompanyOrder {
   id: string;
@@ -19,7 +20,7 @@ interface CompanyOrder {
 @Component({
   selector: 'app-orders-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe],
+  imports: [DateLabelPipe, DatePipe],
   template: `
     <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-[13]">
       <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
@@ -80,7 +81,7 @@ interface CompanyOrder {
                     <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
                       [class]="statusBadge(order.status)">{{ order.status }}</span>
                   </td>
-                  <td class="px-5 py-2.5 text-gray-500">{{ order.createdAt | date:'mediumDate' }}</td>
+                  <td class="px-5 py-2.5 text-gray-500">{{ order.createdAt | dateLabel }}</td>
                 </tr>
               }
             </tbody>

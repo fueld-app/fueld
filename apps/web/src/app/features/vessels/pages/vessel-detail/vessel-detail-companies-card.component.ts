@@ -10,6 +10,7 @@ import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import type { VesselCompanyDto, VesselCompanyRole, VesselCompanyRoleOption, CompanyContactDto } from '@fueld/types';
 import { flagFromIso3 } from '../../../../shared/utils/flags';
+import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
 
 export interface CompanySearchResultOption {
   key: string;
@@ -34,7 +35,7 @@ export interface OwnershipEntry {
 @Component({
   selector: 'app-vessel-detail-companies-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, DatePipe, FormsModule],
+  imports: [DateLabelPipe, RouterLink, DatePipe, FormsModule],
   template: `
     <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-5 min-[900px]:h-[449px] min-[900px]:flex min-[900px]:flex-col overflow-hidden">
       <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
@@ -257,7 +258,7 @@ export interface OwnershipEntry {
                 </div>
               </div>
               <p class="text-[10px] text-gray-400 mt-1">
-                Added by {{ vc.addedByName ?? 'Unknown' }} · {{ vc.createdAt | date:'mediumDate' }}
+                Added by {{ vc.addedByName ?? 'Unknown' }} · {{ vc.createdAt | dateLabel }}
               </p>
             </div>
           }

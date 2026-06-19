@@ -75,6 +75,7 @@ const SS_CODE_TO_ROLE: Record<string, string> = {
 // ═══════════════════════════════════════════════════════════════════════
 
 import { API } from '@app/core/config/api';
+import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
 
 interface CompanySearchResult {
   source: 'local' | 'seasearcher';
@@ -122,7 +123,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
 @Component({
   selector: 'app-vessel-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, DecimalPipe, FormsModule, RouterLink, ActivityTimelineComponent, LastEditedBadgeComponent, CommentsCardComponent, VesselDetailCompaniesCardComponent, VesselDetailDeleteModalComponent, VesselDetailMergeModalComponent],
+  imports: [DateLabelPipe, DatePipe, DecimalPipe, FormsModule, RouterLink, ActivityTimelineComponent, LastEditedBadgeComponent, CommentsCardComponent, VesselDetailCompaniesCardComponent, VesselDetailDeleteModalComponent, VesselDetailMergeModalComponent],
   styles: [`
     :host ::ng-deep .leaflet-container { font-family: inherit; }
   `],
@@ -631,8 +632,8 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                           </td>
                           <td class="px-5 py-2.5 text-gray-900 font-medium">{{ o.clientName }}</td>
                           <td class="px-5 py-2.5 text-gray-600">{{ o.placeName }}</td>
-                          <td class="px-5 py-2.5 text-gray-600">{{ o.eta ? (o.eta | date:'mediumDate') : '—' }}</td>
-                          <td class="px-5 py-2.5 text-gray-600">{{ o.createdAt | date:'mediumDate' }}</td>
+                          <td class="px-5 py-2.5 text-gray-600">{{ o.eta ? (o.eta | dateLabel) : '—' }}</td>
+                          <td class="px-5 py-2.5 text-gray-600">{{ o.createdAt | dateLabel }}</td>
                         </tr>
                       }
                     </tbody>
@@ -944,8 +945,8 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                           @if (movementFlag(m)) { {{ movementFlag(m) }} }
                           {{ m.countryName ?? m.place?.country?.name ?? '—' }}
                         </td>
-                        <td class="px-5 py-2.5 text-gray-600">{{ m.from ? (m.from | date:'mediumDate') : '—' }}</td>
-                        <td class="px-5 py-2.5 text-gray-600">{{ m.to ? (m.to | date:'mediumDate') : '—' }}</td>
+                        <td class="px-5 py-2.5 text-gray-600">{{ m.from ? (m.from | dateLabel) : '—' }}</td>
+                        <td class="px-5 py-2.5 text-gray-600">{{ m.to ? (m.to | dateLabel) : '—' }}</td>
                         <td class="px-5 py-2.5 text-gray-600">
                           @if (m.durationHumanized) {
                             {{ m.durationHumanized }}

@@ -5,12 +5,13 @@ import {
   output,
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { DateLabelPipe } from '../../shared/pipes/date-format.pipe';
 import type { DashboardFollowUpItem, FollowUpGroups } from './dashboard.types';
 
 @Component({
   selector: 'app-dashboard-follow-ups-widget',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe],
+  imports: [DatePipe, DateLabelPipe],
   template: `
     @if (groups().total) {
       <div class="mt-8 rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
@@ -62,7 +63,7 @@ import type { DashboardFollowUpItem, FollowUpGroups } from './dashboard.types';
                     >
                       <div class="flex items-center gap-2">
                         <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium bg-red-100 border-red-200 text-red-700">
-                          {{ f.followUpDate | date:'mediumDate' }}
+                          {{ f.followUpDate | dateLabel }}
                         </span>
                         <span class="text-xs uppercase tracking-wide text-gray-400">{{ f.entityType }}</span>
                         <span class="text-sm font-medium text-gray-900 truncate">{{ f.entityName || f.entityId }}</span>
@@ -106,7 +107,7 @@ import type { DashboardFollowUpItem, FollowUpGroups } from './dashboard.types';
                     >
                       <div class="flex items-center gap-2">
                         <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium bg-amber-100 border-amber-200 text-amber-700">
-                          {{ f.followUpDate | date:'mediumDate' }}
+                          {{ f.followUpDate | dateLabel }}
                         </span>
                         <span class="text-xs uppercase tracking-wide text-gray-400">{{ f.entityType }}</span>
                         <span class="text-sm font-medium text-gray-900 truncate">{{ f.entityName || f.entityId }}</span>
@@ -150,7 +151,7 @@ import type { DashboardFollowUpItem, FollowUpGroups } from './dashboard.types';
                     >
                       <div class="flex items-center gap-2">
                         <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium bg-blue-100 border-blue-200 text-blue-700">
-                          {{ f.followUpDate | date:'mediumDate' }}
+                          {{ f.followUpDate | dateLabel }}
                         </span>
                         <span class="text-xs uppercase tracking-wide text-gray-400">{{ f.entityType }}</span>
                         <span class="text-sm font-medium text-gray-900 truncate">{{ f.entityName || f.entityId }}</span>

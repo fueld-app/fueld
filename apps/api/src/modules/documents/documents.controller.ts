@@ -3,7 +3,7 @@ import { eq, and, desc, inArray, isNull } from 'drizzle-orm';
 import { authGuard } from '../auth/auth.guard';
 import { generateNominationPdfBuffer, generateOrderInvoicePdfBuffer, generateOfferPdfBuffer, generateProformaInvoicePdfBuffer, tryLoadLogoDataUrl, formatCustomerPaymentTerms } from './document.service';
 import { sendDocumentEmail, buildDocumentEmailHtml, buildDocumentEmailSubject, buildInquiryEmailHtml, type DocumentEmailType } from './mail.service';
-import { resolveOrderId, getOrderById } from '../orders/orders.service';
+import { resolveOrderId, getOrderById, updateOrderStatus } from '../orders/orders.service';
 import { getPortSuppliers } from '../lloyds/lli.service';
 import { logActivity } from '../activity/activity.service';
 import { sendWhatsAppGroupMessage, sendWhatsAppMessage, sendTemplatedGroupMessage, buildProductTemplateVariables } from '../whatsapp/whatsapp.service';
@@ -619,6 +619,17 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           subject: body.subject,
         },
       }).catch(() => {});
+
+      // Sending a final invoice transitions a DELIVERED order to INVOICED so it
+      // stops showing as "Delivered". (Proforma sends use docType PROFORMA and are
+      // unaffected.) Other statuses (INVOICED/PAID/etc.) are left untouched.
+      if (docType === 'INVOICE' && order.status === 'DELIVERED') {
+        try {
+          await updateOrderStatus(orderId, 'INVOICED', auth.userId);
+        } catch (err) {
+          console.error('[documents] Failed to transition order to INVOICED:', err);
+        }
+      }
 
       return {
         success: true,

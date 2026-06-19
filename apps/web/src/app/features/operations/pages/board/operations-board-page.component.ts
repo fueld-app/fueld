@@ -15,6 +15,7 @@ import { SearchableDropdownComponent, type DropdownOption } from '../../../../sh
 import type { ApiResponse, OrderListRowDto } from '@fueld/types';
 import { OrderStatus } from '@fueld/types';
 import { DatePipe } from '@angular/common';
+import { DateLabelPipe } from '../../../../shared/pipes/date-format.pipe';
 import { API } from '@app/core/config/api';
 import { AuthService } from '@app/core/auth/auth.service';
 
@@ -27,7 +28,7 @@ interface TeamUserOption {
 @Component({
   selector: 'app-operations-board-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, StatusBadgeComponent, FormsModule, SearchableDropdownComponent, DatePipe],
+  imports: [RouterLink, StatusBadgeComponent, FormsModule, SearchableDropdownComponent, DatePipe, DateLabelPipe],
   template: `
     <div class="h-full flex flex-col">
       <!-- Header -->
@@ -114,7 +115,7 @@ interface TeamUserOption {
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 shrink-0 text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                           <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z" clip-rule="evenodd" />
                         </svg>
-                        <span>ETA {{ order.eta ? (order.eta | date:'mediumDate') : '—' }}</span>
+                        <span>ETA {{ order.eta ? (order.eta | dateLabel) : '—' }}</span>
                       </div>
                       <div class="flex items-center gap-1.5">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 shrink-0 text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">

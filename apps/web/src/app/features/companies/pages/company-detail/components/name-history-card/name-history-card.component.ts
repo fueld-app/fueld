@@ -1,12 +1,13 @@
 import { Component, ChangeDetectionStrategy, input } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
 
 interface NameEntry { name: string; fromDate: string }
 
 @Component({
   selector: 'app-name-history-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe],
+  imports: [DateLabelPipe, DatePipe],
   template: `
     <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-12">
       <div class="border-b border-gray-100 px-5 py-3">
@@ -16,7 +17,7 @@ interface NameEntry { name: string; fromDate: string }
         @for (entry of entries(); track $index) {
           <div class="px-5 py-2.5 flex justify-between text-sm">
             <span class="text-gray-900">{{ entry.name }}</span>
-            <span class="text-xs text-gray-400">{{ entry.fromDate | date:'mediumDate' }}</span>
+            <span class="text-xs text-gray-400">{{ entry.fromDate | dateLabel }}</span>
           </div>
         }
       </div>

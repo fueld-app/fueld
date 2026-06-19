@@ -22,6 +22,8 @@ import type { ApiResponse, CounterpartyDto, OrderListRowDto, UserUiPreferences }
 import { InquiriesListNewInquiryModalComponent } from './inquiries-list-new-inquiry-modal.component';
 import type { TeamUserOption } from './inquiries-list.types';
 import { DecimalPipe, DatePipe } from '@angular/common';
+import { DateLabelPipe } from '../../../../shared/pipes/date-format.pipe';
+import { DateFormatService } from '@app/core/services/date-format.service';
 import { firstValueFrom } from 'rxjs';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -38,7 +40,7 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
 @Component({
   selector: 'app-inquiries-list-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, StatusBadgeComponent, FormsModule, DecimalPipe, DatePipe, SearchableDropdownComponent, PaginationComponent, SortHeaderComponent, ColumnPickerComponent, InquiriesListNewInquiryModalComponent],
+  imports: [RouterLink, StatusBadgeComponent, FormsModule, DecimalPipe, DatePipe, DateLabelPipe, SearchableDropdownComponent, PaginationComponent, SortHeaderComponent, ColumnPickerComponent, InquiriesListNewInquiryModalComponent],
   template: `
     <div>
       <!-- Header -->
@@ -145,10 +147,10 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
                         <td class="px-4 py-3 text-gray-600">{{ inq.invoicingCompanyName || '—' }}</td>
                       }
                       @case ('eta') {
-                        <td class="px-4 py-3 text-gray-500">{{ inq.eta ? (inq.eta | date:'mediumDate') : '—' }}</td>
+                        <td class="px-4 py-3 text-gray-500">{{ inq.eta ? (inq.eta | dateLabel) : '—' }}</td>
                       }
                       @case ('dueDate') {
-                        <td class="px-4 py-3 text-gray-500">{{ inq.dueDate ? (inq.dueDate | date:'mediumDate') : '—' }}</td>
+                        <td class="px-4 py-3 text-gray-500">{{ inq.dueDate ? (inq.dueDate | dateLabel) : '—' }}</td>
                       }
                       @case ('value') {
                         <td class="px-4 py-3 text-right tabular-nums text-gray-900">
@@ -187,7 +189,7 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
                         </td>
                       }
                       @case ('createdAt') {
-                        <td class="px-4 py-3 text-gray-500">{{ inq.createdAt | date:'mediumDate' }}</td>
+                        <td class="px-4 py-3 text-gray-500">{{ inq.createdAt | dateLabel }}</td>
                       }
                     }
                   }
@@ -248,9 +250,9 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
               <div class="grid grid-cols-2 gap-1 text-xs text-gray-500">
                 <span>{{ inq.vesselName }}</span>
                 <span>{{ inq.placeName }}</span>
-                <span>ETA {{ inq.eta ? (inq.eta | date:'mediumDate') : '—' }}</span>
+                <span>ETA {{ inq.eta ? (inq.eta | dateLabel) : '—' }}</span>
                 <span>Resp {{ inq.salesRepName || '—' }}</span>
-                <span>{{ inq.createdAt | date:'mediumDate' }}</span>
+                <span>{{ inq.createdAt | dateLabel }}</span>
               </div>
               @if (isOrders() && auth.canSeePrices()) {
                 <div class="mt-3 grid grid-cols-2 gap-2 rounded-lg border border-gray-100 bg-gray-50 p-3 text-xs">
@@ -395,6 +397,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
 
   // ─── Column configuration ─────────────────────────────────────────
   private readonly userPrefs = inject(UserPreferencesService);
+  private readonly dateFormatSvc = inject(DateFormatService);
 
   readonly allColumnOptions = computed<ColumnOption[]>(() => {
     const base: ColumnOption[] = [
@@ -529,6 +532,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
     this.loadInquiries();
     void this.loadResponsibleUsers();
     void this.userPrefs.load();
+    void this.dateFormatSvc.load();
     if (!this.isOrders()) {
       // Auto-open modal when navigated with ?new=1 (e.g. from navbar button)
       this.queryParamSub = this.route.queryParamMap.subscribe((params) => {

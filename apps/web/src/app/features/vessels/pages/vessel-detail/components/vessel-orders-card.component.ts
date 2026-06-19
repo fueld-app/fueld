@@ -1,10 +1,11 @@
 import { Component, ChangeDetectionStrategy, input, output } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
 
 @Component({
   selector: 'app-vessel-orders-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe],
+  imports: [DateLabelPipe, DatePipe],
   template: `
     @if (vesselOrders().length || ordersLoading()) {
       <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:h-[449px] min-[900px]:flex min-[900px]:flex-col overflow-hidden">
@@ -44,8 +45,8 @@ import { DatePipe } from '@angular/common';
                     </td>
                     <td class="px-5 py-2.5 text-gray-900 font-medium">{{ o.clientName }}</td>
                     <td class="px-5 py-2.5 text-gray-600">{{ o.placeName }}</td>
-                    <td class="px-5 py-2.5 text-gray-600">{{ o.eta ? (o.eta | date:'mediumDate') : '—' }}</td>
-                    <td class="px-5 py-2.5 text-gray-600">{{ o.createdAt | date:'mediumDate' }}</td>
+                    <td class="px-5 py-2.5 text-gray-600">{{ o.eta ? (o.eta | dateLabel) : '—' }}</td>
+                    <td class="px-5 py-2.5 text-gray-600">{{ o.createdAt | dateLabel }}</td>
                   </tr>
                 }
               </tbody>

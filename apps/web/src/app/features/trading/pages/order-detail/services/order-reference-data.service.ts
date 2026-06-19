@@ -26,6 +26,7 @@ export class OrderReferenceDataService {
   readonly defaultUnit = signal<string>('MT');
   readonly orderCategories = signal<{ key: string; label: string }[]>([]);
   readonly taxRates = signal<{ id: string; name: string; rate: number }[]>([]);
+  readonly costSalesDecimalPrecision = signal<number>(5);
   readonly inquiryCancelReasons = signal<string[]>([]);
   readonly allWarehouses = signal<WarehouseDto[]>([]);
   readonly inventorySkus = signal<InventorySkuDto[]>([]);
@@ -63,7 +64,7 @@ export class OrderReferenceDataService {
     if (this._lazyLoaded) return;
     this._lazyLoaded = true;
     try {
-      const [catalogRes, defaultUnitRes, taxRatesRes, unitConversionsRes, cancelReasonsRes, priceRefsRes, warehousesRes, skusRes] = await Promise.all([
+      const [catalogRes, defaultUnitRes, taxRatesRes, unitConversionsRes, cancelReasonsRes, priceRefsRes, warehousesRes, skusRes, precisionRes] = await Promise.all([
         firstValueFrom(this.http.get<ApiResponse<{ items: any[] }>>(`${API_URL}/admin/settings/catalog`)),
         firstValueFrom(this.http.get<ApiResponse<{ defaultUnit: string }>>(`${API_URL}/admin/settings/default-unit`)),
         firstValueFrom(this.http.get<ApiResponse<{ rates: any[] }>>(`${API_URL}/admin/settings/tax-rates`)),
@@ -72,6 +73,7 @@ export class OrderReferenceDataService {
         firstValueFrom(this.http.get<ApiResponse<{ references: any[] }>>(`${API_URL}/admin/settings/my-price-references`)),
         firstValueFrom(this.http.get<ApiResponse<WarehouseDto[]>>(`${API_URL}/inventory/warehouses?activeOnly=true&inventoryEnabledOnly=true`)),
         firstValueFrom(this.http.get<ApiResponse<InventorySkuDto[]>>(`${API_URL}/inventory/skus`)),
+        firstValueFrom(this.http.get<ApiResponse<{ precision: number }>>(`${API_URL}/admin/settings/my-cost-sales-precision`)),
       ]);
 
       if (catalogRes.success) this.catalogItems.set(catalogRes.data.items ?? []);
@@ -82,6 +84,7 @@ export class OrderReferenceDataService {
       if (priceRefsRes.success) this.configuredPriceReferences.set(priceRefsRes.data.references ?? []);
       if (warehousesRes.success) this.allWarehouses.set(warehousesRes.data ?? []);
       if (skusRes.success) this.inventorySkus.set(skusRes.data ?? []);
+      if (precisionRes.success) this.costSalesDecimalPrecision.set(precisionRes.data.precision ?? 5);
     } catch { /* silently ignore */ }
   }
 

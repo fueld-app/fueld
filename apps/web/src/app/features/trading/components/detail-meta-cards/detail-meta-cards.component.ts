@@ -9,6 +9,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { DateFormatService } from '@app/core/services/date-format.service';
 import type { OwnCompanyDto, BankAccountDto } from '@fueld/types';
 import {
   SearchableDropdownComponent,
@@ -465,6 +466,7 @@ import {
 })
 export class TradingDetailMetaCardsComponent {
   private readonly router = inject(Router);
+  private readonly dateFormatSvc = inject(DateFormatService);
   readonly brokerExpanded = signal(false);
   readonly agentExpanded = signal(false);
   readonly clientPartyTab = signal<'client' | 'broker' | 'agent'>('client');
@@ -658,19 +660,24 @@ export class TradingDetailMetaCardsComponent {
     if (!dateStr) return '';
     const date = new Date(dateStr);
     if (Number.isNaN(date.getTime())) return '';
-    return this.formatUtcDateOnly(date);
+    // Format using the configured timezone instead of UTC so the input
+    // reflects the calendar day the user expects.
+    const tz = this.timezone() || 'UTC';
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: this.normalizeTimeZone(tz),
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(date);
+    const map = new Map(parts.map((p) => [p.type, p.value]));
+    const y = map.get('year') ?? '0000';
+    const m = map.get('month') ?? '01';
+    const d = map.get('day') ?? '01';
+    return `${y}-${m}-${d}`;
   }
 
   formatDateLabel(dateStr: string | null | undefined): string {
-    if (!dateStr) return '-';
-    const date = new Date(dateStr);
-    if (Number.isNaN(date.getTime())) return '-';
-    return new Intl.DateTimeFormat('en-GB', {
-      timeZone: 'UTC',
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    }).format(date);
+    return this.dateFormatSvc.formatDateLabel(dateStr);
   }
 
   private formatUtcDateOnly(date: Date): string {

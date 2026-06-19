@@ -14,11 +14,12 @@ import type {
 import { API } from '@app/core/config/api';
 import { AuthService } from '@app/core/auth/auth.service';
 import { PdfPreviewModalComponent } from '@app/shared/components/pdf-preview-modal/pdf-preview-modal.component';
+import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
 
 @Component({
   selector: 'app-platts-reports-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, DatePipe, RouterLink, PdfPreviewModalComponent],
+  imports: [DateLabelPipe, FormsModule, DatePipe, RouterLink, PdfPreviewModalComponent],
   template: `
     <div class="space-y-6 pb-2 min-w-0">
       <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -108,7 +109,7 @@ import { PdfPreviewModalComponent } from '@app/shared/components/pdf-preview-mod
               <article class="rounded-lg border border-gray-200 bg-gray-50 p-4">
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
-                    <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">{{ report.publicationDate | date:'mediumDate' }}</div>
+                    <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">{{ report.publicationDate | dateLabel }}</div>
                     <h2 class="mt-1 text-sm font-semibold text-gray-900">{{ report.title }}</h2>
                     <p class="mt-1 break-words text-xs text-gray-500">{{ report.sourceFileName }}</p>
                   </div>
@@ -164,7 +165,7 @@ import { PdfPreviewModalComponent } from '@app/shared/components/pdf-preview-mod
             <tbody class="divide-y divide-gray-100">
               @for (report of reports(); track report.id) {
                 <tr class="align-top">
-                  <td class="px-4 py-3 text-gray-900">{{ report.publicationDate | date:'mediumDate' }}</td>
+                  <td class="px-4 py-3 text-gray-900">{{ report.publicationDate | dateLabel }}</td>
                   <td class="px-4 py-3">
                     <div class="font-medium text-gray-900">{{ report.title }}</div>
                     <div class="text-xs text-gray-500">{{ report.sourceFileName }}</div>

@@ -433,6 +433,14 @@ async function autoApplyCreditLine(app: typeof creditApplications.$inferSelect) 
       counterpartyId: app.counterpartyId,
     });
   }
+
+  // Sync the counterparty's manual "Credit Limit" (shown on the company card)
+  // to the approved credit line amount so the approval is reflected on the
+  // client/supplier account, not only in the credit lines list.
+  await db
+    .update(counterparties)
+    .set({ creditLimit: app.requestedAmount, updatedAt: new Date() })
+    .where(eq(counterparties.id, app.counterpartyId));
 }
 
 // ═══════════════════════════════════════════════════════════════════════

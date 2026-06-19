@@ -3,11 +3,12 @@ import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { VesselDetailStore } from '../vessel-detail.store';
+import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
 
 @Component({
   selector: 'app-vessel-companies-tab',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, DatePipe, RouterLink],
+  imports: [DateLabelPipe, FormsModule, DatePipe, RouterLink],
   template: `
     <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
       <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
@@ -227,7 +228,7 @@ import { VesselDetailStore } from '../vessel-detail.store';
                 </div>
               </div>
               <p class="text-[10px] text-gray-400 mt-1">
-                Added by {{ vc.addedByName ?? 'Unknown' }} · {{ vc.createdAt | date:'mediumDate' }}
+                Added by {{ vc.addedByName ?? 'Unknown' }} · {{ vc.createdAt | dateLabel }}
               </p>
             </div>
           }

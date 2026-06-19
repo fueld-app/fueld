@@ -9,6 +9,7 @@ import QRCode from 'qrcode';
 import { db } from '../../db';
 import { bankAccounts, orders, orderItems, counterparties, vessels, places, invoices, users, documentRevisions, tenants, priceReferences, type TenantSettings } from '../../db/schema';
 import { isIanaTimezone } from '../../utils/timezone';
+import { getDateFormatSettings, getCostSalesDecimalPrecision } from '../admin/settings.service';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Document Service — Server-side PDF generation (pdfmake v0.3)
@@ -70,8 +71,16 @@ interface DocumentPrintMeta {
   fingerprintShort: string;
 }
 
-function formatIssuedAtUtc(date: Date): string {
-  return date.toISOString().replace(/\.\d{3}Z$/, 'Z');
+function formatIssuedAtUtc(date: Date, dateFormat?: string): string {
+  const y = String(date.getUTCFullYear()).padStart(4, '0');
+  const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(date.getUTCDate()).padStart(2, '0');
+  switch (dateFormat) {
+    case 'AMERICAN':  return `${m}/${d}/${y}`;
+    case 'EUROPEAN':  return `${d}/${m}/${y}`;
+    case 'ISO':
+    default:          return date.toISOString().replace(/\.\d{3}Z$/, 'Z');
+  }
 }
 
 function trimTrailingSlash(value: string): string {
@@ -535,10 +544,12 @@ async function loadOrderBankDetails(
 
 // ─── PDF Builder ─────────────────────────────────────────────────────
 
-function formatNumber(val: string | null | undefined, decimals = 2): string {
+function formatNumber(val: string | null | undefined, decimals = 2, precision?: number): string {
   if (!val) return '—';
   const n = parseFloat(val);
-  return isNaN(n) ? '—' : n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  if (isNaN(n)) return '—';
+  const dp = precision != null ? precision : decimals;
+  return n.toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
 }
 
 /** Format a number, stripping trailing zeros (e.g. 100.000 → "100", 100.500 → "100.5"). */
@@ -669,7 +680,7 @@ export function splitAddressLines(address: string): string[] {
   return trimmed.split(/,\s*/).map(l => l.trim()).filter(Boolean);
 }
 
-function formatStoredDateOnlyForDisplay(value: string | Date | null | undefined, tz?: string | null): string | null {
+function formatStoredDateOnlyForDisplay(value: string | Date | null | undefined, tz?: string | null, dateFormat?: string): string | null {
   if (!value) return null;
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return null;
@@ -677,6 +688,7 @@ function formatStoredDateOnlyForDisplay(value: string | Date | null | undefined,
   // Use the provided timezone if valid, otherwise fall back to UTC
   const safeTz = tz && isIanaTimezone(tz) ? tz : 'UTC';
 
+  // Get the date parts in the target timezone
   const parts = new Intl.DateTimeFormat('en-GB', {
     timeZone: safeTz,
     day: '2-digit',
@@ -688,7 +700,14 @@ function formatStoredDateOnlyForDisplay(value: string | Date | null | undefined,
   const day = map.get('day') ?? '01';
   const month = map.get('month') ?? '01';
   const year = map.get('year') ?? '0000';
-  return `${day}-${month}-${year}`;
+
+  // Apply the configurable date format
+  switch (dateFormat) {
+    case 'AMERICAN':  return `${month}/${day}/${year}`;
+    case 'EUROPEAN':  return `${day}/${month}/${year}`;
+    case 'ISO':
+    default:          return `${year}-${month}-${day}`;
+  }
 }
 
 function parseTimezoneOffset(tz: string | null | undefined): number | null {
@@ -727,8 +746,8 @@ function computeDueDate(
   return new Date(baseDate.getTime() + 30 * 86_400_000).toISOString().split('T')[0]!;
 }
 
-function formatDateTimeForDisplay(value: string | null, tz: string | null | undefined, _omitTz = false): string | null {
-  return formatStoredDateOnlyForDisplay(value, tz);
+function formatDateTimeForDisplay(value: string | null, tz: string | null | undefined, _omitTz = false, dateFormat?: string): string | null {
+  return formatStoredDateOnlyForDisplay(value, tz, dateFormat);
 }
 
 function replaceCompanyNamePlaceholder(
@@ -906,7 +925,7 @@ function buildInvoiceDocument(data: {
       { text: item.productType },
       { text: formatNumberCompact(item.quantity, 3), alignment: 'right' },
       { text: item.unit },
-      { text: formatNumber(item.salesPrice, 4), alignment: 'right' },
+      { text: formatNumber(item.salesPrice, 2, data.costSalesDecimalPrecision ?? undefined), alignment: 'right' },
       { text: formatNumber(String(lineTotal), 2), alignment: 'right' },
     ];
   });
@@ -1187,7 +1206,7 @@ function buildInvoiceDocument(data: {
             margin: [0, 6, 0, 0] as [number, number, number, number],
           },
           ...(data.printMeta ? [{
-            text: `Issued (UTC): ${formatIssuedAtUtc(data.printMeta.issuedAt)}   Revision: ${data.printMeta.revisionNumber}   Ref: ${data.printMeta.verificationRef}   Fingerprint: ${data.printMeta.fingerprintShort}`,
+            text: `Issued (UTC): ${formatIssuedAtUtc(data.printMeta.issuedAt, data.dateFormat ?? undefined)}   Revision: ${data.printMeta.revisionNumber}   Ref: ${data.printMeta.verificationRef}   Fingerprint: ${data.printMeta.fingerprintShort}`,
             fontSize: 7,
             color: '#6b7280',
             alignment: 'center',
@@ -1230,6 +1249,9 @@ function buildInvoiceDocument(data: {
 export async function generateInvoicePdfBuffer(invoiceId: string): Promise<Buffer> {
   const invoice = await fetchInvoiceData(invoiceId);
   const order = invoice.order;
+
+  const { dateFormat } = await getDateFormatSettings();
+  const { precision: costSalesDecimalPrecision } = await getCostSalesDecimalPrecision();
 
   const bank = await loadOrderBankDetails(order.bankAccountId, order.invoicingCompanyId);
 
@@ -1279,6 +1301,8 @@ export async function generateInvoicePdfBuffer(invoiceId: string): Promise<Buffe
     eta: order.eta?.toISOString() ?? null,
     etd: order.etd?.toISOString() ?? null,
     timezone: order.place.timezone ?? null,
+    dateFormat: dateFormat,
+    costSalesDecimalPrecision: costSalesDecimalPrecision,
     currency: order.currency ?? 'USD',
     fromName: order.salesRep?.name ?? null,
     fromEmail: order.salesRep?.email ?? null,
@@ -1342,6 +1366,8 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
   revision: DocumentRevisionInfo;
 }> {
   const order = await fetchOrderForInvoice(orderId);
+  const { dateFormat } = await getDateFormatSettings();
+  const { precision: costSalesDecimalPrecision } = await getCostSalesDecimalPrecision();
 
   // Find the first invoice or generate a preview number
   const invoice = order.invoices?.[0];
@@ -1419,6 +1445,8 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
     eta: order.eta?.toISOString() ?? null,
     etd: order.etd?.toISOString() ?? null,
     timezone: order.place.timezone ?? null,
+    dateFormat: dateFormat,
+    costSalesDecimalPrecision: costSalesDecimalPrecision,
     currency: order.currency ?? 'USD',
     fromName: order.salesRep?.name ?? null,
     fromEmail: order.salesRep?.email ?? null,
@@ -1545,6 +1573,8 @@ function buildOfferDocument(data: {
   eta: string | null;
   etd: string | null;
   timezone: string | null;
+  dateFormat: string | null;
+  costSalesDecimalPrecision: number | null;
   fromName: string | null;
   fromEmail: string | null;
   fromPhone: string | null;
@@ -1701,10 +1731,10 @@ function buildOfferDocument(data: {
   let deliveryDateStr = '';
   if (data.eta) {
     const hasRange = !!data.etd;
-    const fmtEta = formatDateTimeForDisplay(data.eta, data.timezone, hasRange);
+    const fmtEta = formatDateTimeForDisplay(data.eta, data.timezone, hasRange, data.dateFormat ?? undefined);
     deliveryDateStr = fmtEta ?? data.eta;
     if (data.etd) {
-      const fmtEtd = formatDateTimeForDisplay(data.etd, data.timezone);
+      const fmtEtd = formatDateTimeForDisplay(data.etd, data.timezone, false, data.dateFormat ?? undefined);
       deliveryDateStr += ` to ${fmtEtd ?? data.etd}`;
     }
   }
@@ -1801,7 +1831,7 @@ function buildOfferDocument(data: {
           margin: [0, 8, 0, 0] as [number, number, number, number],
         },
         ...(data.printMeta ? [{
-          text: `Issued (UTC): ${formatIssuedAtUtc(data.printMeta.issuedAt)}   Revision: ${data.printMeta.revisionNumber}   Ref: ${data.printMeta.verificationRef}   Fingerprint: ${data.printMeta.fingerprintShort}`,
+          text: `Issued (UTC): ${formatIssuedAtUtc(data.printMeta.issuedAt, data.dateFormat ?? undefined)}   Revision: ${data.printMeta.revisionNumber}   Ref: ${data.printMeta.verificationRef}   Fingerprint: ${data.printMeta.fingerprintShort}`,
           fontSize: 7,
           color: '#6b7280',
           alignment: 'center',
@@ -1987,6 +2017,8 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
   revision: DocumentRevisionInfo;
 }> {
   const order = await fetchOrderForInvoice(orderId);
+  const { dateFormat } = await getDateFormatSettings();
+  const { precision: costSalesDecimalPrecision } = await getCostSalesDecimalPrecision();
   const isInquiryContext = order.status === 'INQUIRY' || order.status === 'OFFER';
   const documentTitle = isInquiryContext ? 'OFFER' : 'CONFIRMATION';
   const documentName = isInquiryContext ? 'Offer' : 'Confirmation';
@@ -2050,6 +2082,8 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
     eta: order.eta?.toISOString() ?? null,
     etd: order.etd?.toISOString() ?? null,
     timezone: order.place.timezone ?? null,
+    dateFormat: dateFormat,
+    costSalesDecimalPrecision: costSalesDecimalPrecision,
     fromName: order.salesRep?.name ?? null,
     fromEmail: order.salesRep?.email ?? null,
     fromPhone: order.salesRep?.phone ?? null,
@@ -2191,6 +2225,8 @@ export async function generateNominationPdfBuffer(orderId: string, options?: {
   revision: DocumentRevisionInfo;
 }> {
   const order = await fetchOrderForInvoice(orderId);
+  const { dateFormat } = await getDateFormatSettings();
+  const { precision: costSalesDecimalPrecision } = await getCostSalesDecimalPrecision();
   const nominationContext = resolveNominationSupplierContext(order, options?.orderSupplierId ?? null);
   if (!nominationContext.items.length) {
     throw new Error('Assign at least one line item to the selected supplier before generating Nomination PDF');
@@ -2266,6 +2302,8 @@ export async function generateNominationPdfBuffer(orderId: string, options?: {
     eta: order.eta?.toISOString() ?? null,
     etd: order.etd?.toISOString() ?? null,
     timezone: order.place.timezone ?? null,
+    dateFormat: dateFormat,
+    costSalesDecimalPrecision: costSalesDecimalPrecision,
     fromName: order.salesRep?.name ?? null,
     fromEmail: order.salesRep?.email ?? null,
     fromPhone: order.salesRep?.phone ?? null,
@@ -2364,6 +2402,8 @@ function buildProformaDocument(data: {
   eta: string | null;
   etd: string | null;
   timezone: string | null;
+  dateFormat: string | null;
+  costSalesDecimalPrecision: number | null;
   currency: string;
   fromName: string | null;
   fromEmail: string | null;
@@ -2492,10 +2532,10 @@ function buildProformaDocument(data: {
   let deliveryDateStr = '';
   if (data.eta) {
     const hasRange = !!data.etd;
-    const fmtEta = formatDateTimeForDisplay(data.eta, data.timezone, hasRange);
+    const fmtEta = formatDateTimeForDisplay(data.eta, data.timezone, hasRange, data.dateFormat ?? undefined);
     deliveryDateStr = fmtEta ?? data.eta;
     if (data.etd) {
-      const fmtEtd = formatDateTimeForDisplay(data.etd, data.timezone);
+      const fmtEtd = formatDateTimeForDisplay(data.etd, data.timezone, false, data.dateFormat ?? undefined);
       deliveryDateStr += ` to ${fmtEtd ?? data.etd}`;
     }
   }
@@ -2588,7 +2628,7 @@ function buildProformaDocument(data: {
           margin: [0, 8, 0, 0] as [number, number, number, number],
         },
         ...(data.printMeta ? [{
-          text: `Issued (UTC): ${formatIssuedAtUtc(data.printMeta.issuedAt)}   Revision: ${data.printMeta.revisionNumber}   Ref: ${data.printMeta.verificationRef}   Fingerprint: ${data.printMeta.fingerprintShort}`,
+          text: `Issued (UTC): ${formatIssuedAtUtc(data.printMeta.issuedAt, data.dateFormat ?? undefined)}   Revision: ${data.printMeta.revisionNumber}   Ref: ${data.printMeta.verificationRef}   Fingerprint: ${data.printMeta.fingerprintShort}`,
           fontSize: 7,
           color: '#6b7280',
           alignment: 'center',
@@ -2807,6 +2847,8 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
   revision: DocumentRevisionInfo;
 }> {
   const order = await fetchOrderForInvoice(orderId);
+  const { dateFormat } = await getDateFormatSettings();
+  const { precision: costSalesDecimalPrecision } = await getCostSalesDecimalPrecision();
   const existingRevision = await getLatestDocumentRevisionByStream({
     documentType: 'PROFORMA_INVOICE',
     orderId: order.id,
@@ -2867,6 +2909,8 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
     eta: order.eta?.toISOString() ?? null,
     etd: order.etd?.toISOString() ?? null,
     timezone: order.place.timezone ?? null,
+    dateFormat: dateFormat,
+    costSalesDecimalPrecision: costSalesDecimalPrecision,
     currency: order.currency ?? 'USD',
     fromName: order.salesRep?.name ?? null,
     fromEmail: order.salesRep?.email ?? null,

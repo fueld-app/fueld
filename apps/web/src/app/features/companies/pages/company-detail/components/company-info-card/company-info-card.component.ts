@@ -17,6 +17,7 @@ import type {
 } from '@fueld/types';
 import { flagFromIso3 } from '../../../../../../shared/utils/flags';
 import { COUNTRIES, type Country } from '../../../../../../shared/data/countries';
+import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
 
 interface CompanyOfficeDto {
   id: string;
@@ -48,7 +49,7 @@ interface CompanyEnrichment {
 @Component({
   selector: 'app-company-info-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, DatePipe],
+  imports: [DateLabelPipe, FormsModule, DatePipe],
   styles: [`
     :host { display: block; }
   `],
@@ -788,7 +789,7 @@ interface CompanyEnrichment {
                     <p class="text-xs text-gray-500 mt-0.5">{{ e.label }}</p>
                   }
                   <p class="text-[10px] text-gray-400 mt-1">
-                    Added by {{ e.addedByName ?? 'Unknown' }} · {{ e.createdAt | date:'mediumDate' }}
+                    Added by {{ e.addedByName ?? 'Unknown' }} · {{ e.createdAt | dateLabel }}
                   </p>
                 </div>
               }

@@ -1,6 +1,7 @@
 import { Component, ChangeDetectionStrategy, input, output } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import type { RiskSummaryDto, RiskHitDto, RiskOverrideDto } from '@fueld/types';
+import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
 
 interface CompanyEnrichment {
   isSanctioned: boolean;
@@ -25,7 +26,7 @@ interface VesselCompanyDto {
 @Component({
   selector: 'app-risk-compliance-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe],
+  imports: [DateLabelPipe, DatePipe],
   template: `
     <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-2 flex flex-col overflow-hidden">
       <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
@@ -82,7 +83,7 @@ interface VesselCompanyDto {
                   <p class="mt-1 text-gray-700">{{ meta.creditOpinion }}</p>
                 </div>
               }
-              <div class="text-xs text-gray-400">Rated {{ meta.ratingDate | date:'mediumDate' }}</div>
+              <div class="text-xs text-gray-400">Rated {{ meta.ratingDate | dateLabel }}</div>
               <a [href]="'https://www.seasearcher.com/company/' + seasearcherId() + '/counterparty-risk-report'"
                 target="_blank" rel="noopener noreferrer"
                 class="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">
@@ -103,7 +104,7 @@ interface VesselCompanyDto {
                 <div class="px-5 py-3 text-sm">
                   <div class="flex items-center gap-2">
                     <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">{{ s.sanctionSource ?? s.source ?? 'Sanction' }}</span>
-                    @if (s.listedDate ?? s.startDate) { <span class="text-xs text-gray-400">{{ (s.listedDate ?? s.startDate) | date:'mediumDate' }}</span> }
+                    @if (s.listedDate ?? s.startDate) { <span class="text-xs text-gray-400">{{ (s.listedDate ?? s.startDate) | dateLabel }}</span> }
                   </div>
                   @if (s.sanctionType ?? s.type ?? s.description) {
                     <p class="mt-1 text-xs text-gray-600">{{ s.sanctionType ?? s.type ?? s.description }}</p>
@@ -127,8 +128,8 @@ interface VesselCompanyDto {
                   </div>
                   <div class="flex items-center gap-2 mt-1 text-xs text-gray-500">
                     @if (s.port ?? s.location) { <span>{{ s.port ?? s.location }}</span> }
-                    @if (s.seizureDate ?? s.date) { <span>&middot; {{ (s.seizureDate ?? s.date) | date:'mediumDate' }}</span> }
-                    @if (s.releaseDate) { <span>&middot; Released {{ s.releaseDate | date:'mediumDate' }}</span> }
+                    @if (s.seizureDate ?? s.date) { <span>&middot; {{ (s.seizureDate ?? s.date) | dateLabel }}</span> }
+                    @if (s.releaseDate) { <span>&middot; Released {{ s.releaseDate | dateLabel }}</span> }
                   </div>
                 </div>
               }

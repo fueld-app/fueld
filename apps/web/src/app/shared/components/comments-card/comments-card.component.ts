@@ -22,6 +22,7 @@ import {
   normalizeFollowUpDays,
   todayDateString,
 } from './comments-card.follow-up';
+import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
 
 interface Comment {
   id: string;
@@ -39,7 +40,7 @@ interface Comment {
 @Component({
   selector: 'app-comments-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, DatePipe],
+  imports: [DateLabelPipe, FormsModule, DatePipe],
   template: `
     <div class="app-panel h-[420px] flex flex-col overflow-hidden">
       <!-- Header -->
@@ -208,7 +209,7 @@ interface Comment {
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                               <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
                             </svg>
-                            {{ c.followUpDate | date:'mediumDate' }}
+                            {{ c.followUpDate | dateLabel }}
                           </span>
                         } @else {
                           <span
@@ -218,7 +219,7 @@ interface Comment {
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                               <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z" clip-rule="evenodd" />
                             </svg>
-                            {{ c.followUpDate | date:'mediumDate' }}
+                            {{ c.followUpDate | dateLabel }}
                           </span>
                           <button
                             (click)="markFollowUpDone(c.id)"

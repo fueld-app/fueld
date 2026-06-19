@@ -163,7 +163,22 @@ function buildPreviewWarnings(order: any): string[] {
   return warnings;
 }
 
-function buildBunkerInstructionsSections(order: any): PortDocumentationSectionDto[] {
+// Resolve the supplier name to show on bunker instructions. When an explicit
+// orderSupplierId is supplied (the currently-active supplier tab), prefer that
+// supplier's company name so the generated Excel reflects the active supplier
+// rather than always the order's primary supplier.
+function resolveSupplierName(order: any, orderSupplierId?: string | null): string | null {
+  if (orderSupplierId && Array.isArray(order.orderSuppliers)) {
+    const match = order.orderSuppliers.find((s: any) => s?.id === orderSupplierId);
+    if (match?.company?.name) return match.company.name;
+  }
+  return order.supplier?.name ?? null;
+}
+
+function buildBunkerInstructionsSections(
+  order: any,
+  orderSupplierId?: string | null,
+): PortDocumentationSectionDto[] {
   const productLines = Array.isArray(order.items)
     ? order.items.map((item: any, index: number) => ({
         label: `Product ${index + 1}`,
@@ -176,8 +191,7 @@ function buildBunkerInstructionsSections(order: any): PortDocumentationSectionDt
       title: 'Order',
       fields: [
         { label: 'Order Number', value: normalizeCell(order.orderNumber) },
-        { label: 'Client', value: normalizeCell(order.client?.name) },
-        { label: 'Supplier', value: normalizeCell(order.supplier?.name) },
+        { label: 'Supplier', value: normalizeCell(resolveSupplierName(order, orderSupplierId)) },
         { label: 'Agent', value: normalizeCell(order.agent?.name) },
         { label: 'Agent Contact', value: normalizeCell(order.agentContact?.name) },
       ],
@@ -532,21 +546,30 @@ export async function getPortDocumentationOrderContext(tenantId: string, orderId
   };
 }
 
-export async function getBunkerInstructionsPreview(tenantId: string, orderId: string): Promise<BunkerInstructionsPreviewDto> {
+export async function getBunkerInstructionsPreview(
+  tenantId: string,
+  orderId: string,
+  orderSupplierId?: string | null,
+): Promise<BunkerInstructionsPreviewDto> {
   const order = await getOrderForPortDocumentation(tenantId, orderId);
   return {
     orderId,
     warnings: buildPreviewWarnings(order),
-    sections: buildBunkerInstructionsSections(order),
+    sections: buildBunkerInstructionsSections(order, orderSupplierId),
   };
 }
 
-export async function generateBunkerInstructionsDocument(tenantId: string, orderId: string, userId: string): Promise<GeneratedDocumentResult> {
+export async function generateBunkerInstructionsDocument(
+  tenantId: string,
+  orderId: string,
+  userId: string,
+  orderSupplierId?: string | null,
+): Promise<GeneratedDocumentResult> {
   const order = await getOrderForPortDocumentation(tenantId, orderId);
   const preview = {
     orderId,
     warnings: buildPreviewWarnings(order),
-    sections: buildBunkerInstructionsSections(order),
+    sections: buildBunkerInstructionsSections(order, orderSupplierId),
   } satisfies BunkerInstructionsPreviewDto;
   const buffer = buildBunkerInstructionsWorkbook(preview);
   const fileName = buildBunkerInstructionsFileName(order);
@@ -558,7 +581,7 @@ export async function generateBunkerInstructionsDocument(tenantId: string, order
     mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     buffer,
     generatedBy: userId,
-    inputSnapshotJson: { warnings: preview.warnings },
+    inputSnapshotJson: { warnings: preview.warnings, orderSupplierId: orderSupplierId ?? null },
     dataSnapshotJson: { sections: preview.sections },
   });
 

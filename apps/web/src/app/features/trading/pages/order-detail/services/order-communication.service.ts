@@ -92,6 +92,7 @@ export class OrderCommunicationService {
     orderId: string,
     emailModal: any,
     showToast: (type: 'success' | 'error', msg: string) => void,
+    onSuccess?: () => void,
   ): void {
     if (!orderId) return;
 
@@ -114,6 +115,7 @@ export class OrderCommunicationService {
           emailModal?.done();
           const channel = res.data?.channel === 'GRAPH' ? 'via Outlook' : 'via email';
           showToast('success', `${payload.documentType} sent to ${payload.recipientEmail} ${channel}`);
+          onSuccess?.();
         },
         error: () => {
           emailModal?.done();

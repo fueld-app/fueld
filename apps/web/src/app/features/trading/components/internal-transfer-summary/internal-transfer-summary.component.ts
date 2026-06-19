@@ -12,12 +12,13 @@ import {
   input,
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { DateLabelPipe } from '../../../../shared/pipes/date-format.pipe';
 import type { OrderTransferDto } from '@fueld/types';
 
 @Component({
   selector: 'app-internal-transfer-summary',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe],
+  imports: [DatePipe, DateLabelPipe],
   template: `
     @if (transfer(); as t) {
       <div class="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-5 shadow-sm">
@@ -29,7 +30,7 @@ import type { OrderTransferDto } from '@fueld/types';
             @if (t.plannedArrivalAt) {
               <span class="text-xs text-gray-600">
                 Planned arrival
-                <strong class="text-gray-900">{{ t.plannedArrivalAt | date:'mediumDate' }}</strong>
+                <strong class="text-gray-900">{{ t.plannedArrivalAt | dateLabel }}</strong>
               </span>
             }
           </div>

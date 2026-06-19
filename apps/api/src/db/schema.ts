@@ -345,6 +345,10 @@ export interface TenantSettings {
   }[];
   // Default unit for new order line items (overrides hardcoded 'MT')
   defaultUnit?: string;
+  // Configurable decimal precision for cost/sales prices (default 5)
+  costSalesDecimalPrecision?: number;
+  // Configurable date format: 'AMERICAN' (MM/DD/YYYY), 'EUROPEAN' (DD/MM/YYYY), 'ISO' (YYYY-MM-DD)
+  dateFormat?: 'AMERICAN' | 'EUROPEAN' | 'ISO';
   // Tax rates — simple flat percentage per product
   taxRates?: {
     id: string;

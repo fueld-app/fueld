@@ -22,6 +22,7 @@ import {
   formatPhoneDisplay, splitAddressLines, computeDueDate, formatIssuedAtUtc,
 } from './document-utils.service';
 import { createDocumentRevision, getRevisionAbsolutePath, mapRevisionInfo } from './document-revision.service';
+import { getDateFormatSettings, getCostSalesDecimalPrecision } from '../admin/settings.service';
 import type { DocumentRevisionInfo, BankDetails, DocumentPrintMeta, DocumentType } from './document.types';
 import { DEFAULT_BANK_DETAILS } from './document.types';
 
@@ -62,6 +63,8 @@ export function buildOfferDocument(data: {
   eta: string | null;
   etd: string | null;
   timezone: string | null;
+  dateFormat: string | null;
+  costSalesDecimalPrecision: number | null;
   fromName: string | null;
   fromEmail: string | null;
   fromPhone: string | null;
@@ -218,10 +221,10 @@ export function buildOfferDocument(data: {
   let deliveryDateStr = '';
   if (data.eta) {
     const hasRange = !!data.etd;
-    const fmtEta = formatDateTimeForDisplay(data.eta, data.timezone, hasRange);
+    const fmtEta = formatDateTimeForDisplay(data.eta, data.timezone, hasRange, data.dateFormat ?? undefined);
     deliveryDateStr = fmtEta ?? data.eta;
     if (data.etd) {
-      const fmtEtd = formatDateTimeForDisplay(data.etd, data.timezone);
+      const fmtEtd = formatDateTimeForDisplay(data.etd, data.timezone, false, data.dateFormat ?? undefined);
       deliveryDateStr += ` to ${fmtEtd ?? data.etd}`;
     }
   }
@@ -318,7 +321,7 @@ export function buildOfferDocument(data: {
           margin: [0, 8, 0, 0] as [number, number, number, number],
         },
         ...(data.printMeta ? [{
-          text: `Issued (UTC): ${formatIssuedAtUtc(data.printMeta.issuedAt)}   Revision: ${data.printMeta.revisionNumber}   Ref: ${data.printMeta.verificationRef}   Fingerprint: ${data.printMeta.fingerprintShort}`,
+          text: `Issued (UTC): ${formatIssuedAtUtc(data.printMeta.issuedAt, data.dateFormat ?? undefined)}   Revision: ${data.printMeta.revisionNumber}   Ref: ${data.printMeta.verificationRef}   Fingerprint: ${data.printMeta.fingerprintShort}`,
           fontSize: 7,
           color: '#6b7280',
           alignment: 'center',
@@ -505,6 +508,8 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
   revision: DocumentRevisionInfo;
 }> {
   const order = await fetchOrderForInvoice(orderId);
+  const { dateFormat } = await getDateFormatSettings();
+  const { precision: costSalesDecimalPrecision } = await getCostSalesDecimalPrecision();
   const isInquiryContext = order.status === 'INQUIRY' || order.status === 'OFFER';
   const documentTitle = isInquiryContext ? 'OFFER' : 'CONFIRMATION';
   const documentName = isInquiryContext ? 'Offer' : 'Confirmation';
@@ -568,6 +573,8 @@ export async function generateOfferPdfBuffer(orderId: string): Promise<{
     eta: order.eta?.toISOString() ?? null,
     etd: order.etd?.toISOString() ?? null,
     timezone: order.place.timezone ?? null,
+    dateFormat: dateFormat,
+    costSalesDecimalPrecision: costSalesDecimalPrecision,
     fromName: order.salesRep?.name ?? null,
     fromEmail: order.salesRep?.email ?? null,
     fromPhone: order.salesRep?.phone ?? null,
@@ -711,6 +718,8 @@ export async function generateNominationPdfBuffer(orderId: string, options?: {
   revision: DocumentRevisionInfo;
 }> {
   const order = await fetchOrderForInvoice(orderId);
+  const { dateFormat } = await getDateFormatSettings();
+  const { precision: costSalesDecimalPrecision } = await getCostSalesDecimalPrecision();
   const nominationContext = resolveNominationSupplierContext(order, options?.orderSupplierId ?? null);
   if (!nominationContext.items.length) {
     throw new Error('Assign at least one line item to the selected supplier before generating Nomination PDF');
@@ -786,6 +795,8 @@ export async function generateNominationPdfBuffer(orderId: string, options?: {
     eta: order.eta?.toISOString() ?? null,
     etd: order.etd?.toISOString() ?? null,
     timezone: order.place.timezone ?? null,
+    dateFormat: dateFormat,
+    costSalesDecimalPrecision: costSalesDecimalPrecision,
     fromName: order.salesRep?.name ?? null,
     fromEmail: order.salesRep?.email ?? null,
     fromPhone: order.salesRep?.phone ?? null,

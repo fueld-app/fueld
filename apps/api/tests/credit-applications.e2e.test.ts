@@ -523,6 +523,51 @@ describe('credit applications controller e2e', () => {
     expect(reviewed.data.data.reviews[0].comment).toBe('Looks good');
   });
 
+  it('syncs the counterparty creditLimit (company card) on approval', async () => {
+    const seeded = await seedAuthBasics();
+    const cm = await seedCreditManagerUser(seeded.tenant.id);
+
+    const traderToken = (await loginE2E(seeded.user.email, seeded.password)).accessToken!;
+    const cmToken = (await loginE2E(cm.email, 'Passw0rd!')).accessToken!;
+
+    const created = await requestJson('/credit/applications', {
+      method: 'POST',
+      token: traderToken,
+      body: {
+        type: 'CUSTOMER',
+        counterpartyId: seeded.client.id,
+        requestedAmount: '7500.00',
+        requestedCurrency: 'USD',
+      },
+    });
+    const appId = created.data.data.id;
+
+    const reviewed = await requestJson(`/credit/applications/${appId}/review`, {
+      method: 'POST',
+      token: cmToken,
+      body: { decision: 'APPROVED' },
+    });
+    expect(reviewed.data.success).toBe(true);
+    expect(reviewed.data.data.status).toBe('APPROVED');
+
+    // The credit line should exist and be linked to the client
+    const linesRes = await requestJson(`/credit/lines?type=CUSTOMER&counterpartyId=${seeded.client.id}`, {
+      token: traderToken,
+    });
+    expect(linesRes.data.success).toBe(true);
+    expect(linesRes.data.data.items.length).toBe(1);
+    expect(linesRes.data.data.items[0].creditAmount).toBe('7500.00');
+
+    // The client's creditLimit (shown on the company card) must reflect the approved credit
+    const db = await getDb();
+    const [cpRow] = await db
+      .select()
+      .from(counterparties)
+      .where(eq(counterparties.id, seeded.client.id))
+      .limit(1);
+    expect(cpRow?.creditLimit).toBe('7500.00');
+  });
+
   it('credit manager can reject an application', async () => {
     const seeded = await seedAuthBasics();
     const cm = await seedCreditManagerUser(seeded.tenant.id);

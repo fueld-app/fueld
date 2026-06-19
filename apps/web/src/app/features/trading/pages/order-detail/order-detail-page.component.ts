@@ -81,7 +81,7 @@ import { InternalTransferSidesComponent } from '../../components/internal-transf
 import { AuthService } from '../../../../core/auth/auth.service';
 import { OrderReferenceDataService } from './services/order-reference-data.service';
 import { OrderReplyService } from './services/order-reply.service';
-import { buildItemPayload, normalizeTimeZone, parseFixedOffsetMinutes, getTimeZoneOffset, toUtcIsoFromZonedInput, formatDateTimeInput, toIsoFromDateTimeInput, formatStoredDateOnlyForInput, parseDecimalValue, normalizeTerms, normalizeCurrencyCode } from './services/order-utils';
+import { buildItemPayload, normalizeTimeZone, parseFixedOffsetMinutes, getTimeZoneOffset, toUtcIsoFromZonedInput, toUtcIsoFromZonedDateInput, formatStoredDateOnlyForInputZoned, formatDateTimeInput, toIsoFromDateTimeInput, formatStoredDateOnlyForInput, parseDecimalValue, normalizeTerms, normalizeCurrencyCode } from './services/order-utils';
 import { OrderLoaderService } from './services/order-loader.service';
 import { OrderPortDocumentationService } from './services/order-port-documentation.service';
 import { OrderInquiryService } from './services/order-inquiry.service';
@@ -93,6 +93,7 @@ import { OrderSearchService } from './services/order-search.service';
 import { OrderSaveService } from './services/order-save.service';
 import { OrderInventoryService } from './services/order-inventory.service';
 import { OrderPlattsService } from './services/order-platts.service';
+import { DateFormatService } from '@app/core/services/date-format.service';
 import { OrderBrokerService } from './services/order-broker.service';
 import { OrderAgentService } from './services/order-agent.service';
 import { OrderActionService } from './services/order-action.service';
@@ -187,6 +188,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   protected readonly brokerSvc = inject(OrderBrokerService);
   protected readonly agentSvc = inject(OrderAgentService);
   protected readonly plattsSvc = inject(OrderPlattsService);
+  protected readonly dateFormatSvc = inject(DateFormatService);
   protected readonly actionSvc = inject(OrderActionService);
   private readonly riskService = inject(RiskMonitoringService);
 
@@ -483,7 +485,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly deliveredAtLocal = computed(() => {
     const iso = this.activeSupplierDeliveredAt();
     if (!iso) return '';
-    return formatStoredDateOnlyForInput(iso);
+    return formatStoredDateOnlyForInputZoned(iso, this.placeTimezone());
   });
 
   readonly deliveredQtyComplete = computed(() =>
@@ -634,7 +636,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly etaMinDateTime = computed(() => {
     const eta = this.order()?.eta;
     if (!eta) return '';
-    return formatStoredDateOnlyForInput(eta);
+    return formatStoredDateOnlyForInputZoned(eta, this.placeTimezone());
   });
 
   readonly paymentsTotal = computed(() =>
@@ -837,15 +839,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   formatStoredDateOnlyLabel(iso: string | null): string {
-    if (!iso) return '-';
-    const date = new Date(iso);
-    if (Number.isNaN(date.getTime())) return '-';
-    return new Intl.DateTimeFormat('en-GB', {
-      timeZone: 'UTC',
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    }).format(date);
+    return this.dateFormatSvc.formatDateLabel(iso);
   }
 
 
@@ -876,6 +870,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   ngOnInit(): void {
     this.loadOrder();
     this.checkWhatsAppLinked();
+    this.dateFormatSvc.load();
   }
 
   ngAfterViewInit(): void {
@@ -1000,12 +995,12 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   async previewBunkerInstructions(): Promise<void> {
-    await this.portDocSvc.previewBunkerInstructions(this.orderId());
+    await this.portDocSvc.previewBunkerInstructions(this.orderId(), this.activeOrderSupplier()?.id ?? null);
     await this.loadPortDocumentationContext();
   }
 
   async generateBunkerInstructions(): Promise<void> {
-    await this.portDocSvc.generateBunkerInstructions(this.orderId());
+    await this.portDocSvc.generateBunkerInstructions(this.orderId(), this.activeOrderSupplier()?.id ?? null);
     await this.loadPortDocumentationContext();
     this.showToast('success', 'Bunker Instructions generated.');
   }
@@ -2259,18 +2254,18 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   onEtaChange(eta: string): void {
-    const iso = eta ? `${eta}T12:00:00.000Z` : null;
+    const iso = eta ? toUtcIsoFromZonedDateInput(eta, this.placeTimezone()) : null;
     this.order.update((o) => (o ? { ...o, eta: iso } : o));
     this.queuePlattsSuggestionsLoad();
   }
 
   onEtdChange(etd: string): void {
-    const iso = etd ? `${etd}T12:00:00.000Z` : null;
+    const iso = etd ? toUtcIsoFromZonedDateInput(etd, this.placeTimezone()) : null;
     this.order.update((o) => (o ? { ...o, etd: iso } : o));
   }
 
   onDeliveredAtChange(value: string): void {
-    const iso = value ? `${value}T12:00:00.000Z` : null;
+    const iso = value ? toUtcIsoFromZonedDateInput(value, this.placeTimezone()) : null;
     if (this.orderSuppliers().length === 0) {
       this.order.update((order) => order ? { ...order, deliveredAt: iso } : order);
       return;
@@ -2416,7 +2411,20 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   onSendEmail(payload: SendEmailPayload): void {
-    this.commSvc.onSendEmail(payload, this.orderId(), this.emailModal(), (type, msg) => this.showToast(type, msg));
+    this.commSvc.onSendEmail(
+      payload,
+      this.orderId(),
+      this.emailModal(),
+      (type, msg) => this.showToast(type, msg),
+      // When a final INVOICE email is sent on a DELIVERED order, the backend
+      // transitions the order status to INVOICED.  Update the local signal so
+      // the status badge / header actions reflect the new state immediately.
+      () => {
+        if (payload.documentType === 'INVOICE' && this.order()?.status === OrderStatus.Delivered) {
+          this.order.update((o) => (o ? { ...o, status: OrderStatus.Invoiced } : o));
+        }
+      },
+    );
   }
 
   // ─── WhatsApp send handlers ──────────────────────────────────────

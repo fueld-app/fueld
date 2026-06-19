@@ -32,15 +32,15 @@ type PricingSide = 'cost' | 'sales';
           @if (barging()) { <div class="text-gray-500">barging {{ barging() }} {{ bargingUnit() || 'l/s' }}</div> }
           @if (creditDays()) { <div class="text-gray-500">{{ creditDays() }} days</div> }
           @if (priceFinalized()) {
-            <div class="font-medium text-gray-900">→ {{ price() | number:'1.2-4' }} {{ currency() }}/{{ unit() }}</div>
+            <div class="font-medium text-gray-900">→ {{ price() | number:priceFormat() }} {{ currency() }}/{{ unit() }}</div>
           } @else {
             <div class="italic text-amber-600">price TBD</div>
           }
         </div>
       } @else {
-        <span class="block text-right tabular-nums">{{ price() | number:'1.2-4' }} {{ currency() }}/{{ unit() }}</span>
+        <span class="block text-right tabular-nums">{{ price() | number:priceFormat() }} {{ currency() }}/{{ unit() }}</span>
         @if (row().unit !== unit()) {
-          <span class="block text-right text-xs text-gray-400">× {{ conversionFactor() | number:'1.2-4' }} {{ row().unit }}/{{ unit() }}</span>
+          <span class="block text-right text-xs text-gray-400">× {{ conversionFactor() | number:priceFormat() }} {{ row().unit }}/{{ unit() }}</span>
         }
       }
     } @else {
@@ -301,9 +301,13 @@ export class OrderItemPricingComponent {
   readonly unitOptions = input<DropdownOption[]>([]);
   readonly plattsMatches = input<PlattsSuggestionsResponseDto['items'][number]['matches']>([]);
   readonly plattsEntryId = input<string | null | undefined>(null);
+  readonly decimalPrecision = input<number>(5);
 
   readonly fieldChange = output<{ field: string; value: unknown }>();
   readonly plattsSelect = output<string>();
+
+  /** Number pipe format string derived from the configurable precision. */
+  protected priceFormat = computed(() => `1.2-${this.decimalPrecision()}`);
 
   /** Derive which pricing model is active based on side. */
   protected pricingModel = computed(() => {

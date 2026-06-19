@@ -24,6 +24,7 @@ import {
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
+import { DateLabelPipe } from '../../../../shared/pipes/date-format.pipe';
 import { firstValueFrom } from 'rxjs';
 import type {
   ApiResponse,
@@ -40,7 +41,7 @@ import { API } from '@app/core/config/api';
 @Component({
   selector: 'app-inventory-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, DatePipe],
+  imports: [FormsModule, DatePipe, DateLabelPipe],
   template: `
     <div>
       <!-- Header -->
@@ -179,7 +180,7 @@ import { API } from '@app/core/config/api';
                   <td class="px-4 py-3 text-gray-700">
                     @if (row.earliestAvailableAt) {
                       <span class="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
-                        {{ row.earliestAvailableAt | date:'mediumDate' }}
+                        {{ row.earliestAvailableAt | dateLabel }}
                       </span>
                     } @else {
                       <span class="text-xs text-gray-400">Now</span>
@@ -226,7 +227,7 @@ import { API } from '@app/core/config/api';
                       <td class="px-4 py-3">{{ p.warehouseName }}</td>
                       <td class="px-4 py-3">{{ p.skuDisplayName }}</td>
                       <td class="px-4 py-3 text-right tabular-nums">{{ formatQty(p.quantity) }} {{ p.unit }}</td>
-                      <td class="px-4 py-3">{{ p.expectedAt | date:'mediumDate' }}</td>
+                      <td class="px-4 py-3">{{ p.expectedAt | dateLabel }}</td>
                       <td class="px-4 py-3">
                         <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
                           [class]="p.status === 'PLANNED' ? 'bg-gray-100 text-gray-700' : 'bg-blue-100 text-blue-700'">
