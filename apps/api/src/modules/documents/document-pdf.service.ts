@@ -28,12 +28,8 @@ pdfmake.setFonts({
 // ─── Shared PDF creation ─────────────────────────────────────────────
 
 export function createPdfBuffer(docDefinition: TDocumentDefinitions): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const pdfDoc = pdfmake.createPdf(docDefinition);
-    pdfDoc.getBuffer((buffer: Buffer) => {
-      resolve(buffer);
-    });
-  });
+  const pdfDoc = pdfmake.createPdf(docDefinition);
+  return pdfDoc.getBuffer();
 }
 
 // ─── Shared document helpers ─────────────────────────────────────────
