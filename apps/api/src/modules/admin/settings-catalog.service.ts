@@ -22,7 +22,7 @@ async function updateTenantField<T>(key: string, value: T): Promise<T> {
 
 export async function getProductSettings(): Promise<{ products: string[] }> {
   const { settings } = await getTenantSettingsRow();
-  return { products: settings.productTypes ?? [] };
+  return { products: settings.products ?? [] };
 }
 
 export async function updateProductSettings(products: string[]): Promise<{ products: string[] }> {
@@ -33,7 +33,7 @@ export async function updateProductSettings(products: string[]): Promise<{ produ
 
 export async function getUnitSettings(): Promise<{ units: string[] }> {
   const { settings } = await getTenantSettingsRow();
-  return { units: settings.unitTypes ?? [] };
+  return { units: settings.units ?? [] };
 }
 
 export async function updateUnitSettings(units: string[]): Promise<{ units: string[] }> {
@@ -43,7 +43,7 @@ export async function updateUnitSettings(units: string[]): Promise<{ units: stri
 export interface UnitConversion {
   fromUnit: string;
   toUnit: string;
-  factor: string;
+  factor: number;
 }
 
 export async function getUnitConversionSettings(): Promise<{ conversions: UnitConversion[] }> {
@@ -84,7 +84,8 @@ export async function listPriceReferences() {
 }
 
 export async function createPriceReference(input: { name: string; code: string; description?: string | null }) {
-  const [created] = await db.insert(priceReferences).values({ name: input.name, code: input.code, description: input.description ?? null }).returning();
+  const { tenantId } = await getTenantSettingsRow();
+  const [created] = await db.insert(priceReferences).values({ name: input.name, code: input.code, description: input.description ?? null, tenantId }).returning();
   return created;
 }
 
@@ -119,15 +120,14 @@ export async function updateSegmentSettings(segmentCategories: SegmentCategory[]
 // ─── Catalog ───────────────────────────────────────────────────────
 
 export interface CatalogItemConfig {
-  sku: string;
+  id: string;
   name: string;
-  productType: string;
-  unit: string;
   description?: string;
-  category?: string;
-  defaultCostPrice?: string;
-  defaultSalesPrice?: string;
-  isActive: boolean;
+  defaultUnit?: string;
+  defaultCostPrice?: number;
+  defaultSalesPrice?: number;
+  defaultTaxRateId?: string;
+  categoryKey?: string;
 }
 
 export async function getCatalogSettings(): Promise<{ items: CatalogItemConfig[] }> {
@@ -169,8 +169,10 @@ export async function updateDefaultUnitSettings(defaultUnit: string): Promise<{ 
 // ─── Tax Rates ─────────────────────────────────────────────────────
 
 export interface TaxRateConfig {
+  id: string;
   name: string;
-  rate: string;
+  rate: number;
+  productType?: string;
   isDefault?: boolean;
 }
 

@@ -8,6 +8,7 @@
 
 import { Elysia, t } from 'elysia';
 import { authGuard } from '../auth/auth.guard';
+import type { ApiResponse } from '@fueld/types';
 import {
   getOrderNumberSettings,
   updateOrderNumberSettings,

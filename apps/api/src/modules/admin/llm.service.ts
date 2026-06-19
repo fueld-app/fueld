@@ -882,6 +882,7 @@ export async function searchHuggingFaceModels(q: string, limit: number): Promise
 }
 
 export async function downloadModel(modelUrl: string): Promise<void> {
+  const { mkdir } = await import('fs/promises');
   // Parse the HF repo + filename from the selection
   const paths = getLlmPaths();
   await mkdir(paths.modelDir, { recursive: true });

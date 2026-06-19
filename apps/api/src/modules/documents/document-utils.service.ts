@@ -191,7 +191,7 @@ export async function loadBankDetails(tenantId: string, invoicingCompanyId: stri
     accountName: bank.accountName ?? null,
     accountNumber: bank.accountNumber ?? null,
     iban: bank.iban ?? null,
-    swift: bank.swift ?? null,
+    swift: bank.swiftBic ?? null,
     currency: bank.currency ?? 'USD',
     branchAddress: bank.branchAddress ?? null,
     sortCode: bank.sortCode ?? null,

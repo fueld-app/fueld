@@ -99,6 +99,7 @@ export async function getNearbyVessels(seasearcherId: string): Promise<NearbyVes
   try {
     const lli = await lliGet<LliResponse<{ currentPage: number; items: NearbyVessel[] }>>(
       `vesselnearbyposition/${seasearcherId}`,
+      {},
     );
     if (lli.IsSuccess && lli.Data?.items?.length) {
       return lli.Data.items;

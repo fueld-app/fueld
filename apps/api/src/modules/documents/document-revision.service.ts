@@ -69,7 +69,7 @@ export async function getLatestDocumentRevisionByStream(params: {
   const conditions = [];
   if (params.orderId) conditions.push(eq(documentRevisions.orderId, params.orderId));
   if (params.invoiceId) conditions.push(eq(documentRevisions.invoiceId, params.invoiceId));
-  if (params.documentType) conditions.push(eq(documentRevisions.documentType, params.documentType));
+  if (params.documentType) conditions.push(eq(documentRevisions.documentType, params.documentType as any));
   if (!conditions.length) return null;
 
   const [revision] = await db
@@ -146,6 +146,9 @@ export async function createDocumentRevision(params: {
       fingerprintShort,
       issuedAt,
       filePath,
+      fileName: `${verificationRef}.pdf`,
+      fileSize: params.pdfBuffer.length,
+      streamKey: verificationRef,
     })
     .returning();
 

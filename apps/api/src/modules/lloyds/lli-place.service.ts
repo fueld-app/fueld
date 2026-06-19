@@ -134,6 +134,7 @@ export async function importPlaceFromLli(lliPlaceId: string): Promise<{ id: stri
 
   const detail = await lliGet<LliResponse<LliPlaceBasic>>(
     `placebasiccharacteristics/${lliPlaceId}`,
+    {},
   );
 
   if (!detail.IsSuccess || !detail.Data) {
@@ -141,9 +142,10 @@ export async function importPlaceFromLli(lliPlaceId: string): Promise<{ id: stri
     try {
       const ss = await seasearcherPlaceDetail<SeasearcherPlaceDetailResponse>(lliPlaceId);
       const [created] = await db
-        .insert(places)
+        .insert(places as any)
         .values({
-          name: ss.name,
+          
+          name: ss.name as any,
           lliPlaceId: ss.id,
           country: ss.country.name,
           countryIso: ss.country.code,
@@ -165,8 +167,9 @@ export async function importPlaceFromLli(lliPlaceId: string): Promise<{ id: stri
 
   const place = detail.Data;
   const [created] = await db
-    .insert(places)
+    .insert(places as any)
     .values({
+          
       name: place.name,
       lliPlaceId: place.placeId,
       country: place.country,
@@ -264,6 +267,7 @@ async function getPlaceHierarchy(seasearcherId: string): Promise<HierarchyNode |
   try {
     const data = await lliGet<LliResponse<{ items: Array<{ placeId: string; name: string; type?: string; unlocode?: string; parentPlaceId?: string; children?: any[] }> }>>(
       `placeadvancedchars_v3/${seasearcherId}`,
+      {},
     );
 
     if (data.IsSuccess && data.Data?.items?.length) {
@@ -288,6 +292,7 @@ async function getChildPlaces(seasearcherId: string): Promise<ChildPlace[]> {
   try {
     const data = await lliGet<LliResponse<{ items: Array<{ placeId: string; name: string; type?: string; unlocode?: string }> }>>(
       `placeadvancedchars_v3/${seasearcherId}`,
+      {},
     );
 
     if (data.IsSuccess && data.Data?.items?.length) {
@@ -322,8 +327,9 @@ export async function createPlace(data: {
   long?: string | null;
 }) {
   const [created] = await db
-    .insert(places)
+    .insert(places as any)
     .values({
+          
       name: data.name,
       country: data.country,
       countryIso: data.countryIso ?? null,
@@ -356,7 +362,7 @@ export async function updateLocalPlace(
   }>,
 ) {
   const [updated] = await db
-    .update(places)
+    .update(places as any)
     .set({ ...data, updatedAt: new Date() })
     .where(eq(places.id, id))
     .returning();
@@ -365,7 +371,7 @@ export async function updateLocalPlace(
 
 export async function updatePlaceOrderRemark(id: string, orderRemark: string | null) {
   const [updated] = await db
-    .update(places)
+    .update(places as any)
     .set({ orderRemark, updatedAt: new Date() })
     .where(eq(places.id, id))
     .returning();
@@ -405,7 +411,7 @@ export async function syncPlaceFromSeasearcher(
         lat: ss.location?.lat?.toFixed(6) ?? local.lat,
         long: ss.location?.lng?.toFixed(6) ?? local.long,
         updatedAt: new Date(),
-      })
+      } as any)
       .where(eq(places.id, placeId))
       .returning();
     if (updated) {
@@ -518,6 +524,7 @@ export async function getPortFacilities(seasearcherId: string) {
   try {
     const lli = await lliGet<LliResponse<{ currentPage: number; items: PortFacility[] }>>(
       `placeportfacilities_v3/${seasearcherId}`,
+      {},
     );
     if (lli.IsSuccess && lli.Data?.items?.length) {
       return lli.Data.items;
@@ -550,6 +557,7 @@ export async function getExpectedArrivals(
   try {
     const lli = await lliGet<LliResponse<{ currentPage: number; items: ExpectedArrival[] }>>(
       `placeexpectedarrivals_v2/${seasearcherId}?days=${daysAhead}`,
+      {},
     );
     if (lli.IsSuccess && lli.Data?.items?.length) {
       return lli.Data.items;
@@ -584,6 +592,7 @@ export async function addPortSupplier(
   const [created] = await db
     .insert(portSuppliers)
     .values({
+          
       placeId,
       companyId: data.companyId,
       contactId: data.contactId ?? null,
@@ -654,7 +663,7 @@ export async function getSupplyPortsForCompany(companyId: string) {
 
 export async function updateResponsibleUser(placeId: string, userId: string | null) {
   const [updated] = await db
-    .update(places)
+    .update(places as any)
     .set({ responsibleUserId: userId, updatedAt: new Date() })
     .where(eq(places.id, placeId))
     .returning();
