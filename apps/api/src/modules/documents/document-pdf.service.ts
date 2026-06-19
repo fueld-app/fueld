@@ -79,6 +79,8 @@ export function buildNotesSection(params: {
   clientName: string;
   vesselName: string;
   placeName: string;
+  itemNotes?: Array<{ label: string; note: string }>;
+  placeRemark?: string | null;
 }): Content[] {
   const notes: Content[] = [];
 

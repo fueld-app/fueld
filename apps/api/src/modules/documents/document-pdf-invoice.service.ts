@@ -8,8 +8,8 @@ import vfsFonts from 'pdfmake/build/vfs_fonts.js';
 import type { TDocumentDefinitions, Content, TableCell } from 'pdfmake/interfaces';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, extname, join } from 'node:path';
 import { db } from '../../db';
 import { bankAccounts, orders, orderItems, counterparties, vessels, places, invoices, users, priceReferences, tenants } from '../../db/schema';
 import type { TenantSettings } from '../../db/schema';
@@ -19,10 +19,39 @@ import {
   getCompanyRegistrationNumber, loadBankDetails, tryLoadLogoDataUrl,
   formatCustomerPaymentTerms, formatStoredDateOnlyForDisplay,
   formatNumber, formatNumberCompact, normalizeCountryName, countryAlreadyInAddress,
-  formatPhoneDisplay, splitAddressLines, computeDueDate, formatIssuedAtUtc,
+  formatPhoneDisplay, splitAddressLines, formatIssuedAtUtc,
 } from './document-utils.service';
 import { createDocumentRevision, getRevisionAbsolutePath, mapRevisionInfo } from './document-revision.service';
-import { getDateFormatSettings, getCostSalesDecimalPrecision } from '../admin/settings.service';
+import {
+  getDateFormatSettings, getCostSalesDecimalPrecision,
+} from '../admin/settings.service';
+import {
+  getPublicApiBaseUrl,
+  phoneToTelUri,
+} from './document-utils.service';
+import {
+  fetchInvoiceData,
+  fetchOrderForInvoice,
+  loadOrderBankDetails,
+  maxMs,
+  maxItemUpdatedAtMs,
+  persistDocumentRevision,
+  overwriteDocumentRevisionArtifact,
+  getLatestDocumentRevisionByStream,
+  loadDocumentRevisionBuffer,
+  trimTrailingSlash,
+  sanitizePathSegment,
+  documentTypePrefix,
+  buildVerificationRef,
+  resolveDocumentStreamTarget,
+  buildDocumentStreamKey,
+  toMs,
+  parseTimezoneOffset,
+  replaceCompanyNamePlaceholder,
+  buildOfferDocument,
+  computeDueDate,
+  formatDateTimeForDisplay,
+} from './document.service';
 import type { DocumentRevisionInfo, BankDetails, DocumentPrintMeta, DocumentType } from './document.types';
 import { DEFAULT_BANK_DETAILS } from './document.types';
 
@@ -1039,7 +1068,12 @@ export function buildProformaDocument(data: {
 
       // Notes
       ...buildNotesSection({
-        customerNote: data.customerNote,
+        customerNotes: data.customerNote,
+        termsAndConditions: data.termsAndConditions ?? null,
+        vendorName: data.companyName ?? '',
+        clientName: data.clientName,
+        vesselName: data.vesselName,
+        placeName: data.portName,
         itemNotes: data.itemNotes,
       }),
 

@@ -83,7 +83,7 @@ function formatIssuedAtUtc(date: Date, dateFormat?: string): string {
   }
 }
 
-function trimTrailingSlash(value: string): string {
+export function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, '');
 }
 
@@ -108,11 +108,11 @@ function getPublicApiBaseUrl(): string {
   return 'http://localhost:3000';
 }
 
-function sanitizePathSegment(value: string): string {
+export function sanitizePathSegment(value: string): string {
   return value.replace(/[^a-zA-Z0-9_-]/g, '-');
 }
 
-function documentTypePrefix(documentType: DocumentType): string {
+export function documentTypePrefix(documentType: DocumentType): string {
   switch (documentType) {
     case 'OFFER': return 'OFF';
     case 'PROFORMA_INVOICE': return 'PFI';
@@ -121,7 +121,7 @@ function documentTypePrefix(documentType: DocumentType): string {
   }
 }
 
-function buildVerificationRef(documentType: DocumentType, issuedAt: Date, revisionNumber: number): string {
+export function buildVerificationRef(documentType: DocumentType, issuedAt: Date, revisionNumber: number): string {
   const yyyy = String(issuedAt.getUTCFullYear());
   const mm = String(issuedAt.getUTCMonth() + 1).padStart(2, '0');
   const dd = String(issuedAt.getUTCDate()).padStart(2, '0');
@@ -147,7 +147,7 @@ function getRevisionAbsolutePath(filePath: string): string {
   return join(process.cwd(), 'uploads', filePath);
 }
 
-function resolveDocumentStreamTarget(params: {
+export function resolveDocumentStreamTarget(params: {
   orderId?: string | null;
   invoiceId?: string | null;
   streamVariant?: string | null;
@@ -157,19 +157,19 @@ function resolveDocumentStreamTarget(params: {
   return params.streamVariant ? `${baseTarget}:${params.streamVariant}` : baseTarget;
 }
 
-function buildDocumentStreamKey(documentType: DocumentType, streamTarget: string): string {
+export function buildDocumentStreamKey(documentType: DocumentType, streamTarget: string): string {
   return `${documentType}:${streamTarget}:${DOCUMENT_TEMPLATE_VERSION}`;
 }
 
-function toMs(date: Date | null | undefined): number {
+export function toMs(date: Date | null | undefined): number {
   return date ? date.getTime() : 0;
 }
 
-function maxMs(values: Array<Date | null | undefined>): number {
+export function maxMs(values: Array<Date | null | undefined>): number {
   return values.reduce((acc, value) => Math.max(acc, toMs(value)), 0);
 }
 
-function maxItemUpdatedAtMs(items: Array<{ updatedAt: Date }>): number {
+export function maxItemUpdatedAtMs(items: Array<{ updatedAt: Date }>): number {
   return items.reduce((acc, item) => Math.max(acc, item.updatedAt.getTime()), 0);
 }
 
@@ -195,7 +195,7 @@ export async function isDocumentRevisionVerificationExpired(revision: DocumentRe
   return Date.now() > expiresAt;
 }
 
-async function persistDocumentRevision(params: {
+export async function persistDocumentRevision(params: {
   tenantId: string;
   orderId?: string | null;
   invoiceId?: string | null;
@@ -344,7 +344,7 @@ export function loadDocumentRevisionBuffer(revision: DocumentRevisionInfo): Buff
   return readFileSync(absolutePath);
 }
 
-async function overwriteDocumentRevisionArtifact(revision: DocumentRevisionInfo, buffer: Buffer): Promise<void> {
+export async function overwriteDocumentRevisionArtifact(revision: DocumentRevisionInfo, buffer: Buffer): Promise<void> {
   const absolutePath = getRevisionAbsolutePath(revision.filePath);
   mkdirSync(dirname(absolutePath), { recursive: true });
   writeFileSync(absolutePath, buffer);
@@ -369,7 +369,7 @@ const DEFAULT_BANK_DETAILS: BankDetails = {
 
 // ─── Data fetching ───────────────────────────────────────────────────
 
-async function fetchInvoiceData(invoiceId: string) {
+export async function fetchInvoiceData(invoiceId: string) {
   const isMissingCompanyRegistrationColumnError = (error: unknown): boolean => {
     if (!(error instanceof Error)) return false;
     return /company_registration_number/i.test(error.message);
@@ -411,7 +411,7 @@ async function fetchInvoiceData(invoiceId: string) {
   return invoice;
 }
 
-async function fetchOrderForInvoice(orderId: string) {
+export async function fetchOrderForInvoice(orderId: string) {
   const isMissingCompanyRegistrationColumnError = (error: unknown): boolean => {
     if (!(error instanceof Error)) return false;
     return /company_registration_number/i.test(error.message);
@@ -491,7 +491,7 @@ function getCompanyRegistrationNumber(company: unknown): string | null {
 }
 
 /** Load the bank account assigned to an order (or the company default). */
-async function loadOrderBankDetails(
+export async function loadOrderBankDetails(
   bankAccountId: string | null | undefined,
   invoicingCompanyId: string | null | undefined,
 ): Promise<BankDetails> {
@@ -710,7 +710,7 @@ function formatStoredDateOnlyForDisplay(value: string | Date | null | undefined,
   }
 }
 
-function parseTimezoneOffset(tz: string | null | undefined): number | null {
+export function parseTimezoneOffset(tz: string | null | undefined): number | null {
   if (!tz) return null;
   const match = tz.match(/([+-])\s*(\d{1,2})(?::(\d{2}))?/);
   if (!match) {
@@ -727,7 +727,7 @@ function parseTimezoneOffset(tz: string | null | undefined): number | null {
  *  For CREDIT terms the due date is deliveryDate (ETA) + creditDays.
  *  Falls back to baseDate when ETA is not available.
  */
-function computeDueDate(
+export function computeDueDate(
   baseDate: Date,
   paymentTermType: string | null | undefined,
   creditDays: number | null | undefined,
@@ -746,11 +746,11 @@ function computeDueDate(
   return new Date(baseDate.getTime() + 30 * 86_400_000).toISOString().split('T')[0]!;
 }
 
-function formatDateTimeForDisplay(value: string | null, tz: string | null | undefined, _omitTz = false, dateFormat?: string): string | null {
+export function formatDateTimeForDisplay(value: string | null, tz: string | null | undefined, _omitTz = false, dateFormat?: string): string | null {
   return formatStoredDateOnlyForDisplay(value, tz, dateFormat);
 }
 
-function replaceCompanyNamePlaceholder(
+export function replaceCompanyNamePlaceholder(
   value: string | null | undefined,
   companyName: string | null | undefined,
   documentName?: string | null,
@@ -772,7 +772,7 @@ function replaceCompanyNamePlaceholder(
   return result;
 }
 
-function buildOfferForAccountOfText(params: {
+export function buildOfferForAccountOfText(params: {
   title: string;
   vesselName: string;
   vesselImo?: string | null;
@@ -1554,7 +1554,7 @@ function createPdfBuffer(docDefinition: TDocumentDefinitions): Promise<Buffer> {
 //  Offer PDF
 // ═══════════════════════════════════════════════════════════════════════
 
-function buildOfferDocument(data: {
+export function buildOfferDocument(data: {
   orderNumber: string | null;
   clientName: string;
   clientCountry: string | null;
@@ -1921,7 +1921,7 @@ function buildOfferDocument(data: {
 
       // Notes
       ...buildNotesSection({
-        customerNote: data.customerNote,
+        customerNotes: data.customerNote,
         termsAndConditions: data.termsAndConditions,
         itemNotes: data.itemNotes,
         placeRemark: data.placeRemark,
@@ -2708,7 +2708,7 @@ function buildProformaDocument(data: {
 
       // Notes
       ...buildNotesSection({
-        customerNote: data.customerNote,
+        customerNotes: data.customerNote,
         itemNotes: data.itemNotes,
       }),
 
