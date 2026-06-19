@@ -63,8 +63,8 @@ export function buildOfferDocument(data: {
   eta: string | null;
   etd: string | null;
   timezone: string | null;
-  dateFormat: string | null;
-  costSalesDecimalPrecision: number | null;
+  dateFormat?: string | null;
+  costSalesDecimalPrecision?: number | null;
   fromName: string | null;
   fromEmail: string | null;
   fromPhone: string | null;

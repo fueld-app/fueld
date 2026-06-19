@@ -80,6 +80,8 @@ export function buildInvoiceDocument(data: {
   companyEmail: string | null;
   printMeta?: DocumentPrintMeta | null;
   purchaseOrderNumber?: string | null;
+  dateFormat?: string | null;
+  costSalesDecimalPrecision?: number | null;
 }): TDocumentDefinitions {
   // Build line items table
   const tableHeader: TableCell[] = [
@@ -733,8 +735,8 @@ export function buildProformaDocument(data: {
   eta: string | null;
   etd: string | null;
   timezone: string | null;
-  dateFormat: string | null;
-  costSalesDecimalPrecision: number | null;
+  dateFormat?: string | null;
+  costSalesDecimalPrecision?: number | null;
   currency: string;
   fromName: string | null;
   fromEmail: string | null;
