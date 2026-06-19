@@ -519,7 +519,7 @@ export async function getPortDocumentationOrderContext(tenantId: string, orderId
   const documents = await db
     .select()
     .from(orderPortDocuments)
-    .where(and(eq(orderPortDocuments.tenantId, tenantId), eq(orderPortDocuments.orderId, orderId)))
+    .where(and(eq(orderPortDocuments.tenantId, tenantId), eq(orderPortDocuments.orderId, order.id)))
     .orderBy(desc(orderPortDocuments.createdAt));
 
   return {
@@ -552,7 +552,7 @@ export async function generateBunkerInstructionsDocument(tenantId: string, order
   const fileName = buildBunkerInstructionsFileName(order);
   const document = await persistGeneratedOrderDocument({
     tenantId,
-    orderId,
+    orderId: order.id,
     documentKind: 'BUNKER_INSTRUCTIONS',
     fileName,
     mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -576,7 +576,7 @@ export async function generateGateListDocument(tenantId: string, orderId: string
   const fileName = buildGateListFileName(order);
   const document = await persistGeneratedOrderDocument({
     tenantId,
-    orderId,
+    orderId: order.id,
     documentKind: 'GATE_LIST',
     fileName,
     mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -594,14 +594,14 @@ export async function generateGateListDocument(tenantId: string, orderId: string
 }
 
 export async function includeFlangeWorksheet(tenantId: string, orderId: string, userId: string): Promise<OrderPortDocumentDto> {
-  await getOrderForPortDocumentation(tenantId, orderId);
+  const order = await getOrderForPortDocumentation(tenantId, orderId);
   const asset = await getCurrentAsset(tenantId, 'FLANGE_WORKSHEET');
   if (!asset) throw new Error('No current Flange Worksheet is uploaded');
 
-  await supersedeExistingDocuments(tenantId, orderId, 'FLANGE_WORKSHEET');
+  await supersedeExistingDocuments(tenantId, order.id, 'FLANGE_WORKSHEET');
   const [inserted] = await db.insert(orderPortDocuments).values({
     tenantId,
-    orderId,
+    orderId: order.id,
     documentKind: 'FLANGE_WORKSHEET',
     sourceType: 'STATIC_ASSET',
     status: 'ACTIVE',
@@ -620,13 +620,14 @@ export async function includeFlangeWorksheet(tenantId: string, orderId: string, 
 }
 
 export async function downloadOrderPortDocument(tenantId: string, orderId: string, documentId: string): Promise<DownloadableFile> {
+  const order = await getOrderForPortDocumentation(tenantId, orderId);
   const [document] = await db
     .select()
     .from(orderPortDocuments)
     .where(and(
       eq(orderPortDocuments.id, documentId),
       eq(orderPortDocuments.tenantId, tenantId),
-      eq(orderPortDocuments.orderId, orderId),
+      eq(orderPortDocuments.orderId, order.id),
     ))
     .limit(1);
 
