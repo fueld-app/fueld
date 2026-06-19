@@ -27,7 +27,6 @@ import {
   type OwnCompanyDto,
   type OrderAttachmentDto,
   type CustomerPaymentDto,
-  type CreditLineDto,
   type CompanyContactDto,
   type BankAccountDto,
   type OrderSupplierDto,
@@ -106,7 +105,6 @@ import { CreditApplicationModalComponent } from '../../../credit/components/cred
 // ═══════════════════════════════════════════════════════════════════════
 
 import { API_URL, toAbsoluteUrl } from '@app/core/config/api';
-import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring.service';
 import type {
   InquirySupplierPerformance,
   InquirySupplierComparisonRow,
@@ -190,7 +188,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   protected readonly plattsSvc = inject(OrderPlattsService);
   protected readonly dateFormatSvc = inject(DateFormatService);
   protected readonly actionSvc = inject(OrderActionService);
-  private readonly riskService = inject(RiskMonitoringService);
 
   readonly emailModal = viewChild(SendEmailModalComponent);
   readonly pdfModal = viewChild(PdfPreviewModalComponent);
@@ -314,11 +311,15 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   readonly portDocumentationError = computed(() => this.portDocSvc.portDocumentationError());
   readonly portDocumentationAction = computed(() => this.portDocSvc.portDocumentationAction());
   readonly bunkerInstructionsPreview = computed(() => this.portDocSvc.bunkerInstructionsPreview());
-  readonly customerCreditLines = signal<CreditLineDto[]>([]);
-  readonly customerCreditLoading = signal(false);
-  readonly customerCreditFrozen = signal(false);
-  readonly supplierCreditLines = signal<CreditLineDto[]>([]);
-  readonly supplierCreditLoading = signal(false);
+  // Credit line signals delegate to OrderFinancialService — the service owns the
+  // HTTP loading calls, so the component must read from the same source to avoid
+  // stale/empty signals (previous bug: component had its own signals that were
+  // never populated because all load calls went to financialSvc).
+  readonly customerCreditLines = computed(() => this.financialSvc.customerCreditLines());
+  readonly customerCreditLoading = computed(() => this.financialSvc.customerCreditLoading());
+  readonly customerCreditFrozen = computed(() => this.financialSvc.customerCreditFrozen());
+  readonly supplierCreditLines = computed(() => this.financialSvc.supplierCreditLines());
+  readonly supplierCreditLoading = computed(() => this.financialSvc.supplierCreditLoading());
   readonly noteTab = signal<'customer' | 'supplier'>('customer');
   readonly showCustomerPaymentNote = signal(false);
   readonly showSupplierPaymentNote = signal(false);
@@ -1113,56 +1114,6 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     }
   }
 
-  private async loadCustomerCreditLines(counterpartyId: string | null | undefined): Promise<void> {
-    if (!counterpartyId) return;
-    this.customerCreditLoading.set(true);
-    this.customerCreditFrozen.set(false);
-    try {
-      const [res, frozenRes] = await Promise.all([
-        firstValueFrom(
-          this.http.get<ApiResponse<{ items: CreditLineDto[]; total: number }>>(
-            `${API_URL}/credit/lines?type=CUSTOMER&counterpartyId=${encodeURIComponent(counterpartyId)}&limit=50`,
-          ),
-        ),
-        this.riskService.isFrozen(counterpartyId).catch(() => false),
-      ]);
-      if (res.success) {
-        this.customerCreditLines.set(res.data.items ?? []);
-      } else {
-        this.customerCreditLines.set([]);
-      }
-      this.customerCreditFrozen.set(frozenRes);
-    } catch {
-      this.customerCreditLines.set([]);
-    } finally {
-      this.customerCreditLoading.set(false);
-    }
-  }
-
-  private async loadSupplierCreditLines(counterpartyId: string | null | undefined): Promise<void> {
-    if (!counterpartyId) {
-      this.supplierCreditLines.set([]);
-      return;
-    }
-    this.supplierCreditLoading.set(true);
-    try {
-      const res = await firstValueFrom(
-        this.http.get<ApiResponse<{ items: CreditLineDto[]; total: number }>>(
-          `${API_URL}/credit/lines?type=SUPPLIER&counterpartyId=${encodeURIComponent(counterpartyId)}&limit=50`,
-        ),
-      );
-      if (res.success) {
-        this.supplierCreditLines.set(res.data.items ?? []);
-      } else {
-        this.supplierCreditLines.set([]);
-      }
-    } catch {
-      this.supplierCreditLines.set([]);
-    } finally {
-      this.supplierCreditLoading.set(false);
-    }
-  }
-
   async openAttachment(att: OrderAttachmentDto): Promise<void> {
     const modal = this.pdfModal();
     if (!modal) return;
@@ -1662,7 +1613,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       this.supplier.set(null);
       this.supplierContact.set(null);
       this.supplierContacts.set([]);
-      this.supplierCreditLines.set([]);
+      void this.financialSvc.loadSupplierCreditLines(null);
       return;
     }
 
