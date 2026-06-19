@@ -1921,7 +1921,7 @@ export function buildOfferDocument(data: {
 
       // Notes
       ...buildNotesSection({
-        customerNotes: data.customerNote,
+        customerNote: data.customerNote,
         termsAndConditions: data.termsAndConditions,
         itemNotes: data.itemNotes,
         placeRemark: data.placeRemark,
@@ -2708,7 +2708,8 @@ function buildProformaDocument(data: {
 
       // Notes
       ...buildNotesSection({
-        customerNotes: data.customerNote,
+        customerNote: data.customerNote,
+        termsAndConditions: data.termsAndConditions ?? null,
         itemNotes: data.itemNotes,
       }),
 
