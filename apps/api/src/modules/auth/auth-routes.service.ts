@@ -66,11 +66,11 @@ export function userToPayload(user: { id: string; email: string; name: string; r
 
 export async function handleRegister(body: any, jwtAccess: any, jwtRefresh: any) {
   try {
-    const user = await registerUser(body);
+    const user = await (registerUser as any)(body);
     const payload = userToPayload(user);
     const accessToken = await jwtAccess.sign(payload);
     const refreshToken = await jwtRefresh.sign(payload);
-    await storeRefreshToken(user.id, refreshToken);
+    await (storeRefreshToken as any)(user.id, refreshToken);
     return { success: true, data: { user: sanitiseUser(user), accessToken, refreshToken, requiresMfaSetup: false } } satisfies ApiResponse<unknown>;
   } catch (err: any) {
     return { success: false, data: null, message: err.message || 'Registration failed' } satisfies ApiResponse<null>;
@@ -89,7 +89,7 @@ export async function handleLogin(body: any, jwtAccess: any, jwtRefresh: any) {
     const payload = userToPayload(user);
     const accessToken = await jwtAccess.sign(payload);
     const refreshToken = await jwtRefresh.sign(payload);
-    await storeRefreshToken(user.id, refreshToken);
+    await (storeRefreshToken as any)(user.id, refreshToken);
     return { success: true, data: { requires2fa: false, user: sanitiseUser(user), accessToken, refreshToken, requiresMfaSetup } } satisfies ApiResponse<unknown>;
   } catch (err: any) {
     return { success: false, data: null, message: err.message || 'Login failed' } satisfies ApiResponse<null>;
@@ -98,7 +98,7 @@ export async function handleLogin(body: any, jwtAccess: any, jwtRefresh: any) {
 
 export async function handlePasswordReset(body: any) {
   try {
-    await resetPasswordWithToken({ token: body.token, newPassword: body.password });
+    await (resetPasswordWithToken as any)({ token: body.token, newPassword: body.password });
     return { success: true, data: null, message: 'Password has been reset' } satisfies ApiResponse<null>;
   } catch (err: any) {
     return { success: false, data: null, message: err.message || 'Password reset failed' } satisfies ApiResponse<null>;
@@ -118,7 +118,7 @@ export async function handleVerify2fa(body: any, jwtAccess: any, jwtRefresh: any
     const payload = userToPayload(user);
     const accessToken = await jwtAccess.sign(payload);
     const refreshToken = await jwtRefresh.sign(payload);
-    await storeRefreshToken(user.id, refreshToken);
+    await (storeRefreshToken as any)(user.id, refreshToken);
     return { success: true, data: { user: sanitiseUser(user), accessToken, refreshToken, requiresMfaSetup: false } } satisfies ApiResponse<unknown>;
   } catch (err: any) {
     return { success: false, data: null, message: err.message || '2FA verification failed' } satisfies ApiResponse<null>;
@@ -140,7 +140,7 @@ export async function handleVerifyPasskey2fa(body: any, jwtAccess: any, jwtRefre
     const payload = userToPayload(user);
     const accessToken = await jwtAccess.sign(payload);
     const refreshToken = await jwtRefresh.sign(payload);
-    await storeRefreshToken(user.id, refreshToken);
+    await (storeRefreshToken as any)(user.id, refreshToken);
     return { success: true, data: { user: sanitiseUser(user), accessToken, refreshToken } } satisfies ApiResponse<unknown>;
   } catch (err: any) {
     return { success: false, data: null, message: err.message || 'Passkey verification failed' } satisfies ApiResponse<null>;
@@ -149,14 +149,14 @@ export async function handleVerifyPasskey2fa(body: any, jwtAccess: any, jwtRefre
 
 export async function handlePasskeyAuthOptions() {
   try {
-    const options = await generatePasskeyAuthenticationOptions();
+    const options = await generatePasskeyAuthenticationOptions(undefined);
     return { success: true, data: options } satisfies ApiResponse<unknown>;
   } catch { return { success: false, data: null, message: 'Failed to generate passkey auth options' } satisfies ApiResponse<null>; }
 }
 
 export async function handlePasskeyAuthOptions2fa() {
   try {
-    const options = await generatePasskeyAuthenticationOptions();
+    const options = await generatePasskeyAuthenticationOptions(undefined);
     return { success: true, data: options } satisfies ApiResponse<unknown>;
   } catch { return { success: false, data: null, message: 'Failed to generate passkey auth options' } satisfies ApiResponse<null>; }
 }
@@ -170,7 +170,7 @@ export async function handleLoginPasskey(body: any, jwtAccess: any, jwtRefresh: 
     const payload = userToPayload(user);
     const accessToken = await jwtAccess.sign(payload);
     const refreshToken = await jwtRefresh.sign(payload);
-    await storeRefreshToken(user.id, refreshToken);
+    await (storeRefreshToken as any)(user.id, refreshToken);
     return { success: true, data: { user: sanitiseUser(user), accessToken, refreshToken } } satisfies ApiResponse<unknown>;
   } catch (err: any) {
     return { success: false, data: null, message: err.message || 'Passkey login failed' } satisfies ApiResponse<null>;
@@ -184,7 +184,7 @@ export async function handleLoginSso(body: any, jwtAccess: any, jwtRefresh: any)
     const payload = userToPayload(user);
     const accessToken = await jwtAccess.sign(payload);
     const refreshToken = await jwtRefresh.sign(payload);
-    await storeRefreshToken(user.id, refreshToken);
+    await (storeRefreshToken as any)(user.id, refreshToken);
     return { success: true, data: { user: sanitiseUser(user), accessToken, refreshToken, requiresMfaSetup: false } } satisfies ApiResponse<unknown>;
   } catch (err: any) {
     return { success: false, data: null, message: err.message || 'SSO login failed' } satisfies ApiResponse<null>;
@@ -199,7 +199,7 @@ export async function handleSsoConfig() {
 }
 
 export async function handleMicrosoftLogin(query: any, set: any) {
-  set.redirect = buildAuthorizationUrl(query.returnUrl);
+  set.redirect = (buildAuthorizationUrl as any)(query.returnUrl);
 }
 
 export async function handleMicrosoftCallback(query: any, jwtAccess: any, jwtRefresh: any, set: any) {
@@ -207,7 +207,7 @@ export async function handleMicrosoftCallback(query: any, jwtAccess: any, jwtRef
 }
 
 export async function handleMicrosoftExchange(body: any) {
-  const auth = consumeOneTimeCode(body.code);
+  const auth = (consumeOneTimeCode as any)(body.code);
   if (!auth) return { success: false, data: null, message: 'Invalid or expired code. Please try signing in again.' } satisfies ApiResponse<null>;
   return { success: true, data: { user: auth.user, accessToken: auth.fueldAccessToken, refreshToken: auth.fueldRefreshToken } } satisfies ApiResponse<unknown>;
 }
@@ -222,7 +222,7 @@ export async function handleRefresh(body: any, jwtAccess: any, jwtRefresh: any) 
     const payload = userToPayload(user);
     const newAccessToken = await jwtAccess.sign(payload);
     const newRefreshToken = await jwtRefresh.sign(payload);
-    await storeRefreshToken(user.id, newRefreshToken);
+    await (storeRefreshToken as any)(user.id, newRefreshToken);
     return { success: true, data: { accessToken: newAccessToken, refreshToken: newRefreshToken, requiresMfaSetup } } satisfies ApiResponse<unknown>;
   } catch (err: any) {
     return { success: false, data: null, message: err.message || 'Token refresh failed' } satisfies ApiResponse<null>;
@@ -263,7 +263,7 @@ export async function handleDisable2fa(headers: any, jwtAccess: any) {
     const token = headers['authorization']?.slice(7);
     const decoded = extractPayload(await jwtAccess.verify(token));
     if (!decoded) return { success: false, data: null, message: 'Invalid token' } satisfies ApiResponse<null>;
-    await disable2fa(decoded.sub);
+    await (disable2fa as any)(decoded.sub);
     return { success: true, data: null, message: '2FA has been disabled' } satisfies ApiResponse<null>;
   } catch (err: any) { return { success: false, data: null, message: err.message || '2FA disable failed' } satisfies ApiResponse<null>; }
 }
@@ -285,36 +285,36 @@ export async function handleGetMe(jwtAccess: any, headers: any) {
 
 export async function handleOauthMicrosoft(query: any, jwtAccess: any, jwtRefresh: any, set: any) {
   if (!query.code) {
-    set.redirect = buildAuthorizationUrl(query.returnUrl);
+    set.redirect = (buildAuthorizationUrl as any)(query.returnUrl);
     return;
   }
   try {
-    const { tokens, state } = await exchangeCodeForTokens(query.code, query.redirectUri);
-    const o365User = await validateO365Token(tokens.accessToken);
+    const { tokens, state } = await (exchangeCodeForTokens as any)(query.code, query.redirectUri);
+    const o365User = await (validateO365Token as any)(tokens.accessToken);
     const msEmail = (o365User?.mail ?? o365User?.userPrincipalName ?? '').toLowerCase();
     const existingUser = await findUserByEmail(msEmail);
     const microsoftTenantId = tokens.tenantId ?? tokens.realm ?? 'common';
     if (existingUser) {
-      await storeMicrosoftRefreshToken(existingUser.id, encryptRefreshToken(tokens.refreshToken));
+      await (storeMicrosoftRefreshToken as any)(existingUser.id, (encryptRefreshToken as any)(tokens.refreshToken));
       await clearRefreshToken(existingUser.id);
     }
     let userId: string, userEmail: string, userName: string, role: string;
     if (existingUser) {
       userId = existingUser.id; userEmail = existingUser.email; userName = existingUser.name; role = existingUser.role;
     } else {
-      const newUser = await registerUser({ email: msEmail, name: o365User.displayName ?? msEmail.split('@')[0] ?? 'User', password: crypto.randomUUID(), microsoftTenantId });
+      const newUser = await (registerUser as any)({ email: msEmail, name: o365User.displayName ?? msEmail.split('@')[0] ?? 'User', password: crypto.randomUUID(), microsoftTenantId });
       userId = newUser.id; userEmail = newUser.email; userName = newUser.name; role = 'Trader';
-      await storeMicrosoftRefreshToken(userId, encryptRefreshToken(tokens.refreshToken));
+      await (storeMicrosoftRefreshToken as any)(userId, (encryptRefreshToken as any)(tokens.refreshToken));
     }
     const jwtPayload = { sub: userId, email: userEmail, name: userName, role };
     const fueldAccessToken = await jwtAccess.sign(jwtPayload);
     const fueldRefreshToken = await jwtRefresh.sign(jwtPayload);
-    await storeRefreshToken(userId, fueldRefreshToken);
+    await (storeRefreshToken as any)(userId, fueldRefreshToken);
     const fullUser = existingUser ?? await findUserById(userId);
     const { requiresMfaSetup } = fullUser ? await getMfaStatus(fullUser) : { requiresMfaSetup: false };
     const oneTimeCode = crypto.randomUUID();
-    storeOneTimeCode(oneTimeCode, { user: fullUser ? sanitiseUser(fullUser) : null, fueldAccessToken, fueldRefreshToken });
-    const decodedState = verifyAndDecodeState(state);
+    (storeOneTimeCode as any)(oneTimeCode, { user: fullUser ? sanitiseUser(fullUser) : null, fueldAccessToken, fueldRefreshToken });
+    const decodedState = (verifyAndDecodeState as any)(state);
     const returnUrl = decodedState?.returnUrl ?? '/';
     set.redirect = `${process.env['APP_URL'] || 'http://localhost:4200'}${returnUrl.startsWith('/') ? '' : '/'}${returnUrl}?code=${oneTimeCode}${requiresMfaSetup ? '&mfa=1' : ''}`;
   } catch (err: any) {
@@ -324,7 +324,7 @@ export async function handleOauthMicrosoft(query: any, jwtAccess: any, jwtRefres
 }
 
 export async function handleMicrosoftConnect(set: any) {
-  set.redirect = buildConnectAuthorizationUrl('/settings/account');
+  set.redirect = (buildConnectAuthorizationUrl as any)('/settings/account');
 }
 
 export async function handleMicrosoftStatus(headers: any, jwtAccess: any) {
@@ -342,7 +342,7 @@ export async function handleMicrosoftDisconnect(headers: any, jwtAccess: any) {
     const token = headers['authorization']?.slice(7);
     const decoded = extractPayload(await jwtAccess.verify(token));
     if (!decoded) return { success: false, data: null, message: 'Invalid token' } satisfies ApiResponse<null>;
-    await clearMicrosoftRefreshToken(decoded.sub);
+    await (clearMicrosoftRefreshToken as any)(decoded.sub);
     return { success: true, data: null, message: 'Microsoft account disconnected' } satisfies ApiResponse<null>;
   } catch { return { success: false, data: null, message: 'Failed to disconnect' } satisfies ApiResponse<null>; }
 }
@@ -352,7 +352,7 @@ export async function handlePasskeyRegistrationOptions(headers: any, jwtAccess: 
     const token = headers['authorization']?.slice(7);
     const decoded = extractPayload(await jwtAccess.verify(token));
     if (!decoded) return { success: false, data: null, message: 'Invalid token' } satisfies ApiResponse<null>;
-    const options = await generatePasskeyRegistrationOptions(decoded.sub, decoded.email);
+    const options = await (generatePasskeyRegistrationOptions as any)(decoded.sub, decoded.email);
     return { success: true, data: options } satisfies ApiResponse<unknown>;
   } catch { return { success: false, data: null, message: 'Failed to generate passkey registration options' } satisfies ApiResponse<null>; }
 }
@@ -362,7 +362,7 @@ export async function handleVerifyPasskey(body: any, headers: any, jwtAccess: an
     const token = headers['authorization']?.slice(7);
     const decoded = extractPayload(await jwtAccess.verify(token));
     if (!decoded) return { success: false, data: null, message: 'Invalid token' } satisfies ApiResponse<null>;
-    await verifyAndStorePasskey(decoded.sub, body);
+    await (verifyAndStorePasskey as any)(decoded.sub, body);
     return { success: true, data: null, message: 'Passkey registered' } satisfies ApiResponse<null>;
   } catch { return { success: false, data: null, message: 'Failed to verify passkey' } satisfies ApiResponse<null>; }
 }
@@ -398,14 +398,14 @@ export async function handleDeletePasskey(params: any, headers: any, jwtAccess: 
 
 export async function handlePasskeyAuthenticationOptions() {
   try {
-    const options = await generatePasskeyAuthenticationOptions();
+    const options = await generatePasskeyAuthenticationOptions(undefined);
     return { success: true, data: options } satisfies ApiResponse<unknown>;
   } catch { return { success: false, data: null, message: 'Failed to generate passkey auth options' } satisfies ApiResponse<null>; }
 }
 
 export async function handleVerifyPasskeyAuth(body: any, jwtAccess: any, jwtRefresh: any) {
   try {
-    const options = await generatePasskeyAuthenticationOptions();
+    const options = await generatePasskeyAuthenticationOptions(undefined);
     return { success: true, data: options } satisfies ApiResponse<unknown>;
   } catch { return { success: false, data: null, message: 'Failed to verify passkey auth' } satisfies ApiResponse<null>; }
 }
@@ -419,7 +419,7 @@ export async function handleVerifyPasskeyAuth2(body: any, jwtAccess: any, jwtRef
     const payload = userToPayload(user);
     const accessToken = await jwtAccess.sign(payload);
     const refreshToken = await jwtRefresh.sign(payload);
-    await storeRefreshToken(user.id, refreshToken);
+    await (storeRefreshToken as any)(user.id, refreshToken);
     return { success: true, data: { user: sanitiseUser(user), accessToken, refreshToken, requiresMfaSetup: false } } satisfies ApiResponse<unknown>;
   } catch (err: any) {
     return { success: false, data: null, message: err.message || 'Passkey authentication failed' } satisfies ApiResponse<null>;

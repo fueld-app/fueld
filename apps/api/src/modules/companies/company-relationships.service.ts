@@ -99,7 +99,7 @@ export async function getGroupFleetForCompany(companyId: string): Promise<{ resu
   // Get parent fleet
   try {
     const { seasearcherCompanyFleet } = await import('../lloyds/lli.client');
-    const fleet = await seasearcherCompanyFleet(company.seasearcherId);
+    const fleet = await seasearcherCompanyFleet<any>(company.seasearcherId);
     if (fleet?.results) fleetResults.push(...fleet.results);
   } catch {}
 
@@ -111,7 +111,7 @@ export async function getGroupFleetForCompany(companyId: string): Promise<{ resu
       if (!childSeasearcherId || queriedIds.has(childSeasearcherId)) continue;
       queriedIds.add(childSeasearcherId);
       const { seasearcherCompanyFleet } = await import('../lloyds/lli.client');
-      const fleet = await seasearcherCompanyFleet(childSeasearcherId);
+      const fleet = await seasearcherCompanyFleet<any>(childSeasearcherId);
       if (fleet?.results) fleetResults.push(...fleet.results);
     } catch {}
   }
@@ -227,19 +227,19 @@ export async function reapplyCompanyPlaceSupplyRule(companyId: string, ruleId: s
   const matchingPlaces = await db
     .select({ id: places.id, name: places.name })
     .from(places)
-    .where(and(eq(places.countryIso, rule.countryIso), inArray(places.type, rule.placeTypes)))
+    .where(and(eq(places.countryIso, rule.countryIso), inArray(places.placeType, rule.placeTypes as any)))
     .limit(50);
 
   for (const place of matchingPlaces) {
     const [existing] = await db
       .select({ id: portSuppliers.id })
       .from(portSuppliers)
-      .where(and(eq(portSuppliers.counterpartyId, companyId), eq(portSuppliers.placeId, place.id)))
+      .where(and(eq(portSuppliers.companyId, companyId), eq(portSuppliers.placeId, place.id)))
       .limit(1);
     if (existing) continue;
 
-    await db.insert(portSuppliers).values({
-      supplierId: companyId,
+    await db.insert(portSuppliers as any).values({
+      companyId: companyId,
       counterpartyId: companyId,
       placeId: place.id,
       source: COMPANY_PLACE_SUPPLY_RULE_SOURCE,
@@ -254,7 +254,7 @@ export async function reapplyCompanyPlaceSupplyRule(companyId: string, ruleId: s
 }
 
 export async function applyMatchingCompanyPlaceSupplyRulesForPlace(placeId: string) {
-  const [place] = await db.select({ countryIso: places.countryIso, type: places.type }).from(places).where(eq(places.id, placeId)).limit(1);
+  const [place] = await db.select({ countryIso: places.countryIso, type: places.placeType }).from(places).where(eq(places.id, placeId)).limit(1);
   if (!place?.countryIso) return;
 
   const rules = await db
@@ -266,12 +266,12 @@ export async function applyMatchingCompanyPlaceSupplyRulesForPlace(placeId: stri
     const [existing] = await db
       .select({ id: portSuppliers.id })
       .from(portSuppliers)
-      .where(and(eq(portSuppliers.counterpartyId, rule.companyId), eq(portSuppliers.placeId, placeId)))
+      .where(and(eq(portSuppliers.companyId, rule.companyId), eq(portSuppliers.placeId, placeId)))
       .limit(1);
     if (existing) continue;
 
-    await db.insert(portSuppliers).values({
-      supplierId: rule.companyId,
+    await db.insert(portSuppliers as any).values({
+      companyId: rule.companyId,
       counterpartyId: rule.companyId,
       placeId,
       source: COMPANY_PLACE_SUPPLY_RULE_SOURCE,

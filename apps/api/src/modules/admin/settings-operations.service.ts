@@ -93,7 +93,7 @@ export interface DeliveryDocumentationSettings {
 
 export async function getDeliveryDocumentationSettings(): Promise<DeliveryDocumentationSettings> {
   const { settings } = await getTenantSettingsRow();
-  return { requireDeliveryDocumentation: settings.requireDeliveryDocumentation ?? false, deliveryDocumentationTypes: settings.deliveryDocumentationTypes ?? [] };
+  return { requireDeliveryDocumentation: (settings as any).requireDeliveryDocumentation ?? false, deliveryDocumentationTypes: (settings as any).deliveryDocumentationTypes ?? [] };
 }
 
 export async function updateDeliveryDocumentationSettings(data: { requireDeliveryDocumentation?: boolean; deliveryDocumentationTypes?: string[] }): Promise<DeliveryDocumentationSettings> {
@@ -106,7 +106,7 @@ export async function updateDeliveryDocumentationSettings(data: { requireDeliver
 
 export async function getPortDocumentationSettings(): Promise<{ enabled: boolean }> {
   const { settings } = await getTenantSettingsRow();
-  return { enabled: settings.portDocumentationEnabled ?? false };
+  return { enabled: (settings as any).portDocumentationEnabled ?? false };
 }
 
 export async function updatePortDocumentationSettings(data: { enabled?: boolean }): Promise<{ enabled: boolean }> {
@@ -138,12 +138,12 @@ export interface InquirySettings {
 export async function getInquirySettings(): Promise<InquirySettings> {
   const { settings } = await getTenantSettingsRow();
   return {
-    supplierResponseUrlEnabled: settings.supplierResponseUrlEnabled ?? DEFAULT_SUPPLIER_RESPONSE_URL_ENABLED,
-    autoMarkNoReplyAfterHours: settings.autoMarkNoReplyAfterHours ?? DEFAULT_AUTO_MARK_NO_REPLY_AFTER_HOURS,
-    responseDeadlineHours: settings.responseDeadlineHours ?? DEFAULT_RESPONSE_DEADLINE_HOURS,
-    notifyQuoteSubmitEmail: settings.notifyQuoteSubmitEmail ?? DEFAULT_NOTIFY_QUOTE_SUBMIT_EMAIL,
-    notifyQuoteSubmitPush: settings.notifyQuoteSubmitPush ?? DEFAULT_NOTIFY_QUOTE_SUBMIT_PUSH,
-    notifyQuoteSubmitWhatsApp: settings.notifyQuoteSubmitWhatsApp ?? DEFAULT_NOTIFY_QUOTE_SUBMIT_WHATSAPP,
+    supplierResponseUrlEnabled: (settings as any).supplierResponseUrlEnabled ?? DEFAULT_SUPPLIER_RESPONSE_URL_ENABLED,
+    autoMarkNoReplyAfterHours: (settings as any).autoMarkNoReplyAfterHours ?? DEFAULT_AUTO_MARK_NO_REPLY_AFTER_HOURS,
+    responseDeadlineHours: (settings as any).responseDeadlineHours ?? DEFAULT_RESPONSE_DEADLINE_HOURS,
+    notifyQuoteSubmitEmail: (settings as any).notifyQuoteSubmitEmail ?? DEFAULT_NOTIFY_QUOTE_SUBMIT_EMAIL,
+    notifyQuoteSubmitPush: (settings as any).notifyQuoteSubmitPush ?? DEFAULT_NOTIFY_QUOTE_SUBMIT_PUSH,
+    notifyQuoteSubmitWhatsApp: (settings as any).notifyQuoteSubmitWhatsApp ?? DEFAULT_NOTIFY_QUOTE_SUBMIT_WHATSAPP,
   };
 }
 
@@ -163,7 +163,7 @@ export async function updateInquirySettings(data: Partial<InquirySettings>): Pro
 
 export async function getFinancingSettings(): Promise<{ annualRate: number; dayCountConvention: number }> {
   const { settings } = await getTenantSettingsRow();
-  return { annualRate: settings.financingAnnualRate ?? DEFAULT_FINANCING_RATE_ANNUAL, dayCountConvention: settings.financingDayCount ?? DEFAULT_FINANCING_DAY_COUNT };
+  return { annualRate: (settings as any).financingAnnualRate ?? DEFAULT_FINANCING_RATE_ANNUAL, dayCountConvention: (settings as any).financingDayCount ?? DEFAULT_FINANCING_DAY_COUNT };
 }
 
 export async function updateFinancingSettings(annualRate: number): Promise<{ annualRate: number; dayCountConvention: number }> {
@@ -175,7 +175,7 @@ export async function updateFinancingSettings(annualRate: number): Promise<{ ann
 
 export async function getWhatsAppSettings(): Promise<{ enabled: boolean; defaultGroupJid: string | null; incomingRfqEnabled: boolean; firstInquiryGroupNotificationEnabled: boolean }> {
   const { settings } = await getTenantSettingsRow();
-  return { enabled: settings.whatsappEnabled ?? false, defaultGroupJid: settings.whatsappDefaultGroupJid ?? null, incomingRfqEnabled: settings.whatsappIncomingRfqEnabled ?? false, firstInquiryGroupNotificationEnabled: settings.whatsappFirstInquiryGroupNotificationEnabled ?? false };
+  return { enabled: (settings as any).whatsappEnabled ?? false, defaultGroupJid: (settings as any).whatsappDefaultGroupJid ?? null, incomingRfqEnabled: (settings as any).whatsappIncomingRfqEnabled ?? false, firstInquiryGroupNotificationEnabled: settings.whatsappFirstInquiryGroupNotificationEnabled ?? false };
 }
 
 export async function updateWhatsAppSettings(data: { enabled?: boolean; defaultGroupJid?: string | null; incomingRfqEnabled?: boolean; firstInquiryGroupNotificationEnabled?: boolean }) {
@@ -193,7 +193,7 @@ export async function getWhatsAppNotificationRules() {
 }
 
 export async function createWhatsAppNotificationRule(data: { eventType: string; groupJid: string; templateName: string; isActive?: boolean }) {
-  const [created] = await db.insert(whatsappNotificationRules).values(data).returning();
+  const [created] = await db.insert(whatsappNotificationRules).values(data as any).returning();
   return created;
 }
 
@@ -211,7 +211,7 @@ export async function deleteWhatsAppNotificationRule(id: string) {
 
 export async function getBrokerSettings(): Promise<{ brokerCcCustomer: boolean }> {
   const { settings } = await getTenantSettingsRow();
-  return { brokerCcCustomer: settings.brokerCcCustomer ?? false };
+  return { brokerCcCustomer: (settings as any).brokerCcCustomer ?? false };
 }
 
 export async function updateBrokerSettings(data: { brokerCcCustomer?: boolean }): Promise<{ brokerCcCustomer: boolean }> {
@@ -222,7 +222,7 @@ export async function updateBrokerSettings(data: { brokerCcCustomer?: boolean })
 
 export async function getFollowUpSettings(): Promise<{ defaultFollowUpDays: number }> {
   const { settings } = await getTenantSettingsRow();
-  return { defaultFollowUpDays: settings.defaultFollowUpDays ?? 30 };
+  return { defaultFollowUpDays: (settings as any).defaultFollowUpDays ?? 30 };
 }
 
 export async function updateFollowUpSettings(data: { defaultFollowUpDays?: number }): Promise<{ defaultFollowUpDays: number }> {
@@ -233,7 +233,7 @@ export async function updateFollowUpSettings(data: { defaultFollowUpDays?: numbe
 
 export async function getRoleDashboardSettings(): Promise<{ dashboards: Record<string, string> }> {
   const { settings } = await getTenantSettingsRow();
-  return { dashboards: settings.roleDashboards ?? {} };
+  return { dashboards: (settings as any).roleDashboards ?? {} };
 }
 
 export async function updateRoleDashboardSettings(dashboards: Record<string, string>): Promise<{ dashboards: Record<string, string> }> {
@@ -244,7 +244,7 @@ export async function updateRoleDashboardSettings(dashboards: Record<string, str
 
 export async function getTimezoneSettings(): Promise<{ defaultTimezone: string | null }> {
   const { settings } = await getTenantSettingsRow();
-  return { defaultTimezone: settings.defaultTimezone ?? null };
+  return { defaultTimezone: (settings as any).defaultTimezone ?? null };
 }
 
 export async function updateTimezoneSettings(data: { defaultTimezone?: string | null }): Promise<{ defaultTimezone: string | null }> {

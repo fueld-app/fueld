@@ -5,7 +5,7 @@
 import * as XLSX from 'xlsx';
 import { buildCsv, buildFileSuffix, formatMoney, parseNumber } from './report-utils.service';
 import { getReleaseTwoReports } from './report-crud.service';
-import type { ReportFiltersDto, ReportsQueryInput, ReleaseTwoReportsDto, MarginAnalysisRowDto } from '@fueld/types';
+import type { ReportFiltersDto, ReleaseTwoReportsDto, MarginAnalysisRowDto } from '@fueld/types';
 
 // ─── Trader Performance ─────────────────────────────────────────────
 
@@ -86,13 +86,13 @@ export async function exportMarginAnalysisXlsx(tenantId: string, requestingUserI
 
 // ─── Exceptions ─────────────────────────────────────────────────────
 
-export async function exportExceptionsCsv(tenantId: string, requestingUserId: string, filters: ReportsQueryInput): Promise<{ fileName: string; csv: string }> {
+export async function exportExceptionsCsv(tenantId: string, requestingUserId: string, filters: any): Promise<{ fileName: string; csv: string }> {
   const report = await getReleaseTwoReports(tenantId, requestingUserId, filters);
   const csv = buildCsv([['Type', 'Severity', 'Title', 'Description', 'Primary Value', 'Secondary Value'], ...report.exceptions.rows.map((r) => [r.type, r.severity, r.title, r.description, r.primaryValue, r.secondaryValue ?? ''])]);
   return { fileName: `report-exceptions_${buildFileSuffix(report.filtersApplied)}.csv`, csv };
 }
 
-export async function exportExceptionsXlsx(tenantId: string, requestingUserId: string, filters: ReportsQueryInput): Promise<{ fileName: string; content: Buffer }> {
+export async function exportExceptionsXlsx(tenantId: string, requestingUserId: string, filters: any): Promise<{ fileName: string; content: Buffer }> {
   const report = await getReleaseTwoReports(tenantId, requestingUserId, filters);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(report.exceptions.rows.map((r) => ({ Type: r.type, Severity: r.severity, Title: r.title, Description: r.description, 'Primary Value': r.primaryValue, 'Secondary Value': r.secondaryValue ?? '' }))), 'Exceptions');

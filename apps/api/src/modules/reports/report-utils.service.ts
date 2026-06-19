@@ -281,7 +281,7 @@ export function normalizeReportSettings(settings?: any | null): any {
   return { savedViews: [...(settings?.savedViews ?? [])], schedules: [...(settings?.schedules ?? [])] };
 }
 
-export function emptyVariance(): ReportsVarianceDto {
+export function emptyVariance(): any {
   return { comparison: null, summary: null, topTraderMovers: [], topCustomerMovers: [], topProductMovers: [] };
 }
 

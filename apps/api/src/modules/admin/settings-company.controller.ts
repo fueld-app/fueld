@@ -561,7 +561,7 @@ export const settingsCompanyController = new Elysia()
   .post('/companies/:companyId/bank-accounts', async ({ auth, params, body }) => {
     try {
       requireAdmin(auth);
-      const data = await createBankAccount(params.companyId, body);
+      const data = await createBankAccount(params.companyId, body as any);
       return { success: true, data } satisfies ApiResponse<unknown>;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed';
@@ -590,7 +590,7 @@ export const settingsCompanyController = new Elysia()
   .patch('/companies/:companyId/bank-accounts/:id', async ({ auth, params, body }) => {
     try {
       requireAdmin(auth);
-      const data = await updateBankAccount(params.id, params.companyId, body as Record<string, unknown>);
+      const data = await updateBankAccount(params.id, body as Record<string, unknown>);
       return { success: true, data } satisfies ApiResponse<unknown>;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed';

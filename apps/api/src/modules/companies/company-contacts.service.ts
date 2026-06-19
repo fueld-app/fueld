@@ -41,7 +41,7 @@ export async function syncContactsFromSeasearcher(
   seasearcherId: string,
 ) {
   const { seasearcherCompanyDetail } = await import('../lloyds/lli.client');
-  const detail = await seasearcherCompanyDetail(seasearcherId);
+  const detail = await seasearcherCompanyDetail<any>(seasearcherId);
   if (!detail?.headOffice?.personnel?.length && !detail?.offices?.length) return [];
 
   const existing = await getCompanyContacts(counterpartyId);
@@ -128,7 +128,7 @@ export async function deleteCompanyOffice(id: string) {
 
 export async function syncOfficesFromSeasearcher(counterpartyId: string, seasearcherId: string) {
   const { seasearcherCompanyDetail } = await import('../lloyds/lli.client');
-  const detail = await seasearcherCompanyDetail(seasearcherId);
+  const detail = await seasearcherCompanyDetail<any>(seasearcherId);
   if (!detail?.offices?.length) return [];
 
   const existing = await getCompanyOffices(counterpartyId);

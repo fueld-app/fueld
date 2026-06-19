@@ -5,10 +5,10 @@
 import { resolveReportAccessContext } from './report-access.service';
 import { fetchScopedDataset } from './report-dataset.service';
 import { getTenantSettingsRow, updateTenantReportSettings } from './report-dataset.service';
-import { normalizeReportSettings, normalizeScheduleMode, normalizeDeliveryMode, resolveScheduleBodyMode, normalizeExceptionTypes } from './report-utils.service';
+import { normalizeScheduleMode, normalizeDeliveryMode, resolveScheduleBodyMode, normalizeExceptionTypes } from './report-utils.service';
 import { buildTraderPerformanceReport, buildInvoiceAgingReport, buildCommercialSummary, buildMarginAnalysis, buildVariance, buildExceptions, buildFilterOptions } from './report-builders.service';
 import type { ReportAccessContext, StoredReportSettings } from './report.types';
-import type { ReportFiltersDto, ReportsQueryInput, ReportComparisonMode, ReleaseOneReportsDto, ReleaseTwoReportsDto, ReportFilterOptionsDto, SavedReportViewDto, ReportScheduleDto } from '@fueld/types';
+import type { ReportFiltersDto, ReportComparisonMode, ReleaseOneReportsDto, ReleaseTwoReportsDto, ReportFilterOptionsDto, SavedReportViewDto, ReportScheduleDto } from '@fueld/types';
 import type { TenantSettings } from '../../db/schema';
 
 export async function getReleaseOneReports(tenantId: string, requestingUserId: string, filters: ReportFiltersDto): Promise<ReleaseOneReportsDto> {
@@ -28,7 +28,7 @@ export async function getReleaseOneReports(tenantId: string, requestingUserId: s
   };
 }
 
-export async function getReleaseTwoReports(tenantId: string, requestingUserId: string, filters: ReportsQueryInput): Promise<ReleaseTwoReportsDto> {
+export async function getReleaseTwoReports(tenantId: string, requestingUserId: string, filters: any): Promise<ReleaseTwoReportsDto> {
   const context = await resolveReportAccessContext(tenantId, requestingUserId);
   const tenant = await getTenantSettingsRow(tenantId);
   const settings = normalizeReportSettings(((tenant.settings ?? {}) as TenantSettings).reportsSettings);

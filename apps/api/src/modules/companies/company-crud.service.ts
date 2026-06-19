@@ -23,13 +23,13 @@ export async function listCompanies(query?: {
     conditions.push(
       or(
         ilike(counterparties.name, `%${query.search}%`),
-        ilike(counterparties.imo, `%${query.search}%`),
+        ilike(counterparties.companyImo, `%${query.search}%`),
       ),
     );
   }
   if (query?.types?.length) {
     // Companies can have either 'type' singular or 'types' array
-    const typeConditions = query.types.map((t) => or(eq(counterparties.type, t), sql`${counterparties.types} @> ARRAY[${t}]::text[]`));
+    const typeConditions = query.types.map((t) => or(eq(counterparties.type, t as any), sql`${counterparties.types} @> ARRAY[${t}]::text[]`));
     conditions.push(or(...typeConditions));
   }
 
@@ -80,7 +80,7 @@ export async function createCompany(data: {
   tenantId?: string;
   seasearcherId?: string;
 }) {
-  const [created] = await db.insert(counterparties).values({
+  const [created] = await db.insert(counterparties as any).values({
     name: data.name,
     type: data.type ?? 'SUPPLIER',
     types: data.types ?? [data.type ?? 'SUPPLIER'],
@@ -96,10 +96,10 @@ export async function importCompanyFromSeasearcher(seasearcherId: string) {
   const existing = await getCompanyBySeasearcherId(seasearcherId);
   if (existing) return existing;
 
-  const detail = await seasearcherCompanyDetail(seasearcherId);
+  const detail = await seasearcherCompanyDetail<any>(seasearcherId);
   const types = normalizeSeasearcherCompanyTypes(detail.companyRoles);
 
-  const [created] = await db.insert(counterparties).values({
+  const [created] = await db.insert(counterparties as any).values({
     name: detail.companyName,
     seasearcherId: String(detail.id),
     country: detail.country?.name ?? null,
@@ -114,7 +114,7 @@ export async function importCompanyFromSeasearcher(seasearcherId: string) {
 }
 
 export async function importCompanyByName(companyName: string) {
-  const results = await seasearcherCompanySearch(companyName);
+  const results = await seasearcherCompanySearch<any>(companyName);
   if (!results?.results?.length) throw new Error('No company found in Seasearcher');
   const firstMatch = results.results[0];
   return importCompanyFromSeasearcher(String(firstMatch.id));
@@ -124,7 +124,7 @@ export async function syncCompanyFromSeasearcher(companyId: string): Promise<Syn
   const local = await getCompanyById(companyId);
   if (!local?.seasearcherId) return null;
 
-  const detail = await seasearcherCompanyDetail(local.seasearcherId);
+  const detail = await seasearcherCompanyDetail<any>(local.seasearcherId);
   const types = normalizeSeasearcherCompanyTypes(detail.companyRoles);
   const updateFields: Record<string, any> = { lastSynced: new Date(), updatedAt: new Date() };
   const conflicts: SyncConflict[] = [];
@@ -155,7 +155,7 @@ export async function syncCompanyFromSeasearcher(companyId: string): Promise<Syn
 export async function acceptSeasearcherValue(companyId: string, field: string) {
   const local = await getCompanyById(companyId);
   if (!local?.seasearcherId) return null;
-  const detail = await seasearcherCompanyDetail(local.seasearcherId);
+  const detail = await seasearcherCompanyDetail<any>(local.seasearcherId);
   const updateFields: Record<string, any> = { lastSynced: new Date(), updatedAt: new Date() };
 
   if (field === 'name' && detail.companyName) updateFields.name = detail.companyName;
@@ -183,7 +183,7 @@ export async function updateCompanyTypes(companyId: string, types: string[]) {
 }
 
 export async function updateCompanySegments(companyId: string, segments: Record<string, string | string[]>) {
-  const [updated] = await db.update(counterparties).set({ manualOverrides: { segments }, updatedAt: new Date() }).where(eq(counterparties.id, companyId)).returning();
+  const [updated] = await db.update(counterparties).set({ manualOverrides: { segments } as any, updatedAt: new Date() }).where(eq(counterparties.id, companyId)).returning();
   return updated ?? null;
 }
 
@@ -200,29 +200,29 @@ export async function deleteCompany(id: string) {
 export async function searchCompaniesTypeahead(term: string, limit?: number) {
   const rows = await db.select({ id: counterparties.id, name: counterparties.name, country: counterparties.country })
     .from(counterparties)
-    .where(or(ilike(counterparties.name, `%${term}%`), ilike(counterparties.imo, `%${term}%`)))
+    .where(or(ilike(counterparties.name, `%${term}%`), ilike(counterparties.companyImo, `%${term}%`)))
     .limit(limit ?? 20);
   return rows;
 }
 
 export async function getCompanyEnrichment(seasearcherId: string) {
-  return seasearcherCompanyDetail(seasearcherId);
+  return seasearcherCompanyDetail<any>(seasearcherId);
 }
 
 export async function getCompanyFleet(seasearcherId: string) {
-  return seasearcherCompanyFleet(seasearcherId);
+  return seasearcherCompanyFleet<any>(seasearcherId);
 }
 
 export async function getCompanyHierarchy(seasearcherId: string) {
-  return seasearcherCompanyHierarchy(seasearcherId);
+  return seasearcherCompanyHierarchy<any>(seasearcherId);
 }
 
 export async function getCompanySeizures(seasearcherId: string) {
-  return seasearcherCompanySeizures(seasearcherId);
+  return seasearcherCompanySeizures<any>(seasearcherId);
 }
 
 export async function getCompanySanctions(seasearcherId: string) {
-  return seasearcherCompanySanctions(seasearcherId);
+  return seasearcherCompanySanctions<any>(seasearcherId);
 }
 
 export async function getOrdersForCompany(companyId: string) {

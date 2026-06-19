@@ -10,7 +10,7 @@ import { parseNumber, formatMoney, formatQuantity, formatPercentValue, monthKey,
 import { fetchScopedDataset, buildEconomicsByOrder } from './report-dataset.service';
 import { resolveReportAccessContext } from './report-access.service';
 import type { ScopedDataset, ReportAccessContext } from './report.types';
-import type { ReportFiltersDto, ReportComparisonMode, ReportDrilldownTarget, ReportDrilldownInput, ReportDrilldownResponseDto, ReportDrilldownOrderRowDto, ReleaseOneReportsDto, ReleaseTwoReportsDto, ReportsVarianceDto, ReportsExceptionsDto, ReportsAccessDto, InvoiceAgingReportDto, InvoiceAgingReportRowDto, CommercialSummaryReportDto, ConversionMetricsDto, LossAnalysisResponseDto, PipelineStageDto, MarginAnalysisReportDto, MarginAnalysisRowDto, MarginTrendPointDto, TraderPerformanceReportDto, TraderPerformanceReportRowDto, ReportExceptionRowDto, ReportExceptionType, ReportFilterOptionsDto, ReportScheduleMode, SavedReportViewDto, ReportScheduleDto, ReportScheduleType, ReportScheduleDeliveryMode, ReportScheduleBodyMode } from '@fueld/types';
+import type { ReportFiltersDto, ReportComparisonMode, ReportDrilldownTarget, ReportDrilldownResponseDto, ReportDrilldownOrderRowDto, ReleaseOneReportsDto, ReleaseTwoReportsDto, ReportsExceptionsDto, ReportsAccessDto, InvoiceAgingReportDto, InvoiceAgingReportRowDto, CommercialSummaryReportDto, ConversionMetricsDto, LossAnalysisResponseDto, PipelineStageDto, MarginAnalysisReportDto, MarginAnalysisRowDto, MarginTrendPointDto, TraderPerformanceReportDto, TraderPerformanceReportRowDto, ReportExceptionRowDto, ReportExceptionType, ReportFilterOptionsDto, ReportScheduleMode, SavedReportViewDto, ReportScheduleDto, ReportScheduleType, ReportScheduleDeliveryMode, ReportScheduleBodyMode } from '@fueld/types';
 import { Role } from '@fueld/types';
 import { logActivity } from '../activity/activity.service';
 
@@ -24,7 +24,7 @@ function emptyInvoiceAging(): InvoiceAgingReportDto {
   return { rows: [], buckets: ['CURRENT', '1-30', '31-60', '61-90', '90+'].map((label) => ({ label, count: 0, outstandingAmount: '0.00' })), totalInvoices: 0, totalOutstanding: '0.00' };
 }
 
-function emptyVariance(): ReportsVarianceDto {
+function emptyVariance(): any {
   return { comparison: null, summary: null, topTraderMovers: [], topCustomerMovers: [], topProductMovers: [] };
 }
 
@@ -36,7 +36,7 @@ function emptyExceptions(): ReportsExceptionsDto {
 
 export function buildTraderPerformanceReport(dataset: ScopedDataset): TraderPerformanceReportDto {
   if (dataset.orderRows.length === 0) return emptyTraderPerformance();
-  const economicsByOrder = buildEconomicsByOrder(dataset);
+  const economicsByOrder = buildEconomicsByOrder(dataset) as any;
   const wonStatuses = new Set(['CONFIRMED', 'DELIVERED', 'INVOICED', 'PAID']);
   const stats = new Map<string, { row: TraderPerformanceReportRowDto; totalRevenueValue: number; totalNetProfitValue: number }>();
 
@@ -160,7 +160,7 @@ function accumulateMarginRow(map: Map<string, any>, key: string, label: string, 
 }
 
 export function buildMarginAnalysis(dataset: ScopedDataset): MarginAnalysisReportDto {
-  const economicsByOrder = buildEconomicsByOrder(dataset);
+  const economicsByOrder = buildEconomicsByOrder(dataset) as any;
   const byCustomer = new Map(), byProduct = new Map(), byVessel = new Map();
   const monthlyTrend = new Map<string, { revenue: number; netProfit: number; orderCount: number }>();
 
@@ -173,7 +173,7 @@ export function buildMarginAnalysis(dataset: ScopedDataset): MarginAnalysisRepor
     const ct = monthlyTrend.get(trendKey) ?? { revenue: 0, netProfit: 0, orderCount: 0 }; ct.orderCount += 1; ct.revenue += economics.totalRevenueBase; ct.netProfit += economics.totalNetProfit; monthlyTrend.set(trendKey, ct);
 
     const items = dataset.itemsByOrder.get(order.orderId) ?? [];
-    economics.lineEconomics.forEach((line, idx) => { const item = items[idx]; if (!item) return; accumulateMarginRow(byProduct, item.productType, item.productType, { quantity: line.quantity, revenue: line.revenueBase, grossProfit: line.grossProfit, financingCost: line.financingCost, netProfit: line.netProfit }); });
+    economics.lineEconomics.forEach((line: any, idx: number) => { const item = items[idx]; if (!item) return; accumulateMarginRow(byProduct, item.productType, item.productType, { quantity: line.quantity, revenue: line.revenueBase, grossProfit: line.grossProfit, financingCost: line.financingCost, netProfit: line.netProfit }); });
   }
 
   const sortRows = (m: Map<string, any>) => Array.from(m.values()).map((e) => e.row).sort((a: any, b: any) => parseNumber(b.totalNetProfit) - parseNumber(a.totalNetProfit));
@@ -184,7 +184,7 @@ export function buildMarginAnalysis(dataset: ScopedDataset): MarginAnalysisRepor
 
 // ─── Variance ───────────────────────────────────────────────────────
 
-export async function buildVariance(tenantId: string, context: ReportAccessContext, currentFilters: ReportFiltersDto, current: { traderPerformance: TraderPerformanceReportDto; invoiceAging: InvoiceAgingReportDto; commercialSummary: CommercialSummaryReportDto; marginAnalysis: MarginAnalysisReportDto }, comparisonMode?: ReportComparisonMode | null): Promise<ReportsVarianceDto> {
+export async function buildVariance(tenantId: string, context: ReportAccessContext, currentFilters: ReportFiltersDto, current: { traderPerformance: TraderPerformanceReportDto; invoiceAging: InvoiceAgingReportDto; commercialSummary: CommercialSummaryReportDto; marginAnalysis: MarginAnalysisReportDto }, comparisonMode?: ReportComparisonMode | null): Promise<any> {
   const comparison = buildComparisonWindow(currentFilters, comparisonMode);
   if (!comparison || !comparison.previousFrom || !comparison.previousTo) return emptyVariance();
 
@@ -211,7 +211,7 @@ export async function buildVariance(tenantId: string, context: ReportAccessConte
 // ─── Exceptions ─────────────────────────────────────────────────────
 
 export function buildExceptions(dataset: ScopedDataset, invoiceAging: InvoiceAgingReportDto, marginAnalysis: MarginAnalysisReportDto): ReportsExceptionsDto {
-  const economicsByOrder = buildEconomicsByOrder(dataset);
+  const economicsByOrder = buildEconomicsByOrder(dataset) as any;
   const rows: ReportExceptionRowDto[] = [];
 
   for (const order of dataset.orderRows) {
@@ -254,14 +254,14 @@ export async function buildFilterOptions(tenantId: string, context: ReportAccess
 // ─── Drilldown ──────────────────────────────────────────────────────
 
 function buildOrderDrilldownRows(dataset: ScopedDataset, orderRows: any[]): ReportDrilldownOrderRowDto[] {
-  const economicsByOrder = buildEconomicsByOrder(dataset);
+  const economicsByOrder = buildEconomicsByOrder(dataset) as any;
   return orderRows.map((order) => {
     const e = economicsByOrder.get(order.orderId);
     return { orderId: order.orderId, traderId: order.traderId, traderName: order.traderName, clientId: order.clientId, clientName: order.clientName, vesselId: order.vesselId, vesselName: order.vesselName, status: order.status, createdAt: order.createdAt.toISOString(), totalQuantity: formatQuantity(e?.totalQuantity ?? 0), totalRevenue: formatMoney(e?.totalRevenueBase ?? 0), totalGrossProfit: formatMoney(e?.totalGrossProfit ?? 0), totalFinancingCost: formatMoney(e?.totalFinancingCost ?? 0), totalNetProfit: formatMoney(e?.totalNetProfit ?? 0), netMarginPct: e?.netMarginPct ?? null };
   }).sort((a, b) => parseNumber(b.totalNetProfit) - parseNumber(a.totalNetProfit));
 }
 
-export async function getReportDrilldown(tenantId: string, requestingUserId: string, input: ReportDrilldownInput): Promise<ReportDrilldownResponseDto> {
+export async function getReportDrilldown(tenantId: string, requestingUserId: string, input: any): Promise<ReportDrilldownResponseDto> {
   const context = await resolveReportAccessContext(tenantId, requestingUserId);
   if (input.dimension === 'AGING_BUCKET') {
     const dataset = await fetchScopedDataset(tenantId, context, input);

@@ -1936,13 +1936,13 @@ export async function updateTimezoneSettings(data: { defaultTimezone?: string | 
 
 export async function getCostSalesDecimalPrecision(): Promise<{ precision: number }> {
   const [tenant] = await db.select({ id: tenants.id, settings: tenants.settings }).from(tenants).limit(1);
-  const settings = (tenant?.settings ?? {}) as TenantSettings;
+  const settings = (tenant?.settings ?? {}) as import('../../db/schema').TenantSettings;
   return { precision: settings.costSalesDecimalPrecision ?? DEFAULT_COST_SALES_DECIMAL_PRECISION };
 }
 
 export async function updateCostSalesDecimalPrecision(data: { precision?: number }): Promise<{ precision: number }> {
   const [tenant] = await db.select({ id: tenants.id, settings: tenants.settings }).from(tenants).limit(1);
-  const settings = (tenant?.settings ?? {}) as TenantSettings;
+  const settings = (tenant?.settings ?? {}) as import('../../db/schema').TenantSettings;
   settings.costSalesDecimalPrecision = data.precision ?? DEFAULT_COST_SALES_DECIMAL_PRECISION;
   await db
     .update(tenants)
@@ -1953,13 +1953,13 @@ export async function updateCostSalesDecimalPrecision(data: { precision?: number
 
 export async function getDateFormatSettings(): Promise<{ dateFormat: DateFormatSetting }> {
   const [tenant] = await db.select({ id: tenants.id, settings: tenants.settings }).from(tenants).limit(1);
-  const settings = (tenant?.settings ?? {}) as TenantSettings;
+  const settings = (tenant?.settings ?? {}) as import('../../db/schema').TenantSettings;
   return { dateFormat: (settings.dateFormat as DateFormatSetting) ?? DEFAULT_DATE_FORMAT };
 }
 
 export async function updateDateFormatSettings(data: { dateFormat?: DateFormatSetting }): Promise<{ dateFormat: DateFormatSetting }> {
   const [tenant] = await db.select({ id: tenants.id, settings: tenants.settings }).from(tenants).limit(1);
-  const settings = (tenant?.settings ?? {}) as TenantSettings;
+  const settings = (tenant?.settings ?? {}) as import('../../db/schema').TenantSettings;
   settings.dateFormat = data.dateFormat ?? DEFAULT_DATE_FORMAT;
   await db
     .update(tenants)
