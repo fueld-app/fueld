@@ -6,7 +6,6 @@ import {
   OnInit,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { ActivatedRoute } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import type { ApiResponse, IntegrationStatusDto } from '@fueld/types';
 
@@ -60,7 +59,6 @@ import { WhatsAppIntegrationCardComponent } from './whatsapp-integration-card.co
 })
 export class IntegrationsPageComponent implements OnInit {
   private readonly http = inject(HttpClient);
-  private readonly route = inject(ActivatedRoute);
 
   readonly loading = signal(true);
   readonly integrations = signal<IntegrationStatusDto[]>([]);
@@ -73,13 +71,6 @@ export class IntegrationsPageComponent implements OnInit {
   waStatus = () => this.integrations().find((i) => i.provider.toUpperCase() === 'WHATSAPP') ?? undefined;
 
   ngOnInit(): void {
-    this.route.queryParams.subscribe((params) => {
-      if (params['qb'] === 'connected') {
-        // QuickBooks OAuth callback success — handled by card component
-      } else if (params['qb'] === 'error') {
-        // QuickBooks OAuth callback error — handled by card component
-      }
-    });
     this.loadIntegrations();
   }
 

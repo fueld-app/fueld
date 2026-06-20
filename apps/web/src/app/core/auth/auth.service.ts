@@ -340,6 +340,7 @@ export class AuthService {
   /** Verify the first TOTP code and enable 2FA on the account. */
   async enable2fa(code: string): Promise<void> {
     const token = this.getAccessToken();
+    if (!token) throw new Error('Not authenticated. Please log in again.');
     const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
 
     const res = await firstValueFrom(

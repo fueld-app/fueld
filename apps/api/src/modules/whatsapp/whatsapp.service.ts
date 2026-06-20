@@ -244,7 +244,8 @@ export async function startWhatsAppSession(userId: string): Promise<{ qr?: strin
           updatedAt: new Date(),
         })
         .where(eq(whatsappSessions.userId, userId))
-        .then(() => {});
+        .then(() => {})
+        .catch((err) => console.warn('[WhatsApp] Failed to persist connection info:', err));
 
       sendToUserSockets(userId, { type: 'whatsapp:connected', data: { phoneNumber: phone } }, 'whatsapp');
     }

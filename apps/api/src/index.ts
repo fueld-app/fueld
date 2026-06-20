@@ -3,7 +3,7 @@ import { Elysia, t } from 'elysia';
 import { swagger } from '@elysiajs/swagger';
 import { cors } from '@elysiajs/cors';
 import { existsSync, readFileSync } from 'fs';
-import { join } from 'path';
+import { join, resolve, sep } from 'path';
 import type { ApiResponse } from '@fueld/types';
 import { authController } from './modules/auth';
 import { documentsController } from './modules/documents/documents.controller';
@@ -247,6 +247,30 @@ async function runPendingMigrations() {
   }
 }
 
+/**
+ * Build a handler that serves a file from uploads/<subdir>, guarding against
+ * path traversal (e.g. `filename=../../etc/passwd`). Resolved path must remain
+ * within the base upload directory.
+ */
+function serveUpload(subdir: string) {
+  return async ({ params, set }: { params: { filename: string }; set: any }) => {
+    const baseDir = resolve(process.cwd(), 'uploads', subdir);
+    const resolved = resolve(baseDir, params.filename);
+    if (resolved !== baseDir && !resolved.startsWith(baseDir + sep)) {
+      set.status = 400;
+      return 'Invalid filename';
+    }
+    const file = Bun.file(resolved);
+    if (!(await file.exists())) {
+      set.status = 404;
+      return 'Not found';
+    }
+    set.headers['content-type'] = file.type;
+    set.headers['cache-control'] = 'public, max-age=3600';
+    return file;
+  };
+}
+
 function registerAutoSyncHooks() {
   onEntityView(async (socketId, entityType, entityId) => {
     try {
@@ -441,42 +465,9 @@ export async function createApp(options: CreateAppOptions = {}) {
     .use(vesselSanctionsController)
     .use(inventoryController)
     .use(transfersController)
-    .get('/uploads/avatars/:filename', async ({ params, set }: { params: { filename: string }; set: any }) => {
-      const { join } = await import('path');
-      const path = join(process.cwd(), 'uploads/avatars', params.filename);
-      const file = Bun.file(path);
-      if (!(await file.exists())) {
-        set.status = 404;
-        return 'Not found';
-      }
-      set.headers['content-type'] = file.type;
-      set.headers['cache-control'] = 'public, max-age=3600';
-      return file;
-    })
-    .get('/uploads/logos/:filename', async ({ params, set }: { params: { filename: string }; set: any }) => {
-      const { join } = await import('path');
-      const path = join(process.cwd(), 'uploads/logos', params.filename);
-      const file = Bun.file(path);
-      if (!(await file.exists())) {
-        set.status = 404;
-        return 'Not found';
-      }
-      set.headers['content-type'] = file.type;
-      set.headers['cache-control'] = 'public, max-age=3600';
-      return file;
-    })
-    .get('/uploads/attachments/:filename', async ({ params, set }: { params: { filename: string }; set: any }) => {
-      const { join } = await import('path');
-      const path = join(process.cwd(), 'uploads/attachments', params.filename);
-      const file = Bun.file(path);
-      if (!(await file.exists())) {
-        set.status = 404;
-        return 'Not found';
-      }
-      set.headers['content-type'] = file.type;
-      set.headers['cache-control'] = 'public, max-age=3600';
-      return file;
-    })
+    .get('/uploads/avatars/:filename', serveUpload('avatars'))
+    .get('/uploads/logos/:filename', serveUpload('logos'))
+    .get('/uploads/attachments/:filename', serveUpload('attachments'))
     .use(jwtAccessPlugin)
     .ws('/ws', {
       query: t.Object({

@@ -710,7 +710,11 @@ export const ordersController = new Elysia({ prefix: '/orders' })
           return { success: false, data: null, message: 'Invalid attachment type' };
         }
 
-        const ext = file.name.split('.').pop() ?? 'bin';
+        const ext = (file.name.split('.').pop() ?? '').toLowerCase();
+        const allowedExtensions = new Set(['pdf', 'jpg', 'jpeg', 'png', 'webp', 'heic']);
+        if (!allowedExtensions.has(ext)) {
+          return { success: false, data: null, message: 'Only PDF or image files are allowed' };
+        }
         const filename = `${orderId}-${crypto.randomUUID()}.${ext}`;
         const { join } = await import('path');
         const { mkdir } = await import('fs/promises');

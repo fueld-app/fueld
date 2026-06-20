@@ -1505,6 +1505,10 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
       this.positionMap.remove();
       this.positionMap = null;
     }
+    if (this.companySearchTimeout) {
+      clearTimeout(this.companySearchTimeout);
+      this.companySearchTimeout = null;
+    }
     this.routeSub?.unsubscribe();
     this.syncSub?.unsubscribe();
   }
@@ -1955,6 +1959,9 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
       );
 
       this.linkedCreditImpacts.set(response.success && response.data ? response.data : []);
+    } catch (err) {
+      console.error('Failed to load vessel risk impacts:', err);
+      this.linkedCreditImpacts.set([]);
     } finally {
       this.creditImpactLoading.set(false);
     }

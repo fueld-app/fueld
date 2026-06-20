@@ -4,10 +4,11 @@ import {
   inject,
   signal,
   OnInit,
+  OnDestroy,
 } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive, ActivatedRoute } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, Subscription } from 'rxjs';
 import type { ApiResponse, IntegrationStatusDto } from '@fueld/types';
 
 import { API } from '@app/core/config/api';
@@ -61,13 +62,15 @@ import { IntegrationsToastService } from './integrations-toast.service';
     </div>
   `,
 })
-export class IntegrationsShellComponent implements OnInit {
+export class IntegrationsShellComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly route = inject(ActivatedRoute);
   readonly toastService = inject(IntegrationsToastService);
 
   readonly loading = signal(true);
   readonly integrations = signal<IntegrationStatusDto[]>([]);
+
+  private routeSub: Subscription | null = null;
 
   tabs = [
     { path: 'lli', label: 'LLI' },
@@ -79,7 +82,7 @@ export class IntegrationsShellComponent implements OnInit {
   ] as const;
 
   ngOnInit(): void {
-    this.route.queryParams.subscribe((params) => {
+    this.routeSub = this.route.queryParams.subscribe((params) => {
       if (params['qb'] === 'connected') {
         this.toastService.show('success', 'QuickBooks Online connected successfully!');
       } else if (params['qb'] === 'error') {
@@ -89,6 +92,10 @@ export class IntegrationsShellComponent implements OnInit {
     });
 
     this.loadIntegrations();
+  }
+
+  ngOnDestroy(): void {
+    this.routeSub?.unsubscribe();
   }
 
   async loadIntegrations(): Promise<void> {

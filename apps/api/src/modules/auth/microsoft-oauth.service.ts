@@ -13,7 +13,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import { encrypt, decrypt } from '../../lib/crypto';
-import { randomBytes, createHmac } from 'crypto';
+import { randomBytes, createHmac, timingSafeEqual } from 'crypto';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -226,7 +226,12 @@ export function verifyAndDecodeState(state: string): OAuthState {
   const sig = state.substring(dotIndex + 1);
 
   const expectedSig = createHmac('sha256', getStateSigningKey()).update(encoded).digest('base64url');
-  if (sig !== expectedSig) throw new Error('Invalid OAuth state signature');
+  // Constant-time comparison to avoid timing side-channels on the state signature.
+  const sigBuf = Buffer.from(sig);
+  const expBuf = Buffer.from(expectedSig);
+  if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) {
+    throw new Error('Invalid OAuth state signature');
+  }
 
   const data = JSON.parse(Buffer.from(encoded, 'base64url').toString()) as OAuthState;
 

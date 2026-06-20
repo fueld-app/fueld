@@ -1,7 +1,7 @@
 import { Elysia, t } from 'elysia';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import type { ApiResponse } from '@fueld/types';
 import { authGuard } from '../auth/auth.guard';
 import {
@@ -20,7 +20,11 @@ function requireAdmin(auth: { role: string } | undefined) {
 
 async function writeUploadedFile(file: File, prefix: string): Promise<{ dir: string; filePath: string }> {
   const dir = await mkdtemp(join(tmpdir(), prefix));
-  const filePath = join(dir, file.name || 'backup.fueldbak');
+  // Sanitize the uploaded filename: strip any path components to prevent
+  // path traversal (file.name is user-controlled and could contain `..`/`/`).
+  const rawName = basename(file.name || 'backup.fueldbak');
+  const safeName = rawName && !rawName.startsWith('.') ? rawName : 'backup.fueldbak';
+  const filePath = join(dir, safeName);
   await Bun.write(filePath, file);
   return { dir, filePath };
 }

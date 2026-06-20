@@ -222,16 +222,23 @@ export class InternalTransferSidesComponent {
     const orderId = this.orderId();
     if (!orderId) return;
 
+    const previousValue = side[field];
+
     // Optimistic local update.
     this.sides.update((arr) => arr.map((s) => (s.id === side.id ? { ...s, [field]: value } : s)));
 
     const body: Partial<Record<K, OrderTransferSideDto[K] | null>> = { [field]: value } as Partial<Record<K, OrderTransferSideDto[K] | null>>;
-    await firstValueFrom(
-      this.http.patch<ApiResponse<OrderTransferSideDto>>(
-        `${API_URL}/transfers/${orderId}/sides/${side.id}`,
-        body,
-      ),
-    );
+    try {
+      await firstValueFrom(
+        this.http.patch<ApiResponse<OrderTransferSideDto>>(
+          `${API_URL}/transfers/${orderId}/sides/${side.id}`,
+          body,
+        ),
+      );
+    } catch {
+      // Revert optimistic update on failure
+      this.sides.update((arr) => arr.map((s) => (s.id === side.id ? { ...s, [field]: previousValue } : s)));
+    }
   }
 
   async finalize(side: OrderTransferSideDto): Promise<void> {
@@ -247,6 +254,8 @@ export class InternalTransferSidesComponent {
       );
       if (res.success) await this.reload();
       else if (res.message) alert(res.message);
+    } catch {
+      // Finalize failed — keep current state, let reload sync if needed
     } finally {
       this.acting.set(null);
     }
@@ -264,6 +273,8 @@ export class InternalTransferSidesComponent {
         ),
       );
       if (res.success) await this.reload();
+    } catch {
+      // Reopen failed — keep current state
     } finally {
       this.acting.set(null);
     }

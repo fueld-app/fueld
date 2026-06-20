@@ -1,5 +1,6 @@
 import { Component, ChangeDetectionStrategy, inject, OnInit, OnDestroy, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { CompanyDetailStore } from './company-detail.store';
 import { CompanyHeaderComponent } from './components/company-header/company-header.component';
 import { CreditApplicationModalComponent } from '@app/features/credit/components/credit-application-modal.component';
@@ -201,6 +202,8 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
 
   readonly confirmDeleteOpen = signal(false);
 
+  private routeSub: Subscription | null = null;
+
   readonly tabs = [
     { key: 'overview', label: 'Overview', icon: 'M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z' },
     { key: 'commercial', label: 'Commercial', icon: 'M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941' },
@@ -215,7 +218,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
       void this.store.loadCompany(id);
     }
 
-    this.route.paramMap.subscribe((params) => {
+    this.routeSub = this.route.paramMap.subscribe((params) => {
       const newId = params.get('id');
       if (newId) {
         void this.store.loadCompany(newId);
@@ -225,6 +228,7 @@ export class CompanyDetailPageComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.store.destroy();
+    this.routeSub?.unsubscribe();
   }
 
   navigateToTab(tab: string): void {

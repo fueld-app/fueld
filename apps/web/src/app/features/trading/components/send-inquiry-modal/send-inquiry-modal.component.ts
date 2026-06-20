@@ -10,6 +10,7 @@ import {
   untracked,
   viewChild,
   ElementRef,
+  OnDestroy,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -769,7 +770,7 @@ export interface SendInquiryWhatsAppPayload {
     }
   `],
 })
-export class SendInquiryModalComponent {
+export class SendInquiryModalComponent implements OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly sanitizer = inject(DomSanitizer);
   private readonly defaultResponseDeadlineHours = 48;
@@ -1195,6 +1196,8 @@ export class SendInquiryModalComponent {
     navigator.clipboard.writeText(text).then(() => {
       this.copySuccess.set(true);
       setTimeout(() => this.copySuccess.set(false), 2000);
+    }).catch(() => {
+      // Clipboard API rejected (e.g. permissions or not available) — ignore silently
     });
   }
 
@@ -1479,7 +1482,14 @@ export class SendInquiryModalComponent {
 
   // ─── Add Supplier ─────────────────────────────────────────────
 
-  private addSupplierDebounce: any;
+  private addSupplierDebounce: ReturnType<typeof setTimeout> | null = null;
+
+  ngOnDestroy(): void {
+    if (this.addSupplierDebounce) {
+      clearTimeout(this.addSupplierDebounce);
+      this.addSupplierDebounce = null;
+    }
+  }
 
   onAddSupplierSearch(query: string): void {
     this.addSupplierQuery.set(query);

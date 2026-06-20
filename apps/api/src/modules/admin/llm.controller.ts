@@ -20,6 +20,11 @@ function requireAdmin(auth: { role: string } | undefined) {
   }
 }
 
+/** Validate a prompt slug to prevent path traversal via the `:id` route param. */
+function isValidPromptSlug(id: string): boolean {
+  return /^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(id) || /^[a-z0-9]$/.test(id);
+}
+
 // ─── Constants ──────────────────────────────────────────────────────
 
 type LlmRuntime = 'mainline' | 'ik';
@@ -2439,6 +2444,9 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
     '/prompts/:id',
     async ({ auth, params }) => {
       requireAdmin(auth);
+      if (!isValidPromptSlug(params.id)) {
+        return { success: false, data: null, error: 'Invalid prompt id' };
+      }
       const prompt = await getPrompt(params.id);
       if (!prompt) {
         return { success: false, data: null, error: `Prompt "${params.id}" not found` };
@@ -2481,6 +2489,9 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
     '/prompts/:id',
     async ({ auth, params, body }) => {
       requireAdmin(auth);
+      if (!isValidPromptSlug(params.id)) {
+        return { success: false, data: null, error: 'Invalid prompt id' };
+      }
       try {
         const updated = await updatePrompt(params.id, body.content);
         return { success: true, data: updated };
@@ -2504,6 +2515,9 @@ export const llmController = new Elysia({ prefix: '/admin/llm' })
     '/prompts/:id',
     async ({ auth, params }) => {
       requireAdmin(auth);
+      if (!isValidPromptSlug(params.id)) {
+        return { success: false, data: null, error: 'Invalid prompt id' };
+      }
       try {
         await deletePrompt(params.id);
         return { success: true, data: { deleted: params.id } };

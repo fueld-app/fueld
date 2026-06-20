@@ -6,6 +6,7 @@ import {
   inject,
   input,
   effect,
+  OnDestroy,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
@@ -48,7 +49,7 @@ function describeAction(action: string, httpPath: string | null): string {
     }
   `,
 })
-export class LastEditedBadgeComponent {
+export class LastEditedBadgeComponent implements OnDestroy {
   private readonly http = inject(HttpClient);
 
   readonly entityType = input.required<string>();
@@ -62,6 +63,13 @@ export class LastEditedBadgeComponent {
   });
 
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
+
+  ngOnDestroy(): void {
+    if (this.refreshTimer) {
+      clearInterval(this.refreshTimer);
+      this.refreshTimer = null;
+    }
+  }
 
   constructor() {
     effect(() => {

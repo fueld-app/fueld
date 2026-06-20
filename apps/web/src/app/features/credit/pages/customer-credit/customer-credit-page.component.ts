@@ -4,6 +4,7 @@ import {
   signal,
   inject,
   OnInit,
+  OnDestroy,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -364,7 +365,7 @@ interface CompanySearchResultOption {
     </div>
   `,
 })
-export class CustomerCreditPageComponent implements OnInit {
+export class CustomerCreditPageComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -422,6 +423,13 @@ export class CustomerCreditPageComponent implements OnInit {
     const page = Number(params.get('page'));
     if (page > 0) this.currentPage.set(page);
     this.loadData();
+  }
+
+  ngOnDestroy(): void {
+    if (this.searchTimer) {
+      clearTimeout(this.searchTimer);
+      this.searchTimer = null;
+    }
   }
 
   async loadData(): Promise<void> {

@@ -546,6 +546,10 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.queryParamSub?.unsubscribe();
+    if (this.searchTimeout) {
+      clearTimeout(this.searchTimeout);
+      this.searchTimeout = null;
+    }
   }
 
   // ─── Data loading ─────────────────────────────────────────────────
