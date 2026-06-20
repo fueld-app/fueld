@@ -53,10 +53,11 @@ import {
 
 const PRIVILEGED_ROLES = new Set(['ADMIN', 'OPERATIONSMANAGER']);
 
-function requirePrivileged(auth: { role: string } | undefined) {
+function requirePrivileged(auth: { role: string } | undefined): ApiResponse<null> | null {
   if (!auth || !PRIVILEGED_ROLES.has(auth.role)) {
-    throw new Error('Only admins and operations managers can perform this action');
+    return { success: false, data: null, message: 'Only admins and operations managers can perform this action' };
   }
+  return null;
 }
 
 export const inventoryController = new Elysia({ prefix: '/inventory' })
@@ -99,8 +100,9 @@ export const inventoryController = new Elysia({ prefix: '/inventory' })
   )
   .post(
     '/skus',
-    async ({ body, auth }) => {
-      requirePrivileged(auth);
+    async ({ body, auth, set }) => {
+      const denied = requirePrivileged(auth);
+      if (denied) { set.status = 403; return denied; }
       const created = await createInventorySku(body as Parameters<typeof createInventorySku>[0]);
       return { success: true, data: created } satisfies ApiResponse<typeof created>;
     },
@@ -117,8 +119,9 @@ export const inventoryController = new Elysia({ prefix: '/inventory' })
   )
   .patch(
     '/skus/:id',
-    async ({ params, body, auth }) => {
-      requirePrivileged(auth);
+    async ({ params, body, auth, set }) => {
+      const denied = requirePrivileged(auth);
+      if (denied) { set.status = 403; return denied; }
       const updated = await updateInventorySku(params.id, body);
       if (!updated) return { success: false, data: null, message: 'SKU not found' };
       return { success: true, data: updated } satisfies ApiResponse<typeof updated>;
@@ -137,8 +140,9 @@ export const inventoryController = new Elysia({ prefix: '/inventory' })
   )
   .delete(
     '/skus/:id',
-    async ({ params, auth }) => {
-      requirePrivileged(auth);
+    async ({ params, auth, set }) => {
+      const denied = requirePrivileged(auth);
+      if (denied) { set.status = 403; return denied; }
       try {
         const ok = await deleteInventorySku(params.id);
         return { success: ok, data: null, message: ok ? undefined : 'SKU not found' };
@@ -185,8 +189,9 @@ export const inventoryController = new Elysia({ prefix: '/inventory' })
   )
   .post(
     '/warehouses',
-    async ({ body, auth }) => {
-      requirePrivileged(auth);
+    async ({ body, auth, set }) => {
+      const denied = requirePrivileged(auth);
+      if (denied) { set.status = 403; return denied; }
       try {
         const created = await createWarehouse(body as Parameters<typeof createWarehouse>[0]);
         return { success: true, data: created } satisfies ApiResponse<typeof created>;
@@ -213,8 +218,9 @@ export const inventoryController = new Elysia({ prefix: '/inventory' })
   )
   .patch(
     '/warehouses/:id',
-    async ({ params, body, auth }) => {
-      requirePrivileged(auth);
+    async ({ params, body, auth, set }) => {
+      const denied = requirePrivileged(auth);
+      if (denied) { set.status = 403; return denied; }
       const updated = await updateWarehouse(params.id, body as Parameters<typeof updateWarehouse>[1]);
       if (!updated) return { success: false, data: null, message: 'Warehouse not found' };
       return { success: true, data: updated } satisfies ApiResponse<typeof updated>;
@@ -290,8 +296,9 @@ export const inventoryController = new Elysia({ prefix: '/inventory' })
   )
   .post(
     '/replenishment-plans',
-    async ({ body, auth }) => {
-      requirePrivileged(auth);
+    async ({ body, auth, set }) => {
+      const denied = requirePrivileged(auth);
+      if (denied) { set.status = 403; return denied; }
       try {
         const created = await createReplenishmentPlan(body, auth?.sub);
         return { success: true, data: created } satisfies ApiResponse<typeof created>;
@@ -317,8 +324,9 @@ export const inventoryController = new Elysia({ prefix: '/inventory' })
   )
   .patch(
     '/replenishment-plans/:id',
-    async ({ params, body, auth }) => {
-      requirePrivileged(auth);
+    async ({ params, body, auth, set }) => {
+      const denied = requirePrivileged(auth);
+      if (denied) { set.status = 403; return denied; }
       const updated = await updateReplenishmentPlan(params.id, body as Parameters<typeof updateReplenishmentPlan>[1]);
       if (!updated) return { success: false, data: null, message: 'Plan not found' };
       return { success: true, data: updated } satisfies ApiResponse<typeof updated>;
@@ -337,8 +345,9 @@ export const inventoryController = new Elysia({ prefix: '/inventory' })
   )
   .post(
     '/replenishment-plans/:id/cancel',
-    async ({ params, auth }) => {
-      requirePrivileged(auth);
+    async ({ params, auth, set }) => {
+      const denied = requirePrivileged(auth);
+      if (denied) { set.status = 403; return denied; }
       await cancelReplenishmentPlan(params.id);
       return { success: true, data: null };
     },

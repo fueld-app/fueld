@@ -24,16 +24,18 @@ import {
 const PRIVILEGED_ROLES = new Set(['ADMIN', 'OPERATIONSMANAGER']);
 const FINANCE_ROLES = new Set(['ADMIN', 'OPERATIONSMANAGER', 'FINANCE']);
 
-function requireOpsPrivileged(auth: { role: string } | undefined) {
+function requireOpsPrivileged(auth: { role: string } | undefined): ApiResponse<null> | null {
   if (!auth || !PRIVILEGED_ROLES.has(auth.role)) {
-    throw new Error('Only admins and operations managers can perform this action');
+    return { success: false, data: null, message: 'Only admins and operations managers can perform this action' };
   }
+  return null;
 }
 
-function requireFinanceOrOps(auth: { role: string } | undefined) {
+function requireFinanceOrOps(auth: { role: string } | undefined): ApiResponse<null> | null {
   if (!auth || !FINANCE_ROLES.has(auth.role)) {
-    throw new Error('Only finance, admins, and operations managers can perform this action');
+    return { success: false, data: null, message: 'Only finance, admins, and operations managers can perform this action' };
   }
+  return null;
 }
 
 export const transfersController = new Elysia({ prefix: '/transfers' })
@@ -41,8 +43,9 @@ export const transfersController = new Elysia({ prefix: '/transfers' })
 
   .post(
     '/',
-    async ({ body, auth }) => {
-      requireOpsPrivileged(auth);
+    async ({ body, auth, set }) => {
+      const denied = requireOpsPrivileged(auth);
+      if (denied) { set.status = 403; return denied; }
       try {
         const order = await createInternalTransfer(body, auth?.sub);
         return { success: true, data: order } satisfies ApiResponse<typeof order>;
@@ -96,8 +99,9 @@ export const transfersController = new Elysia({ prefix: '/transfers' })
 
   .patch(
     '/:orderId/sides/:sideId',
-    async ({ params, body, auth }) => {
-      requireFinanceOrOps(auth);
+    async ({ params, body, auth, set }) => {
+      const denied = requireFinanceOrOps(auth);
+      if (denied) { set.status = 403; return denied; }
       const updated = await updateTransferSide(params.sideId, body);
       if (!updated) return { success: false, data: null, message: 'Side not found' };
       return { success: true, data: updated };
@@ -121,8 +125,9 @@ export const transfersController = new Elysia({ prefix: '/transfers' })
 
   .post(
     '/:orderId/sides/:sideId/finalize',
-    async ({ params, auth }) => {
-      requireFinanceOrOps(auth);
+    async ({ params, auth, set }) => {
+      const denied = requireFinanceOrOps(auth);
+      if (denied) { set.status = 403; return denied; }
       if (!auth?.sub) return { success: false, data: null, message: 'Unauthorized' };
       try {
         const updated = await finalizeTransferSide(params.sideId, auth.sub);
@@ -141,8 +146,9 @@ export const transfersController = new Elysia({ prefix: '/transfers' })
 
   .post(
     '/:orderId/sides/:sideId/reopen',
-    async ({ params, auth }) => {
-      requireFinanceOrOps(auth);
+    async ({ params, auth, set }) => {
+      const denied = requireFinanceOrOps(auth);
+      if (denied) { set.status = 403; return denied; }
       const updated = await reopenTransferSide(params.sideId);
       if (!updated) return { success: false, data: null, message: 'Side not found' };
       return { success: true, data: updated };

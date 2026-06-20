@@ -120,16 +120,14 @@ describe('inventory controller e2e', () => {
       token,
       body: { ownerCompanyId: '00000000-0000-0000-0000-000000000000', name: 'X' },
     });
-    expect(wh.status).toBe(500); // requirePrivileged throws → handled as server error
-    // The actual error body bubbles through Elysia's default error handler.
-    // We assert it's not a 200 success.
+    expect(wh.status).toBe(403); // requirePrivileged returns 403 Forbidden
 
     const sku = await requestJson('/inventory/skus', {
       method: 'POST',
       token,
       body: { productType: 'VLSFO', displayName: 'Should not create' },
     });
-    expect(sku.status).toBe(500);
+    expect(sku.status).toBe(403);
 
     const plan = await requestJson('/inventory/replenishment-plans', {
       method: 'POST',
@@ -141,7 +139,7 @@ describe('inventory controller e2e', () => {
         expectedAt: new Date().toISOString(),
       },
     });
-    expect(plan.status).toBe(500);
+    expect(plan.status).toBe(403);
   });
 
   it('any authed user can read SKUs, warehouses, overview, and check availability', async () => {

@@ -721,12 +721,6 @@ export async function getBalance(warehouseId: string, skuId: string): Promise<{
   let onHand = 0;
   let plannedInbound = 0;
   let plannedOutbound = 0;
-  for (const e of events) {
-    if (e.at <= now && e.delta !== 0 /* movements only at past moments */) {
-      // We can't distinguish movement vs reservation/plan from events alone here;
-      // recompute precisely from sources to keep onHand and reserved separate.
-    }
-  }
 
   // Recompute precisely from sources for clarity.
   const movementsAgg = await db
@@ -777,12 +771,17 @@ export async function getBalance(warehouseId: string, skuId: string): Promise<{
   const availableNow = onHand - reserved;
 
   // Earliest moment availableNow ≥ 0 (ie no shortfall) — if already >= 0 it's now, else find first inbound that bridges the gap.
-  let earliestAvailableAt: Date | null = availableNow >= 0 ? null : null;
+  let earliestAvailableAt: Date | null = null;
   if (availableNow < 0) {
-    let running = onHand;
+    // Project the cumulative balance forward from the event timeline (starting
+    // at 0) and find the first *future* event where the balance recovers to >= 0.
+    // Starting from onHand would double-count movements (onHand is already the
+    // sum of movement deltas that also appear in `events`) and could return a
+    // past date when the balance was previously positive.
+    let running = 0;
     for (const e of events) {
       running += e.delta;
-      if (running >= 0) {
+      if (e.at > now && running >= 0) {
         earliestAvailableAt = e.at;
         break;
       }

@@ -238,6 +238,46 @@ describe('inventory availability', () => {
     expect(result.shortageQuantity).toBe('200.000');
     expect(result.reason).toContain('no future replenishment');
   });
+
+  test('getBalance.earliestAvailableAt points to the next future replenishment, not a past movement', async () => {
+    const yesterday = new Date(Date.now() - 86_400_000);
+    const today = new Date();
+    const tomorrow = new Date(Date.now() + 86_400_000);
+
+    // 1000 in stock yesterday, then a 1200 outbound today -> onHand = -200 (shortfall).
+    await inventory.recordMovement({
+      warehouseId,
+      skuId,
+      quantity: 1000,
+      unit: 'MT',
+      movementType: 'OPENING_BALANCE',
+      occurredAt: yesterday,
+    });
+    await inventory.recordMovement({
+      warehouseId,
+      skuId,
+      quantity: -1200,
+      unit: 'MT',
+      movementType: 'OUTBOUND_DELIVERY',
+      occurredAt: today,
+    });
+
+    // Future replenishment that bridges the gap.
+    await inventory.createReplenishmentPlan({
+      warehouseId,
+      skuId,
+      quantity: '500',
+      unit: 'MT',
+      expectedAt: tomorrow.toISOString(),
+    });
+
+    const result = await inventory.getBalance(warehouseId, skuId);
+    expect(result.availableNow).toBeLessThan(0);
+    expect(result.earliestAvailableAt).not.toBeNull();
+    // Must be the future replenishment, not the past opening-balance movement
+    // (the old `running = onHand` double-count returned the past movement date).
+    expect(result.earliestAvailableAt!.getTime()).toBe(tomorrow.getTime());
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════
