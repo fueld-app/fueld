@@ -8,6 +8,7 @@ import { authGuard } from '../auth/auth.guard';
 import { db } from '../../db';
 import { tenants, type TenantSettings } from '../../db/schema';
 import type { ApiResponse, SecuritySettingsDto } from '@fueld/types';
+import { setMicrosoftCredentials } from './integrations.service';
 
 function normalizeApprovedEmailDomain(domain: string): string {
   return domain.trim().toLowerCase().replace(/^@/, '').replace(/\.+$/, '');
@@ -100,7 +101,20 @@ export const securityController = new Elysia({ prefix: '/admin/security' })
 
       if (body.ssoProvider !== undefined) patch.ssoProvider = body.ssoProvider;
       if (body.ssoClientId !== undefined) patch.ssoClientId = body.ssoClientId;
-      if (body.ssoClientSecret !== undefined) patch.ssoClientSecret = body.ssoClientSecret;
+      if (body.ssoClientSecret !== undefined) {
+        // Persist the SSO client secret encrypted in integration_credentials
+        // (like other integration secrets) instead of plaintext tenant.settings.
+        // clientId/tenantId are non-secret and also stay in tenant.settings for the
+        // frontend config endpoint; they are written to integration_credentials so
+        // getMicrosoftCredentialsFromDB returns the encrypted secret. Existing
+        // plaintext in tenant.settings is cleared; deployments that haven't
+        // re-saved keep working via the legacy tenant.settings fallback.
+        const existing = await getSecuritySettings();
+        const clientId = body.ssoClientId ?? existing.ssoClientId ?? '';
+        const tenantIdValue = body.ssoTenantId ?? existing.ssoTenantId ?? 'common';
+        await setMicrosoftCredentials(clientId, body.ssoClientSecret, tenantIdValue, auth.sub);
+        patch.ssoClientSecret = '';
+      }
       if (body.ssoTenantId !== undefined) patch.ssoTenantId = body.ssoTenantId;
       if (body.ssoEnabled !== undefined) patch.ssoEnabled = body.ssoEnabled;
       if (body.enforce2FA !== undefined) patch.enforce2FA = body.enforce2FA;

@@ -6,6 +6,7 @@ import {
   loginWithO365,
   registerUser,
   storeRefreshToken,
+  hashRefreshToken,
   storeMicrosoftRefreshToken,
   clearMicrosoftRefreshToken,
   clearRefreshToken,
@@ -895,7 +896,7 @@ export const authController = new Elysia({ prefix: '/auth' })
 
         const user = await findUserById(decoded.sub);
 
-        if (!user || user.refreshToken !== body.refreshToken) {
+        if (!user || (user.refreshToken !== body.refreshToken && user.refreshToken !== hashRefreshToken(body.refreshToken))) {
           return {
             success: false,
             data: null,

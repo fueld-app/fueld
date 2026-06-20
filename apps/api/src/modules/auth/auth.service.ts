@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { db } from '../../db';
 import { users, tenants, type NewUser, type User, type TenantSettings } from '../../db/schema';
@@ -156,13 +157,23 @@ export async function loginWithO365(microsoftAccessToken: string): Promise<User>
 
 // ── Refresh Token Persistence ────────────────────────────────────────
 
+/**
+ * Hash a refresh token for at-rest storage. The refresh flow compares the
+ * provided token's hash against the stored hash (with a legacy-plaintext
+ * fallback for tokens issued before this change), so raw refresh tokens are
+ * never persisted.
+ */
+export function hashRefreshToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
+
 export async function storeRefreshToken(
   userId: string,
   refreshToken: string,
 ): Promise<void> {
   await db
     .update(users)
-    .set({ refreshToken, updatedAt: new Date() })
+    .set({ refreshToken: hashRefreshToken(refreshToken), updatedAt: new Date() })
     .where(eq(users.id, userId));
 }
 
