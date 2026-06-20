@@ -1,4 +1,5 @@
 import { type Page } from '@playwright/test';
+import { authHeaders } from './auth';
 
 interface ApiResponse<T> {
   success: boolean;
@@ -57,15 +58,7 @@ async function ensureOwnCompanyBankAccount(
 }
 
 export async function createInquiryViaApi(page: Page): Promise<string> {
-  const accessToken = await page.evaluate(() => localStorage.getItem('fueld_access_token'));
-  if (!accessToken) {
-    throw new Error('Missing access token in browser localStorage.');
-  }
-
-  const headers = {
-    Authorization: `Bearer ${accessToken}`,
-    Accept: 'application/json',
-  };
+  const headers = await authHeaders(page);
 
   const [clientsRes, vesselsRes, placesRes] = await Promise.all([
     page.request.get('http://localhost:3000/companies/local?type=CLIENT&limit=1', { headers }),
@@ -146,13 +139,7 @@ export async function createInquiryViaApi(page: Page): Promise<string> {
 export async function createMultiSupplierInquiryViaApi(
   page: Page,
 ): Promise<{ inquiryId: string; supplierRecordIds: string[] }> {
-  const accessToken = await page.evaluate(() => localStorage.getItem('fueld_access_token'));
-  if (!accessToken) throw new Error('Missing access token');
-
-  const headers = {
-    Authorization: `Bearer ${accessToken}`,
-    Accept: 'application/json',
-  };
+  const headers = await authHeaders(page);
 
   // Step 1: create inquiry (no items yet — we'll add per-supplier items)
   const [clientsRes, vesselsRes, placesRes] = await Promise.all([

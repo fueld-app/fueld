@@ -1,18 +1,8 @@
 import { test, expect, type Page } from '../fixtures/coverage';
-import { loginViaUi } from '../helpers/auth';
+import { loginViaUi, authHeaders } from '../helpers/auth';
 import { createInquiryViaApi } from '../helpers/trading';
 
 const API = 'http://localhost:3000';
-
-async function authHeaders(page: Page): Promise<Record<string, string>> {
-  const token = await page.evaluate(() => localStorage.getItem('fueld_access_token'));
-  if (!token) throw new Error('Missing access token in localStorage');
-  return {
-    Authorization: `Bearer ${token}`,
-    Accept: 'application/json',
-    'Content-Type': 'application/json',
-  };
-}
 
 interface InquirySupplier {
   companyId?: string;

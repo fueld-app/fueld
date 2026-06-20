@@ -8,6 +8,6 @@ test('trader cannot access admin routes', async ({ page }) => {
   });
 
   await page.goto('/admin/users');
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/dashboard/);
   await expect(page.getByRole('heading', { name: /dashboard/i })).toBeVisible();
 });

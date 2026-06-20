@@ -16,7 +16,7 @@ import {
 import { disconnectUserSessions } from '../activity/session-tracker';
 import type { ApiResponse } from '@fueld/types';
 import { sendInviteEmail, sendPasswordResetEmail, sendTestEmail } from '../../lib/email';
-import { jwtAccessPlugin, jwtRefreshPlugin, type JwtPayload } from '../auth/jwt.setup';
+import { jwtAccessPlugin, jwtRefreshPlugin, type JwtPayload, setAuthCookies, generateCsrfToken } from '../auth/jwt.setup';
 import { createPasswordResetForUser } from '../auth/password-reset.service';
 
 // ─── Admin Controller ────────────────────────────────────────────────
@@ -139,7 +139,10 @@ export const adminController = new Elysia({ prefix: '/admin' })
       const invite = await inviteUser({
         email: body.email,
         name: body.name,
-        role: body.role as 'ADMIN' | 'TRADER' | 'FINANCE' | 'TEAMLEAD' | 'CREDITMANAGER' | 'OPERATIONSMANAGER' | 'LIGHT',
+        // Default an empty/missing role to TRADER (matches the schema default)
+        // so an invite sent without explicitly picking a role doesn't 500 on the
+        // roleEnum column.
+        role: (body.role || 'TRADER') as 'ADMIN' | 'TRADER' | 'FINANCE' | 'TEAMLEAD' | 'CREDITMANAGER' | 'OPERATIONSMANAGER' | 'LIGHT',
         invitedBy: auth.sub,
         allowReinvite: body.allowReinvite,
       });
@@ -471,7 +474,7 @@ export const inviteController = new Elysia({ prefix: '/invite' })
   })
 
   // ── POST /invite/:token/accept — complete signup ─────────────────
-  .post('/:token/accept', async ({ params, body, jwtAccess, jwtRefresh }) => {
+  .post('/:token/accept', async ({ params, body, jwtAccess, jwtRefresh, set }) => {
     try {
       const { storeRefreshToken } = await import('../auth/auth.service');
 
@@ -480,14 +483,15 @@ export const inviteController = new Elysia({ prefix: '/invite' })
       const payload = userToPayload(user);
       const accessToken = await jwtAccess.sign(payload);
       const refreshToken = await jwtRefresh.sign(payload);
+      const csrfToken = generateCsrfToken();
       await storeRefreshToken(user.id, refreshToken);
+
+      setAuthCookies(set, accessToken, refreshToken, csrfToken);
 
       return {
         success: true,
         data: {
           user: sanitiseUser(user),
-          accessToken,
-          refreshToken,
           requiresMfaSetup: true,
         },
       } satisfies ApiResponse<unknown>;

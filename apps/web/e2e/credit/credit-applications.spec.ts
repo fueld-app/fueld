@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/coverage';
-import { loginViaUi } from '../helpers/auth';
+import { loginViaUi, authHeaders } from '../helpers/auth';
 import { createInquiryViaApi } from '../helpers/trading';
 import type { Page } from '@playwright/test';
 
@@ -42,19 +42,6 @@ interface CreditApplicationDto {
 interface PaginatedResponse<T> {
   items: T[];
   total: number;
-}
-
-async function getAccessToken(page: Page): Promise<string> {
-  const token = await page.evaluate(() => localStorage.getItem('fueld_access_token'));
-  if (!token) throw new Error('Missing browser access token');
-  return token;
-}
-
-async function authHeaders(page: Page): Promise<Record<string, string>> {
-  return {
-    Authorization: `Bearer ${await getAccessToken(page)}`,
-    Accept: 'application/json',
-  };
 }
 
 async function fetchSeededClientId(page: Page): Promise<string> {

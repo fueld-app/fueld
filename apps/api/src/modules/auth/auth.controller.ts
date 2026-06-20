@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia';
 import { join } from 'path';
-import { jwtAccessPlugin, jwtRefreshPlugin, type JwtPayload } from './jwt.setup';
+import { jwtAccessPlugin, jwtRefreshPlugin, type JwtPayload, setAuthCookies, clearAuthCookies, generateCsrfToken, extractRefreshToken, flattenElysiaCookies, resolveAccessToken, validateCsrfToken, isCookieAuth, STATE_CHANGING_METHODS, ACCESS_COOKIE } from './jwt.setup';
 import {
   loginWithPassword,
   loginWithO365,
@@ -113,22 +113,23 @@ export const authController = new Elysia({ prefix: '/auth' })
   // ── POST /auth/register ──────────────────────────────────────────
   .post(
     '/register',
-    async ({ body, jwtAccess, jwtRefresh }) => {
+    async ({ body, jwtAccess, jwtRefresh, set }) => {
       try {
         const user = await registerUser(body);
         const payload = userToPayload(user);
 
         const accessToken = await jwtAccess.sign(payload);
         const refreshToken = await jwtRefresh.sign(payload);
+        const csrfToken = generateCsrfToken();
 
         await storeRefreshToken(user.id, refreshToken);
+
+        setAuthCookies(set, accessToken, refreshToken, csrfToken);
 
         return {
           success: true,
           data: {
             user: sanitiseUser(user),
-            accessToken,
-            refreshToken,
             requiresMfaSetup: false,
           },
         } satisfies ApiResponse<unknown>;
@@ -153,7 +154,7 @@ export const authController = new Elysia({ prefix: '/auth' })
   // ── POST /auth/login ─────────────────────────────────────────────
   .post(
     '/login',
-    async ({ body, jwtAccess, jwtRefresh }) => {
+    async ({ body, jwtAccess, jwtRefresh, set }) => {
       try {
         const { user } = await loginWithPassword(
           body.email,
@@ -200,16 +201,17 @@ export const authController = new Elysia({ prefix: '/auth' })
 
         const accessToken = await jwtAccess.sign(payload);
         const refreshToken = await jwtRefresh.sign(payload);
+        const csrfToken = generateCsrfToken();
 
         await storeRefreshToken(user.id, refreshToken);
+
+        setAuthCookies(set, accessToken, refreshToken, csrfToken);
 
         return {
           success: true,
           data: {
             requires2fa: false,
             user: sanitiseUser(user),
-            accessToken,
-            refreshToken,
             requiresMfaSetup,
           },
         } satisfies ApiResponse<unknown>;
@@ -265,7 +267,7 @@ export const authController = new Elysia({ prefix: '/auth' })
   // ── POST /auth/verify-2fa ────────────────────────────────────────
   .post(
     '/verify-2fa',
-    async ({ body, jwtAccess, jwtRefresh }) => {
+    async ({ body, jwtAccess, jwtRefresh, set }) => {
       try {
         // Decode the temp token to get the user ID
         const raw = await jwtAccess.verify(body.tempToken);
@@ -301,15 +303,16 @@ export const authController = new Elysia({ prefix: '/auth' })
 
         const accessToken = await jwtAccess.sign(payload);
         const refreshToken = await jwtRefresh.sign(payload);
+        const csrfToken = generateCsrfToken();
 
         await storeRefreshToken(user.id, refreshToken);
+
+        setAuthCookies(set, accessToken, refreshToken, csrfToken);
 
         return {
           success: true,
           data: {
             user: sanitiseUser(user),
-            accessToken,
-            refreshToken,
             requiresMfaSetup: false,
           },
         } satisfies ApiResponse<unknown>;
@@ -334,7 +337,7 @@ export const authController = new Elysia({ prefix: '/auth' })
   // Step 2 of 2FA passkey flow: verify the assertion from the browser
   .post(
     '/verify-passkey',
-    async ({ body, jwtAccess, jwtRefresh }) => {
+    async ({ body, jwtAccess, jwtRefresh, set }) => {
       try {
         const raw = await jwtAccess.verify(body.tempToken);
         const decoded = raw ? (raw as Record<string, unknown>) : null;
@@ -379,14 +382,15 @@ export const authController = new Elysia({ prefix: '/auth' })
         const payload = userToPayload(user);
         const accessToken = await jwtAccess.sign(payload);
         const refreshToken = await jwtRefresh.sign(payload);
+        const csrfToken = generateCsrfToken();
         await storeRefreshToken(user.id, refreshToken);
+
+        setAuthCookies(set, accessToken, refreshToken, csrfToken);
 
         return {
           success: true,
           data: {
             user: sanitiseUser(user),
-            accessToken,
-            refreshToken,
           },
         } satisfies ApiResponse<unknown>;
       } catch (err) {
@@ -509,7 +513,7 @@ export const authController = new Elysia({ prefix: '/auth' })
   // Step 2 of passwordless login: verify the assertion response
   .post(
     '/login/passkey',
-    async ({ body, jwtAccess, jwtRefresh }) => {
+    async ({ body, jwtAccess, jwtRefresh, set }) => {
       try {
         const config = await isPasskeyEnabled();
         if (!config.enabled || !config.allowPasswordless) {
@@ -573,15 +577,16 @@ export const authController = new Elysia({ prefix: '/auth' })
         const payload = userToPayload(user);
         const accessToken = await jwtAccess.sign(payload);
         const refreshToken = await jwtRefresh.sign(payload);
+        const csrfToken = generateCsrfToken();
         await storeRefreshToken(user.id, refreshToken);
+
+        setAuthCookies(set, accessToken, refreshToken, csrfToken);
 
         return {
           success: true,
           data: {
             requires2fa: false,
             user: sanitiseUser(user),
-            accessToken,
-            refreshToken,
             requiresMfaSetup: false,
           },
         } satisfies ApiResponse<unknown>;
@@ -606,22 +611,23 @@ export const authController = new Elysia({ prefix: '/auth' })
   // ── POST /auth/login/sso ─────────────────────────────────────────
   .post(
     '/login/sso',
-    async ({ body, jwtAccess, jwtRefresh }) => {
+    async ({ body, jwtAccess, jwtRefresh, set }) => {
       try {
         const user = await loginWithO365(body.microsoftAccessToken);
         const payload = userToPayload(user);
 
         const accessToken = await jwtAccess.sign(payload);
         const refreshToken = await jwtRefresh.sign(payload);
+        const csrfToken = generateCsrfToken();
 
         await storeRefreshToken(user.id, refreshToken);
+
+        setAuthCookies(set, accessToken, refreshToken, csrfToken);
 
         return {
           success: true,
           data: {
             user: sanitiseUser(user),
-            accessToken,
-            refreshToken,
           },
         } satisfies ApiResponse<unknown>;
       } catch (err) {
@@ -850,7 +856,7 @@ export const authController = new Elysia({ prefix: '/auth' })
   // ── POST /auth/microsoft/exchange — redeem one-time code for tokens ─
   .post(
     '/microsoft/exchange',
-    async ({ body }) => {
+    async ({ body, set }) => {
       const auth = consumeOneTimeCode(body.code);
       if (!auth) {
         return {
@@ -860,12 +866,13 @@ export const authController = new Elysia({ prefix: '/auth' })
         } satisfies ApiResponse<null>;
       }
 
+      const csrfToken = generateCsrfToken();
+      setAuthCookies(set, auth.fueldAccessToken, auth.fueldRefreshToken, csrfToken);
+
       return {
         success: true,
         data: {
           user: auth.user,
-          accessToken: auth.fueldAccessToken,
-          refreshToken: auth.fueldRefreshToken,
         },
       } satisfies ApiResponse<unknown>;
     },
@@ -883,9 +890,36 @@ export const authController = new Elysia({ prefix: '/auth' })
   // ── POST /auth/refresh ───────────────────────────────────────────
   .post(
     '/refresh',
-    async ({ body, jwtAccess, jwtRefresh }) => {
+    async ({ body, jwtAccess, jwtRefresh, set, cookie, headers, request }) => {
       try {
-        const decoded = extractPayload(await jwtRefresh.verify(body.refreshToken));
+        const flatCookies = flattenElysiaCookies(cookie);
+
+        // CSRF: a cookie-authenticated refresh (browser, no Bearer header) is a
+        // state-changing POST, so it must present the double-submit CSRF token.
+        if (
+          isCookieAuth(headers as Record<string, string | undefined>) &&
+          STATE_CHANGING_METHODS.has(request.method)
+        ) {
+          if (!validateCsrfToken(headers as Record<string, string | undefined>, flatCookies)) {
+            set.status = 403;
+            return {
+              success: false,
+              data: null,
+              message: 'Invalid or missing CSRF token',
+            } satisfies ApiResponse<null>;
+          }
+        }
+
+        const refreshTokenValue = extractRefreshToken(flatCookies, body as { refreshToken?: string });
+        if (!refreshTokenValue) {
+          return {
+            success: false,
+            data: null,
+            message: 'Missing refresh token (cookie or body)',
+          } satisfies ApiResponse<null>;
+        }
+
+        const decoded = extractPayload(await jwtRefresh.verify(refreshTokenValue));
         if (!decoded) {
           return {
             success: false,
@@ -896,7 +930,7 @@ export const authController = new Elysia({ prefix: '/auth' })
 
         const user = await findUserById(decoded.sub);
 
-        if (!user || (user.refreshToken !== body.refreshToken && user.refreshToken !== hashRefreshToken(body.refreshToken))) {
+        if (!user || (user.refreshToken !== refreshTokenValue && user.refreshToken !== hashRefreshToken(refreshTokenValue))) {
           return {
             success: false,
             data: null,
@@ -910,15 +944,16 @@ export const authController = new Elysia({ prefix: '/auth' })
 
         const newAccessToken = await jwtAccess.sign(payload);
         const newRefreshToken = await jwtRefresh.sign(payload);
+        const csrfToken = generateCsrfToken();
 
         // Rotate the refresh token in DB
         await storeRefreshToken(user.id, newRefreshToken);
 
+        setAuthCookies(set, newAccessToken, newRefreshToken, csrfToken);
+
         return {
           success: true,
           data: {
-            accessToken: newAccessToken,
-            refreshToken: newRefreshToken,
             requiresMfaSetup,
           },
         } satisfies ApiResponse<unknown>;
@@ -929,7 +964,7 @@ export const authController = new Elysia({ prefix: '/auth' })
     },
     {
       body: t.Object({
-        refreshToken: t.String(),
+        refreshToken: t.Optional(t.String()),
       }),
       detail: {
         tags: ['Auth'],
@@ -941,18 +976,43 @@ export const authController = new Elysia({ prefix: '/auth' })
   // ── POST /auth/logout ────────────────────────────────────────────
   .post(
     '/logout',
-    async ({ body, jwtAccess }) => {
+    async ({ body, jwtAccess, set, cookie, headers, request }) => {
       try {
-        const decoded = extractPayload(await jwtAccess.verify(body.accessToken));
-        if (decoded) {
-          await clearRefreshToken(decoded.sub);
+        const flatCookies = flattenElysiaCookies(cookie);
+
+        // CSRF: cookie-authenticated logout is a state-changing POST.
+        if (
+          isCookieAuth(headers as Record<string, string | undefined>) &&
+          STATE_CHANGING_METHODS.has(request.method)
+        ) {
+          if (!validateCsrfToken(headers as Record<string, string | undefined>, flatCookies)) {
+            set.status = 403;
+            return {
+              success: false,
+              data: null,
+              message: 'Invalid or missing CSRF token',
+            } satisfies ApiResponse<null>;
+          }
         }
+
+        // Try to read access token from cookie first, then body
+        const accessToken = flatCookies[ACCESS_COOKIE] ?? body?.accessToken;
+
+        if (accessToken) {
+          const decoded = extractPayload(await jwtAccess.verify(accessToken));
+          if (decoded) {
+            await clearRefreshToken(decoded.sub);
+          }
+        }
+
+        clearAuthCookies(set);
         return {
           success: true,
           data: null,
           message: 'Logged out',
         } satisfies ApiResponse<null>;
       } catch {
+        clearAuthCookies(set);
         return {
           success: true,
           data: null,
@@ -962,7 +1022,7 @@ export const authController = new Elysia({ prefix: '/auth' })
     },
     {
       body: t.Object({
-        accessToken: t.String(),
+        accessToken: t.Optional(t.String()),
       }),
       detail: {
         tags: ['Auth'],
@@ -974,25 +1034,17 @@ export const authController = new Elysia({ prefix: '/auth' })
   // ── POST /auth/2fa/generate ──────────────────────────────────────
   .post(
     '/2fa/generate',
-    async ({ headers, jwtAccess }) => {
+    async ({ headers, jwtAccess, cookie, request, set }) => {
       try {
-        const authHeader = headers['authorization'];
-        if (!authHeader?.startsWith('Bearer ')) {
-          return {
-            success: false,
-            data: null,
-            message: 'Missing authorization header',
-          } satisfies ApiResponse<null>;
+        const flatCookies = flattenElysiaCookies(cookie);
+        const resolved = resolveAccessToken(headers as Record<string, string | undefined>, flatCookies, request.method);
+        if (!resolved.ok) {
+          if (resolved.reason === 'csrf') set.status = 403;
+          return { success: false, data: null, message: resolved.reason === 'csrf' ? 'Invalid or missing CSRF token' : 'Missing authentication token' } satisfies ApiResponse<null>;
         }
-
-        const token = authHeader.slice(7);
-        const decoded = extractPayload(await jwtAccess.verify(token));
+        const decoded = extractPayload(await jwtAccess.verify(resolved.token));
         if (!decoded) {
-          return {
-            success: false,
-            data: null,
-            message: 'Invalid token',
-          } satisfies ApiResponse<null>;
+          return { success: false, data: null, message: 'Invalid token' } satisfies ApiResponse<null>;
         }
 
         const { secret, qrDataUrl } = await generate2faSecret(decoded.sub);
@@ -1018,25 +1070,17 @@ export const authController = new Elysia({ prefix: '/auth' })
   // ── POST /auth/2fa/enable ────────────────────────────────────────
   .post(
     '/2fa/enable',
-    async ({ body, headers, jwtAccess }) => {
+    async ({ body, headers, jwtAccess, cookie, request, set }) => {
       try {
-        const authHeader = headers['authorization'];
-        if (!authHeader?.startsWith('Bearer ')) {
-          return {
-            success: false,
-            data: null,
-            message: 'Missing authorization header',
-          } satisfies ApiResponse<null>;
+        const flatCookies = flattenElysiaCookies(cookie);
+        const resolved = resolveAccessToken(headers as Record<string, string | undefined>, flatCookies, request.method);
+        if (!resolved.ok) {
+          if (resolved.reason === 'csrf') set.status = 403;
+          return { success: false, data: null, message: resolved.reason === 'csrf' ? 'Invalid or missing CSRF token' : 'Missing authentication token' } satisfies ApiResponse<null>;
         }
-
-        const token = authHeader.slice(7);
-        const decoded = extractPayload(await jwtAccess.verify(token));
+        const decoded = extractPayload(await jwtAccess.verify(resolved.token));
         if (!decoded) {
-          return {
-            success: false,
-            data: null,
-            message: 'Invalid token',
-          } satisfies ApiResponse<null>;
+          return { success: false, data: null, message: 'Invalid token' } satisfies ApiResponse<null>;
         }
 
         const enabled = await enable2fa(decoded.sub, body.code);
@@ -1073,25 +1117,17 @@ export const authController = new Elysia({ prefix: '/auth' })
   // ── POST /auth/2fa/disable ───────────────────────────────────────
   .post(
     '/2fa/disable',
-    async ({ body, headers, jwtAccess }) => {
+    async ({ body, headers, jwtAccess, cookie, request, set }) => {
       try {
-        const authHeader = headers['authorization'];
-        if (!authHeader?.startsWith('Bearer ')) {
-          return {
-            success: false,
-            data: null,
-            message: 'Missing authorization header',
-          } satisfies ApiResponse<null>;
+        const flatCookies = flattenElysiaCookies(cookie);
+        const resolved = resolveAccessToken(headers as Record<string, string | undefined>, flatCookies, request.method);
+        if (!resolved.ok) {
+          if (resolved.reason === 'csrf') set.status = 403;
+          return { success: false, data: null, message: resolved.reason === 'csrf' ? 'Invalid or missing CSRF token' : 'Missing authentication token' } satisfies ApiResponse<null>;
         }
-
-        const token = authHeader.slice(7);
-        const decoded = extractPayload(await jwtAccess.verify(token));
+        const decoded = extractPayload(await jwtAccess.verify(resolved.token));
         if (!decoded) {
-          return {
-            success: false,
-            data: null,
-            message: 'Invalid token',
-          } satisfies ApiResponse<null>;
+          return { success: false, data: null, message: 'Invalid token' } satisfies ApiResponse<null>;
         }
 
         const disabled = await disable2fa(decoded.sub, body.code);
@@ -1128,14 +1164,15 @@ export const authController = new Elysia({ prefix: '/auth' })
   // ── GET /auth/passkeys — list user's passkeys ──────────────────────
   .get(
     '/passkeys',
-    async ({ headers, jwtAccess }) => {
+    async ({ headers, jwtAccess, cookie, request, set }) => {
       try {
-        const authHeader = headers['authorization'];
-        if (!authHeader?.startsWith('Bearer ')) {
-          return { success: false, data: null, message: 'Missing authorization header' } satisfies ApiResponse<null>;
+        const flatCookies = flattenElysiaCookies(cookie);
+        const resolved = resolveAccessToken(headers as Record<string, string | undefined>, flatCookies, request.method);
+        if (!resolved.ok) {
+          if (resolved.reason === 'csrf') set.status = 403;
+          return { success: false, data: null, message: resolved.reason === 'csrf' ? 'Invalid or missing CSRF token' : 'Missing authentication token' } satisfies ApiResponse<null>;
         }
-        const token = authHeader.slice(7);
-        const decoded = extractPayload(await jwtAccess.verify(token));
+        const decoded = extractPayload(await jwtAccess.verify(resolved.token));
         if (!decoded) {
           return { success: false, data: null, message: 'Invalid token' } satisfies ApiResponse<null>;
         }
@@ -1154,14 +1191,15 @@ export const authController = new Elysia({ prefix: '/auth' })
   // ── POST /auth/passkeys/register-options — generate registration challenge ──
   .post(
     '/passkeys/register-options',
-    async ({ headers, jwtAccess }) => {
+    async ({ headers, jwtAccess, cookie, request, set }) => {
       try {
-        const authHeader = headers['authorization'];
-        if (!authHeader?.startsWith('Bearer ')) {
-          return { success: false, data: null, message: 'Missing authorization header' } satisfies ApiResponse<null>;
+        const flatCookies = flattenElysiaCookies(cookie);
+        const resolved = resolveAccessToken(headers as Record<string, string | undefined>, flatCookies, request.method);
+        if (!resolved.ok) {
+          if (resolved.reason === 'csrf') set.status = 403;
+          return { success: false, data: null, message: resolved.reason === 'csrf' ? 'Invalid or missing CSRF token' : 'Missing authentication token' } satisfies ApiResponse<null>;
         }
-        const token = authHeader.slice(7);
-        const decoded = extractPayload(await jwtAccess.verify(token));
+        const decoded = extractPayload(await jwtAccess.verify(resolved.token));
         if (!decoded) {
           return { success: false, data: null, message: 'Invalid token' } satisfies ApiResponse<null>;
         }
@@ -1184,14 +1222,15 @@ export const authController = new Elysia({ prefix: '/auth' })
   // ── POST /auth/passkeys/register-verify — verify attestation and store passkey ──
   .post(
     '/passkeys/register-verify',
-    async ({ body, headers, jwtAccess }) => {
+    async ({ body, headers, jwtAccess, cookie, request, set }) => {
       try {
-        const authHeader = headers['authorization'];
-        if (!authHeader?.startsWith('Bearer ')) {
-          return { success: false, data: null, message: 'Missing authorization header' } satisfies ApiResponse<null>;
+        const flatCookies = flattenElysiaCookies(cookie);
+        const resolved = resolveAccessToken(headers as Record<string, string | undefined>, flatCookies, request.method);
+        if (!resolved.ok) {
+          if (resolved.reason === 'csrf') set.status = 403;
+          return { success: false, data: null, message: resolved.reason === 'csrf' ? 'Invalid or missing CSRF token' : 'Missing authentication token' } satisfies ApiResponse<null>;
         }
-        const token = authHeader.slice(7);
-        const decoded = extractPayload(await jwtAccess.verify(token));
+        const decoded = extractPayload(await jwtAccess.verify(resolved.token));
         if (!decoded) {
           return { success: false, data: null, message: 'Invalid token' } satisfies ApiResponse<null>;
         }
@@ -1218,14 +1257,15 @@ export const authController = new Elysia({ prefix: '/auth' })
   // ── PUT /auth/passkeys/:id — rename a passkey ──────────────────────
   .put(
     '/passkeys/:id',
-    async ({ params, body, headers, jwtAccess }) => {
+    async ({ params, body, headers, jwtAccess, cookie, request, set }) => {
       try {
-        const authHeader = headers['authorization'];
-        if (!authHeader?.startsWith('Bearer ')) {
-          return { success: false, data: null, message: 'Missing authorization header' } satisfies ApiResponse<null>;
+        const flatCookies = flattenElysiaCookies(cookie);
+        const resolved = resolveAccessToken(headers as Record<string, string | undefined>, flatCookies, request.method);
+        if (!resolved.ok) {
+          if (resolved.reason === 'csrf') set.status = 403;
+          return { success: false, data: null, message: resolved.reason === 'csrf' ? 'Invalid or missing CSRF token' : 'Missing authentication token' } satisfies ApiResponse<null>;
         }
-        const token = authHeader.slice(7);
-        const decoded = extractPayload(await jwtAccess.verify(token));
+        const decoded = extractPayload(await jwtAccess.verify(resolved.token));
         if (!decoded) {
           return { success: false, data: null, message: 'Invalid token' } satisfies ApiResponse<null>;
         }
@@ -1248,14 +1288,15 @@ export const authController = new Elysia({ prefix: '/auth' })
   // ── DELETE /auth/passkeys/:id — delete a passkey ───────────────────
   .delete(
     '/passkeys/:id',
-    async ({ params, headers, jwtAccess }) => {
+    async ({ params, headers, jwtAccess, cookie, request, set }) => {
       try {
-        const authHeader = headers['authorization'];
-        if (!authHeader?.startsWith('Bearer ')) {
-          return { success: false, data: null, message: 'Missing authorization header' } satisfies ApiResponse<null>;
+        const flatCookies = flattenElysiaCookies(cookie);
+        const resolved = resolveAccessToken(headers as Record<string, string | undefined>, flatCookies, request.method);
+        if (!resolved.ok) {
+          if (resolved.reason === 'csrf') set.status = 403;
+          return { success: false, data: null, message: resolved.reason === 'csrf' ? 'Invalid or missing CSRF token' : 'Missing authentication token' } satisfies ApiResponse<null>;
         }
-        const token = authHeader.slice(7);
-        const decoded = extractPayload(await jwtAccess.verify(token));
+        const decoded = extractPayload(await jwtAccess.verify(resolved.token));
         if (!decoded) {
           return { success: false, data: null, message: 'Invalid token' } satisfies ApiResponse<null>;
         }
@@ -1281,13 +1322,15 @@ export const authController = new Elysia({ prefix: '/auth' })
   // ── PATCH /auth/phone — update user phone number ───────────────────
   .patch(
     '/phone',
-    async ({ body, headers, jwtAccess }) => {
+    async ({ body, headers, jwtAccess, cookie, request, set }) => {
       try {
-        const authHeader = headers['authorization'];
-        if (!authHeader?.startsWith('Bearer ')) {
-          return { success: false, data: null, message: 'Missing authorization header' } satisfies ApiResponse<null>;
+        const flatCookies = flattenElysiaCookies(cookie);
+        const resolved = resolveAccessToken(headers as Record<string, string | undefined>, flatCookies, request.method);
+        if (!resolved.ok) {
+          if (resolved.reason === 'csrf') set.status = 403;
+          return { success: false, data: null, message: resolved.reason === 'csrf' ? 'Invalid or missing CSRF token' : 'Missing authentication token' } satisfies ApiResponse<null>;
         }
-        const decoded = extractPayload(await jwtAccess.verify(authHeader.slice(7)));
+        const decoded = extractPayload(await jwtAccess.verify(resolved.token));
         if (!decoded) {
           return { success: false, data: null, message: 'Invalid token' } satisfies ApiResponse<null>;
         }
@@ -1322,14 +1365,15 @@ export const authController = new Elysia({ prefix: '/auth' })
   // ── GET /auth/preferences — get current user's UI preferences ──────
   .get(
     '/preferences',
-    async ({ headers, jwtAccess }) => {
+    async ({ headers, jwtAccess, cookie, request, set }) => {
       try {
-        const authHeader = headers['authorization'];
-        if (!authHeader?.startsWith('Bearer ')) {
-          return { success: false, data: null, message: 'Missing authorization header' } satisfies ApiResponse<null>;
+        const flatCookies = flattenElysiaCookies(cookie);
+        const resolved = resolveAccessToken(headers as Record<string, string | undefined>, flatCookies, request.method);
+        if (!resolved.ok) {
+          if (resolved.reason === 'csrf') set.status = 403;
+          return { success: false, data: null, message: resolved.reason === 'csrf' ? 'Invalid or missing CSRF token' : 'Missing authentication token' } satisfies ApiResponse<null>;
         }
-        const token = authHeader.slice(7);
-        const decoded = extractPayload(await jwtAccess.verify(token));
+        const decoded = extractPayload(await jwtAccess.verify(resolved.token));
         if (!decoded) {
           return { success: false, data: null, message: 'Invalid token' } satisfies ApiResponse<null>;
         }
@@ -1350,14 +1394,15 @@ export const authController = new Elysia({ prefix: '/auth' })
   // ── PUT /auth/preferences — update current user's UI preferences ───
   .put(
     '/preferences',
-    async ({ body, headers, jwtAccess }) => {
+    async ({ body, headers, jwtAccess, cookie, request, set }) => {
       try {
-        const authHeader = headers['authorization'];
-        if (!authHeader?.startsWith('Bearer ')) {
-          return { success: false, data: null, message: 'Missing authorization header' } satisfies ApiResponse<null>;
+        const flatCookies = flattenElysiaCookies(cookie);
+        const resolved = resolveAccessToken(headers as Record<string, string | undefined>, flatCookies, request.method);
+        if (!resolved.ok) {
+          if (resolved.reason === 'csrf') set.status = 403;
+          return { success: false, data: null, message: resolved.reason === 'csrf' ? 'Invalid or missing CSRF token' : 'Missing authentication token' } satisfies ApiResponse<null>;
         }
-        const token = authHeader.slice(7);
-        const decoded = extractPayload(await jwtAccess.verify(token));
+        const decoded = extractPayload(await jwtAccess.verify(resolved.token));
         if (!decoded) {
           return { success: false, data: null, message: 'Invalid token' } satisfies ApiResponse<null>;
         }
@@ -1383,13 +1428,15 @@ export const authController = new Elysia({ prefix: '/auth' })
   // ── PUT /auth/avatar — upload user avatar ──────────────────────────
   .put(
     '/avatar',
-    async ({ body, headers, jwtAccess }) => {
+    async ({ body, headers, jwtAccess, cookie, request, set }) => {
       try {
-        const authHeader = headers['authorization'];
-        if (!authHeader?.startsWith('Bearer ')) {
-          return { success: false, data: null, message: 'Missing authorization header' } satisfies ApiResponse<null>;
+        const flatCookies = flattenElysiaCookies(cookie);
+        const resolved = resolveAccessToken(headers as Record<string, string | undefined>, flatCookies, request.method);
+        if (!resolved.ok) {
+          if (resolved.reason === 'csrf') set.status = 403;
+          return { success: false, data: null, message: resolved.reason === 'csrf' ? 'Invalid or missing CSRF token' : 'Missing authentication token' } satisfies ApiResponse<null>;
         }
-        const decoded = extractPayload(await jwtAccess.verify(authHeader.slice(7)));
+        const decoded = extractPayload(await jwtAccess.verify(resolved.token));
         if (!decoded) {
           return { success: false, data: null, message: 'Invalid token' } satisfies ApiResponse<null>;
         }
@@ -1455,13 +1502,15 @@ export const authController = new Elysia({ prefix: '/auth' })
   // ── DELETE /auth/avatar — remove user avatar ───────────────────────
   .delete(
     '/avatar',
-    async ({ headers, jwtAccess }) => {
+    async ({ headers, jwtAccess, cookie, request, set }) => {
       try {
-        const authHeader = headers['authorization'];
-        if (!authHeader?.startsWith('Bearer ')) {
-          return { success: false, data: null, message: 'Missing authorization header' } satisfies ApiResponse<null>;
+        const flatCookies = flattenElysiaCookies(cookie);
+        const resolved = resolveAccessToken(headers as Record<string, string | undefined>, flatCookies, request.method);
+        if (!resolved.ok) {
+          if (resolved.reason === 'csrf') set.status = 403;
+          return { success: false, data: null, message: resolved.reason === 'csrf' ? 'Invalid or missing CSRF token' : 'Missing authentication token' } satisfies ApiResponse<null>;
         }
-        const decoded = extractPayload(await jwtAccess.verify(authHeader.slice(7)));
+        const decoded = extractPayload(await jwtAccess.verify(resolved.token));
         if (!decoded) {
           return { success: false, data: null, message: 'Invalid token' } satisfies ApiResponse<null>;
         }
@@ -1496,14 +1545,15 @@ export const authController = new Elysia({ prefix: '/auth' })
   // ── GET /auth/microsoft/connect — initiate OAuth to link Microsoft (no SSO required) ──
   .get(
     '/microsoft/connect',
-    async ({ query, headers, set, jwtAccess, request }) => {
+    async ({ query, headers, set, jwtAccess, request, cookie }) => {
       // Require authentication
-      const authHeader = headers['authorization'];
-      if (!authHeader?.startsWith('Bearer ')) {
+      const flatCookies = flattenElysiaCookies(cookie);
+      const resolved = resolveAccessToken(headers as Record<string, string | undefined>, flatCookies, request.method);
+      if (!resolved.ok) {
         set.status = 401;
-        return { success: false, message: 'Missing authorization header' };
+        return { success: false, message: resolved.reason === 'csrf' ? 'Invalid or missing CSRF token' : 'Missing authentication token' };
       }
-      const decoded = extractPayload(await jwtAccess.verify(authHeader.slice(7)));
+      const decoded = extractPayload(await jwtAccess.verify(resolved.token));
       if (!decoded) {
         set.status = 401;
         return { success: false, message: 'Invalid token' };
@@ -1551,13 +1601,14 @@ export const authController = new Elysia({ prefix: '/auth' })
   // ── GET /auth/microsoft/status — check if current user has Microsoft connected ──
   .get(
     '/microsoft/status',
-    async ({ headers, jwtAccess, set }) => {
-      const authHeader = headers['authorization'];
-      if (!authHeader?.startsWith('Bearer ')) {
-        set.status = 401;
-        return { success: false, data: null, message: 'Missing authorization header' } satisfies ApiResponse<null>;
+    async ({ headers, jwtAccess, set, cookie, request }) => {
+      const flatCookies = flattenElysiaCookies(cookie);
+      const resolved = resolveAccessToken(headers as Record<string, string | undefined>, flatCookies, request.method);
+      if (!resolved.ok) {
+        set.status = resolved.reason === 'csrf' ? 403 : 401;
+        return { success: false, data: null, message: resolved.reason === 'csrf' ? 'Invalid or missing CSRF token' : 'Missing authentication token' } satisfies ApiResponse<null>;
       }
-      const decoded = extractPayload(await jwtAccess.verify(authHeader.slice(7)));
+      const decoded = extractPayload(await jwtAccess.verify(resolved.token));
       if (!decoded) {
         set.status = 401;
         return { success: false, data: null, message: 'Invalid token' } satisfies ApiResponse<null>;
@@ -1597,13 +1648,14 @@ export const authController = new Elysia({ prefix: '/auth' })
   // ── DELETE /auth/microsoft/connection — disconnect Microsoft account ──
   .delete(
     '/microsoft/connection',
-    async ({ headers, jwtAccess, set }) => {
-      const authHeader = headers['authorization'];
-      if (!authHeader?.startsWith('Bearer ')) {
-        set.status = 401;
-        return { success: false, data: null, message: 'Missing authorization header' } satisfies ApiResponse<null>;
+    async ({ headers, jwtAccess, set, cookie, request }) => {
+      const flatCookies = flattenElysiaCookies(cookie);
+      const resolved = resolveAccessToken(headers as Record<string, string | undefined>, flatCookies, request.method);
+      if (!resolved.ok) {
+        set.status = resolved.reason === 'csrf' ? 403 : 401;
+        return { success: false, data: null, message: resolved.reason === 'csrf' ? 'Invalid or missing CSRF token' : 'Missing authentication token' } satisfies ApiResponse<null>;
       }
-      const decoded = extractPayload(await jwtAccess.verify(authHeader.slice(7)));
+      const decoded = extractPayload(await jwtAccess.verify(resolved.token));
       if (!decoded) {
         set.status = 401;
         return { success: false, data: null, message: 'Invalid token' } satisfies ApiResponse<null>;

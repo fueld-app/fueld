@@ -62,12 +62,23 @@ test('admin can invite a user who can complete signup and login', async ({ brows
   const inviteToken = inviteLink.split('/invite/')[1] ?? '';
   expect(inviteToken).not.toBe('');
 
-  const acceptRes = await request.post(`http://localhost:3000/invite/${inviteToken}/accept`, {
-    data: { password: invitedPassword },
-  });
-  const acceptBody = await acceptRes.json();
-  expect(acceptRes.ok(), `Invite accept request failed: ${JSON.stringify(acceptBody)}`).toBeTruthy();
-  expect(acceptBody?.success, `Invite accept API returned success=false: ${JSON.stringify(acceptBody)}`).toBeTruthy();
+  // Accept via an in-page fetch (adminPage's context). The accept response sets
+  // HttpOnly cookies for the invited user; doing this through page.request / the
+  // `request` fixture races Playwright's cookie-jar update on the 200+Set-Cookie
+  // ("Target page, context or browser has been closed"). An in-page fetch lets
+  // the browser store the cookies natively. admin's context is discarded after
+  // this, so overwriting admin's cookies here is harmless.
+  const acceptResult = await adminPage.evaluate(async ({ url, password }) => {
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ password }),
+    });
+    return { ok: r.ok, status: r.status, body: await r.json().catch(() => null) };
+  }, { url: `/api/invite/${inviteToken}/accept`, password: invitedPassword });
+  expect(acceptResult.ok, `Invite accept request failed: ${JSON.stringify(acceptResult.body)}`).toBeTruthy();
+  expect(acceptResult.body?.success, `Invite accept API returned success=false: ${JSON.stringify(acceptResult.body)}`).toBeTruthy();
 
   const userContext = await browser.newContext({ baseURL });
   const userPage = await userContext.newPage();

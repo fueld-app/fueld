@@ -5,19 +5,20 @@
 
 function getApiUrl(): string {
   if (typeof window === 'undefined') return 'http://localhost:3000';
+  // In both dev (via proxy) and prod (via nginx), use relative /api
+  // The dev proxy (proxy.conf.json) forwards /api → http://localhost:3000
   if (window.location.hostname !== 'localhost') {
     return '/api';
   }
-  return 'http://localhost:3000';
+  return '/api'; // Dev: Angular proxy handles forwarding
 }
 
 function getWsUrl(): string {
   if (typeof window === 'undefined') return 'ws://localhost:3000/ws';
-  if (window.location.hostname !== 'localhost') {
-    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    return `${proto}//${window.location.host}/ws`;
-  }
-  return 'ws://localhost:3000/ws';
+  // Dev: Angular proxy handles /ws → ws://localhost:3000
+  // Prod: nginx proxies /ws to backend
+  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${proto}//${window.location.host}/ws`;
 }
 
 function getBrowserOrigin(): string {

@@ -55,3 +55,20 @@ export async function loginViaUi(page: Page, params: { email: string; password: 
   // This avoids flakiness where follow-up navigation happens before auth state is applied.
   await expect(page.getByRole('link', { name: 'Dashboard' })).toBeVisible({ timeout: 15_000 });
 }
+
+/**
+ * Headers for cookie-authenticated e2e API calls. Access/refresh tokens live in
+ * HttpOnly cookies (sent automatically by Playwright's `page.request` for the
+ * same-site API), so only the CSRF token must be attached: read it from the
+ * JS-readable fueld_csrf cookie and echo it back as X-CSRF-Token (the server
+ * validates this against the fueld_csrf cookie it receives automatically).
+ */
+export async function authHeaders(page: Page): Promise<Record<string, string>> {
+  const csrf = await page.evaluate(() => {
+    const m = document.cookie.match(/(?:^|;\s*)fueld_csrf=([^;]+)/);
+    return m ? decodeURIComponent(m[1]) : null;
+  });
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (csrf) headers['X-CSRF-Token'] = csrf;
+  return headers;
+}

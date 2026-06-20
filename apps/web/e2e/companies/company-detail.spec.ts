@@ -1,16 +1,10 @@
 import { test, expect } from '../fixtures/coverage';
-import { loginViaUi } from '../helpers/auth';
+import { loginViaUi, authHeaders } from '../helpers/auth';
 
 const { env } = process;
 
 const traderEmail = env['E2E_TRADER5_USER_EMAIL'] ?? 'trader5@fueld.local';
 const traderPassword = env['E2E_TRADER5_USER_PASSWORD'] ?? 'trader5password123';
-
-async function authHeaders(page: import('@playwright/test').Page): Promise<Record<string, string>> {
-  const token = await page.evaluate(() => localStorage.getItem('fueld_access_token'));
-  if (!token) throw new Error('Missing access token in localStorage');
-  return { Authorization: `Bearer ${token}`, Accept: 'application/json' };
-}
 
 /** Fetch the first seeded CLIENT company ID. */
 /** Fetch the first seeded CLIENT company ID. */

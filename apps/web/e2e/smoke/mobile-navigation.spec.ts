@@ -36,7 +36,7 @@ test.describe('mobile navigation', () => {
   });
 
   test('dashboard loads and renders on mobile viewport', async ({ page }) => {
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/dashboard/);
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
 
     // Ensure the page fits without horizontal scroll

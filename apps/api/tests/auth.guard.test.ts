@@ -27,6 +27,15 @@ async function buildApp() {
     }));
 }
 
+/** App with a POST route so the guard's CSRF enforcement on state-changing
+ *  methods can be exercised under cookie auth. */
+async function buildAppWithPost() {
+  return new Elysia()
+    .use(authGuard)
+    .get('/protected', ({ auth }) => ({ sub: auth.sub }))
+    .post('/protected', ({ auth }) => ({ sub: auth.sub }));
+}
+
 beforeEach(async () => {
   await truncateAll();
 });
@@ -238,6 +247,91 @@ describe('auth.guard', () => {
         headers: {
           authorization: `Bearer ${token}`,
           'x-real-ip': '198.51.100.19',
+        },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+  });
+
+  // ── Cookie-based auth + CSRF ─────────────────────────────────────
+  test('GET with a valid fueld_access cookie (no Bearer) → 200', async () => {
+    const seeded = await seedBasics();
+    const token = await signAccessToken({ sub: seeded.user.id, email: seeded.user.email, role: seeded.user.role });
+    const app = await buildAppWithPost();
+
+    const response = await app.handle(
+      new Request('http://localhost/protected', {
+        headers: { cookie: `fueld_access=${token}` },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+  });
+
+  test('POST with a valid cookie + matching X-CSRF-Token → 200', async () => {
+    const seeded = await seedBasics();
+    const token = await signAccessToken({ sub: seeded.user.id, email: seeded.user.email, role: seeded.user.role });
+    const csrf = 'csrf-match';
+    const app = await buildAppWithPost();
+
+    const response = await app.handle(
+      new Request('http://localhost/protected', {
+        method: 'POST',
+        headers: {
+          cookie: `fueld_access=${token}; fueld_csrf=${csrf}`,
+          'x-csrf-token': csrf,
+        },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+  });
+
+  test('POST with a valid cookie but no X-CSRF-Token → 403', async () => {
+    const seeded = await seedBasics();
+    const token = await signAccessToken({ sub: seeded.user.id, email: seeded.user.email, role: seeded.user.role });
+    const app = await buildAppWithPost();
+
+    const response = await app.handle(
+      new Request('http://localhost/protected', {
+        method: 'POST',
+        headers: { cookie: `fueld_access=${token}; fueld_csrf=csrf-token` },
+      }),
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  test('POST with a valid cookie but mismatched X-CSRF-Token → 403', async () => {
+    const seeded = await seedBasics();
+    const token = await signAccessToken({ sub: seeded.user.id, email: seeded.user.email, role: seeded.user.role });
+    const app = await buildAppWithPost();
+
+    const response = await app.handle(
+      new Request('http://localhost/protected', {
+        method: 'POST',
+        headers: {
+          cookie: `fueld_access=${token}; fueld_csrf=real-csrf`,
+          'x-csrf-token': 'wrong-csrf',
+        },
+      }),
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  test('POST with a valid cookie AND a Bearer header → 200 (CSRF skipped)', async () => {
+    const seeded = await seedBasics();
+    const token = await signAccessToken({ sub: seeded.user.id, email: seeded.user.email, role: seeded.user.role });
+    const app = await buildAppWithPost();
+
+    const response = await app.handle(
+      new Request('http://localhost/protected', {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${token}`,
+          cookie: `fueld_access=${token}`,
         },
       }),
     );

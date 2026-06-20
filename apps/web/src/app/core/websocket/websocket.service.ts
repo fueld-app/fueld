@@ -22,7 +22,6 @@ interface WsMessage {
 @Injectable({ providedIn: 'root' })
 export class WebSocketService {
   private ws: WebSocket | null = null;
-  private currentToken: string | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 10;
@@ -142,15 +141,17 @@ export class WebSocketService {
    * Connect to the WebSocket server with a JWT token.
    * Called by AuthService on login and by MainLayout on init (page reload).
    */
-  connect(token: string): void {
+  connect(token?: string): void {
     // Don't create duplicate connections
     if (this.ws?.readyState === WebSocket.OPEN || this.ws?.readyState === WebSocket.CONNECTING) {
       return;
     }
 
-    this.currentToken = token;
     this.intentionallyClosed = false;
-    this.ws = new WebSocket(`${WS_BASE}?token=${encodeURIComponent(token)}`);
+    // Cookies are sent automatically with the WebSocket upgrade request
+    // No need to pass token in URL (backward compat: still accept it for non-browser clients)
+    const wsUrl = token ? `${WS_BASE}?token=${encodeURIComponent(token)}` : WS_BASE;
+    this.ws = new WebSocket(wsUrl);
 
     this.ws.onopen = () => {
       console.log('[WS] Connected');
@@ -199,7 +200,7 @@ export class WebSocketService {
       this.connected.set(false);
       this.authenticated.set(false);
 
-      if (!this.intentionallyClosed && this.currentToken) {
+      if (!this.intentionallyClosed) {
         this.scheduleReconnect();
       }
     };
@@ -214,7 +215,6 @@ export class WebSocketService {
    */
   disconnect(): void {
     this.intentionallyClosed = true;
-    this.currentToken = null;
     this.connected.set(false);
     this.authenticated.set(false);
     this.pendingMessages = [];
@@ -247,8 +247,8 @@ export class WebSocketService {
     console.log(`[WS] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
 
     this.reconnectTimer = setTimeout(() => {
-      if (!this.intentionallyClosed && this.currentToken) {
-        this.connect(this.currentToken);
+      if (!this.intentionallyClosed) {
+        this.connect();
       }
     }, delay);
   }

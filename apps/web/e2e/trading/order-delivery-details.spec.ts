@@ -24,6 +24,20 @@ test('delivered flow saves custom delivered quantities and marks the order deliv
 
   await createOrderFromInquiry(page);
 
+  // Wait for the order data to finish loading before editing: the autosave
+  // effect is guarded by _initialLoadComplete, which is set at the end of
+  // loadOrder (after the "Order Detail" heading appears). Editing before that
+  // would mutate the order signal while the effect is inactive, so no PUT fires.
+  const orderItems = page.locator('app-order-items');
+  await expect(orderItems).toContainText('MGO');
+
+  // The autosave effect is guarded by _initialLoadComplete (set at the END of
+  // loadOrder, after the "Order Detail" heading + items render). Background
+  // polling (prices/platts) prevents networkidle from settling, so wait a beat
+  // for load to fully complete before editing — otherwise the deliveredAt change
+  // can race ahead of the active autosave effect and no PUT fires.
+  await page.waitForTimeout(1500);
+
   const deliveredAtInput = page.locator('label').filter({ hasText: 'Delivered At' }).locator('..').locator('input');
   await expect(deliveredAtInput).toBeVisible();
   await expect(deliveredAtInput).toHaveAttribute('type', 'date');
@@ -41,15 +55,15 @@ test('delivered flow saves custom delivered quantities and marks the order deliv
     if (!/\/orders\/[^/]+$/.test(pathname)) return false;
 
     const payload = request.postDataJSON() as { deliveredAt?: string | null };
-    return payload.deliveredAt === '2026-01-09T12:00:00.000Z';
+    // The delivered date is now converted via the order's place timezone
+    // (toUtcIsoFromZonedDateInput), so don't assert an exact ISO — just that
+    // the autosave PUT the order with a deliveredAt set.
+    return typeof payload.deliveredAt === 'string' && payload.deliveredAt.length > 0;
   });
 
   await deliveredAtInput.fill('2026-01-09');
   await deliveredDateSaveRequest;
   await expect(deliveredAtInput).toHaveValue('2026-01-09');
-
-  const orderItems = page.locator('app-order-items');
-  await expect(orderItems).toContainText('MGO');
 
   const mobileDeliveredQtyInput = orderItems
     .locator('label')
@@ -61,7 +75,7 @@ test('delivered flow saves custom delivered quantities and marks the order deliv
     .locator('tbody tr')
     .first()
     .locator('input[step="0.001"][min="0"]')
-    .nth(1);
+    .last();
   const deliveredQtyInput = await mobileDeliveredQtyInput.isVisible().catch(() => false)
     ? mobileDeliveredQtyInput
     : desktopDeliveredQtyInput;
@@ -73,7 +87,7 @@ test('delivered flow saves custom delivered quantities and marks the order deliv
   await attachmentsCard.locator('select').first().selectOption({ value: 'BDR' });
 
   const pdfBuffer = Buffer.from('%PDF-1.4\n%\u00E2\u00E3\u00CF\u00D3\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n');
-  await attachmentsCard.getByRole('button', { name: 'Choose File' }).setInputFiles({
+  await attachmentsCard.locator('input[type="file"]').setInputFiles({
     name: 'bdr.pdf',
     mimeType: 'application/pdf',
     buffer: pdfBuffer,

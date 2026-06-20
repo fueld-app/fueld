@@ -1,22 +1,10 @@
 import { test, expect, type Page } from '../fixtures/coverage';
-import { loginViaUi } from '../helpers/auth';
+import { loginViaUi, authHeaders } from '../helpers/auth';
 import { createInquiryViaApi } from '../helpers/trading';
 
 const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
 const adminEmail = env['E2E_ADMIN2_EMAIL'] ?? 'admin2@fueld.local';
 const adminPassword = env['E2E_ADMIN2_PASSWORD'] ?? 'admin2password123';
-
-async function authHeaders(page: Page): Promise<Record<string, string>> {
-  const accessToken = await page.evaluate(() => localStorage.getItem('fueld_access_token'));
-  if (!accessToken) {
-    throw new Error('Missing access token in browser localStorage.');
-  }
-
-  return {
-    Authorization: `Bearer ${accessToken}`,
-    Accept: 'application/json',
-  };
-}
 
 test('inquiry actions keep terminal actions at the bottom', async ({ page }) => {
   test.setTimeout(90_000);

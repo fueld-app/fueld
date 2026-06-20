@@ -1,27 +1,15 @@
 import { test, expect } from '../fixtures/coverage';
-import { loginViaUi } from '../helpers/auth';
+import { loginViaUi, authHeaders } from '../helpers/auth';
 
 const adminEmail = process.env['E2E_ADMIN2_EMAIL'] ?? 'admin2@fueld.local';
 const adminPassword = process.env['E2E_ADMIN2_PASSWORD'] ?? 'admin2password123';
-
-async function adminHeaders(page: import('@playwright/test').Page): Promise<Record<string, string>> {
-  const accessToken = await page.evaluate(() => localStorage.getItem('fueld_access_token'));
-  if (!accessToken) {
-    throw new Error('Missing access token in browser localStorage.');
-  }
-
-  return {
-    Authorization: `Bearer ${accessToken}`,
-    Accept: 'application/json',
-  };
-}
 
 test('admin inquiry settings persist through reloads', async ({ page }) => {
   test.setTimeout(90_000);
 
   await loginViaUi(page, { email: adminEmail, password: adminPassword });
 
-  const headers = await adminHeaders(page);
+  const headers = await authHeaders(page);
   const resetResponse = await page.request.put('http://localhost:3000/admin/settings/inquiry', {
     headers,
     data: {
@@ -31,8 +19,8 @@ test('admin inquiry settings persist through reloads', async ({ page }) => {
   });
   expect(resetResponse.ok()).toBe(true);
 
-  await page.goto('/admin/settings');
-  await expect(page.getByRole('heading', { name: 'General Settings' })).toBeVisible();
+  await page.goto('/admin/settings/documents');
+  await expect(page.getByRole('heading', { name: 'Documents & Inquiry Settings' })).toBeVisible();
 
   const inquiryCard = page.locator('div.app-panel').filter({
     has: page.getByRole('heading', { name: 'Supplier Inquiry Settings' }),
@@ -56,7 +44,7 @@ test('admin inquiry settings persist through reloads', async ({ page }) => {
   await expect(inquiryCard.locator('input[type="number"]')).toHaveCount(1);
 
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'General Settings' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Documents & Inquiry Settings' })).toBeVisible();
   await expect(responseToggle).toHaveClass(/bg-gray-200/);
   await expect(noReplyToggle).toHaveClass(/bg-gray-200/);
   await expect(inquiryCard.locator('input[type="number"]')).toHaveCount(1);
@@ -72,7 +60,7 @@ test('admin inquiry settings persist through reloads', async ({ page }) => {
   await expect(inquiryCard).toContainText('No-reply timing updated.');
 
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'General Settings' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Documents & Inquiry Settings' })).toBeVisible();
   await expect(responseToggle).toHaveClass(/bg-gray-200/);
   await expect(noReplyToggle).toHaveClass(/bg-sky-500/);
   await expect(hoursInput).toHaveValue('24');

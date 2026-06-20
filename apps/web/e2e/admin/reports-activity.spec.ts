@@ -15,26 +15,29 @@ test('reports config changes appear in admin activity log', async ({ page }) => 
   const scheduleName = `Daily Audit Digest ${Date.now()}`;
   const updatedScheduleName = `${scheduleName} Updated`;
 
-  await page.getByTestId('reports-view-name').fill(savedViewName);
-  await page.getByTestId('reports-view-description').fill('Playwright saved view');
+  // ── Saved views ──────────────────────────────────────────────────────
+  // The saved-views card was rewritten without data-testids, so drive it via
+  // placeholders and button text. (The schedule + activity-log sections below
+  // still use their existing testIds.)
+  const savedViewsCard = page.locator('app-reports-saved-views-card');
+
+  await savedViewsCard.getByPlaceholder('View name').fill(savedViewName);
+  await savedViewsCard.getByPlaceholder('Description (optional)').fill('Playwright saved view');
 
   const createViewResponse = page.waitForResponse(
     (response) => response.request().method() === 'POST' && response.url().includes('/reports/saved-views'),
   );
-  await page.getByTestId('reports-save-view').click();
+  await savedViewsCard.getByRole('button', { name: 'Save view' }).click();
   await createViewResponse;
   await expect(page.getByText(savedViewName, { exact: true })).toBeVisible({ timeout: 15_000 });
 
-  const savedViewCard = page.getByText(savedViewName, { exact: true }).locator('..').locator('..');
-  const savedViewCardId = await savedViewCard.getAttribute('data-testid');
-  if (!savedViewCardId) throw new Error('Saved view card test id not found');
-  const savedViewId = savedViewCardId.replace('reports-view-card-', '');
-
-  await page.getByTestId(`reports-view-edit-${savedViewId}`).click();
-  await page.getByTestId('reports-view-name').fill(updatedSavedViewName);
-  await page.getByTestId('reports-save-view').click();
+  // Edit the saved view
+  await savedViewsCard.getByRole('button', { name: 'Edit' }).click();
+  await savedViewsCard.getByPlaceholder('View name').fill(updatedSavedViewName);
+  await savedViewsCard.getByRole('button', { name: 'Update view' }).click();
   await expect(page.getByText(updatedSavedViewName, { exact: true })).toBeVisible({ timeout: 15_000 });
 
+  // ── Schedule (testIds still present) ─────────────────────────────────
   await page.getByTestId('reports-schedule-name').fill(scheduleName);
   await page.getByTestId('reports-schedule-description').fill('Playwright schedule');
   await page.getByTestId('reports-schedule-delivery-mode').selectOption('CSV_XLSX');
@@ -59,13 +62,15 @@ test('reports config changes appear in admin activity log', async ({ page }) => 
   await page.getByTestId('reports-save-schedule').click();
   await expect(page.getByTestId(`reports-schedule-card-${scheduleId}`)).toContainText(updatedScheduleName, { timeout: 15_000 });
 
+  // ── Delete the saved view (rewritten UI: Delete button) ──────────────
   const deleteUpdatedViewResponse = page.waitForResponse(
     (response) => response.request().method() === 'DELETE' && response.url().includes('/reports/saved-views/'),
   );
-  await page.getByTestId(`reports-view-delete-${savedViewId}`).click();
+  await savedViewsCard.getByRole('button', { name: 'Delete' }).click();
   await deleteUpdatedViewResponse;
   await expect(page.getByText(updatedSavedViewName, { exact: true })).not.toBeVisible({ timeout: 15_000 });
 
+  // ── Delete the schedule ──────────────────────────────────────────────
   const deleteUpdatedScheduleResponse = page.waitForResponse(
     (response) => response.request().method() === 'DELETE' && response.url().includes('/reports/schedules/'),
   );
@@ -73,6 +78,7 @@ test('reports config changes appear in admin activity log', async ({ page }) => 
   await deleteUpdatedScheduleResponse;
   await expect(page.getByTestId(`reports-schedule-card-${scheduleId}`)).toHaveCount(0, { timeout: 15_000 });
 
+  // ── Activity log ─────────────────────────────────────────────────────
   await page.goto('/admin/activity');
   await expect(page.getByRole('heading', { name: /Activity/i })).toBeVisible({ timeout: 15_000 });
   await page.getByTestId('activity-log-tab').click();

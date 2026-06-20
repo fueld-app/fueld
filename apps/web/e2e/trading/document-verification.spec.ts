@@ -1,16 +1,10 @@
 import { type APIResponse } from '@playwright/test';
 import { test, expect } from '../fixtures/coverage';
-import { loginViaUi } from '../helpers/auth';
+import { loginViaUi, authHeaders } from '../helpers/auth';
 import { createInquiryViaApi } from '../helpers/trading';
 
 function expectPdfSignature(body: Buffer): void {
   expect(body.subarray(0, 4).toString()).toBe('%PDF');
-}
-
-async function getAccessToken(page: import('@playwright/test').Page): Promise<string> {
-  const accessToken = await page.evaluate(() => localStorage.getItem('fueld_access_token'));
-  if (!accessToken) throw new Error('Missing access token in browser localStorage.');
-  return accessToken;
 }
 
 function getRequiredHeader(response: APIResponse, name: string): string {
@@ -21,15 +15,9 @@ function getRequiredHeader(response: APIResponse, name: string): string {
 
 async function ensureBankAccountForOrder(
   page: import('@playwright/test').Page,
-  accessToken: string,
+  headers: Record<string, string>,
   orderId: string,
 ): Promise<void> {
-  const headers = {
-    Authorization: `Bearer ${accessToken}`,
-    Accept: 'application/json',
-    'Content-Type': 'application/json',
-  };
-
   const ownCompaniesRes = await page.request.get('http://localhost:3000/companies/own', { headers });
   if (!ownCompaniesRes.ok()) {
     throw new Error(`Failed to fetch own companies: ${ownCompaniesRes.status()} ${ownCompaniesRes.statusText()}`);
@@ -89,11 +77,11 @@ test('offer verification endpoints expose immutable revision by token', async ({
   });
 
   const orderId = await createInquiryViaApi(page);
-  const accessToken = await getAccessToken(page);
-  await ensureBankAccountForOrder(page, accessToken, orderId);
+  const headers = await authHeaders(page);
+  await ensureBankAccountForOrder(page, headers, orderId);
 
   const authenticatedOffer = await page.request.get(`http://localhost:3000/orders/${orderId}/offer/pdf`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
+    headers,
   });
 
   expect(authenticatedOffer.ok()).toBeTruthy();
@@ -135,11 +123,11 @@ test('invoice and proforma verification endpoints expose immutable revisions by 
   });
 
   const orderId = await createInquiryViaApi(page);
-  const accessToken = await getAccessToken(page);
-  await ensureBankAccountForOrder(page, accessToken, orderId);
+  const headers = await authHeaders(page);
+  await ensureBankAccountForOrder(page, headers, orderId);
 
   const authenticatedInvoice = await page.request.get(`http://localhost:3000/orders/${orderId}/invoice/pdf`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
+    headers,
   });
   expect(authenticatedInvoice.ok()).toBeTruthy();
   expect(authenticatedInvoice.headers()['content-type']).toContain('application/pdf');
@@ -164,7 +152,7 @@ test('invoice and proforma verification endpoints expose immutable revisions by 
   expect(invoiceByToken.headers()['x-document-revision']).toBe(invoiceRevision);
 
   const authenticatedProforma = await page.request.get(`http://localhost:3000/orders/${orderId}/proforma/pdf`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
+    headers,
   });
   expect(authenticatedProforma.ok()).toBeTruthy();
   expect(authenticatedProforma.headers()['content-type']).toContain('application/pdf');

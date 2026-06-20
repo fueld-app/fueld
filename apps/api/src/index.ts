@@ -44,11 +44,12 @@ import {
   sendToSocket,
   extractClientIp,
 } from './modules/activity/session-tracker';
+import { ACCESS_COOKIE, jwtAccessPlugin, assertJwtSecretsConfig, parseCookieHeader } from './modules/auth/jwt.setup';
+import { isProductionRuntime } from './lib/crypto';
 import { getNearbyVessels, getNearbyVesselPositions, syncPlaceFromSeasearcher } from './modules/lloyds/lli.service';
 import { syncVesselFromSeasearcher } from './modules/vessels/vessel.service';
 import { syncCompanyFromSeasearcher } from './modules/companies/company.service';
 import { startPricePolling, getLatestPriceSnapshot, getLatestPriceSnapshotForWire } from './modules/prices/price.service';
-import { jwtAccessPlugin, assertJwtSecretsConfig } from './modules/auth/jwt.setup';
 import { db } from './db';
 import { users } from './db/schema';
 import { eq, sql } from 'drizzle-orm';
@@ -334,6 +335,30 @@ function startVesselSanctionJob() {
   console.log('[Vessel Sanctions] Background job started (interval: 1h)');
 }
 
+/**
+ * Resolve the CORS origin. With `credentials: true`, the origin must never be
+ * a wildcard or a loose regex, otherwise any site can make credentialed
+ * (cookie-bearing) requests. In production we require an explicit, exact
+ * origin (or comma-separated list) in CORS_ORIGIN and refuse to boot otherwise.
+ * In development we fall back to a `localhost` regex for convenience.
+ */
+function resolveCorsOrigin(): string | RegExp | string[] {
+  const raw = process.env['CORS_ORIGIN'];
+  if (isProductionRuntime()) {
+    if (!raw) {
+      throw new Error('CORS_ORIGIN must be set to an exact origin in production (credentials are enabled).');
+    }
+    if (raw.trim() === '*' || raw.includes('*')) {
+      throw new Error(`CORS_ORIGIN must be an exact origin (not a wildcard) in production with credentials; got: ${raw}`);
+    }
+    return raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  return raw ?? /localhost/;
+}
+
 export async function createApp(options: CreateAppOptions = {}) {
   assertCredentialsEncryptionConfig();
   assertJwtSecretsConfig();
@@ -379,7 +404,8 @@ export async function createApp(options: CreateAppOptions = {}) {
     )
     .use(
       cors({
-        origin: process.env['CORS_ORIGIN'] || /localhost/,
+        origin: resolveCorsOrigin(),
+        credentials: true,
         exposeHeaders: [
           'Content-Disposition',
           'X-Document-Revision',
@@ -472,11 +498,22 @@ export async function createApp(options: CreateAppOptions = {}) {
     .use(jwtAccessPlugin)
     .ws('/ws', {
       query: t.Object({
-        token: t.String(),
+        token: t.Optional(t.String()),
       }),
 
       async open(ws: any) {
-        const token = ws.data.query.token;
+        // Read token from cookie (browser auto-sends cookies with WS upgrade)
+        // or from query parameter (fallback for non-browser clients)
+        const request = (ws as any).data?.request as Request | undefined;
+        const cookies = parseCookieHeader(request?.headers.get('cookie') ?? '');
+        const token = cookies[ACCESS_COOKIE] ?? ws.data.query.token ?? null;
+
+        if (!token) {
+          console.log('[WS] Connection rejected: no token in cookie or query');
+          ws.send(JSON.stringify({ type: 'auth-error', message: 'Missing authentication token' }));
+          ws.close();
+          return;
+        }
 
         try {
           const raw = await ws.data.jwtAccess.verify(token);

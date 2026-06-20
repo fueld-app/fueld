@@ -3,7 +3,7 @@
  * Vessels, Places, and Analytics.
  */
 import { test, expect } from '../fixtures/coverage';
-import { loginViaUi } from '../helpers/auth';
+import { loginViaUi, authHeaders } from '../helpers/auth';
 
 const { env } = process;
 
@@ -44,8 +44,7 @@ test.describe('Vessels page', () => {
     await loginViaUi(page, { email: traderEmail, password: traderPassword });
 
     // Find the seeded vessel via API
-    const token = await page.evaluate(() => localStorage.getItem('fueld_access_token'));
-    const headers = { Authorization: `Bearer ${token}`, Accept: 'application/json' };
+    const headers = await authHeaders(page);
     const res = await page.request.get('http://localhost:3000/vessels/local?limit=1', { headers });
     expect(res.ok()).toBe(true);
     const json = await res.json();
@@ -96,8 +95,7 @@ test.describe('Places page', () => {
     await loginViaUi(page, { email: traderEmail, password: traderPassword });
 
     // Find the seeded place via API
-    const token = await page.evaluate(() => localStorage.getItem('fueld_access_token'));
-    const headers = { Authorization: `Bearer ${token}`, Accept: 'application/json' };
+    const headers = await authHeaders(page);
     const res = await page.request.get('http://localhost:3000/lloyds/places/local?limit=1', { headers });
     expect(res.ok()).toBe(true);
     const json = await res.json();

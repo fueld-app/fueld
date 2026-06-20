@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/coverage';
-import { loginViaUi } from '../helpers/auth';
+import { loginViaUi, authHeaders } from '../helpers/auth';
 import { selectSearchableDropdownOption } from '../helpers/dropdown';
 
 const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
@@ -13,12 +13,6 @@ type ApiResponse<T> = {
 type CompanyDto = { id: string; name?: string };
 type VesselDto = { id: string; name?: string };
 type PlaceDto = { id: string; name?: string; unlocode?: string };
-
-async function authHeaders(page: import('@playwright/test').Page): Promise<Record<string, string>> {
-  const token = await page.evaluate(() => localStorage.getItem('fueld_access_token'));
-  if (!token) throw new Error('Missing access token in localStorage');
-  return { Authorization: `Bearer ${token}`, Accept: 'application/json' };
-}
 
 async function fetchSeededInquiryEntities(page: import('@playwright/test').Page): Promise<{
   clientLabel: string;

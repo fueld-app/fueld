@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/coverage';
-import { loginViaUi } from '../helpers/auth';
+import { loginViaUi, authHeaders } from '../helpers/auth';
 import { createInquiryViaApi } from '../helpers/trading';
 
 const { env } = process;
@@ -9,17 +9,11 @@ const traderPassword = env['E2E_TRADER7_USER_PASSWORD'] ?? 'trader7password123';
 const adminEmail = env['E2E_ADMIN3_EMAIL'] ?? 'admin3@fueld.local';
 const adminPassword = env['E2E_ADMIN3_PASSWORD'] ?? 'admin3password123';
 
-async function authHeaders(page: import('@playwright/test').Page): Promise<Record<string, string>> {
-  const token = await page.evaluate(() => localStorage.getItem('fueld_access_token'));
-  if (!token) throw new Error('Missing access token in localStorage');
-  return { Authorization: `Bearer ${token}`, Accept: 'application/json' };
-}
-
 test.describe('Dashboard KPI cards', () => {
   test('dashboard renders all six KPI cards with labels', async ({ page }) => {
     await loginViaUi(page, { email: traderEmail, password: traderPassword });
 
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/dashboard/);
     await expect(page.getByRole('heading', { name: /dashboard/i })).toBeVisible();
 
     const kpiContainer = page.locator('.app-kpi-card');
@@ -45,7 +39,7 @@ test.describe('Dashboard KPI cards', () => {
 
   test('conversion metrics section renders', async ({ page }) => {
     await loginViaUi(page, { email: traderEmail, password: traderPassword });
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/dashboard/);
 
     // Conversion metric cards (Win Rate, Avg Days to Close, Won Orders, Lost Orders)
     await expect(page.locator('.app-kpi-card').filter({ hasText: 'Win Rate' })).toBeVisible({ timeout: 15_000 });
@@ -58,7 +52,7 @@ test.describe('Dashboard KPI cards', () => {
     test.setTimeout(90_000);
 
     await loginViaUi(page, { email: traderEmail, password: traderPassword });
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/dashboard/);
 
     // Wait for KPI cards to fully render with data (not "—")
     const ordersCard = page.locator('.app-kpi-card').filter({ hasText: 'Total Orders' });
@@ -94,7 +88,7 @@ test.describe('Dashboard KPI cards', () => {
     test.setTimeout(90_000);
 
     await loginViaUi(page, { email: traderEmail, password: traderPassword });
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/dashboard/);
 
     // Wait for KPI cards to fully load
     await expect(page.locator('.app-kpi-card').first()).toBeVisible({ timeout: 15_000 });
@@ -121,7 +115,7 @@ test.describe('Dashboard KPI cards', () => {
 
   test('date range selector updates KPI data', async ({ page }) => {
     await loginViaUi(page, { email: traderEmail, password: traderPassword });
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/dashboard/);
     await expect(page.locator('.app-kpi-card').first()).toBeVisible({ timeout: 15_000 });
 
     // Open date range dropdown
@@ -140,7 +134,7 @@ test.describe('Dashboard KPI cards', () => {
 
   test('admin can toggle team view on dashboard', async ({ page }) => {
     await loginViaUi(page, { email: adminEmail, password: adminPassword });
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/dashboard/);
     await expect(page.locator('.app-kpi-card').first()).toBeVisible({ timeout: 15_000 });
 
     // Admin should see the team view toggle (it's a role="switch" element)
@@ -156,7 +150,7 @@ test.describe('Dashboard KPI cards', () => {
 
   test('sales pipeline section renders status breakdown', async ({ page }) => {
     await loginViaUi(page, { email: traderEmail, password: traderPassword });
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/dashboard/);
 
     // Wait for dashboard to load
     await expect(page.locator('.app-kpi-card').first()).toBeVisible({ timeout: 15_000 });
@@ -168,7 +162,7 @@ test.describe('Dashboard KPI cards', () => {
 
   test('collections widget renders overdue invoices section', async ({ page }) => {
     await loginViaUi(page, { email: traderEmail, password: traderPassword });
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/dashboard/);
 
     // Collections section (overdue invoices widget)
     await expect(page.locator('app-collections-widget').first()).toBeVisible({ timeout: 15_000 });

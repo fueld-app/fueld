@@ -1,15 +1,17 @@
 import { Elysia } from 'elysia';
-import { jwtAccessPlugin, type JwtPayload } from './jwt.setup';
+import { jwtAccessPlugin, type JwtPayload, extractAccessToken, validateCsrfToken, flattenElysiaCookies, isCookieAuth, STATE_CHANGING_METHODS } from './jwt.setup';
 import { findUserById, getMfaStatus } from './auth.service';
 import { extractClientIp } from '../../utils/client-ip';
 
 // ─── Auth Guard ──────────────────────────────────────────────────────
 // Reusable Elysia plugin that protects routes.
 // Any route that `.use(authGuard)` will:
-//   1. Require a `Bearer <token>` header
-//   2. Verify + decode the JWT
-//   3. Check IP restriction (if configured for user)
-//   4. Expose `auth` on the context ({ sub, email, role })
+//   1. Read the access token from the `fueld_access` cookie (browser)
+//      or `Authorization: Bearer` header (API clients / scripts)
+//   2. Validate the CSRF token (cookie vs X-CSRF-Token header) for cookie-based requests
+//   3. Verify + decode the JWT
+//   4. Check IP restriction (if configured for user)
+//   5. Expose `auth` on the context ({ sub, email, role })
 // ─────────────────────────────────────────────────────────────────────
 
 /** Check if an IP matches a CIDR range or exact IP */
@@ -50,15 +52,26 @@ function isIpAllowed(clientIp: string, allowedIps: string[]): boolean {
 
 export const authGuard = new Elysia({ name: 'auth-guard' })
   .use(jwtAccessPlugin)
-  .derive({ as: 'scoped' }, async ({ jwtAccess, headers, set, request }) => {
-    const authHeader = headers['authorization'];
+  .derive({ as: 'scoped' }, async ({ jwtAccess, headers, set, request, cookie }) => {
+    // Extract token from cookie (browser) or Authorization header (API clients)
+    const flatCookies = flattenElysiaCookies(cookie);
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const token = extractAccessToken(headers as Record<string, string | undefined>, flatCookies);
+
+    if (!token) {
       set.status = 401;
-      throw new Error('Missing or malformed Authorization header');
+      throw new Error('Missing authentication token (cookie or Authorization header)');
     }
 
-    const token = authHeader.slice(7);
+    // CSRF check: only for cookie-based requests (no Authorization header)
+    // and only for state-changing methods
+    if (isCookieAuth(headers as Record<string, string | undefined>) && STATE_CHANGING_METHODS.has(request.method)) {
+      if (!validateCsrfToken(headers as Record<string, string | undefined>, flatCookies)) {
+        set.status = 403;
+        throw new Error('Invalid or missing CSRF token');
+      }
+    }
+
     const raw = await jwtAccess.verify(token);
 
     if (!raw) {

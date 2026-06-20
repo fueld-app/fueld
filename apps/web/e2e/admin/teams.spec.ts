@@ -1,16 +1,10 @@
 import { test, expect } from '../fixtures/coverage';
-import { loginViaUi } from '../helpers/auth';
+import { loginViaUi, authHeaders } from '../helpers/auth';
 
 const { env } = process;
 
 const adminEmail = env['E2E_ADMIN3_EMAIL'] ?? 'admin3@fueld.local';
 const adminPassword = env['E2E_ADMIN3_PASSWORD'] ?? 'admin3password123';
-
-async function authHeaders(page: import('@playwright/test').Page): Promise<Record<string, string>> {
-  const token = await page.evaluate(() => localStorage.getItem('fueld_access_token'));
-  if (!token) throw new Error('Missing access token in localStorage');
-  return { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' };
-}
 
 /** Delete a team via API. Ignores 404 (already deleted). */
 async function deleteTeamViaApi(page: import('@playwright/test').Page, teamId: string): Promise<void> {
@@ -88,6 +82,6 @@ test.describe('Teams management', () => {
 
     await page.goto('/admin/teams');
     // Should be redirected away from admin
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/dashboard/);
   });
 });

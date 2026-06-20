@@ -182,8 +182,8 @@ export interface InvitationDto {
 /** Response when accepting an invitation. */
 export interface InviteAcceptResponseDto {
   user: UserDto;
-  accessToken: string;
-  refreshToken: string;
+  accessToken?: string;
+  refreshToken?: string;
   requiresMfaSetup?: boolean;
 }
 
@@ -1478,19 +1478,23 @@ export interface SetLeaveDto {
 //  AUTH DTOs (kept from Phase 2)
 // ═══════════════════════════════════════════════════════════════════════
 
-/** Tokens returned after a successful authentication. */
+/** Tokens returned after a successful authentication.
+ *  Tokens are delivered via HttpOnly cookies; these fields are optional because
+ *  the server no longer echoes them in the response body (kept for API clients). */
 export interface AuthTokensDto {
-  accessToken: string;
-  refreshToken: string;
+  accessToken?: string;
+  refreshToken?: string;
   requiresMfaSetup?: boolean;
 }
 
-/** Full login response (when 2FA is NOT required). */
+/** Full login response (when 2FA is NOT required).
+ *  Tokens are delivered via HttpOnly cookies; accessToken/refreshToken are no
+ *  longer echoed in the body (kept optional for non-browser API clients). */
 export interface LoginResponseDto {
   requires2fa: false;
   user: UserDto;
-  accessToken: string;
-  refreshToken: string;
+  accessToken?: string;
+  refreshToken?: string;
   /** Indicates the user must set up 2FA or passkey before proceeding. */
   requiresMfaSetup?: boolean;
 }
@@ -1506,8 +1510,8 @@ export interface Login2faPendingDto {
 /** Response after successful registration. */
 export interface RegisterResponseDto {
   user: UserDto;
-  accessToken: string;
-  refreshToken: string;
+  accessToken?: string;
+  refreshToken?: string;
 }
 
 /** 2FA setup response with QR code. */

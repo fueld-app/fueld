@@ -22,8 +22,6 @@ import { WebSocketService } from '../websocket/websocket.service';
 // ═══════════════════════════════════════════════════════════════════════
 
 import { API_URL } from '@app/core/config/api';
-const ACCESS_TOKEN_KEY = 'fueld_access_token';
-const REFRESH_TOKEN_KEY = 'fueld_refresh_token';
 const USER_KEY = 'fueld_user';
 const MFA_SETUP_REQUIRED_KEY = 'fueld_mfa_setup_required';
 
@@ -91,19 +89,11 @@ export class AuthService {
     private readonly router: Router,
   ) {
     // On page reload, refresh the access token then connect WebSocket
-    // Only if we have both a user AND a refresh token (not just stale user data)
-    const hasRefreshToken = !!localStorage.getItem(REFRESH_TOKEN_KEY);
-    if (this.isAuthenticated() && hasRefreshToken) {
+    // Tokens are in HTTP-only cookies set by the server
+    if (this.isAuthenticated()) {
       setTimeout(() => this.refreshAndConnectWs(), 0);
-      // Also check if Microsoft SSO is available
       setTimeout(() => this.checkMicrosoftSso(), 0);
-    } else if (this.isAuthenticated() && !hasRefreshToken) {
-      // Stale user data without tokens — clean up silently
-      localStorage.removeItem(USER_KEY);
-      localStorage.removeItem(ACCESS_TOKEN_KEY);
-      this.user.set(null);
-      this.setMfaSetupRequired(false);
-    } else if (!this.isAuthenticated()) {
+    } else {
       this.setMfaSetupRequired(false);
     }
   }
@@ -125,22 +115,21 @@ export class AuthService {
   /** Refresh the access token, then open the WebSocket with the fresh token. */
   private async refreshAndConnectWs(): Promise<void> {
     await this.refreshToken();
-    // refreshToken() calls setTokens() which calls wsService.connect()
+    // refreshToken() calls afterAuthSuccess() which calls wsService.connect()
   }
 
   // ─── Token management ────────────────────────────────────────────
 
-  getAccessToken(): string | null {
-    return localStorage.getItem(ACCESS_TOKEN_KEY);
-  }
-
-  private setTokens(tokens: AuthTokensDto): void {
-    localStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
-    localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
-    // Connect WebSocket with the new token
-    this.wsService.connect(tokens.accessToken);
-    // Schedule proactive refresh before the access token expires
+  /**
+   * Called after a successful login/register/2FA/refresh.
+   * Cookies are already set by the server — we just connect WS + schedule refresh.
+   */
+  private afterAuthSuccess(requiresMfaSetup?: boolean): void {
+    this.wsService.connect();
     this.scheduleRefresh();
+    if (requiresMfaSetup !== undefined) {
+      this.setMfaSetupRequired(requiresMfaSetup);
+    }
   }
 
   private setUser(user: UserDto): void {
@@ -208,7 +197,7 @@ export class AuthService {
     const data = res.data;
 
     if (!data.requires2fa) {
-      this.setTokens(data);
+      this.afterAuthSuccess(data.requiresMfaSetup);
       this.setUser(data.user);
       this.setMfaSetupRequired(!!data.requiresMfaSetup);
     } else {
@@ -227,7 +216,7 @@ export class AuthService {
       }),
     );
 
-    this.setTokens(res.data);
+    this.afterAuthSuccess(false);
     this.setUser(res.data.user);
     return res.data;
   }
@@ -244,7 +233,7 @@ export class AuthService {
       throw new Error(res.message ?? 'Failed to accept invitation');
     }
 
-    this.setTokens(res.data);
+    this.afterAuthSuccess(res.data.requiresMfaSetup);
     this.setUser(res.data.user);
     this.setMfaSetupRequired(!!res.data.requiresMfaSetup);
     return res.data;
@@ -263,39 +252,26 @@ export class AuthService {
     }
 
     const data = res.data as LoginResponseDto;
-    this.setTokens(data);
+    this.afterAuthSuccess(data.requiresMfaSetup);
     this.setUser(data.user);
     this.setMfaSetupRequired(!!data.requiresMfaSetup);
     return data;
   }
 
   async refreshToken(): Promise<boolean> {
-    const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-    if (!refreshToken) {
-      this.logout();
-      return false;
-    }
-
+    // Refresh token is in the HTTP-only cookie — server reads it automatically
     try {
       const res = await firstValueFrom(
-        this.http.post<ApiResponse<AuthTokensDto>>(`${API_URL}/auth/refresh`, {
-          refreshToken,
-        }),
+        this.http.post<ApiResponse<AuthTokensDto>>(`${API_URL}/auth/refresh`, {}),
       );
 
       if (!res.success || !res.data) {
-        // Server said the refresh token is invalid/expired (HTTP 200, success: false)
         console.warn('[Auth] Refresh token rejected by server, logging out');
         this.logout();
         return false;
       }
 
-      this.setTokens(res.data);
-      if (res.data.requiresMfaSetup) {
-        this.markMfaSetupRequired();
-      } else {
-        this.setMfaSetupRequired(false);
-      }
+      this.afterAuthSuccess(res.data.requiresMfaSetup);
       return true;
     } catch (err: any) {
       // Only logout on 401/403 (invalid token). Network errors (0, 502, etc.)
@@ -317,16 +293,10 @@ export class AuthService {
 
   /** Generate a TOTP secret + QR code for setup. Requires an active session. */
   async setup2fa(): Promise<TwoFactorSetupDto> {
-    const token = this.getAccessToken();
-    if (!token) throw new Error('Not authenticated. Please log in again.');
-
-    const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
-
     const res = await firstValueFrom(
       this.http.post<ApiResponse<TwoFactorSetupDto>>(
         `${API_URL}/auth/2fa/generate`,
         {},
-        { headers },
       ),
     );
 
@@ -339,15 +309,11 @@ export class AuthService {
 
   /** Verify the first TOTP code and enable 2FA on the account. */
   async enable2fa(code: string): Promise<void> {
-    const token = this.getAccessToken();
-    if (!token) throw new Error('Not authenticated. Please log in again.');
-    const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
 
     const res = await firstValueFrom(
       this.http.post<ApiResponse<null>>(
         `${API_URL}/auth/2fa/enable`,
         { code },
-        { headers },
       ),
     );
 
@@ -365,16 +331,10 @@ export class AuthService {
 
   /** Verify a TOTP code and disable 2FA on the account. */
   async disable2fa(code: string): Promise<void> {
-    const token = this.getAccessToken();
-    if (!token) throw new Error('Not authenticated. Please log in again.');
-
-    const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
-
     const res = await firstValueFrom(
       this.http.post<ApiResponse<null>>(
         `${API_URL}/auth/2fa/disable`,
         { code },
-        { headers },
       ),
     );
 
@@ -449,7 +409,7 @@ export class AuthService {
     }
 
     const data = res.data as LoginResponseDto;
-    this.setTokens(data);
+    this.afterAuthSuccess(data.requiresMfaSetup);
     this.setUser(data.user);
     this.setMfaSetupRequired(false);
     return data;
@@ -492,7 +452,7 @@ export class AuthService {
     }
 
     const data = res.data as LoginResponseDto;
-    this.setTokens(data);
+    this.afterAuthSuccess(data.requiresMfaSetup);
     this.setUser(data.user);
     this.setMfaSetupRequired(false);
     return data;
@@ -502,12 +462,9 @@ export class AuthService {
 
   /** List all passkeys for the current user. */
   async listPasskeys(): Promise<PasskeyDto[]> {
-    const token = this.getAccessToken();
-    if (!token) throw new Error('Not authenticated.');
-    const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
 
     const res = await firstValueFrom(
-      this.http.get<ApiResponse<PasskeyDto[]>>(`${API_URL}/auth/passkeys`, { headers }),
+      this.http.get<ApiResponse<PasskeyDto[]>>(`${API_URL}/auth/passkeys`),
     );
     if (!res.success) throw new Error(res.message ?? 'Failed to list passkeys');
     return res.data ?? [];
@@ -515,16 +472,12 @@ export class AuthService {
 
   /** Register a new passkey with real WebAuthn attestation. */
   async registerPasskey(friendlyName: string): Promise<PasskeyDto> {
-    const token = this.getAccessToken();
-    if (!token) throw new Error('Not authenticated.');
-    const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
 
     // Step 1: Get registration options (challenge) from server
     const optionsRes = await firstValueFrom(
       this.http.post<ApiResponse<any>>(
         `${API_URL}/auth/passkeys/register-options`,
         {},
-        { headers },
       ),
     );
     if (!optionsRes.success || !optionsRes.data) {
@@ -544,7 +497,6 @@ export class AuthService {
       this.http.post<ApiResponse<PasskeyDto>>(
         `${API_URL}/auth/passkeys/register-verify`,
         { friendlyName, attestationResponse },
-        { headers },
       ),
     );
     if (!res.success || !res.data) throw new Error(res.message ?? 'Failed to register passkey');
@@ -554,15 +506,11 @@ export class AuthService {
 
   /** Rename a passkey. */
   async renamePasskey(id: string, friendlyName: string): Promise<void> {
-    const token = this.getAccessToken();
-    if (!token) throw new Error('Not authenticated.');
-    const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
 
     const res = await firstValueFrom(
       this.http.put<ApiResponse<null>>(
         `${API_URL}/auth/passkeys/${id}`,
         { friendlyName },
-        { headers },
       ),
     );
     if (!res.success) throw new Error(res.message ?? 'Failed to rename passkey');
@@ -570,14 +518,10 @@ export class AuthService {
 
   /** Delete a passkey. */
   async deletePasskey(id: string): Promise<void> {
-    const token = this.getAccessToken();
-    if (!token) throw new Error('Not authenticated.');
-    const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
 
     const res = await firstValueFrom(
       this.http.delete<ApiResponse<null>>(
         `${API_URL}/auth/passkeys/${id}`,
-        { headers },
       ),
     );
     if (!res.success) throw new Error(res.message ?? 'Failed to delete passkey');
@@ -638,7 +582,7 @@ export class AuthService {
     }
 
     const data = res.data;
-    this.setTokens(data);
+    this.afterAuthSuccess(data.requiresMfaSetup);
     this.setUser(data.user);
     this.setMfaSetupRequired(false);
   }
@@ -646,8 +590,11 @@ export class AuthService {
   logout(): void {
     this.clearRefreshTimer();
     this.wsService.disconnect();
-    localStorage.removeItem(ACCESS_TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    // Call the API to clear cookies server-side (fire and forget)
+    this.http.post(`${API_URL}/auth/logout`, {}).subscribe({
+      error: () => { /* cookie clearing is best-effort */ },
+      complete: () => {},
+    });
     localStorage.removeItem(USER_KEY);
     localStorage.removeItem(MFA_SETUP_REQUIRED_KEY);
     this.user.set(null);
