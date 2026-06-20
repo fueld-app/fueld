@@ -23,9 +23,9 @@ The following report-only findings have since been fixed and shipped to `main` (
 - **`0a313661`** — XSS hardening: escaped user-controllable values in invite/reset email HTML (`lib/email.ts`), report email HTML (`reports.service.ts`), and the Leaflet vessel popup (`vessel-detail-page.component.ts`); sanitized the `Content-Disposition` filename in `port-documentation.controller.ts`.
 - **`03aa8709`** — validated the order payment `amount` (finite, non-negative → 400) before insert; added `minLength:1` on the vessel-company `role` fields (full role-catalog validation deferred — roles are admin-configurable).
 - **`81454086`** — hashed refresh tokens at rest (`auth.service.ts`/`auth.controller.ts`, backward-compatible: existing sessions keep working, rotate to hashed on next refresh); encrypted the SSO client secret via `integration_credentials` and cleared it from plaintext `tenant.settings` (`security.controller.ts`, backward-compatible legacy fallback).
+- **`9e891b9a`** — sandboxed the send-inquiry email preview: replaced `[innerHTML]="previewEmailHtml()"` (bypassSecurityTrustHtml -> app DOM) with a `<iframe [srcdoc] sandbox="">` so active content in the user-composed email body cannot execute in the app context. Verified by a new Playwright e2e regression (`e2e/trading/send-inquiry-preview.spec.ts`) asserting a non-empty `srcdoc` and `sandbox=""` (no `allow-scripts`); 4/4 trading inquiry specs pass.
 
 ### Still open (report-only, need a product / deployment decision)
-- `send-inquiry-modal` `bypassSecurityTrustHtml` email preview — deliberate product decision (sandboxed-iframe vs. sanitized `[innerHTML]` vs. accept); pending visual verification.
 - `auth.guard.ts` IP allowlist fail-open + IPv4-only CIDR matching (warning).
 - `microsoft-oauth.service.ts` `getStateSigningKey` weak fallback (unreachable in prod while `DATABASE_URL` is set) and `validateReturnUrl` allowing any `https` origin (warning).
 - `company.service.ts:459` raw-SQL `catKey` interpolation with manual escaping (warning).
