@@ -1493,7 +1493,7 @@ export class SendInquiryModalComponent implements OnDestroy {
 
   onAddSupplierSearch(query: string): void {
     this.addSupplierQuery.set(query);
-    clearTimeout(this.addSupplierDebounce);
+    clearTimeout(this.addSupplierDebounce ?? undefined);
     if (query.trim().length < 2) {
       this.addSupplierResults.set([]);
       return;
