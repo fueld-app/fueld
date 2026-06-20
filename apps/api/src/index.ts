@@ -48,7 +48,7 @@ import { getNearbyVessels, getNearbyVesselPositions, syncPlaceFromSeasearcher } 
 import { syncVesselFromSeasearcher } from './modules/vessels/vessel.service';
 import { syncCompanyFromSeasearcher } from './modules/companies/company.service';
 import { startPricePolling, getLatestPriceSnapshot, getLatestPriceSnapshotForWire } from './modules/prices/price.service';
-import { jwtAccessPlugin } from './modules/auth/jwt.setup';
+import { jwtAccessPlugin, assertJwtSecretsConfig } from './modules/auth/jwt.setup';
 import { db } from './db';
 import { users } from './db/schema';
 import { eq, sql } from 'drizzle-orm';
@@ -336,6 +336,7 @@ function startVesselSanctionJob() {
 
 export async function createApp(options: CreateAppOptions = {}) {
   assertCredentialsEncryptionConfig();
+  assertJwtSecretsConfig();
 
   if (options.runMigrations !== false) {
     await runPendingMigrations();

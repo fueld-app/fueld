@@ -881,26 +881,3 @@ export async function searchHuggingFaceModels(q: string, limit: number): Promise
   });
 }
 
-export async function downloadModel(modelUrl: string): Promise<void> {
-  const { mkdir } = await import('fs/promises');
-  // Parse the HF repo + filename from the selection
-  const paths = getLlmPaths();
-  await mkdir(paths.modelDir, { recursive: true });
-  // Simple download with progress tracking via the existing _modelDownload state
-  _modelDownload = { status: 'downloading', filename: null, repoId: null, totalBytes: null, downloadedBytes: 0, sizeMb: null, error: null, startedAt: Date.now() };
-
-  // Delegate to background process
-  const downloadProc = Bun.spawn([
-    'bash', '-c',
-    `cd "${paths.modelDir}" && curl -L --progress-bar -o "${require('path').basename(modelUrl)}" "${modelUrl}"`,
-  ]);
-
-  await downloadProc.exited;
-
-  if (downloadProc.exitCode === 0) {
-    _modelDownload.status = 'done';
-  } else {
-    _modelDownload.status = 'error';
-    _modelDownload.error = `Download exited with code ${downloadProc.exitCode}`;
-  }
-}
