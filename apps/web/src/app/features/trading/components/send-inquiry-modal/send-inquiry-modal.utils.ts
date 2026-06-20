@@ -13,6 +13,15 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function buildTableRowPattern(label: string): RegExp {
   return new RegExp(
     `<tr[^>]*>\\s*<td[^>]*>\\s*${escapeRegExp(label)}\\s*</td>\\s*<td[^>]*>[\\s\\S]*?</td>\\s*</tr>`,
@@ -33,7 +42,7 @@ function upsertMetadataRowInHtml(
     return html.replace(rowPattern, '');
   }
 
-  const rowHtml = `<tr><td>${label}</td><td>${trimmedValue}</td></tr>`;
+  const rowHtml = `<tr><td>${escapeHtml(label)}</td><td>${escapeHtml(trimmedValue)}</td></tr>`;
   if (rowPattern.test(html)) {
     return html.replace(rowPattern, rowHtml);
   }
