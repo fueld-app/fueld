@@ -13,6 +13,30 @@ The most serious findings are **four path-traversal vectors** in admin/file-hand
 
 **Inline fixes: 20** (1 by the orchestrator + 19 by subagents), plus 1 pre-existing path-traversal fix already in the working tree. All other findings are report-only.
 
+## Follow-up Status (post-review)
+
+The following report-only findings have since been fixed and shipped to `main` (each passed CI Tests + Deploy):
+
+- **`20c3750c`** — JWT production fail-fast assertion (`jwt.setup.ts`, closes the critical dev-secret fallback); removed 18 dead-code files (`report-delivery.service.ts`, the `document-pdf-*` family, the dead `vessel-detail` store + 3 tabs + 7 components, `llm-page.store.ts`, `settings-page.component.ts.deprecated`) and the unused shell-injection-prone `downloadModel` helper (`llm.service.ts`). (Kept `order-utils.service`, which is live via `company-crud.service.ts`.)
+- **`b696e799`** — fixed the inventory balance double-count (`inventory.service.ts` `getBalance.earliestAvailableAt` now projects the timeline from 0 and returns the first *future* recovery) + removed a dead empty loop; changed the inventory/transfers privilege helpers to return **403** instead of throwing → 500; deleted 7 dead `order-*.service` split files.
+- **`7a05a584`** — broke the order-detail autosave feedback loop (`_autosavePaused` guard); added `t.Object` query schemas to all 6 dashboard routes; added `Number.isFinite` guards to `page`/`limit` parsing in vessels / risk-monitoring / vessel-sanctions controllers.
+- **`0a313661`** — XSS hardening: escaped user-controllable values in invite/reset email HTML (`lib/email.ts`), report email HTML (`reports.service.ts`), and the Leaflet vessel popup (`vessel-detail-page.component.ts`); sanitized the `Content-Disposition` filename in `port-documentation.controller.ts`.
+- **`03aa8709`** — validated the order payment `amount` (finite, non-negative → 400) before insert; added `minLength:1` on the vessel-company `role` fields (full role-catalog validation deferred — roles are admin-configurable).
+- **`81454086`** — hashed refresh tokens at rest (`auth.service.ts`/`auth.controller.ts`, backward-compatible: existing sessions keep working, rotate to hashed on next refresh); encrypted the SSO client secret via `integration_credentials` and cleared it from plaintext `tenant.settings` (`security.controller.ts`, backward-compatible legacy fallback).
+
+### Still open (report-only, need a product / deployment decision)
+- `send-inquiry-modal` `bypassSecurityTrustHtml` email preview — deliberate product decision (sandboxed-iframe vs. sanitized `[innerHTML]` vs. accept); pending visual verification.
+- `auth.guard.ts` IP allowlist fail-open + IPv4-only CIDR matching (warning).
+- `microsoft-oauth.service.ts` `getStateSigningKey` weak fallback (unreachable in prod while `DATABASE_URL` is set) and `validateReturnUrl` allowing any `https` origin (warning).
+- `company.service.ts:459` raw-SQL `catKey` interpolation with manual escaping (warning).
+- `admin/llm.controller.ts` model-install filename arbitrary file write (warning).
+- `admin/backup.service.ts` `pg_dump`/`psql` stderr may echo the `DATABASE_URL` connection string (warning).
+- `core/websocket/websocket.service.ts` JWT in WS URL query; `core/auth/auth.service.ts` tokens in `localStorage`; `files-card.component.ts` `window.open` bypasses the auth interceptor (warning, design-level).
+- Various `info`: geoip `ip-api` path handling, `lli.client`/`integrations.service` upstream error leakage, LIKE wildcard injection, vessel `role` full catalog validation, `send-inquiry-modal.utils` non-DOM HTML fallback, `order-financial.service.ts` dead branch, `parseInt` radix.
+
+### Pre-existing (not caused by this review)
+- `inventory.transfers.test.ts` "DELIVERED transfer records both source TRANSFER_OUT and destination TRANSFER_IN" fails on clean `main` (reproduces without any review change) and is not run by CI scripts — separate transfer-delivery bug.
+
 ## Coverage
 
 The full in-scope set was reviewed (API core read directly; API domain modules and the Angular app covered by 6 parallel worker subagents over disjoint file sets). Large files were read via map/signatures with targeted full reads of suspect sections. No in-scope module was skipped.
