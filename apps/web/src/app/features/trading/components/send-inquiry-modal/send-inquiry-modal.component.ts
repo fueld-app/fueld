@@ -645,7 +645,7 @@ export interface SendInquiryWhatsAppPayload {
                         <div class="mb-3 text-xs text-gray-500">
                           Preview of the email for {{ previewRecipientSummary() || 'the selected supplier' }}
                         </div>
-                        <div class="inquiry-email-canvas min-h-[200px] overflow-auto" [innerHTML]="previewEmailHtml()"></div>
+                        <iframe class="inquiry-email-canvas" [srcdoc]="previewEmailHtml()" sandbox="" style="width:100%;height:320px;border:0;background:#fff;display:block" title="Email preview"></iframe>
                       } @else {
                         <div class="text-sm text-gray-500">This recipient does not currently have an email destination selected.</div>
                       }
@@ -840,7 +840,18 @@ export class SendInquiryModalComponent implements OnDestroy {
   });
   readonly previewEmailHtml = computed<SafeHtml>(() => {
     const supplier = this.previewRecipient();
-    return this.sanitizer.bypassSecurityTrustHtml(this.renderEmailPreview(this.htmlBody(), supplier));
+    const body = this.renderEmailPreview(this.htmlBody(), supplier);
+    if (!body) return this.sanitizer.bypassSecurityTrustHtml('');
+    // Render the preview inside a sandboxed iframe (the template binds this to
+    // [srcdoc] with sandbox="" and no allow-* tokens) so any active content in
+    // the user-composed email body cannot execute in the app DOM. The canvas
+    // CSS is injected so the preview keeps its styling inside the isolated doc.
+    const doc =
+      '<!DOCTYPE html><html><head><meta charset="utf-8"><style>' +
+      'body{font-family:system-ui,Arial,sans-serif;color:#111827;line-height:1.5;margin:0;word-break:break-word;}' +
+      'img{max-width:100%;height:auto;}table{max-width:100%;}p{margin:0 0 16px;line-height:1.65;}li{margin:0;}' +
+      '</style></head><body>' + body + '</body></html>';
+    return this.sanitizer.bypassSecurityTrustHtml(doc);
   });
   private readonly inheritedInquiryDateSync = effect(() => {
     if (!this.open()) return;
