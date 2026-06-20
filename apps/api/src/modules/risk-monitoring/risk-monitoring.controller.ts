@@ -67,7 +67,7 @@ export const riskMonitoringController = new Elysia({ prefix: '/risk-monitoring' 
   .get(
     '/checks/:counterpartyId',
     async ({ params, query }) => {
-      const checks = await getChecksForCompany(params.counterpartyId, query.limit ? parseInt(query.limit) : 50);
+      const checks = await getChecksForCompany(params.counterpartyId, query.limit && Number.isFinite(Number(query.limit)) ? Number(query.limit) : 50);
       return { success: true, data: checks } satisfies ApiResponse<typeof checks>;
     },
     {

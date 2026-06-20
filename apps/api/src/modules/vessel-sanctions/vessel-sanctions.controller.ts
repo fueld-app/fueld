@@ -66,8 +66,8 @@ export const vesselSanctionsController = new Elysia({ prefix: '/vessel-sanctions
     try {
       requireAdmin(auth);
       const data = await getVesselSanctionHistory(auth.tenantId, {
-        limit: query.limit ? Number(query.limit) : undefined,
-        page: query.page ? Number(query.page) : undefined,
+        limit: query.limit && Number.isFinite(Number(query.limit)) ? Number(query.limit) : undefined,
+        page: query.page && Number.isFinite(Number(query.page)) ? Number(query.page) : undefined,
       });
       return { success: true, data } satisfies ApiResponse<typeof data>;
     } catch (err) {

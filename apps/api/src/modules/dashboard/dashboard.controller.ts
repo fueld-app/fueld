@@ -19,6 +19,11 @@ export const dashboardController = new Elysia({ prefix: '/dashboard' })
       return { items, count: items.length };
     },
     {
+      query: t.Object({
+        from: t.Optional(t.String()),
+        to: t.Optional(t.String()),
+        userId: t.Optional(t.String()),
+      }),
       detail: {
         tags: ['Dashboard'],
         summary: 'Get overdue invoices (collections)',
@@ -38,6 +43,11 @@ export const dashboardController = new Elysia({ prefix: '/dashboard' })
       return { traders: stats };
     },
     {
+      query: t.Object({
+        from: t.Optional(t.String()),
+        to: t.Optional(t.String()),
+        userId: t.Optional(t.String()),
+      }),
       detail: {
         tags: ['Dashboard'],
         summary: 'Get trader profit & volume stats',
@@ -57,6 +67,11 @@ export const dashboardController = new Elysia({ prefix: '/dashboard' })
       return { stages: pipeline };
     },
     {
+      query: t.Object({
+        from: t.Optional(t.String()),
+        to: t.Optional(t.String()),
+        userId: t.Optional(t.String()),
+      }),
       detail: {
         tags: ['Dashboard'],
         summary: 'Get order pipeline summary',
@@ -74,6 +89,11 @@ export const dashboardController = new Elysia({ prefix: '/dashboard' })
       return getLossAnalysis(auth.tenantId, params.from, params.to, params.userId);
     },
     {
+      query: t.Object({
+        from: t.Optional(t.String()),
+        to: t.Optional(t.String()),
+        userId: t.Optional(t.String()),
+      }),
       detail: {
         tags: ['Dashboard'],
         summary: 'Get cancel-reason breakdown',
@@ -91,6 +111,11 @@ export const dashboardController = new Elysia({ prefix: '/dashboard' })
       return getConversionMetrics(auth.tenantId, params.from, params.to, params.userId);
     },
     {
+      query: t.Object({
+        from: t.Optional(t.String()),
+        to: t.Optional(t.String()),
+        userId: t.Optional(t.String()),
+      }),
       detail: {
         tags: ['Dashboard'],
         summary: 'Get conversion metrics',
@@ -109,6 +134,11 @@ export const dashboardController = new Elysia({ prefix: '/dashboard' })
       return { items };
     },
     {
+      query: t.Object({
+        from: t.Optional(t.String()),
+        to: t.Optional(t.String()),
+        userId: t.Optional(t.String()),
+      }),
       detail: {
         tags: ['Dashboard'],
         summary: 'Get incomplete follow-ups',

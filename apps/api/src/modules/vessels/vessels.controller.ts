@@ -58,8 +58,8 @@ export const vesselsController = new Elysia({ prefix: '/vessels' })
         search: query.search,
         sortBy: query.sortBy,
         sortDir: query.sortDir as 'asc' | 'desc' | undefined,
-        page: query.page ? parseInt(query.page) : undefined,
-        limit: query.limit ? parseInt(query.limit) : undefined,
+        page: query.page && Number.isFinite(Number(query.page)) ? Number(query.page) : undefined,
+        limit: query.limit && Number.isFinite(Number(query.limit)) ? Number(query.limit) : undefined,
       });
       return { success: true, data: results } satisfies ApiResponse<typeof results>;
     },

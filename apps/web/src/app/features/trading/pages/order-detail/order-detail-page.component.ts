@@ -845,6 +845,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
 
   private _initialLoadComplete = false;
+  private _autosavePaused = false;
 
   constructor() {
     // Reactive autosave — watches mutable signals; fires on any change
@@ -852,7 +853,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       this.order();
       this.itemRows();
       this.orderSuppliers();
-      if (!this._initialLoadComplete) return;
+      if (!this._initialLoadComplete || this._autosavePaused) return;
 
       const timer = setTimeout(() => this.performAutoSave(), 1500);
       onCleanup(() => clearTimeout(timer));
@@ -2252,19 +2253,28 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     const o = this.order();
     if (!id || !o || this.isPaidOrCancelled()) return;
 
+    // Pause the autosave effect while saving: the save path reloads suppliers and
+    // rebinds item rows (new array refs / itemRows.update), which would re-trigger
+    // this effect and loop an autosave every ~1.5s. An edit made during the save
+    // window is an accepted rare edge case (the next edit recovers).
+    this._autosavePaused = true;
     this.autoSaving.set(true);
-    const success = await this.saveSvc.saveOrder(id, o, {
-      itemRows: () => this.itemRows(),
-      hasMultipleOrderSuppliers: () => this.hasMultipleOrderSuppliers(),
-      buildItemPayload: (rows, opts) => this.buildItemPayload(rows, opts),
-      syncSupplierRecords: (oid) => this.syncOrderSupplierRecords(oid),
-      clearSavedDraftIds: (rows) => this.saveSvc.clearSavedDraftItemIds(rows),
-      loadCustomerCreditLines: (cid) => this.financialSvc.loadCustomerCreditLines(cid),
-      loadSupplierCreditLines: (scid) => this.financialSvc.loadSupplierCreditLines(scid),
-      activeSupplierCompanyId: () => this.activeOrderSupplier()?.companyId ?? null,
-    });
-    if (success) this.lastSaved.set(new Date());
-    this.autoSaving.set(false);
+    try {
+      const success = await this.saveSvc.saveOrder(id, o, {
+        itemRows: () => this.itemRows(),
+        hasMultipleOrderSuppliers: () => this.hasMultipleOrderSuppliers(),
+        buildItemPayload: (rows, opts) => this.buildItemPayload(rows, opts),
+        syncSupplierRecords: (oid) => this.syncOrderSupplierRecords(oid),
+        clearSavedDraftIds: (rows) => this.saveSvc.clearSavedDraftItemIds(rows),
+        loadCustomerCreditLines: (cid) => this.financialSvc.loadCustomerCreditLines(cid),
+        loadSupplierCreditLines: (scid) => this.financialSvc.loadSupplierCreditLines(scid),
+        activeSupplierCompanyId: () => this.activeOrderSupplier()?.companyId ?? null,
+      });
+      if (success) this.lastSaved.set(new Date());
+    } finally {
+      this.autoSaving.set(false);
+      this._autosavePaused = false;
+    }
   }
 
   // ─── Actions ─────────────────────────────────────────────────────
