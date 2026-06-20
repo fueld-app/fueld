@@ -67,7 +67,10 @@ async function fetchToken(): Promise<string> {
   const body = (await res.json()) as { Message: string; Payload: string };
 
   if (body.Message !== 'Success' || !body.Payload) {
-    throw new Error(`LLI token response invalid: ${JSON.stringify(body)}`);
+    // Avoid leaking the raw upstream response body into the API error response;
+    // log it server-side for debugging and surface only the status message.
+    console.error('[LLI] token response invalid:', body);
+    throw new Error(`LLI token response invalid: ${body.Message || 'unexpected response'}`);
   }
 
   return body.Payload;
