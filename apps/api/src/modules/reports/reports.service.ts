@@ -2085,17 +2085,24 @@ function buildScheduledAttachments(schedule: ReportScheduleDto, report: ReleaseT
   return attachments;
 }
 
+const escHtml = (s: string | number | null | undefined) =>
+  String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
 function buildSummaryEmailHtml(tenantName: string, report: ReleaseTwoReportsDto): string {
   const topTraders = report.traderPerformance.rows.slice(0, 5)
-    .map((row) => `<tr><td style="padding:6px 0;">${row.traderName}</td><td style="padding:6px 0; text-align:right;">${formatMoney(parseNumber(row.totalNetProfit))}</td></tr>`)
+    .map((row) => `<tr><td style="padding:6px 0;">${escHtml(row.traderName)}</td><td style="padding:6px 0; text-align:right;">${formatMoney(parseNumber(row.totalNetProfit))}</td></tr>`)
     .join('');
   const agingRows = report.invoiceAging.buckets
-    .map((bucket) => `<tr><td style="padding:6px 0;">${bucket.label}</td><td style="padding:6px 0; text-align:right;">${bucket.count}</td><td style="padding:6px 0; text-align:right;">${bucket.outstandingAmount}</td></tr>`)
+    .map((bucket) => `<tr><td style="padding:6px 0;">${escHtml(bucket.label)}</td><td style="padding:6px 0; text-align:right;">${bucket.count}</td><td style="padding:6px 0; text-align:right;">${bucket.outstandingAmount}</td></tr>`)
     .join('');
 
   return `
     <div style="font-family: Arial, sans-serif; color:#111827; line-height:1.5;">
-      <h2 style="margin:0 0 12px;">${tenantName} report summary</h2>
+      <h2 style="margin:0 0 12px;">${escHtml(tenantName)} report summary</h2>
       <p style="margin:0 0 18px; color:#6b7280;">Generated ${new Date(report.generatedAt).toUTCString()}</p>
       <div style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:12px; margin-bottom:18px;">
         <div style="border:1px solid #e5e7eb; border-radius:12px; padding:12px;">
@@ -2117,15 +2124,15 @@ function buildSummaryEmailHtml(tenantName: string, report: ReleaseTwoReportsDto)
 
 function buildMarginEmailHtml(tenantName: string, report: ReleaseTwoReportsDto): string {
   const topCustomers = report.marginAnalysis.byCustomer.slice(0, 5)
-    .map((row) => `<tr><td style="padding:6px 0;">${row.label}</td><td style="padding:6px 0; text-align:right;">${row.totalNetProfit}</td><td style="padding:6px 0; text-align:right;">${row.netMarginPct ?? '—'}%</td></tr>`)
+    .map((row) => `<tr><td style="padding:6px 0;">${escHtml(row.label)}</td><td style="padding:6px 0; text-align:right;">${row.totalNetProfit}</td><td style="padding:6px 0; text-align:right;">${row.netMarginPct ?? '—'}%</td></tr>`)
     .join('');
   const trendRows = report.marginAnalysis.monthlyTrend
-    .map((point) => `<tr><td style="padding:6px 0;">${point.month}</td><td style="padding:6px 0; text-align:right;">${point.totalRevenue}</td><td style="padding:6px 0; text-align:right;">${point.totalNetProfit}</td></tr>`)
+    .map((point) => `<tr><td style="padding:6px 0;">${escHtml(point.month)}</td><td style="padding:6px 0; text-align:right;">${point.totalRevenue}</td><td style="padding:6px 0; text-align:right;">${point.totalNetProfit}</td></tr>`)
     .join('');
 
   return `
     <div style="font-family: Arial, sans-serif; color:#111827; line-height:1.5;">
-      <h2 style="margin:0 0 12px;">${tenantName} margin analysis</h2>
+      <h2 style="margin:0 0 12px;">${escHtml(tenantName)} margin analysis</h2>
       <p style="margin:0 0 18px; color:#6b7280;">Generated ${new Date(report.generatedAt).toUTCString()}</p>
       <h3 style="margin:0 0 8px;">Top customers by net profit</h3>
       <table style="width:100%; border-collapse:collapse; margin-bottom:18px;"><tbody>${topCustomers || '<tr><td>No customer data</td></tr>'}</tbody></table>
@@ -2137,12 +2144,12 @@ function buildMarginEmailHtml(tenantName: string, report: ReleaseTwoReportsDto):
 
 function buildExceptionsEmailHtml(tenantName: string, rows: ReportExceptionRowDto[]): string {
   const tableRows = rows.slice(0, 10)
-    .map((row) => `<tr><td style="padding:6px 0;">${row.title}</td><td style="padding:6px 0;">${row.type}</td><td style="padding:6px 0; text-align:right;">${row.primaryValue}</td></tr>`)
+    .map((row) => `<tr><td style="padding:6px 0;">${escHtml(row.title)}</td><td style="padding:6px 0;">${escHtml(row.type)}</td><td style="padding:6px 0; text-align:right;">${escHtml(row.primaryValue)}</td></tr>`)
     .join('');
 
   return `
     <div style="font-family: Arial, sans-serif; color:#111827; line-height:1.5;">
-      <h2 style="margin:0 0 12px;">${tenantName} report exceptions</h2>
+      <h2 style="margin:0 0 12px;">${escHtml(tenantName)} report exceptions</h2>
       <p style="margin:0 0 18px; color:#6b7280;">${rows.length} exception${rows.length === 1 ? '' : 's'} matched the current schedule.</p>
       <table style="width:100%; border-collapse:collapse;"><tbody>${tableRows || '<tr><td>No exceptions</td></tr>'}</tbody></table>
     </div>

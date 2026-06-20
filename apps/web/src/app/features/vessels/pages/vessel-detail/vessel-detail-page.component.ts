@@ -1481,12 +1481,19 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
     const icon = vesselIcon(heading, loaVal, zoom, lat, isSanctioned);
 
     const vesselName = this.vessel()?.name ?? 'Vessel';
-    let popupHtml = `<div style="font-family:system-ui;font-size:13px;min-width:140px"><strong>${vesselName}</strong>`;
+    // Escape server-controlled strings (vessel name, destination) before interpolating
+    // into the Leaflet popup HTML to prevent HTML/script injection in the map popup.
+    const esc = (s: string) => s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+    let popupHtml = `<div style="font-family:system-ui;font-size:13px;min-width:140px"><strong>${esc(vesselName)}</strong>`;
     popupHtml += `<br><span style="color:#6b7280">Lat:</span> ${lat.toFixed(4)}`;
     popupHtml += `<br><span style="color:#6b7280">Lng:</span> ${lng.toFixed(4)}`;
     if (speed != null) popupHtml += `<br><span style="color:#6b7280">Speed:</span> ${speed} kn`;
     if (heading != null) popupHtml += `<br><span style="color:#6b7280">Heading:</span> ${heading}°`;
-    if (dest) popupHtml += `<br><span style="color:#6b7280">Dest:</span> ${dest}`;
+    if (dest) popupHtml += `<br><span style="color:#6b7280">Dest:</span> ${esc(dest)}`;
     popupHtml += '</div>';
 
     const marker = L.marker([lat, lng], { icon })

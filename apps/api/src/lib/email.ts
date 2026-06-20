@@ -32,6 +32,14 @@ type EmailAttachment = {
   contentType?: string;
 };
 
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 function getSmtpConfigFromEnv(): SmtpConfig | null {
   const host = process.env['SMTP_HOST'];
   const port = Number(process.env['SMTP_PORT'] ?? '587');
@@ -124,7 +132,7 @@ export async function sendInviteEmail(payload: InviteEmailPayload): Promise<bool
     <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #1f2937;">
       <h2 style="margin: 0 0 12px;">You are invited to Fueld</h2>
       <p style="margin: 0 0 12px;">
-        <strong>${payload.invitedByName}</strong> invited you to Fueld as <strong>${payload.role}</strong>.
+        <strong>${escapeHtml(payload.invitedByName)}</strong> invited you to Fueld as <strong>${escapeHtml(payload.role)}</strong>.
       </p>
       <p style="margin: 0 0 16px;">Click below to complete your signup:</p>
       <p style="margin: 0 0 24px;">
@@ -158,6 +166,7 @@ export async function sendPasswordResetEmail(payload: PasswordResetEmailPayload)
   if (!transporter) return false;
 
   const requestedBy = payload.requestedByName ? ` (requested by ${payload.requestedByName})` : '';
+  const requestedByHtml = payload.requestedByName ? ` (requested by ${escapeHtml(payload.requestedByName)})` : '';
   const subject = `Password reset for your Fueld account${requestedBy}`;
   const text =
     `Hi,\n\n` +
@@ -168,7 +177,7 @@ export async function sendPasswordResetEmail(payload: PasswordResetEmailPayload)
   const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #1f2937;">
       <h2 style="margin: 0 0 12px;">Reset your Fueld password</h2>
-      <p style="margin: 0 0 12px;">A password reset was requested for your Fueld account${requestedBy}.</p>
+      <p style="margin: 0 0 12px;">A password reset was requested for your Fueld account${requestedByHtml}.</p>
       <p style="margin: 0 0 16px;">Click below to set a new password:</p>
       <p style="margin: 0 0 24px;">
         <a href="${payload.resetLink}" style="display: inline-block; padding: 10px 16px; background: #2563eb; color: #fff; text-decoration: none; border-radius: 6px;">

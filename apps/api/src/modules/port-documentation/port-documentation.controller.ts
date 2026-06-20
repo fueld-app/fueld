@@ -26,6 +26,13 @@ function requireAdmin(auth: { role: string } | undefined) {
   }
 }
 
+function safeDownloadFilename(name: string): string {
+  // Remove characters that can break or inject the quoted Content-Disposition
+  // header (control chars / CRLF, double-quote, backslash).
+  const cleaned = (name ?? '').replace(/[\x00-\x1f\x7f"\\]/g, '').trim();
+  return cleaned || 'download';
+}
+
 export const portDocumentationController = new Elysia()
   .use(authGuard)
 
@@ -176,7 +183,7 @@ export const portDocumentationController = new Elysia()
       const fileMeta = await downloadPortDocumentAsset(auth.tenantId, params.id);
       const file = Bun.file(getPortDocumentAbsolutePath(fileMeta.filePath));
       set.headers['Content-Type'] = fileMeta.mimeType;
-      set.headers['Content-Disposition'] = `attachment; filename="${fileMeta.fileName}"`;
+      set.headers['Content-Disposition'] = `attachment; filename="${safeDownloadFilename(fileMeta.fileName)}"`;
       return file;
     } catch (err) {
       set.status = 404;
@@ -306,7 +313,7 @@ export const portDocumentationController = new Elysia()
       const fileMeta = await downloadOrderPortDocument(auth.tenantId, params.id, params.documentId);
       const file = Bun.file(getPortDocumentAbsolutePath(fileMeta.filePath));
       set.headers['Content-Type'] = fileMeta.mimeType;
-      set.headers['Content-Disposition'] = `attachment; filename="${fileMeta.fileName}"`;
+      set.headers['Content-Disposition'] = `attachment; filename="${safeDownloadFilename(fileMeta.fileName)}"`;
       return file;
     } catch (err) {
       set.status = 404;
