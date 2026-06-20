@@ -648,10 +648,15 @@ export const ordersController = new Elysia({ prefix: '/orders' })
   )
   .post(
     '/:id/payments',
-    async ({ params, body, auth }) => {
+    async ({ params, body, auth, set }) => {
       try {
         const orderId = await resolveOrderId(params.id);
         if (!orderId) return { success: false, data: null, message: 'Order not found' };
+        const amount = Number(body.amount);
+        if (!Number.isFinite(amount) || amount < 0) {
+          set.status = 400;
+          return { success: false, data: null, message: 'Invalid payment amount' };
+        }
         const created = await createOrderPayment(orderId, {
           amount: body.amount,
           currency: body.currency,

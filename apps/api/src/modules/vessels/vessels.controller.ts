@@ -532,7 +532,7 @@ export const vesselsController = new Elysia({ prefix: '/vessels' })
       params: t.Object({ id: t.String() }),
       body: t.Object({
         companyId: t.String(),
-        role: t.String(),
+        role: t.String({ minLength: 1 }),
         source: t.Optional(t.String()),
         contactId: t.Optional(t.Nullable(t.String())),
         note: t.Optional(t.String()),
@@ -567,7 +567,7 @@ export const vesselsController = new Elysia({ prefix: '/vessels' })
     {
       params: t.Object({ id: t.String(), companyAssocId: t.String() }),
       body: t.Object({
-        role: t.Optional(t.String()),
+        role: t.Optional(t.String({ minLength: 1 })),
         contactId: t.Optional(t.Nullable(t.String())),
         note: t.Optional(t.String()),
       }),
