@@ -5,6 +5,7 @@
 
 import { eq, ilike, or, and, sql, asc, desc } from 'drizzle-orm';
 import { db } from '../../db';
+import { escapeLikePattern } from '../../utils/like';
 import { vessels, places, counterparties, orders, portSuppliers, users, companyContacts } from '../../db/schema';
 import { lliGet, seasearcherPlaceSearch, seasearcherPlaceDetail, seasearcherNearbyVessels, seasearcherNearbyVesselsSpatial, seasearcherPortFacilities, seasearcherExpectedArrivals } from './lli.client';
 import { resolveIanaTimezone } from '../../utils/timezone';
@@ -223,7 +224,7 @@ export async function searchVessels(query: {
   const conditions = [];
   if (query.imo) conditions.push(eq(vessels.imo, query.imo));
   if (query.mmsi) conditions.push(eq(vessels.mmsi, query.mmsi));
-  if (query.name) conditions.push(ilike(vessels.name, `%${query.name}%`));
+  if (query.name) conditions.push(ilike(vessels.name, `%${escapeLikePattern(query.name)}%`));
 
   if (conditions.length > 0) {
     const localResults = await db
@@ -317,14 +318,14 @@ export async function searchPlaces(query: {
     // Match against name OR unlocode (spaced form like "IN MUN" and compact form like "INMUN")
     conditions.push(
       or(
-        ilike(places.name, `%${term}%`),
-        ilike(places.unlocode, `%${term}%`),
-        sql`lower(replace(${places.unlocode}, ' ', '')) LIKE lower(${'%' + term.replace(/\s+/g, '') + '%'})`,
-        sql`lower((SELECT replace(p2.unlocode, ' ', '') FROM places p2 WHERE p2.id = ${places.parentPlaceId})) LIKE lower(${'%' + term.replace(/\s+/g, '') + '%'})`,
+        ilike(places.name, `%${escapeLikePattern(term)}%`),
+        ilike(places.unlocode, `%${escapeLikePattern(term)}%`),
+        sql`lower(replace(${places.unlocode}, ' ', '')) LIKE lower(${'%' + escapeLikePattern(term.replace(/\s+/g, '')) + '%'})`,
+        sql`lower((SELECT replace(p2.unlocode, ' ', '') FROM places p2 WHERE p2.id = ${places.parentPlaceId})) LIKE lower(${'%' + escapeLikePattern(term.replace(/\s+/g, '')) + '%'})`,
       )!,
     );
   }
-  if (query.country) conditions.push(ilike(places.country, `%${query.country}%`));
+  if (query.country) conditions.push(ilike(places.country, `%${escapeLikePattern(query.country)}%`));
 
   if (conditions.length > 0) {
     const localResults = await db
@@ -498,14 +499,14 @@ export async function listPlaces(query?: {
     // Match against name OR unlocode (spaced form like "IN MUN" and compact form like "INMUN")
     conditions.push(
       or(
-        ilike(places.name, `%${term}%`),
-        ilike(places.unlocode, `%${term}%`),
-        sql`lower(replace(${places.unlocode}, ' ', '')) LIKE lower(${'%' + term.replace(/\s+/g, '') + '%'})`,
-        sql`lower((SELECT replace(p2.unlocode, ' ', '') FROM places p2 WHERE p2.id = ${places.parentPlaceId})) LIKE lower(${'%' + term.replace(/\s+/g, '') + '%'})`,
+        ilike(places.name, `%${escapeLikePattern(term)}%`),
+        ilike(places.unlocode, `%${escapeLikePattern(term)}%`),
+        sql`lower(replace(${places.unlocode}, ' ', '')) LIKE lower(${'%' + escapeLikePattern(term.replace(/\s+/g, '')) + '%'})`,
+        sql`lower((SELECT replace(p2.unlocode, ' ', '') FROM places p2 WHERE p2.id = ${places.parentPlaceId})) LIKE lower(${'%' + escapeLikePattern(term.replace(/\s+/g, '')) + '%'})`,
       )!,
     );
   }
-  if (query?.country) conditions.push(ilike(places.country, `%${query.country}%`));
+  if (query?.country) conditions.push(ilike(places.country, `%${escapeLikePattern(query.country)}%`));
   if (query?.placeType) conditions.push(eq(places.placeType, query.placeType as any));
   if (query?.responsibleUserId) conditions.push(eq(places.responsibleUserId, query.responsibleUserId));
 
@@ -997,8 +998,8 @@ export async function searchCompanies(query: {
 }): Promise<CompanySearchResult[]> {
   // ── 1. Local DB search ─────────────────────────────────────────────
   const conditions = [];
-  if (query.name) conditions.push(ilike(counterparties.name, `%${query.name}%`));
-  if (query.country) conditions.push(ilike(counterparties.country, `%${query.country}%`));
+  if (query.name) conditions.push(ilike(counterparties.name, `%${escapeLikePattern(query.name)}%`));
+  if (query.country) conditions.push(ilike(counterparties.country, `%${escapeLikePattern(query.country)}%`));
 
   if (conditions.length > 0) {
     const localResults = await db

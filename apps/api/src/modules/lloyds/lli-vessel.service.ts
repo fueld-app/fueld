@@ -4,6 +4,7 @@
 
 import { eq, ilike, or } from 'drizzle-orm';
 import { db } from '../../db';
+import { escapeLikePattern } from '../../utils/like';
 import { vessels } from '../../db/schema';
 import { lliGet, seasearcherNearbyVessels, seasearcherNearbyVesselsSpatial } from './lli.client';
 import type {
@@ -27,7 +28,7 @@ export async function searchVessels(query: {
   const conditions: any[] = [];
   if (query.imo) conditions.push(eq(vessels.imo, query.imo));
   if (query.mmsi) conditions.push(eq(vessels.mmsi, query.mmsi));
-  if (query.name) conditions.push(ilike(vessels.name, `%${query.name}%`));
+  if (query.name) conditions.push(ilike(vessels.name, `%${escapeLikePattern(query.name)}%`));
 
   if (conditions.length > 0) {
     const localResults = await db

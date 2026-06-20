@@ -4,6 +4,7 @@
 
 import { eq, ilike, or, and, sql, asc, desc, inArray, ne } from 'drizzle-orm';
 import { db } from '../../db';
+import { escapeLikePattern } from '../../utils/like';
 import { counterparties, orders, vessels, places, users, vesselCompanies } from '../../db/schema';
 import { matchLocalVessels } from '../vessels/vessel.service';
 import type { SyncResult, SyncConflict } from './company.types';
@@ -22,8 +23,8 @@ export async function listCompanies(query?: {
   if (query?.search) {
     conditions.push(
       or(
-        ilike(counterparties.name, `%${query.search}%`),
-        ilike(counterparties.companyImo, `%${query.search}%`),
+        ilike(counterparties.name, `%${escapeLikePattern(query.search)}%`),
+        ilike(counterparties.companyImo, `%${escapeLikePattern(query.search)}%`),
       ),
     );
   }
@@ -200,7 +201,7 @@ export async function deleteCompany(id: string) {
 export async function searchCompaniesTypeahead(term: string, limit?: number) {
   const rows = await db.select({ id: counterparties.id, name: counterparties.name, country: counterparties.country })
     .from(counterparties)
-    .where(or(ilike(counterparties.name, `%${term}%`), ilike(counterparties.companyImo, `%${term}%`)))
+    .where(or(ilike(counterparties.name, `%${escapeLikePattern(term)}%`), ilike(counterparties.companyImo, `%${escapeLikePattern(term)}%`)))
     .limit(limit ?? 20);
   return rows;
 }

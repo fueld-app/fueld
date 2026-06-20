@@ -4,6 +4,7 @@
 
 import { eq, ilike, or, and, sql, asc, desc } from 'drizzle-orm';
 import { db } from '../../db';
+import { escapeLikePattern } from '../../utils/like';
 import {
   vessels, places, counterparties, orders, portSuppliers, users, companyContacts,
 } from '../../db/schema';
@@ -39,14 +40,14 @@ export async function searchPlaces(query: {
     const term = query.name.trim();
     conditions.push(
       or(
-        ilike(places.name, `%${term}%`),
-        ilike(places.unlocode, `%${term}%`),
-        sql`lower(replace(${places.unlocode}, ' ', '')) LIKE lower(${'%' + term.replace(/\s+/g, '') + '%'})`,
-        sql`lower((SELECT replace(p2.unlocode, ' ', '') FROM places p2 WHERE p2.id = ${places.parentPlaceId})) LIKE lower(${'%' + term.replace(/\s+/g, '') + '%'})`,
+        ilike(places.name, `%${escapeLikePattern(term)}%`),
+        ilike(places.unlocode, `%${escapeLikePattern(term)}%`),
+        sql`lower(replace(${places.unlocode}, ' ', '')) LIKE lower(${'%' + escapeLikePattern(term.replace(/\s+/g, '')) + '%'})`,
+        sql`lower((SELECT replace(p2.unlocode, ' ', '') FROM places p2 WHERE p2.id = ${places.parentPlaceId})) LIKE lower(${'%' + escapeLikePattern(term.replace(/\s+/g, '')) + '%'})`,
       )!,
     );
   }
-  if (query.country) conditions.push(ilike(places.country, `%${query.country}%`));
+  if (query.country) conditions.push(ilike(places.country, `%${escapeLikePattern(query.country)}%`));
 
   if (conditions.length > 0) {
     const localResults = await db
@@ -206,9 +207,9 @@ export async function listPlaces(query?: {
   if (query?.search) {
     conditions.push(
       or(
-        ilike(places.name, `%${query.search}%`),
-        ilike(places.unlocode, `%${query.search}%`),
-        ilike(places.country, `%${query.search}%`),
+        ilike(places.name, `%${escapeLikePattern(query.search)}%`),
+        ilike(places.unlocode, `%${escapeLikePattern(query.search)}%`),
+        ilike(places.country, `%${escapeLikePattern(query.search)}%`),
       ),
     );
   }
@@ -435,8 +436,8 @@ export async function searchCompanies(query: {
 
   // 1. Local DB
   const localConditions: any[] = [];
-  if (query.name) localConditions.push(ilike(counterparties.name, `%${query.name}%`));
-  if (query.country) localConditions.push(ilike(counterparties.country, `%${query.country}%`));
+  if (query.name) localConditions.push(ilike(counterparties.name, `%${escapeLikePattern(query.name)}%`));
+  if (query.country) localConditions.push(ilike(counterparties.country, `%${escapeLikePattern(query.country)}%`));
 
   if (localConditions.length > 0) {
     const local = await db
