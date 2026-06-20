@@ -7,6 +7,7 @@
 
 import { eq, and, sql, desc, inArray, or, ilike } from 'drizzle-orm';
 import { db } from '../../db';
+import { escapeLikePattern } from '../../utils/like';
 import {
   counterparties,
   creditLines,
@@ -295,12 +296,12 @@ export async function getActiveVesselRiskImpacts(vesselId: string, tenantId: str
   const imo = (vessel.imo ?? '').trim();
   const searchClauses = [];
   if (name) {
-    searchClauses.push(ilike(riskHits.title, `%${name}%`));
-    searchClauses.push(ilike(riskHits.detail, `%${name}%`));
+    searchClauses.push(ilike(riskHits.title, `%${escapeLikePattern(name)}%`));
+    searchClauses.push(ilike(riskHits.detail, `%${escapeLikePattern(name)}%`));
   }
   if (imo) {
-    searchClauses.push(ilike(riskHits.title, `%${imo}%`));
-    searchClauses.push(ilike(riskHits.detail, `%${imo}%`));
+    searchClauses.push(ilike(riskHits.title, `%${escapeLikePattern(imo)}%`));
+    searchClauses.push(ilike(riskHits.detail, `%${escapeLikePattern(imo)}%`));
   }
   if (!searchClauses.length) return [];
 

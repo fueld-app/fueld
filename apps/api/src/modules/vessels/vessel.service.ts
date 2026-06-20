@@ -11,6 +11,7 @@ import {
   seasearcherVesselSearch,
   seasearcherVesselMovements,
 } from '../lloyds/lli.client';
+import { escapeLikePattern } from '../../utils/like';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Seasearcher Response Types
@@ -80,9 +81,9 @@ export async function listVessels(query?: {
   if (query?.search) {
     conditions.push(
       or(
-        ilike(vessels.name, `%${query.search}%`),
-        ilike(vessels.imo, `%${query.search}%`),
-        ilike(vessels.mmsi, `%${query.search}%`),
+        ilike(vessels.name, `%${escapeLikePattern(query.search)}%`),
+        ilike(vessels.imo, `%${escapeLikePattern(query.search)}%`),
+        ilike(vessels.mmsi, `%${escapeLikePattern(query.search)}%`),
       ),
     );
   }
@@ -478,9 +479,9 @@ export async function searchVesselsTypeahead(
     .from(vessels)
     .where(
       or(
-        ilike(vessels.name, `%${term}%`),
-        ilike(vessels.imo, `%${term}%`),
-        ilike(vessels.mmsi, `%${term}%`),
+        ilike(vessels.name, `%${escapeLikePattern(term)}%`),
+        ilike(vessels.imo, `%${escapeLikePattern(term)}%`),
+        ilike(vessels.mmsi, `%${escapeLikePattern(term)}%`),
       ),
     )
     .limit(20);
