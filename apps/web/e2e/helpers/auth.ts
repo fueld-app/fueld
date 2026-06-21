@@ -1,5 +1,23 @@
 import { expect, type Page } from '@playwright/test';
 
+/**
+ * Wait for the authenticated app shell to render after login (viewport-agnostic).
+ * On desktop the sidebar "Dashboard" link is visible; on phone/tablet (<lg) the
+ * sidebar is hidden behind the "Open menu" hamburger button. Both elements are
+ * always in the DOM (one CSS-hidden per viewport), so .or() would trip strict
+ * mode (2 elements) — instead poll until either is visible (each locator
+ * resolves to a single element). Use this instead of asserting the Dashboard
+ * link directly, which fails on mobile/tablet viewports.
+ */
+export async function waitForAppShell(page: Page): Promise<void> {
+  const dashboardLink = page.getByRole('link', { name: 'Dashboard' });
+  const openMenuButton = page.getByRole('button', { name: 'Open menu' });
+  await expect.poll(
+    async () => (await dashboardLink.isVisible()) || (await openMenuButton.isVisible()),
+    { timeout: 15_000 },
+  ).toBeTruthy();
+}
+
 export async function loginViaUi(page: Page, params: { email: string; password: string }): Promise<void> {
   await page.goto('/login');
   await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
@@ -51,9 +69,8 @@ export async function loginViaUi(page: Page, params: { email: string; password: 
   // Assert we actually left the login page (guards against silent failures).
   await expect(page).not.toHaveURL(/\/login(\?.*)?$/);
 
-  // Wait for the authenticated app shell to render.
-  // This avoids flakiness where follow-up navigation happens before auth state is applied.
-  await expect(page.getByRole('link', { name: 'Dashboard' })).toBeVisible({ timeout: 15_000 });
+  // Wait for the authenticated app shell to render (viewport-agnostic).
+  await waitForAppShell(page);
 }
 
 /**

@@ -32,7 +32,9 @@ test('reports config changes appear in admin activity log', async ({ page }) => 
   await expect(page.getByText(savedViewName, { exact: true })).toBeVisible({ timeout: 15_000 });
 
   // Edit the saved view
-  await savedViewsCard.getByRole('button', { name: 'Edit' }).click();
+  // Scope to the created view's row (apply button contains the unique name -> parent row -> Edit).
+  // Avoids strict-mode violations when prior failed runs left accumulated saved views.
+  await savedViewsCard.getByRole('button', { name: savedViewName }).locator('..').getByRole('button', { name: 'Edit' }).click();
   await savedViewsCard.getByPlaceholder('View name').fill(updatedSavedViewName);
   await savedViewsCard.getByRole('button', { name: 'Update view' }).click();
   await expect(page.getByText(updatedSavedViewName, { exact: true })).toBeVisible({ timeout: 15_000 });
@@ -66,7 +68,8 @@ test('reports config changes appear in admin activity log', async ({ page }) => 
   const deleteUpdatedViewResponse = page.waitForResponse(
     (response) => response.request().method() === 'DELETE' && response.url().includes('/reports/saved-views/'),
   );
-  await savedViewsCard.getByRole('button', { name: 'Delete' }).click();
+  // Scope to the updated view's row (its apply button now shows updatedSavedViewName).
+  await savedViewsCard.getByRole('button', { name: updatedSavedViewName }).locator('..').getByRole('button', { name: 'Delete' }).click();
   await deleteUpdatedViewResponse;
   await expect(page.getByText(updatedSavedViewName, { exact: true })).not.toBeVisible({ timeout: 15_000 });
 

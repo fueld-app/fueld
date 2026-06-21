@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/coverage';
-import { loginViaUi } from '../helpers/auth';
+import { loginViaUi, waitForAppShell } from '../helpers/auth';
 
 const adminEmail = process.env['E2E_USER_EMAIL'] ?? 'e2e@fueld.local';
 const adminPassword = process.env['E2E_USER_PASSWORD'] ?? 'password123';
@@ -66,6 +66,6 @@ test('admin can generate and use password reset link', async ({ page }) => {
   // 7) Login as the target user with the new password
   await page.goto('/login');
   await loginViaUi(page, { email: targetEmail, password: newPassword });
-  // We just need to prove we're authenticated (sidebar link exists).
-  await expect(page.getByRole('link', { name: 'Dashboard' })).toBeVisible();
+  // We just need to prove we're authenticated (app shell rendered, viewport-agnostic).
+  await waitForAppShell(page);
 });
