@@ -29,12 +29,14 @@ The following report-only findings have since been fixed and shipped to `main` (
 - **Prior commits (not in the original follow-up list, but closed listed items):** `18eefe3d`/`bd87db18` migrated JWT to HttpOnly cookies + CSRF (closes the localStorage/WS-URL token-exposure and `window.open` auth-bypass items); `64c1a986`/`fb788e29` escaped LIKE wildcards; `160989ec` redacted the LLI token-response leak; `5cade6b3` escaped the send-inquiry metadata HTML fallback; `9054d86f`/`f63d64c1` removed dead code (incl. the `order-financial.service.ts` dead branch).
 
 ### Still open
-- `vessels.controller.ts` vessel-company `role` full-catalog validation (info) — deferred: roles are admin-configurable (`vesselCompanyRoles` settings) and an empty catalog must fall back to permissive, so this is a data-quality decision more than a hard validation.
 - `admin/llm.controller.ts` model-install filename arbitrary file write (warning) — **dropped per product call** (LLM is admin-only).
-- `test:db` parallel-race flake: `bun test` runs the `test:db` file group concurrently against the shared local `fueld_test`, racing on `truncateAll`/`seedBasics` (FK/duplicate violations). CI is unaffected (its API matrix runs only `test:mocked`). A sequential `test:db` script is applied locally but lives in `package.json` alongside unrelated in-progress dependency bumps, so it's left uncommitted pending that work.
+
+### Resolved since the last status update
+- **`b2ace269`** — `test:db` now runs its file group sequentially (separate `&& bun test <file>` invocations), eliminating the parallel-race flake on the shared local `fueld_test` (CI was unaffected — its API matrix runs only `test:mocked`).
+- **`a1a86926`** — vessel-company `role` now validated against the tenant's `vesselCompanyRoles` catalog (empty catalog → permissive fallback); closes the deferred role-catalog info item. Also exempted `INTERNAL_TRANSFER` orders from the BDR delivery-document requirement on DELIVERED (an internal transfer is a stock move, not a customer delivery) — this fixed the pre-existing `inventory.transfers.test.ts` "DELIVERED transfer records" failure.
 
 ### Pre-existing (not caused by this review)
-- `inventory.transfers.test.ts` "DELIVERED transfer records both source TRANSFER_OUT and destination TRANSFER_IN" fails on clean `main` (reproduces without any review change) and is not run by CI scripts — separate transfer-delivery bug.
+- _None remaining._ (The `inventory.transfers` "DELIVERED transfer records" failure was fixed by `a1a86926`.)
 
 ## Coverage
 
