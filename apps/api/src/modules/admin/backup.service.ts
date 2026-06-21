@@ -314,6 +314,13 @@ async function extractTarArchive(archivePath: string, targetDir: string): Promis
   }
 }
 
+function redactConnectionStrings(text: string): string {
+  // pg_dump/psql stderr may echo the DATABASE_URL (which contains the DB
+  // password). Strip the userinfo (user:password) from any postgres URL before
+  // surfacing the error.
+  return text.replace(/(postgres(?:ql)?:\/\/[^:/?#]+:)[^@]+@/g, '$1***@');
+}
+
 async function createDatabaseDump(outputPath: string): Promise<void> {
   const databaseUrl = process.env['DATABASE_URL'];
   if (!databaseUrl) throw new Error('DATABASE_URL environment variable is required');
@@ -331,7 +338,7 @@ async function createDatabaseDump(outputPath: string): Promise<void> {
   ]);
 
   if (result.exitCode !== 0) {
-    throw new Error(result.stderr || 'pg_dump failed');
+    throw new Error(redactConnectionStrings(result.stderr || 'pg_dump failed'));
   }
 }
 
@@ -350,7 +357,7 @@ async function restoreDatabaseFromDump(dumpPath: string): Promise<void> {
   ]);
 
   if (result.exitCode !== 0) {
-    throw new Error(result.stderr || 'psql restore failed');
+    throw new Error(redactConnectionStrings(result.stderr || 'psql restore failed'));
   }
 }
 

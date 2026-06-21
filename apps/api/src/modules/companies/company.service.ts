@@ -455,10 +455,11 @@ export async function listCompanies(query?: {
   if (query?.segment) {
     const [catKey, optKey] = query.segment.split(':');
     if (catKey && optKey) {
-      // Match both single-select (string) and multi-select (array contains)
+      // Match both single-select (string) and multi-select (array contains).
+      // catKey/optKey are bound as parameters (not sql.raw) to avoid SQL injection.
       conditions.push(sql`(
-        ${counterparties.segments}->>${sql.raw(`'${catKey.replace(/'/g, "''")}'`)} = ${optKey}
-        OR ${counterparties.segments}->${sql.raw(`'${catKey.replace(/'/g, "''")}'`)} @> ${JSON.stringify([optKey])}::jsonb
+        ${counterparties.segments}->>${catKey} = ${optKey}
+        OR ${counterparties.segments}->${catKey} @> ${JSON.stringify([optKey])}::jsonb
       )`);
     }
   }

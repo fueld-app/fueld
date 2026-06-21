@@ -16,20 +16,33 @@ import { extractClientIp } from '../../utils/client-ip';
 
 /** Check if an IP matches a CIDR range or exact IP */
 function ipMatchesCidr(ip: string, cidr: string): boolean {
-  // Exact match
+  // Exact match (non-CIDR)
   if (ip === cidr) return true;
 
-  // CIDR notation
-  const parts = cidr.split('/');
-  if (parts.length !== 2) return false;
-  const [baseIp, prefixStr] = parts;
-  const prefix = parseInt(prefixStr!, 10);
-  if (isNaN(prefix) || prefix < 0 || prefix > 32) return false;
+  const slash = cidr.indexOf('/');
+  if (slash === -1) return false;
+  const baseIp = cidr.slice(0, slash);
+  const prefix = parseInt(cidr.slice(slash + 1), 10);
+  if (isNaN(prefix) || prefix < 0) return false;
 
+  const isV6 = (s: string): boolean => s.includes(':');
+  // IPv4 allow-list entries must not match IPv6 clients (and vice-versa).
+  if (isV6(ip) !== isV6(baseIp)) return false;
+
+  if (isV6(ip)) {
+    const ipNum = ipv6ToBigInt(ip);
+    const baseNum = ipv6ToBigInt(baseIp);
+    if (ipNum === null || baseNum === null || prefix > 128) return false;
+    if (prefix === 0) return true;
+    const allOnes = (1n << 128n) - 1n;
+    const mask = (allOnes << BigInt(128 - prefix)) & allOnes;
+    return (ipNum & mask) === (baseNum & mask);
+  }
+
+  // IPv4
   const ipNum = ipToNumber(ip);
-  const baseNum = ipToNumber(baseIp!);
-  if (ipNum === null || baseNum === null) return false;
-
+  const baseNum = ipToNumber(baseIp);
+  if (ipNum === null || baseNum === null || prefix > 32) return false;
   const mask = prefix === 0 ? 0 : (~0 << (32 - prefix)) >>> 0;
   return (ipNum & mask) === (baseNum & mask);
 }
@@ -39,11 +52,39 @@ function ipToNumber(ip: string): number | null {
   if (parts.length !== 4) return null;
   let num = 0;
   for (const part of parts) {
-    const n = parseInt(part!, 10);
+    const n = parseInt(part, 10);
     if (isNaN(n) || n < 0 || n > 255) return null;
     num = (num << 8) | n;
   }
   return num >>> 0;
+}
+
+/** Parse an IPv6 address (with `::` expansion) into a 128-bit BigInt. */
+function ipv6ToBigInt(ip: string): bigint | null {
+  try {
+    const addr = ip.toLowerCase();
+    let groups: string[];
+    if (addr.includes('::')) {
+      const idx = addr.indexOf('::');
+      const left = addr.slice(0, idx).split(':').filter((g) => g.length > 0);
+      const right = addr.slice(idx + 2).split(':').filter((g) => g.length > 0);
+      const fill = 8 - left.length - right.length;
+      if (fill < 0) return null;
+      groups = [...left, ...Array.from({ length: fill }, () => '0'), ...right];
+    } else {
+      groups = addr.split(':');
+    }
+    if (groups.length !== 8) return null;
+    let result = 0n;
+    for (const g of groups) {
+      const n = parseInt(g || '0', 16);
+      if (isNaN(n) || n < 0 || n > 0xffff) return null;
+      result = (result << 16n) | BigInt(n);
+    }
+    return result;
+  } catch {
+    return null;
+  }
 }
 
 function isIpAllowed(clientIp: string, allowedIps: string[]): boolean {
@@ -109,7 +150,11 @@ export const authGuard = new Elysia({ name: 'auth-guard' })
       if (err instanceof Error && err.message.includes('IP address is not allowed')) {
         throw err;
       }
-      // If getUserAllowedIps fails (e.g. user deleted), let it through to fail on other checks
+      // Fail closed: if the IP-allowlist lookup itself fails, deny rather than
+      // silently bypassing the restriction (fail-open would let a restricted
+      // user through on a transient fetch error).
+      set.status = 403;
+      throw new Error('IP allowlist check failed');
     }
 
     const user = await findUserById(userId);

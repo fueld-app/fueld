@@ -54,9 +54,12 @@ const STATE_MAX_AGE_MS = 10 * 60 * 1000; // 10 minutes
  * Derived from CREDENTIALS_ENCRYPTION_KEY or DATABASE_URL (same source as crypto.ts).
  */
 function getStateSigningKey(): string {
-  return process.env['CREDENTIALS_ENCRYPTION_KEY']
-    ?? process.env['DATABASE_URL']
-    ?? 'fueld-oauth-state-fallback';
+  const key = process.env['CREDENTIALS_ENCRYPTION_KEY'] ?? process.env['DATABASE_URL'];
+  if (key) return key;
+  if (process.env['NODE_ENV'] === 'production') {
+    throw new Error('CREDENTIALS_ENCRYPTION_KEY or DATABASE_URL must be set for OAuth state signing');
+  }
+  return 'fueld-oauth-state-fallback';
 }
 
 // ─── One-time code store (in-memory) ────────────────────────────────
@@ -351,9 +354,19 @@ export async function loadMicrosoftConfig(): Promise<MicrosoftSsoConfig | null> 
 export function validateReturnUrl(returnUrl: string): boolean {
   try {
     const url = new URL(returnUrl);
-    // Allow http only for localhost (development)
-    if (url.protocol === 'http:' && url.hostname !== 'localhost') return false;
     if (url.protocol !== 'http:' && url.protocol !== 'https:') return false;
+    // Allow http only for localhost (development)
+    if (url.protocol === 'http:' && url.hostname !== 'localhost' && url.hostname !== '127.0.0.1') return false;
+    // In production (APP_URL configured), restrict to the app's own origin to
+    // prevent open-redirect via a user-supplied returnUrl. Dev (no APP_URL) is
+    // permissive. returnUrl is also HMAC-signed into the state, so this is
+    // defense-in-depth on top of the signature.
+    const appUrl = process.env['APP_URL'];
+    if (appUrl && url.hostname !== 'localhost' && url.hostname !== '127.0.0.1') {
+      let appOrigin: string | null = null;
+      try { appOrigin = new URL(appUrl.trim()).origin; } catch {}
+      if (appOrigin && url.origin !== appOrigin) return false;
+    }
     return true;
   } catch {
     return false;

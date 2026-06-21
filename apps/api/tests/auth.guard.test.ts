@@ -229,11 +229,11 @@ describe('auth.guard', () => {
     expect(response.status).toBe(200);
   });
 
-  test('allows request when allowed IP lookup fails unexpectedly', async () => {
+  test('denies request when allowed IP lookup fails unexpectedly (fail-closed)', async () => {
     const seeded = await seedBasics();
     const db = await getDb();
-    // Malformed JSON triggers JSON.parse error inside admin.service getUserAllowedIps
-    // which auth.guard treats as a non-blocking failure.
+    // Malformed JSON triggers JSON.parse error inside admin.service getUserAllowedIps.
+    // auth.guard now fails closed (403) instead of silently bypassing the restriction.
     await db
       .update(users)
       .set({ allowedIps: 'not-json', updatedAt: new Date() })
@@ -251,7 +251,7 @@ describe('auth.guard', () => {
       }),
     );
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(403);
   });
 
   // ── Cookie-based auth + CSRF ─────────────────────────────────────
