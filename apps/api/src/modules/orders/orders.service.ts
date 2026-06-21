@@ -1795,8 +1795,10 @@ export async function updateOrderStatus(
     .where(eq(orders.id, id))
     .limit(1);
 
-  // Validate delivery documentation requirements before marking delivered
-  if (newStatus === 'DELIVERED') {
+  // Validate delivery documentation requirements before marking delivered.
+  // Internal transfers (stock moves between own warehouses) are not customer
+  // deliveries, so a BDR/delivery doc is not required for them.
+  if (newStatus === 'DELIVERED' && previous?.orderKind !== 'INTERNAL_TRANSFER') {
     const { getDeliveryDocumentationSettings } = await import('../admin/settings.service');
     const docSettings = await getDeliveryDocumentationSettings();
     if (docSettings.requireDeliveryDocumentation) {

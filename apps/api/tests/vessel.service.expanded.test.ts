@@ -216,7 +216,7 @@ describe('vessel.service expanded flows', () => {
 
     const createdRole = await vesselService.addVesselCompany(vessel.id, {
       companyId: companyA.id,
-      role: 'MANAGER',
+      role: 'TECHNICAL_MANAGER',
       contactId: contactA.id,
       note: 'primary',
     }, user.id, user.name);
@@ -225,12 +225,12 @@ describe('vessel.service expanded flows', () => {
 
     await expect(vesselService.addVesselCompany(vessel.id, {
       companyId: companyB.id,
-      role: 'MANAGER',
+      role: 'TECHNICAL_MANAGER',
     }, user.id, user.name)).rejects.toThrow('Role already exists');
 
     const replacedRole = await vesselService.addVesselCompany(vessel.id, {
       companyId: companyB.id,
-      role: 'MANAGER',
+      role: 'TECHNICAL_MANAGER',
       replaceExistingRole: true,
       note: 'replaced',
     }, user.id, user.name);
@@ -247,10 +247,10 @@ describe('vessel.service expanded flows', () => {
 
     const chartererRole = await vesselService.addVesselCompany(vessel.id, {
       companyId: chartererCompany.id,
-      role: 'CHARTERER',
+      role: 'BAREBOAT_CHARTERER',
     }, user.id, user.name);
 
-    await expect(vesselService.updateVesselCompany(chartererRole!.id, { role: 'MANAGER' })).rejects.toThrow('Role already exists');
+    await expect(vesselService.updateVesselCompany(chartererRole!.id, { role: 'TECHNICAL_MANAGER' })).rejects.toThrow('Role already exists');
 
     const updatedRole = await vesselService.updateVesselCompany(chartererRole!.id, { note: 'updated note' });
     expect(updatedRole?.note).toBe('updated note');

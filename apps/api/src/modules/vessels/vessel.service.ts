@@ -616,12 +616,24 @@ export async function getVesselCompanies(vesselId: string) {
     .orderBy(vesselCompanies.role, counterparties.name);
 }
 
+async function assertValidVesselRole(role: string): Promise<void> {
+  // Validate against the tenant's configured vessel-company role catalog.
+  // If the admin hasn't configured any roles (empty catalog), allow any (fallback).
+  const { getVesselCompanyRoleSettings } = await import('../admin/settings.service');
+  const { roles } = await getVesselCompanyRoleSettings();
+  if (roles.length > 0 && !roles.some((r) => r.key === role)) {
+    throw new Error(`Invalid vessel company role: '${role}'. Allowed: ${roles.map((r) => r.key).join(', ')}`);
+  }
+}
+
 export async function addVesselCompany(
   vesselId: string,
   data: { companyId: string; role: VesselCompanyRole; contactId?: string | null; note?: string; source?: string; replaceExistingRole?: boolean },
   userId: string,
   userName: string
 ) {
+  await assertValidVesselRole(data.role);
+
   const [existing] = await db
     .select({ id: vesselCompanies.id })
     .from(vesselCompanies)
@@ -693,6 +705,7 @@ export async function updateVesselCompany(
   data: { role?: VesselCompanyRole; contactId?: string | null; note?: string }
 ) {
   if (data.role) {
+    await assertValidVesselRole(data.role);
     const [current] = await db
       .select({ vesselId: vesselCompanies.vesselId, companyId: vesselCompanies.companyId })
       .from(vesselCompanies)
