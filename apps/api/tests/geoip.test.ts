@@ -16,8 +16,8 @@ describe('geoip', () => {
 
   const uniqueIp = (lastOctet: number): string => {
     sequence += 1;
-    const thirdOctet = ((suiteSalt >> 8) + sequence) % 256;
-    const fourthOctet = ((suiteSalt & 0xff) + lastOctet + sequence) % 256;
+    const thirdOctet = ((suiteSalt >>> 8) + sequence) & 0xff;
+    const fourthOctet = ((suiteSalt & 0xff) + lastOctet + sequence) & 0xff;
     return `203.0.${thirdOctet}.${fourthOctet}`;
   };
 

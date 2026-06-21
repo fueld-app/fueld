@@ -94,6 +94,9 @@ export async function lookupIp(ip: string | null): Promise<GeoInfo> {
 
   const normalized = normalizeIp(ip);
   if (isPrivateIp(normalized)) return EMPTY;
+  // Only request ip-api for well-formed IPs. A malicious X-Forwarded-For value
+  // could otherwise inject path/control characters into the request URL.
+  if (!/^[0-9a-fA-F:.]+$/.test(normalized)) return EMPTY;
 
   // Check cache first
   const cached = getCached(normalized);

@@ -65,8 +65,8 @@ export const ordersController = new Elysia({ prefix: '/orders' })
           brokerId: query.brokerId,
           sortBy: query.sortBy,
           sortDir: query.sortDir as 'asc' | 'desc' | undefined,
-          page: query.page ? parseInt(query.page) : undefined,
-          limit: query.limit ? parseInt(query.limit) : undefined,
+          page: query.page ? parseInt(query.page, 10) : undefined,
+          limit: query.limit ? parseInt(query.limit, 10) : undefined,
         });
         return { success: true, data: results } satisfies ApiResponse<typeof results>;
       } catch (err) {
