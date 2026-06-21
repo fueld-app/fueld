@@ -98,7 +98,7 @@ describe('auth controller more branches e2e', () => {
 
     const verify = await requestJson('/auth/verify-passkey', {
       method: 'POST',
-      body: { tempToken, assertionResponse: {} },
+      body: { tempToken, assertionResponse: {}, sessionId: 'any' },
     });
 
     expect(verify.status).toBe(200);
@@ -132,7 +132,7 @@ describe('auth controller more branches e2e', () => {
 
     const login = await requestJson('/auth/login/passkey', {
       method: 'POST',
-      body: { email: 'deactivated-passkey@test.local', assertionResponse: {} },
+      body: { email: 'deactivated-passkey@test.local', assertionResponse: {}, sessionId: 'any' },
     });
 
     expect(login.status).toBe(200);

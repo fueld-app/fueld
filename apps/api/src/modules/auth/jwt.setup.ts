@@ -39,6 +39,30 @@ export function isCookieAuth(headers: Record<string, string | undefined>): boole
 }
 
 /**
+ * Browsers always send an `Origin` header on POST (even same-origin); API clients
+ * (scripts, integrations, the e2e suite) typically don't. Used to decide
+ * whether to deliver auth tokens via HttpOnly cookies only (browser, XSS-safe:
+ * no tokens in the response body an XSS could read) or in the response body
+ * (API client, which needs the bearer tokens).
+ */
+export function isBrowserRequest(headers: Record<string, string | undefined>): boolean {
+  return !!headers['origin'];
+}
+
+/**
+ * Token fields to include in the auth response BODY: empty for browsers (which
+ * receive tokens via HttpOnly cookies only — XSS can't read the body); for API
+ * clients (no `Origin`) return the tokens so they can use `Authorization: Bearer`.
+ */
+export function apiTokenFields(
+  headers: Record<string, string | undefined>,
+  accessToken: string,
+  refreshToken: string,
+): Record<string, string> {
+  return isBrowserRequest(headers) ? {} : { accessToken, refreshToken };
+}
+
+/**
  * Flatten Elysia's `cookie` jar (`Record<string, { value?: string }>`) into a
  * plain `Record<string, string>`. Used wherever a handler destructures `cookie`.
  */

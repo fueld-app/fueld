@@ -16,7 +16,7 @@ describe('auth passkeys guard/error e2e', () => {
     });
     expect(missingRegisterOptions.status).toBe(200);
     expect(missingRegisterOptions.data?.success).toBe(false);
-    expect(String(missingRegisterOptions.data?.message ?? '')).toContain('Missing authorization header');
+    expect(String(missingRegisterOptions.data?.message ?? '')).toContain('Missing authentication token');
 
     const invalidRegisterOptions = await requestJson('/auth/passkeys/register-options', {
       method: 'POST',
@@ -32,7 +32,7 @@ describe('auth passkeys guard/error e2e', () => {
     });
     expect(missingRegisterVerify.status).toBe(200);
     expect(missingRegisterVerify.data?.success).toBe(false);
-    expect(String(missingRegisterVerify.data?.message ?? '')).toContain('Missing authorization header');
+    expect(String(missingRegisterVerify.data?.message ?? '')).toContain('Missing authentication token');
 
     const invalidRegisterVerify = await requestJson('/auth/passkeys/register-verify', {
       method: 'POST',
@@ -49,7 +49,7 @@ describe('auth passkeys guard/error e2e', () => {
     });
     expect(missingRename.status).toBe(200);
     expect(missingRename.data?.success).toBe(false);
-    expect(String(missingRename.data?.message ?? '')).toContain('Missing authorization header');
+    expect(String(missingRename.data?.message ?? '')).toContain('Missing authentication token');
 
     const invalidRename = await requestJson('/auth/passkeys/123e4567-e89b-12d3-a456-426614174000', {
       method: 'PUT',
@@ -65,7 +65,7 @@ describe('auth passkeys guard/error e2e', () => {
     });
     expect(missingDelete.status).toBe(200);
     expect(missingDelete.data?.success).toBe(false);
-    expect(String(missingDelete.data?.message ?? '')).toContain('Missing authorization header');
+    expect(String(missingDelete.data?.message ?? '')).toContain('Missing authentication token');
 
     const invalidDelete = await requestJson('/auth/passkeys/123e4567-e89b-12d3-a456-426614174000', {
       method: 'DELETE',
@@ -82,6 +82,7 @@ describe('auth passkeys guard/error e2e', () => {
       body: {
         email: 'anyone@test.local',
         assertionResponse: {},
+        sessionId: 'any',
       },
     });
 

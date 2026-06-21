@@ -16,7 +16,7 @@ import {
 import { disconnectUserSessions } from '../activity/session-tracker';
 import type { ApiResponse } from '@fueld/types';
 import { sendInviteEmail, sendPasswordResetEmail, sendTestEmail } from '../../lib/email';
-import { jwtAccessPlugin, jwtRefreshPlugin, type JwtPayload, setAuthCookies, generateCsrfToken } from '../auth/jwt.setup';
+import { jwtAccessPlugin, jwtRefreshPlugin, type JwtPayload, setAuthCookies, generateCsrfToken, apiTokenFields } from '../auth/jwt.setup';
 import { createPasswordResetForUser } from '../auth/password-reset.service';
 
 // ─── Admin Controller ────────────────────────────────────────────────
@@ -474,7 +474,7 @@ export const inviteController = new Elysia({ prefix: '/invite' })
   })
 
   // ── POST /invite/:token/accept — complete signup ─────────────────
-  .post('/:token/accept', async ({ params, body, jwtAccess, jwtRefresh, set }) => {
+  .post('/:token/accept', async ({ params, body, jwtAccess, jwtRefresh, set, headers }) => {
     try {
       const { storeRefreshToken } = await import('../auth/auth.service');
 
@@ -493,6 +493,7 @@ export const inviteController = new Elysia({ prefix: '/invite' })
         data: {
           user: sanitiseUser(user),
           requiresMfaSetup: true,
+          ...apiTokenFields(headers as Record<string, string | undefined>, accessToken, refreshToken),
         },
       } satisfies ApiResponse<unknown>;
     } catch (err) {

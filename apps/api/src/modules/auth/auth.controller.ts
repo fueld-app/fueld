@@ -1,6 +1,6 @@
 import { Elysia, t } from 'elysia';
 import { join } from 'path';
-import { jwtAccessPlugin, jwtRefreshPlugin, type JwtPayload, setAuthCookies, clearAuthCookies, generateCsrfToken, extractRefreshToken, flattenElysiaCookies, resolveAccessToken, validateCsrfToken, isCookieAuth, STATE_CHANGING_METHODS, ACCESS_COOKIE } from './jwt.setup';
+import { jwtAccessPlugin, jwtRefreshPlugin, type JwtPayload, setAuthCookies, clearAuthCookies, generateCsrfToken, extractRefreshToken, flattenElysiaCookies, resolveAccessToken, validateCsrfToken, isCookieAuth, isBrowserRequest, apiTokenFields, STATE_CHANGING_METHODS, ACCESS_COOKIE, REFRESH_COOKIE } from './jwt.setup';
 import {
   loginWithPassword,
   loginWithO365,
@@ -113,7 +113,7 @@ export const authController = new Elysia({ prefix: '/auth' })
   // ── POST /auth/register ──────────────────────────────────────────
   .post(
     '/register',
-    async ({ body, jwtAccess, jwtRefresh, set }) => {
+    async ({ body, jwtAccess, jwtRefresh, set, headers }) => {
       try {
         const user = await registerUser(body);
         const payload = userToPayload(user);
@@ -131,6 +131,7 @@ export const authController = new Elysia({ prefix: '/auth' })
           data: {
             user: sanitiseUser(user),
             requiresMfaSetup: false,
+            ...apiTokenFields(headers as Record<string, string | undefined>, accessToken, refreshToken),
           },
         } satisfies ApiResponse<unknown>;
       } catch (err) {
@@ -154,7 +155,7 @@ export const authController = new Elysia({ prefix: '/auth' })
   // ── POST /auth/login ─────────────────────────────────────────────
   .post(
     '/login',
-    async ({ body, jwtAccess, jwtRefresh, set }) => {
+    async ({ body, jwtAccess, jwtRefresh, set, headers }) => {
       try {
         const { user } = await loginWithPassword(
           body.email,
@@ -213,6 +214,7 @@ export const authController = new Elysia({ prefix: '/auth' })
             requires2fa: false,
             user: sanitiseUser(user),
             requiresMfaSetup,
+            ...apiTokenFields(headers as Record<string, string | undefined>, accessToken, refreshToken),
           },
         } satisfies ApiResponse<unknown>;
       } catch (err) {
@@ -267,7 +269,7 @@ export const authController = new Elysia({ prefix: '/auth' })
   // ── POST /auth/verify-2fa ────────────────────────────────────────
   .post(
     '/verify-2fa',
-    async ({ body, jwtAccess, jwtRefresh, set }) => {
+    async ({ body, jwtAccess, jwtRefresh, set, headers }) => {
       try {
         // Decode the temp token to get the user ID
         const raw = await jwtAccess.verify(body.tempToken);
@@ -314,6 +316,7 @@ export const authController = new Elysia({ prefix: '/auth' })
           data: {
             user: sanitiseUser(user),
             requiresMfaSetup: false,
+            ...apiTokenFields(headers as Record<string, string | undefined>, accessToken, refreshToken),
           },
         } satisfies ApiResponse<unknown>;
       } catch (err) {
@@ -337,7 +340,7 @@ export const authController = new Elysia({ prefix: '/auth' })
   // Step 2 of 2FA passkey flow: verify the assertion from the browser
   .post(
     '/verify-passkey',
-    async ({ body, jwtAccess, jwtRefresh, set }) => {
+    async ({ body, jwtAccess, jwtRefresh, set, headers }) => {
       try {
         const raw = await jwtAccess.verify(body.tempToken);
         const decoded = raw ? (raw as Record<string, unknown>) : null;
@@ -391,6 +394,7 @@ export const authController = new Elysia({ prefix: '/auth' })
           success: true,
           data: {
             user: sanitiseUser(user),
+            ...apiTokenFields(headers as Record<string, string | undefined>, accessToken, refreshToken),
           },
         } satisfies ApiResponse<unknown>;
       } catch (err) {
@@ -513,7 +517,7 @@ export const authController = new Elysia({ prefix: '/auth' })
   // Step 2 of passwordless login: verify the assertion response
   .post(
     '/login/passkey',
-    async ({ body, jwtAccess, jwtRefresh, set }) => {
+    async ({ body, jwtAccess, jwtRefresh, set, headers }) => {
       try {
         const config = await isPasskeyEnabled();
         if (!config.enabled || !config.allowPasswordless) {
@@ -588,6 +592,7 @@ export const authController = new Elysia({ prefix: '/auth' })
             requires2fa: false,
             user: sanitiseUser(user),
             requiresMfaSetup: false,
+            ...apiTokenFields(headers as Record<string, string | undefined>, accessToken, refreshToken),
           },
         } satisfies ApiResponse<unknown>;
       } catch (err) {
@@ -611,7 +616,7 @@ export const authController = new Elysia({ prefix: '/auth' })
   // ── POST /auth/login/sso ─────────────────────────────────────────
   .post(
     '/login/sso',
-    async ({ body, jwtAccess, jwtRefresh, set }) => {
+    async ({ body, jwtAccess, jwtRefresh, set, headers }) => {
       try {
         const user = await loginWithO365(body.microsoftAccessToken);
         const payload = userToPayload(user);
@@ -628,6 +633,7 @@ export const authController = new Elysia({ prefix: '/auth' })
           success: true,
           data: {
             user: sanitiseUser(user),
+            ...apiTokenFields(headers as Record<string, string | undefined>, accessToken, refreshToken),
           },
         } satisfies ApiResponse<unknown>;
       } catch (err) {
@@ -856,7 +862,7 @@ export const authController = new Elysia({ prefix: '/auth' })
   // ── POST /auth/microsoft/exchange — redeem one-time code for tokens ─
   .post(
     '/microsoft/exchange',
-    async ({ body, set }) => {
+    async ({ body, set, headers }) => {
       const auth = consumeOneTimeCode(body.code);
       if (!auth) {
         return {
@@ -873,6 +879,7 @@ export const authController = new Elysia({ prefix: '/auth' })
         success: true,
         data: {
           user: auth.user,
+          ...apiTokenFields(headers as Record<string, string | undefined>, auth.fueldAccessToken, auth.fueldRefreshToken),
         },
       } satisfies ApiResponse<unknown>;
     },
@@ -894,9 +901,11 @@ export const authController = new Elysia({ prefix: '/auth' })
       try {
         const flatCookies = flattenElysiaCookies(cookie);
 
-        // CSRF: a cookie-authenticated refresh (browser, no Bearer header) is a
+        // CSRF: a cookie-authenticated refresh (browser sends fueld_refresh) is a
         // state-changing POST, so it must present the double-submit CSRF token.
+        // API clients send body.refreshToken (no cookie) — no CSRF needed there.
         if (
+          flatCookies[REFRESH_COOKIE] &&
           isCookieAuth(headers as Record<string, string | undefined>) &&
           STATE_CHANGING_METHODS.has(request.method)
         ) {
@@ -955,6 +964,7 @@ export const authController = new Elysia({ prefix: '/auth' })
           success: true,
           data: {
             requiresMfaSetup,
+            ...apiTokenFields(headers as Record<string, string | undefined>, newAccessToken, newRefreshToken),
           },
         } satisfies ApiResponse<unknown>;
       } catch (err) {
@@ -980,8 +990,10 @@ export const authController = new Elysia({ prefix: '/auth' })
       try {
         const flatCookies = flattenElysiaCookies(cookie);
 
-        // CSRF: cookie-authenticated logout is a state-changing POST.
+        // CSRF: cookie-authenticated logout (browser sends fueld_access) is a
+        // state-changing POST. API clients send body.accessToken — no CSRF there.
         if (
+          flatCookies[ACCESS_COOKIE] &&
           isCookieAuth(headers as Record<string, string | undefined>) &&
           STATE_CHANGING_METHODS.has(request.method)
         ) {

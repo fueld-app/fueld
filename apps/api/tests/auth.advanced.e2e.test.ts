@@ -139,12 +139,12 @@ describe('auth advanced e2e', () => {
     const generate = await requestJson('/auth/2fa/generate', { method: 'POST' });
     expect(generate.status).toBe(200);
     expect(generate.data?.success).toBe(false);
-    expect(String(generate.data?.message ?? '')).toContain('Missing authorization header');
+    expect(String(generate.data?.message ?? '')).toContain('Missing authentication token');
 
     const passkeys = await requestJson('/auth/passkeys', { method: 'GET' });
     expect(passkeys.status).toBe(200);
     expect(passkeys.data?.success).toBe(false);
-    expect(String(passkeys.data?.message ?? '')).toContain('Missing authorization header');
+    expect(String(passkeys.data?.message ?? '')).toContain('Missing authentication token');
   });
 
   it('covers invalid-token and revoked-token auth branches', async () => {

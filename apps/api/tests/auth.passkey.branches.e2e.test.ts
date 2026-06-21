@@ -71,6 +71,7 @@ describe('auth passkey/2fa branch e2e', () => {
       body: {
         tempToken: 'not-a-valid-temp-token',
         assertionResponse: {},
+        sessionId: 'any',
       },
     });
 
@@ -118,6 +119,7 @@ describe('auth passkey/2fa branch e2e', () => {
       body: {
         email: 'missing-user@test.local',
         assertionResponse: {},
+        sessionId: 'any',
       },
     });
 
