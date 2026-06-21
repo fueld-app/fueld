@@ -214,7 +214,7 @@
       [customerTermsText]="customerTermsText()"
       [supplierTermsText]="supplierTermsText()"
       [hasOrderTermsOverride]="!!order()?.termsAndConditions"
-      [clientSpecialTermsLabel]="client()?.specialCustomerTerms ? (client()?.name + ' special terms') : null"
+      [clientSpecialTermsLabel]="client()?.specialCustomerTerms ? ($safeNavigationMigration(client()?.name) + ' special terms') : null"
       (placeRemarkChange)="onPlaceRemarkChange($event)"
     />
   </div>

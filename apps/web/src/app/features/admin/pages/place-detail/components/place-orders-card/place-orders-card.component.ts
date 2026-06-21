@@ -19,7 +19,7 @@ import { PlaceDetailStore } from '../../place-detail.store';
         </h2>
         <a
           [routerLink]="['/orders/new']"
-          [queryParams]="{ placeId: store.place()?.id }"
+          [queryParams]="{ placeId: $safeNavigationMigration(store.place()?.id) }"
           class="app-button-add text-[11px]"
         >
           New order

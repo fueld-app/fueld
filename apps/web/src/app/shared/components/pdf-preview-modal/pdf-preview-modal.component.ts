@@ -378,18 +378,19 @@ export class PdfPreviewModalComponent {
       GlobalWorkerOptions.workerSrc = this.pdfWorkerUrl;
 
       const data = new Uint8Array(await blob.arrayBuffer());
-      const pdf = await getDocument({ data }).promise;
+      const loadingTask = getDocument({ data });
+      const pdf = await loadingTask.promise;
 
       // Wait a tick for Angular to render the container after loading state change
       await new Promise(resolve => setTimeout(resolve, 0));
       if (renderSessionId !== this.renderSessionId) {
-        pdf.destroy();
+        loadingTask.destroy();
         return;
       }
 
       const container = this.pdfCanvasHost()?.nativeElement;
       if (!container) {
-        pdf.destroy();
+        loadingTask.destroy();
         return;
       }
 
@@ -399,7 +400,7 @@ export class PdfPreviewModalComponent {
 
       for (let i = 1; i <= pdf.numPages; i++) {
         if (renderSessionId !== this.renderSessionId) {
-          pdf.destroy();
+          loadingTask.destroy();
           return;
         }
 
@@ -426,7 +427,7 @@ export class PdfPreviewModalComponent {
         await page.render({ canvas, canvasContext: context, viewport }).promise;
         page.cleanup();
       }
-      pdf.destroy();
+      loadingTask.destroy();
     } catch {
       if (renderSessionId === this.renderSessionId) {
         this.renderError.set(
