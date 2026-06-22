@@ -67,19 +67,19 @@ import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
         <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
           <div class="xl:col-span-2">
             <label class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Search</label>
-            <input [(ngModel)]="search" class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm" placeholder="Title or file name" />
+            <input [(ngModel)]="search" class="mt-1 w-full h-10 rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm" placeholder="Title or file name" />
           </div>
           <div>
             <label class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">From</label>
-            <input [(ngModel)]="fromDate" type="date" class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm" />
+            <input [(ngModel)]="fromDate" type="date" class="mt-1 w-full h-10 rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm" />
           </div>
           <div>
             <label class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">To</label>
-            <input [(ngModel)]="toDate" type="date" class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm" />
+            <input [(ngModel)]="toDate" type="date" class="mt-1 w-full h-10 rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm" />
           </div>
           <div>
             <label class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Status</label>
-            <select [(ngModel)]="statusFilter" class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm">
+            <select [(ngModel)]="statusFilter" class="mt-1 w-full h-10 rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm">
               <option value="">All</option>
               <option value="UPLOADED">Uploaded</option>
               <option value="PARSING">Parsing</option>

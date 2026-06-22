@@ -460,15 +460,15 @@ body {
   }
 
   .app-input {
-    @apply rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-brand-600 focus:ring-1 focus:ring-brand-600 dark:border-line-strong dark:bg-surface-2 dark:text-ink dark:focus:border-brand-500 dark:focus:ring-brand-500;
+    @apply h-10 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-colors focus:border-brand-600 focus:ring-1 focus:ring-brand-600 dark:border-line-strong dark:bg-surface-2 dark:text-ink dark:focus:border-brand-500 dark:focus:ring-brand-500;
   }
 
   .app-input-mono {
-    @apply rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono outline-none transition-colors focus:border-brand-600 focus:ring-1 focus:ring-brand-600 dark:border-line-strong dark:bg-surface-2 dark:text-ink dark:focus:border-brand-500 dark:focus:ring-brand-500;
+    @apply h-10 rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono outline-none transition-colors focus:border-brand-600 focus:ring-1 focus:ring-brand-600 dark:border-line-strong dark:bg-surface-2 dark:text-ink dark:focus:border-brand-500 dark:focus:ring-brand-500;
   }
 
   .app-input-mono-uppercase {
-    @apply rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono uppercase outline-none transition-colors focus:border-brand-600 focus:ring-1 focus:ring-brand-600 dark:border-line-strong dark:bg-surface-2 dark:text-ink dark:focus:border-brand-500 dark:focus:ring-brand-500;
+    @apply h-10 rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono uppercase outline-none transition-colors focus:border-brand-600 focus:ring-1 focus:ring-brand-600 dark:border-line-strong dark:bg-surface-2 dark:text-ink dark:focus:border-brand-500 dark:focus:ring-brand-500;
   }
 
   .app-button-primary {
