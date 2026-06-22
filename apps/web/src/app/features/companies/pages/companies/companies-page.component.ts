@@ -71,7 +71,7 @@ interface CompanySearchResult {
             (ngModelChange)="onSearchInput($event)"
             (focus)="onSearchFocus()"
             placeholder="Search companies to import or create (min. 2 characters)…"
-            class="w-full rounded-lg border border-gray-300 dark:border-line-strong py-2 pl-9 pr-3 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
+            class="w-full h-10 rounded-lg border border-gray-300 dark:border-line-strong py-2 pl-9 pr-3 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
           />
           @if (searching()) {
             <div class="absolute inset-y-0 right-0 flex items-center pr-3">
@@ -151,7 +151,7 @@ interface CompanySearchResult {
         <select
           [ngModel]="filterType()"
           (ngModelChange)="filterType.set($event); currentPage.set(1); loadCompanies(); updateUrlParams()"
-          class="rounded-lg border border-gray-300 dark:border-line-strong py-2 pl-3 pr-8 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
+          class="h-10 rounded-lg border border-gray-300 dark:border-line-strong py-2 pl-3 pr-8 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
         >
           <option value="">All Types</option>
           @for (type of availableTypes(); track type) {
@@ -163,7 +163,7 @@ interface CompanySearchResult {
         <select
           [ngModel]="filterResponsible()"
           (ngModelChange)="filterResponsible.set($event); currentPage.set(1); loadCompanies(); updateUrlParams()"
-          class="rounded-lg border border-gray-300 dark:border-line-strong py-2 pl-3 pr-8 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
+          class="h-10 rounded-lg border border-gray-300 dark:border-line-strong py-2 pl-3 pr-8 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
         >
           <option value="">All Responsible</option>
           @for (u of users(); track u.id) {
@@ -175,7 +175,7 @@ interface CompanySearchResult {
         <select
           [ngModel]="filterCountry()"
           (ngModelChange)="filterCountry.set($event); currentPage.set(1); loadCompanies(); updateUrlParams()"
-          class="rounded-lg border border-gray-300 dark:border-line-strong py-2 pl-3 pr-8 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
+          class="h-10 rounded-lg border border-gray-300 dark:border-line-strong py-2 pl-3 pr-8 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
         >
           <option value="">All Countries</option>
           @for (c of countries; track c.code) {
@@ -188,7 +188,7 @@ interface CompanySearchResult {
           <select
             [ngModel]="filterSegment()"
             (ngModelChange)="filterSegment.set($event); currentPage.set(1); loadCompanies(); updateUrlParams()"
-            class="rounded-lg border border-gray-300 dark:border-line-strong py-2 pl-3 pr-8 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
+            class="h-10 rounded-lg border border-gray-300 dark:border-line-strong py-2 pl-3 pr-8 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
           >
             <option value="">All Segments</option>
             @for (cat of segmentCategories(); track cat.key) {
