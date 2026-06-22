@@ -18,7 +18,7 @@ import {
       100% { background-position: 0% 50%; }
     }
     .hero-bg {
-      background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 40%, #1a56db 70%, #3b82f6 100%);
+      background: linear-gradient(135deg, #1c1917 0%, var(--color-brand-900) 40%, var(--color-brand-800) 70%, var(--color-brand-700) 100%);
       background-size: 300% 300%;
       animation: drift 20s ease-in-out infinite;
     }
