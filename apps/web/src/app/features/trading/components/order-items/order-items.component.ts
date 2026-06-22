@@ -365,8 +365,8 @@ import type {
             </tr>
           }
         </tbody>
-        <!-- Totals row -->
-        @if (rows().length > 0) {
+        <!-- Totals row (hidden for LIGHT users — no financial numbers) -->
+        @if (rows().length > 0 && canSeePrices()) {
           <tfoot>
             <tr class="border-t-2 border-gray-200 dark:border-line bg-gray-50/50 font-semibold dark:bg-surface-2">
               <td class="px-4 py-3 text-right text-gray-600 dark:text-ink-dim">Totals</td>
