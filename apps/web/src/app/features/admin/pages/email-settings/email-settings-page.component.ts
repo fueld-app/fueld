@@ -58,13 +58,13 @@ const DOC_LABELS: Record<DocumentType, string> = {
     <div class="space-y-8">
       <!-- Page header -->
       <div>
-        <h1 class="text-2xl font-bold text-gray-900">Email Settings</h1>
-        <p class="mt-1 text-sm text-gray-500">Configure email templates and default CC/BCC rules for outgoing documents.</p>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-ink">Email Settings</h1>
+        <p class="mt-1 text-sm text-gray-500 dark:text-muted">Configure email templates and default CC/BCC rules for outgoing documents.</p>
       </div>
 
       @if (loading()) {
         <div class="flex items-center justify-center py-20">
-          <svg class="h-8 w-8 animate-spin text-brand-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <svg class="h-8 w-8 animate-spin text-brand-600 dark:text-brand-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
           </svg>
@@ -80,26 +80,26 @@ const DOC_LABELS: Record<DocumentType, string> = {
               </svg>
             </div>
             <div>
-              <h2 class="text-lg font-semibold text-gray-900">Email Templates</h2>
-              <p class="mt-0.5 text-sm text-gray-600">
+              <h2 class="text-lg font-semibold text-gray-900 dark:text-ink">Email Templates</h2>
+              <p class="mt-0.5 text-sm text-gray-600 dark:text-ink-dim">
                 Define default subject line and body for each document type. Use
-                <code class="rounded bg-gray-100 px-1 py-0.5 text-xs font-mono text-brand-700" [textContent]="lbrace + lbrace + 'variable' + rbrace + rbrace"></code>
+                <code class="rounded bg-gray-100 dark:bg-surface-3 px-1 py-0.5 text-xs font-mono text-brand-700 dark:text-brand-400" [textContent]="lbrace + lbrace + 'variable' + rbrace + rbrace"></code>
                 placeholders.
               </p>
             </div>
           </div>
 
           <!-- Template variables reference -->
-          <div class="border-b border-gray-100 bg-gray-50/70 px-6 py-3">
+          <div class="border-b border-gray-100 dark:border-line bg-gray-50/70 px-6 py-3">
             <details>
-              <summary class="cursor-pointer text-sm font-medium text-gray-600 select-none">
+              <summary class="cursor-pointer text-sm font-medium text-gray-600 dark:text-ink-dim select-none">
                 Available template variables
               </summary>
               <div class="mt-2 grid grid-cols-2 gap-x-8 gap-y-1.5 text-sm">
                 @for (v of templateVariables(); track v.key) {
                   <div class="flex items-baseline gap-2">
-                    <code class="font-mono text-xs text-brand-700 shrink-0" [textContent]="wrapVar(v.key)"></code>
-                    <span class="text-gray-400 text-xs truncate">{{ v.label }}</span>
+                    <code class="font-mono text-xs text-brand-700 dark:text-brand-400 shrink-0" [textContent]="wrapVar(v.key)"></code>
+                    <span class="text-gray-400 dark:text-muted text-xs truncate">{{ v.label }}</span>
                   </div>
                 }
               </div>
@@ -108,15 +108,15 @@ const DOC_LABELS: Record<DocumentType, string> = {
 
           <!-- One section per document type -->
           @for (docType of docTypes; track docType) {
-            <div class="border-b border-gray-100 last:border-b-0">
+            <div class="border-b border-gray-100 dark:border-line last:border-b-0">
               <div class="px-6 py-4">
                 <div class="flex items-center justify-between mb-3">
-                  <h3 class="text-sm font-semibold text-gray-800">{{ docLabels[docType] }}</h3>
+                  <h3 class="text-sm font-semibold text-gray-800 dark:text-ink">{{ docLabels[docType] }}</h3>
                   @if (getTemplate(docType)) {
                     <button
                       type="button"
                       (click)="deleteTemplate(docType)"
-                      class="text-xs text-red-500 hover:text-red-700 font-medium"
+                      class="text-xs text-red-500 dark:text-red-300 hover:text-red-700 font-medium"
                     >
                       Remove template
                     </button>
@@ -126,7 +126,7 @@ const DOC_LABELS: Record<DocumentType, string> = {
                 <div class="space-y-3">
                   <!-- Subject -->
                   <div>
-                    <label class="block text-xs font-medium text-gray-500 mb-1">Subject template</label>
+                    <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Subject template</label>
                     <input
                       type="text"
                       [ngModel]="getSubject(docType)"
@@ -138,7 +138,7 @@ const DOC_LABELS: Record<DocumentType, string> = {
 
                   <!-- Body -->
                   <div>
-                    <label class="block text-xs font-medium text-gray-500 mb-1">Body template (HTML)</label>
+                    <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Body template (HTML)</label>
                     <textarea
                       [ngModel]="getBody(docType)"
                       (ngModelChange)="setBody(docType, $event)"
@@ -165,7 +165,7 @@ const DOC_LABELS: Record<DocumentType, string> = {
                       Save
                     </button>
                     @if (savedTemplate() === docType) {
-                      <span class="text-xs text-green-600 font-medium">✓ Saved</span>
+                      <span class="text-xs text-green-600 dark:text-green-400 font-medium">✓ Saved</span>
                     }
                   </div>
                 </div>
@@ -184,8 +184,8 @@ const DOC_LABELS: Record<DocumentType, string> = {
               </svg>
             </div>
             <div>
-              <h2 class="text-lg font-semibold text-gray-900">Default CC / BCC Rules</h2>
-              <p class="mt-0.5 text-sm text-gray-600">
+              <h2 class="text-lg font-semibold text-gray-900 dark:text-ink">Default CC / BCC Rules</h2>
+              <p class="mt-0.5 text-sm text-gray-600 dark:text-ink-dim">
                 Automatically add CC or BCC recipients when sending emails. Rules can be scoped
                 to a specific own company and/or document type, or apply globally.
               </p>
@@ -195,7 +195,7 @@ const DOC_LABELS: Record<DocumentType, string> = {
           <!-- Existing rules table -->
           <div class="overflow-x-auto">
             <table class="w-full text-sm text-left">
-              <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
+              <thead class="bg-gray-50 dark:bg-bg-2 text-xs text-gray-500 dark:text-muted uppercase tracking-wider">
                 <tr>
                   <th class="px-6 py-3">Type</th>
                   <th class="px-6 py-3">Email</th>
@@ -205,23 +205,23 @@ const DOC_LABELS: Record<DocumentType, string> = {
                   <th class="px-6 py-3"></th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-gray-100">
+              <tbody class="divide-y divide-gray-100 dark:divide-line">
                 @for (rule of rules(); track rule.id) {
                   <tr class="hover:bg-gray-50/50">
                     <td class="px-6 py-3">
                       <span
                         class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
                         [class]="rule.ruleType === 'CC'
-                          ? 'bg-blue-50 text-blue-700'
-                          : 'bg-amber-50 text-amber-700'"
+                          ? 'bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-400'
+                          : 'bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-400'"
                       >
                         {{ rule.ruleType }}
                       </span>
                     </td>
                     <td class="px-6 py-3 font-mono text-xs">{{ rule.email }}</td>
-                    <td class="px-6 py-3 text-gray-500">{{ rule.label || '—' }}</td>
-                    <td class="px-6 py-3 text-gray-500">{{ getCompanyName(rule.ownCompanyId) }}</td>
-                    <td class="px-6 py-3 text-gray-500">{{ rule.documentType ? docLabels[rule.documentType] : 'All' }}</td>
+                    <td class="px-6 py-3 text-gray-500 dark:text-muted">{{ rule.label || '—' }}</td>
+                    <td class="px-6 py-3 text-gray-500 dark:text-muted">{{ getCompanyName(rule.ownCompanyId) }}</td>
+                    <td class="px-6 py-3 text-gray-500 dark:text-muted">{{ rule.documentType ? docLabels[rule.documentType] : 'All' }}</td>
                     <td class="px-6 py-3 text-right">
                       <button
                         type="button"
@@ -237,7 +237,7 @@ const DOC_LABELS: Record<DocumentType, string> = {
                   </tr>
                 } @empty {
                   <tr>
-                    <td colspan="6" class="px-6 py-8 text-center text-gray-400">
+                    <td colspan="6" class="px-6 py-8 text-center text-gray-400 dark:text-muted">
                       No rules configured yet. Add one below.
                     </td>
                   </tr>
@@ -247,12 +247,12 @@ const DOC_LABELS: Record<DocumentType, string> = {
           </div>
 
           <!-- Add new rule -->
-          <div class="border-t border-gray-200 bg-gray-50/50 px-6 py-4">
-            <h3 class="text-sm font-medium text-gray-700 mb-3">Add rule</h3>
+          <div class="border-t border-gray-200 dark:border-line bg-gray-50/50 px-6 py-4">
+            <h3 class="text-sm font-medium text-gray-700 dark:text-ink-dim mb-3">Add rule</h3>
             <div class="flex flex-wrap items-end gap-3">
               <!-- Rule type -->
               <div>
-                <label class="block text-xs font-medium text-gray-500 mb-1">Type</label>
+                <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Type</label>
                 <select
                   [(ngModel)]="newRule.ruleType"
                   class="app-input"
@@ -264,7 +264,7 @@ const DOC_LABELS: Record<DocumentType, string> = {
 
               <!-- Email -->
               <div class="flex-1 min-w-[200px]">
-                <label class="block text-xs font-medium text-gray-500 mb-1">Email</label>
+                <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Email</label>
                 <input
                   type="email"
                   [(ngModel)]="newRule.email"
@@ -275,7 +275,7 @@ const DOC_LABELS: Record<DocumentType, string> = {
 
               <!-- Label -->
               <div class="min-w-[150px]">
-                <label class="block text-xs font-medium text-gray-500 mb-1">Label <span class="text-gray-400">(optional)</span></label>
+                <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Label <span class="text-gray-400 dark:text-muted">(optional)</span></label>
                 <input
                   type="text"
                   [(ngModel)]="newRule.label"
@@ -286,7 +286,7 @@ const DOC_LABELS: Record<DocumentType, string> = {
 
               <!-- Own Company -->
               <div class="min-w-[180px]">
-                <label class="block text-xs font-medium text-gray-500 mb-1">Own Company <span class="text-gray-400">(optional)</span></label>
+                <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Own Company <span class="text-gray-400 dark:text-muted">(optional)</span></label>
                 <select
                   [(ngModel)]="newRule.ownCompanyId"
                   class="app-input w-full"
@@ -300,7 +300,7 @@ const DOC_LABELS: Record<DocumentType, string> = {
 
               <!-- Document Type -->
               <div class="min-w-[160px]">
-                <label class="block text-xs font-medium text-gray-500 mb-1">Document Type <span class="text-gray-400">(optional)</span></label>
+                <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Document Type <span class="text-gray-400 dark:text-muted">(optional)</span></label>
                 <select
                   [(ngModel)]="newRule.documentType"
                   class="app-input w-full"

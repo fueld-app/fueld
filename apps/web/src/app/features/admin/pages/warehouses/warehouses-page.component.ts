@@ -52,8 +52,8 @@ const PRODUCT_TYPES: ProductType[] = [
   template: `
     <div>
       <div class="mb-6">
-        <h1 class="text-2xl font-bold text-gray-900">Warehouses & Inventory SKUs</h1>
-        <p class="mt-1 text-sm text-gray-500">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-ink">Warehouses & Inventory SKUs</h1>
+        <p class="mt-1 text-sm text-gray-500 dark:text-muted">
           Configure physical operations: enable companies for inventory, register warehouses,
           and manage tracked product/grade SKUs.
         </p>
@@ -61,13 +61,13 @@ const PRODUCT_TYPES: ProductType[] = [
 
       <!-- Own companies — physical ops toggle -->
       <section class="mb-8">
-        <h2 class="text-base font-semibold text-gray-900 mb-3">Physical-ops enabled companies</h2>
+        <h2 class="text-base font-semibold text-gray-900 dark:text-ink mb-3">Physical-ops enabled companies</h2>
         @if (ownCompaniesLoading()) {
-          <p class="text-sm text-gray-500">Loading…</p>
+          <p class="text-sm text-gray-500 dark:text-muted">Loading…</p>
         } @else {
-          <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm">
             <table class="min-w-full text-sm">
-              <thead class="bg-gray-50 text-xs uppercase tracking-wider text-gray-500">
+              <thead class="bg-gray-50 dark:bg-bg-2 text-xs uppercase tracking-wider text-gray-500 dark:text-muted">
                 <tr>
                   <th class="px-4 py-3 text-left">Company</th>
                   <th class="px-4 py-3 text-left">Country</th>
@@ -76,16 +76,16 @@ const PRODUCT_TYPES: ProductType[] = [
               </thead>
               <tbody>
                 @for (c of ownCompanies(); track c.id) {
-                  <tr class="border-t border-gray-100">
-                    <td class="px-4 py-3 font-medium text-gray-900">{{ c.name }}</td>
-                    <td class="px-4 py-3 text-gray-600">{{ c.country ?? '—' }}</td>
+                  <tr class="border-t border-gray-100 dark:border-line">
+                    <td class="px-4 py-3 font-medium text-gray-900 dark:text-ink">{{ c.name }}</td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">{{ c.country ?? '—' }}</td>
                     <td class="px-4 py-3 text-right">
                       <button
                         (click)="togglePhysicalOps(c.id, !isPhysicalOpsEnabled(c.id))"
                         class="inline-flex items-center gap-2 rounded-lg px-3 py-1 text-xs font-semibold transition-colors"
                         [class]="isPhysicalOpsEnabled(c.id)
-                          ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                          ? 'bg-emerald-100 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-200'
+                          : 'bg-gray-100 dark:bg-surface-3 text-gray-600 dark:text-ink-dim hover:bg-gray-200'"
                       >
                         <span class="inline-block h-2 w-2 rounded-full"
                           [class]="isPhysicalOpsEnabled(c.id) ? 'bg-emerald-500' : 'bg-gray-400'"></span>
@@ -103,25 +103,25 @@ const PRODUCT_TYPES: ProductType[] = [
       <!-- Warehouses -->
       <section class="mb-8">
         <div class="mb-3 flex items-center justify-between">
-          <h2 class="text-base font-semibold text-gray-900">Warehouses</h2>
+          <h2 class="text-base font-semibold text-gray-900 dark:text-ink">Warehouses</h2>
           <button
             (click)="openWarehouseForm()"
-            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 transition-colors"
+            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-800 transition-colors"
           >
             + Add warehouse
           </button>
         </div>
 
         @if (warehousesLoading()) {
-          <p class="text-sm text-gray-500">Loading…</p>
+          <p class="text-sm text-gray-500 dark:text-muted">Loading…</p>
         } @else if (warehouses().length === 0) {
-          <div class="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-6 py-10 text-center text-sm text-gray-500">
+          <div class="rounded-xl border border-dashed border-gray-300 dark:border-line-strong bg-gray-50 dark:bg-bg-2 px-6 py-10 text-center text-sm text-gray-500 dark:text-muted">
             No warehouses yet. Add your first one to start tracking stock.
           </div>
         } @else {
-          <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div class="overflow-x-auto rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm">
             <table class="min-w-full text-sm">
-              <thead class="bg-gray-50 text-xs uppercase tracking-wider text-gray-500">
+              <thead class="bg-gray-50 dark:bg-bg-2 text-xs uppercase tracking-wider text-gray-500 dark:text-muted">
                 <tr>
                   <th class="px-4 py-3 text-left">Name</th>
                   <th class="px-4 py-3 text-left">Owner</th>
@@ -134,18 +134,18 @@ const PRODUCT_TYPES: ProductType[] = [
               </thead>
               <tbody>
                 @for (w of warehouses(); track w.id) {
-                  <tr class="border-t border-gray-100">
-                    <td class="px-4 py-3 font-medium text-gray-900">{{ w.name }}</td>
-                    <td class="px-4 py-3 text-gray-600">{{ w.ownerCompanyName }}</td>
-                    <td class="px-4 py-3 text-gray-600">{{ w.vesselName ?? '—' }}</td>
-                    <td class="px-4 py-3 text-gray-600">{{ w.type }}</td>
+                  <tr class="border-t border-gray-100 dark:border-line">
+                    <td class="px-4 py-3 font-medium text-gray-900 dark:text-ink">{{ w.name }}</td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">{{ w.ownerCompanyName }}</td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">{{ w.vesselName ?? '—' }}</td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">{{ w.type }}</td>
                     <td class="px-4 py-3 text-center">
                       <button
                         (click)="updateWarehouseFlag(w.id, 'inventoryEnabled', !w.inventoryEnabled)"
                         class="inline-flex h-5 w-9 items-center rounded-full transition-colors"
                         [class]="w.inventoryEnabled ? 'bg-emerald-500' : 'bg-gray-300'"
                       >
-                        <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+                        <span class="inline-block h-4 w-4 transform rounded-full bg-white dark:bg-surface transition-transform"
                           [class]="w.inventoryEnabled ? 'translate-x-4' : 'translate-x-0.5'"></span>
                       </button>
                     </td>
@@ -155,7 +155,7 @@ const PRODUCT_TYPES: ProductType[] = [
                         class="inline-flex h-5 w-9 items-center rounded-full transition-colors"
                         [class]="w.allowManualReplenishment ? 'bg-emerald-500' : 'bg-gray-300'"
                       >
-                        <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+                        <span class="inline-block h-4 w-4 transform rounded-full bg-white dark:bg-surface transition-transform"
                           [class]="w.allowManualReplenishment ? 'translate-x-4' : 'translate-x-0.5'"></span>
                       </button>
                     </td>
@@ -165,7 +165,7 @@ const PRODUCT_TYPES: ProductType[] = [
                         class="inline-flex h-5 w-9 items-center rounded-full transition-colors"
                         [class]="w.active ? 'bg-emerald-500' : 'bg-gray-300'"
                       >
-                        <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+                        <span class="inline-block h-4 w-4 transform rounded-full bg-white dark:bg-surface transition-transform"
                           [class]="w.active ? 'translate-x-4' : 'translate-x-0.5'"></span>
                       </button>
                     </td>
@@ -180,25 +180,25 @@ const PRODUCT_TYPES: ProductType[] = [
       <!-- Inventory SKUs -->
       <section>
         <div class="mb-3 flex items-center justify-between">
-          <h2 class="text-base font-semibold text-gray-900">Inventory SKUs</h2>
+          <h2 class="text-base font-semibold text-gray-900 dark:text-ink">Inventory SKUs</h2>
           <button
             (click)="openSkuForm()"
-            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700 transition-colors"
+            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-800 transition-colors"
           >
             + Add SKU
           </button>
         </div>
 
         @if (skusLoading()) {
-          <p class="text-sm text-gray-500">Loading…</p>
+          <p class="text-sm text-gray-500 dark:text-muted">Loading…</p>
         } @else if (skus().length === 0) {
-          <div class="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-6 py-10 text-center text-sm text-gray-500">
+          <div class="rounded-xl border border-dashed border-gray-300 dark:border-line-strong bg-gray-50 dark:bg-bg-2 px-6 py-10 text-center text-sm text-gray-500 dark:text-muted">
             No SKUs yet. Add a tracked product/grade combination to start.
           </div>
         } @else {
-          <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div class="overflow-x-auto rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm">
             <table class="min-w-full text-sm">
-              <thead class="bg-gray-50 text-xs uppercase tracking-wider text-gray-500">
+              <thead class="bg-gray-50 dark:bg-bg-2 text-xs uppercase tracking-wider text-gray-500 dark:text-muted">
                 <tr>
                   <th class="px-4 py-3 text-left">Display name</th>
                   <th class="px-4 py-3 text-left">Product</th>
@@ -210,18 +210,18 @@ const PRODUCT_TYPES: ProductType[] = [
               </thead>
               <tbody>
                 @for (s of skus(); track s.id) {
-                  <tr class="border-t border-gray-100">
-                    <td class="px-4 py-3 font-medium text-gray-900">{{ s.displayName }}</td>
-                    <td class="px-4 py-3 text-gray-600">{{ s.productType }}</td>
-                    <td class="px-4 py-3 text-gray-600">{{ s.grade ?? '—' }}</td>
-                    <td class="px-4 py-3 text-gray-600">{{ s.baseUnit }}</td>
+                  <tr class="border-t border-gray-100 dark:border-line">
+                    <td class="px-4 py-3 font-medium text-gray-900 dark:text-ink">{{ s.displayName }}</td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">{{ s.productType }}</td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">{{ s.grade ?? '—' }}</td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">{{ s.baseUnit }}</td>
                     <td class="px-4 py-3 text-center">
                       <button
                         (click)="updateSkuFlag(s.id, 'inventoryTracked', !s.inventoryTracked)"
                         class="inline-flex h-5 w-9 items-center rounded-full transition-colors"
                         [class]="s.inventoryTracked ? 'bg-emerald-500' : 'bg-gray-300'"
                       >
-                        <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+                        <span class="inline-block h-4 w-4 transform rounded-full bg-white dark:bg-surface transition-transform"
                           [class]="s.inventoryTracked ? 'translate-x-4' : 'translate-x-0.5'"></span>
                       </button>
                     </td>
@@ -231,7 +231,7 @@ const PRODUCT_TYPES: ProductType[] = [
                         class="inline-flex h-5 w-9 items-center rounded-full transition-colors"
                         [class]="s.active ? 'bg-emerald-500' : 'bg-gray-300'"
                       >
-                        <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+                        <span class="inline-block h-4 w-4 transform rounded-full bg-white dark:bg-surface transition-transform"
                           [class]="s.active ? 'translate-x-4' : 'translate-x-0.5'"></span>
                       </button>
                     </td>
@@ -246,13 +246,13 @@ const PRODUCT_TYPES: ProductType[] = [
       <!-- Warehouse modal -->
       @if (showWarehouseForm()) {
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">New warehouse</h3>
+          <div class="w-full max-w-md rounded-xl bg-white dark:bg-surface p-6 shadow-xl">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-ink mb-4">New warehouse</h3>
             <div class="space-y-3">
               <label class="block">
-                <span class="text-xs font-medium text-gray-600">Owner company</span>
+                <span class="text-xs font-medium text-gray-600 dark:text-ink-dim">Owner company</span>
                 <select [ngModel]="newWarehouse.ownerCompanyId" (ngModelChange)="newWarehouse.ownerCompanyId = $event"
-                  class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                  class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm">
                   <option value="">Select…</option>
                   @for (c of physicalOpsCompanies(); track c.id) {
                     <option [value]="c.id">{{ c.name }}</option>
@@ -260,9 +260,9 @@ const PRODUCT_TYPES: ProductType[] = [
                 </select>
               </label>
               <label class="block">
-                <span class="text-xs font-medium text-gray-600">Type</span>
+                <span class="text-xs font-medium text-gray-600 dark:text-ink-dim">Type</span>
                 <select [(ngModel)]="newWarehouse.type" (ngModelChange)="onTypeChange()"
-                  class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                  class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm">
                   <option value="VESSEL">Vessel</option>
                   <option value="TERMINAL">Terminal</option>
                   <option value="SHORE_TANK">Shore tank</option>
@@ -271,7 +271,7 @@ const PRODUCT_TYPES: ProductType[] = [
               </label>
               @if (newWarehouse.type === 'VESSEL') {
                 <label class="block">
-                  <span class="text-xs font-medium text-gray-600">Vessel</span>
+                  <span class="text-xs font-medium text-gray-600 dark:text-ink-dim">Vessel</span>
                   <app-searchable-dropdown
                     class="mt-1 block"
                     [options]="vesselDropdownOptions()"
@@ -286,9 +286,9 @@ const PRODUCT_TYPES: ProductType[] = [
                 </label>
               } @else {
                 <label class="block">
-                  <span class="text-xs font-medium text-gray-600">Name</span>
+                  <span class="text-xs font-medium text-gray-600 dark:text-ink-dim">Name</span>
                   <input [(ngModel)]="newWarehouse.name" placeholder="e.g. Rotterdam Terminal"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                    class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm" />
                 </label>
               }
               <label class="flex items-center gap-2 text-sm">
@@ -301,11 +301,11 @@ const PRODUCT_TYPES: ProductType[] = [
               </label>
             </div>
             <div class="mt-5 flex justify-end gap-2">
-              <button (click)="closeWarehouseForm()" class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm">
+              <button (click)="closeWarehouseForm()" class="rounded-lg border border-gray-200 dark:border-line px-3 py-1.5 text-sm">
                 Cancel
               </button>
               <button (click)="submitWarehouse()" [disabled]="!canSubmitWarehouse() || warehouseSubmitting()"
-                class="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50">
+                class="rounded-lg bg-brand-700 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50">
                 {{ warehouseSubmitting() ? 'Creating…' : 'Create' }}
               </button>
             </div>
@@ -316,32 +316,32 @@ const PRODUCT_TYPES: ProductType[] = [
       <!-- SKU modal -->
       @if (showSkuForm()) {
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">New inventory SKU</h3>
+          <div class="w-full max-w-md rounded-xl bg-white dark:bg-surface p-6 shadow-xl">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-ink mb-4">New inventory SKU</h3>
             <div class="space-y-3">
               <label class="block">
-                <span class="text-xs font-medium text-gray-600">Product</span>
+                <span class="text-xs font-medium text-gray-600 dark:text-ink-dim">Product</span>
                 <select [(ngModel)]="newSku.productType"
-                  class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                  class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm">
                   @for (p of productTypes; track p) {
                     <option [value]="p">{{ p }}</option>
                   }
                 </select>
               </label>
               <label class="block">
-                <span class="text-xs font-medium text-gray-600">Grade (optional)</span>
+                <span class="text-xs font-medium text-gray-600 dark:text-ink-dim">Grade (optional)</span>
                 <input [(ngModel)]="newSku.grade" placeholder="e.g. RMG 380, 0.10% S"
-                  class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                  class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm" />
               </label>
               <label class="block">
-                <span class="text-xs font-medium text-gray-600">Display name (optional)</span>
+                <span class="text-xs font-medium text-gray-600 dark:text-ink-dim">Display name (optional)</span>
                 <input [(ngModel)]="newSku.displayName" placeholder="Defaults to product + grade"
-                  class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                  class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm" />
               </label>
               <label class="block">
-                <span class="text-xs font-medium text-gray-600">Base unit</span>
+                <span class="text-xs font-medium text-gray-600 dark:text-ink-dim">Base unit</span>
                 <select [(ngModel)]="newSku.baseUnit" [disabled]="configuredUnits().length === 0"
-                  class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-400">
+                  class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-400">
                   @if (configuredUnits().length === 0) {
                     <option value="">No units configured</option>
                   } @else {
@@ -357,11 +357,11 @@ const PRODUCT_TYPES: ProductType[] = [
               </label>
             </div>
             <div class="mt-5 flex justify-end gap-2">
-              <button (click)="closeSkuForm()" class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm">
+              <button (click)="closeSkuForm()" class="rounded-lg border border-gray-200 dark:border-line px-3 py-1.5 text-sm">
                 Cancel
               </button>
               <button (click)="submitSku()" [disabled]="!canSubmitSku()"
-                class="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50">
+                class="rounded-lg bg-brand-700 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50">
                 Create
               </button>
             </div>

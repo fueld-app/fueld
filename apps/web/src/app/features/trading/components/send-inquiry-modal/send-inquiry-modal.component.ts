@@ -128,24 +128,24 @@ export interface SendInquiryWhatsAppPayload {
       >
         <!-- Modal panel -->
         <div
-          class="w-full max-w-4xl rounded-2xl bg-white shadow-2xl flex flex-col max-h-[90vh]"
+          class="w-full max-w-4xl rounded-2xl bg-white dark:bg-surface shadow-2xl flex flex-col max-h-[90vh]"
           role="dialog"
           aria-modal="true"
           aria-labelledby="inquiry-modal-title"
         >
           <!-- Header -->
-          <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4 shrink-0">
+          <div class="flex items-center justify-between border-b border-gray-200 dark:border-line px-6 py-4 shrink-0">
             <div>
-              <h2 id="inquiry-modal-title" class="text-lg font-semibold text-gray-900">
+              <h2 id="inquiry-modal-title" class="text-lg font-semibold text-gray-900 dark:text-ink">
                 Send Inquiry to Suppliers
               </h2>
-              <p class="text-sm text-gray-500 mt-0.5">
+              <p class="text-sm text-gray-500 dark:text-muted mt-0.5">
                 Select suppliers at {{ portName() }} to send RFQ emails or WhatsApp messages
               </p>
             </div>
             <button
               (click)="close()"
-              class="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              class="rounded-md p-1 text-gray-400 dark:text-muted hover:bg-gray-100 dark:hover:bg-surface-tint-strong hover:text-gray-600"
               aria-label="Close"
             >
               <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -160,21 +160,21 @@ export interface SendInquiryWhatsAppPayload {
             <!-- Suppliers list -->
             <div>
               <div class="flex items-center justify-between mb-3">
-                <label class="block text-sm font-medium text-gray-700">
+                <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">
                   Suppliers ({{ selectedCount() }}/{{ suppliers().length }} selected)
                 </label>
                 <div class="flex items-center gap-3">
                   <button
                     type="button"
-                    class="text-sm font-medium text-brand-600 hover:text-brand-700"
+                    class="text-sm font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700"
                     (click)="showAddSupplier.set(!showAddSupplier())"
                   >
                     {{ showAddSupplier() ? 'Cancel' : '+ Add supplier' }}
                   </button>
-                  <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                  <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-ink-dim cursor-pointer">
                     <input
                       type="checkbox"
-                      class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                      class="h-4 w-4 rounded border-gray-300 dark:border-line-strong text-brand-600 dark:text-brand-400 focus:ring-brand-600"
                       [checked]="allSelected()"
                       [indeterminate]="someSelected() && !allSelected()"
                       (change)="toggleAll()"
@@ -186,48 +186,48 @@ export interface SendInquiryWhatsAppPayload {
 
               <!-- Add supplier inline search -->
               @if (showAddSupplier()) {
-                <div class="mb-3 rounded-lg border border-brand-200 bg-brand-50/50 p-3 space-y-2">
+                <div class="mb-3 rounded-lg border border-brand-200 dark:border-brand-500/30 bg-brand-50/50 p-3 space-y-2">
                   <div class="relative">
                     <input
                       type="text"
-                      class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                      class="block w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm text-gray-900 dark:text-ink focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
                       [ngModel]="addSupplierQuery()"
                       (ngModelChange)="onAddSupplierSearch($event)"
                       placeholder="Search existing companies by name..."
                     />
                     @if (addSupplierLoading()) {
-                      <svg class="absolute right-3 top-2.5 h-4 w-4 animate-spin text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <svg class="absolute right-3 top-2.5 h-4 w-4 animate-spin text-gray-400 dark:text-muted" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
                     }
                   </div>
                   @if (addSupplierResults().length > 0) {
-                    <div class="max-h-40 overflow-y-auto rounded border border-gray-200 bg-white divide-y divide-gray-100">
+                    <div class="max-h-40 overflow-y-auto rounded border border-gray-200 dark:border-line bg-white dark:bg-surface divide-y divide-gray-100 dark:divide-line">
                       @for (company of addSupplierResults(); track company.localId) {
                         <button
                           type="button"
-                          class="flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-gray-50 transition-colors"
+                          class="flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors"
                           [disabled]="isAlreadyPortSupplier(company.localId)"
                           [class.opacity-50]="isAlreadyPortSupplier(company.localId)"
                           (click)="addCompanyAsSupplier(company.localId, company.name)"
                         >
                           <div>
-                            <span class="font-medium text-gray-900">{{ company.name }}</span>
+                            <span class="font-medium text-gray-900 dark:text-ink">{{ company.name }}</span>
                             @if (company.country) {
-                              <span class="ml-1 text-xs text-gray-500">{{ company.country }}</span>
+                              <span class="ml-1 text-xs text-gray-500 dark:text-muted">{{ company.country }}</span>
                             }
                           </div>
                           @if (isAlreadyPortSupplier(company.localId)) {
-                            <span class="text-xs text-gray-400">Already added</span>
+                            <span class="text-xs text-gray-400 dark:text-muted">Already added</span>
                           } @else {
-                            <span class="text-xs font-medium text-brand-600">Add</span>
+                            <span class="text-xs font-medium text-brand-600 dark:text-brand-400">Add</span>
                           }
                         </button>
                       }
                     </div>
                   } @else if (addSupplierQuery().length >= 2 && !addSupplierLoading()) {
-                    <p class="text-xs text-gray-500 px-1">No matching companies found. Create the company first in the Companies section.</p>
+                    <p class="text-xs text-gray-500 dark:text-muted px-1">No matching companies found. Create the company first in the Companies section.</p>
                   }
                 </div>
               }
@@ -236,7 +236,7 @@ export interface SendInquiryWhatsAppPayload {
                 <div class="mb-3">
                   <input
                     type="text"
-                    class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                    class="block w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm text-gray-900 dark:text-ink focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
                     [ngModel]="supplierFilter()"
                     (ngModelChange)="supplierFilter.set($event)"
                     placeholder="Filter suppliers, contacts, emails, or products"
@@ -245,7 +245,7 @@ export interface SendInquiryWhatsAppPayload {
               }
 
               @if (loadingSuppliers()) {
-                <div class="flex items-center justify-center py-8 text-gray-400">
+                <div class="flex items-center justify-center py-8 text-gray-400 dark:text-muted">
                   <svg class="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -253,35 +253,35 @@ export interface SendInquiryWhatsAppPayload {
                   Loading suppliers...
                 </div>
               } @else if (suppliers().length === 0) {
-                <div class="text-center py-8 text-gray-400 text-sm">
+                <div class="text-center py-8 text-gray-400 dark:text-muted text-sm">
                   No suppliers registered for this port.
                   <br/>
                   Add port suppliers via the Places section.
                 </div>
               } @else if (filteredSuppliers().length === 0) {
-                <div class="rounded-lg border border-dashed border-gray-200 px-4 py-6 text-center text-sm text-gray-400">
+                <div class="rounded-lg border border-dashed border-gray-200 dark:border-line px-4 py-6 text-center text-sm text-gray-400 dark:text-muted">
                   No suppliers match the current filter.
                 </div>
               } @else {
-                <div class="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-64 overflow-y-auto">
+                <div class="border border-gray-200 dark:border-line rounded-lg divide-y divide-gray-100 dark:divide-line max-h-64 overflow-y-auto">
                   @for (s of filteredSuppliers(); track s.portSupplierId) {
                     <label
-                      class="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors"
+                      class="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-surface-tint cursor-pointer transition-colors"
                       [class.bg-brand-50]="s.selected"
                       [class.opacity-60]="!s.email && !s.emailOverride"
                     >
                       <input
                         type="checkbox"
-                        class="h-4 w-4 mt-0.5 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                        class="h-4 w-4 mt-0.5 rounded border-gray-300 dark:border-line-strong text-brand-600 dark:text-brand-400 focus:ring-brand-600"
                         [checked]="s.selected"
                         (change)="toggleSupplier(s)"
                         [disabled]="!s.email && !s.emailOverride"
                       />
                       <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-2">
-                          <span class="text-sm font-medium text-gray-900 truncate">{{ s.supplierName }}</span>
+                          <span class="text-sm font-medium text-gray-900 dark:text-ink truncate">{{ s.supplierName }}</span>
                           @if (isRecommendedSupplier(s)) {
-                            <span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                            <span class="inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
                               {{ recommendationLabel(s) }}
                             </span>
                           }
@@ -293,14 +293,14 @@ export interface SendInquiryWhatsAppPayload {
                           }
                         </div>
                         @if (s.contactName) {
-                          <div class="text-xs text-gray-500 mt-0.5">{{ s.contactName }}</div>
+                          <div class="text-xs text-gray-500 dark:text-muted mt-0.5">{{ s.contactName }}</div>
                         }
                         @if (s.companyEmails.length || s.contacts.length) {
-                          <div class="mt-1 flex items-center gap-3 text-[11px] text-gray-500">
+                          <div class="mt-1 flex items-center gap-3 text-[11px] text-gray-500 dark:text-muted">
                             <span>{{ recipientOptionCount(s) }} recipient option{{ recipientOptionCount(s) === 1 ? '' : 's' }}</span>
                             <button
                               type="button"
-                              class="font-medium text-brand-600 hover:text-brand-700"
+                              class="font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700"
                               (click)="toggleExpanded(s, $event)"
                             >
                               {{ s.expanded ? 'Hide recipient tree' : 'Show recipient tree' }}
@@ -310,7 +310,7 @@ export interface SendInquiryWhatsAppPayload {
                         @if (s.products && s.products.length > 0) {
                           <div class="flex flex-wrap gap-1 mt-1">
                             @for (p of s.products; track p) {
-                              <span class="inline-flex items-center rounded-md bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600">
+                              <span class="inline-flex items-center rounded-md bg-gray-100 dark:bg-surface-3 px-1.5 py-0.5 text-xs text-gray-600 dark:text-ink-dim">
                                 {{ p }}
                               </span>
                             }
@@ -319,37 +319,37 @@ export interface SendInquiryWhatsAppPayload {
                         @if (hasPerformanceStats(s)) {
                           <div class="mt-1.5 flex flex-wrap gap-1.5">
                             @if (s.performance.deliveredCountOverall > 0) {
-                              <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-200">
+                              <span class="inline-flex items-center rounded-full bg-emerald-50 dark:bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-200 dark:ring-emerald-500/30">
                                 {{ s.performance.deliveredCountOverall }} delivered
                               </span>
                             }
                             @if (s.performance.deliveredCountAtPlace > 0) {
-                              <span class="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-blue-200">
+                              <span class="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-500/15 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-400 ring-1 ring-blue-200 dark:ring-blue-500/30">
                                 {{ s.performance.deliveredCountAtPlace }} at this place
                               </span>
                             }
                             @if (s.performance.quotedCount > 0) {
-                              <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-amber-200">
+                              <span class="inline-flex items-center rounded-full bg-amber-50 dark:bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-500/30">
                                 {{ s.performance.quotedCount }} quoted
                               </span>
                             }
                             @if (quoteRateLabel(s)) {
-                              <span class="inline-flex items-center rounded-full bg-fuchsia-50 px-2 py-0.5 text-[10px] font-medium text-fuchsia-700 ring-1 ring-fuchsia-200">
+                              <span class="inline-flex items-center rounded-full bg-fuchsia-50 dark:bg-fuchsia-500/15 px-2 py-0.5 text-[10px] font-medium text-fuchsia-700 dark:text-fuchsia-400 ring-1 ring-fuchsia-200 dark:ring-fuchsia-500/30">
                                 {{ quoteRateLabel(s) }}
                               </span>
                             }
                             @if (averageResponseLabel(s)) {
-                              <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-amber-200">
+                              <span class="inline-flex items-center rounded-full bg-amber-50 dark:bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-500/30">
                                 {{ averageResponseLabel(s) }}
                               </span>
                             }
                             @if (deliverabilityLabel(s)) {
-                              <span class="inline-flex items-center rounded-full bg-teal-50 px-2 py-0.5 text-[10px] font-medium text-teal-700 ring-1 ring-teal-200">
+                              <span class="inline-flex items-center rounded-full bg-teal-50 dark:bg-teal-500/15 px-2 py-0.5 text-[10px] font-medium text-teal-700 dark:text-teal-400 ring-1 ring-teal-200 dark:ring-teal-500/30">
                                 {{ deliverabilityLabel(s) }}
                               </span>
                             }
                             @if (performanceSummary(s)) {
-                              <span class="inline-flex items-center rounded-full bg-gray-50 px-2 py-0.5 text-[10px] font-medium text-gray-600 ring-1 ring-gray-200">
+                              <span class="inline-flex items-center rounded-full bg-gray-50 dark:bg-bg-2 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:text-ink-dim ring-1 ring-gray-200 dark:ring-line">
                                 {{ performanceSummary(s) }}
                               </span>
                             }
@@ -360,7 +360,7 @@ export interface SendInquiryWhatsAppPayload {
                           @if (s.email || s.emailOverride) {
                             <input
                               type="email"
-                              class="w-full text-xs rounded border-gray-200 bg-gray-50 px-2 py-1 text-gray-600 focus:bg-white focus:border-brand-400 focus:ring-1 focus:ring-brand-300"
+                              class="w-full text-xs rounded border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 px-2 py-1 text-gray-600 dark:text-ink-dim focus:bg-white dark:focus:bg-surface focus:border-brand-400 focus:ring-1 focus:ring-brand-300"
                               [value]="s.emailOverride || s.email || ''"
                               (input)="onEmailEdit(s, $event)"
                               (click)="$event.stopPropagation()"
@@ -371,8 +371,8 @@ export interface SendInquiryWhatsAppPayload {
                           }
                         </div>
                         @if (resolvedRecipientEmail(s)) {
-                          <div class="mt-1 text-[11px] text-gray-500">
-                            Using: <span class="font-medium text-gray-700">{{ resolvedRecipientEmail(s) }}</span>
+                          <div class="mt-1 text-[11px] text-gray-500 dark:text-muted">
+                            Using: <span class="font-medium text-gray-700 dark:text-ink-dim">{{ resolvedRecipientEmail(s) }}</span>
                             @if (resolvedRecipientLabel(s)) {
                               <span> • {{ resolvedRecipientLabel(s) }}</span>
                             }
@@ -380,10 +380,10 @@ export interface SendInquiryWhatsAppPayload {
                         }
                         <!-- CC company email checkbox -->
                         @if (s.selected && s.contactId && ccCompanyEmailAddress(s)) {
-                          <label class="mt-1.5 flex items-center gap-2 text-[11px] text-gray-600 cursor-pointer" (click)="$event.stopPropagation()">
+                          <label class="mt-1.5 flex items-center gap-2 text-[11px] text-gray-600 dark:text-ink-dim cursor-pointer" (click)="$event.stopPropagation()">
                             <input
                               type="checkbox"
-                              class="h-3.5 w-3.5 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                              class="h-3.5 w-3.5 rounded border-gray-300 dark:border-line-strong text-brand-600 dark:text-brand-400 focus:ring-brand-600"
                               [checked]="s.ccCompanyEmail"
                               (change)="toggleCcCompanyEmail(s)"
                             />
@@ -395,7 +395,7 @@ export interface SendInquiryWhatsAppPayload {
                           <div class="mt-1.5" (click)="$event.stopPropagation()">
                             @if (s.personalNote) {
                               <textarea
-                                class="w-full text-xs rounded border-gray-200 bg-gray-50 px-2 py-1.5 text-gray-600 focus:bg-white focus:border-brand-400 focus:ring-1 focus:ring-brand-300 resize-none"
+                                class="w-full text-xs rounded border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 px-2 py-1.5 text-gray-600 dark:text-ink-dim focus:bg-white dark:focus:bg-surface focus:border-brand-400 focus:ring-1 focus:ring-brand-300 resize-none"
                                 rows="2"
                                 [value]="s.personalNote"
                                 (input)="onPersonalNoteEdit(s, $event)"
@@ -404,7 +404,7 @@ export interface SendInquiryWhatsAppPayload {
                             } @else {
                               <button
                                 type="button"
-                                class="text-[11px] font-medium text-brand-600 hover:text-brand-700"
+                                class="text-[11px] font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700"
                                 (click)="enablePersonalNote(s)"
                               >
                                 + Add personal note
@@ -415,7 +415,7 @@ export interface SendInquiryWhatsAppPayload {
                         <div class="mt-2">
                           <input
                             type="tel"
-                            class="w-full text-xs rounded border-gray-200 bg-gray-50 px-2 py-1 text-gray-600 focus:bg-white focus:border-green-400 focus:ring-1 focus:ring-green-300 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+                            class="w-full text-xs rounded border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 px-2 py-1 text-gray-600 dark:text-ink-dim focus:bg-white dark:focus:bg-surface focus:border-green-400 focus:ring-1 focus:ring-green-300 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
                             [value]="resolvedWhatsAppPhone(s)"
                             (input)="onPhoneEdit(s, $event)"
                             (click)="$event.stopPropagation()"
@@ -423,24 +423,24 @@ export interface SendInquiryWhatsAppPayload {
                             [disabled]="!waLinked()"
                           />
                           @if (waLinked() && resolvedWhatsAppPhone(s)) {
-                            <div class="mt-1 text-[11px] text-gray-500">
-                              WhatsApp: <span class="font-medium text-gray-700">{{ resolvedWhatsAppPhone(s) }}</span>
+                            <div class="mt-1 text-[11px] text-gray-500 dark:text-muted">
+                              WhatsApp: <span class="font-medium text-gray-700 dark:text-ink-dim">{{ resolvedWhatsAppPhone(s) }}</span>
                               @if (resolvedWhatsAppLabel(s)) {
                                 <span> • {{ resolvedWhatsAppLabel(s) }}</span>
                               }
                             </div>
                           } @else if (waLinked() && whatsappOptionCount(s) > 0) {
-                            <div class="mt-1 text-[11px] text-gray-500">Choose a contact phone below or enter one manually.</div>
+                            <div class="mt-1 text-[11px] text-gray-500 dark:text-muted">Choose a contact phone below or enter one manually.</div>
                           } @else if (!waLinked()) {
-                            <div class="mt-1 text-[11px] text-gray-400">Link WhatsApp in Settings to send inquiries here.</div>
+                            <div class="mt-1 text-[11px] text-gray-400 dark:text-muted">Link WhatsApp in Settings to send inquiries here.</div>
                           }
                         </div>
                         @if (s.expanded && (s.companyEmails.length || s.contacts.length)) {
-                          <div class="mt-3 space-y-3 rounded-lg border border-gray-200 bg-white/80 p-3" (click)="$event.stopPropagation()">
+                          <div class="mt-3 space-y-3 rounded-lg border border-gray-200 dark:border-line bg-white/80 p-3" (click)="$event.stopPropagation()">
                             @if (s.companyEmails.length) {
                               <div>
-                                <div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Company emails</div>
-                                <div class="space-y-1.5 border-l border-gray-200 pl-3">
+                                <div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Company emails</div>
+                                <div class="space-y-1.5 border-l border-gray-200 dark:border-line pl-3">
                                   @for (companyEmail of s.companyEmails; track companyEmail.email) {
                                     <button
                                       type="button"
@@ -456,12 +456,12 @@ export interface SendInquiryWhatsAppPayload {
                                         [class.border-brand-500]="isSelectedRecipientOption(s, companyEmail.email, null)"
                                         [class.border-gray-300]="!isSelectedRecipientOption(s, companyEmail.email, null)">
                                         @if (isSelectedRecipientOption(s, companyEmail.email, null)) {
-                                          <span class="h-2 w-2 rounded-full bg-brand-600"></span>
+                                          <span class="h-2 w-2 rounded-full bg-brand-700"></span>
                                         }
                                       </span>
                                       <div class="min-w-0 flex-1">
-                                        <div class="truncate text-xs font-medium text-gray-800">{{ companyEmail.email }}</div>
-                                        <div class="text-[11px] text-gray-500">
+                                        <div class="truncate text-xs font-medium text-gray-800 dark:text-ink">{{ companyEmail.email }}</div>
+                                        <div class="text-[11px] text-gray-500 dark:text-muted">
                                           {{ formatEmailType(companyEmail.emailType) }}{{ companyEmail.isPrimary ? ' • Primary' : '' }}
                                         </div>
                                       </div>
@@ -473,8 +473,8 @@ export interface SendInquiryWhatsAppPayload {
 
                             @if (s.contacts.length) {
                               <div>
-                                <div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Contacts</div>
-                                <div class="space-y-1.5 border-l border-gray-200 pl-3">
+                                <div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Contacts</div>
+                                <div class="space-y-1.5 border-l border-gray-200 dark:border-line pl-3">
                                   @for (contact of s.contacts; track contact.id) {
                                     <button
                                       type="button"
@@ -491,17 +491,17 @@ export interface SendInquiryWhatsAppPayload {
                                         [class.border-brand-500]="contact.email && isSelectedRecipientOption(s, contact.email, contact.id)"
                                         [class.border-gray-300]="!contact.email || !isSelectedRecipientOption(s, contact.email, contact.id)">
                                         @if (contact.email && isSelectedRecipientOption(s, contact.email, contact.id)) {
-                                          <span class="h-2 w-2 rounded-full bg-brand-600"></span>
+                                          <span class="h-2 w-2 rounded-full bg-brand-700"></span>
                                         }
                                       </span>
                                       <div class="min-w-0 flex-1">
-                                        <div class="truncate text-xs font-medium text-gray-800">{{ contact.name }}</div>
-                                        <div class="text-[11px] text-gray-500">{{ contact.role || 'Contact person' }}</div>
+                                        <div class="truncate text-xs font-medium text-gray-800 dark:text-ink">{{ contact.name }}</div>
+                                        <div class="text-[11px] text-gray-500 dark:text-muted">{{ contact.role || 'Contact person' }}</div>
                                         @if (contact.email) {
-                                          <div class="truncate text-[11px] text-gray-600">{{ contact.email }}</div>
+                                          <div class="truncate text-[11px] text-gray-600 dark:text-ink-dim">{{ contact.email }}</div>
                                         }
                                         @if (contact.phone) {
-                                          <div class="truncate text-[11px] text-gray-600">{{ contact.phone }}</div>
+                                          <div class="truncate text-[11px] text-gray-600 dark:text-ink-dim">{{ contact.phone }}</div>
                                         }
                                         @if (!contact.email && !contact.phone) {
                                           <div class="text-[11px] text-red-400">No email on file</div>
@@ -510,7 +510,7 @@ export interface SendInquiryWhatsAppPayload {
                                       @if (contact.phone) {
                                         <button
                                           type="button"
-                                          class="self-center text-[11px] font-medium text-green-600 hover:text-green-700 disabled:cursor-not-allowed disabled:text-gray-300"
+                                          class="self-center text-[11px] font-medium text-green-600 dark:text-green-400 hover:text-green-700 disabled:cursor-not-allowed disabled:text-gray-300"
                                           (click)="applySupplierPhone(s, contact.phone, contact.id, contact.name, $event)"
                                           [disabled]="!waLinked()"
                                         >
@@ -525,7 +525,7 @@ export interface SendInquiryWhatsAppPayload {
                           </div>
                         }
                         @if (s.inquirySentAt) {
-                          <div class="text-xs text-gray-400 mt-0.5">
+                          <div class="text-xs text-gray-400 dark:text-muted mt-0.5">
                             Sent {{ formatDate(s.inquirySentAt) }}
                           </div>
                         }
@@ -538,11 +538,11 @@ export interface SendInquiryWhatsAppPayload {
 
             <!-- Subject -->
             <div>
-              <label for="inquiry-subject" class="block text-sm font-medium text-gray-700">Subject</label>
+              <label for="inquiry-subject" class="block text-sm font-medium text-gray-700 dark:text-ink-dim">Subject</label>
               <input
                 id="inquiry-subject"
                 type="text"
-                class="mt-1 block w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                class="mt-1 block w-full rounded-lg border border-gray-300 dark:border-line-strong px-3.5 py-2.5 text-sm text-gray-900 dark:text-ink focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
                 [ngModel]="subject()"
                 (ngModelChange)="subject.set($event)"
               />
@@ -559,7 +559,7 @@ export interface SendInquiryWhatsAppPayload {
 
             <!-- Additional recipients -->
             <div>
-              <label class="block text-sm font-medium text-gray-700">Additional recipients</label>
+              <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">Additional recipients</label>
               <div class="mt-1">
                 <app-email-tag-input
                   #recipientInput
@@ -568,13 +568,13 @@ export interface SendInquiryWhatsAppPayload {
                   (tagsChange)="recipientTags.set($event)"
                 />
               </div>
-              <p class="mt-2 text-xs leading-5 text-gray-500">Each address here receives its own separate email, just like a selected supplier.</p>
+              <p class="mt-2 text-xs leading-5 text-gray-500 dark:text-muted">Each address here receives its own separate email, just like a selected supplier.</p>
             </div>
 
             <!-- Body editor -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Email Body</label>
-              <p class="mb-2 text-xs leading-5 text-gray-500">
+              <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1">Email Body</label>
+              <p class="mb-2 text-xs leading-5 text-gray-500 dark:text-muted">
                 The content you edit here is the email body that will be sent. Recipient placeholders like name, senderName, and companyName are resolved separately for each recipient when sending.
               </p>
               <app-inquiry-body-editor
@@ -585,21 +585,21 @@ export interface SendInquiryWhatsAppPayload {
 
             @if (htmlBody() || whatsappPreviewText()) {
               <details class="group">
-                <summary class="cursor-pointer text-sm text-gray-500 hover:text-gray-700 select-none">
+                <summary class="cursor-pointer text-sm text-gray-500 dark:text-muted hover:text-gray-700 select-none">
                   Preview message
                   @if (previewRecipientSummary()) {
-                    <span class="text-gray-400"> • {{ previewRecipientSummary() }}</span>
+                    <span class="text-gray-400 dark:text-muted"> • {{ previewRecipientSummary() }}</span>
                   }
                 </summary>
-                <div class="mt-3 space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <div class="mt-3 space-y-3 rounded-xl border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 p-4">
                   @if (previewCandidates().length > 1) {
                     <div>
-                      <label for="preview-recipient" class="block text-xs font-medium uppercase tracking-[0.08em] text-gray-500">
+                      <label for="preview-recipient" class="block text-xs font-medium uppercase tracking-[0.08em] text-gray-500 dark:text-muted">
                         Preview recipient
                       </label>
                       <select
                         id="preview-recipient"
-                        class="fueld-select-no-chevron mt-1 block w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                        class="fueld-select-no-chevron mt-1 block w-full appearance-none rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-2 text-sm text-gray-900 dark:text-ink focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
                         [ngModel]="previewRecipientId()"
                         (ngModelChange)="previewRecipientId.set($event)"
                       >
@@ -610,7 +610,7 @@ export interface SendInquiryWhatsAppPayload {
                     </div>
                   }
 
-                  <div class="flex items-center gap-2 border-b border-gray-200 pb-2">
+                  <div class="flex items-center gap-2 border-b border-gray-200 dark:border-line pb-2">
                     <button
                       type="button"
                       class="rounded-full px-3 py-1.5 text-sm font-medium transition-colors"
@@ -640,18 +640,18 @@ export interface SendInquiryWhatsAppPayload {
                   </div>
 
                   @if (activePreviewTab() === 'email') {
-                    <div class="rounded-lg border border-gray-200 bg-white p-4">
+                    <div class="rounded-lg border border-gray-200 dark:border-line bg-white dark:bg-surface p-4">
                       @if (hasPreviewEmail()) {
-                        <div class="mb-3 text-xs text-gray-500">
+                        <div class="mb-3 text-xs text-gray-500 dark:text-muted">
                           Preview of the email for {{ previewRecipientSummary() || 'the selected supplier' }}
                         </div>
                         <iframe class="inquiry-email-canvas" [srcdoc]="previewEmailHtml()" sandbox="" style="width:100%;height:320px;border:0;background:#fff;display:block" title="Email preview"></iframe>
                       } @else {
-                        <div class="text-sm text-gray-500">This recipient does not currently have an email destination selected.</div>
+                        <div class="text-sm text-gray-500 dark:text-muted">This recipient does not currently have an email destination selected.</div>
                       }
                     </div>
                   } @else {
-                    <div class="rounded-2xl border border-green-100 bg-[#e8f5e9] p-4 shadow-sm">
+                    <div class="rounded-2xl border border-green-100 dark:border-green-500/25 bg-[#e8f5e9] p-4 shadow-sm">
                       @if (hasPreviewWhatsApp()) {
                         <div class="mb-3 flex items-center gap-2 text-xs text-green-800/70">
                           <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-green-600 text-white font-semibold">
@@ -660,7 +660,7 @@ export interface SendInquiryWhatsAppPayload {
                           <span>Preview of the message sent directly to {{ previewRecipientSummary() || 'the selected supplier' }}</span>
                         </div>
                         <div class="rounded-2xl bg-white/70 px-4 py-3">
-                          <pre class="whitespace-pre-wrap break-words font-sans text-[13px] leading-6 text-gray-800">{{ whatsappPreviewText() }}</pre>
+                          <pre class="whitespace-pre-wrap break-words font-sans text-[13px] leading-6 text-gray-800 dark:text-ink">{{ whatsappPreviewText() }}</pre>
                         </div>
                       } @else {
                         <div class="text-sm text-green-900/70">This recipient does not currently have a WhatsApp destination selected.</div>
@@ -673,8 +673,8 @@ export interface SendInquiryWhatsAppPayload {
           </div>
 
           <!-- Footer -->
-          <div class="flex items-center justify-between border-t border-gray-200 px-6 py-4 shrink-0 bg-gray-50 rounded-b-2xl">
-            <span class="text-sm text-gray-500">
+          <div class="flex items-center justify-between border-t border-gray-200 dark:border-line px-6 py-4 shrink-0 bg-gray-50 dark:bg-bg-2 rounded-b-2xl">
+            <span class="text-sm text-gray-500 dark:text-muted">
               @if (totalRecipientCount() > 0) {
                 {{ totalRecipientCount() }} email{{ totalRecipientCount() === 1 ? '' : 's' }} will be sent
                 @if (selectedWhatsAppCount() > 0) {
@@ -688,14 +688,14 @@ export interface SendInquiryWhatsAppPayload {
               <button
                 type="button"
                 (click)="copyBodyText()"
-                class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 dark:border-line-strong px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors"
                 title="Copy RFQ summary"
               >
                 @if (copySuccess()) {
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-600" viewBox="0 0 20 20" fill="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-600 dark:text-green-400" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
                   </svg>
-                  <span class="text-green-600">Copied</span>
+                  <span class="text-green-600 dark:text-green-400">Copied</span>
                 } @else {
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                     <path d="M8 2a1 1 0 000 2h2a1 1 0 100-2H8z" />
@@ -728,8 +728,8 @@ export interface SendInquiryWhatsAppPayload {
                 type="button"
                 (click)="send()"
                 [disabled]="sending() || totalRecipientCount() === 0 || !subject()"
-                class="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white
-                  hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                class="inline-flex items-center gap-2 rounded-lg bg-brand-700 px-5 py-2 text-sm font-semibold text-white
+                  hover:bg-brand-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 @if (sending()) {
                   <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

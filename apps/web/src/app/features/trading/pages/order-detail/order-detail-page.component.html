@@ -12,11 +12,11 @@
   [lastSaved]="lastSaved()"
 >
   <span subtitle-extra class="flex items-center gap-2">
-    <span class="text-xs text-gray-500">Responsible:</span>
+    <span class="text-xs text-gray-500 dark:text-muted">Responsible:</span>
     <select
       [ngModel]="order()?.salesRepId ?? ''"
       (ngModelChange)="onResponsibleUserChange($event)"
-      class="fueld-select-no-chevron appearance-none rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+      class="fueld-select-no-chevron appearance-none rounded-md border border-gray-200 dark:border-line bg-white dark:bg-surface px-2 py-1 text-xs text-gray-700 dark:text-ink-dim focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
     >
       <option value="">— None —</option>
       @for (u of refData.teamUsers(); track u.id) {
@@ -146,8 +146,8 @@
                 [attr.aria-selected]="activeOrderSupplierId() === supplierTab.id"
                 class="inline-flex min-w-0 items-center gap-2 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
                 [class]="activeOrderSupplierId() === supplierTab.id
-                  ? 'bg-brand-50 text-brand-700'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'"
+                  ? 'bg-brand-50 dark:bg-brand-500/15 text-brand-700 dark:text-brand-400'
+                  : 'text-gray-500 dark:text-muted hover:text-gray-700 hover:bg-gray-50 dark:hover:bg-surface-tint'"
               >
                 <span class="max-w-[9rem] truncate">{{ supplierTab.label }}</span>
               </button>
@@ -158,7 +158,7 @@
           <button
             type="button"
             (click)="addSupplierTab()"
-            class="inline-flex shrink-0 items-center gap-1 rounded-md bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 transition-colors hover:bg-brand-100"
+            class="inline-flex shrink-0 items-center gap-1 rounded-md bg-brand-50 dark:bg-brand-500/15 px-2 py-1 text-[11px] font-medium text-brand-700 dark:text-brand-400 transition-colors hover:bg-brand-100 dark:hover:bg-brand-500/20"
           >
             + Add
           </button>
@@ -412,15 +412,15 @@
   <div
     class="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-lg border px-4 py-3 text-sm font-medium shadow-lg transition-all"
     [class]="toast()!.type === 'success'
-      ? 'border-green-200 bg-green-50 text-green-800'
-      : 'border-red-200 bg-red-50 text-red-800'"
+      ? 'border-green-200 dark:border-green-500/30 bg-green-50 dark:bg-green-500/15 text-green-800 dark:text-green-300'
+      : 'border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 text-red-800 dark:text-red-300'"
   >
     @if (toast()!.type === 'success') {
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500 dark:text-green-300" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
         <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd" />
       </svg>
     } @else {
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-500 dark:text-red-300" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
         <path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd" />
       </svg>
     }

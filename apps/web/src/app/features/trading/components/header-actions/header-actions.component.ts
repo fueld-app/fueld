@@ -160,13 +160,12 @@ const ACTIONS: ActionItem[] = [
     <button
       #trigger
       (click)="toggleMenu()"
-          class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm
-            font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim shadow-sm hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors"
       [attr.aria-expanded]="isOpen()"
       aria-haspopup="true"
     >
       Actions
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400 dark:text-muted" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
         <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
       </svg>
     </button>
@@ -177,16 +176,16 @@ const ACTIONS: ActionItem[] = [
       <div
         [style.top.px]="dropdownTop()"
         [style.left.px]="dropdownLeft()"
-        class="fixed z-50 w-72 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+        class="fixed z-50 w-72 rounded-lg border border-gray-200 dark:border-line bg-white dark:bg-surface py-1 shadow-lg"
         role="menu"
       >
         @for (action of displayActions(); track action.key) {
           @if (action.dividerBefore) {
-            <div class="my-1 border-t border-gray-100"></div>
+            <div class="my-1 border-t border-gray-100 dark:border-line"></div>
           }
           <button
             (click)="onAction(action.key)"
-            class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+            class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
             role="menuitem"
             [disabled]="loading() || action.disabled"
           >

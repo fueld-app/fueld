@@ -1,6 +1,8 @@
 import {
-  Component, ChangeDetectionStrategy, input, output, signal, effect, viewChild, ElementRef, OnDestroy,
+  Component, ChangeDetectionStrategy, input, output, signal, effect, viewChild, ElementRef, inject, OnDestroy,
 } from '@angular/core';
+import { ThemeService } from '@app/core/theme.service';
+import { swapLeafletTileLayer } from '@app/shared/utils/leaflet-theme';
 
 interface FleetVessel {
   id: string;
@@ -66,27 +68,27 @@ function vesselIcon(
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (vessels().length || (mode() === 'group' && loading())) {
-      <div class="rounded-xl border border-gray-200 bg-white shadow-sm transition-all min-[900px]:order-[15]"
+      <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm transition-all min-[900px]:order-[15]"
            [class.fleet-map-fullscreen]="fullscreen()">
-        <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between"
+        <div class="border-b border-gray-100 dark:border-line px-5 py-3 flex items-center justify-between"
              [class.hidden]="fullscreen()">
           <div class="flex items-center gap-2">
-            <h2 class="text-sm font-semibold text-gray-700">Fleet Map</h2>
+            <h2 class="text-sm font-semibold text-gray-700 dark:text-ink-dim">Fleet Map</h2>
             @if (mode() === 'group') {
-              <span class="inline-flex items-center rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-medium text-brand-700">Group</span>
+              <span class="inline-flex items-center rounded-full bg-brand-50 dark:bg-brand-700/15 px-2 py-0.5 text-[10px] font-medium text-brand-700 dark:text-brand-400">Group</span>
             }
             @if (totalMatches(); as totalMatches) {
-              <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">{{ totalMatches }} vessels</span>
+              <span class="inline-flex items-center rounded-full bg-gray-100 dark:bg-surface-3 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:text-ink-dim">{{ totalMatches }} vessels</span>
             }
             @if (limitNotice(); as notice) {
-              <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700"
+              <span class="inline-flex items-center rounded-full bg-amber-50 dark:bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400"
                     [title]="'Showing first ' + notice.queried + ' of ' + notice.total + ' linked companies on the map'">
                 {{ notice.queried }}/{{ notice.total }} companies
               </span>
             }
           </div>
           <button (click)="toggleFullscreen()"
-            class="rounded-md p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors" title="Fullscreen">
+            class="rounded-md p-1 text-gray-400 dark:text-muted hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-surface-tint-strong transition-colors" title="Fullscreen">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
               <path d="M3 4a1 1 0 011-1h4a1 1 0 010 2H6.414l2.293 2.293a1 1 0 01-1.414 1.414L5 6.414V8a1 1 0 01-2 0V4zm9 1a1 1 0 010-2h4a1 1 0 011 1v4a1 1 0 01-2 0V6.414l-2.293 2.293a1 1 0 11-1.414-1.414L13.586 5H12zm-9 7a1 1 0 012 0v1.586l2.293-2.293a1 1 0 011.414 1.414L6.414 15H8a1 1 0 010 2H4a1 1 0 01-1-1v-4zm13 0a1 1 0 01.993.883L17 13v4a1 1 0 01-1 1h-4a1 1 0 010-2h1.586l-2.293-2.293a1 1 0 011.414-1.414L15 14.586V13a1 1 0 011-1z" />
             </svg>
@@ -95,7 +97,7 @@ function vesselIcon(
         <div class="p-0 relative">
           @if (mode() === 'group' && loading()) {
             <div class="flex items-center justify-center" [style.height]="fullscreen() ? '100vh' : '400px'">
-              <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+              <svg class="h-5 w-5 animate-spin text-gray-400 dark:text-muted" viewBox="0 0 24 24" fill="none">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
               </svg>
@@ -105,7 +107,7 @@ function vesselIcon(
           }
           @if (fullscreen()) {
             <button (click)="toggleFullscreen()"
-              class="absolute top-3 right-3 z-[10000] rounded-lg bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-md border border-gray-200 hover:bg-gray-50 transition-colors flex items-center gap-1.5">
+              class="absolute top-3 right-3 z-[10000] rounded-lg bg-white dark:bg-surface px-3 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim shadow-md border border-gray-200 dark:border-line hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors flex items-center gap-1.5">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                 <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
               </svg>
@@ -145,8 +147,18 @@ export class FleetMapCardComponent implements OnDestroy {
   private fleetMap: L.Map | null = null;
   private fleetMapInitialized = false;
   private vesselLayer: L.LayerGroup | null = null;
+  private readonly theme = inject(ThemeService);
+  private tileLayer: any = null;
 
   constructor() {
+    effect(() => {
+      // Re-theme the base tiles when the app theme changes.
+      this.theme.resolved();
+      if (this.fleetMap) {
+        const L = (window as any).L;
+        this.tileLayer = swapLeafletTileLayer(L, this.fleetMap, this.tileLayer, this.theme.resolved());
+      }
+    });
     effect(() => {
       const el = this.fleetMapEl();
       const vessels = this.vessels();
@@ -194,7 +206,7 @@ export class FleetMapCardComponent implements OnDestroy {
     if (!el || this.fleetMap || !vessels.length) return;
 
     this.fleetMap = L.map(el, { zoomControl: true, attributionControl: false }).setView([30, 0], 2);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 18, subdomains: 'abcd' }).addTo(this.fleetMap);
+    this.tileLayer = swapLeafletTileLayer(L, this.fleetMap, null, this.theme.resolved(), { maxZoom: 18, subdomains: 'abcd' });
     this.vesselLayer = L.layerGroup().addTo(this.fleetMap);
 
     this.fleetMap!.on('popupopen', (e: any) => {
@@ -257,7 +269,7 @@ export class FleetMapCardComponent implements OnDestroy {
       const speed = v.latestInformation?.aisSpeed ?? null;
       const companyName = 'companyName' in v ? v.companyName : null;
       const popupLines = [
-        `<a href="javascript:void(0)" class="vessel-nav-link text-blue-600 hover:underline font-semibold" data-vessel-id="${v.id}">${v.name}</a>`,
+        `<a href="javascript:void(0)" class="vessel-nav-link text-blue-600 dark:text-blue-400 hover:underline font-semibold" data-vessel-id="${v.id}">${v.name}</a>`,
         `IMO: ${v.imo}`,
         companyName ? `Company: ${companyName}` : null,
         v.type ? `Type: ${v.type}` : null,

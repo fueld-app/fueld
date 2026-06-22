@@ -46,36 +46,36 @@ const PLACE_RULE_TYPE_OPTIONS: Array<{ value: CompanyPlaceSupplyRulePlaceType; l
   imports: [FormsModule, RouterLink],
   template: `
     <ng-container>
-    <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-11">
-      <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between gap-3">
-        <h2 class="text-sm font-semibold text-gray-700">
+    <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm min-[900px]:order-11">
+      <div class="border-b border-gray-100 dark:border-line px-5 py-3 flex items-center justify-between gap-3">
+        <h2 class="text-sm font-semibold text-gray-700 dark:text-ink-dim">
           Supplies At
           @if (supplyPorts().length) {
-            <span class="ml-1 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">{{ supplyPorts().length }}</span>
+            <span class="ml-1 inline-flex items-center rounded-full bg-gray-100 dark:bg-surface-3 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:text-ink-dim">{{ supplyPorts().length }}</span>
           }
         </h2>
         <div class="flex items-center gap-2">
           <button type="button" (click)="openRulesModal()"
-            class="rounded-md border border-gray-200 px-2 py-1 text-[11px] font-medium text-gray-600 hover:bg-gray-50 transition-colors">Coverage rules</button>
+            class="rounded-md border border-gray-200 dark:border-line px-2 py-1 text-[11px] font-medium text-gray-600 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors">Coverage rules</button>
           <button type="button" (click)="openAdd()"
-            class="rounded-md bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 hover:bg-brand-100 transition-colors">+ Add place</button>
+            class="rounded-md bg-brand-50 dark:bg-brand-700/15 px-2 py-1 text-[11px] font-medium text-brand-700 dark:text-brand-400 hover:bg-brand-100 dark:hover:bg-brand-500/20 transition-colors">+ Add place</button>
         </div>
       </div>
 
       @if (showAdd()) {
-        <div class="border-b border-gray-100 px-5 py-4 bg-gray-50/50">
+        <div class="border-b border-gray-100 dark:border-line px-5 py-4 bg-gray-50/50">
           <div class="space-y-3">
             <div class="relative">
               @if (selectedPlace()) {
-                <div class="flex items-center justify-between rounded-md border border-brand-300 bg-brand-50 px-3 py-2 text-sm">
+                <div class="flex items-center justify-between rounded-md border border-brand-300 bg-brand-50 dark:bg-brand-700/15 px-3 py-2 text-sm">
                   <div>
-                    <span class="font-medium text-brand-800">{{ selectedPlace()!.name }}</span>
+                    <span class="font-medium text-brand-800 dark:text-brand-300">{{ selectedPlace()!.name }}</span>
                     @if (selectedPlace()!.unlocode || selectedPlace()!.parentPlaceUnlocode) {
                       <div class="mt-0.5 text-[11px] font-medium uppercase tracking-[0.12em] text-brand-700/80">{{ (selectedPlace()!.unlocode ?? selectedPlace()!.parentPlaceUnlocode)!.replaceAll(' ', '') }}</div>
                     }
                     @if (selectedPlace()!.country) { <span class="ml-1 text-xs text-brand-700/80">{{ selectedPlace()!.country }}</span> }
                     @if (selectedPlace()!.source === 'lloyds') {
-                      <span class="ml-2 inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">Imported from Seasearcher</span>
+                      <span class="ml-2 inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-500/15 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-400">Imported from Seasearcher</span>
                     }
                   </div>
                   @if (!editingId()) {
@@ -91,32 +91,32 @@ const PLACE_RULE_TYPE_OPTIONS: Array<{ value: CompanyPlaceSupplyRulePlaceType; l
                   [ngModel]="placeSearch()"
                   (ngModelChange)="onPlaceSearch($event)"
                   placeholder="Search local place or import from Seasearcher..."
-                  class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                  class="w-full rounded-md border border-gray-200 dark:border-line px-3 py-1.5 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
                 />
                 @if (placeResults().length) {
-                  <div class="absolute z-10 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
+                  <div class="absolute z-10 mt-1 w-full rounded-md border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-lg max-h-48 overflow-y-auto">
                     @for (place of placeResults(); track place.id) {
                       <button type="button" (click)="selectPlace(place)"
                         [disabled]="isImporting(place)"
-                        class="w-full px-3 py-2 text-left text-sm hover:bg-brand-50 transition-colors flex items-center justify-between disabled:cursor-wait disabled:opacity-60">
+                        class="w-full px-3 py-2 text-left text-sm hover:bg-brand-50 dark:hover:bg-brand-500/15 transition-colors flex items-center justify-between disabled:cursor-wait disabled:opacity-60">
                         <div class="min-w-0">
                           <div class="flex items-center gap-2">
-                            <span class="font-medium text-gray-900">{{ place.name }}</span>
+                            <span class="font-medium text-gray-900 dark:text-ink">{{ place.name }}</span>
                             @if (place.source === 'lloyds') {
-                              <span class="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">Seasearcher</span>
+                              <span class="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-500/15 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-400">Seasearcher</span>
                             }
                           </div>
                           @if (place.unlocode || place.parentPlaceUnlocode) {
-                            <div class="text-[11px] font-medium uppercase tracking-[0.12em] text-gray-500">{{ (place.unlocode ?? place.parentPlaceUnlocode)!.replaceAll(' ', '') }}</div>
+                            <div class="text-[11px] font-medium uppercase tracking-[0.12em] text-gray-500 dark:text-muted">{{ (place.unlocode ?? place.parentPlaceUnlocode)!.replaceAll(' ', '') }}</div>
                           }
                           @if (place.source === 'lloyds') {
-                            <div class="text-[11px] text-gray-400">Import this place and add it as a supply port</div>
+                            <div class="text-[11px] text-gray-400 dark:text-muted">Import this place and add it as a supply port</div>
                           }
                         </div>
                         <div class="ml-3 flex shrink-0 items-center gap-2">
-                          @if (place.country) { <span class="text-xs text-gray-400">{{ place.country }}</span> }
+                          @if (place.country) { <span class="text-xs text-gray-400 dark:text-muted">{{ place.country }}</span> }
                           @if (isImporting(place)) {
-                            <svg class="h-3.5 w-3.5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+                            <svg class="h-3.5 w-3.5 animate-spin text-gray-400 dark:text-muted" viewBox="0 0 24 24" fill="none">
                               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                             </svg>
@@ -130,30 +130,30 @@ const PLACE_RULE_TYPE_OPTIONS: Array<{ value: CompanyPlaceSupplyRulePlaceType; l
             </div>
 
             <div>
-              <label class="block text-xs font-medium text-gray-500 mb-1">Contact Person</label>
+              <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Contact Person</label>
               @if (contactsLoading()) {
-                <div class="text-xs text-gray-400 py-1">Loading contacts...</div>
+                <div class="text-xs text-gray-400 dark:text-muted py-1">Loading contacts...</div>
               } @else if (contacts().length) {
                 <select [ngModel]="portForm().contactId" (ngModelChange)="portForm.set({ ...portForm(), contactId: $event || null })"
-                  class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
+                  class="w-full rounded-md border border-gray-200 dark:border-line px-3 py-1.5 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600">
                   <option [ngValue]="null">— None —</option>
                   @for (c of contacts(); track c.id) {
                     <option [ngValue]="c.id">{{ c.name }}{{ c.role ? " (" + c.role + ")" : "" }}</option>
                   }
                 </select>
               } @else {
-                <div class="text-xs text-gray-400 py-1">No contacts on file</div>
+                <div class="text-xs text-gray-400 dark:text-muted py-1">No contacts on file</div>
               }
             </div>
 
             <div>
-              <label class="block text-xs font-medium text-gray-500 mb-1">Products</label>
+              <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Products</label>
               <div class="flex flex-wrap gap-1.5">
                 @for (prod of productOptions; track prod) {
                   <button type="button" (click)="toggleProduct(prod)"
                     [class]="portForm().products.includes(prod)
-                      ? 'rounded-full px-2.5 py-1 text-xs font-medium bg-brand-600 text-white ring-1 ring-brand-600 transition-colors'
-                      : 'rounded-full px-2.5 py-1 text-xs font-medium bg-white text-gray-600 ring-1 ring-gray-300 hover:ring-brand-400 hover:text-brand-700 transition-colors'">
+                      ? 'rounded-full px-2.5 py-1 text-xs font-medium bg-brand-700 text-white ring-1 ring-brand-600 transition-colors'
+                      : 'rounded-full px-2.5 py-1 text-xs font-medium bg-white dark:bg-surface text-gray-600 dark:text-ink-dim ring-1 ring-gray-300 dark:ring-line-strong hover:ring-brand-400 hover:text-brand-700 transition-colors'">
                     {{ prod }}
                   </button>
                 }
@@ -162,14 +162,14 @@ const PLACE_RULE_TYPE_OPTIONS: Array<{ value: CompanyPlaceSupplyRulePlaceType; l
 
             <textarea [ngModel]="portForm().note" (ngModelChange)="portForm.set({ ...portForm(), note: $event })"
               placeholder="Notes" rows="2"
-              class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"></textarea>
+              class="w-full rounded-md border border-gray-200 dark:border-line px-3 py-1.5 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600"></textarea>
 
             <div class="flex justify-end gap-2">
               <button type="button" (click)="cancelAdd()"
-                class="rounded-md border border-gray-200 px-3 py-1 text-xs text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+                class="rounded-md border border-gray-200 dark:border-line px-3 py-1 text-xs text-gray-600 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors">Cancel</button>
               <button type="button" (click)="savePort()"
                 [disabled]="savingPort() || !selectedPlace()"
-                class="rounded-md bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors">
+                class="rounded-md bg-brand-700 px-3 py-1 text-xs font-medium text-white hover:bg-brand-800 disabled:opacity-50 transition-colors">
                 {{ savingPort() ? (editingId() ? 'Saving...' : 'Adding...') : (editingId() ? 'Save' : 'Add') }}
               </button>
             </div>
@@ -179,48 +179,48 @@ const PLACE_RULE_TYPE_OPTIONS: Array<{ value: CompanyPlaceSupplyRulePlaceType; l
 
       @if (loading()) {
         <div class="flex items-center justify-center py-6">
-          <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+          <svg class="h-5 w-5 animate-spin text-gray-400 dark:text-muted" viewBox="0 0 24 24" fill="none">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
           </svg>
         </div>
       } @else if (!supplyPorts().length) {
-        <div class="px-5 py-6 text-center text-sm text-gray-400">No supply ports added for this company</div>
+        <div class="px-5 py-6 text-center text-sm text-gray-400 dark:text-muted">No supply ports added for this company</div>
       } @else {
         <div class="divide-y divide-gray-50 max-h-[420px] overflow-y-auto pb-2">
           @for (sp of supplyPorts(); track sp.id) {
             <div class="px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors">
               <div class="flex items-center justify-between">
                 <div class="min-w-0">
-                  <a [routerLink]="['/places', sp.placeId]" class="font-medium text-brand-700 hover:text-brand-900 hover:underline">{{ sp.placeName }}</a>
-                  @if (sp.placeCode) { <div class="mt-0.5 text-[11px] font-medium uppercase tracking-[0.12em] text-gray-400">{{ sp.placeCode.replaceAll(' ', '') }}</div> }
+                  <a [routerLink]="['/places', sp.placeId]" class="font-medium text-brand-700 dark:text-brand-400 hover:text-brand-900 hover:underline">{{ sp.placeName }}</a>
+                  @if (sp.placeCode) { <div class="mt-0.5 text-[11px] font-medium uppercase tracking-[0.12em] text-gray-400 dark:text-muted">{{ sp.placeCode.replaceAll(' ', '') }}</div> }
                 </div>
                 <div class="ml-3 flex items-start gap-2">
                   @if (sp.placeCountry) {
-                    <span class="inline-flex items-center gap-1.5 text-xs text-gray-500 whitespace-nowrap">
+                    <span class="inline-flex items-center gap-1.5 text-xs text-gray-500 dark:text-muted whitespace-nowrap">
                       @if (placeFlag(sp.placeCountry)) { <span>{{ placeFlag(sp.placeCountry) }}</span> }
                       <span>{{ placeLabel(sp.placeCountry) }}</span>
                     </span>
                   }
                   <div class="flex items-center gap-0.5 shrink-0">
-                    <button (click)="openEdit(sp)" class="rounded-md p-1 text-gray-400 hover:text-brand-600 transition-colors" title="Edit">
+                    <button (click)="openEdit(sp)" class="rounded-md p-1 text-gray-400 dark:text-muted hover:text-brand-600 transition-colors" title="Edit">
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" /></svg>
                     </button>
-                    <button (click)="confirmDel(sp)" class="rounded-md p-1 text-gray-400 hover:text-red-500 transition-colors" title="Delete">
+                    <button (click)="confirmDel(sp)" class="rounded-md p-1 text-gray-400 dark:text-muted hover:text-red-500 transition-colors" title="Delete">
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
                     </button>
                   </div>
                 </div>
               </div>
-              @if (sp.contactName) { <div class="mt-1 text-xs text-gray-500">Contact: {{ sp.contactName }}</div> }
+              @if (sp.contactName) { <div class="mt-1 text-xs text-gray-500 dark:text-muted">Contact: {{ sp.contactName }}</div> }
               @if (sp.products.length) {
                 <div class="flex flex-wrap gap-1 mt-1">
                   @for (prod of sp.products; track prod) {
-                    <span class="inline-flex items-center rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-medium text-brand-700 ring-1 ring-brand-200">{{ prod }}</span>
+                    <span class="inline-flex items-center rounded-full bg-brand-50 dark:bg-brand-700/15 px-2 py-0.5 text-[10px] font-medium text-brand-700 dark:text-brand-400 ring-1 ring-brand-200 dark:ring-brand-500/30">{{ prod }}</span>
                   }
                 </div>
               }
-              @if (sp.note) { <p class="text-xs text-gray-400 mt-0.5 italic">{{ sp.note }}</p> }
+              @if (sp.note) { <p class="text-xs text-gray-400 dark:text-muted mt-0.5 italic">{{ sp.note }}</p> }
             </div>
           }
         </div>
@@ -230,11 +230,11 @@ const PLACE_RULE_TYPE_OPTIONS: Array<{ value: CompanyPlaceSupplyRulePlaceType; l
     <!-- Delete supply port modal -->
     @if (deleteTarget()) {
       <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" (click)="deleteTarget.set(null)">
-        <div class="rounded-xl bg-white p-6 shadow-xl max-w-sm mx-4" (click)="$event.stopPropagation()">
-          <h3 class="text-lg font-semibold text-gray-900">Delete supply location?</h3>
-          <p class="mt-2 text-sm text-gray-500">Remove <strong>{{ deleteTarget()!.placeName }}</strong> from this company's supply locations?</p>
+        <div class="rounded-xl bg-white dark:bg-surface p-6 shadow-xl max-w-sm mx-4" (click)="$event.stopPropagation()">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-ink">Delete supply location?</h3>
+          <p class="mt-2 text-sm text-gray-500 dark:text-muted">Remove <strong>{{ deleteTarget()!.placeName }}</strong> from this company's supply locations?</p>
           <div class="mt-4 flex justify-end gap-2">
-            <button (click)="deleteTarget.set(null)" class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+            <button (click)="deleteTarget.set(null)" class="rounded-lg border border-gray-300 dark:border-line-strong px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint">Cancel</button>
             <button (click)="executeDel()" class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">Delete</button>
           </div>
         </div>
@@ -245,59 +245,59 @@ const PLACE_RULE_TYPE_OPTIONS: Array<{ value: CompanyPlaceSupplyRulePlaceType; l
     <!-- Coverage rules modal (inside ng-container to avoid parse issues) -->
     @if (showRules()) {
       <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" (click)="closeRulesModal()">
-        <div class="mx-4 flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" (click)="$event.stopPropagation()">
-          <div class="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-4">
+        <div class="mx-4 flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white dark:bg-surface shadow-2xl" (click)="$event.stopPropagation()">
+          <div class="flex items-start justify-between gap-4 border-b border-gray-100 dark:border-line px-6 py-4">
             <div>
-              <h3 class="text-lg font-semibold text-gray-900">Place Coverage Rules</h3>
-              <p class="mt-1 text-sm text-gray-500">Create rules to auto-add this supplier to matching places.</p>
+              <h3 class="text-lg font-semibold text-gray-900 dark:text-ink">Place Coverage Rules</h3>
+              <p class="mt-1 text-sm text-gray-500 dark:text-muted">Create rules to auto-add this supplier to matching places.</p>
             </div>
-            <button type="button" (click)="closeRulesModal()" class="rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
+            <button type="button" (click)="closeRulesModal()" class="rounded-md p-2 text-gray-400 dark:text-muted hover:bg-gray-100 dark:hover:bg-surface-tint-strong hover:text-gray-600 transition-colors">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                 <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
               </svg>
             </button>
           </div>
           <div class="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1.3fr)_360px]">
-            <div class="min-h-0 overflow-y-auto border-b border-gray-100 lg:border-b-0 lg:border-r lg:border-gray-100">
+            <div class="min-h-0 overflow-y-auto border-b border-gray-100 dark:border-line lg:border-b-0 lg:border-r lg:border-gray-100">
               @if (rulesLoading()) {
                 <div class="flex h-full min-h-[260px] items-center justify-center">
-                  <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                  <svg class="h-5 w-5 animate-spin text-gray-400 dark:text-muted" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
                 </div>
               } @else if (!placeRules().length) {
-                <div class="flex h-full min-h-[260px] items-center justify-center px-6 text-center text-sm text-gray-400">No coverage rules yet. Create one to auto-add this supplier to matching places.</div>
+                <div class="flex h-full min-h-[260px] items-center justify-center px-6 text-center text-sm text-gray-400 dark:text-muted">No coverage rules yet. Create one to auto-add this supplier to matching places.</div>
               } @else {
-                <div class="divide-y divide-gray-100">
+                <div class="divide-y divide-gray-100 dark:divide-line">
                   @for (rule of placeRules(); track rule.id) {
                     <div class="px-6 py-4">
                       <div class="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                         <div class="min-w-0">
                           <div class="flex flex-wrap items-center gap-2">
                             @if (countryFlag(rule.countryIso)) {<span class="text-base">{{ countryFlag(rule.countryIso) }}</span>}
-                            <span class="font-medium text-gray-900">{{ countryLabel(rule.countryIso) }}</span>
-                            <span class="text-[11px] font-medium uppercase tracking-[0.12em] text-gray-400">{{ rule.countryIso }}</span>
+                            <span class="font-medium text-gray-900 dark:text-ink">{{ countryLabel(rule.countryIso) }}</span>
+                            <span class="text-[11px] font-medium uppercase tracking-[0.12em] text-gray-400 dark:text-muted">{{ rule.countryIso }}</span>
                           </div>
                           <div class="mt-2 flex flex-wrap gap-1.5">
                             @for (pt of rule.placeTypes; track pt) {
-                              <span class="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-blue-200">{{ ruleTypeLabel(pt) }}</span>
+                              <span class="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-500/15 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-400 ring-1 ring-blue-200 dark:ring-blue-500/30">{{ ruleTypeLabel(pt) }}</span>
                             }
                           </div>
-                          @if (rule.contactName) {<div class="mt-2 text-xs text-gray-500">Contact: {{ rule.contactName }}</div>}
+                          @if (rule.contactName) {<div class="mt-2 text-xs text-gray-500 dark:text-muted">Contact: {{ rule.contactName }}</div>}
                           @if (rule.products.length) {
                             <div class="mt-2 flex flex-wrap gap-1.5">
                               @for (prod of rule.products; track prod) {
-                                <span class="inline-flex items-center rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-medium text-brand-700 ring-1 ring-brand-200">{{ prod }}</span>
+                                <span class="inline-flex items-center rounded-full bg-brand-50 dark:bg-brand-700/15 px-2 py-0.5 text-[10px] font-medium text-brand-700 dark:text-brand-400 ring-1 ring-brand-200 dark:ring-brand-500/30">{{ prod }}</span>
                               }
                             </div>
                           }
-                          @if (rule.note) {<p class="mt-2 text-xs italic text-gray-400">{{ rule.note }}</p>}
+                          @if (rule.note) {<p class="mt-2 text-xs italic text-gray-400 dark:text-muted">{{ rule.note }}</p>}
                         </div>
                         <div class="flex shrink-0 flex-wrap items-center gap-2 xl:justify-end">
-                          <button type="button" (click)="editRule(rule)" class="rounded-md border border-gray-200 px-2.5 py-1 text-[11px] font-medium text-gray-600 hover:bg-gray-50 transition-colors">Edit</button>
+                          <button type="button" (click)="editRule(rule)" class="rounded-md border border-gray-200 dark:border-line px-2.5 py-1 text-[11px] font-medium text-gray-600 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors">Edit</button>
                           <button type="button" (click)="reapplyRule(rule)" [disabled]="reapplyingRuleId() === rule.id"
-                            class="rounded-md border border-brand-200 bg-brand-50 px-2.5 py-1 text-[11px] font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50 transition-colors">
+                            class="rounded-md border border-brand-200 dark:border-brand-500/30 bg-brand-50 dark:bg-brand-700/15 px-2.5 py-1 text-[11px] font-medium text-brand-700 dark:text-brand-400 hover:bg-brand-100 dark:hover:bg-brand-500/20 disabled:opacity-50 transition-colors">
                             {{ reapplyingRuleId() === rule.id ? "Applying..." : "Reapply" }}
                           </button>
-                          <button type="button" (click)="deleteRule(rule)" class="rounded-md border border-red-200 px-2.5 py-1 text-[11px] font-medium text-red-600 hover:bg-red-50 transition-colors">Delete</button>
+                          <button type="button" (click)="deleteRule(rule)" class="rounded-md border border-red-200 dark:border-red-500/30 px-2.5 py-1 text-[11px] font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/15 transition-colors">Delete</button>
                         </div>
                       </div>
                     </div>
@@ -308,18 +308,18 @@ const PLACE_RULE_TYPE_OPTIONS: Array<{ value: CompanyPlaceSupplyRulePlaceType; l
             <div class="min-h-0 overflow-y-auto bg-gray-50/70 px-6 py-5">
               <div class="flex items-start justify-between gap-3">
                 <div>
-                  <h4 class="text-sm font-semibold text-gray-800">{{ editingRuleId() ? "Edit Rule" : "New Rule" }}</h4>
-                  <p class="mt-1 text-xs text-gray-500">Create applies immediately. Editing only affects future matches until you reapply.</p>
+                  <h4 class="text-sm font-semibold text-gray-800 dark:text-ink">{{ editingRuleId() ? "Edit Rule" : "New Rule" }}</h4>
+                  <p class="mt-1 text-xs text-gray-500 dark:text-muted">Create applies immediately. Editing only affects future matches until you reapply.</p>
                 </div>
                 @if (editingRuleId()) {
-                  <button type="button" (click)="resetRuleForm()" class="rounded-md border border-gray-200 px-2 py-1 text-[11px] font-medium text-gray-600 hover:bg-white transition-colors">Clear</button>
+                  <button type="button" (click)="resetRuleForm()" class="rounded-md border border-gray-200 dark:border-line px-2 py-1 text-[11px] font-medium text-gray-600 dark:text-ink-dim hover:bg-white transition-colors">Clear</button>
                 }
               </div>
               <div class="mt-4 space-y-4">
                 <div>
-                  <label class="block text-xs font-medium text-gray-500 mb-1">Country</label>
+                  <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Country</label>
                   <select [ngModel]="ruleForm().countryIso" (ngModelChange)="ruleForm.set({ ...ruleForm(), countryIso: $event })"
-                    class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
+                    class="w-full rounded-md border border-gray-200 dark:border-line bg-white dark:bg-surface px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600">
                     <option value="">Select country...</option>
                     @for (c of allCountries; track c.code) {
                       <option [value]="c.code">{{ c.name }} ({{ c.code }})</option>
@@ -327,52 +327,52 @@ const PLACE_RULE_TYPE_OPTIONS: Array<{ value: CompanyPlaceSupplyRulePlaceType; l
                   </select>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500 mb-1">Place Types</label>
+                  <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Place Types</label>
                   <div class="flex flex-wrap gap-1.5">
                     @for (opt of ruleTypeOptions; track opt.value) {
                       <button type="button" (click)="toggleRulePlaceType(opt.value)"
-                        [class]="ruleForm().placeTypes.includes(opt.value) ? 'rounded-full px-2.5 py-1 text-xs font-medium bg-brand-600 text-white ring-1 ring-brand-600 transition-colors' : 'rounded-full px-2.5 py-1 text-xs font-medium bg-white text-gray-600 ring-1 ring-gray-300 hover:ring-brand-400 hover:text-brand-700 transition-colors'">
+                        [class]="ruleForm().placeTypes.includes(opt.value) ? 'rounded-full px-2.5 py-1 text-xs font-medium bg-brand-700 text-white ring-1 ring-brand-600 transition-colors' : 'rounded-full px-2.5 py-1 text-xs font-medium bg-white dark:bg-surface text-gray-600 dark:text-ink-dim ring-1 ring-gray-300 dark:ring-line-strong hover:ring-brand-400 hover:text-brand-700 transition-colors'">
                         {{ opt.label }}
                       </button>
                     }
                   </div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500 mb-1">Contact Person</label>
+                  <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Contact Person</label>
                   @if (contacts().length) {
                     <select [ngModel]="ruleForm().contactId" (ngModelChange)="ruleForm.set({ ...ruleForm(), contactId: $event || null })"
-                      class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
+                      class="w-full rounded-md border border-gray-200 dark:border-line bg-white dark:bg-surface px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600">
                       <option [ngValue]="null">None</option>
                       @for (c of contacts(); track c.id) {
                         <option [ngValue]="c.id">{{ c.name }}{{ c.role ? " (" + c.role + ")" : "" }}</option>
                       }
                     </select>
                   } @else {
-                    <div class="text-xs text-gray-400 py-1">No contacts on file</div>
+                    <div class="text-xs text-gray-400 dark:text-muted py-1">No contacts on file</div>
                   }
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500 mb-1">Products</label>
+                  <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Products</label>
                   <div class="flex flex-wrap gap-1.5">
                     @for (prod of productOptions; track prod) {
                       <button type="button" (click)="toggleRuleProduct(prod)"
-                        [class]="ruleForm().products.includes(prod) ? 'rounded-full px-2.5 py-1 text-xs font-medium bg-brand-600 text-white ring-1 ring-brand-600 transition-colors' : 'rounded-full px-2.5 py-1 text-xs font-medium bg-white text-gray-600 ring-1 ring-gray-300 hover:ring-brand-400 hover:text-brand-700 transition-colors'">
+                        [class]="ruleForm().products.includes(prod) ? 'rounded-full px-2.5 py-1 text-xs font-medium bg-brand-700 text-white ring-1 ring-brand-600 transition-colors' : 'rounded-full px-2.5 py-1 text-xs font-medium bg-white dark:bg-surface text-gray-600 dark:text-ink-dim ring-1 ring-gray-300 dark:ring-line-strong hover:ring-brand-400 hover:text-brand-700 transition-colors'">
                         {{ prod }}
                       </button>
                     }
                   </div>
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500 mb-1">Note</label>
+                  <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Note</label>
                   <textarea [ngModel]="ruleForm().note" (ngModelChange)="ruleForm.set({ ...ruleForm(), note: $event })"
                     rows="3" placeholder="Notes"
-                    class="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"></textarea>
+                    class="w-full rounded-md border border-gray-200 dark:border-line bg-white dark:bg-surface px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600"></textarea>
                 </div>
                 <div class="flex justify-end gap-2 pt-2">
-                  <button type="button" (click)="closeRulesModal()" class="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-white transition-colors">Close</button>
+                  <button type="button" (click)="closeRulesModal()" class="rounded-md border border-gray-200 dark:border-line px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-ink-dim hover:bg-white transition-colors">Close</button>
                   <button type="button" (click)="saveRule()"
                     [disabled]="savingRule() || !ruleForm().countryIso || !ruleForm().placeTypes.length"
-                    class="rounded-md bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors">
+                    class="rounded-md bg-brand-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-800 disabled:opacity-50 transition-colors">
                     {{ savingRule() ? "Saving..." : (editingRuleId() ? "Save Rule" : "Create Rule") }}
                   </button>
                 </div>

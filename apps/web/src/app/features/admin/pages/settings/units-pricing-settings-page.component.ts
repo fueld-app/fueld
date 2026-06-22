@@ -27,13 +27,13 @@ import { SettingsToastService } from './settings-toast.service';
       <div class="app-panel">
         <div class="app-panel-header app-panel-header--amber">
           <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--amber">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-600 dark:text-amber-400" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M10 2a.75.75 0 01.75.75v.258a33.186 33.186 0 016.668.83.75.75 0 01-.336 1.461 31.28 31.28 0 00-1.103-.232l1.702 7.545a.75.75 0 01-.387.832A4.981 4.981 0 0115 14c-.825 0-1.606-.2-2.294-.556a.75.75 0 01-.387-.832l1.77-7.849a31.743 31.743 0 00-3.339-.254v11.505a20.01 20.01 0 013.78.501.75.75 0 11-.339 1.462A18.558 18.558 0 0010 17.5c-1.442 0-2.845.165-4.191.477a.75.75 0 01-.338-1.462 20.01 20.01 0 013.779-.501V4.509c-1.129.026-2.243.112-3.34.254l1.771 7.85a.75.75 0 01-.387.83A4.981 4.981 0 015 14c-.825 0-1.606-.2-2.294-.556a.75.75 0 01-.387-.832l1.702-7.545c-.372.06-.742.126-1.103.232a.75.75 0 11-.336-1.462 33.186 33.186 0 016.668-.829V2.75A.75.75 0 0110 2zM5 12.662l-1.395-6.177C4.6 6.327 5.597 6.2 6 6.2c.404 0 1.4.127 2.395.285L5 12.662zm8.395-6.177L15 12.662l1.395-6.177C14.6 6.327 13.597 6.2 13.2 6.2c-.404 0-1.4.127-2.395.285z" clip-rule="evenodd" />
             </svg>
           </div>
           <div class="flex-1 min-w-0">
-            <h3 class="text-sm font-semibold text-gray-900">Units</h3>
-            <p class="text-xs text-gray-500">Configure which measurement units appear in order line item dropdowns.</p>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">Units</h3>
+            <p class="text-xs text-gray-500 dark:text-muted">Configure which measurement units appear in order line item dropdowns.</p>
           </div>
         </div>
 
@@ -41,10 +41,10 @@ import { SettingsToastService } from './settings-toast.service';
           @for (u of units(); track $index; let i = $index) {
             <div class="flex items-center gap-2">
               <div class="flex flex-col gap-0.5 shrink-0">
-                <button (click)="moveUnitUp(i)" [disabled]="i === 0" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move up">
+                <button (click)="moveUnitUp(i)" [disabled]="i === 0" class="text-gray-400 dark:text-muted hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move up">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
                 </button>
-                <button (click)="moveUnitDown(i)" [disabled]="i === units().length - 1" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move down">
+                <button (click)="moveUnitDown(i)" [disabled]="i === units().length - 1" class="text-gray-400 dark:text-muted hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move down">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
                 </button>
               </div>
@@ -57,7 +57,7 @@ import { SettingsToastService } from './settings-toast.service';
               <button
                 (click)="removeUnit(i)"
                 [disabled]="units().length <= 1"
-                class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 transition-colors shrink-0"
+                class="rounded-md p-1.5 text-gray-400 dark:text-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/15 disabled:opacity-30 transition-colors shrink-0"
                 title="Remove unit"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -85,7 +85,7 @@ import { SettingsToastService } from './settings-toast.service';
               @if (unitsSaving()) { Saving… } @else { Save Units }
             </button>
             @if (unitsSaved()) {
-              <span class="text-sm text-green-600 flex items-center gap-1">
+              <span class="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
                 </svg>
@@ -102,13 +102,13 @@ import { SettingsToastService } from './settings-toast.service';
       <div class="app-panel min-w-0">
         <div class="app-panel-header app-panel-header--amber">
           <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--amber">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-600 dark:text-amber-400" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H4.28a.75.75 0 00-.75.75v3.955a.75.75 0 001.5 0v-2.134l.312.312a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm.002-2.853a.75.75 0 00.743-.648 7 7 0 00-11.712 3.138.75.75 0 001.449.39 5.5 5.5 0 009.201-2.466l.312.311H13.01a.75.75 0 000 1.5h3.955a.75.75 0 00.75-.75V6.091a.75.75 0 00-1.5 0v2.134l-.312-.312a5.474 5.474 0 00-.59-.342z" clip-rule="evenodd" />
             </svg>
           </div>
           <div class="flex-1 min-w-0">
-            <h3 class="text-sm font-semibold text-gray-900">Unit Conversions</h3>
-            <p class="text-xs text-gray-500">Default density/conversion factors per product. Leave product blank for a generic fallback.</p>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">Unit Conversions</h3>
+            <p class="text-xs text-gray-500 dark:text-muted">Default density/conversion factors per product. Leave product blank for a generic fallback.</p>
           </div>
         </div>
 
@@ -120,8 +120,7 @@ import { SettingsToastService } from './settings-toast.service';
                 [value]="conv.productType ?? ''"
                 (input)="updateUnitConversion(i, 'productType', $any($event.target).value)"
                 placeholder="All products"
-                class="min-w-0 flex-1 rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
-                       focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                class="min-w-0 flex-1 rounded-lg border border-gray-300 dark:border-line-strong px-2 py-1.5 text-sm text-gray-700 dark:text-ink-dim focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
               />
               <input
                 type="text"
@@ -130,7 +129,7 @@ import { SettingsToastService } from './settings-toast.service';
                 placeholder="From"
                 class="app-input-mono-uppercase min-w-0 w-16 shrink"
               />
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400 dark:text-muted shrink-0" viewBox="0 0 20 20" fill="currentColor">
                 <path fill-rule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 11-1.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z" clip-rule="evenodd" />
               </svg>
               <input
@@ -140,18 +139,16 @@ import { SettingsToastService } from './settings-toast.service';
                 placeholder="To"
                 class="app-input-mono-uppercase min-w-0 w-16 shrink"
               />
-              <span class="text-xs text-gray-400">=</span>
+              <span class="text-xs text-gray-400 dark:text-muted">=</span>
               <input
                 type="number" step="0.0001" min="0"
                 [ngModel]="conv.factor"
                 (ngModelChange)="updateUnitConversion(i, 'factor', +$event)"
-                class="min-w-0 w-20 shrink rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm tabular-nums
-                       [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
-                       focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                class="min-w-0 w-20 shrink rounded-lg border border-gray-300 dark:border-line-strong px-2 py-1.5 text-right text-sm tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
               />
               <button
                 (click)="removeUnitConversion(i)"
-                class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
+                class="rounded-md p-1.5 text-gray-400 dark:text-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/15 transition-colors shrink-0"
                 title="Remove conversion"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -179,7 +176,7 @@ import { SettingsToastService } from './settings-toast.service';
               @if (unitConversionsSaving()) { Saving… } @else { Save Conversions }
             </button>
             @if (unitConversionsSaved()) {
-              <span class="text-sm text-green-600 flex items-center gap-1">
+              <span class="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
                 </svg>
@@ -196,13 +193,13 @@ import { SettingsToastService } from './settings-toast.service';
       <div class="app-panel min-w-0">
         <div class="app-panel-header app-panel-header--violet">
           <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--violet">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-violet-600" viewBox="0 0 20 20" fill="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-violet-600 dark:text-violet-400" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M12.577 4.878a.75.75 0 01.919-.53l4.78 1.281a.75.75 0 01.531.919l-1.281 4.78a.75.75 0 01-1.449-.387l.81-3.022a19.407 19.407 0 00-5.594 5.203.75.75 0 01-1.139.093L7 10.06l-4.72 4.72a.75.75 0 01-1.06-1.06l5.25-5.25a.75.75 0 011.06 0l3.074 3.073a20.923 20.923 0 015.545-4.931l-3.042-.815a.75.75 0 01-.53-.919z" clip-rule="evenodd" />
             </svg>
           </div>
           <div class="flex-1 min-w-0">
-            <h3 class="text-sm font-semibold text-gray-900">Price References</h3>
-            <p class="text-xs text-gray-500">Named pricing sources for formula-based pricing (e.g. Aramco OSP, Platts). Used when suppliers quote "posted price + premium".</p>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">Price References</h3>
+            <p class="text-xs text-gray-500 dark:text-muted">Named pricing sources for formula-based pricing (e.g. Aramco OSP, Platts). Used when suppliers quote "posted price + premium".</p>
           </div>
         </div>
 
@@ -214,8 +211,7 @@ import { SettingsToastService } from './settings-toast.service';
                 [value]="ref.name"
                 (input)="updatePriceRef(i, 'name', $any($event.target).value)"
                 placeholder="Name (e.g. Aramco OSP)"
-                class="min-w-0 flex-1 rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
-                       focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                class="min-w-0 flex-1 rounded-lg border border-gray-300 dark:border-line-strong px-2 py-1.5 text-sm text-gray-700 dark:text-ink-dim focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
               />
               <input
                 type="text"
@@ -229,12 +225,11 @@ import { SettingsToastService } from './settings-toast.service';
                 [value]="ref.description ?? ''"
                 (input)="updatePriceRef(i, 'description', $any($event.target).value)"
                 placeholder="Description (optional)"
-                class="min-w-0 flex-1 rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
-                       focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                class="min-w-0 flex-1 rounded-lg border border-gray-300 dark:border-line-strong px-2 py-1.5 text-sm text-gray-700 dark:text-ink-dim focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
               />
               <button
                 (click)="removePriceRef(i)"
-                class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
+                class="rounded-md p-1.5 text-gray-400 dark:text-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/15 transition-colors shrink-0"
                 title="Remove price reference"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -262,7 +257,7 @@ import { SettingsToastService } from './settings-toast.service';
               @if (priceRefsSaving()) { Saving… } @else { Save Price References }
             </button>
             @if (priceRefsSaved()) {
-              <span class="text-sm text-green-600 flex items-center gap-1">
+              <span class="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
                 </svg>
@@ -279,14 +274,14 @@ import { SettingsToastService } from './settings-toast.service';
       <div class="app-panel">
         <div class="app-panel-header app-panel-header--cyan">
           <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--cyan">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-cyan-600" viewBox="0 0 20 20" fill="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-cyan-600 dark:text-cyan-400" viewBox="0 0 20 20" fill="currentColor">
               <path d="M10.75 10.818v2.614A3.13 3.13 0 0011.888 13c.482-.315.612-.648.612-.875 0-.227-.13-.56-.612-.875a3.13 3.13 0 00-1.138-.432zM8.33 8.62c.053.055.115.11.184.164.208.16.46.284.736.363V6.603a2.45 2.45 0 00-.92.363c-.293.18-.42.403-.42.56 0 .159.127.382.42.56.08.05.164.092.25.128z" />
               <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-6a.75.75 0 01.75.75v.316a3.78 3.78 0 011.653.713c.426.33.744.74.925 1.2a.75.75 0 01-1.395.55 1.35 1.35 0 00-.447-.563 2.187 2.187 0 00-.736-.363V9.3c.514.082 1.006.234 1.438.467.669.36 1.115.86 1.115 1.608 0 .746-.446 1.245-1.115 1.607a3.78 3.78 0 01-1.438.467v.316a.75.75 0 01-1.5 0v-.316a3.78 3.78 0 01-1.653-.713 2.72 2.72 0 01-.925-1.2.75.75 0 011.395-.55c.12.3.272.492.447.563.243.098.5.163.736.363v-2.697a3.78 3.78 0 01-1.438-.467C5.446 8.87 5 8.37 5 7.625c0-.746.446-1.245 1.115-1.607a3.78 3.78 0 011.438-.467V5.25A.75.75 0 018.25 4.5h.08z" clip-rule="evenodd" />
             </svg>
           </div>
           <div class="flex-1 min-w-0">
-            <h3 class="text-sm font-semibold text-gray-900">Currencies</h3>
-            <p class="text-xs text-gray-500">Configure which currencies appear in order line item dropdowns and are tracked via Yahoo Finance.</p>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">Currencies</h3>
+            <p class="text-xs text-gray-500 dark:text-muted">Configure which currencies appear in order line item dropdowns and are tracked via Yahoo Finance.</p>
           </div>
         </div>
 
@@ -294,17 +289,17 @@ import { SettingsToastService } from './settings-toast.service';
           @for (c of currencies(); track $index; let i = $index) {
             <div class="flex items-center gap-2">
               <div class="flex flex-col gap-0.5 shrink-0">
-                <button (click)="moveCurrencyUp(i)" [disabled]="i === 0" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move up">
+                <button (click)="moveCurrencyUp(i)" [disabled]="i === 0" class="text-gray-400 dark:text-muted hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move up">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
                 </button>
-                <button (click)="moveCurrencyDown(i)" [disabled]="i === currencies().length - 1" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move down">
+                <button (click)="moveCurrencyDown(i)" [disabled]="i === currencies().length - 1" class="text-gray-400 dark:text-muted hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move down">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
                 </button>
               </div>
               <select
                 [value]="c"
                 (change)="updateCurrency(i, $any($event.target).value)"
-                      class="app-input-mono flex-1 bg-white"
+                      class="app-input-mono flex-1 bg-white dark:bg-surface"
               >
                 @for (opt of availableCurrencyOptions(); track opt.code) {
                   <option [value]="opt.code" [selected]="opt.code === c" [disabled]="opt.code !== c && currencies().includes(opt.code)">{{ opt.code }} — {{ opt.name }}</option>
@@ -313,7 +308,7 @@ import { SettingsToastService } from './settings-toast.service';
               <button
                 (click)="removeCurrency(i)"
                 [disabled]="currencies().length <= 1"
-                class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 transition-colors shrink-0"
+                class="rounded-md p-1.5 text-gray-400 dark:text-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/15 disabled:opacity-30 transition-colors shrink-0"
                 title="Remove currency"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -341,7 +336,7 @@ import { SettingsToastService } from './settings-toast.service';
               @if (currenciesSaving()) { Saving… } @else { Save Currencies }
             </button>
             @if (currenciesSaved()) {
-              <span class="text-sm text-green-600 flex items-center gap-1">
+              <span class="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
                 </svg>

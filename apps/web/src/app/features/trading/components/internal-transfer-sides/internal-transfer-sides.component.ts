@@ -37,29 +37,29 @@ import { API_URL } from '@app/core/config/api';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, DatePipe],
   template: `
-    <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+    <div class="rounded-2xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm">
       <div class="mb-4 flex items-center justify-between">
         <div>
-          <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-700">
+          <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-700 dark:text-ink-dim">
             Transfer Sides
           </h3>
-          <p class="mt-0.5 text-xs text-gray-500">
+          <p class="mt-0.5 text-xs text-gray-500 dark:text-muted">
             Finalize each side before generating its internal documents.
           </p>
         </div>
         <button
           (click)="reload()"
           [disabled]="loading()"
-          class="rounded-md border border-gray-200 px-2.5 py-1 text-xs text-gray-600 hover:bg-gray-50"
+          class="rounded-md border border-gray-200 dark:border-line px-2.5 py-1 text-xs text-gray-600 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint"
         >
           Refresh
         </button>
       </div>
 
       @if (loading()) {
-        <div class="py-6 text-center text-sm text-gray-400">Loading…</div>
+        <div class="py-6 text-center text-sm text-gray-400 dark:text-muted">Loading…</div>
       } @else if (sides().length === 0) {
-        <div class="py-6 text-center text-sm text-gray-400">No transfer sides yet.</div>
+        <div class="py-6 text-center text-sm text-gray-400 dark:text-muted">No transfer sides yet.</div>
       } @else {
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
           @for (s of sides(); track s.id) {
@@ -70,15 +70,15 @@ import { API_URL } from '@app/core/config/api';
             >
               <div class="mb-3 flex items-start justify-between">
                 <div>
-                  <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                  <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-muted">
                     {{ s.kind === 'SOURCE_SELL' ? 'Source · sell' : 'Destination · buy' }}
                   </p>
-                  <p class="mt-1 text-sm font-semibold text-gray-900">{{ s.companyName }}</p>
+                  <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-ink">{{ s.companyName }}</p>
                 </div>
                 <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase"
                   [class]="s.status === 'FINALIZED'
-                    ? 'bg-emerald-100 text-emerald-800'
-                    : 'bg-gray-100 text-gray-600'"
+                    ? 'bg-emerald-100 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300'
+                    : 'bg-gray-100 dark:bg-surface-3 text-gray-600 dark:text-ink-dim'"
                 >
                   {{ s.status }}
                 </span>
@@ -86,23 +86,23 @@ import { API_URL } from '@app/core/config/api';
 
               <div class="space-y-2 text-xs">
                 <label class="block">
-                  <span class="text-[10px] font-medium uppercase tracking-wider text-gray-500">Currency</span>
+                  <span class="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-muted">Currency</span>
                   <input
                     type="text"
                     [ngModel]="s.currency"
                     (ngModelChange)="updateField(s, 'currency', $event)"
                     [disabled]="s.status === 'FINALIZED' || readonly()"
-                    class="mt-0.5 w-full rounded-md border border-gray-300 px-2 py-1 disabled:opacity-60"
+                    class="mt-0.5 w-full rounded-md border border-gray-300 dark:border-line-strong px-2 py-1 disabled:opacity-60"
                   />
                 </label>
 
                 <label class="block">
-                  <span class="text-[10px] font-medium uppercase tracking-wider text-gray-500">Payment terms</span>
+                  <span class="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-muted">Payment terms</span>
                   <select
                     [ngModel]="s.paymentTermType ?? ''"
                     (ngModelChange)="updateField(s, 'paymentTermType', ($event || null))"
                     [disabled]="s.status === 'FINALIZED' || readonly()"
-                    class="fueld-select-no-chevron mt-0.5 w-full appearance-none rounded-md border border-gray-300 px-2 py-1 disabled:opacity-60"
+                    class="fueld-select-no-chevron mt-0.5 w-full appearance-none rounded-md border border-gray-300 dark:border-line-strong px-2 py-1 disabled:opacity-60"
                   >
                     <option value="">— Not set —</option>
                     <option value="CREDIT">Credit</option>
@@ -113,31 +113,31 @@ import { API_URL } from '@app/core/config/api';
 
                 @if (s.paymentTermType === 'CREDIT') {
                   <label class="block">
-                    <span class="text-[10px] font-medium uppercase tracking-wider text-gray-500">Credit days</span>
+                    <span class="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-muted">Credit days</span>
                     <input
                       type="number"
                       min="0"
                       [ngModel]="s.creditDays ?? ''"
                       (ngModelChange)="updateField(s, 'creditDays', $event === '' ? null : Number($event))"
                       [disabled]="s.status === 'FINALIZED' || readonly()"
-                      class="mt-0.5 w-full rounded-md border border-gray-300 px-2 py-1 disabled:opacity-60"
+                      class="mt-0.5 w-full rounded-md border border-gray-300 dark:border-line-strong px-2 py-1 disabled:opacity-60"
                     />
                   </label>
                 }
 
                 <label class="block">
-                  <span class="text-[10px] font-medium uppercase tracking-wider text-gray-500">Note</span>
+                  <span class="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-muted">Note</span>
                   <textarea
                     rows="2"
                     [ngModel]="s.note ?? ''"
                     (ngModelChange)="updateField(s, 'note', $event || null)"
                     [disabled]="s.status === 'FINALIZED' || readonly()"
-                    class="mt-0.5 w-full rounded-md border border-gray-300 px-2 py-1 disabled:opacity-60"
+                    class="mt-0.5 w-full rounded-md border border-gray-300 dark:border-line-strong px-2 py-1 disabled:opacity-60"
                   ></textarea>
                 </label>
 
                 @if (s.status === 'FINALIZED' && s.finalizedAt) {
-                  <p class="text-[11px] text-gray-500">
+                  <p class="text-[11px] text-gray-500 dark:text-muted">
                     Finalized {{ s.finalizedAt | date:'short' }}
                     @if (s.finalizedByName) { · {{ s.finalizedByName }} }
                   </p>
@@ -150,7 +150,7 @@ import { API_URL } from '@app/core/config/api';
                     <button
                       (click)="finalize(s)"
                       [disabled]="!canFinalize(s) || acting() === s.id"
-                      class="inline-flex items-center rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+                      class="inline-flex items-center rounded-lg bg-brand-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-800 disabled:opacity-50"
                     >
                       Finalize
                     </button>
@@ -158,7 +158,7 @@ import { API_URL } from '@app/core/config/api';
                     <button
                       (click)="reopen(s)"
                       [disabled]="acting() === s.id"
-                      class="inline-flex items-center rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+                      class="inline-flex items-center rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/20 disabled:opacity-50"
                     >
                       Reopen
                     </button>

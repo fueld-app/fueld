@@ -19,15 +19,15 @@ import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring
   template: `
     <div>
       <div class="mb-6">
-        <h1 class="text-2xl font-bold text-gray-900">Credit & Financing Settings</h1>
-        <p class="mt-1 text-sm text-gray-500">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-ink">Credit & Financing Settings</h1>
+        <p class="mt-1 text-sm text-gray-500 dark:text-muted">
           Configure credit approvals and the financing rate used in trader margin calculations.
         </p>
       </div>
 
       @if (loading()) {
         <div class="flex items-center justify-center py-12">
-          <svg class="h-8 w-8 animate-spin text-brand-600" viewBox="0 0 24 24" fill="none">
+          <svg class="h-8 w-8 animate-spin text-brand-600 dark:text-brand-400" viewBox="0 0 24 24" fill="none">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
           </svg>
@@ -37,7 +37,7 @@ import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring
           <div class="app-panel">
             <div class="app-panel-header app-panel-header--brand">
               <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--brand">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-brand-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-brand-600 dark:text-brand-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M14.25 3.75H8.25A2.25 2.25 0 0 0 6 6v12a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 18V7.5l-3.75-3.75Z" />
                   <path d="M14.25 3.75V7.5H18" />
                   <path d="M9 10.5h6" />
@@ -46,15 +46,15 @@ import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring
                 </svg>
               </div>
               <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-semibold text-gray-900">Approval Workflow</h3>
-                <p class="text-xs text-gray-600">Control how credit applications are reviewed and approved.</p>
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">Approval Workflow</h3>
+                <p class="text-xs text-gray-600 dark:text-ink-dim">Control how credit applications are reviewed and approved.</p>
               </div>
             </div>
 
             <div class="app-panel-body app-panel-stack">
               <!-- Required Approvals -->
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Required Approvals</label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1">Required Approvals</label>
                 <input
                   type="number"
                   min="1"
@@ -63,7 +63,7 @@ import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring
                   (ngModelChange)="requiredApprovals.set($event)"
                       class="app-input w-24"
                 />
-                <p class="mt-1 text-xs text-gray-500">
+                <p class="mt-1 text-xs text-gray-500 dark:text-muted">
                   How many credit managers must approve a credit application before it is accepted.
                 </p>
               </div>
@@ -72,13 +72,13 @@ import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring
               <div class="flex items-start gap-3">
                 <button (click)="immediateRejection.set(!immediateRejection())"
                   class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
-                  [class]="immediateRejection() ? 'bg-brand-600' : 'bg-gray-300'">
-                  <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                  [class]="immediateRejection() ? 'bg-brand-700' : 'bg-gray-300'">
+                  <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white dark:bg-surface transition-transform"
                     [class]="immediateRejection() ? 'translate-x-4' : 'translate-x-0.5'"></span>
                 </button>
                 <div>
-                  <p class="text-sm font-medium text-gray-700">Immediate Rejection</p>
-                  <p class="text-xs text-gray-500">
+                  <p class="text-sm font-medium text-gray-700 dark:text-ink-dim">Immediate Rejection</p>
+                  <p class="text-xs text-gray-500 dark:text-muted">
                     When enabled, a single rejection immediately rejects the application.
                     When disabled, all required reviewers must vote (majority decides).
                   </p>
@@ -89,13 +89,13 @@ import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring
               <div class="flex items-start gap-3">
                 <button (click)="autoApplyOnApproval.set(!autoApplyOnApproval())"
                   class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
-                  [class]="autoApplyOnApproval() ? 'bg-brand-600' : 'bg-gray-300'">
-                  <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                  [class]="autoApplyOnApproval() ? 'bg-brand-700' : 'bg-gray-300'">
+                  <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white dark:bg-surface transition-transform"
                     [class]="autoApplyOnApproval() ? 'translate-x-4' : 'translate-x-0.5'"></span>
                 </button>
                 <div>
-                  <p class="text-sm font-medium text-gray-700">Auto-Apply on Approval</p>
-                  <p class="text-xs text-gray-500">
+                  <p class="text-sm font-medium text-gray-700 dark:text-ink-dim">Auto-Apply on Approval</p>
+                  <p class="text-xs text-gray-500 dark:text-muted">
                     Automatically create or update the credit line when an application is fully approved.
                   </p>
                 </div>
@@ -105,13 +105,13 @@ import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring
               <div class="flex items-start gap-3">
                 <button (click)="notifyCreditManagers.set(!notifyCreditManagers())"
                   class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
-                  [class]="notifyCreditManagers() ? 'bg-brand-600' : 'bg-gray-300'">
-                  <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                  [class]="notifyCreditManagers() ? 'bg-brand-700' : 'bg-gray-300'">
+                  <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white dark:bg-surface transition-transform"
                     [class]="notifyCreditManagers() ? 'translate-x-4' : 'translate-x-0.5'"></span>
                 </button>
                 <div>
-                  <p class="text-sm font-medium text-gray-700">Push Notifications</p>
-                  <p class="text-xs text-gray-500">
+                  <p class="text-sm font-medium text-gray-700 dark:text-ink-dim">Push Notifications</p>
+                  <p class="text-xs text-gray-500 dark:text-muted">
                     Send push notifications to credit managers when a new application is submitted.
                   </p>
                 </div>
@@ -121,13 +121,13 @@ import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring
               <div class="flex items-start gap-3">
                 <button (click)="notifyEmail.set(!notifyEmail())"
                   class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
-                  [class]="notifyEmail() ? 'bg-brand-600' : 'bg-gray-300'">
-                  <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                  [class]="notifyEmail() ? 'bg-brand-700' : 'bg-gray-300'">
+                  <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white dark:bg-surface transition-transform"
                     [class]="notifyEmail() ? 'translate-x-4' : 'translate-x-0.5'"></span>
                 </button>
                 <div>
-                  <p class="text-sm font-medium text-gray-700">Email Notifications</p>
-                  <p class="text-xs text-gray-500">
+                  <p class="text-sm font-medium text-gray-700 dark:text-ink-dim">Email Notifications</p>
+                  <p class="text-xs text-gray-500 dark:text-muted">
                     Send an email to all credit managers and admins when a new application is submitted.
                   </p>
                 </div>
@@ -137,33 +137,33 @@ import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring
               <div class="flex items-start gap-3">
                 <button (click)="notifyWhatsApp.set(!notifyWhatsApp())"
                   class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
-                  [class]="notifyWhatsApp() ? 'bg-brand-600' : 'bg-gray-300'">
-                  <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                  [class]="notifyWhatsApp() ? 'bg-brand-700' : 'bg-gray-300'">
+                  <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white dark:bg-surface transition-transform"
                     [class]="notifyWhatsApp() ? 'translate-x-4' : 'translate-x-0.5'"></span>
                 </button>
                 <div>
-                  <p class="text-sm font-medium text-gray-700">WhatsApp Notifications</p>
-                  <p class="text-xs text-gray-500">
+                  <p class="text-sm font-medium text-gray-700 dark:text-ink-dim">WhatsApp Notifications</p>
+                  <p class="text-xs text-gray-500 dark:text-muted">
                     Send a WhatsApp message to the default group when a new application is submitted.
                     Requires WhatsApp to be connected and a default group configured in Integrations.
                   </p>
                 </div>
               </div>
 
-              <div class="pt-3 mt-1 border-t border-gray-200">
-                <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">Notify Trader on Decision</p>
+              <div class="pt-3 mt-1 border-t border-gray-200 dark:border-line">
+                <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-muted mb-3">Notify Trader on Decision</p>
 
                 <!-- Notify Trader Push -->
                 <div class="flex items-start gap-3 mb-3">
                   <button (click)="notifyTraderPush.set(!notifyTraderPush())"
                     class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
-                    [class]="notifyTraderPush() ? 'bg-brand-600' : 'bg-gray-300'">
-                    <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                    [class]="notifyTraderPush() ? 'bg-brand-700' : 'bg-gray-300'">
+                    <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white dark:bg-surface transition-transform"
                       [class]="notifyTraderPush() ? 'translate-x-4' : 'translate-x-0.5'"></span>
                   </button>
                   <div>
-                    <p class="text-sm font-medium text-gray-700">Push Notification to Trader</p>
-                    <p class="text-xs text-gray-500">
+                    <p class="text-sm font-medium text-gray-700 dark:text-ink-dim">Push Notification to Trader</p>
+                    <p class="text-xs text-gray-500 dark:text-muted">
                       Send a push notification to the submitting trader when their credit application is approved or rejected.
                     </p>
                   </div>
@@ -173,13 +173,13 @@ import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring
                 <div class="flex items-start gap-3 mb-3">
                   <button (click)="notifyTraderEmail.set(!notifyTraderEmail())"
                     class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
-                    [class]="notifyTraderEmail() ? 'bg-brand-600' : 'bg-gray-300'">
-                    <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                    [class]="notifyTraderEmail() ? 'bg-brand-700' : 'bg-gray-300'">
+                    <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white dark:bg-surface transition-transform"
                       [class]="notifyTraderEmail() ? 'translate-x-4' : 'translate-x-0.5'"></span>
                   </button>
                   <div>
-                    <p class="text-sm font-medium text-gray-700">Email Notification to Trader</p>
-                    <p class="text-xs text-gray-500">
+                    <p class="text-sm font-medium text-gray-700 dark:text-ink-dim">Email Notification to Trader</p>
+                    <p class="text-xs text-gray-500 dark:text-muted">
                       Send an email to the submitting trader when their credit application is approved or rejected.
                     </p>
                   </div>
@@ -189,13 +189,13 @@ import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring
                 <div class="flex items-start gap-3">
                   <button (click)="notifyTraderWhatsApp.set(!notifyTraderWhatsApp())"
                     class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
-                    [class]="notifyTraderWhatsApp() ? 'bg-brand-600' : 'bg-gray-300'">
-                    <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                    [class]="notifyTraderWhatsApp() ? 'bg-brand-700' : 'bg-gray-300'">
+                    <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white dark:bg-surface transition-transform"
                       [class]="notifyTraderWhatsApp() ? 'translate-x-4' : 'translate-x-0.5'"></span>
                   </button>
                   <div>
-                    <p class="text-sm font-medium text-gray-700">WhatsApp Group on Decision</p>
-                    <p class="text-xs text-gray-500">
+                    <p class="text-sm font-medium text-gray-700 dark:text-ink-dim">WhatsApp Group on Decision</p>
+                    <p class="text-xs text-gray-500 dark:text-muted">
                       Send a message to the default WhatsApp group when a credit application is approved or rejected.
                     </p>
                   </div>
@@ -203,7 +203,7 @@ import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring
               </div>
 
               <!-- Save button -->
-              <div class="pt-2 border-t border-gray-100">
+              <div class="pt-2 border-t border-gray-100 dark:border-line">
                 <button (click)="save()" [disabled]="saving()"
                   class="app-button-primary inline-flex items-center gap-1.5 font-semibold">
                   @if (saving()) {
@@ -215,10 +215,10 @@ import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring
                   Save Settings
                 </button>
                 @if (saveSuccess()) {
-                  <span class="ml-3 text-sm text-green-600">Settings saved successfully.</span>
+                  <span class="ml-3 text-sm text-green-600 dark:text-green-400">Settings saved successfully.</span>
                 }
                 @if (saveError()) {
-                  <span class="ml-3 text-sm text-red-600">{{ saveError() }}</span>
+                  <span class="ml-3 text-sm text-red-600 dark:text-red-400">{{ saveError() }}</span>
                 }
               </div>
             </div>
@@ -227,20 +227,20 @@ import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring
           <div class="app-panel">
             <div class="app-panel-header app-panel-header--amber">
               <div class="app-panel-icon-shell app-panel-icon-shell--pill app-panel-icon-shell--amber">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-600 dark:text-amber-400" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M4.5 5A2.5 2.5 0 0 1 7 2.5h6A2.5 2.5 0 0 1 15.5 5v.5h.5A2.5 2.5 0 0 1 18.5 8v5A2.5 2.5 0 0 1 16 15.5h-.5v.5A2.5 2.5 0 0 1 13 18.5H7A2.5 2.5 0 0 1 4.5 16v-.5H4A2.5 2.5 0 0 1 1.5 13V8A2.5 2.5 0 0 1 4 5.5h.5V5Zm2 0v.5h7V5A.5.5 0 0 0 13 4.5H7a.5.5 0 0 0-.5.5Zm7 2.5h-7V13a.5.5 0 0 0 .5.5h6a.5.5 0 0 0 .5-.5V7.5Zm-4.25 1a.75.75 0 0 1 .75.75v.5h.5a.75.75 0 0 1 0 1.5H10v.5a.75.75 0 0 1-1.5 0v-.5H8a.75.75 0 0 1 0-1.5h.5v-.5a.75.75 0 0 1 .75-.75Z" clip-rule="evenodd"/>
                 </svg>
               </div>
               <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-semibold text-gray-900">Trade Financing</h3>
-                <p class="text-xs text-gray-600">Default rate used to calculate financing drag from payment-day spreads.</p>
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">Trade Financing</h3>
+                <p class="text-xs text-gray-600 dark:text-ink-dim">Default rate used to calculate financing drag from payment-day spreads.</p>
               </div>
             </div>
 
             <div class="app-panel-body app-panel-stack">
               <div class="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Annual Rate (%)</label>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1">Annual Rate (%)</label>
                   <input
                     type="number"
                     min="0"
@@ -249,21 +249,21 @@ import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring
                     (ngModelChange)="financingAnnualRatePercent.set($event)"
                     class="app-input w-full"
                   />
-                  <p class="mt-1 text-xs text-gray-500">Stored as a decimal rate in the backend and applied to buy value only.</p>
+                  <p class="mt-1 text-xs text-gray-500 dark:text-muted">Stored as a decimal rate in the backend and applied to buy value only.</p>
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Day Count Convention</label>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1">Day Count Convention</label>
                   <input
                     type="number"
                     [ngModel]="financingDayCountConvention()"
                     disabled
-                    class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500 outline-none"
+                    class="w-full rounded-lg border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 px-3 py-2 text-sm text-gray-500 dark:text-muted outline-none"
                   />
-                  <p class="mt-1 text-xs text-gray-500">Fixed at 365 for V1.</p>
+                  <p class="mt-1 text-xs text-gray-500 dark:text-muted">Fixed at 365 for V1.</p>
                 </div>
               </div>
 
-              <div class="pt-2 border-t border-gray-100">
+              <div class="pt-2 border-t border-gray-100 dark:border-line">
                 <button (click)="saveFinancingSettings()" [disabled]="financingSaving()"
                   class="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-amber-700 transition-colors disabled:opacity-50">
                   @if (financingSaving()) {
@@ -275,10 +275,10 @@ import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring
                   Save Financing Settings
                 </button>
                 @if (financingSaveSuccess()) {
-                  <span class="ml-3 text-sm text-green-600">Financing settings saved successfully.</span>
+                  <span class="ml-3 text-sm text-green-600 dark:text-green-400">Financing settings saved successfully.</span>
                 }
                 @if (financingSaveError()) {
-                  <span class="ml-3 text-sm text-red-600">{{ financingSaveError() }}</span>
+                  <span class="ml-3 text-sm text-red-600 dark:text-red-400">{{ financingSaveError() }}</span>
                 }
               </div>
             </div>
@@ -288,13 +288,13 @@ import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring
           <div class="app-panel">
             <div class="app-panel-header app-panel-header--red">
               <div class="app-panel-icon-shell app-panel-icon-shell--pill app-panel-icon-shell--red">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-600" viewBox="0 0 20 20" fill="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-600 dark:text-red-400" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M10 1a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 0110 1zM5.05 3.05a.75.75 0 011.06 0l1.062 1.06A.75.75 0 116.11 5.173L5.05 4.11a.75.75 0 010-1.06zm9.9 0a.75.75 0 010 1.06l-1.06 1.062a.75.75 0 01-1.062-1.06l1.06-1.062a.75.75 0 011.06 0zM10 7a3 3 0 100 6 3 3 0 000-6zm-6.25 3a.75.75 0 01.75-.75h1.5a.75.75 0 010 1.5H4.5a.75.75 0 01-.75-.75zm11 0a.75.75 0 01.75-.75h1.5a.75.75 0 010 1.5h-1.5a.75.75 0 01-.75-.75zM6.11 14.828a.75.75 0 010 1.06l-1.06 1.06a.75.75 0 01-1.06-1.06l1.06-1.06a.75.75 0 011.06 0zm7.78 0a.75.75 0 011.06 0l1.06 1.06a.75.75 0 11-1.06 1.06l-1.06-1.06a.75.75 0 010-1.06z" clip-rule="evenodd"/>
                 </svg>
               </div>
               <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-semibold text-gray-900">Risk Monitoring</h3>
-                <p class="text-xs text-gray-600">Automated sanctions, maritime, and business-distress checks on counterparties.</p>
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">Risk Monitoring</h3>
+                <p class="text-xs text-gray-600 dark:text-ink-dim">Automated sanctions, maritime, and business-distress checks on counterparties.</p>
               </div>
             </div>
 
@@ -303,20 +303,20 @@ import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring
               <div class="flex items-start gap-3">
                 <button (click)="riskEnabled.set(!riskEnabled())"
                   class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
-                  [class]="riskEnabled() ? 'bg-brand-600' : 'bg-gray-300'">
-                  <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                  [class]="riskEnabled() ? 'bg-brand-700' : 'bg-gray-300'">
+                  <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white dark:bg-surface transition-transform"
                     [class]="riskEnabled() ? 'translate-x-4' : 'translate-x-0.5'"></span>
                 </button>
                 <div>
-                  <p class="text-sm font-medium text-gray-700">Enable Risk Monitoring</p>
-                  <p class="text-xs text-gray-500">Run automated risk checks on counterparties with active credit lines.</p>
+                  <p class="text-sm font-medium text-gray-700 dark:text-ink-dim">Enable Risk Monitoring</p>
+                  <p class="text-xs text-gray-500 dark:text-muted">Run automated risk checks on counterparties with active credit lines.</p>
                 </div>
               </div>
 
               @if (riskEnabled()) {
                 <!-- Check interval -->
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Check Interval (hours)</label>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1">Check Interval (hours)</label>
                   <input
                     type="number"
                     min="1"
@@ -325,12 +325,12 @@ import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring
                     (ngModelChange)="riskCheckIntervalHours.set($event)"
                     class="app-input w-24"
                   />
-                  <p class="mt-1 text-xs text-gray-500">How often to re-check each counterparty. Default: 24 hours.</p>
+                  <p class="mt-1 text-xs text-gray-500 dark:text-muted">How often to re-check each counterparty. Default: 24 hours.</p>
                 </div>
 
                 <!-- Override expiry -->
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Override Expiry (days)</label>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1">Override Expiry (days)</label>
                   <input
                     type="number"
                     min="1"
@@ -339,11 +339,11 @@ import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring
                     (ngModelChange)="riskOverrideExpiryDays.set($event)"
                     class="app-input w-24"
                   />
-                  <p class="mt-1 text-xs text-gray-500">How many days an approved override remains valid before it expires.</p>
+                  <p class="mt-1 text-xs text-gray-500 dark:text-muted">How many days an approved override remains valid before it expires.</p>
                 </div>
 
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Override Required Approvals</label>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1">Override Required Approvals</label>
                   <input
                     type="number"
                     min="1"
@@ -352,26 +352,26 @@ import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring
                     (ngModelChange)="riskOverrideRequiredApprovals.set($event)"
                     class="app-input w-24"
                   />
-                  <p class="mt-1 text-xs text-gray-500">How many approval votes are needed before a requested override becomes active.</p>
+                  <p class="mt-1 text-xs text-gray-500 dark:text-muted">How many approval votes are needed before a requested override becomes active.</p>
                 </div>
 
                 <!-- Provider: OpenSanctions -->
-                <div class="rounded-lg border border-gray-200 p-4 space-y-3">
+                <div class="rounded-lg border border-gray-200 dark:border-line p-4 space-y-3">
                   <div class="flex items-start gap-3">
                     <button (click)="riskOpenSanctionsEnabled.set(!riskOpenSanctionsEnabled())"
                       class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
-                      [class]="riskOpenSanctionsEnabled() ? 'bg-brand-600' : 'bg-gray-300'">
-                      <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                      [class]="riskOpenSanctionsEnabled() ? 'bg-brand-700' : 'bg-gray-300'">
+                      <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white dark:bg-surface transition-transform"
                         [class]="riskOpenSanctionsEnabled() ? 'translate-x-4' : 'translate-x-0.5'"></span>
                     </button>
                     <div>
-                      <p class="text-sm font-medium text-gray-700">OpenSanctions (Yente)</p>
-                      <p class="text-xs text-gray-500">Watchlist screening via a self-hosted yente instance.</p>
+                      <p class="text-sm font-medium text-gray-700 dark:text-ink-dim">OpenSanctions (Yente)</p>
+                      <p class="text-xs text-gray-500 dark:text-muted">Watchlist screening via a self-hosted yente instance.</p>
                     </div>
                   </div>
                   @if (riskOpenSanctionsEnabled()) {
                     <div>
-                      <label class="block text-xs font-medium text-gray-600">Yente Base URL</label>
+                      <label class="block text-xs font-medium text-gray-600 dark:text-ink-dim">Yente Base URL</label>
                       <input type="text" [ngModel]="riskOpenSanctionsBaseUrl()" (ngModelChange)="riskOpenSanctionsBaseUrl.set($event)"
                         class="app-input w-full mt-1" placeholder="http://yente:8000" />
                     </div>
@@ -379,38 +379,38 @@ import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring
                 </div>
 
                 <!-- Provider: SeaSearcher -->
-                <div class="rounded-lg border border-gray-200 p-4">
+                <div class="rounded-lg border border-gray-200 dark:border-line p-4">
                   <div class="flex items-start gap-3">
                     <button (click)="riskSeaSearcherEnabled.set(!riskSeaSearcherEnabled())"
                       class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
-                      [class]="riskSeaSearcherEnabled() ? 'bg-brand-600' : 'bg-gray-300'">
-                      <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                      [class]="riskSeaSearcherEnabled() ? 'bg-brand-700' : 'bg-gray-300'">
+                      <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white dark:bg-surface transition-transform"
                         [class]="riskSeaSearcherEnabled() ? 'translate-x-4' : 'translate-x-0.5'"></span>
                     </button>
                     <div>
-                      <p class="text-sm font-medium text-gray-700">SeaSearcher</p>
-                      <p class="text-xs text-gray-500">Maritime sanctions and seizure data. Uses your existing SeaSearcher subscription.</p>
+                      <p class="text-sm font-medium text-gray-700 dark:text-ink-dim">SeaSearcher</p>
+                      <p class="text-xs text-gray-500 dark:text-muted">Maritime sanctions and seizure data. Uses your existing SeaSearcher subscription.</p>
                     </div>
                   </div>
                 </div>
 
                 <!-- Provider: Companies House -->
-                <div class="rounded-lg border border-gray-200 p-4 space-y-3">
+                <div class="rounded-lg border border-gray-200 dark:border-line p-4 space-y-3">
                   <div class="flex items-start gap-3">
                     <button (click)="riskCompaniesHouseEnabled.set(!riskCompaniesHouseEnabled())"
                       class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
-                      [class]="riskCompaniesHouseEnabled() ? 'bg-brand-600' : 'bg-gray-300'">
-                      <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                      [class]="riskCompaniesHouseEnabled() ? 'bg-brand-700' : 'bg-gray-300'">
+                      <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white dark:bg-surface transition-transform"
                         [class]="riskCompaniesHouseEnabled() ? 'translate-x-4' : 'translate-x-0.5'"></span>
                     </button>
                     <div>
-                      <p class="text-sm font-medium text-gray-700">Companies House (UK)</p>
-                      <p class="text-xs text-gray-500">Insolvency and dissolution checks for UK-registered companies.</p>
+                      <p class="text-sm font-medium text-gray-700 dark:text-ink-dim">Companies House (UK)</p>
+                      <p class="text-xs text-gray-500 dark:text-muted">Insolvency and dissolution checks for UK-registered companies.</p>
                     </div>
                   </div>
                   @if (riskCompaniesHouseEnabled()) {
                     <div>
-                      <label class="block text-xs font-medium text-gray-600">API Key</label>
+                      <label class="block text-xs font-medium text-gray-600 dark:text-ink-dim">API Key</label>
                       <input type="password" [ngModel]="riskCompaniesHouseApiKey()" (ngModelChange)="riskCompaniesHouseApiKey.set($event)"
                         class="app-input w-full mt-1" placeholder="Companies House API key" />
                     </div>
@@ -421,13 +421,13 @@ import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring
                 <div class="flex items-start gap-3">
                   <button (click)="riskNotifyPush.set(!riskNotifyPush())"
                     class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
-                    [class]="riskNotifyPush() ? 'bg-brand-600' : 'bg-gray-300'">
-                    <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                    [class]="riskNotifyPush() ? 'bg-brand-700' : 'bg-gray-300'">
+                    <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white dark:bg-surface transition-transform"
                       [class]="riskNotifyPush() ? 'translate-x-4' : 'translate-x-0.5'"></span>
                   </button>
                   <div>
-                    <p class="text-sm font-medium text-gray-700">Push Notifications</p>
-                    <p class="text-xs text-gray-500">Send push notifications to admins, credit managers, and finance when a new risk signal is detected.</p>
+                    <p class="text-sm font-medium text-gray-700 dark:text-ink-dim">Push Notifications</p>
+                    <p class="text-xs text-gray-500 dark:text-muted">Send push notifications to admins, credit managers, and finance when a new risk signal is detected.</p>
                   </div>
                 </div>
 
@@ -435,19 +435,19 @@ import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring
                 <div class="flex items-start gap-3">
                   <button (click)="riskAutoEnforce.set(!riskAutoEnforce())"
                     class="relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
-                    [class]="riskAutoEnforce() ? 'bg-brand-600' : 'bg-gray-300'">
-                    <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                    [class]="riskAutoEnforce() ? 'bg-brand-700' : 'bg-gray-300'">
+                    <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white dark:bg-surface transition-transform"
                       [class]="riskAutoEnforce() ? 'translate-x-4' : 'translate-x-0.5'"></span>
                   </button>
                   <div>
-                    <p class="text-sm font-medium text-gray-700">Auto-Freeze on Hit</p>
-                    <p class="text-xs text-gray-500">Automatically freeze credit when risk signals are detected. When disabled, hits are recorded but credit is not blocked.</p>
+                    <p class="text-sm font-medium text-gray-700 dark:text-ink-dim">Auto-Freeze on Hit</p>
+                    <p class="text-xs text-gray-500 dark:text-muted">Automatically freeze credit when risk signals are detected. When disabled, hits are recorded but credit is not blocked.</p>
                   </div>
                 </div>
               }
 
               <!-- Save button -->
-              <div class="pt-2 border-t border-gray-100">
+              <div class="pt-2 border-t border-gray-100 dark:border-line">
                 <button (click)="saveRiskSettings()" [disabled]="riskSaving()"
                   class="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700 transition-colors disabled:opacity-50">
                   @if (riskSaving()) {
@@ -459,10 +459,10 @@ import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring
                   Save Risk Settings
                 </button>
                 @if (riskSaveSuccess()) {
-                  <span class="ml-3 text-sm text-green-600">Risk settings saved.</span>
+                  <span class="ml-3 text-sm text-green-600 dark:text-green-400">Risk settings saved.</span>
                 }
                 @if (riskSaveError()) {
-                  <span class="ml-3 text-sm text-red-600">{{ riskSaveError() }}</span>
+                  <span class="ml-3 text-sm text-red-600 dark:text-red-400">{{ riskSaveError() }}</span>
                 }
               </div>
             </div>

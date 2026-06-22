@@ -47,14 +47,14 @@ import { API } from '@app/core/config/api';
       <!-- Header -->
       <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 class="text-2xl font-bold text-gray-900">Inventory</h1>
-          <p class="mt-1 text-sm text-gray-500">
+          <h1 class="text-2xl font-bold text-gray-900 dark:text-ink">Inventory</h1>
+          <p class="mt-1 text-sm text-gray-500 dark:text-muted">
             Stock balances, reservations, and replenishment plans across enabled warehouses.
           </p>
         </div>
         <button
           (click)="reload()"
-          class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          class="inline-flex items-center gap-2 rounded-lg border border-gray-200 dark:border-line px-3 py-2 text-sm text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors"
           [disabled]="loading()"
         >
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -69,7 +69,7 @@ import { API } from '@app/core/config/api';
         <select
           [ngModel]="filterCompanyId()"
           (ngModelChange)="setFilterCompany($event)"
-          class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          class="rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm"
         >
           <option value="">All companies</option>
           @for (c of ownCompanies(); track c.id) {
@@ -80,7 +80,7 @@ import { API } from '@app/core/config/api';
         <select
           [ngModel]="filterWarehouseId()"
           (ngModelChange)="setFilterWarehouse($event)"
-          class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          class="rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm"
         >
           <option value="">All warehouses</option>
           @for (w of filteredWarehouses(); track w.id) {
@@ -91,46 +91,46 @@ import { API } from '@app/core/config/api';
 
       <!-- Summary cards -->
       <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div class="rounded-2xl border border-gray-200 bg-white px-4 py-3">
-          <p class="text-xs uppercase tracking-wider text-gray-400">Tracked SKUs</p>
-          <p class="mt-1 text-xl font-semibold text-gray-900">{{ trackedSkuCount() }}</p>
+        <div class="rounded-2xl border border-gray-200 dark:border-line bg-white dark:bg-surface px-4 py-3">
+          <p class="text-xs uppercase tracking-wider text-gray-400 dark:text-muted">Tracked SKUs</p>
+          <p class="mt-1 text-xl font-semibold text-gray-900 dark:text-ink">{{ trackedSkuCount() }}</p>
         </div>
-        <div class="rounded-2xl border border-gray-200 bg-white px-4 py-3">
-          <p class="text-xs uppercase tracking-wider text-gray-400">Active warehouses</p>
-          <p class="mt-1 text-xl font-semibold text-gray-900">{{ activeWarehouseCount() }}</p>
+        <div class="rounded-2xl border border-gray-200 dark:border-line bg-white dark:bg-surface px-4 py-3">
+          <p class="text-xs uppercase tracking-wider text-gray-400 dark:text-muted">Active warehouses</p>
+          <p class="mt-1 text-xl font-semibold text-gray-900 dark:text-ink">{{ activeWarehouseCount() }}</p>
         </div>
-        <div class="rounded-2xl border border-gray-200 bg-white px-4 py-3">
-          <p class="text-xs uppercase tracking-wider text-gray-400">Shortages</p>
-          <p class="mt-1 text-xl font-semibold" [class]="shortageCount() > 0 ? 'text-red-600' : 'text-gray-900'">
+        <div class="rounded-2xl border border-gray-200 dark:border-line bg-white dark:bg-surface px-4 py-3">
+          <p class="text-xs uppercase tracking-wider text-gray-400 dark:text-muted">Shortages</p>
+          <p class="mt-1 text-xl font-semibold" [class]="shortageCount() > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-ink'">
             {{ shortageCount() }}
           </p>
         </div>
-        <div class="rounded-2xl border border-gray-200 bg-white px-4 py-3">
-          <p class="text-xs uppercase tracking-wider text-gray-400">Pending replenishments</p>
-          <p class="mt-1 text-xl font-semibold text-gray-900">{{ pendingPlanCount() }}</p>
+        <div class="rounded-2xl border border-gray-200 dark:border-line bg-white dark:bg-surface px-4 py-3">
+          <p class="text-xs uppercase tracking-wider text-gray-400 dark:text-muted">Pending replenishments</p>
+          <p class="mt-1 text-xl font-semibold text-gray-900 dark:text-ink">{{ pendingPlanCount() }}</p>
         </div>
       </div>
 
       <!-- Loading -->
       @if (loading()) {
         <div class="flex items-center justify-center py-16">
-          <svg class="h-8 w-8 animate-spin text-brand-600" viewBox="0 0 24 24" fill="none">
+          <svg class="h-8 w-8 animate-spin text-brand-600 dark:text-brand-400" viewBox="0 0 24 24" fill="none">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
           </svg>
         </div>
       } @else if (filteredBalances().length === 0) {
-        <div class="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-6 py-12 text-center">
-          <p class="text-sm text-gray-500">
+        <div class="rounded-xl border border-dashed border-gray-300 dark:border-line-strong bg-gray-50 dark:bg-bg-2 px-6 py-12 text-center">
+          <p class="text-sm text-gray-500 dark:text-muted">
             No inventory data yet. Enable a warehouse and add a tracked SKU under
             <strong>Admin → Warehouses</strong> to see balances here.
           </p>
         </div>
       } @else {
         <!-- Balances table -->
-        <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div class="overflow-x-auto rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm">
           <table class="min-w-full text-sm">
-            <thead class="bg-gray-50 text-xs uppercase tracking-wider text-gray-500">
+            <thead class="bg-gray-50 dark:bg-bg-2 text-xs uppercase tracking-wider text-gray-500 dark:text-muted">
               <tr>
                 <th class="px-4 py-3 text-left">Company</th>
                 <th class="px-4 py-3 text-left">Warehouse</th>
@@ -145,45 +145,45 @@ import { API } from '@app/core/config/api';
             </thead>
             <tbody>
               @for (row of filteredBalances(); track row.warehouseId + ':' + row.skuId) {
-                <tr class="border-t border-gray-100 hover:bg-gray-50/50">
-                  <td class="px-4 py-3 text-gray-900">{{ row.ownerCompanyName }}</td>
-                  <td class="px-4 py-3 text-gray-900">
+                <tr class="border-t border-gray-100 dark:border-line hover:bg-gray-50/50">
+                  <td class="px-4 py-3 text-gray-900 dark:text-ink">{{ row.ownerCompanyName }}</td>
+                  <td class="px-4 py-3 text-gray-900 dark:text-ink">
                     <div class="flex flex-col">
                       <span>{{ row.warehouseName }}</span>
                       @if (row.vesselName) {
-                        <span class="text-xs text-gray-400">{{ row.vesselName }}</span>
+                        <span class="text-xs text-gray-400 dark:text-muted">{{ row.vesselName }}</span>
                       }
                     </div>
                   </td>
                   <td class="px-4 py-3">
                     <div class="flex flex-col">
-                      <span class="font-medium text-gray-900">{{ row.skuDisplayName }}</span>
-                      <span class="text-xs text-gray-400">
+                      <span class="font-medium text-gray-900 dark:text-ink">{{ row.skuDisplayName }}</span>
+                      <span class="text-xs text-gray-400 dark:text-muted">
                         {{ row.productType }}@if (row.grade) { · {{ row.grade }} }
                       </span>
                     </div>
                   </td>
                   <td class="px-4 py-3 text-right tabular-nums">{{ formatQty(row.onHand) }} {{ row.baseUnit }}</td>
-                  <td class="px-4 py-3 text-right tabular-nums text-gray-500">
+                  <td class="px-4 py-3 text-right tabular-nums text-gray-500 dark:text-muted">
                     {{ formatQty(row.reserved) }}
                   </td>
                   <td class="px-4 py-3 text-right tabular-nums font-semibold"
-                    [class]="isShort(row) ? 'text-red-600' : 'text-emerald-700'">
+                    [class]="isShort(row) ? 'text-red-600 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-400'">
                     {{ formatQty(row.availableNow) }}
                   </td>
-                  <td class="px-4 py-3 text-right tabular-nums text-blue-700">
+                  <td class="px-4 py-3 text-right tabular-nums text-blue-700 dark:text-blue-400">
                     {{ formatQty(row.plannedInbound) }}
                   </td>
-                  <td class="px-4 py-3 text-right tabular-nums text-amber-700">
+                  <td class="px-4 py-3 text-right tabular-nums text-amber-700 dark:text-amber-400">
                     {{ formatQty(row.plannedOutbound) }}
                   </td>
-                  <td class="px-4 py-3 text-gray-700">
+                  <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">
                     @if (row.earliestAvailableAt) {
-                      <span class="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
+                      <span class="rounded-full bg-amber-50 dark:bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-800 dark:text-amber-300">
                         {{ row.earliestAvailableAt | dateLabel }}
                       </span>
                     } @else {
-                      <span class="text-xs text-gray-400">Now</span>
+                      <span class="text-xs text-gray-400 dark:text-muted">Now</span>
                     }
                   </td>
                 </tr>
@@ -195,22 +195,22 @@ import { API } from '@app/core/config/api';
         <!-- Replenishment plans -->
         <div class="mt-8">
           <div class="mb-3 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-gray-900">Pending replenishments</h2>
+            <h2 class="text-base font-semibold text-gray-900 dark:text-ink">Pending replenishments</h2>
             <button
               (click)="openPlanForm()"
-              class="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700"
+              class="inline-flex items-center gap-1.5 rounded-lg bg-brand-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-800"
             >
               + Plan replenishment
             </button>
           </div>
           @if (pendingPlans().length === 0) {
-            <div class="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-6 py-8 text-center text-sm text-gray-500">
+            <div class="rounded-xl border border-dashed border-gray-300 dark:border-line-strong bg-gray-50 dark:bg-bg-2 px-6 py-8 text-center text-sm text-gray-500 dark:text-muted">
               No pending replenishments.
             </div>
           } @else {
-            <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div class="overflow-x-auto rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm">
               <table class="min-w-full text-sm">
-                <thead class="bg-gray-50 text-xs uppercase tracking-wider text-gray-500">
+                <thead class="bg-gray-50 dark:bg-bg-2 text-xs uppercase tracking-wider text-gray-500 dark:text-muted">
                   <tr>
                     <th class="px-4 py-3 text-left">Warehouse</th>
                     <th class="px-4 py-3 text-left">SKU</th>
@@ -223,24 +223,24 @@ import { API } from '@app/core/config/api';
                 </thead>
                 <tbody>
                   @for (p of pendingPlans(); track p.id) {
-                    <tr class="border-t border-gray-100">
+                    <tr class="border-t border-gray-100 dark:border-line">
                       <td class="px-4 py-3">{{ p.warehouseName }}</td>
                       <td class="px-4 py-3">{{ p.skuDisplayName }}</td>
                       <td class="px-4 py-3 text-right tabular-nums">{{ formatQty(p.quantity) }} {{ p.unit }}</td>
                       <td class="px-4 py-3">{{ p.expectedAt | dateLabel }}</td>
                       <td class="px-4 py-3">
                         <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
-                          [class]="p.status === 'PLANNED' ? 'bg-gray-100 text-gray-700' : 'bg-blue-100 text-blue-700'">
+                          [class]="p.status === 'PLANNED' ? 'bg-gray-100 dark:bg-surface-3 text-gray-700 dark:text-ink-dim' : 'bg-blue-100 dark:bg-blue-500/15 text-blue-700 dark:text-blue-400'">
                           {{ p.status }}
                         </span>
                       </td>
-                      <td class="px-4 py-3 text-gray-500">{{ p.orderNumber ?? '—' }}</td>
+                      <td class="px-4 py-3 text-gray-500 dark:text-muted">{{ p.orderNumber ?? '—' }}</td>
                       <td class="px-4 py-3 text-right">
                         <div class="flex justify-end gap-2">
                           <button
                             (click)="cancelPlan(p)"
                             [disabled]="actingPlanId() === p.id"
-                            class="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                            class="rounded-md border border-gray-200 dark:border-line px-2 py-1 text-xs text-gray-600 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint disabled:opacity-50"
                           >
                             Cancel
                           </button>
@@ -258,13 +258,13 @@ import { API } from '@app/core/config/api';
       <!-- Replenishment plan modal -->
       @if (showPlanForm()) {
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">Plan replenishment</h3>
+          <div class="w-full max-w-md rounded-xl bg-white dark:bg-surface p-6 shadow-xl">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-ink mb-4">Plan replenishment</h3>
             <div class="space-y-3">
               <label class="block">
-                <span class="text-xs font-medium text-gray-600">Warehouse</span>
+                <span class="text-xs font-medium text-gray-600 dark:text-ink-dim">Warehouse</span>
                 <select [(ngModel)]="newPlan.warehouseId"
-                  class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                  class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm">
                   <option value="">Select…</option>
                   @for (w of warehouses(); track w.id) {
                     @if (w.inventoryEnabled && w.allowManualReplenishment && w.active) {
@@ -276,9 +276,9 @@ import { API } from '@app/core/config/api';
                 </select>
               </label>
               <label class="block">
-                <span class="text-xs font-medium text-gray-600">SKU</span>
+                <span class="text-xs font-medium text-gray-600 dark:text-ink-dim">SKU</span>
                 <select [(ngModel)]="newPlan.skuId"
-                  class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                  class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm">
                   <option value="">Select…</option>
                   @for (s of skus(); track s.id) {
                     @if (s.inventoryTracked && s.active) {
@@ -289,38 +289,38 @@ import { API } from '@app/core/config/api';
               </label>
               <div class="grid grid-cols-2 gap-3">
                 <label class="block">
-                  <span class="text-xs font-medium text-gray-600">Quantity</span>
+                  <span class="text-xs font-medium text-gray-600 dark:text-ink-dim">Quantity</span>
                   <input type="number" min="0" step="0.001" [(ngModel)]="newPlan.quantity"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                    class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm" />
                 </label>
                 <label class="block">
-                  <span class="text-xs font-medium text-gray-600">Unit</span>
+                  <span class="text-xs font-medium text-gray-600 dark:text-ink-dim">Unit</span>
                   <input type="text" [(ngModel)]="newPlan.unit"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                    class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm" />
                 </label>
               </div>
               <label class="block">
-                <span class="text-xs font-medium text-gray-600">Expected date</span>
+                <span class="text-xs font-medium text-gray-600 dark:text-ink-dim">Expected date</span>
                 <input type="date" [(ngModel)]="newPlan.expectedAt"
-                  class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                  class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm" />
               </label>
               <label class="block">
-                <span class="text-xs font-medium text-gray-600">Note (optional)</span>
+                <span class="text-xs font-medium text-gray-600 dark:text-ink-dim">Note (optional)</span>
                 <input type="text" [(ngModel)]="newPlan.note" placeholder="e.g. Awaiting supplier confirmation"
-                  class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                  class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm" />
               </label>
               @if (planFormError()) {
-                <p class="text-xs text-red-600">{{ planFormError() }}</p>
+                <p class="text-xs text-red-600 dark:text-red-400">{{ planFormError() }}</p>
               }
             </div>
             <div class="mt-5 flex justify-end gap-2">
-              <button (click)="closePlanForm()" class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm">
+              <button (click)="closePlanForm()" class="rounded-lg border border-gray-200 dark:border-line px-3 py-1.5 text-sm">
                 Cancel
               </button>
               <button
                 (click)="submitPlan()"
                 [disabled]="!canSubmitPlan() || planSubmitting()"
-                class="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+                class="rounded-lg bg-brand-700 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
               >
                 {{ planSubmitting() ? 'Saving…' : 'Create plan' }}
               </button>

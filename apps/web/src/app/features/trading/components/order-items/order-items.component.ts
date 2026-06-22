@@ -39,21 +39,19 @@ import type {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, DecimalPipe, SearchableDropdownComponent, OrderItemPricingComponent, OrderItemInventoryBandComponent],
   template: `
-    <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+    <div class="overflow-hidden rounded-2xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm">
       <!-- ═══════════════════════════════════════════════════════════ -->
       <!--  Shared header                                             -->
       <!-- ═══════════════════════════════════════════════════════════ -->
-      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 dark:border-line px-4 py-3">
         <div>
-          <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-700">Line Items</h3>
-          <p class="mt-1 text-xs text-gray-500">{{ rows().length }} item{{ rows().length === 1 ? '' : 's' }} in this {{ readonly() ? 'document' : 'deal' }}</p>
+          <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-700 dark:text-ink-dim">Line Items</h3>
+          <p class="mt-1 text-xs text-gray-500 dark:text-muted">{{ rows().length }} item{{ rows().length === 1 ? '' : 's' }} in this {{ readonly() ? 'document' : 'deal' }}</p>
         </div>
         @if (!readonly()) {
           <button
             (click)="addRow()"
-            class="inline-flex items-center gap-2 rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold
-                   text-gray-700 shadow-sm transition-colors hover:border-brand-300 hover:text-brand-700 focus:outline-none
-                   focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
+            class="inline-flex items-center gap-2 rounded-full border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-4 py-2 text-sm font-semibold text-gray-700 dark:text-ink-dim shadow-sm transition-colors hover:border-brand-300 hover:text-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:ring-offset-2"
           >
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
@@ -69,30 +67,30 @@ import type {
     <div class="hidden overflow-x-auto md:block">
       <table class="w-full text-sm">
         <thead>
-          <tr class="border-b border-gray-200 bg-gray-50/80">
-            <th class="px-4 py-3 text-left font-medium text-gray-600 min-w-[140px]">Product</th>
+          <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80">
+            <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim min-w-[140px]">Product</th>
             @if (showSupplierColumn()) {
-              <th class="px-4 py-3 text-left font-medium text-gray-600 min-w-[160px]">Supplier</th>
+              <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim min-w-[160px]">Supplier</th>
             }
-            <th class="px-4 py-3 text-left font-medium text-gray-600 min-w-[180px]">Description</th>
-            <th class="px-4 py-3 text-left font-medium text-gray-600 min-w-[120px]">Qty</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim min-w-[180px]">Description</th>
+            <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim min-w-[120px]">Qty</th>
             @if (allowDeliveredEdit()) {
-              <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[110px]">Del. Qty</th>
+              <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[110px]">Del. Qty</th>
             }
             @if (canSeePrices()) {
-              <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[180px]">Cost</th>
-              <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[180px]">Sell</th>
-              <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Gross ({{ baseCurrency() }})</th>
-              <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Financing</th>
-              <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[120px]">Net</th>
-              <th class="px-4 py-3 text-right font-medium text-gray-600 min-w-[100px]">Tax</th>
+              <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[180px]">Cost</th>
+              <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[180px]">Sell</th>
+              <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[120px]">Gross ({{ baseCurrency() }})</th>
+              <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[120px]">Financing</th>
+              <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[120px]">Net</th>
+              <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim min-w-[100px]">Tax</th>
             }
             @if (!readonly()) {
               <th class="w-0 p-0"></th>
             }
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-100">
+        <tbody class="divide-y divide-gray-100 dark:divide-line">
           @for (row of rows(); track row.id; let i = $index) {
             <tr class="group relative transition-colors hover:bg-gray-50/50 align-top">
               <!-- Product -->
@@ -112,13 +110,12 @@ import type {
               @if (showSupplierColumn()) {
                 <td class="px-4 py-2">
                   @if (readonly()) {
-                    <span class="text-sm text-gray-700">{{ supplierLabel(row.orderSupplierId) }}</span>
+                    <span class="text-sm text-gray-700 dark:text-ink-dim">{{ supplierLabel(row.orderSupplierId) }}</span>
                   } @else {
                     <select
                       [ngModel]="row.orderSupplierId ?? ''"
                       (ngModelChange)="updateField(i, 'orderSupplierId', $event || null)"
-                      class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
-                             focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                      class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 dark:border-line-strong px-2 py-1.5 text-sm text-gray-700 dark:text-ink-dim focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none bg-white dark:bg-surface"
                     >
                       <option value="">Select supplier</option>
                       @for (supplier of supplierOptions(); track supplier.value) {
@@ -132,15 +129,14 @@ import type {
               <!-- Description -->
               <td class="px-4 py-2">
                 @if (readonly()) {
-                  <span class="text-sm text-gray-700">{{ row.description || '-' }}</span>
+                  <span class="text-sm text-gray-700 dark:text-ink-dim">{{ row.description || '-' }}</span>
                 } @else {
                   <input
                     type="text"
                     [ngModel]="row.description"
                     (ngModelChange)="updateField(i, 'description', $event)"
                     placeholder="e.g. local specs"
-                    class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm
-                           focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                    class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-2 py-1.5 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
                   />
                 }
               </td>
@@ -164,10 +160,9 @@ import type {
                         [ngModel]="row.quantityMin"
                         (ngModelChange)="updateQuantityMin(i, $event)"
                         placeholder="Min"
-                        class="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm tabular-nums
-                               focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                        class="w-20 rounded-lg border border-gray-300 dark:border-line-strong px-2 py-1.5 text-right text-sm tabular-nums focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
                       />
-                      <span class="text-gray-400 text-xs">–</span>
+                      <span class="text-gray-400 dark:text-muted text-xs">–</span>
                     }
                     <input
                       type="number" step="0.001" min="0"
@@ -175,22 +170,20 @@ import type {
                       (ngModelChange)="updateQuantity(i, $event)"
                       [attr.min]="spreadEnabled().has(row.id) && row.quantityMin !== null ? row.quantityMin : 0"
                       placeholder="Qty"
-                      class="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm tabular-nums
-                             focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                      class="w-20 rounded-lg border border-gray-300 dark:border-line-strong px-2 py-1.5 text-right text-sm tabular-nums focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
                     />
                     <span class="order-item-inline-select-wrap">
                       <select
                         [ngModel]="row.unit"
                         (ngModelChange)="updateField(i, 'unit', $event)"
-                        class="order-item-inline-select cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500
-                               hover:text-brand-600 focus:outline-none"
+                        class="order-item-inline-select cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-500 dark:text-muted hover:text-brand-600 focus:outline-none"
                       >
                         @for (u of unitOptions(); track u.value) {
                           <option [value]="u.value">{{ u.label }}</option>
                         }
                       </select>
                       <svg
-                        class="pointer-events-none absolute right-0 top-1/2 h-3 w-3 -translate-y-1/2 text-gray-400"
+                        class="pointer-events-none absolute right-0 top-1/2 h-3 w-3 -translate-y-1/2 text-gray-400 dark:text-muted"
                         xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
                       >
                         <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
@@ -202,7 +195,7 @@ import type {
                       [class.text-brand-600]="spreadEnabled().has(row.id)"
                       [class.bg-brand-50]="spreadEnabled().has(row.id)"
                       [class.text-gray-400]="!spreadEnabled().has(row.id)"
-                      class="rounded p-1 text-xs hover:bg-gray-100 transition-colors"
+                      class="rounded p-1 text-xs hover:bg-gray-100 dark:hover:bg-surface-tint-strong transition-colors"
                       [attr.title]="spreadEnabled().has(row.id) ? 'Remove min qty' : 'Add min qty spread'"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -221,8 +214,7 @@ import type {
                     type="number" step="0.001" min="0"
                     [ngModel]="row.deliveredQuantity ?? row.quantity"
                     (ngModelChange)="updateField(i, 'deliveredQuantity', parseDecimalInput($event))"
-                    class="w-24 rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm tabular-nums
-                           focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                    class="w-24 rounded-lg border border-gray-300 dark:border-line-strong px-2 py-1.5 text-right text-sm tabular-nums focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
                   />
                 </td>
               }
@@ -271,13 +263,13 @@ import type {
                 [class.font-semibold]="!isFormulaUnfinalized(row) && profitForRow(row) !== 0"
               >
                 @if (isFormulaUnfinalized(row)) {
-                  <span class="italic text-amber-600 text-xs">TBD</span>
+                  <span class="italic text-amber-600 dark:text-amber-400 text-xs">TBD</span>
                 } @else {
                   {{ profitForRow(row) | number:'1.2-2' }}
                 }
               </td>
 
-              <td class="px-4 py-3 pt-4 text-right tabular-nums text-amber-700">
+              <td class="px-4 py-3 pt-4 text-right tabular-nums text-amber-700 dark:text-amber-400">
                 @if (isFormulaUnfinalized(row)) {
                   <span class="italic text-xs">TBD</span>
                 } @else {
@@ -291,7 +283,7 @@ import type {
                 [class.font-semibold]="!isFormulaUnfinalized(row) && netProfitForRow(row) !== 0"
               >
                 @if (isFormulaUnfinalized(row)) {
-                  <span class="italic text-amber-600 text-xs">TBD</span>
+                  <span class="italic text-amber-600 dark:text-amber-400 text-xs">TBD</span>
                 } @else {
                   {{ netProfitForRow(row) | number:'1.2-2' }}
                 }
@@ -303,19 +295,19 @@ import type {
                 [class.font-semibold]="!isFormulaUnfinalized(row) && row.taxAmount != null && row.taxAmount > 0"
               >
                 @if (isFormulaUnfinalized(row)) {
-                  <span class="italic text-amber-600 text-xs">TBD</span>
+                  <span class="italic text-amber-600 dark:text-amber-400 text-xs">TBD</span>
                 } @else if (readonly()) {
                   @if (row.taxRate != null) {
-                    <span class="text-xs text-gray-500">{{ row.taxRate | number:'1.2-2' }}%</span>
+                    <span class="text-xs text-gray-500 dark:text-muted">{{ row.taxRate | number:'1.2-2' }}%</span>
                     <div>{{ row.taxAmount ?? 0 | number:'1.2-2' }}</div>
                   } @else {
-                    <span class="text-gray-400 text-xs">—</span>
+                    <span class="text-gray-400 dark:text-muted text-xs">—</span>
                   }
                 } @else {
                   <select
                     [ngModel]="row.taxRate ?? ''"
                     (ngModelChange)="onTaxRateChange(i, $event)"
-                    class="order-item-inline-select cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-700 hover:text-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-500/20 rounded"
+                    class="order-item-inline-select cursor-pointer appearance-none bg-transparent border-0 p-0 text-xs text-gray-700 dark:text-ink-dim hover:text-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600/20 rounded"
                   >
                     <option value="">None</option>
                     @for (rate of taxRatesInput(); track rate.id) {
@@ -323,7 +315,7 @@ import type {
                     }
                   </select>
                   @if (row.taxRate != null) {
-                    <div class="text-xs text-gray-500">{{ row.taxAmount ?? 0 | number:'1.2-2' }}</div>
+                    <div class="text-xs text-gray-500 dark:text-muted">{{ row.taxAmount ?? 0 | number:'1.2-2' }}</div>
                   }
                 }
               </td>
@@ -334,7 +326,7 @@ import type {
                 <td class="relative w-0 p-0">
                   <button
                     (click)="removeRow(i)"
-                    class="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-gray-300 opacity-0 transition-all hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
+                    class="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-gray-300 dark:text-muted opacity-0 transition-all hover:bg-red-50 dark:hover:bg-red-500/15 hover:text-red-500 group-hover:opacity-100"
                     aria-label="Remove item"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -360,11 +352,11 @@ import type {
           } @empty {
             <tr>
               <td [attr.colspan]="(readonly() ? 4 : 5) + (showSupplierColumn() ? 1 : 0) + (allowDeliveredEdit() ? 1 : 0) + (canSeePrices() ? 5 : 0)" class="px-4 py-12 text-center">
-                <p class="text-sm text-gray-400">No line items yet.</p>
+                <p class="text-sm text-gray-400 dark:text-muted">No line items yet.</p>
                 @if (!readonly()) {
                   <button
                     (click)="addRow()"
-                    class="mt-2 text-sm font-medium text-brand-600 hover:text-brand-700"
+                    class="mt-2 text-sm font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700"
                   >
                     + Add your first item
                   </button>
@@ -376,22 +368,22 @@ import type {
         <!-- Totals row -->
         @if (rows().length > 0) {
           <tfoot>
-            <tr class="border-t-2 border-gray-200 bg-gray-50/50 font-semibold">
-              <td class="px-4 py-3 text-right text-gray-600">Totals</td>
+            <tr class="border-t-2 border-gray-200 dark:border-line bg-gray-50/50 font-semibold">
+              <td class="px-4 py-3 text-right text-gray-600 dark:text-ink-dim">Totals</td>
               <td></td>
               <td></td>
               @if (allowDeliveredEdit()) {
                 <td></td>
               }
-              <td class="px-4 py-3 text-right tabular-nums text-gray-600">{{ totalCost() | number:'1.2-2' }} {{ baseCurrency() }}</td>
-              <td class="px-4 py-3 text-right tabular-nums text-gray-600">{{ totalRevenue() | number:'1.2-2' }} {{ baseCurrency() }}</td>
+              <td class="px-4 py-3 text-right tabular-nums text-gray-600 dark:text-ink-dim">{{ totalCost() | number:'1.2-2' }} {{ baseCurrency() }}</td>
+              <td class="px-4 py-3 text-right tabular-nums text-gray-600 dark:text-ink-dim">{{ totalRevenue() | number:'1.2-2' }} {{ baseCurrency() }}</td>
               <td class="px-4 py-3 text-right tabular-nums"
                 [class.text-green-600]="totalProfit() > 0"
                 [class.text-red-600]="totalProfit() < 0"
               >
                 {{ totalProfit() | number:'1.2-2' }} {{ baseCurrency() }}
               </td>
-              <td class="px-4 py-3 text-right tabular-nums text-amber-700">
+              <td class="px-4 py-3 text-right tabular-nums text-amber-700 dark:text-amber-400">
                 {{ totalFinancingCost() | number:'1.2-2' }} {{ baseCurrency() }}
               </td>
               <td class="px-4 py-3 text-right tabular-nums"
@@ -412,16 +404,16 @@ import type {
     <!-- ═════════════════════════════════════════════════════════════ -->
     <div class="space-y-3 bg-gray-50/40 p-4 md:hidden">
       @for (row of rows(); track row.id; let i = $index) {
-        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-4 shadow-sm">
           <!-- Card header -->
           <div class="flex items-center justify-between mb-3">
-            <span class="inline-flex items-center rounded-md bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
+            <span class="inline-flex items-center rounded-md bg-brand-50 dark:bg-brand-700/15 px-2 py-0.5 text-xs font-semibold text-brand-700 dark:text-brand-400">
               {{ row.productType || 'New Item' }}
             </span>
             @if (!readonly()) {
               <button
                 (click)="removeRow(i)"
-                class="rounded-md p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"
+                class="rounded-md p-1 text-gray-400 dark:text-muted hover:bg-red-50 dark:hover:bg-red-500/15 hover:text-red-500"
                 aria-label="Remove item"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -435,7 +427,7 @@ import type {
           <div class="grid grid-cols-2 gap-3">
             <!-- Product -->
             <div class="col-span-2">
-              <label class="mb-1 block text-xs font-medium text-gray-500">Product</label>
+              <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">Product</label>
               @if (readonly()) {
                 <span class="text-sm">{{ row.productType }}</span>
               } @else {
@@ -450,15 +442,14 @@ import type {
 
             @if (showSupplierColumn()) {
               <div class="col-span-2">
-                <label class="mb-1 block text-xs font-medium text-gray-500">Supplier</label>
+                <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">Supplier</label>
                 @if (readonly()) {
-                  <span class="text-sm text-gray-700">{{ supplierLabel(row.orderSupplierId) }}</span>
+                  <span class="text-sm text-gray-700 dark:text-ink-dim">{{ supplierLabel(row.orderSupplierId) }}</span>
                 } @else {
                   <select
                     [ngModel]="row.orderSupplierId ?? ''"
                     (ngModelChange)="updateField(i, 'orderSupplierId', $event || null)"
-                    class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
-                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                    class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 dark:border-line-strong px-2 py-1.5 text-sm text-gray-700 dark:text-ink-dim focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none bg-white dark:bg-surface"
                   >
                     <option value="">Select supplier</option>
                     @for (supplier of supplierOptions(); track supplier.value) {
@@ -471,24 +462,23 @@ import type {
 
             <!-- Description -->
             <div class="col-span-2">
-              <label class="mb-1 block text-xs font-medium text-gray-500">Description</label>
+              <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">Description</label>
               @if (readonly()) {
-                <span class="text-sm text-gray-700">{{ row.description || '-' }}</span>
+                <span class="text-sm text-gray-700 dark:text-ink-dim">{{ row.description || '-' }}</span>
               } @else {
                 <input
                   type="text"
                   [ngModel]="row.description"
                   (ngModelChange)="updateField(i, 'description', $event)"
                   placeholder="e.g. local specs"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm
-                         focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-1.5 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
                 />
               }
             </div>
 
             <!-- Qty -->
             <div>
-              <label class="mb-1 block text-xs font-medium text-gray-500">Quantity</label>
+              <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">Quantity</label>
               @if (readonly()) {
                 <span class="text-sm tabular-nums">
                   @if (row.quantityMin != null && row.quantityMin !== row.quantity) {
@@ -505,8 +495,7 @@ import type {
                       [ngModel]="row.quantityMin"
                       (ngModelChange)="updateQuantityMin(i, $event)"
                       placeholder="Min qty"
-                      class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
-                             focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                      class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-1.5 text-sm tabular-nums focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
                     />
                   }
                   <div class="flex items-center gap-2">
@@ -515,8 +504,7 @@ import type {
                       (ngModelChange)="updateQuantity(i, $event)"
                       [attr.min]="spreadEnabled().has(row.id) && row.quantityMin !== null ? row.quantityMin : 0"
                       placeholder="Qty"
-                      class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
-                             focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                      class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-1.5 text-sm tabular-nums focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
                     />
                     <button
                       type="button"
@@ -524,7 +512,7 @@ import type {
                       [class.text-brand-600]="spreadEnabled().has(row.id)"
                       [class.bg-brand-50]="spreadEnabled().has(row.id)"
                       [class.text-gray-400]="!spreadEnabled().has(row.id)"
-                      class="shrink-0 rounded p-1 text-xs hover:bg-gray-100 transition-colors"
+                      class="shrink-0 rounded p-1 text-xs hover:bg-gray-100 dark:hover:bg-surface-tint-strong transition-colors"
                       [attr.title]="spreadEnabled().has(row.id) ? 'Remove min qty' : 'Add min qty spread'"
                     >
                       ±
@@ -536,15 +524,14 @@ import type {
 
             <!-- Unit (base qty unit) -->
             <div>
-              <label class="mb-1 block text-xs font-medium text-gray-500">Unit</label>
+              <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">Unit</label>
               @if (readonly()) {
-                <span class="text-sm text-gray-500">{{ row.unit }}</span>
+                <span class="text-sm text-gray-500 dark:text-muted">{{ row.unit }}</span>
               } @else {
                 <select
                   [ngModel]="row.unit"
                   (ngModelChange)="updateField(i, 'unit', $event)"
-                  class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
-                         focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                  class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 dark:border-line-strong px-2 py-1.5 text-sm text-gray-700 dark:text-ink-dim focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none bg-white dark:bg-surface"
                 >
                   @for (u of unitOptions(); track u.value) {
                     <option [value]="u.value">{{ u.label }}</option>
@@ -555,15 +542,14 @@ import type {
 
             <!-- Cost Unit -->
             <div>
-              <label class="mb-1 block text-xs font-medium text-gray-500">Cost Unit</label>
+              <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">Cost Unit</label>
               @if (readonly()) {
-                <span class="text-sm text-gray-500">{{ row.costUnit }}</span>
+                <span class="text-sm text-gray-500 dark:text-muted">{{ row.costUnit }}</span>
               } @else {
                 <select
                   [ngModel]="row.costUnit"
                   (ngModelChange)="updateField(i, 'costUnit', $event)"
-                  class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
-                         focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                  class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 dark:border-line-strong px-2 py-1.5 text-sm text-gray-700 dark:text-ink-dim focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none bg-white dark:bg-surface"
                 >
                   @for (u of unitOptions(); track u.value) {
                     <option [value]="u.value">{{ u.label }}</option>
@@ -574,15 +560,14 @@ import type {
 
             <!-- Sales Unit -->
             <div>
-              <label class="mb-1 block text-xs font-medium text-gray-500">Sales Unit</label>
+              <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">Sales Unit</label>
               @if (readonly()) {
-                <span class="text-sm text-gray-500">{{ row.salesUnit }}</span>
+                <span class="text-sm text-gray-500 dark:text-muted">{{ row.salesUnit }}</span>
               } @else {
                 <select
                   [ngModel]="row.salesUnit"
                   (ngModelChange)="updateField(i, 'salesUnit', $event)"
-                  class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
-                         focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                  class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 dark:border-line-strong px-2 py-1.5 text-sm text-gray-700 dark:text-ink-dim focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none bg-white dark:bg-surface"
                 >
                   @for (u of unitOptions(); track u.value) {
                     <option [value]="u.value">{{ u.label }}</option>
@@ -594,7 +579,7 @@ import type {
             @if (canSeePrices()) {
             <!-- Cost -->
             <div>
-              <label class="mb-1 block text-xs font-medium text-gray-500">Cost</label>
+              <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">Cost</label>
               <app-order-item-pricing
                 [row]="row"
                 side="cost"
@@ -613,7 +598,7 @@ import type {
 
             <!-- Sell -->
             <div>
-              <label class="mb-1 block text-xs font-medium text-gray-500">Sell</label>
+              <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">Sell</label>
               <app-order-item-pricing
                 [row]="row"
                 side="sales"
@@ -632,9 +617,9 @@ import type {
 
             <!-- Gross Profit -->
             <div>
-              <label class="mb-1 block text-xs font-medium text-gray-500">Gross Profit ({{ baseCurrency() }})</label>
+              <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">Gross Profit ({{ baseCurrency() }})</label>
               @if (isFormulaUnfinalized(row)) {
-                <span class="text-xs italic text-amber-600">TBD</span>
+                <span class="text-xs italic text-amber-600 dark:text-amber-400">TBD</span>
               } @else {
                 <span
                   class="text-sm font-semibold tabular-nums"
@@ -647,20 +632,20 @@ import type {
             </div>
 
             <div>
-              <label class="mb-1 block text-xs font-medium text-gray-500">Financing</label>
+              <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">Financing</label>
               @if (isFormulaUnfinalized(row)) {
-                <span class="text-xs italic text-amber-700">TBD</span>
+                <span class="text-xs italic text-amber-700 dark:text-amber-400">TBD</span>
               } @else {
-                <span class="text-sm font-semibold tabular-nums text-amber-700">
+                <span class="text-sm font-semibold tabular-nums text-amber-700 dark:text-amber-400">
                   {{ financingCostForRow(row) | number:'1.2-2' }}
                 </span>
               }
             </div>
 
             <div>
-              <label class="mb-1 block text-xs font-medium text-gray-500">Net Profit ({{ baseCurrency() }})</label>
+              <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">Net Profit ({{ baseCurrency() }})</label>
               @if (isFormulaUnfinalized(row)) {
-                <span class="text-xs italic text-amber-600">TBD</span>
+                <span class="text-xs italic text-amber-600 dark:text-amber-400">TBD</span>
               } @else {
                 <span
                   class="text-sm font-semibold tabular-nums"
@@ -676,21 +661,21 @@ import type {
             <!-- Tax (mobile) -->
             @if (canSeePrices()) {
             <div>
-              <label class="mb-1 block text-xs font-medium text-gray-500">Tax</label>
+              <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">Tax</label>
               @if (isFormulaUnfinalized(row)) {
-                <span class="text-xs italic text-amber-600">TBD</span>
+                <span class="text-xs italic text-amber-600 dark:text-amber-400">TBD</span>
               } @else if (readonly()) {
                 @if (row.taxRate != null) {
-                  <span class="text-xs text-gray-500">{{ row.taxRate | number:'1.2-2' }}%</span>
+                  <span class="text-xs text-gray-500 dark:text-muted">{{ row.taxRate | number:'1.2-2' }}%</span>
                   <span class="block text-sm font-medium tabular-nums">{{ row.taxAmount ?? 0 | number:'1.2-2' }}</span>
                 } @else {
-                  <span class="text-gray-400 text-xs">—</span>
+                  <span class="text-gray-400 dark:text-muted text-xs">—</span>
                 }
               } @else {
                 <select
                   [ngModel]="row.taxRate ?? ''"
                   (ngModelChange)="onTaxRateChange(i, $event)"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm bg-white focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-1.5 text-sm bg-white dark:bg-surface focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
                 >
                   <option value="">None</option>
                   @for (rate of taxRatesInput(); track rate.id) {
@@ -698,7 +683,7 @@ import type {
                   }
                 </select>
                 @if (row.taxRate != null) {
-                  <span class="block text-xs text-gray-500 mt-1">{{ row.taxAmount ?? 0 | number:'1.2-2' }} {{ baseCurrency() }}</span>
+                  <span class="block text-xs text-gray-500 dark:text-muted mt-1">{{ row.taxAmount ?? 0 | number:'1.2-2' }} {{ baseCurrency() }}</span>
                 }
               }
             </div>
@@ -707,12 +692,11 @@ import type {
             <!-- Delivered Qty (mobile) -->
             @if (allowDeliveredEdit()) {
               <div>
-                <label class="mb-1 block text-xs font-medium text-gray-500">Delivered Qty</label>
+                <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">Delivered Qty</label>
                 <input type="number" step="0.001" min="0"
                   [ngModel]="row.deliveredQuantity ?? row.quantity"
                   (ngModelChange)="updateField(i, 'deliveredQuantity', parseDecimalInput($event))"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm tabular-nums
-                         focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-1.5 text-sm tabular-nums focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
                 />
               </div>
             }
@@ -720,10 +704,10 @@ import type {
           </div>
         </div>
       } @empty {
-        <div class="rounded-xl border-2 border-dashed border-gray-300 bg-white p-8 text-center">
-          <p class="text-sm text-gray-400">No line items yet.</p>
+        <div class="rounded-xl border-2 border-dashed border-gray-300 dark:border-line-strong bg-white dark:bg-surface p-8 text-center">
+          <p class="text-sm text-gray-400 dark:text-muted">No line items yet.</p>
           @if (!readonly()) {
-            <button (click)="addRow()" class="mt-2 text-sm font-medium text-brand-600 hover:text-brand-700">
+            <button (click)="addRow()" class="mt-2 text-sm font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700">
               + Add your first item
             </button>
           }
@@ -732,9 +716,9 @@ import type {
 
       <!-- Mobile totals bar -->
       @if (rows().length > 0 && canSeePrices()) {
-        <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+        <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 p-4">
           <div class="flex items-center justify-between text-sm">
-            <span class="font-medium text-gray-600">Gross Profit</span>
+            <span class="font-medium text-gray-600 dark:text-ink-dim">Gross Profit</span>
             <span
               class="text-lg font-bold tabular-nums"
               [class.text-green-600]="totalProfit() > 0"
@@ -743,12 +727,12 @@ import type {
               {{ totalProfit() | number:'1.2-2' }} {{ baseCurrency() }}
             </span>
           </div>
-          <div class="mt-2 flex items-center justify-between text-sm text-amber-700">
+          <div class="mt-2 flex items-center justify-between text-sm text-amber-700 dark:text-amber-400">
             <span class="font-medium">Financing Cost</span>
             <span class="font-semibold tabular-nums">{{ totalFinancingCost() | number:'1.2-2' }} {{ baseCurrency() }}</span>
           </div>
           <div class="mt-2 flex items-center justify-between text-sm">
-            <span class="font-medium text-gray-600">Net Profit</span>
+            <span class="font-medium text-gray-600 dark:text-ink-dim">Net Profit</span>
             <span
               class="text-lg font-bold tabular-nums"
               [class.text-green-600]="totalNetProfit() > 0"
@@ -757,24 +741,24 @@ import type {
               {{ totalNetProfit() | number:'1.2-2' }} {{ baseCurrency() }}
             </span>
           </div>
-          <div class="mt-2 flex items-center justify-between text-xs text-gray-500">
+          <div class="mt-2 flex items-center justify-between text-xs text-gray-500 dark:text-muted">
             <span>Financing / MT</span>
             <span class="tabular-nums">{{ (financingCostPerMt() ?? 0) | number:'1.2-2' }} {{ baseCurrency() }}</span>
           </div>
-          <div class="mt-1 flex items-center justify-between text-xs text-gray-500">
+          <div class="mt-1 flex items-center justify-between text-xs text-gray-500 dark:text-muted">
             <span>Net Margin</span>
             <span class="tabular-nums">{{ (netMarginPct() ?? 0) | number:'1.2-2' }}%</span>
           </div>
-          <div class="mt-1 flex items-center justify-between text-xs text-gray-400">
+          <div class="mt-1 flex items-center justify-between text-xs text-gray-400 dark:text-muted">
             <span>{{ rows().length }} item(s) · {{ totalQty() | number:'1.0-0' }} MT</span>
             <span>Rev {{ totalRevenue() | number:'1.2-2' }} {{ baseCurrency() }}</span>
           </div>
         </div>
       } @else if (rows().length > 0) {
-        <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
-          <div class="flex items-center justify-between text-xs text-gray-400">
+        <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 p-4">
+          <div class="flex items-center justify-between text-xs text-gray-400 dark:text-muted">
             <span>{{ rows().length }} item(s) · {{ totalQty() | number:'1.0-0' }} MT</span>
-            <span class="text-sm font-medium text-gray-500">Quantities only</span>
+            <span class="text-sm font-medium text-gray-500 dark:text-muted">Quantities only</span>
           </div>
         </div>
       }

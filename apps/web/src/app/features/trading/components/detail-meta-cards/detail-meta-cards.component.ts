@@ -23,13 +23,13 @@ import {
   template: `
     <div class="mb-4 grid gap-4 grid-cols-1 min-[900px]:grid-cols-2 min-[1600px]:grid-cols-4">
       <!-- Client + Customer Contact + Broker + Agent + Customer Payment -->
-      <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-        <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between gap-3">
+      <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm overflow-hidden">
+        <div class="border-b border-gray-100 dark:border-line px-5 py-3 flex items-center justify-between gap-3">
           <div class="flex min-w-0 items-center gap-1">
             <button
               type="button"
               class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
-              [class]="activeClientPartyTab() === 'client' ? 'bg-brand-50 text-brand-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'"
+              [class]="activeClientPartyTab() === 'client' ? 'bg-brand-50 dark:bg-brand-700/15 text-brand-700 dark:text-brand-400' : 'text-gray-500 dark:text-muted hover:text-gray-700 hover:bg-gray-50 dark:hover:bg-surface-tint'"
               (click)="clientPartyTab.set('client')"
             >
               Client
@@ -38,7 +38,7 @@ import {
               <button
                 type="button"
                 class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
-                [class]="activeClientPartyTab() === 'broker' ? 'bg-brand-50 text-brand-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'"
+                [class]="activeClientPartyTab() === 'broker' ? 'bg-brand-50 dark:bg-brand-700/15 text-brand-700 dark:text-brand-400' : 'text-gray-500 dark:text-muted hover:text-gray-700 hover:bg-gray-50 dark:hover:bg-surface-tint'"
                 (click)="clientPartyTab.set('broker')"
               >
                 Broker
@@ -48,7 +48,7 @@ import {
               <button
                 type="button"
                 class="rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors"
-                [class]="activeClientPartyTab() === 'agent' ? 'bg-brand-50 text-brand-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'"
+                [class]="activeClientPartyTab() === 'agent' ? 'bg-brand-50 dark:bg-brand-700/15 text-brand-700 dark:text-brand-400' : 'text-gray-500 dark:text-muted hover:text-gray-700 hover:bg-gray-50 dark:hover:bg-surface-tint'"
                 (click)="clientPartyTab.set('agent')"
               >
                 Agent
@@ -61,7 +61,7 @@ import {
                 <button
                   type="button"
                   (click)="openBrokerTab()"
-                  class="inline-flex items-center gap-1 rounded-md bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 transition-colors hover:bg-brand-100"
+                  class="inline-flex items-center gap-1 rounded-md bg-brand-50 dark:bg-brand-700/15 px-2 py-1 text-[11px] font-medium text-brand-700 dark:text-brand-400 transition-colors hover:bg-brand-100 dark:hover:bg-brand-500/20"
                 >
                   + Add broker
                 </button>
@@ -70,7 +70,7 @@ import {
                 <button
                   type="button"
                   (click)="openAgentTab()"
-                  class="inline-flex items-center gap-1 rounded-md bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 transition-colors hover:bg-brand-100"
+                  class="inline-flex items-center gap-1 rounded-md bg-brand-50 dark:bg-brand-700/15 px-2 py-1 text-[11px] font-medium text-brand-700 dark:text-brand-400 transition-colors hover:bg-brand-100 dark:hover:bg-brand-500/20"
                 >
                   + Add agent
                 </button>
@@ -91,19 +91,18 @@ import {
                 (selectionChange)="clientChange.emit($event)"
               />
             } @else {
-              <p class="mt-1 text-sm font-semibold text-gray-900">{{ clientName() }}</p>
+              <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-ink">{{ clientName() }}</p>
             }
             @if (!brokerId()) {
-              <div class="mt-3 border-t border-gray-100 pt-3">
-                <label class="text-xs font-medium text-gray-400">Contact Person</label>
+              <div class="mt-3 border-t border-gray-100 dark:border-line pt-3">
+                <label class="text-xs font-medium text-gray-400 dark:text-muted">Contact Person</label>
                 @if (isReadonly()) {
-                  <p class="mt-1 text-sm text-gray-900">{{ customerContactName() || '—' }}</p>
+                  <p class="mt-1 text-sm text-gray-900 dark:text-ink">{{ customerContactName() || '—' }}</p>
                 } @else {
                   <select
                     [ngModel]="customerContactId()"
                     (ngModelChange)="customerContactChange.emit($event)"
-                    class="fueld-select-no-chevron mt-1 w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
-                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                    class="fueld-select-no-chevron mt-1 w-full appearance-none rounded-lg border border-gray-300 dark:border-line-strong px-2 py-1.5 text-sm text-gray-700 dark:text-ink-dim focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none bg-white dark:bg-surface"
                   >
                     <option value="">— None —</option>
                     @for (c of customerContactOptions(); track c.value) {
@@ -112,18 +111,17 @@ import {
                   </select>
                 }
               </div>
-              <div class="mt-3 border-t border-gray-100 pt-3">
-                <label class="text-xs font-medium text-gray-400">PO Number</label>
+              <div class="mt-3 border-t border-gray-100 dark:border-line pt-3">
+                <label class="text-xs font-medium text-gray-400 dark:text-muted">PO Number</label>
                 @if (isReadonly()) {
-                  <p class="mt-1 text-sm text-gray-900">{{ purchaseOrderNumber() || '—' }}</p>
+                  <p class="mt-1 text-sm text-gray-900 dark:text-ink">{{ purchaseOrderNumber() || '—' }}</p>
                 } @else {
                   <input
                     type="text"
                     [ngModel]="purchaseOrderNumber()"
                     (ngModelChange)="purchaseOrderNumberChange.emit($event)"
                     placeholder="e.g. PO-2026-001"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-900
-                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                    class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-2.5 py-1.5 text-sm text-gray-900 dark:text-ink focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
                   />
                 }
               </div>
@@ -145,7 +143,7 @@ import {
               Broker
             </button>
             @if (isReadonly()) {
-              <p class="mt-1 text-sm font-semibold text-gray-900">{{ brokerName() }}</p>
+              <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-ink">{{ brokerName() }}</p>
             } @else {
               <app-searchable-dropdown
                 [options]="brokerOptions()"
@@ -159,16 +157,15 @@ import {
               />
             }
             @if (brokerId()) {
-              <div class="mt-3 border-t border-gray-100 pt-3">
-                <label class="text-xs font-medium text-gray-400">Broker Contact</label>
+              <div class="mt-3 border-t border-gray-100 dark:border-line pt-3">
+                <label class="text-xs font-medium text-gray-400 dark:text-muted">Broker Contact</label>
                 @if (isReadonly()) {
-                  <p class="mt-1 text-sm text-gray-900">{{ brokerContactName() || '—' }}</p>
+                  <p class="mt-1 text-sm text-gray-900 dark:text-ink">{{ brokerContactName() || '—' }}</p>
                 } @else {
                   <select
                     [ngModel]="brokerContactId()"
                     (ngModelChange)="brokerContactChange.emit($event)"
-                    class="fueld-select-no-chevron mt-1 w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
-                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                    class="fueld-select-no-chevron mt-1 w-full appearance-none rounded-lg border border-gray-300 dark:border-line-strong px-2 py-1.5 text-sm text-gray-700 dark:text-ink-dim focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none bg-white dark:bg-surface"
                   >
                     <option value="">— None —</option>
                     @for (c of brokerContactOptions(); track c.value) {
@@ -184,15 +181,15 @@ import {
                     (click)="brokerGetsAllChange.emit(!brokerGetsAll())"
                     [disabled]="isReadonly()"
                     class="relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
-                    [class]="brokerGetsAll() ? 'bg-brand-600' : 'bg-gray-300'"
+                    [class]="brokerGetsAll() ? 'bg-brand-700' : 'bg-gray-300'"
                   >
                     <span
-                      class="pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                      class="pointer-events-none inline-block h-4 w-4 rounded-full bg-white dark:bg-surface shadow ring-0 transition duration-200 ease-in-out"
                       [class.translate-x-4]="brokerGetsAll()"
                       [class.translate-x-0]="!brokerGetsAll()"
                     ></span>
                   </button>
-                  <span class="text-xs text-gray-600">Broker gets all comms</span>
+                  <span class="text-xs text-gray-600 dark:text-ink-dim">Broker gets all comms</span>
                 </label>
               </div>
             }
@@ -213,7 +210,7 @@ import {
               Agent
             </button>
             @if (isReadonly()) {
-              <p class="mt-1 text-sm font-semibold text-gray-900">{{ agentName() }}</p>
+              <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-ink">{{ agentName() }}</p>
             } @else {
               <app-searchable-dropdown
                 [options]="agentOptions()"
@@ -227,16 +224,15 @@ import {
               />
             }
             @if (agentId()) {
-              <div class="mt-3 border-t border-gray-100 pt-3">
-                <label class="text-xs font-medium text-gray-400">Agent Contact</label>
+              <div class="mt-3 border-t border-gray-100 dark:border-line pt-3">
+                <label class="text-xs font-medium text-gray-400 dark:text-muted">Agent Contact</label>
                 @if (isReadonly()) {
-                  <p class="mt-1 text-sm text-gray-900">{{ agentContactName() || '—' }}</p>
+                  <p class="mt-1 text-sm text-gray-900 dark:text-ink">{{ agentContactName() || '—' }}</p>
                 } @else {
                   <select
                     [ngModel]="agentContactId()"
                     (ngModelChange)="agentContactChange.emit($event)"
-                    class="fueld-select-no-chevron mt-1 w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
-                           focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                    class="fueld-select-no-chevron mt-1 w-full appearance-none rounded-lg border border-gray-300 dark:border-line-strong px-2 py-1.5 text-sm text-gray-700 dark:text-ink-dim focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none bg-white dark:bg-surface"
                   >
                     <option value="">— None —</option>
                     @for (c of agentContactOptions(); track c.value) {
@@ -247,14 +243,14 @@ import {
               </div>
             }
           }
-          <div class="mt-3 border-t border-gray-100 pt-3">
+          <div class="mt-3 border-t border-gray-100 dark:border-line pt-3">
             <ng-content select="[customerPayment]"></ng-content>
           </div>
         </div>
       </div>
       <!-- Supplier + Supplier Contact + Supplier Payment -->
-      <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-        <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between gap-3">
+      <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm overflow-hidden">
+        <div class="border-b border-gray-100 dark:border-line px-5 py-3 flex items-center justify-between gap-3">
           @if (!supplierId()) {
             <button
               type="button"
@@ -277,7 +273,7 @@ import {
         </div>
         <div class="px-5 py-4">
           @if (isReadonly()) {
-            <p class="mt-1 text-sm font-semibold text-gray-900">{{ supplierName() }}</p>
+            <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-ink">{{ supplierName() }}</p>
           } @else {
             <app-searchable-dropdown
               [options]="supplierOptions()"
@@ -290,18 +286,16 @@ import {
               (selectionChange)="supplierChange.emit($event)"
             />
           }
-          <div class="mt-3 border-t border-gray-100 pt-3">
-            <label class="text-xs font-medium text-gray-400">Contact Person</label>
+          <div class="mt-3 border-t border-gray-100 dark:border-line pt-3">
+            <label class="text-xs font-medium text-gray-400 dark:text-muted">Contact Person</label>
             @if (isReadonly()) {
-              <p class="mt-1 text-sm text-gray-900">{{ supplierContactName() || '—' }}</p>
+              <p class="mt-1 text-sm text-gray-900 dark:text-ink">{{ supplierContactName() || '—' }}</p>
             } @else {
               <select
                 [ngModel]="supplierContactId()"
                 (ngModelChange)="supplierContactChange.emit($event)"
                 [disabled]="!supplierId()"
-                class="fueld-select-no-chevron mt-1 w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
-                       focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white
-                       disabled:opacity-50 disabled:cursor-not-allowed"
+                class="fueld-select-no-chevron mt-1 w-full appearance-none rounded-lg border border-gray-300 dark:border-line-strong px-2 py-1.5 text-sm text-gray-700 dark:text-ink-dim focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none bg-white dark:bg-surface disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="">— None —</option>
                 @for (c of supplierContactOptions(); track c.value) {
@@ -310,14 +304,14 @@ import {
               </select>
             }
           </div>
-          <div class="mt-3 border-t border-gray-100 pt-3">
+          <div class="mt-3 border-t border-gray-100 dark:border-line pt-3">
             <ng-content select="[supplierPayment]"></ng-content>
           </div>
         </div>
       </div>
 
       <!-- Voyage: Vessel + Place + ETA/ETD -->
-      <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+      <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm">
         <button
           type="button"
           (click)="navigateToVessel()"
@@ -333,7 +327,7 @@ import {
           Vessel
         </button>
         @if (isReadonly()) {
-          <p class="mt-1 text-sm font-semibold text-gray-900">{{ vesselName() }}</p>
+          <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-ink">{{ vesselName() }}</p>
         } @else {
           <app-searchable-dropdown
             [options]="vesselOptions()"
@@ -345,7 +339,7 @@ import {
             (selectionChange)="vesselChange.emit($event)"
           />
         }
-        <div class="mt-3 border-t border-gray-100 pt-3">
+        <div class="mt-3 border-t border-gray-100 dark:border-line pt-3">
           <button
             type="button"
             (click)="navigateToPlace()"
@@ -361,7 +355,7 @@ import {
             Place
           </button>
           @if (isReadonly()) {
-            <p class="mt-1 text-sm font-semibold text-gray-900">{{ placeName() }}</p>
+            <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-ink">{{ placeName() }}</p>
           } @else {
             <app-searchable-dropdown
               [options]="placeOptions()"
@@ -374,10 +368,10 @@ import {
             />
           }
         </div>
-        <div class="mt-3 border-t border-gray-100 pt-3">
-          <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">ETA</p>
+        <div class="mt-3 border-t border-gray-100 dark:border-line pt-3">
+          <p class="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-muted mb-1.5">ETA</p>
           @if (isReadonly()) {
-            <p class="mt-1 text-sm font-semibold text-gray-900">
+            <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-ink">
               {{ formatDateLabel(eta()) }}
             </p>
           } @else {
@@ -385,16 +379,15 @@ import {
               type="date"
               [ngModel]="formatDateForInput(eta())"
               (ngModelChange)="etaChange.emit($event)"
-              class="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-900
-                     focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+              class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-2.5 py-1.5 text-sm text-gray-900 dark:text-ink focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
             />
           }
         </div>
         @if (showEtd()) {
-          <div class="mt-3 border-t border-gray-100 pt-3">
-            <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1.5">ETD</p>
+          <div class="mt-3 border-t border-gray-100 dark:border-line pt-3">
+            <p class="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-muted mb-1.5">ETD</p>
             @if (isReadonly()) {
-              <p class="mt-1 text-sm font-semibold text-gray-900">
+              <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-ink">
                 {{ formatDateLabel(etd()) }}
               </p>
             } @else {
@@ -403,27 +396,24 @@ import {
                 [ngModel]="formatDateForInput(etd())"
                 (ngModelChange)="etdChange.emit($event)"
                 [min]="etaMinDateTime()"
-                class="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm text-gray-900
-                       focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-2.5 py-1.5 text-sm text-gray-900 dark:text-ink focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
               />
             }
           </div>
         }
       </div>
       <!-- Invoicing + Notes + T&C -->
-      <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <p class="text-xs font-medium uppercase tracking-wider text-gray-500">Invoicing Company</p>
+      <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm">
+        <p class="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-muted">Invoicing Company</p>
         @if (isReadonly()) {
-          <p class="mt-1 text-sm font-semibold text-gray-900">{{ invoicingCompanyName() }}</p>
+          <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-ink">{{ invoicingCompanyName() }}</p>
         } @else {
           <select
             data-testid="order-invoicing-company"
             [ngModel]="invoicingCompanyId()"
             (ngModelChange)="invoicingCompanyChange.emit($event)"
             [disabled]="ownCompanies().length === 0"
-            class="fueld-select-no-chevron mt-1 w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm font-semibold text-gray-900
-                   focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white
-                   disabled:opacity-50 disabled:cursor-not-allowed"
+            class="fueld-select-no-chevron mt-1 w-full appearance-none rounded-lg border border-gray-300 dark:border-line-strong px-2 py-1.5 text-sm font-semibold text-gray-900 dark:text-ink focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none bg-white dark:bg-surface disabled:opacity-50 disabled:cursor-not-allowed"
           >
             @if (ownCompanies().length === 0) {
               <option value="">- Select -</option>
@@ -434,19 +424,17 @@ import {
           </select>
         }
         <!-- Bank Account -->
-        <div class="mt-3 border-t border-gray-100 pt-3">
-          <label class="text-xs font-medium text-gray-400">Bank Account</label>
+        <div class="mt-3 border-t border-gray-100 dark:border-line pt-3">
+          <label class="text-xs font-medium text-gray-400 dark:text-muted">Bank Account</label>
           @if (isReadonly() && !allowBankAccountEdit()) {
-            <p class="mt-1 text-sm text-gray-900">{{ bankAccountLabel() }}</p>
+            <p class="mt-1 text-sm text-gray-900 dark:text-ink">{{ bankAccountLabel() }}</p>
           } @else {
             <select
               data-testid="order-bank-account"
               [ngModel]="bankAccountId()"
               (ngModelChange)="bankAccountChange.emit($event)"
               [disabled]="!invoicingCompanyId() || bankAccountOptions().length === 0"
-              class="fueld-select-no-chevron mt-1 w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
-                     focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white
-                     disabled:opacity-50 disabled:cursor-not-allowed"
+              class="fueld-select-no-chevron mt-1 w-full appearance-none rounded-lg border border-gray-300 dark:border-line-strong px-2 py-1.5 text-sm text-gray-700 dark:text-ink-dim focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none bg-white dark:bg-surface disabled:opacity-50 disabled:cursor-not-allowed"
             >
               @if (bankAccountOptions().length === 0) {
                 <option value="">— None —</option>
@@ -457,7 +445,7 @@ import {
             </select>
           }
         </div>
-        <div class="mt-3 border-t border-gray-100 pt-3">
+        <div class="mt-3 border-t border-gray-100 dark:border-line pt-3">
           <ng-content select="[notesAndTerms]"></ng-content>
         </div>
       </div>

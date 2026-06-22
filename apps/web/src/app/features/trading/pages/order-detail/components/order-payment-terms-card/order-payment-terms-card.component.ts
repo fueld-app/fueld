@@ -23,17 +23,16 @@ export type PaymentSide = 'customer' | 'supplier';
   imports: [FormsModule, DecimalPipe],
   template: `
     <div>
-      <p class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1.5">Payment</p>
+      <p class="text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-muted mb-1.5">Payment</p>
 
       @if (readonly()) {
-        <p class="mt-1 text-sm font-semibold text-gray-900">{{ formattedTerms() }}</p>
+        <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-ink">{{ formattedTerms() }}</p>
       } @else {
         <div class="flex items-center gap-2">
           <select
             [ngModel]="paymentTermType()"
             (ngModelChange)="onPaymentTermChange($event)"
-            class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-700
-                   focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+            class="fueld-select-no-chevron w-full appearance-none rounded-lg border border-gray-300 dark:border-line-strong px-2 py-1.5 text-sm text-gray-700 dark:text-ink-dim focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none bg-white dark:bg-surface"
           >
             <option value="">Select</option>
             @for (opt of paymentTermOptions(); track opt.value) {
@@ -53,18 +52,17 @@ export type PaymentSide = 'customer' | 'supplier';
               [ngModel]="creditDays()"
               (ngModelChange)="onCreditDaysChange($event)"
               placeholder="Days"
-              class="w-24 rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm
-                     focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+              class="w-24 rounded-lg border border-gray-300 dark:border-line-strong px-2 py-1.5 text-right text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
             />
           }
         </div>
 
-        <div class="mt-2 text-xs text-gray-500">
+        <div class="mt-2 text-xs text-gray-500 dark:text-muted">
           @if (creditLoading()) {
             <span>Loading credit line...</span>
           } @else if (creditSummary(); as cs) {
             @if (creditFrozen()) {
-              <span class="text-red-600 font-medium">Credit frozen — risk monitoring hit</span>
+              <span class="text-red-600 dark:text-red-400 font-medium">Credit frozen — risk monitoring hit</span>
             } @else {
               <span>
                 Available: {{ cs.available | number:'1.2-2' }}
@@ -73,13 +71,13 @@ export type PaymentSide = 'customer' | 'supplier';
             }
             @if (side() === 'customer') {
               <button (click)="requestCredit.emit()"
-                class="ml-2 text-xs text-brand-600 hover:text-brand-700 underline">Request Increase</button>
+                class="ml-2 text-xs text-brand-600 dark:text-brand-400 hover:text-brand-700 underline">Request Increase</button>
             }
           } @else {
             <span>No credit line on file.</span>
             @if (side() === 'customer') {
               <button (click)="requestCredit.emit()"
-                class="ml-1 text-xs text-brand-600 hover:text-brand-700 underline">Request Credit</button>
+                class="ml-1 text-xs text-brand-600 dark:text-brand-400 hover:text-brand-700 underline">Request Credit</button>
             }
           }
         </div>
@@ -94,15 +92,14 @@ export type PaymentSide = 'customer' | 'supplier';
               [ngModel]="note()"
               (ngModelChange)="onNoteChange($event)"
               [placeholder]="side() === 'customer' ? 'Customer note for PDFs and emails' : 'Supplier note'"
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700
-                     focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+              class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm text-gray-700 dark:text-ink-dim focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
             ></textarea>
             <button (click)="showNoteChange.emit(false)"
-              class="mt-1 text-xs text-gray-400 hover:text-gray-600 transition-colors">Hide note</button>
+              class="mt-1 text-xs text-gray-400 dark:text-muted hover:text-gray-600 transition-colors">Hide note</button>
           </div>
         } @else {
           <button (click)="showNoteChange.emit(true)"
-            class="mt-2 inline-flex items-center gap-1 text-xs text-gray-400 hover:text-brand-600 transition-colors">
+            class="mt-2 inline-flex items-center gap-1 text-xs text-gray-400 dark:text-muted hover:text-brand-600 transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
               <path d="M2 4.75A.75.75 0 0 1 2.75 4h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 4.75Zm0 10.5a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5a.75.75 0 0 1-.75-.75ZM2 10a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 10Z" />
             </svg>
@@ -110,7 +107,7 @@ export type PaymentSide = 'customer' | 'supplier';
           </button>
         }
       } @else if (note()) {
-        <p class="mt-2 text-xs text-gray-500 whitespace-pre-line">{{ note() }}</p>
+        <p class="mt-2 text-xs text-gray-500 dark:text-muted whitespace-pre-line">{{ note() }}</p>
       }
     </div>
   `,

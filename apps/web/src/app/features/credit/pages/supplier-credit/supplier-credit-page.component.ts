@@ -47,14 +47,14 @@ interface CompanySearchResultOption {
       <!-- Header -->
       <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
-          <h1 class="text-2xl font-bold text-gray-900">Supplier Credit</h1>
-          <p class="mt-1 text-sm text-gray-500">
+          <h1 class="text-2xl font-bold text-gray-900 dark:text-ink">Supplier Credit</h1>
+          <p class="mt-1 text-sm text-gray-500 dark:text-muted">
             Credit terms with your suppliers. Used amount is auto-calculated from open orders.
           </p>
         </div>
         <button
           (click)="openCreateModal()"
-          class="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 transition-colors"
+          class="inline-flex items-center gap-1.5 rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-800 transition-colors"
         >
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
             <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
@@ -66,40 +66,40 @@ interface CompanySearchResultOption {
       <!-- Table -->
       @if (loading()) {
         <div class="flex items-center justify-center py-12">
-          <svg class="h-8 w-8 animate-spin text-brand-600" viewBox="0 0 24 24" fill="none">
+          <svg class="h-8 w-8 animate-spin text-brand-600 dark:text-brand-400" viewBox="0 0 24 24" fill="none">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
           </svg>
         </div>
       } @else {
-        <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div class="overflow-x-auto rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm">
           <table class="w-full text-sm">
             <thead>
-              <tr class="border-b border-gray-200 bg-gray-50/80">
-                <th app-sort-header field="updatedAt" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Updated</th>
-                <th class="px-4 py-3 text-left font-medium text-gray-600">Supplier(s)</th>
-                <th class="px-4 py-3 text-left font-medium text-gray-600">Our Companies</th>
-                <th app-sort-header field="expires" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Expires</th>
-                <th app-sort-header field="periodDays" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Period</th>
-                <th app-sort-header field="creditAmount" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-right font-medium text-gray-600">Credit</th>
-                <th class="px-4 py-3 text-right font-medium text-gray-600">Used</th>
-                <th class="px-4 py-3 text-right font-medium text-gray-600">Available</th>
+              <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80">
+                <th app-sort-header field="updatedAt" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Updated</th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Supplier(s)</th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Our Companies</th>
+                <th app-sort-header field="expires" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Expires</th>
+                <th app-sort-header field="periodDays" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Period</th>
+                <th app-sort-header field="creditAmount" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim">Credit</th>
+                <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim">Used</th>
+                <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim">Available</th>
                 <th class="px-4 py-3 w-20"></th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-100">
+            <tbody class="divide-y divide-gray-100 dark:divide-line">
               @for (line of creditLines(); track line.id) {
                 <tr class="transition-colors hover:bg-gray-50/50">
-                  <td class="px-4 py-3 text-gray-500 text-xs">{{ formatDate(line.updatedAt) }}</td>
+                  <td class="px-4 py-3 text-gray-500 dark:text-muted text-xs">{{ formatDate(line.updatedAt) }}</td>
                   <td class="px-4 py-3">
                     <div class="flex flex-wrap gap-1">
                       @for (name of line.counterpartyNames; track name; let i = $index) {
                         <a [routerLink]="['/companies', line.counterpartyIds[i]]"
-                          class="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors">
+                          class="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-500/15 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors">
                           {{ name }}
                         </a>
                       } @empty {
-                        <span class="text-gray-400">—</span>
+                        <span class="text-gray-400 dark:text-muted">—</span>
                       }
                     </div>
                   </td>
@@ -107,43 +107,43 @@ interface CompanySearchResultOption {
                     @if (line.ownCompanyNames.length) {
                       <div class="flex flex-wrap gap-1">
                         @for (name of line.ownCompanyNames; track name) {
-                          <span class="inline-flex items-center rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">{{ name }}</span>
+                          <span class="inline-flex items-center rounded-full bg-brand-50 dark:bg-brand-700/15 px-2 py-0.5 text-xs font-medium text-brand-700 dark:text-brand-400">{{ name }}</span>
                         }
                       </div>
                     } @else {
-                      <span class="text-gray-400">All</span>
+                      <span class="text-gray-400 dark:text-muted">All</span>
                     }
                   </td>
-                  <td class="px-4 py-3 text-gray-600">
+                  <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">
                     @if (line.expires) {
-                      <span [class]="isExpired(line.expires) ? 'text-red-600 font-medium' : ''">
+                      <span [class]="isExpired(line.expires) ? 'text-red-600 dark:text-red-400 font-medium' : ''">
                         {{ formatDate(line.expires) }}
                       </span>
                     } @else {
-                      <span class="text-gray-400">—</span>
+                      <span class="text-gray-400 dark:text-muted">—</span>
                     }
                   </td>
-                  <td class="px-4 py-3 text-gray-600">{{ line.periodDays }} days</td>
-                  <td class="px-4 py-3 text-right font-medium text-gray-900">{{ formatAmount(line.creditAmount, line.currency) }}</td>
+                  <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">{{ line.periodDays }} days</td>
+                  <td class="px-4 py-3 text-right font-medium text-gray-900 dark:text-ink">{{ formatAmount(line.creditAmount, line.currency) }}</td>
                   <td class="px-4 py-3 text-right">
-                    <span [class]="parseFloat(line.usedAmount) > 0 ? 'text-amber-600 font-medium' : 'text-gray-400'">
+                    <span [class]="parseFloat(line.usedAmount) > 0 ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-gray-400 dark:text-muted'">
                       {{ formatAmount(line.usedAmount, line.currency) }}
                     </span>
                   </td>
                   <td class="px-4 py-3 text-right">
-                    <span [class]="parseFloat(line.availableAmount) > 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'">
+                    <span [class]="parseFloat(line.availableAmount) > 0 ? 'text-green-600 dark:text-green-400 font-medium' : 'text-red-600 dark:text-red-400 font-medium'">
                       {{ formatAmount(line.availableAmount, line.currency) }}
                     </span>
                   </td>
                   <td class="px-4 py-3">
                     <div class="flex items-center gap-1">
-                      <button (click)="openEditModal(line)" class="rounded-md p-1 text-gray-400 hover:text-brand-600 transition-colors" title="Edit">
+                      <button (click)="openEditModal(line)" class="rounded-md p-1 text-gray-400 dark:text-muted hover:text-brand-600 transition-colors" title="Edit">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                           <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
                           <path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" />
                         </svg>
                       </button>
-                      <button (click)="confirmDelete(line)" class="rounded-md p-1 text-gray-400 hover:text-red-500 transition-colors" title="Delete">
+                      <button (click)="confirmDelete(line)" class="rounded-md p-1 text-gray-400 dark:text-muted hover:text-red-500 transition-colors" title="Delete">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                           <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
                         </svg>
@@ -153,7 +153,7 @@ interface CompanySearchResultOption {
                 </tr>
               } @empty {
                 <tr>
-                  <td colspan="9" class="px-4 py-8 text-center text-gray-400">
+                  <td colspan="9" class="px-4 py-8 text-center text-gray-400 dark:text-muted">
                     No supplier credit lines yet. Click "Add Credit Line" to create one.
                   </td>
                 </tr>
@@ -174,34 +174,34 @@ interface CompanySearchResultOption {
       <!-- Create / Edit modal -->
       @if (showModal()) {
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div class="rounded-xl bg-white p-6 shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto" (click)="$event.stopPropagation()">
-            <h3 class="text-lg font-semibold text-gray-900">{{ editingId() ? 'Edit' : 'Add' }} Supplier Credit Line</h3>
+          <div class="rounded-xl bg-white dark:bg-surface p-6 shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto" (click)="$event.stopPropagation()">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-ink">{{ editingId() ? 'Edit' : 'Add' }} Supplier Credit Line</h3>
 
             @if (formError()) {
-              <div class="mt-3 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">{{ formError() }}</div>
+              <div class="mt-3 rounded-lg bg-red-50 dark:bg-red-500/15 border border-red-200 dark:border-red-500/30 p-3 text-sm text-red-700 dark:text-red-400">{{ formError() }}</div>
             }
 
             <div class="mt-4 space-y-4">
               <!-- Supplier search + multi-select -->
               <div>
-                <label class="block text-sm font-medium text-gray-700">Supplier(s) *</label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">Supplier(s) *</label>
                 <div class="relative mt-1">
                   <input type="text" [ngModel]="companySearch()" (ngModelChange)="onCompanySearch($event)"
                     (focus)="companyDropdownOpen.set(companySearchResults().length > 0)"
                     placeholder="Search suppliers to add..."
-                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
+                    class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none" />
                   @if (companyDropdownOpen() && companySearchResults().length) {
-                    <div class="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
+                    <div class="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-lg max-h-48 overflow-y-auto">
                       @for (c of companySearchResults(); track c.key) {
-                        <button (click)="addCounterparty(c)" class="flex w-full items-center gap-2 px-3 py-2 text-sm text-left hover:bg-gray-50">
-                          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                        <button (click)="addCounterparty(c)" class="flex w-full items-center gap-2 px-3 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-surface-tint">
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400 dark:text-muted" viewBox="0 0 20 20" fill="currentColor">
                             <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
                           </svg>
-                          <span class="font-medium text-gray-900">{{ c.name }}</span>
+                          <span class="font-medium text-gray-900 dark:text-ink">{{ c.name }}</span>
                           @if (c.source === 'seasearcher') {
-                            <span class="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">Import</span>
+                            <span class="rounded-full border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/15 px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:text-blue-400">Import</span>
                           } @else if (c.country) {
-                            <span class="text-xs text-gray-500">{{ c.country }}</span>
+                            <span class="text-xs text-gray-500 dark:text-muted">{{ c.country }}</span>
                           }
                         </button>
                       }
@@ -211,7 +211,7 @@ interface CompanySearchResultOption {
                 @if (selectedCounterparties().length) {
                   <div class="mt-2 flex flex-wrap gap-1.5">
                     @for (co of selectedCounterparties(); track co.id) {
-                      <span class="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
+                      <span class="inline-flex items-center gap-1 rounded-full bg-blue-50 dark:bg-blue-500/15 px-2.5 py-1 text-xs font-medium text-blue-700 dark:text-blue-400">
                         {{ co.name }}
                         <button (click)="removeCounterparty(co.id)" class="text-blue-400 hover:text-blue-700">
                           <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -230,51 +230,51 @@ interface CompanySearchResultOption {
 
               <div class="grid grid-cols-2 gap-4">
                 <div>
-                  <label class="block text-sm font-medium text-gray-700">Credit Amount *</label>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">Credit Amount *</label>
                   <input type="number" step="0.01" [ngModel]="form().creditAmount" (ngModelChange)="updateForm('creditAmount', $event)"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                    class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
                     placeholder="100000" />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-gray-700">Currency *</label>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">Currency *</label>
                   <select [ngModel]="form().currency" (ngModelChange)="updateForm('currency', $event)"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white">
+                    class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none bg-white dark:bg-surface">
                     @for (c of configuredCurrencies(); track c) {
                       <option [value]="c">{{ c }}</option>
                     }
                   </select>
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-gray-700">Expires</label>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">Expires</label>
                   <input type="date" [ngModel]="form().expires" (ngModelChange)="updateForm('expires', $event)"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
+                    class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none" />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-gray-700">Period (days) *</label>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">Period (days) *</label>
                   <input type="number" [ngModel]="form().periodDays" (ngModelChange)="updateForm('periodDays', +$event)"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                    class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
                     placeholder="30" />
                 </div>
               </div>
 
               <!-- Own Companies multi-select -->
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">
+                <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-2">
                   Our Companies
-                  <span class="text-xs text-gray-400 ml-1">(which of our entities does this credit apply to?)</span>
+                  <span class="text-xs text-gray-400 dark:text-muted ml-1">(which of our entities does this credit apply to?)</span>
                 </label>
                 @if (ownCompanies().length === 0) {
-                  <p class="text-sm text-gray-400">No own companies configured.</p>
+                  <p class="text-sm text-gray-400 dark:text-muted">No own companies configured.</p>
                 } @else {
                   <div class="space-y-1.5 max-h-36 overflow-y-auto">
                     @for (co of ownCompanies(); track co.id) {
-                      <label class="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-gray-50 cursor-pointer">
+                      <label class="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-gray-50 dark:hover:bg-surface-tint cursor-pointer">
                         <input type="checkbox" [checked]="selectedOwnCompanyIds().has(co.id)"
                           (change)="toggleOwnCompany(co.id)"
-                          class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
-                        <span class="text-sm text-gray-900">{{ co.name }}</span>
+                          class="h-4 w-4 rounded border-gray-300 dark:border-line-strong text-brand-600 dark:text-brand-400 focus:ring-brand-600" />
+                        <span class="text-sm text-gray-900 dark:text-ink">{{ co.name }}</span>
                         @if (co.country) {
-                          <span class="text-xs text-gray-500">{{ co.country }}</span>
+                          <span class="text-xs text-gray-500 dark:text-muted">{{ co.country }}</span>
                         }
                       </label>
                     }
@@ -283,18 +283,18 @@ interface CompanySearchResultOption {
               </div>
 
               <div>
-                <label class="block text-sm font-medium text-gray-700">Notes</label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">Notes</label>
                 <textarea [ngModel]="form().notes" (ngModelChange)="updateForm('notes', $event)" rows="2"
-                  class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                  class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
                   placeholder="Optional notes..."></textarea>
               </div>
             </div>
 
             <div class="mt-5 flex justify-end gap-2">
               <button (click)="showModal.set(false)"
-                class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+                class="rounded-lg border border-gray-300 dark:border-line-strong px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint">Cancel</button>
               <button (click)="saveForm()" [disabled]="saving()"
-                class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+                class="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50">
                 @if (saving()) { Saving... } @else { {{ editingId() ? 'Update' : 'Create' }} }
               </button>
             </div>
@@ -305,15 +305,15 @@ interface CompanySearchResultOption {
       <!-- Delete confirmation modal -->
       @if (deleteTarget()) {
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" (click)="deleteTarget.set(null)">
-          <div class="rounded-xl bg-white p-6 shadow-xl max-w-sm mx-4" (click)="$event.stopPropagation()">
-            <h3 class="text-lg font-semibold text-gray-900">Delete credit line?</h3>
-            <p class="mt-2 text-sm text-gray-500">
+          <div class="rounded-xl bg-white dark:bg-surface p-6 shadow-xl max-w-sm mx-4" (click)="$event.stopPropagation()">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-ink">Delete credit line?</h3>
+            <p class="mt-2 text-sm text-gray-500 dark:text-muted">
               Are you sure you want to delete the credit line for
               <strong>{{ deleteTarget()!.counterpartyNames.join(', ') }}</strong>?
             </p>
             <div class="mt-4 flex justify-end gap-2">
               <button (click)="deleteTarget.set(null)"
-                class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+                class="rounded-lg border border-gray-300 dark:border-line-strong px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint">Cancel</button>
               <button (click)="executeDelete()" [disabled]="deleting()"
                 class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
                 @if (deleting()) { Deleting... } @else { Delete }

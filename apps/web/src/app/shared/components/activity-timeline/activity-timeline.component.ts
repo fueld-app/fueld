@@ -46,14 +46,14 @@ interface ActivityItem {
   template: `
     <div class="app-panel h-[420px] flex flex-col overflow-hidden">
       <div class="app-panel-header app-panel-header--blue justify-between px-5 py-3">
-        <h2 class="text-sm font-semibold text-gray-700">Activity History</h2>
+        <h2 class="text-sm font-semibold text-gray-700 dark:text-ink-dim">Activity History</h2>
         <div class="flex items-center gap-2">
           @if (total() > 0) {
-            <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">{{ total() }}</span>
+            <span class="inline-flex items-center rounded-full bg-gray-100 dark:bg-surface-3 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:text-ink-dim">{{ total() }}</span>
           }
           <button
             (click)="reload()"
-            class="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+            class="rounded-md p-1 text-gray-400 dark:text-muted hover:bg-gray-100 dark:hover:bg-surface-tint-strong hover:text-gray-600 transition-colors"
             title="Refresh"
           >
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -66,7 +66,7 @@ interface ActivityItem {
       <div class="flex-1 min-h-0 overflow-y-auto">
       @if (loading()) {
         <div class="flex items-center justify-center py-8">
-          <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+          <svg class="h-5 w-5 animate-spin text-gray-400 dark:text-muted" viewBox="0 0 24 24" fill="none">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
           </svg>
@@ -106,34 +106,34 @@ interface ActivityItem {
               <!-- Content -->
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-2 text-sm">
-                  <span class="font-medium text-gray-900">{{ item.userName ?? item.userEmail ?? 'System' }}</span>
-                  <span class="text-gray-400">{{ actionLabel(item.action, item.httpPath, item.metadata) }}</span>
+                  <span class="font-medium text-gray-900 dark:text-ink">{{ item.userName ?? item.userEmail ?? 'System' }}</span>
+                  <span class="text-gray-400 dark:text-muted">{{ actionLabel(item.action, item.httpPath, item.metadata) }}</span>
                 </div>
                 @if (changeRows(item.metadata); as changes) {
-                  <div class="mt-2 space-y-1 text-[11px] text-gray-600">
+                  <div class="mt-2 space-y-1 text-[11px] text-gray-600 dark:text-ink-dim">
                     @for (change of changes; track change.field) {
-                      <div class="flex flex-wrap items-start gap-x-2 gap-y-1 rounded-lg border border-gray-100 bg-gray-50 px-2.5 py-1.5">
-                        <span class="font-medium text-gray-700">{{ change.field }}</span>
-                        <span class="text-gray-400">from</span>
-                        <span class="break-words whitespace-normal text-gray-500">{{ change.from }}</span>
-                        <span class="text-gray-400">to</span>
-                        <span class="break-words whitespace-normal font-medium text-gray-700">{{ change.to }}</span>
+                      <div class="flex flex-wrap items-start gap-x-2 gap-y-1 rounded-lg border border-gray-100 dark:border-line bg-gray-50 dark:bg-bg-2 px-2.5 py-1.5">
+                        <span class="font-medium text-gray-700 dark:text-ink-dim">{{ change.field }}</span>
+                        <span class="text-gray-400 dark:text-muted">from</span>
+                        <span class="break-words whitespace-normal text-gray-500 dark:text-muted">{{ change.from }}</span>
+                        <span class="text-gray-400 dark:text-muted">to</span>
+                        <span class="break-words whitespace-normal font-medium text-gray-700 dark:text-ink-dim">{{ change.to }}</span>
                       </div>
                     }
                   </div>
                 } @else if (metadataEntries(item.metadata); as entries) {
                   @if (entries.length) {
-                    <div class="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-gray-500">
+                    <div class="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-gray-500 dark:text-muted">
                       @for (entry of entries; track entry.key) {
                         <span class="max-w-full min-w-0 break-words whitespace-normal">
-                          <span class="font-medium text-gray-600">{{ entry.key }}:</span>
+                          <span class="font-medium text-gray-600 dark:text-ink-dim">{{ entry.key }}:</span>
                           <span class="break-words whitespace-normal">{{ entry.value }}</span>
                         </span>
                       }
                     </div>
                   }
                 }
-                <div class="mt-0.5 flex items-center gap-2 text-xs text-gray-400">
+                <div class="mt-0.5 flex items-center gap-2 text-xs text-gray-400 dark:text-muted">
                   <span>{{ item.createdAt | date:'short' }}</span>
                   @if (item.platform) {
                     <span class="hidden sm:inline">&middot;</span>
@@ -156,11 +156,11 @@ interface ActivityItem {
         </div>
 
         @if (hasMore()) {
-          <div class="border-t border-gray-100 px-5 py-3 text-center">
+          <div class="border-t border-gray-100 dark:border-line px-5 py-3 text-center">
             <button
               (click)="loadMore()"
               [disabled]="loadingMore()"
-              class="text-xs font-medium text-brand-600 hover:text-brand-700 transition-colors disabled:opacity-50"
+              class="text-xs font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 transition-colors disabled:opacity-50"
             >
               @if (loadingMore()) {
                 Loading…
@@ -171,7 +171,7 @@ interface ActivityItem {
           </div>
         }
       } @else {
-        <div class="px-5 py-8 text-center text-sm text-gray-400">
+        <div class="px-5 py-8 text-center text-sm text-gray-400 dark:text-muted">
           No activity recorded for this entity yet.
         </div>
       }
@@ -433,21 +433,21 @@ export class ActivityTimelineComponent implements OnInit, OnDestroy {
   actionBadgeClass(action: string): string {
     switch (action) {
       case 'CREATE':
-        return 'bg-green-50 text-green-700';
+        return 'bg-green-50 text-green-700 dark:bg-emerald-500/15 dark:text-emerald-300';
       case 'UPDATE':
-        return 'bg-blue-50 text-blue-700';
+        return 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300';
       case 'DELETE':
-        return 'bg-red-50 text-red-700';
+        return 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-300';
       case 'PRINT':
-        return 'bg-cyan-50 text-cyan-700';
+        return 'bg-cyan-50 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300';
       case 'SCREENSHOT':
-        return 'bg-rose-50 text-rose-700';
+        return 'bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300';
       case 'VIEW':
-        return 'bg-gray-100 text-gray-600';
+        return 'bg-gray-100 text-gray-600 dark:bg-surface-3 dark:text-ink-dim';
       case 'EMAIL_SENT':
-        return 'bg-indigo-50 text-indigo-700';
+        return 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300';
       default:
-        return 'bg-gray-100 text-gray-600';
+        return 'bg-gray-100 text-gray-600 dark:bg-surface-3 dark:text-ink-dim';
     }
   }
 }

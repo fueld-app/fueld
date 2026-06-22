@@ -37,30 +37,30 @@ export interface OwnershipEntry {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [DateLabelPipe, RouterLink, DatePipe, FormsModule],
   template: `
-    <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-5 min-[900px]:h-[449px] min-[900px]:flex min-[900px]:flex-col overflow-hidden">
-      <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
-        <h2 class="text-sm font-semibold text-gray-700">
+    <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm min-[900px]:order-5 min-[900px]:h-[449px] min-[900px]:flex min-[900px]:flex-col overflow-hidden">
+      <div class="border-b border-gray-100 dark:border-line px-5 py-3 flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-gray-700 dark:text-ink-dim">
           Companies
           @if (vesselCompanies().length) {
-            <span class="ml-1 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
+            <span class="ml-1 inline-flex items-center rounded-full bg-gray-100 dark:bg-surface-3 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:text-ink-dim">
               {{ vesselCompanies().length }}
             </span>
           }
         </h2>
         <button (click)="add.emit()"
-          class="rounded-md bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 hover:bg-brand-100 transition-colors">
+          class="rounded-md bg-brand-50 dark:bg-brand-700/15 px-2 py-1 text-[11px] font-medium text-brand-700 dark:text-brand-400 hover:bg-brand-100 dark:hover:bg-brand-500/20 transition-colors">
           + Add
         </button>
       </div>
 
       @if (showAddForm()) {
-        <div class="border-b border-gray-100 px-5 py-4 bg-gray-50/50">
+        <div class="border-b border-gray-100 dark:border-line px-5 py-4 bg-gray-50/50">
           <div class="space-y-2">
             @if (!editingCompanyId()) {
               <div class="relative">
                 @if (selectedCompany()) {
-                  <div class="flex items-center justify-between rounded-md border border-brand-300 bg-brand-50 px-3 py-1.5 text-sm">
-                    <span class="font-medium text-brand-800">{{ selectedCompany()!.name }}</span>
+                  <div class="flex items-center justify-between rounded-md border border-brand-300 bg-brand-50 dark:bg-brand-700/15 px-3 py-1.5 text-sm">
+                    <span class="font-medium text-brand-800 dark:text-brand-300">{{ selectedCompany()!.name }}</span>
                     <button (click)="clearSelected.emit()"
                       class="ml-2 text-brand-400 hover:text-brand-600 transition-colors">
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -73,18 +73,18 @@ export interface OwnershipEntry {
                     [ngModel]="companySearch()"
                     (ngModelChange)="companySearchChange.emit($event)"
                     placeholder="Search company..."
-                    class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                    class="w-full rounded-md border border-gray-200 dark:border-line px-3 py-1.5 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
                   />
                   @if (searchResults().length) {
-                    <div class="absolute z-10 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
+                    <div class="absolute z-10 mt-1 w-full rounded-md border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-lg max-h-48 overflow-y-auto">
                       @for (c of searchResults(); track c.key) {
                         <button (click)="selectCompany.emit(c)"
-                          class="w-full px-3 py-2 text-left text-sm hover:bg-brand-50 transition-colors flex items-center justify-between">
-                          <span class="font-medium text-gray-900">{{ c.name }}</span>
+                          class="w-full px-3 py-2 text-left text-sm hover:bg-brand-50 dark:hover:bg-brand-500/15 transition-colors flex items-center justify-between">
+                          <span class="font-medium text-gray-900 dark:text-ink">{{ c.name }}</span>
                           @if (c.source === 'seasearcher') {
-                            <span class="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">Import</span>
+                            <span class="rounded-full border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/15 px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:text-blue-400">Import</span>
                           } @else if (c.country) {
-                            <span class="text-xs text-gray-400">{{ c.country }}</span>
+                            <span class="text-xs text-gray-400 dark:text-muted">{{ c.country }}</span>
                           }
                         </button>
                       }
@@ -95,11 +95,11 @@ export interface OwnershipEntry {
             }
 
             <div>
-              <label class="block text-xs font-medium text-gray-500 mb-1">Role</label>
+              <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Role</label>
               <select
                 [ngModel]="companyForm().role"
                 (ngModelChange)="onRoleChange($event)"
-                class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
+                class="w-full rounded-md border border-gray-200 dark:border-line px-3 py-1.5 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600">
                 @for (grp of roleGroups(); track grp.group) {
                   <optgroup [label]="grp.group">
                     @for (role of grp.roles; track role.key) {
@@ -111,68 +111,68 @@ export interface OwnershipEntry {
             </div>
 
             @if (!editingCompanyId() && selectedCompany() && roleExists()) {
-              <div class="text-[11px] text-amber-600">This role is already assigned to another company on this vessel. Adding will replace it.</div>
+              <div class="text-[11px] text-amber-600 dark:text-amber-400">This role is already assigned to another company on this vessel. Adding will replace it.</div>
             }
 
             @if (selectedCompany() || editingCompanyId()) {
               <div>
                 <div class="flex items-center justify-between mb-1">
-                  <label class="block text-xs font-medium text-gray-500">Contact Person</label>
+                  <label class="block text-xs font-medium text-gray-500 dark:text-muted">Contact Person</label>
                   @if (!addingNewContact()) {
-                    <button (click)="addNewContact.emit()" class="text-[10px] font-medium text-brand-600 hover:text-brand-700 transition-colors">+ New</button>
+                    <button (click)="addNewContact.emit()" class="text-[10px] font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 transition-colors">+ New</button>
                   }
                 </div>
                 @if (addingNewContact()) {
-                  <div class="space-y-1.5 rounded-md border border-brand-200 bg-brand-50/30 p-2 mb-1">
+                  <div class="space-y-1.5 rounded-md border border-brand-200 dark:border-brand-500/30 bg-brand-50/30 p-2 mb-1">
                     <input
                       [ngModel]="newContactName()"
                       (ngModelChange)="newContactNameChange.emit($event)"
                       placeholder="Contact name *"
-                      class="w-full rounded-md border border-gray-200 px-2.5 py-1 text-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                      class="w-full rounded-md border border-gray-200 dark:border-line px-2.5 py-1 text-xs focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
                     />
                     <div class="flex gap-1.5">
                       <input
                         [ngModel]="newContactRole()"
                         (ngModelChange)="newContactRoleChange.emit($event)"
                         placeholder="Role"
-                        class="flex-1 rounded-md border border-gray-200 px-2.5 py-1 text-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                        class="flex-1 rounded-md border border-gray-200 dark:border-line px-2.5 py-1 text-xs focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
                       />
                       <input
                         [ngModel]="newContactEmail()"
                         (ngModelChange)="newContactEmailChange.emit($event)"
                         placeholder="Email"
-                        class="flex-1 rounded-md border border-gray-200 px-2.5 py-1 text-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                        class="flex-1 rounded-md border border-gray-200 dark:border-line px-2.5 py-1 text-xs focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
                       />
                       <input
                         [ngModel]="newContactPhone()"
                         (ngModelChange)="newContactPhoneChange.emit($event)"
                         placeholder="Phone"
-                        class="flex-1 rounded-md border border-gray-200 px-2.5 py-1 text-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                        class="flex-1 rounded-md border border-gray-200 dark:border-line px-2.5 py-1 text-xs focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
                       />
                     </div>
                     <div class="flex justify-end gap-1.5">
-                      <button (click)="cancelNewContact.emit()" class="rounded px-2 py-0.5 text-[10px] text-gray-500 hover:bg-gray-100 transition-colors">Cancel</button>
+                      <button (click)="cancelNewContact.emit()" class="rounded px-2 py-0.5 text-[10px] text-gray-500 dark:text-muted hover:bg-gray-100 dark:hover:bg-surface-tint-strong transition-colors">Cancel</button>
                       <button (click)="createNewContact.emit()" [disabled]="!newContactName().trim() || creatingContact()"
-                        class="rounded bg-brand-600 px-2 py-0.5 text-[10px] font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors">
+                        class="rounded bg-brand-700 px-2 py-0.5 text-[10px] font-medium text-white hover:bg-brand-800 disabled:opacity-50 transition-colors">
                         {{ creatingContact() ? 'Adding...' : 'Add Contact' }}
                       </button>
                     </div>
                   </div>
                 }
                 @if (contactsLoading()) {
-                  <div class="text-xs text-gray-400 py-1">Loading contacts...</div>
+                  <div class="text-xs text-gray-400 dark:text-muted py-1">Loading contacts...</div>
                 } @else if (companyContacts().length) {
                   <select
                     [ngModel]="companyForm().contactId"
                     (ngModelChange)="onContactChange($event)"
-                    class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
+                    class="w-full rounded-md border border-gray-200 dark:border-line px-3 py-1.5 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600">
                     <option [ngValue]="null">— None —</option>
                     @for (ct of companyContacts(); track ct.id) {
                       <option [ngValue]="ct.id">{{ ct.name }}@if (ct.role) { ({{ ct.role }}) }</option>
                     }
                   </select>
                 } @else if (!addingNewContact()) {
-                  <div class="text-xs text-gray-400 py-1">No contacts on file</div>
+                  <div class="text-xs text-gray-400 dark:text-muted py-1">No contacts on file</div>
                 }
               </div>
             }
@@ -182,16 +182,16 @@ export interface OwnershipEntry {
               (ngModelChange)="onNoteChange($event)"
               placeholder="Notes"
               rows="2"
-              class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+              class="w-full rounded-md border border-gray-200 dark:border-line px-3 py-1.5 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
             ></textarea>
             <div class="flex justify-end gap-2">
               <button (click)="cancel.emit()"
-                class="rounded-md border border-gray-200 px-3 py-1 text-xs text-gray-600 hover:bg-gray-50 transition-colors">
+                class="rounded-md border border-gray-200 dark:border-line px-3 py-1 text-xs text-gray-600 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors">
                 Cancel
               </button>
               <button (click)="save.emit()"
                 [disabled]="saving() || (!editingCompanyId() && !selectedCompany())"
-                class="rounded-md bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors">
+                class="rounded-md bg-brand-700 px-3 py-1 text-xs font-medium text-white hover:bg-brand-800 disabled:opacity-50 transition-colors">
                 {{ editingCompanyId() ? 'Update' : 'Add' }}
               </button>
             </div>
@@ -201,13 +201,13 @@ export interface OwnershipEntry {
 
       @if (loading()) {
         <div class="flex-1 flex items-center justify-center py-6">
-          <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+          <svg class="h-5 w-5 animate-spin text-gray-400 dark:text-muted" viewBox="0 0 24 24" fill="none">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
           </svg>
         </div>
       } @else if (!vesselCompanies().length && !seasearcherSuggestions().length && !showAddForm()) {
-        <div class="flex-1 flex items-center justify-center text-sm text-gray-400">No companies added yet</div>
+        <div class="flex-1 flex items-center justify-center text-sm text-gray-400 dark:text-muted">No companies added yet</div>
       } @else {
         <div class="flex-1 min-h-0 divide-y divide-gray-50 overflow-y-auto">
           @for (vc of vesselCompanies(); track vc.id) {
@@ -215,74 +215,74 @@ export interface OwnershipEntry {
               <div class="flex items-start justify-between gap-2">
                 <div class="min-w-0">
                   <div class="flex items-center gap-1.5 flex-wrap">
-                    <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600 cursor-help"
+                    <span class="inline-flex items-center rounded-full bg-gray-100 dark:bg-surface-3 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:text-ink-dim cursor-help"
                       [title]="getRoleDescription(vc.role)">{{ formatRole(vc.role) }}</span>
                     @if (vc.source === 'seasearcher') {
-                      <span class="inline-flex items-center rounded-full bg-blue-50 border border-blue-100 px-1.5 py-0.5 text-[9px] font-medium text-blue-600">SS</span>
+                      <span class="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-500/15 border border-blue-100 dark:border-blue-500/25 px-1.5 py-0.5 text-[9px] font-medium text-blue-600 dark:text-blue-400">SS</span>
                     }
                   </div>
-                  <a [routerLink]="['/companies', vc.companyId]" class="mt-1 block font-medium text-brand-700 hover:text-brand-900 hover:underline leading-snug break-words">
+                  <a [routerLink]="['/companies', vc.companyId]" class="mt-1 block font-medium text-brand-700 dark:text-brand-400 hover:text-brand-900 hover:underline leading-snug break-words">
                     @if (vc.companyCountryIso) {
                       <span class="mr-1">{{ companyFlag(vc.companyCountryIso) }}</span>
                     }
                     {{ vc.companyName }}
                   </a>
                   @if (vc.contactName) {
-                    <p class="text-xs text-gray-500 mt-0.5">{{ vc.contactName }}</p>
+                    <p class="text-xs text-gray-500 dark:text-muted mt-0.5">{{ vc.contactName }}</p>
                   }
                   @if (vc.note) {
-                    <button (click)="toggleNote(vc.id)" class="mt-1 flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-600 transition-colors">
+                    <button (click)="toggleNote(vc.id)" class="mt-1 flex items-center gap-1 text-[10px] text-gray-400 dark:text-muted hover:text-gray-600 transition-colors">
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M18 13V5a2 2 0 00-2-2H4a2 2 0 00-2 2v8a2 2 0 002 2h3l3 3 3-3h3a2 2 0 002-2zM5 7a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1zm1 3a1 1 0 100 2h3a1 1 0 100-2H6z" clip-rule="evenodd" />
                       </svg>
                       Note
                     </button>
                     @if (expandedNotes().has(vc.id)) {
-                      <p class="text-xs text-gray-400 mt-1 italic bg-gray-50 rounded px-2 py-1">{{ vc.note }}</p>
+                      <p class="text-xs text-gray-400 dark:text-muted mt-1 italic bg-gray-50 dark:bg-bg-2 rounded px-2 py-1">{{ vc.note }}</p>
                     }
                   }
                 </div>
                 <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 pt-0.5">
                   <button (click)="edit.emit(vc)"
-                    class="rounded p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors" title="Edit">
+                    class="rounded p-1 text-gray-400 dark:text-muted hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-surface-tint-strong transition-colors" title="Edit">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
                       <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
                     </svg>
                   </button>
                   <button (click)="delete.emit(vc)"
-                    class="rounded p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Delete">
+                    class="rounded p-1 text-gray-400 dark:text-muted hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/15 transition-colors" title="Delete">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
                       <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
                     </svg>
                   </button>
                 </div>
               </div>
-              <p class="text-[10px] text-gray-400 mt-1">
+              <p class="text-[10px] text-gray-400 dark:text-muted mt-1">
                 Added by {{ vc.addedByName ?? 'Unknown' }} · {{ vc.createdAt | dateLabel }}
               </p>
             </div>
           }
 
           @if (seasearcherSuggestions().length) {
-            <div class="border-t border-gray-100 px-5 py-3">
-              <div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Seasearcher Ownership</div>
+            <div class="border-t border-gray-100 dark:border-line px-5 py-3">
+              <div class="text-[10px] font-semibold text-gray-400 dark:text-muted uppercase tracking-wide mb-2">Seasearcher Ownership</div>
               @for (entry of seasearcherSuggestions(); track entry.typeCode + (entry.companyId ?? entry.companyName)) {
                 <div class="py-2 text-sm">
                   <div class="flex items-start justify-between gap-2">
                     <div class="min-w-0">
-                      <span class="inline-flex items-center rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 text-[10px] font-medium text-blue-700 whitespace-nowrap cursor-help"
+                      <span class="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-500/15 border border-blue-200 dark:border-blue-500/30 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-400 whitespace-nowrap cursor-help"
                         [title]="getSeasearcherTypeDescription(entry.typeCode)">{{ entry.type }}</span>
                       <div class="mt-1 leading-snug break-words">
                         @if (entry.companyId) {
                           <button (click)="linkSeasearcher.emit(entry)"
-                            class="text-left font-medium text-brand-700 hover:text-brand-900 hover:underline transition-colors">
+                            class="text-left font-medium text-brand-700 dark:text-brand-400 hover:text-brand-900 hover:underline transition-colors">
                             @if (entry.country.code) {
                               <span class="mr-1">{{ ownerFlag(entry) }}</span>
                             }
                             {{ entry.companyName }}
                           </button>
                         } @else {
-                          <span class="text-gray-700">
+                          <span class="text-gray-700 dark:text-ink-dim">
                             @if (entry.country.code) {
                               <span class="mr-1">{{ ownerFlag(entry) }}</span>
                             }
@@ -293,7 +293,7 @@ export interface OwnershipEntry {
                     </div>
                     @if (entry.companyId) {
                       <button (click)="linkSeasearcher.emit(entry)"
-                        class="flex-shrink-0 mt-0.5 rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 hover:bg-blue-100 transition-colors">
+                        class="flex-shrink-0 mt-0.5 rounded-md border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/15 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors">
                         Link
                       </button>
                     }

@@ -9,8 +9,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "sh scripts/ng.sh test",
     "test:coverage": "sh scripts/ng.sh test --watch=false --coverage",
-    "test:e2e": "playwright test",
-    "test:e2e:coverage": "rm -rf coverage/e2e && PW_COVERAGE=1 playwright test && node ./e2e/coverage-summary.mjs",
+    "test:e2e": "sh scripts/e2e.sh test",
+    "test:e2e:coverage": "rm -rf coverage/e2e && PW_COVERAGE=1 sh scripts/e2e.sh test && node ./e2e/coverage-summary.mjs",
     "pw:install": "playwright install --with-deps"
   },
   "prettier": {

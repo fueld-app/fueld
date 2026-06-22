@@ -45,8 +45,8 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
     <div>
       <!-- Header -->
       <div class="mb-6">
-        <h1 class="text-2xl font-bold text-gray-900">{{ titleText() }}</h1>
-        <p class="mt-1 text-sm text-gray-500">{{ subtitleText() }}</p>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-ink">{{ titleText() }}</h1>
+        <p class="mt-1 text-sm text-gray-500 dark:text-muted">{{ subtitleText() }}</p>
       </div>
 
       <!-- Search bar -->
@@ -56,12 +56,10 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
           [ngModel]="searchTerm()"
           (ngModelChange)="onSearch($event)"
           [placeholder]="searchPlaceholder()"
-          class="w-full max-w-md rounded-lg border border-gray-300 px-4 py-2.5 text-sm shadow-sm
-                 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none
-                 focus:ring-2 focus:ring-brand-500/20"
+          class="w-full max-w-md rounded-lg border border-gray-300 dark:border-line-strong px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 dark:placeholder:text-muted focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
         />
         <div class="w-56">
-          <label class="mb-1 block text-xs font-medium text-gray-500">Broker</label>
+          <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">Broker</label>
           <app-searchable-dropdown
             placeholder="Filter by broker…"
             [options]="brokerFilterOptions()"
@@ -74,7 +72,7 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
           />
         </div>
         <div class="w-56">
-          <label class="mb-1 block text-xs font-medium text-gray-500">Responsible</label>
+          <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">Responsible</label>
           <app-searchable-dropdown
             placeholder="Filter by responsible…"
             [options]="responsibleFilterOptions()"
@@ -97,43 +95,43 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
       <!-- Loading state -->
       @if (loading()) {
         <div class="flex items-center justify-center py-20">
-          <svg class="h-8 w-8 animate-spin text-brand-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+          <svg class="h-8 w-8 animate-spin text-brand-600 dark:text-brand-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
           </svg>
         </div>
       } @else {
         <!-- Desktop table -->
-        <div class="hidden md:block overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div class="hidden md:block overflow-x-auto rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm">
           <table class="w-full text-sm">
             <thead>
-              <tr class="border-b border-gray-200 bg-gray-50/80">
+              <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80">
                 @for (col of visibleColumns(); track col.field) {
                   @if (col.sortable) {
-                    <th app-sort-header [field]="col.field" [sortBy]="activeSortBy()" [sortDir]="activeSortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">{{ col.label }}</th>
+                    <th app-sort-header [field]="col.field" [sortBy]="activeSortBy()" [sortDir]="activeSortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">{{ col.label }}</th>
                   } @else {
-                    <th class="px-4 py-3 text-left font-medium text-gray-600">{{ col.label }}</th>
+                    <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">{{ col.label }}</th>
                   }
                 }
                 <th class="px-4 py-3 w-12"></th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-100">
+            <tbody class="divide-y divide-gray-100 dark:divide-line">
               @for (inq of inquiries(); track inq.id) {
                 <tr class="transition-colors hover:bg-gray-50/50 cursor-pointer" (click)="goToDetail(inq.orderNumber || inq.id)">
                   @for (col of visibleColumns(); track col.field) {
                     @switch (col.field) {
                       @case ('orderNumber') {
-                        <td class="px-4 py-3 font-mono text-xs text-gray-500">{{ inq.orderNumber ?? '—' }}</td>
+                        <td class="px-4 py-3 font-mono text-xs text-gray-500 dark:text-muted">{{ inq.orderNumber ?? '—' }}</td>
                       }
                       @case ('client') {
-                        <td class="px-4 py-3 font-medium text-gray-900">{{ inq.clientName }}</td>
+                        <td class="px-4 py-3 font-medium text-gray-900 dark:text-ink">{{ inq.clientName }}</td>
                       }
                       @case ('vessel') {
-                        <td class="px-4 py-3 text-gray-600">{{ inq.vesselName }}</td>
+                        <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">{{ inq.vesselName }}</td>
                       }
                       @case ('port') {
-                        <td class="px-4 py-3 text-gray-600">{{ inq.placeName }}</td>
+                        <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">{{ inq.placeName }}</td>
                       }
                       @case ('status') {
                         <td class="px-4 py-3">
@@ -141,23 +139,23 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
                         </td>
                       }
                       @case ('responsible') {
-                        <td class="px-4 py-3 text-gray-600">{{ inq.salesRepName || '—' }}</td>
+                        <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">{{ inq.salesRepName || '—' }}</td>
                       }
                       @case ('invoicingCompany') {
-                        <td class="px-4 py-3 text-gray-600">{{ inq.invoicingCompanyName || '—' }}</td>
+                        <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">{{ inq.invoicingCompanyName || '—' }}</td>
                       }
                       @case ('eta') {
-                        <td class="px-4 py-3 text-gray-500">{{ inq.eta ? (inq.eta | dateLabel) : '—' }}</td>
+                        <td class="px-4 py-3 text-gray-500 dark:text-muted">{{ inq.eta ? (inq.eta | dateLabel) : '—' }}</td>
                       }
                       @case ('dueDate') {
-                        <td class="px-4 py-3 text-gray-500">{{ inq.dueDate ? (inq.dueDate | dateLabel) : '—' }}</td>
+                        <td class="px-4 py-3 text-gray-500 dark:text-muted">{{ inq.dueDate ? (inq.dueDate | dateLabel) : '—' }}</td>
                       }
                       @case ('value') {
-                        <td class="px-4 py-3 text-right tabular-nums text-gray-900">
+                        <td class="px-4 py-3 text-right tabular-nums text-gray-900 dark:text-ink">
                           @if (inq.totalValue > 0) {
                             {{ inq.totalValue | number:'1.2-2' }} {{ inq.displayCurrency || 'USD' }}
                           } @else {
-                            <span class="text-gray-400">—</span>
+                            <span class="text-gray-400 dark:text-muted">—</span>
                           }
                         </td>
                       }
@@ -166,16 +164,16 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
                           @if (inq.totalValue > 0 || inq.totalProfit !== 0) {
                             {{ inq.totalProfit | number:'1.2-2' }} {{ inq.displayCurrency || 'USD' }}
                           } @else {
-                            <span class="text-gray-400">—</span>
+                            <span class="text-gray-400 dark:text-muted">—</span>
                           }
                         </td>
                       }
                       @case ('financing') {
-                        <td class="px-4 py-3 text-right tabular-nums text-amber-700">
+                        <td class="px-4 py-3 text-right tabular-nums text-amber-700 dark:text-amber-400">
                           @if (inq.totalValue > 0 || (inq.totalFinancingCost ?? 0) !== 0) {
                             {{ (inq.totalFinancingCost ?? 0) | number:'1.2-2' }} {{ inq.displayCurrency || 'USD' }}
                           } @else {
-                            <span class="text-gray-400">—</span>
+                            <span class="text-gray-400 dark:text-muted">—</span>
                           }
                         </td>
                       }
@@ -184,19 +182,19 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
                           @if (inq.totalValue > 0 || (inq.totalNetProfit ?? 0) !== 0) {
                             {{ (inq.totalNetProfit ?? 0) | number:'1.2-2' }} {{ inq.displayCurrency || 'USD' }}
                           } @else {
-                            <span class="text-gray-400">—</span>
+                            <span class="text-gray-400 dark:text-muted">—</span>
                           }
                         </td>
                       }
                       @case ('createdAt') {
-                        <td class="px-4 py-3 text-gray-500">{{ inq.createdAt | dateLabel }}</td>
+                        <td class="px-4 py-3 text-gray-500 dark:text-muted">{{ inq.createdAt | dateLabel }}</td>
                       }
                     }
                   }
                   <td class="px-4 py-3">
                     <a
                       [routerLink]="[baseRoute(), inq.orderNumber || inq.id]"
-                      class="rounded-md p-1 text-gray-400 hover:text-brand-600 transition-colors"
+                      class="rounded-md p-1 text-gray-400 dark:text-muted hover:text-brand-600 transition-colors"
                       [attr.aria-label]="isOrders() ? 'View order' : 'View inquiry'"
                       (click)="$event.stopPropagation()"
                     >
@@ -209,11 +207,11 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
               } @empty {
                 <tr>
                   <td [attr.colspan]="visibleColumns().length + 1" class="px-4 py-12 text-center">
-                    <p class="text-sm text-gray-400">{{ isOrders() ? 'No orders found.' : 'No inquiries found.' }}</p>
+                    <p class="text-sm text-gray-400 dark:text-muted">{{ isOrders() ? 'No orders found.' : 'No inquiries found.' }}</p>
                     @if (!isOrders()) {
         <button
                         (click)="openNewInquiryModal()"
-                        class="mt-2 text-sm font-medium text-brand-600 hover:text-brand-700"
+                        class="mt-2 text-sm font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700"
                       >
                         + Create your first inquiry
                       </button>
@@ -238,16 +236,16 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
           @for (inq of inquiries(); track inq.id) {
             <a
               [routerLink]="[baseRoute(), inq.orderNumber || inq.id]"
-              class="block rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+              class="block overflow-hidden rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-4 shadow-sm transition-shadow hover:shadow-md"
             >
               <div class="flex items-center justify-between mb-2">
-                <span class="font-semibold text-gray-900">{{ inq.clientName }}</span>
+                <span class="min-w-0 font-semibold text-gray-900 dark:text-ink">{{ inq.clientName }}</span>
                 <app-status-badge [status]="inq.status" />
               </div>
               @if (inq.orderNumber) {
-                <p class="text-xs font-mono text-gray-400 mb-1">{{ inq.orderNumber }}</p>
+                <p class="text-xs font-mono text-gray-400 dark:text-muted mb-1">{{ inq.orderNumber }}</p>
               }
-              <div class="grid grid-cols-2 gap-1 text-xs text-gray-500">
+              <div class="grid grid-cols-2 gap-1 text-xs text-gray-500 dark:text-muted">
                 <span>{{ inq.vesselName }}</span>
                 <span>{{ inq.placeName }}</span>
                 <span>ETA {{ inq.eta ? (inq.eta | dateLabel) : '—' }}</span>
@@ -255,28 +253,28 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
                 <span>{{ inq.createdAt | dateLabel }}</span>
               </div>
               @if (isOrders() && auth.canSeePrices()) {
-                <div class="mt-3 grid grid-cols-2 gap-2 rounded-lg border border-gray-100 bg-gray-50 p-3 text-xs">
+                <div class="mt-3 grid grid-cols-2 gap-2 rounded-lg border border-gray-100 dark:border-line bg-gray-50 dark:bg-bg-2 p-3 text-xs">
                   <div>
-                    <p class="text-[11px] uppercase tracking-wide text-gray-500">Gross</p>
+                    <p class="text-[11px] uppercase tracking-wide text-gray-500 dark:text-muted">Gross</p>
                     <p class="mt-1 font-semibold tabular-nums" [class.text-green-600]="inq.totalProfit > 0" [class.text-red-600]="inq.totalProfit < 0">
                       {{ inq.totalProfit | number:'1.2-2' }} {{ inq.displayCurrency || 'USD' }}
                     </p>
                   </div>
                   <div>
-                    <p class="text-[11px] uppercase tracking-wide text-amber-700">Financing</p>
-                    <p class="mt-1 font-semibold tabular-nums text-amber-700">
+                    <p class="text-[11px] uppercase tracking-wide text-amber-700 dark:text-amber-400">Financing</p>
+                    <p class="mt-1 font-semibold tabular-nums text-amber-700 dark:text-amber-400">
                       {{ (inq.totalFinancingCost ?? 0) | number:'1.2-2' }} {{ inq.displayCurrency || 'USD' }}
                     </p>
                   </div>
                   <div>
-                    <p class="text-[11px] uppercase tracking-wide text-gray-500">Net</p>
+                    <p class="text-[11px] uppercase tracking-wide text-gray-500 dark:text-muted">Net</p>
                     <p class="mt-1 font-semibold tabular-nums" [class.text-green-600]="(inq.totalNetProfit ?? 0) > 0" [class.text-red-600]="(inq.totalNetProfit ?? 0) < 0">
                       {{ (inq.totalNetProfit ?? 0) | number:'1.2-2' }} {{ inq.displayCurrency || 'USD' }}
                     </p>
                   </div>
                   <div>
-                    <p class="text-[11px] uppercase tracking-wide text-gray-500">Net Margin</p>
-                    <p class="mt-1 font-semibold tabular-nums text-gray-700">
+                    <p class="text-[11px] uppercase tracking-wide text-gray-500 dark:text-muted">Net Margin</p>
+                    <p class="mt-1 font-semibold tabular-nums text-gray-700 dark:text-ink-dim">
                       Net Margin {{ (inq.netMarginPct ?? 0) | number:'1.2-2' }}%
                     </p>
                   </div>
@@ -284,12 +282,12 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
               }
             </a>
           } @empty {
-            <div class="rounded-xl border-2 border-dashed border-gray-300 bg-white p-8 text-center">
-              <p class="text-sm text-gray-400">{{ isOrders() ? 'No orders yet.' : 'No inquiries yet.' }}</p>
+            <div class="rounded-xl border-2 border-dashed border-gray-300 dark:border-line-strong bg-white dark:bg-surface p-8 text-center">
+              <p class="text-sm text-gray-400 dark:text-muted">{{ isOrders() ? 'No orders yet.' : 'No inquiries yet.' }}</p>
               @if (!isOrders()) {
                   <button
                     (click)="openNewInquiryModal()"
-                    class="mt-2 text-sm font-medium text-brand-600 hover:text-brand-700"
+                    class="mt-2 text-sm font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700"
                   >
                     + Create your first inquiry
                   </button>
@@ -316,8 +314,8 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
       <div
         class="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-lg border px-4 py-3 text-sm font-medium shadow-lg"
         [class]="toast()!.type === 'success'
-          ? 'border-green-200 bg-green-50 text-green-800'
-          : 'border-red-200 bg-red-50 text-red-800'"
+          ? 'border-green-200 dark:border-green-500/30 bg-green-50 dark:bg-green-500/15 text-green-800 dark:text-green-300'
+          : 'border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 text-red-800 dark:text-red-300'"
       >
         {{ toast()!.message }}
       </div>

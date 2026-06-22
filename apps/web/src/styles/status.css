@@ -1,0 +1,40 @@
+/*
+ * Fueld platform — theme-aware status tokens.
+ *
+ * Imported after tokens.css. Provides --st-{status}-bg/fg/line for both themes,
+ * consumed by the .status-pill class (defined in styles.css @layer components).
+ * Replaces the old flat --color-status-* scale with semantic, theme-aware pills.
+ */
+
+/* ─── Dark theme (default) ────────────────────────────────────────── */
+:root,
+:root[data-theme='dark'] {
+  --st-inquiry-bg:   rgba(245, 158, 11, 0.12); --st-inquiry-fg:   var(--accent-2); --st-inquiry-line:   rgba(245, 158, 11, 0.30);
+  --st-offer-bg:     rgba(249, 115, 22, 0.14); --st-offer-fg:     #fb923c;          --st-offer-line:     rgba(249, 115, 22, 0.32);
+  --st-confirmed-bg: rgba(34, 211, 238, 0.12); --st-confirmed-fg: var(--cyan);      --st-confirmed-line: rgba(34, 211, 238, 0.30);
+  --st-delivered-bg: rgba(139, 92, 246, 0.14); --st-delivered-fg: #a78bfa;          --st-delivered-line: rgba(139, 92, 246, 0.32);
+  --st-invoiced-bg:  rgba(99, 102, 241, 0.14); --st-invoiced-fg:  #818cf8;          --st-invoiced-line:  rgba(99, 102, 241, 0.32);
+  --st-paid-bg:      var(--pill-emerald-bg);   --st-paid-fg:      var(--pill-emerald-fg); --st-paid-line: var(--pill-emerald-line);
+  --st-cancelled-bg: rgba(239, 68, 68, 0.12);  --st-cancelled-fg: #f87171;          --st-cancelled-line: rgba(239, 68, 68, 0.30);
+  --st-overdue-bg:   rgba(220, 38, 38, 0.16);  --st-overdue-fg:   #fca5a5;          --st-overdue-line:   rgba(220, 38, 38, 0.34);
+  --st-draft-bg:         rgba(255, 255, 255, 0.05); --st-draft-fg:         var(--muted); --st-draft-line:         rgba(255, 255, 255, 0.10);
+  --st-void-bg:          rgba(255, 255, 255, 0.04); --st-void-fg:          var(--muted); --st-void-line:          rgba(255, 255, 255, 0.08);
+  --st-sent-bg:          rgba(59, 130, 246, 0.14);  --st-sent-fg:          #60a5fa;      --st-sent-line:          rgba(59, 130, 246, 0.32);
+  --st-partially-paid-bg: rgba(245, 158, 11, 0.12); --st-partially-paid-fg: var(--accent-2); --st-partially-paid-line: rgba(245, 158, 11, 0.30);
+}
+
+/* ─── Light theme ─────────────────────────────────────────────────── */
+:root[data-theme='light'] {
+  --st-inquiry-bg:   rgba(245, 158, 11, 0.12); --st-inquiry-fg:   #b45309;          --st-inquiry-line:   rgba(245, 158, 11, 0.30);
+  --st-offer-bg:     rgba(249, 115, 22, 0.12); --st-offer-fg:     #c2410c;          --st-offer-line:     rgba(249, 115, 22, 0.30);
+  --st-confirmed-bg: rgba(34, 211, 238, 0.12); --st-confirmed-fg: #0e7490;          --st-confirmed-line: rgba(34, 211, 238, 0.30);
+  --st-delivered-bg: rgba(139, 92, 246, 0.10); --st-delivered-fg: #7c3aed;          --st-delivered-line: rgba(139, 92, 246, 0.28);
+  --st-invoiced-bg:  rgba(99, 102, 241, 0.10); --st-invoiced-fg:  #4f46e5;          --st-invoiced-line:  rgba(99, 102, 241, 0.28);
+  --st-paid-bg:      var(--pill-emerald-bg);   --st-paid-fg:      var(--pill-emerald-fg); --st-paid-line: var(--pill-emerald-line);
+  --st-cancelled-bg: rgba(239, 68, 68, 0.10);  --st-cancelled-fg: #b91c1c;          --st-cancelled-line: rgba(239, 68, 68, 0.28);
+  --st-overdue-bg:   rgba(220, 38, 38, 0.12);  --st-overdue-fg:   #991b1b;          --st-overdue-line:   rgba(220, 38, 38, 0.30);
+  --st-draft-bg:         rgba(15, 20, 35, 0.05); --st-draft-fg:         var(--muted); --st-draft-line:         rgba(15, 20, 35, 0.10);
+  --st-void-bg:          rgba(15, 20, 35, 0.04); --st-void-fg:          var(--muted); --st-void-line:          rgba(15, 20, 35, 0.08);
+  --st-sent-bg:          rgba(59, 130, 246, 0.12); --st-sent-fg:          #1d4ed8;     --st-sent-line:          rgba(59, 130, 246, 0.28);
+  --st-partially-paid-bg: rgba(245, 158, 11, 0.12); --st-partially-paid-fg: #b45309;     --st-partially-paid-line: rgba(245, 158, 11, 0.30);
+}

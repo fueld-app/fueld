@@ -22,6 +22,8 @@ import * as L from 'leaflet/dist/leaflet-src.esm.js';
 import { flagFromIso3 } from '../../../../shared/utils/flags';
 import { WebSocketService } from '../../../../core/websocket/websocket.service';
 import { AuthService } from '../../../../core/auth/auth.service';
+import { ThemeService } from '@app/core/theme.service';
+import { swapLeafletTileLayer } from '@app/shared/utils/leaflet-theme';
 import { ActivityTimelineComponent } from '../../../../shared/components/activity-timeline/activity-timeline.component';
 import { LastEditedBadgeComponent } from '../../../../shared/components/last-edited-badge/last-edited-badge.component';
 import { CommentsCardComponent } from '../../../../shared/components/comments-card/comments-card.component';
@@ -130,7 +132,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
   template: `
     @if (loading()) {
       <div class="flex items-center justify-center py-20">
-        <svg class="h-8 w-8 animate-spin text-brand-600" viewBox="0 0 24 24" fill="none">
+        <svg class="h-8 w-8 animate-spin text-brand-600 dark:text-brand-400" viewBox="0 0 24 24" fill="none">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
         </svg>
@@ -139,7 +141,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
       <!-- Back nav -->
       <button
         (click)="goBack()"
-        class="mb-4 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+        class="mb-4 inline-flex items-center gap-1 text-sm text-gray-500 dark:text-muted hover:text-gray-700 transition-colors"
       >
         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
           <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
@@ -151,25 +153,25 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
       <div class="mb-6">
         <div class="flex items-center gap-3 mb-1">
           @if (vesselFlag()) { <span class="text-2xl">{{ vesselFlag() }}</span> }
-          <h1 class="text-2xl font-bold text-gray-900">{{ vessel()!.name }}</h1>
+          <h1 class="text-2xl font-bold text-gray-900 dark:text-ink">{{ vessel()!.name }}</h1>
           @if (isSanctionedVessel()) {
-            <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">
+            <span class="inline-flex items-center rounded-full bg-red-100 dark:bg-red-500/15 px-2.5 py-1 text-xs font-semibold text-red-700 dark:text-red-400">
               Sanctioned
             </span>
           }
           @if (hasActiveSeizureImpact()) {
-            <span class="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-1 text-xs font-semibold text-orange-700">
+            <span class="inline-flex items-center rounded-full bg-orange-100 dark:bg-orange-500/15 px-2.5 py-1 text-xs font-semibold text-orange-700 dark:text-orange-400">
               Seized / Arrested
             </span>
           }
           @if (vessel()!.status) {
             <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium"
-              [class]="vessel()!.status === 'Live' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'">
+              [class]="vessel()!.status === 'Live' ? 'bg-green-100 dark:bg-green-500/15 text-green-700 dark:text-green-400' : 'bg-gray-100 dark:bg-surface-3 text-gray-600 dark:text-ink-dim'">
               {{ vessel()!.status }}
             </span>
           }
           @if (syncing()) {
-            <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-600">
+            <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-500/15 px-2.5 py-1 text-xs font-medium text-blue-600 dark:text-blue-400">
               <svg class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
@@ -183,7 +185,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 [href]="'https://www.seasearcher.com/vessel/' + vessel()!.seasearcherId"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-line px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
@@ -195,7 +197,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
             @if (canDeleteEntity()) {
               <button
                 (click)="confirmDeleteOpen.set(true)"
-                class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+                class="rounded-lg border border-red-200 dark:border-red-500/30 px-3 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/15 transition-colors"
               >
                 Delete
               </button>
@@ -203,13 +205,13 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
           </div>
         </div>
         <div class="flex items-center gap-3">
-          <p class="text-sm text-gray-500">
+          <p class="text-sm text-gray-500 dark:text-muted">
             @if (vessel()!.imo) { IMO {{ vessel()!.imo }} }
             @if (vessel()!.mmsi) { · MMSI {{ vessel()!.mmsi }} }
             @if (vessel()!.flag) { · {{ vessel()!.flag }} }
           </p>
           @if (vessel()!.lastSynced) {
-            <span class="inline-flex items-center gap-1 text-xs text-gray-400" title="Last synced with Seasearcher">
+            <span class="inline-flex items-center gap-1 text-xs text-gray-400 dark:text-muted" title="Last synced with Seasearcher">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
                 <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" />
               </svg>
@@ -221,40 +223,40 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
       </div>
 
       @if (showCreditEnforcementException()) {
-        <div class="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4">
+        <div class="mb-6 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/15 px-4 py-4">
           <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p class="text-sm font-semibold text-amber-900">Credit Enforcement Exception</p>
+              <p class="text-sm font-semibold text-amber-900 dark:text-amber-300">Credit Enforcement Exception</p>
               @if (isSanctionedVessel()) {
-                <p class="mt-1 text-xs font-semibold uppercase tracking-wide text-red-700">
+                <p class="mt-1 text-xs font-semibold uppercase tracking-wide text-red-700 dark:text-red-400">
                   This vessel is currently marked sanctioned.
                 </p>
               }
               @if (linkedCreditImpacts().length) {
-                <p class="mt-1 text-sm text-amber-800">
+                <p class="mt-1 text-sm text-amber-800 dark:text-amber-300">
                   This vessel is currently referenced by active company monitoring hits. You can exclude those vessel-related maritime hits from credit enforcement without hiding the vessel.
                 </p>
               } @else {
-                <p class="mt-1 text-sm text-amber-800">
+                <p class="mt-1 text-sm text-amber-800 dark:text-amber-300">
                   Exclude vessel-related maritime risk hits from company credit enforcement without removing the vessel from the system.
                 </p>
               }
-              <p class="mt-1 text-xs text-amber-700">
+              <p class="mt-1 text-xs text-amber-700 dark:text-amber-400">
                 After enabling this, open each linked company and run Monitoring → Re-check Now to clear any existing freeze caused by this vessel.
               </p>
 
               @if (creditImpactLoading()) {
-                <p class="mt-2 text-xs text-amber-700">Checking linked company monitoring hits...</p>
+                <p class="mt-2 text-xs text-amber-700 dark:text-amber-400">Checking linked company monitoring hits...</p>
               } @else if (linkedCreditImpacts().length) {
                 <div class="mt-3 space-y-2">
                   @for (impact of linkedCreditImpacts(); track impact.companyId) {
-                    <div class="rounded-lg border border-amber-200 bg-white/70 px-3 py-2">
-                      <a [routerLink]="['/companies', impact.companyId]" class="text-xs font-semibold text-amber-900 hover:underline">
+                    <div class="rounded-lg border border-amber-200 dark:border-amber-500/30 bg-white/70 px-3 py-2">
+                      <a [routerLink]="['/companies', impact.companyId]" class="text-xs font-semibold text-amber-900 dark:text-amber-300 hover:underline">
                         {{ impact.companyName }}
                       </a>
                       <div class="mt-1 space-y-1">
                         @for (hit of impact.hits; track hit.id) {
-                          <p class="text-xs text-amber-800">
+                          <p class="text-xs text-amber-800 dark:text-amber-300">
                             <span class="font-semibold">{{ hit.signalType }}</span>
                             <span class="ml-1">{{ hit.title }}</span>
                           </p>
@@ -270,7 +272,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
               [disabled]="creditEnforcementSaving() || !canManageCreditEnforcementException()"
               (click)="setIgnoreForCreditEnforcement(!vessel()!.ignoreForCreditEnforcement)"
               class="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50"
-              [class]="vessel()!.ignoreForCreditEnforcement ? 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100' : 'border-amber-300 bg-white text-amber-800 hover:bg-amber-100'"
+              [class]="vessel()!.ignoreForCreditEnforcement ? 'border-green-200 dark:border-green-500/30 bg-green-50 dark:bg-green-500/15 text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-500/20' : 'border-amber-300 bg-white dark:bg-surface text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/20'"
             >
               @if (creditEnforcementSaving()) {
                 <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -285,21 +287,21 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
       }
 
       @if (hasActiveSeizureImpact()) {
-        <div class="mb-6 rounded-xl border border-orange-200 bg-orange-50 px-4 py-4">
-          <p class="text-sm font-semibold text-orange-900">Active Seizure / Arrest Impact</p>
-          <p class="mt-1 text-sm text-orange-800">
+        <div class="mb-6 rounded-xl border border-orange-200 dark:border-orange-500/30 bg-orange-50 dark:bg-orange-500/15 px-4 py-4">
+          <p class="text-sm font-semibold text-orange-900 dark:text-orange-300">Active Seizure / Arrest Impact</p>
+          <p class="mt-1 text-sm text-orange-800 dark:text-orange-300">
             This vessel is currently referenced by one or more active maritime seizure or arrest hits that can freeze linked company credit.
           </p>
           <div class="mt-3 space-y-2">
             @for (impact of linkedCreditImpacts(); track impact.companyId) {
               @if (seizureHitsForImpact(impact).length) {
-                <div class="rounded-lg border border-orange-200 bg-white/70 px-3 py-2">
-                  <a [routerLink]="['/companies', impact.companyId]" class="text-xs font-semibold text-orange-900 hover:underline">
+                <div class="rounded-lg border border-orange-200 dark:border-orange-500/30 bg-white/70 px-3 py-2">
+                  <a [routerLink]="['/companies', impact.companyId]" class="text-xs font-semibold text-orange-900 dark:text-orange-300 hover:underline">
                     {{ impact.companyName }}
                   </a>
                   <div class="mt-1 space-y-1">
                     @for (hit of seizureHitsForImpact(impact); track hit.id) {
-                      <p class="text-xs text-orange-800">
+                      <p class="text-xs text-orange-800 dark:text-orange-300">
                         <span class="font-semibold">{{ hit.title }}</span>
                         @if (hit.detail) {
                           <span class="ml-1">{{ hit.detail }}</span>
@@ -320,24 +322,24 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
         <div class="contents">
 
           <!-- Vessel Info + Dimensions (tabbed card) -->
-          <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-1 min-[900px]:h-[449px] min-[900px]:flex min-[900px]:flex-col overflow-hidden">
-            <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
+          <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm min-[900px]:order-1 min-[900px]:h-[449px] min-[900px]:flex min-[900px]:flex-col overflow-hidden">
+            <div class="border-b border-gray-100 dark:border-line px-5 py-3 flex items-center justify-between">
               <div class="flex items-center gap-1">
                 <button (click)="vesselInfoTab.set('info')"
                   class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
-                  [class]="vesselInfoTab() === 'info' ? 'bg-brand-50 text-brand-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'">
+                  [class]="vesselInfoTab() === 'info' ? 'bg-brand-50 dark:bg-brand-700/15 text-brand-700 dark:text-brand-400' : 'text-gray-500 dark:text-muted hover:text-gray-700 hover:bg-gray-50 dark:hover:bg-surface-tint'">
                   Vessel Info
                 </button>
                 <button (click)="vesselInfoTab.set('dimensions')"
                   class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
-                  [class]="vesselInfoTab() === 'dimensions' ? 'bg-brand-50 text-brand-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'">
+                  [class]="vesselInfoTab() === 'dimensions' ? 'bg-brand-50 dark:bg-brand-700/15 text-brand-700 dark:text-brand-400' : 'text-gray-500 dark:text-muted hover:text-gray-700 hover:bg-gray-50 dark:hover:bg-surface-tint'">
                   Dimensions
                 </button>
               </div>
               @if (!vessel()!.seasearcherId && !editing()) {
                 <button
                   (click)="startEditing()"
-                  class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                  class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-gray-500 dark:text-muted hover:bg-gray-100 dark:hover:bg-surface-tint-strong hover:text-gray-700 transition-colors"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
                     <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
@@ -350,12 +352,12 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                   <button
                     (click)="cancelEditing()"
                     [disabled]="editSaving()"
-                    class="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                    class="rounded-md border border-gray-300 dark:border-line-strong px-2.5 py-1 text-xs font-medium text-gray-600 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors disabled:opacity-50"
                   >Cancel</button>
                   <button
                     (click)="saveEditing()"
                     [disabled]="editSaving()"
-                    class="rounded-md bg-brand-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-brand-700 transition-colors disabled:opacity-50"
+                    class="rounded-md bg-brand-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-brand-800 transition-colors disabled:opacity-50"
                   >
                     @if (editSaving()) { Saving… } @else { Save }
                   </button>
@@ -366,55 +368,55 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
               @if (vesselInfoTab() === 'info') {
                 <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
                   <div>
-                    <dt class="text-gray-500">Vessel Name</dt>
+                    <dt class="text-gray-500 dark:text-muted">Vessel Name</dt>
                     @if (editing()) {
                       <dd class="mt-0.5">
                         <input type="text" [value]="editName()" (input)="editName.set($any($event.target).value)"
-                          class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
+                          class="w-full rounded-md border border-gray-300 dark:border-line-strong px-2.5 py-1.5 text-sm font-medium text-gray-900 dark:text-ink focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
                       </dd>
                     } @else {
-                      <dd class="mt-0.5 font-medium text-gray-900">{{ vessel()!.name }}</dd>
+                      <dd class="mt-0.5 font-medium text-gray-900 dark:text-ink">{{ vessel()!.name }}</dd>
                     }
                   </div>
                   <div>
-                    <dt class="text-gray-500">IMO</dt>
+                    <dt class="text-gray-500 dark:text-muted">IMO</dt>
                     @if (editing()) {
                       <dd class="mt-0.5">
                         <input type="text" [value]="editImo()" (input)="editImo.set($any($event.target).value)"
-                          class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium font-mono text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
+                          class="w-full rounded-md border border-gray-300 dark:border-line-strong px-2.5 py-1.5 text-sm font-medium font-mono text-gray-900 dark:text-ink focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
                       </dd>
                     } @else {
-                      <dd class="mt-0.5 font-medium text-gray-900 font-mono">{{ vessel()!.imo ?? '—' }}</dd>
+                      <dd class="mt-0.5 font-medium text-gray-900 dark:text-ink font-mono">{{ vessel()!.imo ?? '—' }}</dd>
                     }
                   </div>
                   <div>
-                    <dt class="text-gray-500">MMSI</dt>
+                    <dt class="text-gray-500 dark:text-muted">MMSI</dt>
                     @if (editing()) {
                       <dd class="mt-0.5">
                         <input type="text" [value]="editMmsi()" (input)="editMmsi.set($any($event.target).value)"
-                          class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium font-mono text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
+                          class="w-full rounded-md border border-gray-300 dark:border-line-strong px-2.5 py-1.5 text-sm font-medium font-mono text-gray-900 dark:text-ink focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
                       </dd>
                     } @else {
-                      <dd class="mt-0.5 font-medium text-gray-900 font-mono">{{ vessel()!.mmsi ?? '—' }}</dd>
+                      <dd class="mt-0.5 font-medium text-gray-900 dark:text-ink font-mono">{{ vessel()!.mmsi ?? '—' }}</dd>
                     }
                   </div>
                   <div>
-                    <dt class="text-gray-500">Flag</dt>
+                    <dt class="text-gray-500 dark:text-muted">Flag</dt>
                     @if (editing()) {
                       <dd class="mt-0.5">
                         <input type="text" [value]="editFlag()" (input)="editFlag.set($any($event.target).value)"
-                          class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
+                          class="w-full rounded-md border border-gray-300 dark:border-line-strong px-2.5 py-1.5 text-sm font-medium text-gray-900 dark:text-ink focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
                       </dd>
                     } @else {
-                      <dd class="mt-0.5 font-medium text-gray-900">{{ vessel()!.flag ?? '—' }}</dd>
+                      <dd class="mt-0.5 font-medium text-gray-900 dark:text-ink">{{ vessel()!.flag ?? '—' }}</dd>
                     }
                   </div>
                   <div>
-                    <dt class="text-gray-500">Type</dt>
+                    <dt class="text-gray-500 dark:text-muted">Type</dt>
                     @if (editing()) {
                       <dd class="mt-0.5">
                         <select [value]="editType()" (change)="editType.set($any($event.target).value)"
-                          class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100 bg-white">
+                          class="w-full rounded-md border border-gray-300 dark:border-line-strong px-2.5 py-1.5 text-sm font-medium text-gray-900 dark:text-ink focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100 bg-white dark:bg-surface">
                           <option value="">— Select Type —</option>
                           @for (t of vesselTypes(); track t) {
                             <option [value]="t">{{ t }}</option>
@@ -422,21 +424,21 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                         </select>
                       </dd>
                     } @else {
-                      <dd class="mt-0.5 font-medium text-gray-900 capitalize">{{ vessel()!.type ?? '—' }}</dd>
+                      <dd class="mt-0.5 font-medium text-gray-900 dark:text-ink capitalize">{{ vessel()!.type ?? '—' }}</dd>
                     }
                   </div>
                   <div>
-                    <dt class="text-gray-500">Status</dt>
+                    <dt class="text-gray-500 dark:text-muted">Status</dt>
                     @if (editing()) {
                       <dd class="mt-0.5">
                         <input type="text" [value]="editStatus()" (input)="editStatus.set($any($event.target).value)"
-                          class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
+                          class="w-full rounded-md border border-gray-300 dark:border-line-strong px-2.5 py-1.5 text-sm font-medium text-gray-900 dark:text-ink focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
                       </dd>
                     } @else {
                       <dd class="mt-0.5">
                         @if (vessel()!.status) {
                           <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                            [class]="vessel()!.status === 'Live' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'">
+                            [class]="vessel()!.status === 'Live' ? 'bg-green-100 dark:bg-green-500/15 text-green-700 dark:text-green-400' : 'bg-gray-100 dark:bg-surface-3 text-gray-600 dark:text-ink-dim'">
                             {{ vessel()!.status }}
                           </span>
                         } @else { — }
@@ -444,27 +446,27 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                     }
                   </div>
                   <div>
-                    <dt class="text-gray-500">Build Year</dt>
+                    <dt class="text-gray-500 dark:text-muted">Build Year</dt>
                     @if (editing()) {
                       <dd class="mt-0.5">
                         <input type="text" [value]="editBuildYear()" (input)="editBuildYear.set($any($event.target).value)"
-                          class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
+                          class="w-full rounded-md border border-gray-300 dark:border-line-strong px-2.5 py-1.5 text-sm font-medium text-gray-900 dark:text-ink focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
                       </dd>
                     } @else {
-                      <dd class="mt-0.5 font-medium text-gray-900">{{ vessel()!.buildYear ?? '—' }}</dd>
+                      <dd class="mt-0.5 font-medium text-gray-900 dark:text-ink">{{ vessel()!.buildYear ?? '—' }}</dd>
                     }
                   </div>
                   <div>
-                    <dt class="text-gray-500">Builder</dt>
+                    <dt class="text-gray-500 dark:text-muted">Builder</dt>
                     @if (editing()) {
                       <dd class="mt-0.5">
                         <input type="text" [value]="editBuilder()" (input)="editBuilder.set($any($event.target).value)"
-                          class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
+                          class="w-full rounded-md border border-gray-300 dark:border-line-strong px-2.5 py-1.5 text-sm font-medium text-gray-900 dark:text-ink focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
                       </dd>
                     } @else {
                       <dd class="mt-0.5 font-medium">
                         @if (enrichment()?.['builderCompany']?.id) {
-                          <button (click)="navigateToCompanyById(enrichment()!['builderCompany'].id)" class="text-blue-700 hover:text-blue-900 hover:underline transition-colors cursor-pointer">
+                          <button (click)="navigateToCompanyById(enrichment()!['builderCompany'].id)" class="text-blue-700 dark:text-blue-400 hover:text-blue-900 hover:underline transition-colors cursor-pointer">
                             @if (navigatingCompanyId() === enrichment()!['builderCompany'].id) {
                               <span class="inline-flex items-center gap-1"><svg class="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> {{ vessel()!.builder }}</span>
                             } @else {
@@ -472,120 +474,120 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                             }
                           </button>
                         } @else {
-                          <span class="text-gray-900">{{ vessel()!.builder ?? '—' }}</span>
+                          <span class="text-gray-900 dark:text-ink">{{ vessel()!.builder ?? '—' }}</span>
                         }
                       </dd>
                     }
                   </div>
                   <div>
-                    <dt class="text-gray-500">Classification</dt>
+                    <dt class="text-gray-500 dark:text-muted">Classification</dt>
                     @if (editing()) {
                       <dd class="mt-0.5">
                         <input type="text" [value]="editClassification()" (input)="editClassification.set($any($event.target).value)"
-                          class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
+                          class="w-full rounded-md border border-gray-300 dark:border-line-strong px-2.5 py-1.5 text-sm font-medium text-gray-900 dark:text-ink focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
                       </dd>
                     } @else {
-                      <dd class="mt-0.5 font-medium text-gray-900">{{ vessel()!.classificationSociety ?? '—' }}</dd>
+                      <dd class="mt-0.5 font-medium text-gray-900 dark:text-ink">{{ vessel()!.classificationSociety ?? '—' }}</dd>
                     }
                   </div>
                   <div>
-                    <dt class="text-gray-500">Phone</dt>
+                    <dt class="text-gray-500 dark:text-muted">Phone</dt>
                     @if (editing()) {
                       <dd class="mt-0.5">
                         <input type="tel" [value]="editPhone()" (input)="editPhone.set($any($event.target).value)"
-                          class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
+                          class="w-full rounded-md border border-gray-300 dark:border-line-strong px-2.5 py-1.5 text-sm font-medium text-gray-900 dark:text-ink focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
                       </dd>
                     } @else {
                       <dd class="mt-0.5 font-medium">
                         @if (vessel()!.phone) {
-                          <a [href]="'tel:' + vessel()!.phone" class="text-brand-700 hover:text-brand-900 hover:underline transition-colors">{{ formatPhone(vessel()!.phone) }}</a>
+                          <a [href]="'tel:' + vessel()!.phone" class="text-brand-700 dark:text-brand-400 hover:text-brand-900 hover:underline transition-colors">{{ formatPhone(vessel()!.phone) }}</a>
                         } @else { — }
                       </dd>
                     }
                   </div>
                   <div>
-                    <dt class="text-gray-500">Seasearcher ID</dt>
-                    <dd class="mt-0.5 font-medium text-gray-900 font-mono">{{ vessel()!.seasearcherId ?? '—' }}</dd>
+                    <dt class="text-gray-500 dark:text-muted">Seasearcher ID</dt>
+                    <dd class="mt-0.5 font-medium text-gray-900 dark:text-ink font-mono">{{ vessel()!.seasearcherId ?? '—' }}</dd>
                   </div>
                 </dl>
               } @else {
                 <dl class="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4 text-sm">
                   <div>
-                    <dt class="text-gray-500">LOA</dt>
+                    <dt class="text-gray-500 dark:text-muted">LOA</dt>
                     @if (editing()) {
                       <dd class="mt-0.5">
                         <div class="flex items-center gap-1">
                           <input type="text" [value]="editLoa()" (input)="editLoa.set($any($event.target).value)"
-                            class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
-                          <span class="text-gray-400 text-xs">m</span>
+                            class="w-full rounded-md border border-gray-300 dark:border-line-strong px-2.5 py-1.5 text-sm font-medium text-gray-900 dark:text-ink focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
+                          <span class="text-gray-400 dark:text-muted text-xs">m</span>
                         </div>
                       </dd>
                     } @else {
-                      <dd class="mt-0.5 font-medium text-gray-900">{{ vessel()!.loa ? vessel()!.loa + ' m' : '—' }}</dd>
+                      <dd class="mt-0.5 font-medium text-gray-900 dark:text-ink">{{ vessel()!.loa ? vessel()!.loa + ' m' : '—' }}</dd>
                     }
                   </div>
                   <div>
-                    <dt class="text-gray-500">Breadth</dt>
+                    <dt class="text-gray-500 dark:text-muted">Breadth</dt>
                     @if (editing()) {
                       <dd class="mt-0.5">
                         <div class="flex items-center gap-1">
                           <input type="text" [value]="editBreadth()" (input)="editBreadth.set($any($event.target).value)"
-                            class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
-                          <span class="text-gray-400 text-xs">m</span>
+                            class="w-full rounded-md border border-gray-300 dark:border-line-strong px-2.5 py-1.5 text-sm font-medium text-gray-900 dark:text-ink focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
+                          <span class="text-gray-400 dark:text-muted text-xs">m</span>
                         </div>
                       </dd>
                     } @else {
-                      <dd class="mt-0.5 font-medium text-gray-900">{{ vessel()!.breadth ? vessel()!.breadth + ' m' : '—' }}</dd>
+                      <dd class="mt-0.5 font-medium text-gray-900 dark:text-ink">{{ vessel()!.breadth ? vessel()!.breadth + ' m' : '—' }}</dd>
                     }
                   </div>
                   <div>
-                    <dt class="text-gray-500">Depth</dt>
+                    <dt class="text-gray-500 dark:text-muted">Depth</dt>
                     @if (editing()) {
                       <dd class="mt-0.5">
                         <div class="flex items-center gap-1">
                           <input type="text" [value]="editDepth()" (input)="editDepth.set($any($event.target).value)"
-                            class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
-                          <span class="text-gray-400 text-xs">m</span>
+                            class="w-full rounded-md border border-gray-300 dark:border-line-strong px-2.5 py-1.5 text-sm font-medium text-gray-900 dark:text-ink focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
+                          <span class="text-gray-400 dark:text-muted text-xs">m</span>
                         </div>
                       </dd>
                     } @else {
-                      <dd class="mt-0.5 font-medium text-gray-900">{{ vessel()!.depth ? vessel()!.depth + ' m' : '—' }}</dd>
+                      <dd class="mt-0.5 font-medium text-gray-900 dark:text-ink">{{ vessel()!.depth ? vessel()!.depth + ' m' : '—' }}</dd>
                     }
                   </div>
                   <div>
-                    <dt class="text-gray-500">Draft</dt>
+                    <dt class="text-gray-500 dark:text-muted">Draft</dt>
                     @if (editing()) {
                       <dd class="mt-0.5">
                         <div class="flex items-center gap-1">
                           <input type="text" [value]="editDraught()" (input)="editDraught.set($any($event.target).value)"
-                            class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
-                          <span class="text-gray-400 text-xs">m</span>
+                            class="w-full rounded-md border border-gray-300 dark:border-line-strong px-2.5 py-1.5 text-sm font-medium text-gray-900 dark:text-ink focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
+                          <span class="text-gray-400 dark:text-muted text-xs">m</span>
                         </div>
                       </dd>
                     } @else {
-                      <dd class="mt-0.5 font-medium text-gray-900">{{ vessel()!.draught ? vessel()!.draught + ' m' : '—' }}</dd>
+                      <dd class="mt-0.5 font-medium text-gray-900 dark:text-ink">{{ vessel()!.draught ? vessel()!.draught + ' m' : '—' }}</dd>
                     }
                   </div>
                   <div>
-                    <dt class="text-gray-500">DWT</dt>
+                    <dt class="text-gray-500 dark:text-muted">DWT</dt>
                     @if (editing()) {
                       <dd class="mt-0.5">
                         <input type="text" [value]="editDwt()" (input)="editDwt.set($any($event.target).value)"
-                          class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium font-mono text-xs text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
+                          class="w-full rounded-md border border-gray-300 dark:border-line-strong px-2.5 py-1.5 text-sm font-medium font-mono text-xs text-gray-900 dark:text-ink focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
                       </dd>
                     } @else {
-                      <dd class="mt-0.5 font-medium text-gray-900 font-mono text-xs">{{ vessel()!.deadWeightTonnage ? vessel()!.deadWeightTonnage!.toLocaleString() : '—' }}</dd>
+                      <dd class="mt-0.5 font-medium text-gray-900 dark:text-ink font-mono text-xs">{{ vessel()!.deadWeightTonnage ? vessel()!.deadWeightTonnage!.toLocaleString() : '—' }}</dd>
                     }
                   </div>
                   <div>
-                    <dt class="text-gray-500">Gross Tonnage</dt>
+                    <dt class="text-gray-500 dark:text-muted">Gross Tonnage</dt>
                     @if (editing()) {
                       <dd class="mt-0.5">
                         <input type="text" [value]="editGrossTonnage()" (input)="editGrossTonnage.set($any($event.target).value)"
-                          class="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-medium font-mono text-xs text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
+                          class="w-full rounded-md border border-gray-300 dark:border-line-strong px-2.5 py-1.5 text-sm font-medium font-mono text-xs text-gray-900 dark:text-ink focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
                       </dd>
                     } @else {
-                      <dd class="mt-0.5 font-medium text-gray-900 font-mono text-xs">{{ vessel()!.grossTonnage ? vessel()!.grossTonnage!.toLocaleString() : '—' }}</dd>
+                      <dd class="mt-0.5 font-medium text-gray-900 dark:text-ink font-mono text-xs">{{ vessel()!.grossTonnage ? vessel()!.grossTonnage!.toLocaleString() : '—' }}</dd>
                     }
                   </div>
                 </dl>
@@ -595,16 +597,16 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
 
           <!-- Orders -->
           @if (vesselOrders().length || ordersLoading()) {
-            <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-3 min-[900px]:h-[449px] min-[900px]:flex min-[900px]:flex-col overflow-hidden">
-              <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
-                <h2 class="text-sm font-semibold text-gray-700">Orders</h2>
+            <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm min-[900px]:order-3 min-[900px]:h-[449px] min-[900px]:flex min-[900px]:flex-col overflow-hidden">
+              <div class="border-b border-gray-100 dark:border-line px-5 py-3 flex items-center justify-between">
+                <h2 class="text-sm font-semibold text-gray-700 dark:text-ink-dim">Orders</h2>
                 @if (vesselOrders().length) {
-                  <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">{{ vesselOrders().length }}</span>
+                  <span class="inline-flex items-center rounded-full bg-gray-100 dark:bg-surface-3 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:text-ink-dim">{{ vesselOrders().length }}</span>
                 }
               </div>
               @if (ordersLoading()) {
                 <div class="flex-1 flex items-center justify-center py-8">
-                  <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+                  <svg class="h-5 w-5 animate-spin text-gray-400 dark:text-muted" viewBox="0 0 24 24" fill="none">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                   </svg>
@@ -613,12 +615,12 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 <div class="flex-1 min-h-0 overflow-auto">
                   <table class="w-full text-sm">
                     <thead class="sticky top-0 z-10">
-                      <tr class="border-b border-gray-100 bg-gray-50/60">
-                        <th class="px-5 py-2 text-left font-medium text-gray-500">Status</th>
-                        <th class="px-5 py-2 text-left font-medium text-gray-500">Client</th>
-                        <th class="px-5 py-2 text-left font-medium text-gray-500">Port</th>
-                        <th class="px-5 py-2 text-left font-medium text-gray-500">ETA</th>
-                        <th class="px-5 py-2 text-left font-medium text-gray-500">Created</th>
+                      <tr class="border-b border-gray-100 dark:border-line bg-gray-50/60">
+                        <th class="px-5 py-2 text-left font-medium text-gray-500 dark:text-muted">Status</th>
+                        <th class="px-5 py-2 text-left font-medium text-gray-500 dark:text-muted">Client</th>
+                        <th class="px-5 py-2 text-left font-medium text-gray-500 dark:text-muted">Port</th>
+                        <th class="px-5 py-2 text-left font-medium text-gray-500 dark:text-muted">ETA</th>
+                        <th class="px-5 py-2 text-left font-medium text-gray-500 dark:text-muted">Created</th>
                       </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-50">
@@ -630,10 +632,10 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                               {{ o.status }}
                             </span>
                           </td>
-                          <td class="px-5 py-2.5 text-gray-900 font-medium">{{ o.clientName }}</td>
-                          <td class="px-5 py-2.5 text-gray-600">{{ o.placeName }}</td>
-                          <td class="px-5 py-2.5 text-gray-600">{{ o.eta ? (o.eta | dateLabel) : '—' }}</td>
-                          <td class="px-5 py-2.5 text-gray-600">{{ o.createdAt | dateLabel }}</td>
+                          <td class="px-5 py-2.5 text-gray-900 dark:text-ink font-medium">{{ o.clientName }}</td>
+                          <td class="px-5 py-2.5 text-gray-600 dark:text-ink-dim">{{ o.placeName }}</td>
+                          <td class="px-5 py-2.5 text-gray-600 dark:text-ink-dim">{{ o.eta ? (o.eta | dateLabel) : '—' }}</td>
+                          <td class="px-5 py-2.5 text-gray-600 dark:text-ink-dim">{{ o.createdAt | dateLabel }}</td>
                         </tr>
                       }
                     </tbody>
@@ -689,8 +691,8 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
         <div class="contents">
 
           @if (enrichmentLoading()) {
-            <div class="rounded-xl border border-gray-200 bg-white shadow-sm p-6 flex items-center justify-center min-[900px]:order-2 min-[900px]:h-[449px]">
-              <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+            <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm p-6 flex items-center justify-center min-[900px]:order-2 min-[900px]:h-[449px]">
+              <svg class="h-5 w-5 animate-spin text-gray-400 dark:text-muted" viewBox="0 0 24 24" fill="none">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
               </svg>
@@ -698,48 +700,48 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
           } @else if (enrichment()) {
             <!-- Latest Information -->
             @if (enrichment()!.latestInformation) {
-              <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-2 min-[900px]:h-[449px] min-[900px]:flex min-[900px]:flex-col overflow-hidden">
-                <div class="border-b border-gray-100 px-5 py-3">
+              <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm min-[900px]:order-2 min-[900px]:h-[449px] min-[900px]:flex min-[900px]:flex-col overflow-hidden">
+                <div class="border-b border-gray-100 dark:border-line px-5 py-3">
                   <div class="flex items-center justify-between">
-                    <h2 class="text-sm font-semibold text-gray-700">Latest Information</h2>
+                    <h2 class="text-sm font-semibold text-gray-700 dark:text-ink-dim">Latest Information</h2>
                     @if (positionAge()) {
-                      <span class="text-xs text-gray-400">{{ positionAge() }}</span>
+                      <span class="text-xs text-gray-400 dark:text-muted">{{ positionAge() }}</span>
                     }
                   </div>
                   @if (positionTimestamp()) {
-                    <p class="text-xs text-gray-400 mt-0.5">Last Updated: {{ formatDate(positionTimestamp()) }}</p>
+                    <p class="text-xs text-gray-400 dark:text-muted mt-0.5">Last Updated: {{ formatDate(positionTimestamp()) }}</p>
                   }
                 </div>
                 <div class="flex-1 min-h-0 overflow-y-auto p-5 text-sm">
                   <div class="grid grid-cols-2 gap-x-6 gap-y-3">
                     @if (enrichment()!.latestInformation!['region']) {
                       <div>
-                        <span class="text-gray-400 text-xs">Region</span>
-                        <div class="font-medium text-gray-900 mt-0.5">{{ enrichment()!.latestInformation!['region'] }}</div>
+                        <span class="text-gray-400 dark:text-muted text-xs">Region</span>
+                        <div class="font-medium text-gray-900 dark:text-ink mt-0.5">{{ enrichment()!.latestInformation!['region'] }}</div>
                       </div>
                     }
                     @if (enrichment()!.latestInformation!.position) {
                       <div>
-                        <span class="text-gray-400 text-xs">Lat/Lng</span>
-                        <div class="font-medium text-gray-900 font-mono text-xs mt-0.5">
+                        <span class="text-gray-400 dark:text-muted text-xs">Lat/Lng</span>
+                        <div class="font-medium text-gray-900 dark:text-ink font-mono text-xs mt-0.5">
                           {{ enrichment()!.latestInformation!.position!['dms']?.lat ?? enrichment()!.latestInformation!.position!.lat?.toFixed(4) }}
-                          <span class="text-blue-600 font-semibold ml-0.5">{{ enrichment()!.latestInformation!.position!['dms']?.latPosition }}</span>
+                          <span class="text-blue-600 dark:text-blue-400 font-semibold ml-0.5">{{ enrichment()!.latestInformation!.position!['dms']?.latPosition }}</span>
                         </div>
-                        <div class="font-medium text-gray-900 font-mono text-xs">
+                        <div class="font-medium text-gray-900 dark:text-ink font-mono text-xs">
                           {{ enrichment()!.latestInformation!.position!['dms']?.lng ?? (enrichment()!.latestInformation!.position!.lng ?? enrichment()!.latestInformation!.position!.lon)?.toFixed(4) }}
-                          <span class="text-blue-600 font-semibold ml-0.5">{{ enrichment()!.latestInformation!.position!['dms']?.lngPosition }}</span>
+                          <span class="text-blue-600 dark:text-blue-400 font-semibold ml-0.5">{{ enrichment()!.latestInformation!.position!['dms']?.lngPosition }}</span>
                         </div>
                       </div>
                     }
                     @if (enrichment()!.latestInformation!['nearestPort']) {
                       <div>
-                        <span class="text-gray-400 text-xs">Nearest Place</span>
+                        <span class="text-gray-400 dark:text-muted text-xs">Nearest Place</span>
                         <div class="mt-0.5">
                           @if (enrichment()!.latestInformation!['nearestPortCountry']?.code) {
                             <span class="mr-1">{{ flagFromCountryCode(enrichment()!.latestInformation!['nearestPortCountry'].code) }}</span>
                           }
                           @if (enrichment()!.latestInformation!['nearestPortId']) {
-                            <button (click)="navigateToPlace('' + enrichment()!.latestInformation!['nearestPortId'])" class="font-medium text-blue-700 hover:text-blue-900 hover:underline transition-colors cursor-pointer">
+                            <button (click)="navigateToPlace('' + enrichment()!.latestInformation!['nearestPortId'])" class="font-medium text-blue-700 dark:text-blue-400 hover:text-blue-900 hover:underline transition-colors cursor-pointer">
                               @if (navigatingPlaceId() === '' + enrichment()!.latestInformation!['nearestPortId']) {
                                 <span class="inline-flex items-center gap-1"><svg class="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> {{ enrichment()!.latestInformation!['nearestPort'] }}</span>
                               } @else {
@@ -747,32 +749,32 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                               }
                             </button>
                           } @else {
-                            <span class="font-medium text-blue-700">{{ enrichment()!.latestInformation!['nearestPort'] }}</span>
+                            <span class="font-medium text-blue-700 dark:text-blue-400">{{ enrichment()!.latestInformation!['nearestPort'] }}</span>
                           }
                           @if (enrichment()!.latestInformation!['nearestPortCountry']?.name) {
-                            <span class="text-gray-500">, {{ enrichment()!.latestInformation!['nearestPortCountry'].name }}</span>
+                            <span class="text-gray-500 dark:text-muted">, {{ enrichment()!.latestInformation!['nearestPortCountry'].name }}</span>
                           }
                         </div>
                         @if (enrichment()!.latestInformation!['distanceFromNearestPort'] != null) {
-                          <div class="text-xs text-gray-400">{{ enrichment()!.latestInformation!['distanceFromNearestPort'].toFixed(1) }} nm</div>
+                          <div class="text-xs text-gray-400 dark:text-muted">{{ enrichment()!.latestInformation!['distanceFromNearestPort'].toFixed(1) }} nm</div>
                         }
                       </div>
                     }
                     @if (enrichment()!.latestInformation!['status']) {
                       <div>
-                        <span class="text-gray-400 text-xs">Status</span>
-                        <div class="font-medium text-gray-900 mt-0.5 capitalize">{{ enrichment()!.latestInformation!['status'] }}</div>
+                        <span class="text-gray-400 dark:text-muted text-xs">Status</span>
+                        <div class="font-medium text-gray-900 dark:text-ink mt-0.5 capitalize">{{ enrichment()!.latestInformation!['status'] }}</div>
                       </div>
                     }
                     @if (destinationInfo().name) {
                       <div>
-                        <span class="text-gray-400 text-xs">Destination</span>
+                        <span class="text-gray-400 dark:text-muted text-xs">Destination</span>
                         <div class="mt-0.5">
                           @if (destinationInfo().flag) {
                             <span class="mr-1">{{ destinationInfo().flag }}</span>
                           }
                           @if (destinationInfo().placeId) {
-                            <button (click)="navigateToPlace(destinationInfo().placeId!)" class="font-medium text-blue-700 hover:text-blue-900 hover:underline transition-colors cursor-pointer">
+                            <button (click)="navigateToPlace(destinationInfo().placeId!)" class="font-medium text-blue-700 dark:text-blue-400 hover:text-blue-900 hover:underline transition-colors cursor-pointer">
                               @if (navigatingPlaceId() === destinationInfo().placeId) {
                                 <span class="inline-flex items-center gap-1"><svg class="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> {{ destinationInfo().name }}</span>
                               } @else {
@@ -780,30 +782,30 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                               }
                             </button>
                           } @else {
-                            <span class="font-medium text-blue-700">{{ destinationInfo().name }}</span>
+                            <span class="font-medium text-blue-700 dark:text-blue-400">{{ destinationInfo().name }}</span>
                           }
                           @if (destinationInfo().country) {
-                            <span class="text-gray-500">, {{ destinationInfo().country }}</span>
+                            <span class="text-gray-500 dark:text-muted">, {{ destinationInfo().country }}</span>
                           }
                         </div>
                       </div>
                     }
                     @if (destinationInfo().eta) {
                       <div>
-                        <span class="text-gray-400 text-xs">ETA</span>
-                        <div class="font-medium text-gray-900 mt-0.5">{{ formatDate(destinationInfo().eta!) }}</div>
-                        <div class="text-xs text-blue-600">{{ etaRelative(destinationInfo().eta!) }}</div>
+                        <span class="text-gray-400 dark:text-muted text-xs">ETA</span>
+                        <div class="font-medium text-gray-900 dark:text-ink mt-0.5">{{ formatDate(destinationInfo().eta!) }}</div>
+                        <div class="text-xs text-blue-600 dark:text-blue-400">{{ etaRelative(destinationInfo().eta!) }}</div>
                       </div>
                     }
                     @if (enrichment()!.latestInformation!['voyageOrigin']?.name) {
                       <div>
-                        <span class="text-gray-400 text-xs">Voyage Origin</span>
+                        <span class="text-gray-400 dark:text-muted text-xs">Voyage Origin</span>
                         <div class="mt-0.5">
                           @if (enrichment()!.latestInformation!['voyageOriginCountry']?.code) {
                             <span class="mr-1">{{ flagFromCountryCode(enrichment()!.latestInformation!['voyageOriginCountry'].code) }}</span>
                           }
                           @if (enrichment()!.latestInformation!['voyageOrigin'].id) {
-                            <button (click)="navigateToPlace(enrichment()!.latestInformation!['voyageOrigin'].id)" class="font-medium text-blue-700 hover:text-blue-900 hover:underline transition-colors cursor-pointer">
+                            <button (click)="navigateToPlace(enrichment()!.latestInformation!['voyageOrigin'].id)" class="font-medium text-blue-700 dark:text-blue-400 hover:text-blue-900 hover:underline transition-colors cursor-pointer">
                               @if (navigatingPlaceId() === enrichment()!.latestInformation!['voyageOrigin'].id) {
                                 <span class="inline-flex items-center gap-1"><svg class="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> {{ enrichment()!.latestInformation!['voyageOrigin'].name }}</span>
                               } @else {
@@ -811,33 +813,33 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                               }
                             </button>
                           } @else {
-                            <span class="font-medium text-blue-700">{{ enrichment()!.latestInformation!['voyageOrigin'].name }}</span>
+                            <span class="font-medium text-blue-700 dark:text-blue-400">{{ enrichment()!.latestInformation!['voyageOrigin'].name }}</span>
                           }
                           @if (enrichment()!.latestInformation!['voyageOriginCountry']?.name) {
-                            <span class="text-gray-500">, {{ enrichment()!.latestInformation!['voyageOriginCountry'].name }}</span>
+                            <span class="text-gray-500 dark:text-muted">, {{ enrichment()!.latestInformation!['voyageOriginCountry'].name }}</span>
                           }
                         </div>
                         @if (enrichment()!.latestInformation!['distanceFromOrigin'] != null) {
-                          <div class="text-xs text-gray-400">{{ enrichment()!.latestInformation!['distanceFromOrigin'].toFixed(1) }} nm</div>
+                          <div class="text-xs text-gray-400 dark:text-muted">{{ enrichment()!.latestInformation!['distanceFromOrigin'].toFixed(1) }} nm</div>
                         }
                       </div>
                     }
                     @if (enrichment()!.latestInformation!.draught != null) {
                       <div>
-                        <span class="text-gray-400 text-xs">Draught</span>
-                        <div class="font-medium text-gray-900 mt-0.5">{{ enrichment()!.latestInformation!.draught }} m</div>
+                        <span class="text-gray-400 dark:text-muted text-xs">Draught</span>
+                        <div class="font-medium text-gray-900 dark:text-ink mt-0.5">{{ enrichment()!.latestInformation!.draught }} m</div>
                       </div>
                     }
                     @if (enrichment()!.latestInformation!.aisSpeed != null) {
                       <div>
-                        <span class="text-gray-400 text-xs">Speed</span>
-                        <div class="font-medium text-gray-900 mt-0.5">{{ enrichment()!.latestInformation!.aisSpeed }} kn</div>
+                        <span class="text-gray-400 dark:text-muted text-xs">Speed</span>
+                        <div class="font-medium text-gray-900 dark:text-ink mt-0.5">{{ enrichment()!.latestInformation!.aisSpeed }} kn</div>
                       </div>
                     }
                     @if (enrichment()!.latestInformation!.trueHeading != null) {
                       <div>
-                        <span class="text-gray-400 text-xs">Heading</span>
-                        <div class="font-medium text-gray-900 mt-0.5">{{ enrichment()!.latestInformation!.trueHeading }}°</div>
+                        <span class="text-gray-400 dark:text-muted text-xs">Heading</span>
+                        <div class="font-medium text-gray-900 dark:text-ink mt-0.5">{{ enrichment()!.latestInformation!.trueHeading }}°</div>
                       </div>
                     }
                   </div>
@@ -846,12 +848,12 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
 
               <!-- Current Position Map -->
               @if (enrichment()!.latestInformation!.position) {
-                <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden flex flex-col"
+                <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm overflow-hidden flex flex-col"
                      [class]="mapFullscreen() ? 'fixed inset-0 z-[70] rounded-none border-0 h-screen' : 'min-[900px]:order-4 min-[900px]:h-[449px]'">
-                  <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
-                    <h2 class="text-sm font-semibold text-gray-700">Current Position</h2>
+                  <div class="border-b border-gray-100 dark:border-line px-5 py-3 flex items-center justify-between">
+                    <h2 class="text-sm font-semibold text-gray-700 dark:text-ink-dim">Current Position</h2>
                     <button (click)="toggleMapFullscreen()"
-                      class="rounded-md p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                      class="rounded-md p-1 text-gray-400 dark:text-muted hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-surface-tint-strong transition-colors"
                       [title]="mapFullscreen() ? 'Exit fullscreen' : 'Fullscreen'">
                       @if (mapFullscreen()) {
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -874,18 +876,18 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
 
             <!-- Sanctions -->
             @if (enrichment()!['isSanctioned']) {
-              <div class="rounded-xl border border-red-200 bg-white shadow-sm min-[900px]:order-[8]">
-                <div class="border-b border-red-100 px-5 py-3">
-                  <h2 class="text-sm font-semibold text-red-700">⚠️ Sanctioned</h2>
+              <div class="rounded-xl border border-red-200 dark:border-red-500/30 bg-white dark:bg-surface shadow-sm min-[900px]:order-[8]">
+                <div class="border-b border-red-100 dark:border-red-500/25 px-5 py-3">
+                  <h2 class="text-sm font-semibold text-red-700 dark:text-red-400">⚠️ Sanctioned</h2>
                 </div>
-                <div class="px-5 py-4 text-sm text-red-600">
+                <div class="px-5 py-4 text-sm text-red-600 dark:text-red-400">
                   This vessel is flagged as sanctioned.
                 </div>
               </div>
             }
           } @else if (vessel()!.seasearcherId) {
-            <div class="rounded-xl border border-gray-200 bg-white shadow-sm p-5 text-center min-[900px]:order-2">
-              <p class="text-sm text-gray-400">Enrichment data unavailable</p>
+            <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm p-5 text-center min-[900px]:order-2">
+              <p class="text-sm text-gray-400 dark:text-muted">Enrichment data unavailable</p>
             </div>
             <!-- Comments (when no enrichment) -->
             <app-comments-card class="block min-[900px]:order-4 min-[900px]:h-[449px] overflow-hidden" entityType="vessel" [entityId]="vessel()!.id" />
@@ -899,16 +901,16 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
 
         <!-- Port Call History -->
         @if (vessel()!.seasearcherId) {
-          <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-[21] min-[900px]:col-span-2 min-[900px]:h-[449px] min-[900px]:flex min-[900px]:flex-col overflow-hidden">
-            <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
-              <h2 class="text-sm font-semibold text-gray-700">Port Call History</h2>
+          <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm min-[900px]:order-[21] min-[900px]:col-span-2 min-[900px]:h-[449px] min-[900px]:flex min-[900px]:flex-col overflow-hidden">
+            <div class="border-b border-gray-100 dark:border-line px-5 py-3 flex items-center justify-between">
+              <h2 class="text-sm font-semibold text-gray-700 dark:text-ink-dim">Port Call History</h2>
               @if (movements().length) {
-                <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">{{ movements().length }}</span>
+                <span class="inline-flex items-center rounded-full bg-gray-100 dark:bg-surface-3 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:text-ink-dim">{{ movements().length }}</span>
               }
             </div>
             @if (movementsLoading()) {
               <div class="flex items-center justify-center py-8">
-                <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+                <svg class="h-5 w-5 animate-spin text-gray-400 dark:text-muted" viewBox="0 0 24 24" fill="none">
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                 </svg>
@@ -917,12 +919,12 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
               <div class="overflow-auto min-[900px]:flex-1">
                 <table class="w-full text-sm">
                   <thead class="sticky top-0 z-10">
-                    <tr class="border-b border-gray-100 bg-gray-50">
-                      <th class="px-5 py-2 text-left font-medium text-gray-500">Port</th>
-                      <th class="px-5 py-2 text-left font-medium text-gray-500">Country</th>
-                      <th class="px-5 py-2 text-left font-medium text-gray-500">Arrived</th>
-                      <th class="px-5 py-2 text-left font-medium text-gray-500">Departed</th>
-                      <th class="px-5 py-2 text-left font-medium text-gray-500">Duration</th>
+                    <tr class="border-b border-gray-100 dark:border-line bg-gray-50 dark:bg-bg-2">
+                      <th class="px-5 py-2 text-left font-medium text-gray-500 dark:text-muted">Port</th>
+                      <th class="px-5 py-2 text-left font-medium text-gray-500 dark:text-muted">Country</th>
+                      <th class="px-5 py-2 text-left font-medium text-gray-500 dark:text-muted">Arrived</th>
+                      <th class="px-5 py-2 text-left font-medium text-gray-500 dark:text-muted">Departed</th>
+                      <th class="px-5 py-2 text-left font-medium text-gray-500 dark:text-muted">Duration</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-gray-50">
@@ -930,7 +932,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                       <tr class="hover:bg-gray-50/50 transition-colors">
                         <td class="px-5 py-2.5 font-medium">
                           @if (m.placeId || m.place?.id) {
-                            <button (click)="navigateToPlace(m.placeId ?? m.place.id)" class="text-blue-700 hover:text-blue-900 hover:underline transition-colors cursor-pointer text-left">
+                            <button (click)="navigateToPlace(m.placeId ?? m.place.id)" class="text-blue-700 dark:text-blue-400 hover:text-blue-900 hover:underline transition-colors cursor-pointer text-left">
                               @if (navigatingPlaceId() === (m.placeId ?? m.place?.id)) {
                                 <span class="inline-flex items-center gap-1"><svg class="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> {{ m.port ?? m.place?.name ?? '—' }}</span>
                               } @else {
@@ -938,20 +940,20 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                               }
                             </button>
                           } @else {
-                            <span class="text-gray-900">{{ m.port ?? m.place?.name ?? '—' }}</span>
+                            <span class="text-gray-900 dark:text-ink">{{ m.port ?? m.place?.name ?? '—' }}</span>
                           }
                         </td>
-                        <td class="px-5 py-2.5 text-gray-600">
+                        <td class="px-5 py-2.5 text-gray-600 dark:text-ink-dim">
                           @if (movementFlag(m)) { {{ movementFlag(m) }} }
                           {{ m.countryName ?? m.place?.country?.name ?? '—' }}
                         </td>
-                        <td class="px-5 py-2.5 text-gray-600">{{ m.from ? (m.from | dateLabel) : '—' }}</td>
-                        <td class="px-5 py-2.5 text-gray-600">{{ m.to ? (m.to | dateLabel) : '—' }}</td>
-                        <td class="px-5 py-2.5 text-gray-600">
+                        <td class="px-5 py-2.5 text-gray-600 dark:text-ink-dim">{{ m.from ? (m.from | dateLabel) : '—' }}</td>
+                        <td class="px-5 py-2.5 text-gray-600 dark:text-ink-dim">{{ m.to ? (m.to | dateLabel) : '—' }}</td>
+                        <td class="px-5 py-2.5 text-gray-600 dark:text-ink-dim">
                           @if (m.durationHumanized) {
                             {{ m.durationHumanized }}
                           } @else if (m.from && !m.to) {
-                            <span class="text-green-600 text-xs font-medium">In port</span>
+                            <span class="text-green-600 dark:text-green-400 text-xs font-medium">In port</span>
                           } @else { — }
                         </td>
                       </tr>
@@ -960,7 +962,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 </table>
               </div>
             } @else {
-              <div class="px-5 py-6 text-center text-sm text-gray-400">No port call history found</div>
+              <div class="px-5 py-6 text-center text-sm text-gray-400 dark:text-muted">No port call history found</div>
             }
           </div>
         }
@@ -995,15 +997,15 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
         <div
           class="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-lg border px-4 py-3 text-sm font-medium shadow-lg transition-all"
           [class]="toast()!.type === 'success'
-            ? 'border-green-200 bg-green-50 text-green-800'
-            : 'border-red-200 bg-red-50 text-red-800'"
+            ? 'border-green-200 dark:border-green-500/30 bg-green-50 dark:bg-green-500/15 text-green-800 dark:text-green-300'
+            : 'border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 text-red-800 dark:text-red-300'"
         >
           @if (toast()!.type === 'success') {
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500 dark:text-green-300" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd" />
             </svg>
           } @else {
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-500 dark:text-red-300" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 5Zm0 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd" />
             </svg>
           }
@@ -1011,7 +1013,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
         </div>
       }
     } @else {
-      <div class="text-center py-20 text-gray-400">Vessel not found</div>
+      <div class="text-center py-20 text-gray-400 dark:text-muted">Vessel not found</div>
     }
   `,
 })
@@ -1046,6 +1048,8 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
   readonly positionMapEl = viewChild<ElementRef<HTMLDivElement>>('positionMapEl');
   private positionMap: L.Map | null = null;
   private positionMapInitialized = false;
+  private readonly theme = inject(ThemeService);
+  private positionTileLayer: any = null;
   readonly mapFullscreen = signal(false);
   private routeSub: Subscription | null = null;
   private syncSub: Subscription | null = null;
@@ -1277,6 +1281,13 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
   });
 
   constructor() {
+    effect(() => {
+      // Re-theme the base tiles when the app theme changes.
+      this.theme.resolved();
+      if (this.positionMap) {
+        this.positionTileLayer = swapLeafletTileLayer(L, this.positionMap, this.positionTileLayer, this.theme.resolved(), { maxZoom: 19, subdomains: 'abcd' });
+      }
+    });
     // React to map element appearing in the DOM
     effect(() => {
       const mapEl = this.positionMapEl();
@@ -1465,10 +1476,10 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
       attributionControl: false,
     }).setView([lat, lng], 8);
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    this.positionTileLayer = swapLeafletTileLayer(L, this.positionMap, null, this.theme.resolved(), {
       maxZoom: 19,
       subdomains: 'abcd',
-    }).addTo(this.positionMap);
+    });
 
     const heading = this.enrichment()?.latestInformation?.trueHeading;
     const speed = this.enrichment()?.latestInformation?.aisSpeed;

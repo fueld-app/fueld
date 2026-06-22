@@ -204,14 +204,14 @@ export class UsersPageStore {
 
   roleBadgeClass(role: string): string {
     switch (role) {
-      case 'ADMIN': return 'bg-purple-50 text-purple-700 ring-1 ring-purple-200';
-      case 'TRADER': return 'bg-blue-50 text-blue-700 ring-1 ring-blue-200';
-      case 'FINANCE': return 'bg-amber-50 text-amber-700 ring-1 ring-amber-200';
-      case 'TEAMLEAD': return 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200';
-      case 'CREDITMANAGER': return 'bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200';
-      case 'OPERATIONSMANAGER': return 'bg-orange-50 text-orange-700 ring-1 ring-orange-200';
-      case 'LIGHT': return 'bg-pink-50 text-pink-700 ring-1 ring-pink-200';
-      default: return 'bg-gray-100 text-gray-600 ring-1 ring-gray-200';
+      case 'ADMIN': return 'bg-purple-50 text-purple-700 ring-1 ring-purple-200 dark:bg-purple-500/15 dark:text-purple-300 dark:ring-purple-500/30';
+      case 'TRADER': return 'bg-blue-50 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-500/30';
+      case 'FINANCE': return 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/30';
+      case 'TEAMLEAD': return 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30';
+      case 'CREDITMANAGER': return 'bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200 dark:bg-cyan-500/15 dark:text-cyan-300 dark:ring-cyan-500/30';
+      case 'OPERATIONSMANAGER': return 'bg-orange-50 text-orange-700 ring-1 ring-orange-200 dark:bg-orange-500/15 dark:text-orange-300 dark:ring-orange-500/30';
+      case 'LIGHT': return 'bg-pink-50 text-pink-700 ring-1 ring-pink-200 dark:bg-pink-500/15 dark:text-pink-300 dark:ring-pink-500/30';
+      default: return 'bg-gray-100 text-gray-600 ring-1 ring-gray-200 dark:bg-surface-3 dark:text-ink-dim dark:ring-line';
     }
   }
 

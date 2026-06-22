@@ -45,9 +45,7 @@ export interface DropdownOption {
         aria-haspopup="listbox"
         role="combobox"
         autocomplete="off"
-        class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm
-               placeholder:text-gray-400 focus:border-brand-500 focus:outline-none
-               focus:ring-2 focus:ring-brand-500/20"
+        class="w-full rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 dark:placeholder:text-muted focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
         [class.pr-16]="clearable() && selected()"
         [class.pr-8]="!clearable() || !selected()"
       />
@@ -56,8 +54,7 @@ export interface DropdownOption {
         <button
           type="button"
           (click)="clear($event)"
-          class="absolute right-7 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-gray-400
-                 hover:bg-gray-100 hover:text-gray-600 focus:outline-none"
+          class="absolute right-7 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-gray-400 dark:text-muted hover:bg-gray-100 dark:hover:bg-surface-tint-strong hover:text-gray-600 focus:outline-none"
           aria-label="Clear selection"
         >
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -67,7 +64,7 @@ export interface DropdownOption {
       }
       <!-- Chevron -->
       <svg
-        class="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+        class="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-muted"
         xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"
       >
         <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
@@ -81,8 +78,7 @@ export interface DropdownOption {
         [style.top.px]="dropdownTop()"
         [style.left.px]="dropdownLeft()"
         [style.width.px]="dropdownWidth()"
-        class="fixed z-[9999] max-h-48 overflow-auto rounded-lg border border-gray-200
-               bg-white py-1 text-sm shadow-lg ring-1 ring-black/5 focus:outline-none"
+        class="fixed z-[9999] max-h-48 overflow-auto rounded-lg border border-gray-200 dark:border-line bg-white dark:bg-surface py-1 text-sm shadow-lg ring-1 ring-black/5 focus:outline-none"
       >
         @for (opt of filteredOptions(); track opt.value; let i = $index) {
           <li
@@ -91,7 +87,7 @@ export interface DropdownOption {
             [class.bg-brand-50]="i === highlightIndex()"
             [class.text-brand-700]="i === highlightIndex()"
             [class.font-semibold]="opt.value === selected()"
-            class="cursor-pointer px-3 py-2 transition-colors hover:bg-gray-50"
+            class="cursor-pointer px-3 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-surface-tint"
             (mousedown)="onOptionPointerDown($event, opt)"
             (mouseenter)="highlightIndex.set(i)"
           >
@@ -99,12 +95,12 @@ export interface DropdownOption {
               <span>{{ opt.label }}</span>
               <div class="flex items-center gap-2">
                 @if (opt.actionLabel) {
-                  <span class="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                  <span class="rounded-full border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/15 px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:text-blue-400">
                     {{ opt.actionLabel }}
                   </span>
                 }
                 @if (opt.value === selected()) {
-                  <svg class="h-4 w-4 text-brand-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <svg class="h-4 w-4 text-brand-600 dark:text-brand-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                     <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" />
                   </svg>
                 }
@@ -113,7 +109,7 @@ export interface DropdownOption {
           </li>
         } @empty {
           @if (loading()) {
-            <li class="flex items-center gap-2 px-3 py-2 text-gray-400 italic">
+            <li class="flex items-center gap-2 px-3 py-2 text-gray-400 dark:text-muted italic">
               <svg class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
@@ -121,9 +117,9 @@ export interface DropdownOption {
               Searching…
             </li>
           } @else if (searchText().length > 0 && searchText().length < minSearchLength()) {
-            <li class="px-3 py-2 text-gray-400 italic">Type at least {{ minSearchLength() }} characters</li>
+            <li class="px-3 py-2 text-gray-400 dark:text-muted italic">Type at least {{ minSearchLength() }} characters</li>
           } @else {
-            <li class="px-3 py-2 text-gray-400 italic">No results</li>
+            <li class="px-3 py-2 text-gray-400 dark:text-muted italic">No results</li>
           }
         }
       </ul>

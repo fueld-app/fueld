@@ -41,8 +41,8 @@ interface CompanySearchResultOption {
       <!-- Header -->
       <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
-          <h1 class="text-2xl font-bold text-gray-900">Our Companies</h1>
-          <p class="mt-1 text-sm text-gray-500">
+          <h1 class="text-2xl font-bold text-gray-900 dark:text-ink">Our Companies</h1>
+          <p class="mt-1 text-sm text-gray-500 dark:text-muted">
             Companies that belong to your organization. Manage logos and bank accounts for invoicing.
           </p>
         </div>
@@ -59,7 +59,7 @@ interface CompanySearchResultOption {
 
       @if (loading()) {
         <div class="flex items-center justify-center py-12">
-          <svg class="h-8 w-8 animate-spin text-brand-600" viewBox="0 0 24 24" fill="none">
+          <svg class="h-8 w-8 animate-spin text-brand-600 dark:text-brand-400" viewBox="0 0 24 24" fill="none">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
           </svg>
@@ -78,7 +78,7 @@ interface CompanySearchResultOption {
                     @if (co.logoUrl) {
                       <button
                         (click)="triggerLogoUpload($event, co.id)"
-                        class="flex h-12 w-12 items-center justify-center rounded-lg border border-gray-200 overflow-hidden hover:border-brand-400 transition-colors cursor-pointer"
+                        class="flex h-12 w-12 items-center justify-center rounded-lg border border-gray-200 dark:border-line overflow-hidden hover:border-brand-400 transition-colors cursor-pointer"
                       >
                         <img [src]="resolveUrl(co.logoUrl)" alt="" class="h-full w-full object-contain" />
                         <div class="absolute inset-0 flex items-center justify-center rounded-lg bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -99,7 +99,7 @@ interface CompanySearchResultOption {
                     } @else {
                       <button
                         (click)="triggerLogoUpload($event, co.id)"
-                        class="flex h-12 w-12 items-center justify-center rounded-lg border-2 border-dashed border-gray-300 hover:border-brand-400 text-gray-400 hover:text-brand-500 transition-colors cursor-pointer"
+                        class="flex h-12 w-12 items-center justify-center rounded-lg border-2 border-dashed border-gray-300 dark:border-line-strong hover:border-brand-400 text-gray-400 dark:text-muted hover:text-brand-500 transition-colors cursor-pointer"
                         title="Upload logo"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -109,7 +109,7 @@ interface CompanySearchResultOption {
                     }
                     @if (uploadingLogoId() === co.id) {
                       <div class="absolute inset-0 flex items-center justify-center rounded-lg bg-white/80">
-                        <svg class="h-5 w-5 animate-spin text-brand-600" viewBox="0 0 24 24" fill="none">
+                        <svg class="h-5 w-5 animate-spin text-brand-600 dark:text-brand-400" viewBox="0 0 24 24" fill="none">
                           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                         </svg>
@@ -117,16 +117,16 @@ interface CompanySearchResultOption {
                     }
                   </div>
                   <div class="min-w-0">
-                    <a [routerLink]="['/companies', co.id]" class="font-semibold text-gray-900 hover:text-brand-700 hover:underline truncate block">
+                    <a [routerLink]="['/companies', co.id]" class="font-semibold text-gray-900 dark:text-ink hover:text-brand-700 hover:underline truncate block">
                       {{ co.name }}
                     </a>
-                    <p class="text-sm text-gray-500">{{ co.country ?? '\u2014' }}</p>
+                    <p class="text-sm text-gray-500 dark:text-muted">{{ co.country ?? '\u2014' }}</p>
                   </div>
                 </div>
                 <div class="flex items-center gap-2 flex-shrink-0">
                   <button
                     (click)="toggleExpand(co.id)"
-                    class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-line px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
                       <path d="M10.5 6a.5.5 0 0 0-1 0v3.5H6a.5.5 0 0 0 0 1h3.5V14a.5.5 0 0 0 1 0v-3.5H14a.5.5 0 0 0 0-1h-3.5V6Z" />
@@ -135,7 +135,7 @@ interface CompanySearchResultOption {
                     {{ expandedCompanyId() === co.id ? 'Hide Details' : 'Show Details' }}
                   </button>
                   <button (click)="confirmRemove(co)"
-                    class="rounded-md p-1.5 text-gray-400 hover:text-red-500 transition-colors" title="Remove company">
+                    class="rounded-md p-1.5 text-gray-400 dark:text-muted hover:text-red-500 transition-colors" title="Remove company">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                       <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
                     </svg>
@@ -147,7 +147,7 @@ interface CompanySearchResultOption {
               @if (expandedCompanyId() === co.id) {
                 <div class="px-5 py-4 bg-gray-50/50">
                   <div class="flex items-center justify-between mb-3">
-                    <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Bank Accounts</h3>
+                    <h3 class="text-xs font-semibold text-gray-500 dark:text-muted uppercase tracking-wider">Bank Accounts</h3>
                     <button
                       (click)="openBankAccountModal(co.id)"
                       class="app-button-add px-2.5 py-1 text-xs"
@@ -161,39 +161,39 @@ interface CompanySearchResultOption {
 
                   @if (bankAccountsLoading()) {
                     <div class="flex items-center justify-center py-6">
-                      <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+                      <svg class="h-5 w-5 animate-spin text-gray-400 dark:text-muted" viewBox="0 0 24 24" fill="none">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                       </svg>
                     </div>
                   } @else if (bankAccounts().length === 0) {
-                    <div class="text-center py-6 text-sm text-gray-400">
+                    <div class="text-center py-6 text-sm text-gray-400 dark:text-muted">
                       No bank accounts yet. Add one to include banking details on invoices.
                     </div>
                   } @else {
                     <div class="space-y-3">
                       @for (ba of bankAccounts(); track ba.id) {
-                        <div class="rounded-lg border bg-white p-4" [class]="ba.isDefault ? 'border-brand-200 ring-1 ring-brand-100' : 'border-gray-200'">
+                        <div class="rounded-lg border bg-white dark:bg-surface p-4" [class]="ba.isDefault ? 'border-brand-200 dark:border-brand-500/30 ring-1 ring-brand-100' : 'border-gray-200 dark:border-line'">
                           <div class="flex items-start justify-between">
                             <div>
                               <div class="flex items-center gap-2">
-                                <span class="font-semibold text-sm text-gray-900">{{ ba.label }}</span>
-                                <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">{{ ba.currency }}</span>
+                                <span class="font-semibold text-sm text-gray-900 dark:text-ink">{{ ba.label }}</span>
+                                <span class="inline-flex items-center rounded-full bg-gray-100 dark:bg-surface-3 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:text-ink-dim">{{ ba.currency }}</span>
                                 @if (ba.isDefault) {
-                                  <span class="inline-flex items-center rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-medium text-brand-700">Default</span>
+                                  <span class="inline-flex items-center rounded-full bg-brand-50 dark:bg-brand-700/15 px-2 py-0.5 text-[10px] font-medium text-brand-700 dark:text-brand-400">Default</span>
                                 }
                               </div>
-                              <p class="text-sm text-gray-600 mt-0.5">{{ ba.bankName }}</p>
+                              <p class="text-sm text-gray-600 dark:text-ink-dim mt-0.5">{{ ba.bankName }}</p>
                             </div>
                             <div class="flex items-center gap-1">
                               <button (click)="editBankAccount(ba)"
-                                class="rounded-md p-1 text-gray-400 hover:text-brand-600 transition-colors" title="Edit">
+                                class="rounded-md p-1 text-gray-400 dark:text-muted hover:text-brand-600 transition-colors" title="Edit">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                                   <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
                                 </svg>
                               </button>
                               <button (click)="confirmDeleteBankAccount(ba)"
-                                class="rounded-md p-1 text-gray-400 hover:text-red-500 transition-colors" title="Delete">
+                                class="rounded-md p-1 text-gray-400 dark:text-muted hover:text-red-500 transition-colors" title="Delete">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                                   <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
                                 </svg>
@@ -202,31 +202,31 @@ interface CompanySearchResultOption {
                           </div>
                           <div class="mt-2 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-1 text-xs">
                             @if (ba.accountName) {
-                              <div><span class="text-gray-400">Beneficiary:</span> <span class="text-gray-700">{{ ba.accountName }}</span></div>
+                              <div><span class="text-gray-400 dark:text-muted">Beneficiary:</span> <span class="text-gray-700 dark:text-ink-dim">{{ ba.accountName }}</span></div>
                             }
                             @if (ba.iban) {
-                              <div><span class="text-gray-400">IBAN:</span> <span class="text-gray-700 font-mono">{{ ba.iban }}</span></div>
+                              <div><span class="text-gray-400 dark:text-muted">IBAN:</span> <span class="text-gray-700 dark:text-ink-dim font-mono">{{ ba.iban }}</span></div>
                             }
                             @if (ba.accountNumber) {
-                              <div><span class="text-gray-400">Account #:</span> <span class="text-gray-700 font-mono">{{ ba.accountNumber }}</span></div>
+                              <div><span class="text-gray-400 dark:text-muted">Account #:</span> <span class="text-gray-700 dark:text-ink-dim font-mono">{{ ba.accountNumber }}</span></div>
                             }
                             @if (ba.swiftBic) {
-                              <div><span class="text-gray-400">SWIFT/BIC:</span> <span class="text-gray-700 font-mono">{{ ba.swiftBic }}</span></div>
+                              <div><span class="text-gray-400 dark:text-muted">SWIFT/BIC:</span> <span class="text-gray-700 dark:text-ink-dim font-mono">{{ ba.swiftBic }}</span></div>
                             }
                             @if (ba.sortCode) {
-                              <div><span class="text-gray-400">Sort Code:</span> <span class="text-gray-700 font-mono">{{ ba.sortCode }}</span></div>
+                              <div><span class="text-gray-400 dark:text-muted">Sort Code:</span> <span class="text-gray-700 dark:text-ink-dim font-mono">{{ ba.sortCode }}</span></div>
                             }
                             @if (ba.routingNumber) {
-                              <div><span class="text-gray-400">Routing #:</span> <span class="text-gray-700 font-mono">{{ ba.routingNumber }}</span></div>
+                              <div><span class="text-gray-400 dark:text-muted">Routing #:</span> <span class="text-gray-700 dark:text-ink-dim font-mono">{{ ba.routingNumber }}</span></div>
                             }
                             @if (ba.intermediaryBank) {
-                              <div class="col-span-2"><span class="text-gray-400">Intermediary Bank:</span> <span class="text-gray-700">{{ ba.intermediaryBank }}</span></div>
+                              <div class="col-span-2"><span class="text-gray-400 dark:text-muted">Intermediary Bank:</span> <span class="text-gray-700 dark:text-ink-dim">{{ ba.intermediaryBank }}</span></div>
                             }
                             @if (ba.branchAddress) {
-                              <div class="col-span-2"><span class="text-gray-400">Branch:</span> <span class="text-gray-700">{{ ba.branchAddress }}</span></div>
+                              <div class="col-span-2"><span class="text-gray-400 dark:text-muted">Branch:</span> <span class="text-gray-700 dark:text-ink-dim">{{ ba.branchAddress }}</span></div>
                             }
                             @if (ba.notes) {
-                              <div class="col-span-full"><span class="text-gray-400">Notes:</span> <span class="text-gray-700">{{ ba.notes }}</span></div>
+                              <div class="col-span-full"><span class="text-gray-400 dark:text-muted">Notes:</span> <span class="text-gray-700 dark:text-ink-dim">{{ ba.notes }}</span></div>
                             }
                           </div>
                         </div>
@@ -235,9 +235,9 @@ interface CompanySearchResultOption {
                   }
 
                   <!-- Terms (applies to Confirmation/Nomination PDFs) -->
-                  <div class="mt-6 border-t border-gray-200 pt-5">
+                  <div class="mt-6 border-t border-gray-200 dark:border-line pt-5">
                     <div class="flex items-center justify-between">
-                      <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Terms, VAT & Invoicing</h3>
+                      <h3 class="text-xs font-semibold text-gray-500 dark:text-muted uppercase tracking-wider">Terms, VAT & Invoicing</h3>
                       <button
                         (click)="saveTerms(co.id)"
                         [disabled]="savingTerms()"
@@ -246,33 +246,33 @@ interface CompanySearchResultOption {
                         {{ savingTerms() ? 'Saving…' : 'Save terms' }}
                       </button>
                     </div>
-                    <p class="mt-1 text-xs text-gray-500">
+                    <p class="mt-1 text-xs text-gray-500 dark:text-muted">
                       These are read-only on the order and included in Confirmation and Nomination PDFs. You can use <span class="font-mono">$&#123;companyName&#125;</span> and <span class="font-mono">$&#123;documentName&#125;</span> in the text (e.g. Offer/Confirmation).
                     </p>
 
                     @if (termsError()) {
-                      <div class="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+                      <div class="mt-3 rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 px-4 py-3 text-sm text-red-700 dark:text-red-400" role="alert">
                         {{ termsError() }}
                       </div>
                     }
 
                     <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
                       <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1">Customer terms</label>
+                        <label class="block text-xs font-semibold text-gray-600 dark:text-ink-dim mb-1">Customer terms</label>
                         <textarea
                           rows="10"
                           [ngModel]="customerTermsDraft()"
                           (ngModelChange)="customerTermsDraft.set($event)"
-                          class="app-input w-full bg-white text-xs text-gray-700 whitespace-pre-line"
+                          class="app-input w-full bg-white dark:bg-surface text-xs text-gray-700 dark:text-ink-dim whitespace-pre-line"
                         ></textarea>
                       </div>
                       <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1">Supplier terms</label>
+                        <label class="block text-xs font-semibold text-gray-600 dark:text-ink-dim mb-1">Supplier terms</label>
                         <textarea
                           rows="10"
                           [ngModel]="supplierTermsDraft()"
                           (ngModelChange)="supplierTermsDraft.set($event)"
-                          class="app-input w-full bg-white text-xs text-gray-700 whitespace-pre-line"
+                          class="app-input w-full bg-white dark:bg-surface text-xs text-gray-700 dark:text-ink-dim whitespace-pre-line"
                         ></textarea>
                       </div>
                     </div>
@@ -280,73 +280,73 @@ interface CompanySearchResultOption {
                     <!-- VAT & Fraud Prevention (invoice-specific) -->
                     <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
                       <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1">VAT Number</label>
+                        <label class="block text-xs font-semibold text-gray-600 dark:text-ink-dim mb-1">VAT Number</label>
                         <input
                           type="text"
                           [ngModel]="vatDraft()"
                           (ngModelChange)="vatDraft.set($event)"
                           placeholder="e.g. FR31000060599"
-                          class="app-input w-full bg-white text-gray-700"
+                          class="app-input w-full bg-white dark:bg-surface text-gray-700 dark:text-ink-dim"
                         />
                       </div>
                       <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1">Company Registration Number</label>
+                        <label class="block text-xs font-semibold text-gray-600 dark:text-ink-dim mb-1">Company Registration Number</label>
                         <input
                           type="text"
                           [ngModel]="companyRegistrationNumberDraft()"
                           (ngModelChange)="companyRegistrationNumberDraft.set($event)"
                           placeholder="e.g. 12345678"
-                          class="app-input w-full bg-white text-gray-700"
+                          class="app-input w-full bg-white dark:bg-surface text-gray-700 dark:text-ink-dim"
                         />
                       </div>
                       <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1">Late Payment Interest <span class="text-gray-400 font-normal">(shown on invoices)</span></label>
+                        <label class="block text-xs font-semibold text-gray-600 dark:text-ink-dim mb-1">Late Payment Interest <span class="text-gray-400 dark:text-muted font-normal">(shown on invoices)</span></label>
                         <input
                           type="text"
                           [ngModel]="latePaymentInterestDraft()"
                           (ngModelChange)="latePaymentInterestDraft.set($event)"
                           placeholder="e.g. 2%"
-                          class="app-input w-full bg-white text-gray-700"
+                          class="app-input w-full bg-white dark:bg-surface text-gray-700 dark:text-ink-dim"
                         />
                       </div>
                       <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1">Email Header Color <span class="text-gray-400 font-normal">(hex, e.g. #1a56db)</span></label>
+                        <label class="block text-xs font-semibold text-gray-600 dark:text-ink-dim mb-1">Email Header Color <span class="text-gray-400 dark:text-muted font-normal">(hex, e.g. #1a56db)</span></label>
                         <div class="flex items-center gap-2">
                           <input
                             type="color"
                             [ngModel]="brandColorDraft() || '#ffffff'"
                             (ngModelChange)="brandColorDraft.set($event)"
-                            class="h-9 w-12 cursor-pointer rounded border border-gray-300 p-0.5"
+                            class="h-9 w-12 cursor-pointer rounded border border-gray-300 dark:border-line-strong p-0.5"
                           />
                           <input
                             type="text"
                             [ngModel]="brandColorDraft()"
                             (ngModelChange)="brandColorDraft.set($event)"
                             placeholder="#ffffff"
-                            class="app-input flex-1 bg-white text-gray-700"
+                            class="app-input flex-1 bg-white dark:bg-surface text-gray-700 dark:text-ink-dim"
                           />
                         </div>
                       </div>
                       <div>
-                        <label class="block text-xs font-semibold text-gray-600 mb-1">Fraud Prevention Notice <span class="text-gray-400 font-normal">(shown on invoices)</span></label>
+                        <label class="block text-xs font-semibold text-gray-600 dark:text-ink-dim mb-1">Fraud Prevention Notice <span class="text-gray-400 dark:text-muted font-normal">(shown on invoices)</span></label>
                         <textarea
                           rows="4"
                           [ngModel]="fraudDraft()"
                           (ngModelChange)="fraudDraft.set($event)"
-                          class="app-input w-full bg-white text-xs text-gray-700 whitespace-pre-line"
+                          class="app-input w-full bg-white dark:bg-surface text-xs text-gray-700 dark:text-ink-dim whitespace-pre-line"
                         ></textarea>
                       </div>
                     </div>
 
                     @if (termsSaved()) {
-                      <p class="mt-2 text-xs font-medium text-green-700">Saved</p>
+                      <p class="mt-2 text-xs font-medium text-green-700 dark:text-green-400">Saved</p>
                     }
                   </div>
                 </div>
               }
             </div>
           } @empty {
-            <div class="app-panel px-4 py-8 text-center text-gray-400">
+            <div class="app-panel px-4 py-8 text-center text-gray-400 dark:text-muted">
               No companies marked as own yet. Click "Add Company" to add one.
             </div>
           }
@@ -356,26 +356,26 @@ interface CompanySearchResultOption {
       <!-- Add Company Modal -->
       @if (showAddModal()) {
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div class="rounded-xl bg-white p-6 shadow-xl w-full max-w-lg mx-4" (click)="$event.stopPropagation()">
-            <h3 class="text-lg font-semibold text-gray-900">Add Own Company</h3>
-            <p class="mt-1 text-sm text-gray-500">Search for and select an existing company to mark as your own.</p>
+          <div class="rounded-xl bg-white dark:bg-surface p-6 shadow-xl w-full max-w-lg mx-4" (click)="$event.stopPropagation()">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-ink">Add Own Company</h3>
+            <p class="mt-1 text-sm text-gray-500 dark:text-muted">Search for and select an existing company to mark as your own.</p>
 
             <div class="mt-4">
-              <label class="block text-sm font-medium text-gray-700">Company *</label>
+              <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">Company *</label>
               <div class="relative mt-1">
                 <input type="text" [ngModel]="searchTerm()" (ngModelChange)="onSearch($event)"
                   (focus)="dropdownOpen.set(searchResults().length > 0)"
                   placeholder="Search companies\u2026"
                   class="app-input w-full" />
                 @if (dropdownOpen() && searchResults().length) {
-                  <div class="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
+                  <div class="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-lg max-h-48 overflow-y-auto">
                     @for (c of searchResults(); track c.key) {
-                      <button (click)="addCompany(c)" class="flex w-full items-center gap-2 px-3 py-2 text-sm text-left hover:bg-gray-50">
-                        <span class="font-medium text-gray-900">{{ c.name }}</span>
+                      <button (click)="addCompany(c)" class="flex w-full items-center gap-2 px-3 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-surface-tint">
+                        <span class="font-medium text-gray-900 dark:text-ink">{{ c.name }}</span>
                         @if (c.source === 'seasearcher') {
-                          <span class="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">Import</span>
+                          <span class="rounded-full border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/15 px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:text-blue-400">Import</span>
                         } @else if (c.country) {
-                          <span class="text-xs text-gray-500">{{ c.country }}</span>
+                          <span class="text-xs text-gray-500 dark:text-muted">{{ c.country }}</span>
                         }
                       </button>
                     }
@@ -390,7 +390,7 @@ interface CompanySearchResultOption {
 
             <div class="mt-5 flex justify-end">
               <button (click)="showAddModal.set(false)"
-                class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+                class="rounded-lg border border-gray-300 dark:border-line-strong px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint">Cancel</button>
             </div>
           </div>
         </div>
@@ -411,14 +411,14 @@ interface CompanySearchResultOption {
       <!-- Remove company confirmation -->
       @if (removeTarget()) {
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" (click)="removeTarget.set(null)">
-          <div class="rounded-xl bg-white p-6 shadow-xl max-w-sm mx-4" (click)="$event.stopPropagation()">
-            <h3 class="text-lg font-semibold text-gray-900">Remove own company?</h3>
-            <p class="mt-2 text-sm text-gray-500">
+          <div class="rounded-xl bg-white dark:bg-surface p-6 shadow-xl max-w-sm mx-4" (click)="$event.stopPropagation()">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-ink">Remove own company?</h3>
+            <p class="mt-2 text-sm text-gray-500 dark:text-muted">
               Are you sure you want to remove <strong>{{ removeTarget()!.name }}</strong> from your own companies?
             </p>
             <div class="mt-4 flex justify-end gap-2">
               <button (click)="removeTarget.set(null)"
-                class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+                class="rounded-lg border border-gray-300 dark:border-line-strong px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint">Cancel</button>
               <button (click)="executeRemove()"
                 class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">Remove</button>
             </div>
@@ -429,14 +429,14 @@ interface CompanySearchResultOption {
       <!-- Delete bank account confirmation -->
       @if (deleteBankAccountTarget()) {
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" (click)="deleteBankAccountTarget.set(null)">
-          <div class="rounded-xl bg-white p-6 shadow-xl max-w-sm mx-4" (click)="$event.stopPropagation()">
-            <h3 class="text-lg font-semibold text-gray-900">Delete bank account?</h3>
-            <p class="mt-2 text-sm text-gray-500">
+          <div class="rounded-xl bg-white dark:bg-surface p-6 shadow-xl max-w-sm mx-4" (click)="$event.stopPropagation()">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-ink">Delete bank account?</h3>
+            <p class="mt-2 text-sm text-gray-500 dark:text-muted">
               Are you sure you want to delete <strong>{{ deleteBankAccountTarget()!.label }}</strong>?
             </p>
             <div class="mt-4 flex justify-end gap-2">
               <button (click)="deleteBankAccountTarget.set(null)"
-                class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+                class="rounded-lg border border-gray-300 dark:border-line-strong px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint">Cancel</button>
               <button (click)="executeDeleteBankAccount()"
                 class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">Delete</button>
             </div>

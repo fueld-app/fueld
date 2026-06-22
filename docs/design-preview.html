@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fueld — Platform Redesign Preview (Current vs New Design System)</title>
+<!--
+  Self-contained, dependency-free preview of the Fueld Angular platform shell
+  rendered THREE ways so you can compare before committing to the migration:
+
+    1. CURRENT   — today's blue/gray/light Tailwind look (dark slate sidebar)
+    2. NEW DARK  — the marketing design system (apps/marketing/src/styles/tokens.css)
+    3. NEW LIGHT — same system, light theme
+
+  The "new" tokens are inlined verbatim from tokens.css so this file is portable
+  (open it by double-clicking; no server needed). The "current" palette is
+  hardcoded to match the live app's Tailwind v4 values (brand #3b82f6, sidebar
+  slate #0f172a, gray-50 surfaces, white panels).
+
+  This is a static mock of the real shell (real nav items, real status colors,
+  real commodity-price strip) — not a pixel-perfect clone, but close enough to
+  judge the visual direction.
+-->
+<style>
+  /* =========================================================================
+     1. DESIGN TOKENS  (inlined verbatim from apps/marketing/src/styles/tokens.css)
+     Scoped under .preview so they don't leak into the control bar.
+     ========================================================================= */
+  .preview {
+    --accent:        #f59e0b;
+    --accent-2:      #fbbf24;
+    --accent-deep:   #b45309;
+    --cyan:          #22d3ee;
+    --emerald:       #34d399;
+    --on-accent:     #1a1208;
+
+    --gradient-accent:        linear-gradient(135deg, #f59e0b 0%, #fb923c 60%, #f97316 100%);
+    --gradient-accent-hover:  linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+
+    --radius-xl: 24px;
+    --radius-lg: 16px;
+    --radius-md: 10px;
+    --radius-sm: 8px;
+
+    --font-display: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', 'Inter', 'Helvetica Neue', Arial, sans-serif;
+    --font-body:    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', 'Inter', 'Helvetica Neue', Arial, sans-serif;
+    --font-mono:    ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  }
+
+  /* DARK (default) */
+  .preview,
+  .preview[data-theme='dark'] {
+    color-scheme: dark;
+    --bg: #06080d; --bg-2: #0a0e16;
+    --surface: #0f1421; --surface-2: #141a2b; --surface-3: #1a2236;
+    --surface-inset: rgba(0,0,0,0.30); --surface-inset-strong: rgba(0,0,0,0.45);
+    --surface-tint: rgba(255,255,255,0.025); --surface-tint-strong: rgba(255,255,255,0.05);
+    --line: rgba(255,255,255,0.08); --line-strong: rgba(255,255,255,0.16); --line-hover: rgba(255,255,255,0.25);
+    --ink: #f3f5fa; --ink-dim: #c7cdda; --muted: #8a93a6;
+    --heading-from: #ffffff; --heading-to: #c9d2e3;
+    --header-bg: rgba(10,14,22,0.72); --header-shadow: 0 10px 40px -10px rgba(0,0,0,0.6);
+    --gradient-card: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%);
+    --code-bg: #050810; --code-kw: #c084fc; --code-fn: var(--cyan); --code-str: #fbbf24; --code-cm: var(--muted);
+    --chip-bg: rgba(245,158,11,0.08); --chip-fg: var(--accent-2);
+    --selection-bg: rgba(245,158,11,0.35); --selection-fg: #fff;
+    --shadow-soft: 0 1px 0 rgba(255,255,255,0.04) inset, 0 30px 80px -20px rgba(0,0,0,0.6);
+    --shadow-card: 0 1px 0 rgba(255,255,255,0.04) inset, 0 18px 40px -20px rgba(0,0,0,0.55);
+    --shadow-accent: 0 10px 24px -10px rgba(245,158,11,0.55);
+    --shadow-accent-hover: 0 14px 30px -10px rgba(245,158,11,0.7);
+    --pill-emerald-bg: rgba(52,211,153,0.12); --pill-emerald-fg: var(--emerald); --pill-emerald-line: rgba(52,211,153,0.30);
+    --pill-amber-bg:   rgba(245,158,11,0.12); --pill-amber-fg:   var(--accent-2); --pill-amber-line:   rgba(245,158,11,0.30);
+  }
+
+  /* LIGHT */
+  .preview[data-theme='light'] {
+    color-scheme: light;
+    --bg: #f6f7fb; --bg-2: #eef1f7;
+    --surface: #ffffff; --surface-2: #fafbfd; --surface-3: #f1f3f8;
+    --surface-inset: rgba(15,20,35,0.04); --surface-inset-strong: rgba(15,20,35,0.08);
+    --surface-tint: rgba(15,20,35,0.03); --surface-tint-strong: rgba(15,20,35,0.05);
+    --line: rgba(15,20,35,0.08); --line-strong: rgba(15,20,35,0.16); --line-hover: rgba(15,20,35,0.28);
+    --ink: #0f1421; --ink-dim: #3f4658; --muted: #6b7385;
+    --heading-from: #0f1421; --heading-to: #3f4658;
+    --header-bg: rgba(255,255,255,0.78); --header-shadow: 0 10px 30px -12px rgba(15,20,35,0.18);
+    --gradient-card: linear-gradient(180deg, rgba(15,20,35,0.015) 0%, rgba(15,20,35,0) 100%);
+    --code-bg: #f3f5fa; --code-kw: #7c3aed; --code-fn: #0e7490; --code-str: #b45309; --code-cm: #6b7385;
+    --chip-bg: rgba(245,158,11,0.12); --chip-fg: #b45309;
+    --selection-bg: rgba(245,158,11,0.30); --selection-fg: #1a1208;
+    --shadow-soft: 0 1px 0 rgba(255,255,255,0.6) inset, 0 24px 60px -28px rgba(15,20,35,0.25);
+    --shadow-card: 0 1px 0 rgba(255,255,255,0.6) inset, 0 14px 32px -22px rgba(15,20,35,0.22);
+    --shadow-accent: 0 10px 24px -10px rgba(245,158,11,0.45);
+    --shadow-accent-hover: 0 14px 30px -10px rgba(245,158,11,0.6);
+    --pill-emerald-bg: rgba(5,150,105,0.10); --pill-emerald-fg: #047857; --pill-emerald-line: rgba(5,150,105,0.30);
+    --pill-amber-bg:   rgba(245,158,11,0.12); --pill-amber-fg:   #b45309; --pill-amber-line:   rgba(245,158,11,0.35);
+  }
+
+  /* Domain status tokens — these are NOT in tokens.css yet (a gap in the plan).
+     Shown here as semantic vars so you can see how statuses would be themed. */
+  .preview {
+    --st-inquiry-bg: rgba(245,158,11,0.12);  --st-inquiry-fg: var(--accent-2);  --st-inquiry-line: rgba(245,158,11,0.30);
+    --st-offer-bg:   rgba(249,115,22,0.14);  --st-offer-fg:   #fb923c;          --st-offer-line:   rgba(249,115,22,0.32);
+    --st-confirmed-bg: rgba(34,211,238,0.12);--st-confirmed-fg: var(--cyan);    --st-confirmed-line: rgba(34,211,238,0.30);
+    --st-delivered-bg: rgba(139,92,246,0.14);--st-delivered-fg:#a78bfa;         --st-delivered-line: rgba(139,92,246,0.32);
+    --st-invoiced-bg: rgba(99,102,241,0.14); --st-invoiced-fg:#818cf8;          --st-invoiced-line: rgba(99,102,241,0.32);
+    --st-paid-bg: var(--pill-emerald-bg);     --st-paid-fg: var(--pill-emerald-fg); --st-paid-line: var(--pill-emerald-line);
+    --st-cancelled-bg: rgba(239,68,68,0.12); --st-cancelled-fg:#f87171;        --st-cancelled-line: rgba(239,68,68,0.30);
+    --st-overdue-bg:   rgba(220,38,38,0.16); --st-overdue-fg:#fca5a5;           --st-overdue-line: rgba(220,38,38,0.34);
+  }
+  .preview[data-theme='light'] {
+    --st-offer-fg:#c2410c; --st-delivered-fg:#7c3aed; --st-invoiced-fg:#4f46e5;
+    --st-cancelled-fg:#b91c1c; --st-overdue-fg:#991b1b;
+  }
+
+  /* =========================================================================
+     2. PAGE / CONTROL BAR
+     ========================================================================= */
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Inter, sans-serif;
+    background: #e5e7eb;
+    color: #111827;
+    -webkit-font-smoothing: antialiased;
+  }
+  .controls {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+    padding: 0.75rem 1.25rem;
+    background: #111827; color: #f9fafb;
+    border-bottom: 1px solid #000;
+    box-shadow: 0 6px 20px -8px rgba(0,0,0,0.5);
+  }
+  .controls h1 { font-size: 0.95rem; font-weight: 700; margin: 0 0.75rem 0 0; letter-spacing: -0.01em; }
+  .controls .modes { display: inline-flex; gap: 0.25rem; background: #1f2937; padding: 0.25rem; border-radius: 0.5rem; }
+  .controls button {
+    appearance: none; border: 0; cursor: pointer;
+    padding: 0.45rem 0.85rem; border-radius: 0.375rem;
+    font-size: 0.82rem; font-weight: 600; color: #9ca3af; background: transparent;
+    transition: color .15s, background .15s;
+  }
+  .controls button:hover { color: #e5e7eb; }
+  .controls button.active { background: #f59e0b; color: #1a1208; }
+  .controls .note { margin-left: auto; font-size: 0.72rem; color: #9ca3af; max-width: 34rem; text-align: right; line-height: 1.4; }
+  .controls .note a { color: #fbbf24; }
+
+  /* =========================================================================
+     3. SHELL LAYOUT  (shared structure, skinned per mode)
+     ========================================================================= */
+  .preview {
+    display: flex; min-height: 100vh;
+    font-size: 14px; line-height: 1.5;
+  }
+  .sidebar {
+    width: 240px; flex-shrink: 0; display: flex; flex-direction: column;
+    position: sticky; top: 0; height: 100vh;
+  }
+  .brand-row { display: flex; align-items: center; gap: 0.6rem; height: 64px; padding: 0 0.85rem; flex-shrink: 0; }
+  .brand-glyph { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 8px; font-weight: 800; letter-spacing: -0.02em; }
+  .brand-name { font-size: 1.05rem; font-weight: 800; letter-spacing: -0.01em; }
+  .nav { margin-top: 1rem; flex: 1; overflow-y: auto; padding: 0 0.5rem; }
+  .nav-group { margin-bottom: 0.1rem; }
+  .nav-item {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.55rem 0.65rem; border-radius: 8px;
+    font-size: 0.85rem; font-weight: 500; cursor: pointer;
+    text-decoration: none; transition: background .15s, color .15s;
+  }
+  .nav-item .ico { width: 20px; height: 20px; flex-shrink: 0; opacity: 0.9; }
+  .nav-item:hover { text-decoration: none; }
+  .nav-item.active { font-weight: 600; }
+  .nav-children { padding-left: 1.5rem; margin: 0.1rem 0 0.3rem; border-left: 1px solid transparent; }
+  .nav-child { display: block; padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer; }
+  .sidebar-footer { border-top: 1px solid transparent; padding: 0.6rem 0.75rem; flex-shrink: 0; }
+  .sidebar-version { font-size: 0.7rem; display: flex; align-items: center; justify-content: space-between; }
+  .ai-dot { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.65rem; text-decoration: none; padding: 0.2rem 0.4rem; border-radius: 6px; }
+  .ai-dot .dot { width: 7px; height: 7px; border-radius: 999px; }
+
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .topbar {
+    position: sticky; top: 0; z-index: 20; height: 64px;
+    display: flex; align-items: center; gap: 0.9rem; padding: 0 1rem 0 1.25rem;
+    backdrop-filter: blur(10px);
+  }
+  .hamburger { display: none; }
+  .search { position: relative; flex: 1; max-width: 480px; }
+  .search input {
+    width: 100%; border-radius: 8px; padding: 0.5rem 0.75rem 0.5rem 2.25rem;
+    font-size: 0.85rem; font-family: inherit; transition: border-color .15s, background .15s;
+  }
+  .search .ico { position: absolute; left: 0.65rem; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; }
+  .prices { display: flex; align-items: center; gap: 1rem; font-size: 0.72rem; }
+  .price-block { display: flex; flex-direction: column; line-height: 1.15; }
+  .price-block .lbl { font-weight: 500; }
+  .price-block .val { font-weight: 600; }
+  .price-block .chg { font-size: 0.65rem; font-weight: 600; }
+  .chg.up { } .chg.down { }
+  .topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 0.6rem; }
+  .btn { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 0.9rem; border-radius: 8px; font-size: 0.82rem; font-weight: 600; cursor: pointer; border: 1px solid transparent; transition: background .15s, border-color .15s, transform .1s; text-decoration: none; }
+  .btn-primary { }
+  .btn-secondary { }
+  .icon-btn { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 8px; cursor: pointer; position: relative; border: 1px solid transparent; background: transparent; }
+  .icon-btn .ico { width: 20px; height: 20px; }
+  .badge { position: absolute; top: -2px; right: -2px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; font-size: 0.62rem; font-weight: 700; display: grid; place-items: center; }
+  .avatar { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; cursor: pointer; }
+
+  .mfa-banner { display: flex; align-items: center; gap: 0.75rem; padding: 0.65rem 1.25rem; font-size: 0.82rem; border-bottom: 1px solid transparent; }
+  .mfa-banner .ico-wrap { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 999px; flex-shrink: 0; }
+  .mfa-banner strong { font-weight: 600; }
+  .mfa-banner .mfa-cta { margin-left: auto; padding: 0.4rem 0.8rem; border-radius: 8px; font-size: 0.78rem; font-weight: 600; cursor: pointer; text-decoration: none; }
+
+  .content { padding: 1.5rem; max-width: 1280px; }
+  .page-title { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.025em; margin: 0 0 1.1rem; }
+  .kpi-row { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 1rem; margin-bottom: 1.25rem; }
+  .kpi { padding: 1.1rem 1.15rem; border-radius: 12px; border: 1px solid transparent; }
+  .kpi .kpi-label { font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; margin: 0; }
+  .kpi .kpi-value { font-size: 1.7rem; font-weight: 700; letter-spacing: -0.02em; margin: 0.3rem 0 0; }
+  .kpi .kpi-delta { font-size: 0.74rem; font-weight: 600; margin-top: 0.3rem; display: inline-block; }
+
+  .panel { border: 1px solid transparent; border-radius: 12px; overflow: hidden; }
+  .panel-head { display: flex; align-items: center; gap: 0.75rem; padding: 0.9rem 1.1rem; border-bottom: 1px solid transparent; }
+  .panel-head h2 { font-size: 1rem; font-weight: 600; margin: 0; }
+  .panel-head .actions { margin-left: auto; display: flex; gap: 0.5rem; align-items: center; }
+  .panel-head .filter { padding: 0.4rem 0.7rem; border-radius: 6px; font-size: 0.78rem; border: 1px solid transparent; font-family: inherit; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  thead th { text-align: left; font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; padding: 0.65rem 0.9rem; border-bottom: 1px solid transparent; }
+  tbody td { padding: 0.7rem 0.9rem; border-bottom: 1px solid transparent; white-space: nowrap; }
+  tbody tr:hover { }
+  .mono { font-family: var(--font-mono, ui-monospace, Menlo, monospace); }
+  .pill { display: inline-flex; align-items: center; padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.02em; border: 1px solid transparent; }
+  .row-actions { display: flex; gap: 0.4rem; }
+  .row-btn { font-size: 0.72rem; padding: 0.3rem 0.55rem; border-radius: 6px; cursor: pointer; border: 1px solid transparent; font-weight: 500; }
+
+  .footer-note { padding: 1.5rem; font-size: 0.72rem; text-align: center; }
+
+  /* =========================================================================
+     4. CURRENT SKIN  (replicates today's blue/gray/light + slate sidebar)
+     ========================================================================= */
+  .preview.skin-current {
+    background: #f9fafb; /* gray-50 */
+    color: #111827;
+  }
+  .preview.skin-current .sidebar { background: #0f172a; border-right: 1px solid #1e293b; }
+  .preview.skin-current .brand-glyph { background: #3b82f6; color: #fff; box-shadow: 0 6px 20px -4px rgba(59,130,246,0.55); }
+  .preview.skin-current .brand-name { color: #f8fafc; }
+  .preview.skin-current .nav-item { color: #94a3b8; }
+  .preview.skin-current .nav-item:hover { background: #1e293b; color: #f8fafc; }
+  .preview.skin-current .nav-item.active { background: #334155; color: #f8fafc; }
+  .preview.skin-current .nav-children { border-color: #1e293b; }
+  .preview.skin-current .nav-child { color: #94a3b8; }
+  .preview.skin-current .nav-child:hover { background: #1e293b; color: #f8fafc; }
+  .preview.skin-current .nav-child.active { color: #f8fafc; background: #334155; }
+  .preview.skin-current .sidebar-footer { border-color: #1e293b; }
+  .preview.skin-current .sidebar-version { color: rgba(148,163,184,0.6); }
+  .preview.skin-current .ai-dot { color: rgba(148,163,184,0.5); }
+  .preview.skin-current .ai-dot:hover { background: #1e293b; }
+  .preview.skin-current .ai-dot .dot { background: #34d399; box-shadow: 0 0 8px #34d399; }
+
+  .preview.skin-current .topbar { background: rgba(255,255,255,0.8); border-bottom: 1px solid #e5e7eb; }
+  .preview.skin-current .search input { background: #f9fafb; border: 1px solid #e5e7eb; color: #374151; }
+  .preview.skin-current .search input::placeholder { color: #9ca3af; }
+  .preview.skin-current .search input:focus { border-color: #93c5fd; background: #fff; outline: none; box-shadow: 0 0 0 2px rgba(59,130,246,0.18); }
+  .preview.skin-current .search .ico { color: #9ca3af; }
+  .preview.skin-current .price-block .lbl { color: #6b7280; }
+  .preview.skin-current .price-block .val { color: #111827; }
+  .preview.skin-current .price-block .timestamp { color: #9ca3af; font-size: 0.62rem; }
+  .preview.skin-current .chg.up { color: #15803d; }
+  .preview.skin-current .chg.down { color: #b91c1c; }
+  .preview.skin-current .divider-v { width: 1px; height: 24px; background: #e5e7eb; }
+  .preview.skin-current .btn-primary { background: #3b82f6; color: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+  .preview.skin-current .btn-primary:hover { background: #1e40af; }
+  .preview.skin-current .btn-secondary { background: #fff; border-color: #d1d5db; color: #374151; }
+  .preview.skin-current .btn-secondary:hover { background: #f3f4f6; }
+  .preview.skin-current .icon-btn { color: #9ca3af; }
+  .preview.skin-current .icon-btn:hover { background: #f3f4f6; color: #4b5563; }
+  .preview.skin-current .badge { background: #ef4444; color: #fff; }
+  .preview.skin-current .avatar { background: #3b82f6; color: #fff; }
+
+  .preview.skin-current .mfa-banner { background: #fffbeb; border-color: #fde68a; color: #78350f; }
+  .preview.skin-current .mfa-banner .ico-wrap { background: #fde68a; color: #92400e; }
+  .preview.skin-current .mfa-banner .mfa-cta { background: #d97706; color: #fff; }
+  .preview.skin-current .mfa-banner .mfa-cta:hover { background: #b45309; }
+
+  .preview.skin-current .page-title { color: #111827; }
+  .preview.skin-current .kpi { background: #fff; border-color: #e5e7eb; box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    background-image: radial-gradient(circle at top right, rgba(255,255,255,0.95), rgba(255,255,255,0.7) 34%, transparent 64%), linear-gradient(135deg,#eff6ff 0%,#fff 52%,#f8fafc 100%); }
+  .preview.skin-current .kpi-label { color: #6b7280; }
+  .preview.skin-current .kpi-value { color: #111827; }
+  .preview.skin-current .kpi-delta.up { color: #15803d; }
+  .preview.skin-current .kpi-delta.down { color: #b91c1c; }
+
+  .preview.skin-current .panel { background: #fff; border-color: #e5e7eb; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+  .preview.skin-current .panel-head { border-color: #e5e7eb; }
+  .preview.skin-current .panel-head h2 { color: #111827; }
+  .preview.skin-current .panel-head .filter { background: #fff; border-color: #d1d5db; color: #374151; }
+  .preview.skin-current thead th { color: #6b7280; border-color: #e5e7eb; background: #f9fafb; }
+  .preview.skin-current tbody td { color: #374151; border-color: #f3f4f6; }
+  .preview.skin-current tbody tr:hover { background: #f9fafb; }
+  .preview.skin-current .row-btn { background: #fff; border-color: #e5e7eb; color: #4b5563; }
+  .preview.skin-current .row-btn:hover { background: #f3f4f6; }
+  .preview.skin-current .row-btn.primary { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+  .preview.skin-current .footer-note { color: #9ca3af; }
+
+  /* Current status pills (today's Tailwind bg-*-50/text-*-700/border-*-200) */
+  .preview.skin-current .pill[data-status="inquiry"]  { background:#fef9c7; color:#854d0e; border-color:#fde68a; }
+  .preview.skin-current .pill[data-status="offer"]    { background:#ffedd5; color:#c2410c; border-color:#fed7aa; }
+  .preview.skin-current .pill[data-status="confirmed"]{ background:#dbeafe; color:#1d4ed8; border-color:#bfdbfe; }
+  .preview.skin-current .pill[data-status="delivered"]{ background:#ede9fe; color:#6d28d9; border-color:#ddd6fe; }
+  .preview.skin-current .pill[data-status="invoiced"]{ background:#e0e7ff; color:#4338ca; border-color:#c7d2fe; }
+  .preview.skin-current .pill[data-status="paid"]    { background:#dcfce7; color:#15803d; border-color:#bbf7d0; }
+  .preview.skin-current .pill[data-status="cancelled"]{ background:#fee2e2; color:#b91c1c; border-color:#fecaca; }
+  .preview.skin-current .pill[data-status="overdue"] { background:#fef2f2; color:#991b1b; border-color:#fecaca; }
+
+  /* =========================================================================
+     5. NEW SKIN  (marketing design system — semantic tokens)
+     ========================================================================= */
+  .preview.skin-new {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+  }
+  .preview.skin-new .sidebar { background: var(--surface); border-right: 1px solid var(--line); }
+  .preview.skin-new .brand-glyph { background: var(--gradient-accent); color: var(--on-accent); box-shadow: var(--shadow-accent); }
+  .preview.skin-new .brand-name { color: var(--ink); }
+  .preview.skin-new .nav-item { color: var(--ink-dim); }
+  .preview.skin-new .nav-item:hover { background: var(--surface-tint-strong); color: var(--ink); }
+  .preview.skin-new .nav-item.active { background: var(--surface-tint-strong); color: var(--ink); }
+  .preview.skin-new .nav-item.active .ico { color: var(--accent); }
+  .preview.skin-new .nav-children { border-color: var(--line); }
+  .preview.skin-current .nav-child, .preview.skin-new .nav-child { color: var(--muted); }
+  .preview.skin-new .nav-child:hover { background: var(--surface-tint-strong); color: var(--ink); }
+  .preview.skin-new .nav-child.active { color: var(--ink); background: var(--surface-tint-strong); }
+  .preview.skin-new .sidebar-footer { border-color: var(--line); }
+  .preview.skin-new .sidebar-version { color: var(--muted); }
+  .preview.skin-new .ai-dot { color: var(--muted); }
+  .preview.skin-new .ai-dot:hover { background: var(--surface-tint-strong); }
+  .preview.skin-new .ai-dot .dot { background: var(--emerald); box-shadow: 0 0 10px var(--emerald); }
+
+  .preview.skin-new .topbar { background: var(--header-bg); border-bottom: 1px solid var(--line); box-shadow: var(--header-shadow); }
+  .preview.skin-new .search input { background: var(--surface-inset); border: 1px solid var(--line); color: var(--ink); }
+  .preview.skin-new .search input::placeholder { color: var(--muted); }
+  .preview.skin-new .search input:focus { border-color: var(--accent); background: var(--surface-inset-strong); outline: none; box-shadow: 0 0 0 3px rgba(245,158,11,0.2); }
+  .preview.skin-new .search .ico { color: var(--muted); }
+  .preview.skin-new .price-block .lbl { color: var(--muted); }
+  .preview.skin-new .price-block .val { color: var(--ink); }
+  .preview.skin-new .price-block .timestamp { color: var(--muted); font-size: 0.62rem; }
+  .preview.skin-new .chg.up { color: var(--pill-emerald-fg); }
+  .preview.skin-new .chg.down { color: var(--st-cancelled-fg); }
+  .preview.skin-new .divider-v { width: 1px; height: 24px; background: var(--line); }
+  .preview.skin-new .btn-primary { background: var(--gradient-accent); color: var(--on-accent); box-shadow: var(--shadow-accent); }
+  .preview.skin-new .btn-primary:hover { box-shadow: var(--shadow-accent-hover); transform: translateY(-1px); }
+  .preview.skin-new .btn-secondary { background: var(--surface-tint); border-color: var(--line-strong); color: var(--ink); }
+  .preview.skin-new .btn-secondary:hover { background: var(--surface-tint-strong); border-color: var(--line-hover); }
+  .preview.skin-new .icon-btn { color: var(--ink-dim); }
+  .preview.skin-new .icon-btn:hover { background: var(--surface-tint-strong); color: var(--ink); }
+  .preview.skin-new .badge { background: var(--accent); color: var(--on-accent); }
+  .preview.skin-new .avatar { background: var(--gradient-accent); color: var(--on-accent); }
+
+  .preview.skin-new .mfa-banner { background: var(--pill-amber-bg); border-color: var(--pill-amber-line); color: var(--pill-amber-fg); }
+  .preview.skin-new .mfa-banner .ico-wrap { background: var(--pill-amber-bg); color: var(--pill-amber-fg); border: 1px solid var(--pill-amber-line); }
+  .preview.skin-new .mfa-banner .mfa-cta { background: var(--gradient-accent); color: var(--on-accent); }
+  .preview.skin-new .mfa-banner .mfa-cta:hover { box-shadow: var(--shadow-accent-hover); }
+
+  .preview.skin-new .page-title {
+    color: var(--ink);
+    background: linear-gradient(180deg, var(--heading-from) 0%, var(--heading-to) 100%);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .preview.skin-new .kpi { background: var(--surface-2); border-color: var(--line); box-shadow: var(--shadow-card); background-image: var(--gradient-card); }
+  .preview.skin-new .kpi-label { color: var(--muted); }
+  .preview.skin-new .kpi-value { color: var(--ink); }
+  .preview.skin-new .kpi-delta.up { color: var(--pill-emerald-fg); }
+  .preview.skin-new .kpi-delta.down { color: var(--st-cancelled-fg); }
+
+  .preview.skin-new .panel { background: var(--surface); border-color: var(--line); box-shadow: var(--shadow-card); }
+  .preview.skin-new .panel-head { border-color: var(--line); }
+  .preview.skin-new .panel-head h2 { color: var(--ink); }
+  .preview.skin-new .panel-head .filter { background: var(--surface-inset); border-color: var(--line-strong); color: var(--ink); }
+  .preview.skin-new thead th { color: var(--muted); border-color: var(--line); background: var(--surface-tint); }
+  .preview.skin-new tbody td { color: var(--ink-dim); border-color: var(--line); }
+  .preview.skin-new tbody tr:hover { background: var(--surface-tint); }
+  .preview.skin-new .row-btn { background: var(--surface-tint); border-color: var(--line); color: var(--ink-dim); }
+  .preview.skin-new .row-btn:hover { background: var(--surface-tint-strong); color: var(--ink); }
+  .preview.skin-new .row-btn.primary { background: var(--gradient-accent); color: var(--on-accent); border-color: transparent; }
+  .preview.skin-new .footer-note { color: var(--muted); }
+
+  /* New status pills — semantic, theme-aware (the pattern the plan should adopt) */
+  .preview.skin-new .pill[data-status="inquiry"]  { background:var(--st-inquiry-bg); color:var(--st-inquiry-fg); border-color:var(--st-inquiry-line); }
+  .preview.skin-new .pill[data-status="offer"]    { background:var(--st-offer-bg); color:var(--st-offer-fg); border-color:var(--st-offer-line); }
+  .preview.skin-new .pill[data-status="confirmed"]{ background:var(--st-confirmed-bg); color:var(--st-confirmed-fg); border-color:var(--st-confirmed-line); }
+  .preview.skin-new .pill[data-status="delivered"]{ background:var(--st-delivered-bg); color:var(--st-delivered-fg); border-color:var(--st-delivered-line); }
+  .preview.skin-new .pill[data-status="invoiced"]{ background:var(--st-invoiced-bg); color:var(--st-invoiced-fg); border-color:var(--st-invoiced-line); }
+  .preview.skin-new .pill[data-status="paid"]    { background:var(--st-paid-bg); color:var(--st-paid-fg); border-color:var(--st-paid-line); }
+  .preview.skin-new .pill[data-status="cancelled"]{ background:var(--st-cancelled-bg); color:var(--st-cancelled-fg); border-color:var(--st-cancelled-line); }
+  .preview.skin-new .pill[data-status="overdue"] { background:var(--st-overdue-bg); color:var(--st-overdue-fg); border-color:var(--st-overdue-line); }
+
+  ::selection { background: var(--selection-bg); color: var(--selection-fg); }
+
+  @media (max-width: 1100px) { .kpi-row { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+  @media (max-width: 760px)  {
+    .sidebar { display: none; }
+    .hamburger { display: grid; }
+    .kpi-row { grid-template-columns: 1fr; }
+    .prices { display: none; }
+    .content { padding: 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="controls">
+  <h1>Fueld Platform — Redesign Preview</h1>
+  <div class="modes" id="modes">
+    <button data-mode="current">● Current (today)</button>
+    <button data-mode="dark">◑ New — Dark</button>
+    <button data-mode="light">◐ New — Light</button>
+  </div>
+  <p class="note">
+    Static mock of the real shell (real nav, real status colors, real price strip).
+    Tokens inlined from <code style="color:#fbbf24">apps/marketing/src/styles/tokens.css</code>.
+    "Current" replicates the live Tailwind v4 values. Switch modes to compare.
+  </p>
+</div>
+
+<div class="preview skin-current" id="preview">
+
+  <!-- ===================== SIDEBAR ===================== -->
+  <aside class="sidebar">
+    <div class="brand-row">
+      <div class="brand-glyph">F</div>
+      <span class="brand-name">FUELD</span>
+    </div>
+
+    <nav class="nav">
+      <a class="nav-item active"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3"/></svg> Dashboard</a>
+      <a class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h18v18H3V3zm4 12h2V9H7v6z"/></svg> Reports</a>
+
+      <div class="nav-group">
+        <a class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2z"/></svg> Trading <span style="margin-left:auto;opacity:.5">▾</span></a>
+        <div class="nav-children">
+          <a class="nav-child active">Active Orders</a>
+          <a class="nav-child">Delivered Orders</a>
+          <a class="nav-child">Completed Orders</a>
+          <a class="nav-child">Cancelled Orders</a>
+          <a class="nav-child">Inquiries</a>
+        </div>
+      </div>
+
+      <div class="nav-group">
+        <a class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg> Credit <span style="margin-left:auto;opacity:.5">▾</span></a>
+        <div class="nav-children">
+          <a class="nav-child">Applications</a>
+          <a class="nav-child">Suppliers</a>
+          <a class="nav-child">Customers</a>
+        </div>
+      </div>
+
+      <div class="nav-group">
+        <a class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M4 12h16M4 17h10"/></svg> Operations <span style="margin-left:auto;opacity:.5">▾</span></a>
+        <div class="nav-children">
+          <a class="nav-child">Board</a>
+          <a class="nav-child">Inventory</a>
+        </div>
+      </div>
+
+      <a class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16"/></svg> Companies</a>
+      <a class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg> Places</a>
+      <a class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 19h16M5 19l1-9h12l1 9"/></svg> Vessels</a>
+
+      <div class="nav-group">
+        <a class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6.75A2.75 2.75 0 016.75 4h10.5A2.75 2.75 0 0120 6.75v10.5A2.75 2.75 0 0117.25 20H6.75A2.75 2.75 0 014 17.25z"/></svg> Resources <span style="margin-left:auto;opacity:.5">▾</span></a>
+        <div class="nav-children"><a class="nav-child">Platts</a></div>
+      </div>
+
+      <div class="nav-group">
+        <a class="nav-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37"/></svg> Admin <span style="margin-left:auto;opacity:.5">▾</span></a>
+        <div class="nav-children">
+          <a class="nav-child">Users</a><a class="nav-child">Our Companies</a><a class="nav-child">Teams</a>
+          <a class="nav-child">Integrations</a><a class="nav-child">Activity Log</a><a class="nav-child">Settings</a>
+          <a class="nav-child">LLM / AI</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-version">
+        <span>v2.4.1 · staging</span>
+        <a class="ai-dot"><span class="dot"></span> AI</a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===================== MAIN ===================== -->
+  <div class="main">
+
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <button class="icon-btn hamburger" aria-label="Menu"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+
+      <div class="search">
+        <svg class="ico" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd"/></svg>
+        <input placeholder="Search orders, vessels, companies, places…" />
+      </div>
+
+      <div class="prices">
+        <div class="price-block"><div><span class="lbl">1 USD =</span> <span class="val">0.92</span> <span class="lbl">EUR</span></div><div><span class="chg down">−0.01 (−0.43%)</span> <span class="timestamp">2m ago</span></div></div>
+        <div class="price-block"><div><span class="lbl">Brent</span> <span class="val">82.40</span></div><div><span class="chg up">+0.35 (+0.43%)</span> <span class="timestamp">2m ago</span></div></div>
+        <div class="price-block"><div><span class="lbl">VLSFO 3.5S</span> <span class="val">612.50</span></div><div><span class="chg up">+2.10 (+0.34%)</span> <span class="timestamp">2m ago</span></div></div>
+      </div>
+      <div class="divider-v"></div>
+
+      <div class="topbar-actions">
+        <button class="btn btn-primary"><svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z"/></svg> New Inquiry</button>
+        <button class="icon-btn" aria-label="Incoming RFQs"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31"/></svg><span class="badge">3</span></button>
+        <div class="avatar">PP</div>
+      </div>
+    </header>
+
+    <!-- MFA BANNER -->
+    <div class="mfa-banner">
+      <div class="ico-wrap"><svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l4.58 8.146c.75 1.334-.213 2.995-1.742 2.995H5.42c-1.53 0-2.492-1.66-1.743-2.995z" clip-rule="evenodd"/></svg></div>
+      <div><strong>Security setup required</strong> — your organisation requires two-factor authentication before normal access is restored.</div>
+      <a class="mfa-cta">Complete Setup</a>
+    </div>
+
+    <!-- CONTENT -->
+    <main class="content">
+      <h1 class="page-title">Dashboard</h1>
+
+      <div class="kpi-row">
+        <div class="kpi"><p class="kpi-label">Active Orders</p><p class="kpi-value">42</p><span class="kpi-delta up">▲ 5 this week</span></div>
+        <div class="kpi"><p class="kpi-label">Open Inquiries</p><p class="kpi-value">18</p><span class="kpi-delta up">▲ 3 today</span></div>
+        <div class="kpi"><p class="kpi-label">Pending Offers</p><p class="kpi-value">7</p><span class="kpi-delta down">▼ 2 vs avg</span></div>
+        <div class="kpi"><p class="kpi-label">Overdue Invoices</p><p class="kpi-value">€12.4k</p><span class="kpi-delta down">▲ 1 new</span></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Active Orders</h2>
+          <div class="actions">
+            <select class="filter"><option>All statuses</option><option>Inquiry</option><option>Offer</option><option>Confirmed</option></select>
+            <button class="btn btn-secondary">Export</button>
+            <button class="btn btn-primary">+ New Inquiry</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Order #</th><th>Client</th><th>Vessel</th><th>Port</th><th>Product</th><th>Qty</th><th>Status</th><th>Updated</th><th></th>
+            </tr></thead>
+            <tbody>
+              <tr><td class="mono">FU-26-0421</td><td>Riviera Marine</td><td>MV Pacific Voyager</td><td>Fujairah</td><td>VLSFO</td><td>500 MT</td><td><span class="pill" data-status="inquiry">Inquiry</span></td><td>2m ago</td><td class="row-actions"><button class="row-btn primary">Open</button></td></tr>
+              <tr><td class="mono">FU-26-0418</td><td>ChannelTX</td><td>MV Stella Polaris</td><td>Rotterdam</td><td>LSMGO</td><td>320 MT</td><td><span class="pill" data-status="offer">Offer</span></td><td>14m ago</td><td class="row-actions"><button class="row-btn primary">Open</button></td></tr>
+              <tr><td class="mono">FU-26-0412</td><td>Moxie Brokerage</td><td>MV Nordic Star</td><td>Singapore</td><td>VLSFO</td><td>1,200 MT</td><td><span class="pill" data-status="confirmed">Confirmed</span></td><td>1h ago</td><td class="row-actions"><button class="row-btn primary">Open</button></td></tr>
+              <tr><td class="mono">FU-26-0407</td><td>Riviera Marine</td><td>MV Atlantic Breeze</td><td>Gibraltar</td><td>HSFO 380</td><td>850 MT</td><td><span class="pill" data-status="delivered">Delivered</span></td><td>3h ago</td><td class="row-actions"><button class="row-btn">View</button></td></tr>
+              <tr><td class="mono">FU-26-0399</td><td>ChannelTX</td><td>MV Harmony Sea</td><td>Hong Kong</td><td>LSMGO</td><td>240 MT</td><td><span class="pill" data-status="invoiced">Invoiced</span></td><td>5h ago</td><td class="row-actions"><button class="row-btn">Invoice</button></td></tr>
+              <tr><td class="mono">FU-26-0391</td><td>Moxie Brokerage</td><td>MV Blue Horizon</td><td>Antwerp</td><td>VLSFO</td><td>680 MT</td><td><span class="pill" data-status="paid">Paid</span></td><td>1d ago</td><td class="row-actions"><button class="row-btn">Receipt</button></td></tr>
+              <tr><td class="mono">FU-26-0384</td><td>Riviera Marine</td><td>MV Ocean Pride</td><td>Port Said</td><td>LSMGO</td><td>410 MT</td><td><span class="pill" data-status="overdue">Overdue</span></td><td>2d ago</td><td class="row-actions"><button class="row-btn">Chase</button></td></tr>
+              <tr><td class="mono">FU-26-0377</td><td>ChannelTX</td><td>MV Silver Wave</td><td>Busan</td><td>VLSFO</td><td>560 MT</td><td><span class="pill" data-status="cancelled">Cancelled</span></td><td>3d ago</td><td class="row-actions"><button class="row-btn">Archive</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <p class="footer-note">Fueld — Bunker Trading · static preview for design direction only · not a live page</p>
+    </main>
+  </div>
+</div>
+
+<script>
+  const preview = document.getElementById('preview');
+  const buttons = document.querySelectorAll('#modes button');
+  const labels = { current: '● Current (today)', dark: '◑ New — Dark', light: '◐ New — Light' };
+
+  function setMode(mode) {
+    buttons.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    if (mode === 'current') {
+      preview.className = 'preview skin-current';
+      preview.removeAttribute('data-theme');
+    } else {
+      preview.className = 'preview skin-new';
+      preview.setAttribute('data-theme', mode); // 'dark' | 'light'
+    }
+  }
+  buttons.forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+  // Default to a side-by-side mental model: start on Current.
+  setMode('current');
+</script>
+</body>
+</html>

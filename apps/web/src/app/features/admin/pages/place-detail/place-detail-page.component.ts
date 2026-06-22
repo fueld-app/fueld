@@ -21,7 +21,7 @@ import { PlaceHeaderComponent } from './components/place-header/place-header.com
     <div>
       <button
         (click)="store.goBack()"
-        class="mb-4 inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+        class="mb-4 inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-muted hover:text-gray-700 transition-colors"
       >
         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
           <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
@@ -31,7 +31,7 @@ import { PlaceHeaderComponent } from './components/place-header/place-header.com
 
       @if (store.loading()) {
         <div class="flex items-center justify-center py-20">
-          <svg class="h-6 w-6 animate-spin text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <svg class="h-6 w-6 animate-spin text-gray-400 dark:text-muted" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
           </svg>
@@ -40,7 +40,7 @@ import { PlaceHeaderComponent } from './components/place-header/place-header.com
         <app-place-header />
 
         <div class="mb-6 -mx-4 px-4 md:mx-0 md:px-0">
-          <nav class="flex gap-1 overflow-x-auto border-b border-gray-200 pb-px scrollbar-hide" aria-label="Place sections">
+          <nav class="flex gap-1 overflow-x-auto border-b border-gray-200 dark:border-line pb-px scrollbar-hide" aria-label="Place sections">
             @for (tab of tabs; track tab.key) {
               <a
                 [routerLink]="[tab.key]"
@@ -51,8 +51,8 @@ import { PlaceHeaderComponent } from './components/place-header/place-header.com
                 [id]="'tab-' + tab.key"
                 class="group inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none"
                 [class]="rla.isActive
-                  ? 'border-blue-600 text-blue-700'
-                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'"
+                  ? 'border-blue-600 text-blue-700 dark:text-blue-400'
+                  : 'border-transparent text-gray-500 dark:text-muted hover:border-gray-300 hover:text-gray-700'"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                   <path [attr.d]="tab.icon" />
@@ -67,19 +67,19 @@ import { PlaceHeaderComponent } from './components/place-header/place-header.com
 
         @if (store.showDeleteModal() && store.canDeleteEntity()) {
           <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" (click)="store.showDeleteModal.set(false)">
-            <div class="rounded-xl bg-white p-6 shadow-xl max-w-sm mx-4" (click)="$event.stopPropagation()">
-              <h3 class="text-lg font-semibold text-gray-900">Delete place?</h3>
-              <p class="mt-2 text-sm text-gray-500">
+            <div class="rounded-xl bg-white dark:bg-surface p-6 shadow-xl max-w-sm mx-4" (click)="$event.stopPropagation()">
+              <h3 class="text-lg font-semibold text-gray-900 dark:text-ink">Delete place?</h3>
+              <p class="mt-2 text-sm text-gray-500 dark:text-muted">
                 Are you sure you want to delete <strong>{{ place.name }}</strong>?
                 This cannot be undone.
               </p>
               @if (store.deleteError()) {
-                <p class="mt-2 text-sm text-red-600">{{ store.deleteError() }}</p>
+                <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ store.deleteError() }}</p>
               }
               <div class="mt-4 flex justify-end gap-2">
                 <button
                   (click)="store.showDeleteModal.set(false)"
-                  class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  class="rounded-lg border border-gray-300 dark:border-line-strong px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint"
                 >Cancel</button>
                 <button
                   (click)="store.executeDeletePlace()"
@@ -93,7 +93,7 @@ import { PlaceHeaderComponent } from './components/place-header/place-header.com
           </div>
         }
       } @else {
-        <div class="text-center py-20 text-gray-400">Place not found</div>
+        <div class="text-center py-20 text-gray-400 dark:text-muted">Place not found</div>
       }
     </div>
   `,

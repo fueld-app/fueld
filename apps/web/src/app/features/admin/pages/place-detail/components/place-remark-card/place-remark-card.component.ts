@@ -9,11 +9,11 @@ import { PlaceDetailStore } from '../../place-detail.store';
   template: `
     <div class="app-panel h-[420px] flex flex-col">
       <div class="app-panel-header app-panel-header--blue justify-between px-5 py-3">
-        <h2 class="text-sm font-semibold text-gray-700">Default Order Remark</h2>
+        <h2 class="text-sm font-semibold text-gray-700 dark:text-ink-dim">Default Order Remark</h2>
         @if (!store.editingOrderRemark()) {
           <button
             (click)="store.startEditOrderRemark()"
-            class="text-xs text-brand-600 hover:text-brand-800"
+            class="text-xs text-brand-600 dark:text-brand-400 hover:text-brand-800"
           >
             Edit
           </button>
@@ -30,15 +30,15 @@ import { PlaceDetailStore } from '../../place-detail.store';
             placeholder="Default remark shown on new orders for this place…"
           ></textarea>
           @if (store.orderRemarkError()) {
-            <p class="mt-2 text-xs text-red-600">{{ store.orderRemarkError() }}</p>
+            <p class="mt-2 text-xs text-red-600 dark:text-red-400">{{ store.orderRemarkError() }}</p>
           }
           @if (store.orderRemarkSaved()) {
-            <p class="mt-2 text-xs text-emerald-600">Saved.</p>
+            <p class="mt-2 text-xs text-emerald-600 dark:text-emerald-400">Saved.</p>
           }
           <div class="mt-3 flex items-center justify-end gap-2">
             <button
               (click)="store.cancelOrderRemarkEdit()"
-              class="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+              class="rounded-md border border-gray-200 dark:border-line px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint"
             >
               Cancel
             </button>
@@ -58,9 +58,9 @@ import { PlaceDetailStore } from '../../place-detail.store';
           </div>
         } @else {
           @if (store.place()?.orderRemark) {
-            <p class="whitespace-pre-wrap text-sm text-gray-700">{{ store.place()?.orderRemark }}</p>
+            <p class="whitespace-pre-wrap text-sm text-gray-700 dark:text-ink-dim">{{ store.place()?.orderRemark }}</p>
           } @else {
-            <p class="text-sm italic text-gray-400">No default remark configured</p>
+            <p class="text-sm italic text-gray-400 dark:text-muted">No default remark configured</p>
           }
         }
       </div>

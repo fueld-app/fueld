@@ -11,47 +11,47 @@ import { API } from '@app/core/config/api';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule],
   template: `
-    <div class="min-h-screen bg-slate-100 px-4 py-10">
-      <div class="mx-auto max-w-3xl rounded-3xl border border-slate-200 bg-white shadow-xl">
-        <div class="border-b border-slate-200 px-8 py-6">
-          <h1 class="text-2xl font-semibold text-slate-900">Supplier Delivery Confirmation</h1>
-          <p class="mt-1 text-sm text-slate-500">Confirm delivery completion, submit the exact delivery time, and upload BDRs without logging in.</p>
+    <div class="min-h-screen bg-slate-100 dark:bg-slate-500/15 px-4 py-10">
+      <div class="mx-auto max-w-3xl rounded-3xl border border-slate-200 dark:border-slate-500/30 bg-white dark:bg-surface shadow-xl">
+        <div class="border-b border-slate-200 dark:border-slate-500/30 px-8 py-6">
+          <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-300">Supplier Delivery Confirmation</h1>
+          <p class="mt-1 text-sm text-slate-500 dark:text-slate-300">Confirm delivery completion, submit the exact delivery time, and upload BDRs without logging in.</p>
         </div>
 
         @if (loading()) {
           <div class="px-8 py-14 text-center text-sm text-slate-400">Loading delivery confirmation...</div>
         } @else if (loadError()) {
           <div class="px-8 py-14 text-center">
-            <p class="text-sm font-medium text-red-600">{{ loadError() }}</p>
+            <p class="text-sm font-medium text-red-600 dark:text-red-400">{{ loadError() }}</p>
           </div>
         } @else if (nomination()) {
           <div class="space-y-6 px-8 py-6">
-            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-              <div class="grid gap-3 text-sm text-slate-600 md:grid-cols-2">
+            <div class="rounded-2xl border border-slate-200 dark:border-slate-500/30 bg-slate-50 dark:bg-slate-500/15 p-5">
+              <div class="grid gap-3 text-sm text-slate-600 dark:text-slate-400 md:grid-cols-2">
                 <div>
                   <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Supplier</div>
-                  <div class="mt-1 font-medium text-slate-900">{{ nomination()!.supplierName }}</div>
+                  <div class="mt-1 font-medium text-slate-900 dark:text-slate-300">{{ nomination()!.supplierName }}</div>
                   @if (nomination()!.contactName) {
-                    <div class="mt-1 text-xs text-slate-500">Attention {{ nomination()!.contactName }}</div>
+                    <div class="mt-1 text-xs text-slate-500 dark:text-slate-300">Attention {{ nomination()!.contactName }}</div>
                   }
                 </div>
                 <div>
                   <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Voyage</div>
-                  <div class="mt-1 font-medium text-slate-900">{{ nomination()!.vesselName }} · {{ nomination()!.portName }}</div>
+                  <div class="mt-1 font-medium text-slate-900 dark:text-slate-300">{{ nomination()!.vesselName }} · {{ nomination()!.portName }}</div>
                   @if (nomination()!.eta) {
-                    <div class="mt-1 text-xs text-slate-500">ETA {{ formatDate(nomination()!.eta!) }}</div>
+                    <div class="mt-1 text-xs text-slate-500 dark:text-slate-300">ETA {{ formatDate(nomination()!.eta!) }}</div>
                   }
                 </div>
               </div>
             </div>
 
-            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+            <div class="rounded-2xl border border-slate-200 dark:border-slate-500/30 bg-slate-50 dark:bg-slate-500/15 p-5">
               <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Products</div>
               <div class="mt-3 space-y-2">
                 @for (item of nomination()!.items; track item.orderItemId) {
-                  <div class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-                    <div class="font-semibold text-slate-900">{{ item.productType }}</div>
-                    <div class="mt-1 text-xs text-slate-500">{{ item.quantity }} {{ item.unit }}@if (item.description) { · {{ item.description }} }</div>
+                  <div class="rounded-xl border border-slate-200 dark:border-slate-500/30 bg-white dark:bg-surface px-4 py-3 text-sm text-slate-700 dark:text-slate-400">
+                    <div class="font-semibold text-slate-900 dark:text-slate-300">{{ item.productType }}</div>
+                    <div class="mt-1 text-xs text-slate-500 dark:text-slate-300">{{ item.quantity }} {{ item.unit }}@if (item.description) { · {{ item.description }} }</div>
                   </div>
                 }
               </div>
@@ -89,7 +89,7 @@ import { API } from '@app/core/config/api';
                     type="datetime-local"
                     [ngModel]="deliveryCompletedAt()"
                     (ngModelChange)="deliveryCompletedAt.set($event)"
-                    class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                    class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 dark:text-slate-300 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
                   />
                 </div>
                 <div>
@@ -98,7 +98,7 @@ import { API } from '@app/core/config/api';
                     type="text"
                     [ngModel]="supplierReference()"
                     (ngModelChange)="supplierReference.set($event)"
-                    class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                    class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 dark:text-slate-300 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
                     placeholder="Delivery receipt or supplier reference"
                   />
                 </div>
@@ -108,19 +108,19 @@ import { API } from '@app/core/config/api';
                     rows="3"
                     [ngModel]="supplierComment()"
                     (ngModelChange)="supplierComment.set($event)"
-                    class="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                    class="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 dark:text-slate-300 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
                     placeholder="Optional delivery comment"
                   ></textarea>
                 </div>
               </div>
 
-              <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+              <div class="rounded-2xl border border-slate-200 dark:border-slate-500/30 bg-slate-50 dark:bg-slate-500/15 p-5">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">BDR uploads</div>
-                    <div class="mt-1 text-sm text-slate-600">Upload one or more BDR files. You can resubmit until the nomination link expires.</div>
+                    <div class="mt-1 text-sm text-slate-600 dark:text-slate-400">Upload one or more BDR files. You can resubmit until the nomination link expires.</div>
                   </div>
-                  <label class="inline-flex cursor-pointer items-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:border-brand-300 hover:text-brand-700">
+                  <label class="inline-flex cursor-pointer items-center rounded-full border border-slate-300 bg-white dark:bg-surface px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-400 shadow-sm transition-colors hover:border-brand-300 hover:text-brand-700">
                     <input type="file" multiple accept=".pdf,image/*" class="hidden" (change)="onFilesSelected($event)" />
                     Choose files
                   </label>
@@ -129,7 +129,7 @@ import { API } from '@app/core/config/api';
                 @if (selectedFiles().length > 0) {
                   <div class="mt-4 space-y-2">
                     @for (file of selectedFiles(); track file.name + '-' + file.size) {
-                      <div class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">{{ file.name }} <span class="text-xs text-slate-400">({{ formatFileSize(file.size) }})</span></div>
+                      <div class="rounded-xl border border-slate-200 dark:border-slate-500/30 bg-white dark:bg-surface px-4 py-3 text-sm text-slate-700 dark:text-slate-400">{{ file.name }} <span class="text-xs text-slate-400">({{ formatFileSize(file.size) }})</span></div>
                     }
                   </div>
                   <div class="mt-4 flex justify-end">
@@ -137,13 +137,13 @@ import { API } from '@app/core/config/api';
                       type="button"
                       (click)="uploadSelectedFiles()"
                       [disabled]="uploadingFiles()"
-                      class="rounded-full bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      class="rounded-full bg-brand-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-800 disabled:cursor-not-allowed disabled:opacity-50"
                     >{{ uploadingFiles() ? 'Uploading...' : 'Upload selected files' }}</button>
                   </div>
                 }
 
                 @if (uploadError()) {
-                  <div class="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{{ uploadError() }}</div>
+                  <div class="mt-4 rounded-2xl border border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/15 px-4 py-3 text-sm text-rose-700 dark:text-rose-400">{{ uploadError() }}</div>
                 }
 
                 <div class="mt-4">
@@ -153,9 +153,9 @@ import { API } from '@app/core/config/api';
                   } @else {
                     <div class="mt-2 space-y-2">
                       @for (attachment of nomination()!.attachments; track attachment.id) {
-                        <div class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-                          <div class="font-medium text-slate-900">{{ attachment.fileName }}</div>
-                          <div class="mt-1 text-xs text-slate-500">{{ formatDateTime(attachment.createdAt) }} · {{ formatFileSize(attachment.fileSize) }}</div>
+                        <div class="rounded-xl border border-slate-200 dark:border-slate-500/30 bg-white dark:bg-surface px-4 py-3 text-sm text-slate-700 dark:text-slate-400">
+                          <div class="font-medium text-slate-900 dark:text-slate-300">{{ attachment.fileName }}</div>
+                          <div class="mt-1 text-xs text-slate-500 dark:text-slate-300">{{ formatDateTime(attachment.createdAt) }} · {{ formatFileSize(attachment.fileSize) }}</div>
                         </div>
                       }
                     </div>
@@ -165,10 +165,10 @@ import { API } from '@app/core/config/api';
             }
 
             @if (submitError()) {
-              <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{{ submitError() }}</div>
+              <div class="rounded-2xl border border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/15 px-4 py-3 text-sm text-rose-700 dark:text-rose-400">{{ submitError() }}</div>
             }
             @if (submitSuccess()) {
-              <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">Delivery confirmation submitted successfully.</div>
+              <div class="rounded-2xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/15 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400">Delivery confirmation submitted successfully.</div>
             }
 
             <div class="flex justify-end">
@@ -176,7 +176,7 @@ import { API } from '@app/core/config/api';
                 type="button"
                 (click)="submit()"
                 [disabled]="submitting() || !canSubmit()"
-                class="rounded-full bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                class="rounded-full bg-brand-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-800 disabled:cursor-not-allowed disabled:opacity-50"
               >{{ submitting() ? 'Submitting...' : 'Submit delivery confirmation' }}</button>
             </div>
           </div>

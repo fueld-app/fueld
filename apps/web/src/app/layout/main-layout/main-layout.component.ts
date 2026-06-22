@@ -307,13 +307,13 @@ const NAVIGATION: NavItem[] = [
     >
       <!-- Brand -->
       <div class="flex h-16 items-center gap-3 px-3" [class.justify-center]="sidebarCollapsed()" [class.px-6]="!sidebarCollapsed()">
-        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-600">
+        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-700">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
             <path fill-rule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clip-rule="evenodd" />
           </svg>
         </div>
         @if (!sidebarCollapsed()) {
-          <span class="text-lg font-bold tracking-tight text-sidebar-text-active">FUELD</span>
+          <span class="text-lg font-bold tracking-tight text-ink">FUELD</span>
         }
       </div>
 
@@ -324,9 +324,9 @@ const NAVIGATION: NavItem[] = [
             <!-- Simple nav link -->
             <a
               [routerLink]="item.route"
-              routerLinkActive="bg-sidebar-active text-sidebar-text-active"
+              routerLinkActive="bg-surface-3 text-ink"
               [routerLinkActiveOptions]="{ exact: item.route === '/' }"
-              class="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-text transition-colors hover:bg-sidebar-hover hover:text-sidebar-text-active focus-visible:outline-none"
+              class="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted transition-colors hover:bg-surface-tint-strong hover:text-ink focus-visible:outline-none"
               [class.justify-center]="sidebarCollapsed()"
               [title]="sidebarCollapsed() ? item.label : ''"
               (click)="closeSidebar()"
@@ -343,7 +343,7 @@ const NAVIGATION: NavItem[] = [
             <div>
               <button
                 (click)="toggleGroup(item.label)"
-                class="group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-text transition-colors hover:bg-sidebar-hover hover:text-sidebar-text-active focus-visible:outline-none"
+                class="group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted transition-colors hover:bg-surface-tint-strong hover:text-ink focus-visible:outline-none"
                 [class.justify-center]="sidebarCollapsed()"
                 [attr.aria-expanded]="isGroupOpen(item.label)"
                 [title]="sidebarCollapsed() ? item.label : ''"
@@ -367,13 +367,13 @@ const NAVIGATION: NavItem[] = [
               </button>
 
               @if (isGroupOpen(item.label) && !sidebarCollapsed()) {
-                <div class="ml-5 mt-1 space-y-0.5 border-l border-sidebar-hover pl-4">
+                <div class="ml-5 mt-1 space-y-0.5 border-l border-line pl-4">
                   @for (child of item.children; track child.label) {
                     @if (!child.allowedRoles || child.allowedRoles.includes('ADMIN') && auth.isAdmin() || child.allowedRoles.includes(auth.userRole())) {
                     <a
                       [routerLink]="child.route"
-                      routerLinkActive="text-sidebar-text-active bg-sidebar-active"
-                      class="block rounded-md px-3 py-2 text-sm text-sidebar-text transition-colors hover:bg-sidebar-hover hover:text-sidebar-text-active focus-visible:outline-none"
+                      routerLinkActive="text-ink bg-surface-3"
+                      class="block rounded-md px-3 py-2 text-sm text-muted transition-colors hover:bg-surface-tint-strong hover:text-ink focus-visible:outline-none"
                       (click)="closeSidebar()"
                     >
                       {{ child.label }}
@@ -388,12 +388,12 @@ const NAVIGATION: NavItem[] = [
       </nav>
 
       <!-- Sidebar footer -->
-      <div class="border-t border-sidebar-hover px-4 py-3">
+      <div class="border-t border-line px-4 py-3">
         @if (!sidebarCollapsed()) {
           <div class="flex items-center justify-between">
-            <p class="truncate text-xs text-sidebar-text/60" [title]="footerVersion()">{{ footerVersion() }}</p>
+            <p class="truncate text-xs text-muted/60" [title]="footerVersion()">{{ footerVersion() }}</p>
             @if (llmHealthy() !== null) {
-              <a routerLink="/admin/llm" class="group flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] transition-colors hover:bg-sidebar-hover"
+              <a routerLink="/admin/llm" class="group flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] transition-colors hover:bg-surface-tint-strong"
                 [title]="llmHealthy() ? 'LLM Online' : 'LLM Offline'">
                 <span class="relative flex h-2 w-2">
                   @if (llmHealthy()) {
@@ -403,7 +403,7 @@ const NAVIGATION: NavItem[] = [
                     <span class="relative inline-flex h-2 w-2 rounded-full bg-red-400"></span>
                   }
                 </span>
-                <span class="text-sidebar-text/50 group-hover:text-sidebar-text/80">AI</span>
+                <span class="text-muted/50 group-hover:text-muted/80">AI</span>
               </a>
             }
           </div>
@@ -411,7 +411,7 @@ const NAVIGATION: NavItem[] = [
         <!-- Collapse toggle (desktop) -->
         <button
           (click)="toggleSidebarCollapsed()"
-          class="mt-2 hidden w-full items-center justify-center rounded-md py-1.5 text-sidebar-text/40 hover:bg-sidebar-hover hover:text-sidebar-text/70 lg:flex transition-colors"
+          class="mt-2 hidden w-full items-center justify-center rounded-md py-1.5 text-muted/40 hover:bg-surface-tint-strong hover:text-muted/70 lg:flex transition-colors"
           [title]="sidebarCollapsed() ? 'Expand sidebar' : 'Collapse sidebar'"
         >
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform" [class.rotate-180]="sidebarCollapsed()" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -428,9 +428,9 @@ const NAVIGATION: NavItem[] = [
       [class.lg:pl-64]="!sidebarCollapsed()"
       [class.lg:pl-16]="sidebarCollapsed()">
       @if (showUpdateToast()) {
-        <div class="app-update-toast fixed z-50 w-80 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-lg">
-          <p class="text-sm font-semibold text-amber-900">Update available</p>
-          <p class="mt-1 text-xs text-amber-800">Reload to get the latest fixes and features.</p>
+        <div class="app-update-toast fixed z-50 w-80 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/15 px-4 py-3 shadow-lg">
+          <p class="text-sm font-semibold text-amber-900 dark:text-amber-300">Update available</p>
+          <p class="mt-1 text-xs text-amber-800 dark:text-amber-300">Reload to get the latest fixes and features.</p>
           <div class="mt-3 flex items-center gap-2">
             <button
               class="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700"
@@ -439,7 +439,7 @@ const NAVIGATION: NavItem[] = [
               Reload
             </button>
             <button
-              class="rounded-md px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100"
+              class="rounded-md px-3 py-1.5 text-xs font-medium text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/20"
               (click)="dismissUpdateToast()"
             >
               Later
@@ -448,10 +448,10 @@ const NAVIGATION: NavItem[] = [
         </div>
       }
       <!-- Top bar -->
-      <header class="app-topbar sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-gray-200 bg-white/80 px-4 backdrop-blur-md sm:px-6 lg:px-8">
+      <header class="app-topbar sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-gray-200 bg-white/80 px-4 backdrop-blur-md sm:px-6 lg:px-8 dark:border-line dark:bg-surface/80">
         <!-- Hamburger (mobile only) -->
         <button
-          class="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 lg:hidden"
+          class="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 lg:hidden dark:text-muted dark:hover:bg-surface-tint-strong dark:hover:text-ink-dim"
           (click)="toggleSidebar()"
           [attr.aria-label]="sidebarOpen() ? 'Close menu' : 'Open menu'"
         >
@@ -467,7 +467,7 @@ const NAVIGATION: NavItem[] = [
         <!-- Global Search -->
         <div class="relative flex-1 transition-all duration-300" [class]="searchFocused() ? 'max-w-2xl' : 'max-w-md'" #searchWrapper>
           <div class="relative">
-            <svg xmlns="http://www.w3.org/2000/svg" class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-muted" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
             </svg>
             <input
@@ -475,7 +475,9 @@ const NAVIGATION: NavItem[] = [
               placeholder="Search…"
               class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm text-gray-700
                      placeholder:text-gray-400 transition-colors
-                     focus:border-brand-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100"
+                     focus:border-brand-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100
+                     dark:border-line dark:bg-bg-2 dark:text-ink-dim dark:placeholder:text-muted
+                     dark:focus:border-brand-500 dark:focus:bg-surface dark:focus:ring-brand-500/20"
               [value]="searchTerm()"
               (input)="onSearchInput($event)"
               (focus)="onSearchFocus()"
@@ -484,7 +486,7 @@ const NAVIGATION: NavItem[] = [
               (keydown.enter)="navigateFirstResult()"
             />
             @if (searchLoading()) {
-              <svg class="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+              <svg class="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-gray-400 dark:text-muted" viewBox="0 0 24 24" fill="none">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
               </svg>
@@ -493,15 +495,15 @@ const NAVIGATION: NavItem[] = [
 
           <!-- Search Results Dropdown -->
           @if (searchOpen() && (searchResults().length || (searchTerm().length >= 2 && !searchLoading()))) {
-            <div class="absolute left-0 right-0 top-full z-50 mt-1 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden">
+            <div class="absolute left-0 right-0 top-full z-50 mt-1 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden dark:border-line dark:bg-surface">
               @if (searchResults().length) {
                 @for (result of searchResults(); track result.id + result.kind) {
                   <button
-                    class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50"
+                    class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50 dark:hover:bg-surface-tint"
                     (click)="goToResult(result)"
                   >
                     @if (result.kind === 'order') {
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-amber-500" viewBox="0 0 20 20" fill="currentColor">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-amber-500 dark:text-amber-300" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd" />
                       </svg>
                     } @else if (result.kind === 'company') {
@@ -513,22 +515,22 @@ const NAVIGATION: NavItem[] = [
                         <path d="M3 18h18l-3-9H6L3 18zM10 2l2 7H8l2-7z" />
                       </svg>
                     } @else {
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-gray-400 dark:text-muted" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" />
                       </svg>
                     }
                     <div class="min-w-0 flex-1">
-                      <p class="truncate font-medium text-gray-900">{{ result.name }}</p>
-                      <p class="truncate text-xs text-gray-500">{{ result.subtitle }}</p>
+                      <p class="truncate font-medium text-gray-900 dark:text-ink">{{ result.name }}</p>
+                      <p class="truncate text-xs text-gray-500 dark:text-muted">{{ result.subtitle }}</p>
                     </div>
                     <span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium"
-                      [class]="result.kind === 'order' ? 'bg-amber-50 text-amber-600' : result.kind === 'company' ? 'bg-blue-50 text-blue-600' : result.kind === 'vessel' ? 'bg-teal-50 text-teal-600' : 'bg-gray-100 text-gray-500'">
+                      [class]="result.kind === 'order' ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400' : result.kind === 'company' ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-400' : result.kind === 'vessel' ? 'bg-teal-50 text-teal-600 dark:bg-teal-500/15 dark:text-teal-400' : 'bg-gray-100 text-gray-500 dark:bg-surface-3 dark:text-muted'">
                       {{ result.kind === 'order' ? 'Order' : result.kind === 'company' ? 'Company' : result.kind === 'vessel' ? 'Vessel' : 'Place' }}
                     </span>
                   </button>
                 }
               } @else {
-                <div class="px-4 py-3 text-sm text-gray-500">No results found</div>
+                <div class="px-4 py-3 text-sm text-gray-500 dark:text-muted">No results found</div>
               }
             </div>
           }
@@ -541,52 +543,52 @@ const NAVIGATION: NavItem[] = [
             @if (eurRate() !== null) {
               <div class="flex shrink-0 flex-col leading-tight">
                 <div class="flex items-center gap-1 text-xs">
-                  <span class="font-medium text-gray-500">1 USD =</span>
-                  <span class="font-semibold text-gray-900">{{ eurRate() | number:'1.2-2' }}</span>
-                  <span class="font-medium text-gray-500">EUR</span>
+                  <span class="font-medium text-gray-500 dark:text-muted">1 USD =</span>
+                  <span class="font-semibold text-gray-900 dark:text-ink">{{ eurRate() | number:'1.2-2' }}</span>
+                  <span class="font-medium text-gray-500 dark:text-muted">EUR</span>
                 </div>
                 <div class="flex items-center gap-1">
                   <span
                     class="text-[11px] font-medium"
-                    [class]="eurChange() >= 0 ? 'text-emerald-600' : 'text-red-600'"
+                    [class]="eurChange() >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'"
                   >
                     {{ eurChange() >= 0 ? '+' : '' }}{{ eurChange() | number:'1.2-2' }}
                     ({{ eurChangePercent() >= 0 ? '+' : '' }}{{ eurChangePercent() | number:'1.2-2' }}%)
                   </span>
-                  <span class="text-[10px] text-gray-400" [title]="formatLocalDateTime(fxUpdatedAt())">{{ relativeTime(fxUpdatedAt()) }}</span>
+                  <span class="text-[10px] text-gray-400 dark:text-muted" [title]="formatLocalDateTime(fxUpdatedAt())">{{ relativeTime(fxUpdatedAt()) }}</span>
                 </div>
               </div>
             }
             @for (p of commodityPrices(); track p.ticker) {
               <div class="flex shrink-0 flex-col leading-tight">
                 <div class="flex items-center gap-1 text-xs">
-                  <span class="font-medium text-gray-500">{{ p.name }}</span>
-                  <span class="font-semibold text-gray-900">{{ p.price | number:'1.2-2' }}</span>
+                  <span class="font-medium text-gray-500 dark:text-muted">{{ p.name }}</span>
+                  <span class="font-semibold text-gray-900 dark:text-ink">{{ p.price | number:'1.2-2' }}</span>
                 </div>
                 <div class="flex items-center gap-1">
                   <span
                     class="text-[11px] font-medium"
-                    [class]="p.change >= 0 ? 'text-emerald-600' : 'text-red-600'"
+                    [class]="p.change >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'"
                   >
                     {{ p.change >= 0 ? '+' : '' }}{{ p.change | number:'1.2-2' }}
                     ({{ p.change >= 0 ? '+' : '' }}{{ p.changePercent | number:'1.2-2' }}%)
                   </span>
-                  <span class="text-[10px] text-gray-400" [title]="formatLocalDateTime(p.updatedAt)">{{ relativeTime(p.updatedAt) }}</span>
+                  <span class="text-[10px] text-gray-400 dark:text-muted" [title]="formatLocalDateTime(p.updatedAt)">{{ relativeTime(p.updatedAt) }}</span>
                 </div>
               </div>
             }
           </div>
 
           @if (commodityPrices().length > 0) {
-            <div class="hidden h-6 w-px bg-gray-200 md:block"></div>
+            <div class="hidden h-6 w-px bg-gray-200 dark:bg-surface-3 md:block dark:bg-line"></div>
           }
 
           <!-- New Inquiry quick button -->
           <button
             (click)="openNewInquiry()"
-            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 p-2 sm:px-3.5 sm:py-2 text-sm font-semibold
-                   text-white shadow-sm transition-colors hover:bg-brand-700
-                   focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
+            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-700 p-2 sm:px-3.5 sm:py-2 text-sm font-semibold
+                   text-white shadow-sm transition-colors hover:bg-brand-800
+                   focus:outline-none focus:ring-2 focus:ring-brand-600 focus:ring-offset-2"
             aria-label="New Inquiry"
           >
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -598,7 +600,7 @@ const NAVIGATION: NavItem[] = [
           <!-- Notifications bell (RFQ inbox) -->
           <button
             (click)="toggleRfqPanel()"
-            class="relative rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+            class="relative rounded-lg p-2 text-gray-400 dark:text-muted hover:bg-gray-100 dark:hover:bg-surface-tint-strong hover:text-gray-600 transition-colors"
             aria-label="Incoming RFQs"
           >
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
@@ -617,17 +619,17 @@ const NAVIGATION: NavItem[] = [
       </header>
 
       @if (auth.mfaSetupRequired()) {
-        <section class="border-b border-amber-200 bg-amber-50/90 px-4 py-3 sm:px-6 lg:px-8">
+        <section class="border-b border-amber-200 bg-amber-50/90 px-4 py-3 sm:px-6 lg:px-8 dark:border-amber-500/30 dark:bg-amber-500/10">
           <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div class="flex items-start gap-3">
-              <div class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+              <div class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                   <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l4.58 8.146c.75 1.334-.213 2.995-1.742 2.995H5.42c-1.53 0-2.492-1.66-1.743-2.995l4.58-8.146zM11 7a1 1 0 10-2 0v2a1 1 0 102 0V7zm-1 6a1.25 1.25 0 100-2.5A1.25 1.25 0 0010 13z" clip-rule="evenodd" />
                 </svg>
               </div>
               <div>
-                <p class="text-sm font-semibold text-amber-950">Security setup required</p>
-                <p class="mt-1 text-sm text-amber-900">
+                <p class="text-sm font-semibold text-amber-950 dark:text-amber-100">Security setup required</p>
+                <p class="mt-1 text-sm text-amber-900 dark:text-amber-300 dark:text-amber-200">
                   Your organisation requires two-factor authentication before normal access is restored.
                   Finish setup in account settings using an authenticator app or a passkey.
                 </p>
@@ -637,7 +639,7 @@ const NAVIGATION: NavItem[] = [
             @if (router.url !== '/account/settings') {
               <a
                 routerLink="/account/settings"
-                class="inline-flex items-center justify-center rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
+                class="inline-flex items-center justify-center rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 dark:bg-amber-500 dark:hover:bg-amber-600 dark:focus:ring-offset-0"
               >
                 Complete Security Setup
               </a>
@@ -657,53 +659,53 @@ const NAVIGATION: NavItem[] = [
     <!-- ═══════════════════════════════════════════════════════════════ -->
     @if (rfqPanelOpen()) {
       <div class="fixed inset-0 z-[60] bg-black/30 backdrop-blur-sm" (click)="closeRfqPanel()"></div>
-      <aside class="fixed inset-y-0 right-0 z-[61] w-full max-w-md bg-white shadow-xl flex flex-col animate-slide-in-right">
+      <aside class="fixed inset-y-0 right-0 z-[61] w-full max-w-md bg-white shadow-xl flex flex-col animate-slide-in-right dark:bg-surface">
         <!-- Header -->
-        <div class="flex items-center justify-between border-b px-5 py-4">
-          <h2 class="text-lg font-semibold text-gray-900">Incoming RFQs</h2>
+        <div class="flex items-center justify-between border-b px-5 py-4 dark:border-line">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-ink">Incoming RFQs</h2>
           <div class="flex items-center gap-2">
-            <button (click)="openPasteModal()" class="text-xs font-medium text-brand-600 hover:text-brand-700">+ Paste RFQ</button>
-            <button (click)="closeRfqPanel()" class="rounded p-1 text-gray-400 hover:text-gray-600">
+            <button (click)="openPasteModal()" class="text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300">+ Paste RFQ</button>
+            <button (click)="closeRfqPanel()" class="rounded p-1 text-gray-400 hover:text-gray-600 dark:text-muted dark:hover:text-ink-dim">
               <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
             </button>
           </div>
         </div>
 
         <!-- RFQ list -->
-        <div class="flex-1 overflow-y-auto divide-y divide-gray-100">
+        <div class="flex-1 overflow-y-auto divide-y divide-gray-100 dark:divide-line">
           @if (rfqLoading()) {
-            <div class="flex items-center justify-center p-8 text-gray-400">
+            <div class="flex items-center justify-center p-8 text-gray-400 dark:text-muted">
               <svg class="h-5 w-5 animate-spin mr-2" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
               Loading…
             </div>
           } @else if (pendingRfqs().length === 0) {
-            <div class="flex flex-col items-center justify-center p-10 text-gray-400">
-              <svg class="h-12 w-12 mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
+            <div class="flex flex-col items-center justify-center p-10 text-gray-400 dark:text-muted">
+              <svg class="h-12 w-12 mb-3 text-gray-300 dark:text-muted dark:text-muted/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
               <p class="text-sm font-medium">No pending RFQs</p>
               <p class="text-xs mt-1">Incoming WhatsApp messages with bunker requests will appear here.</p>
               <button
                 (click)="openPasteModal()"
-                class="mt-4 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-700 transition-colors"
+                class="mt-4 rounded-lg bg-brand-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-800 transition-colors"
               >
                 Paste RFQ
               </button>
             </div>
           } @else {
             @for (rfq of pendingRfqs(); track rfq.id) {
-              <div class="px-5 py-4 hover:bg-gray-50 transition-colors">
+              <div class="px-5 py-4 hover:bg-gray-50 transition-colors dark:hover:bg-surface-tint">
                 <!-- Sender + confidence -->
                 <div class="flex items-center justify-between mb-2">
                   <div class="flex items-center gap-2">
-                    <span class="inline-flex items-center justify-center h-7 w-7 rounded-full bg-green-100 text-green-700 text-xs font-bold">
+                    <span class="inline-flex items-center justify-center h-7 w-7 rounded-full bg-green-100 text-green-700 text-xs font-bold dark:bg-green-500/15 dark:text-green-400">
                       {{ senderInitial(rfq) }}
                     </span>
                     <div>
-                      <div class="text-sm font-medium text-gray-900">{{ senderDisplayName(rfq) }}</div>
-                      <div class="text-xs text-gray-500">{{ senderDisplayMeta(rfq) }}</div>
+                      <div class="text-sm font-medium text-gray-900 dark:text-ink">{{ senderDisplayName(rfq) }}</div>
+                      <div class="text-xs text-gray-500 dark:text-muted">{{ senderDisplayMeta(rfq) }}</div>
                     </div>
                   </div>
                   <span class="text-xs px-1.5 py-0.5 rounded-full"
-                    [class]="rfq.confidence > 0.6 ? 'bg-green-100 text-green-700' : rfq.confidence > 0.4 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-500'">
+                    [class]="rfq.confidence > 0.6 ? 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400' : rfq.confidence > 0.4 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/15 dark:text-yellow-400' : 'bg-gray-100 text-gray-500 dark:bg-surface-3 dark:text-muted'">
                     {{ (rfq.confidence * 100).toFixed(0) }}%
                   </span>
                 </div>
@@ -712,21 +714,21 @@ const NAVIGATION: NavItem[] = [
                 <div class="space-y-1 mb-3">
                   @if (rfq.vesselName) {
                     <div class="flex items-center gap-1.5 text-sm">
-                      <span class="text-gray-400 w-4 text-center">🚢</span>
-                      <span class="font-medium text-gray-800">{{ rfq.vesselName }}</span>
-                      @if (rfq.imo) { <span class="text-xs text-gray-400">IMO {{ rfq.imo }}</span> }
+                      <span class="text-gray-400 w-4 text-center dark:text-muted">🚢</span>
+                      <span class="font-medium text-gray-800 dark:text-ink">{{ rfq.vesselName }}</span>
+                      @if (rfq.imo) { <span class="text-xs text-gray-400 dark:text-muted">IMO {{ rfq.imo }}</span> }
                     </div>
                   }
                   @if (rfq.port) {
                     <div class="flex items-center gap-1.5 text-sm">
-                      <span class="text-gray-400 w-4 text-center">📍</span>
-                      <span class="text-gray-700">{{ rfq.port }}</span>
+                      <span class="text-gray-400 w-4 text-center dark:text-muted">📍</span>
+                      <span class="text-gray-700 dark:text-ink-dim">{{ rfq.port }}</span>
                     </div>
                   }
                   @if (rfq.products?.length) {
                     <div class="flex items-center gap-1.5 text-sm">
-                      <span class="text-gray-400 w-4 text-center">⛽</span>
-                      <span class="text-gray-700">
+                      <span class="text-gray-400 w-4 text-center dark:text-muted">⛽</span>
+                      <span class="text-gray-700 dark:text-ink-dim">
                         @for (p of rfq.products; track p.name; let last = $last) {
                           {{ p.name }}{{ p.quantity ? ' ' + p.quantity + ' ' + p.unit : '' }}{{ last ? '' : ', ' }}
                         }
@@ -735,26 +737,26 @@ const NAVIGATION: NavItem[] = [
                   }
                   @if (rfq.eta) {
                     <div class="flex items-center gap-1.5 text-sm">
-                      <span class="text-gray-400 w-4 text-center">📅</span>
-                      <span class="text-gray-700">{{ rfq.eta | dateLabel }}</span>
+                      <span class="text-gray-400 w-4 text-center dark:text-muted">📅</span>
+                      <span class="text-gray-700 dark:text-ink-dim">{{ rfq.eta | dateLabel }}</span>
                     </div>
                   }
                 </div>
 
                 <!-- Raw text (truncated) -->
-                <div class="text-xs text-gray-500 bg-gray-50 rounded p-2 mb-3 whitespace-pre-wrap max-h-24 overflow-y-auto">{{ rfq.rawText }}</div>
+                <div class="text-xs text-gray-500 bg-gray-50 rounded p-2 mb-3 whitespace-pre-wrap max-h-24 overflow-y-auto dark:text-muted dark:bg-bg-2">{{ rfq.rawText }}</div>
 
                 <!-- Actions -->
                 <div class="flex gap-2">
                   <button
                     (click)="createInquiryFromRfq(rfq)"
-                    class="flex-1 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-700 transition-colors"
+                    class="flex-1 rounded-lg bg-brand-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-800 transition-colors dark:bg-brand-700 dark:hover:bg-brand-800"
                   >
                     Create Inquiry
                   </button>
                   <button
                     (click)="dismissRfqItem(rfq.id)"
-                    class="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors"
+                    class="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-ink-dim hover:bg-gray-100 dark:hover:bg-surface-tint-strong transition-colors dark:border-line dark:text-muted dark:hover:bg-surface-tint"
                   >
                     Dismiss
                   </button>
@@ -771,32 +773,32 @@ const NAVIGATION: NavItem[] = [
     <!-- ═══════════════════════════════════════════════════════════════ -->
     @if (pasteModalOpen()) {
       <div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-sm" (click)="closePasteModal()">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4" (click)="$event.stopPropagation()">
-          <div class="flex items-center justify-between px-6 py-4 border-b">
-            <h3 class="text-base font-semibold text-gray-900">Paste RFQ</h3>
-            <button (click)="closePasteModal()" class="text-gray-400 hover:text-gray-600">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 dark:bg-surface" (click)="$event.stopPropagation()">
+          <div class="flex items-center justify-between px-6 py-4 border-b dark:border-line">
+            <h3 class="text-base font-semibold text-gray-900 dark:text-ink">Paste RFQ</h3>
+            <button (click)="closePasteModal()" class="text-gray-400 hover:text-gray-600 dark:text-muted dark:hover:text-ink-dim">
               <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
             </button>
           </div>
           <div class="px-6 py-5">
-            <label class="block text-sm font-medium text-gray-700 mb-2">Paste the RFQ message below</label>
+            <label class="block text-sm font-medium text-gray-700 mb-2 dark:text-ink-dim">Paste the RFQ message below</label>
             <textarea
               #pasteInput
-              class="w-full h-44 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 placeholder-gray-400 resize-none"
+              class="w-full h-44 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20 placeholder-gray-400 resize-none dark:border-line-strong dark:bg-surface-2 dark:text-ink dark:placeholder:text-muted"
               placeholder="MV Pacific Voyager&#10;IMO 9876543&#10;Fujairah Anchorage&#10;VLSFO 500 MT&#10;LSMGO 100 MT&#10;ETA 15/01/2025"
               [value]="pasteText()"
               (input)="pasteText.set($any($event.target).value)"
             ></textarea>
             @if (pasteError()) {
-              <p class="text-xs text-red-500 mt-2">{{ pasteError() }}</p>
+              <p class="text-xs text-red-500 dark:text-red-300 mt-2 dark:text-red-400">{{ pasteError() }}</p>
             }
           </div>
-          <div class="flex justify-end gap-3 px-6 py-4 bg-gray-50 rounded-b-xl">
-            <button (click)="closePasteModal()" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100">Cancel</button>
+          <div class="flex justify-end gap-3 px-6 py-4 bg-gray-50 rounded-b-xl dark:bg-bg-2">
+            <button (click)="closePasteModal()" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 dark:text-ink-dim hover:bg-gray-100 dark:hover:bg-surface-tint-strong dark:text-muted dark:hover:bg-surface-tint">Cancel</button>
             <button
               (click)="submitPastedRfq()"
               [disabled]="pasteSubmitting()"
-              class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 disabled:opacity-50 transition-colors"
+              class="rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-800 disabled:opacity-50 transition-colors"
             >
               @if (pasteSubmitting()) {
                 <svg class="inline h-4 w-4 animate-spin mr-1" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
@@ -1283,7 +1285,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
   readonly sidebarClasses = computed(() => {
     const base =
-      'app-sidebar fixed inset-y-0 left-0 z-50 flex flex-col bg-sidebar transition-all duration-300 ease-in-out';
+      'app-sidebar fixed inset-y-0 left-0 z-50 flex flex-col bg-surface transition-all duration-300 ease-in-out';
     const width = this.sidebarCollapsed() ? 'w-16' : 'w-64';
     const mobileVisibility = this.sidebarOpen()
       ? 'translate-x-0 visible pointer-events-auto'

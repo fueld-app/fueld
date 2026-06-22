@@ -31,8 +31,8 @@ import { API } from '@app/core/config/api';
       <!-- Header -->
       <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
-          <h1 class="text-2xl font-bold text-gray-900">Credit Applications</h1>
-          <p class="mt-1 text-sm text-gray-500">
+          <h1 class="text-2xl font-bold text-gray-900 dark:text-ink">Credit Applications</h1>
+          <p class="mt-1 text-sm text-gray-500 dark:text-muted">
             Review and manage credit applications from traders.
           </p>
         </div>
@@ -45,8 +45,8 @@ import { API } from '@app/core/config/api';
             (click)="onStatusFilter(s.value)"
             class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
             [class]="statusFilter() === s.value
-              ? 'bg-brand-600 text-white shadow-sm'
-              : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'"
+              ? 'bg-brand-700 text-white shadow-sm'
+              : 'bg-white dark:bg-surface text-gray-600 dark:text-ink-dim border border-gray-200 dark:border-line hover:bg-gray-50 dark:hover:bg-surface-tint'"
           >
             {{ s.label }}
             @if (s.value === 'PENDING' && pendingCount() > 0) {
@@ -61,7 +61,7 @@ import { API } from '@app/core/config/api';
       <!-- Loading -->
       @if (loading()) {
         <div class="flex items-center justify-center py-12">
-          <svg class="h-8 w-8 animate-spin text-brand-600" viewBox="0 0 24 24" fill="none">
+          <svg class="h-8 w-8 animate-spin text-brand-600 dark:text-brand-400" viewBox="0 0 24 24" fill="none">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
           </svg>
@@ -70,21 +70,21 @@ import { API } from '@app/core/config/api';
         <!-- Applications list -->
         <div class="space-y-4">
           @for (app of applications(); track app.id) {
-            <div class="rounded-xl border bg-white shadow-sm overflow-hidden transition-all"
-              [class]="app.status === 'PENDING' ? 'border-amber-200' : 'border-gray-200'">
+            <div class="rounded-xl border bg-white dark:bg-surface shadow-sm overflow-hidden transition-all"
+              [class]="app.status === 'PENDING' ? 'border-amber-200 dark:border-amber-500/30' : 'border-gray-200 dark:border-line'">
 
               <!-- Card header -->
-              <div class="flex items-start justify-between gap-4 px-6 py-4 border-b border-gray-100">
+              <div class="flex items-start justify-between gap-4 px-6 py-4 border-b border-gray-100 dark:border-line">
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2 flex-wrap">
                     <a [routerLink]="['/companies', app.counterpartyId]"
-                      class="text-base font-semibold text-gray-900 hover:text-brand-600 transition-colors">
+                      class="text-base font-semibold text-gray-900 dark:text-ink hover:text-brand-600 transition-colors">
                       {{ app.counterpartyName }}
                     </a>
                     <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
                       [class]="app.type === 'CUSTOMER'
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'bg-purple-50 text-purple-700'">
+                        ? 'bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-400'
+                        : 'bg-purple-50 dark:bg-purple-500/15 text-purple-700 dark:text-purple-400'">
                       {{ app.type }}
                     </span>
                     <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold"
@@ -92,14 +92,14 @@ import { API } from '@app/core/config/api';
                       {{ app.status }}
                     </span>
                   </div>
-                  <div class="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
-                    <span>Requested by <strong class="text-gray-700">{{ app.requestedByName }}</strong></span>
+                  <div class="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-muted">
+                    <span>Requested by <strong class="text-gray-700 dark:text-ink-dim">{{ app.requestedByName }}</strong></span>
                     <span>{{ formatDate(app.createdAt) }}</span>
                     @if (app.orderReference) {
                       <span>
                         Order:
                         <a [routerLink]="['/trading/orders', app.orderId]"
-                          class="font-medium text-brand-600 hover:underline">
+                          class="font-medium text-brand-600 dark:text-brand-400 hover:underline">
                           {{ app.orderReference }}
                         </a>
                       </span>
@@ -107,20 +107,20 @@ import { API } from '@app/core/config/api';
                   </div>
                 </div>
                 <div class="text-right shrink-0">
-                  <div class="text-lg font-bold text-gray-900">
+                  <div class="text-lg font-bold text-gray-900 dark:text-ink">
                     {{ app.requestedCurrency }} {{ formatNumber(app.requestedAmount) }}
                   </div>
                   @if (app.requestedDays) {
-                    <div class="text-sm text-gray-500">{{ app.requestedDays }} days</div>
+                    <div class="text-sm text-gray-500 dark:text-muted">{{ app.requestedDays }} days</div>
                   }
                 </div>
               </div>
 
               <!-- Reason -->
               @if (app.reason) {
-                <div class="px-6 py-3 bg-gray-50/50 border-b border-gray-100">
-                  <p class="text-sm text-gray-600">
-                    <span class="font-medium text-gray-700">Reason:</span>
+                <div class="px-6 py-3 bg-gray-50/50 border-b border-gray-100 dark:border-line">
+                  <p class="text-sm text-gray-600 dark:text-ink-dim">
+                    <span class="font-medium text-gray-700 dark:text-ink-dim">Reason:</span>
                     {{ app.reason }}
                   </p>
                 </div>
@@ -128,15 +128,15 @@ import { API } from '@app/core/config/api';
 
               <!-- Reviews -->
               @if (app.reviews.length) {
-                <div class="px-6 py-3 border-b border-gray-100">
-                  <h4 class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Reviews</h4>
+                <div class="px-6 py-3 border-b border-gray-100 dark:border-line">
+                  <h4 class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-muted mb-2">Reviews</h4>
                   <div class="space-y-2">
                     @for (review of app.reviews; track review.id) {
                       <div class="flex items-start gap-2">
                         <span class="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full"
                           [class]="review.decision === 'APPROVED'
-                            ? 'bg-green-100 text-green-600'
-                            : 'bg-red-100 text-red-600'">
+                            ? 'bg-green-100 dark:bg-green-500/15 text-green-600 dark:text-green-400'
+                            : 'bg-red-100 dark:bg-red-500/15 text-red-600 dark:text-red-400'">
                           @if (review.decision === 'APPROVED') {
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                               <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
@@ -148,10 +148,10 @@ import { API } from '@app/core/config/api';
                           }
                         </span>
                         <div>
-                          <span class="text-sm font-medium text-gray-700">{{ review.reviewerName }}</span>
-                          <span class="text-sm text-gray-400"> &middot; {{ formatDate(review.decidedAt) }}</span>
+                          <span class="text-sm font-medium text-gray-700 dark:text-ink-dim">{{ review.reviewerName }}</span>
+                          <span class="text-sm text-gray-400 dark:text-muted"> &middot; {{ formatDate(review.decidedAt) }}</span>
                           @if (review.comment) {
-                            <p class="text-sm text-gray-600 mt-0.5">{{ review.comment }}</p>
+                            <p class="text-sm text-gray-600 dark:text-ink-dim mt-0.5">{{ review.comment }}</p>
                           }
                         </div>
                       </div>
@@ -166,10 +166,10 @@ import { API } from '@app/core/config/api';
                   @if (reviewingId() === app.id) {
                     <div class="space-y-3">
                       <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Comment (optional)</label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1">Comment (optional)</label>
                         <textarea [ngModel]="reviewComment()" (ngModelChange)="reviewComment.set($event)" rows="2"
                           placeholder="Add a note about your decision..."
-                          class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none resize-none">
+                          class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none resize-none">
                         </textarea>
                       </div>
                       <div class="flex items-center gap-2">
@@ -190,14 +190,14 @@ import { API } from '@app/core/config/api';
                           Reject
                         </button>
                         <button (click)="reviewingId.set(null)"
-                          class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                          class="rounded-lg border border-gray-300 dark:border-line-strong px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors">
                           Cancel
                         </button>
                       </div>
                     </div>
                   } @else {
                     <button (click)="openReview(app.id)"
-                      class="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 transition-colors">
+                      class="inline-flex items-center gap-1.5 rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-800 transition-colors">
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                         <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
                         <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/>
@@ -213,19 +213,19 @@ import { API } from '@app/core/config/api';
                 <div class="px-6 py-3 bg-gray-50/30 flex justify-end">
                   <button (click)="cancelApplication(app.id)"
                     [disabled]="submitting()"
-                    class="text-sm text-gray-500 hover:text-red-600 transition-colors">
+                    class="text-sm text-gray-500 dark:text-muted hover:text-red-600 transition-colors">
                     Cancel application
                   </button>
                 </div>
               }
             </div>
           } @empty {
-            <div class="rounded-xl border border-gray-200 bg-white p-12 text-center">
-              <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-12 w-12 text-gray-300" viewBox="0 0 20 20" fill="currentColor">
+            <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-12 text-center">
+              <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-12 w-12 text-gray-300 dark:text-muted" viewBox="0 0 20 20" fill="currentColor">
                 <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/>
               </svg>
-              <h3 class="mt-4 text-base font-medium text-gray-900">No applications</h3>
-              <p class="mt-1 text-sm text-gray-500">
+              <h3 class="mt-4 text-base font-medium text-gray-900 dark:text-ink">No applications</h3>
+              <p class="mt-1 text-sm text-gray-500 dark:text-muted">
                 @if (statusFilter() === 'PENDING') {
                   No pending credit applications to review.
                 } @else {

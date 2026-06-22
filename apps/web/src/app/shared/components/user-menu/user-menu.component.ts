@@ -38,7 +38,7 @@ import { API } from '@app/core/config/api';
 
     <button
       (click)="toggleMenu()"
-      class="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+      class="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:hover:bg-surface-tint-strong"
       [attr.aria-expanded]="isOpen()"
       aria-haspopup="true"
     >
@@ -51,17 +51,17 @@ import { API } from '@app/core/config/api';
         />
       } @else {
         <span
-          class="flex h-8 w-8 items-center justify-center rounded-full bg-brand-600 text-xs font-semibold text-white"
+          class="flex h-8 w-8 items-center justify-center rounded-full bg-brand-700 text-xs font-semibold text-white"
         >
           {{ initials() }}
         </span>
       }
-      <span class="hidden text-sm font-medium text-gray-700 md:inline">
+      <span class="hidden text-sm font-medium text-gray-700 md:inline dark:text-ink-dim">
         {{ userName() }}
       </span>
       <!-- Chevron -->
       <svg
-        class="hidden h-4 w-4 text-gray-400 transition-transform md:inline"
+        class="hidden h-4 w-4 text-gray-400 transition-transform md:inline dark:text-muted"
         [class.rotate-180]="isOpen()"
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 20 20"
@@ -79,10 +79,10 @@ import { API } from '@app/core/config/api';
     <!-- Dropdown panel -->
     @if (isOpen()) {
       <div
-        class="absolute right-0 z-50 mt-2 w-56 origin-top-right rounded-lg border border-gray-200 bg-white shadow-lg ring-1 ring-black/5 focus:outline-none"
+        class="absolute right-0 z-50 mt-2 w-56 origin-top-right rounded-lg border border-gray-200 bg-white shadow-lg ring-1 ring-black/5 focus:outline-none dark:border-line dark:bg-surface"
         role="menu"
       >
-        <div class="border-b border-gray-100 px-4 py-3">
+        <div class="border-b border-gray-100 px-4 py-3 dark:border-line">
           <div class="flex items-center gap-3">
             <!-- Clickable avatar for upload -->
             <button
@@ -98,7 +98,7 @@ import { API } from '@app/core/config/api';
                 />
               } @else {
                 <span
-                  class="flex h-10 w-10 items-center justify-center rounded-full bg-brand-600 text-sm font-semibold text-white"
+                  class="flex h-10 w-10 items-center justify-center rounded-full bg-brand-700 text-sm font-semibold text-white"
                 >
                   {{ initials() }}
                 </span>
@@ -119,8 +119,8 @@ import { API } from '@app/core/config/api';
               }
             </button>
             <div class="min-w-0">
-              <p class="text-sm font-medium text-gray-900">{{ userName() }}</p>
-              <p class="truncate text-xs text-gray-500">{{ userEmail() }}</p>
+              <p class="text-sm font-medium text-gray-900 dark:text-ink">{{ userName() }}</p>
+              <p class="truncate text-xs text-gray-500 dark:text-muted">{{ userEmail() }}</p>
             </div>
           </div>
         </div>
@@ -129,7 +129,7 @@ import { API } from '@app/core/config/api';
             @if (notificationPermission() === 'granted') {
               <button
                 (click)="disableNotifications()"
-                class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors dark:text-ink-dim dark:hover:bg-surface-tint"
                 role="menuitem"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -138,13 +138,13 @@ import { API } from '@app/core/config/api';
                 Disable notifications
               </button>
             } @else if (notificationPermission() === 'denied') {
-              <div class="px-4 py-2 text-xs text-gray-500">
+              <div class="px-4 py-2 text-xs text-gray-500 dark:text-muted">
                 Notifications are blocked in your browser settings.
               </div>
             } @else {
               <button
                 (click)="enableNotifications()"
-                class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors dark:text-ink-dim dark:hover:bg-surface-tint"
                 role="menuitem"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -156,7 +156,7 @@ import { API } from '@app/core/config/api';
           }
           <button
             (click)="goToSecurity()"
-            class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+            class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors dark:text-ink-dim dark:hover:bg-surface-tint"
             role="menuitem"
           >
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -166,7 +166,7 @@ import { API } from '@app/core/config/api';
           </button>
           <button
             (click)="handleLogout()"
-            class="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+            class="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-500/15 transition-colors dark:text-red-400 dark:hover:bg-red-500/10"
             role="menuitem"
           >
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">

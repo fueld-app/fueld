@@ -23,15 +23,15 @@ import { SettingsToastService } from './settings-toast.service';
     <div>
       <!-- Header -->
       <div class="mb-6">
-        <h1 class="text-2xl font-bold text-gray-900">General Settings</h1>
-        <p class="mt-1 text-sm text-gray-500">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-ink">General Settings</h1>
+        <p class="mt-1 text-sm text-gray-500 dark:text-muted">
           Configure order numbering and other general settings.
         </p>
       </div>
 
       @if (loading()) {
         <div class="flex items-center justify-center py-12">
-          <svg class="h-8 w-8 animate-spin text-brand-600" viewBox="0 0 24 24" fill="none">
+          <svg class="h-8 w-8 animate-spin text-brand-600 dark:text-brand-400" viewBox="0 0 24 24" fill="none">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
           </svg>
@@ -45,13 +45,13 @@ import { SettingsToastService } from './settings-toast.service';
           <div class="app-panel">
             <div class="app-panel-header app-panel-header--brand">
               <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--brand">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-brand-600" viewBox="0 0 20 20" fill="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-brand-600 dark:text-brand-400" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M4.5 2A1.5 1.5 0 003 3.5v13A1.5 1.5 0 004.5 18h11a1.5 1.5 0 001.5-1.5V7.621a1.5 1.5 0 00-.44-1.06l-4.12-4.122A1.5 1.5 0 0011.378 2H4.5zm4.75 6.75a.75.75 0 00-1.5 0v2.546l-.943-1.048a.75.75 0 00-1.114 1.004l2.25 2.5a.75.75 0 001.114 0l2.25-2.5a.75.75 0 10-1.114-1.004l-.943 1.048V8.75z" clip-rule="evenodd" />
                 </svg>
               </div>
               <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-semibold text-gray-900">Order Number Format</h3>
-                <p class="text-xs text-gray-500">Configure the format used for external order/inquiry numbers.</p>
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">Order Number Format</h3>
+                <p class="text-xs text-gray-500 dark:text-muted">Configure the format used for external order/inquiry numbers.</p>
               </div>
             </div>
 
@@ -59,7 +59,7 @@ import { SettingsToastService } from './settings-toast.service';
 
               <!-- Prefix -->
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Prefix (optional)</label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1">Prefix (optional)</label>
                 <input
                   type="text"
                   [ngModel]="prefix()"
@@ -67,35 +67,35 @@ import { SettingsToastService } from './settings-toast.service';
                   placeholder="e.g. FU-"
                       class="app-input w-full max-w-xs"
                 />
-                <p class="mt-1 text-xs text-gray-500">
+                <p class="mt-1 text-xs text-gray-500 dark:text-muted">
                   Added before the template. Leave empty for no prefix.
                 </p>
               </div>
 
               <!-- Template -->
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Template</label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1">Template</label>
                 <input
                   type="text"
                   [ngModel]="template()"
                   (ngModelChange)="template.set($event)"
                       class="app-input-mono w-full max-w-md"
                 />
-                <p class="mt-1 text-xs text-gray-500">
+                <p class="mt-1 text-xs text-gray-500 dark:text-muted">
                   Available tokens:
-                  <code class="rounded bg-gray-100 px-1 py-0.5 text-xs">{{ '{' }}PREFIX{{ '}' }}</code>,
-                  <code class="rounded bg-gray-100 px-1 py-0.5 text-xs">{{ '{' }}YYYY{{ '}' }}</code>,
-                  <code class="rounded bg-gray-100 px-1 py-0.5 text-xs">{{ '{' }}MM{{ '}' }}</code>,
-                  <code class="rounded bg-gray-100 px-1 py-0.5 text-xs">{{ '{' }}DD{{ '}' }}</code>,
-                  <code class="rounded bg-gray-100 px-1 py-0.5 text-xs">{{ '{' }}SEQ:N{{ '}' }}</code> (N = zero-padded digits)
+                  <code class="rounded bg-gray-100 dark:bg-surface-3 px-1 py-0.5 text-xs">{{ '{' }}PREFIX{{ '}' }}</code>,
+                  <code class="rounded bg-gray-100 dark:bg-surface-3 px-1 py-0.5 text-xs">{{ '{' }}YYYY{{ '}' }}</code>,
+                  <code class="rounded bg-gray-100 dark:bg-surface-3 px-1 py-0.5 text-xs">{{ '{' }}MM{{ '}' }}</code>,
+                  <code class="rounded bg-gray-100 dark:bg-surface-3 px-1 py-0.5 text-xs">{{ '{' }}DD{{ '}' }}</code>,
+                  <code class="rounded bg-gray-100 dark:bg-surface-3 px-1 py-0.5 text-xs">{{ '{' }}SEQ:N{{ '}' }}</code> (N = zero-padded digits)
                 </p>
               </div>
 
               <!-- Preview -->
-              <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                <p class="text-xs font-medium uppercase tracking-wider text-gray-500 mb-1">Preview (next number)</p>
-                <p class="text-lg font-mono font-semibold text-gray-900">{{ livePreview() }}</p>
-                <p class="text-xs text-gray-500 mt-1">
+              <div class="rounded-lg border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 p-4">
+                <p class="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-muted mb-1">Preview (next number)</p>
+                <p class="text-lg font-mono font-semibold text-gray-900 dark:text-ink">{{ livePreview() }}</p>
+                <p class="text-xs text-gray-500 dark:text-muted mt-1">
                   Global sequence counter: {{ nextSeq() }}
                 </p>
               </div>
@@ -115,7 +115,7 @@ import { SettingsToastService } from './settings-toast.service';
                 </button>
 
                 @if (saved()) {
-                  <span class="text-sm text-green-600 flex items-center gap-1">
+                  <span class="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                       <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
                     </svg>
@@ -132,37 +132,37 @@ import { SettingsToastService } from './settings-toast.service';
           <div class="app-panel">
             <div class="app-panel-header app-panel-header--blue">
               <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--blue">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600 dark:text-blue-400" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z" clip-rule="evenodd" />
                 </svg>
               </div>
               <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-semibold text-gray-900">Timezone</h3>
-                <p class="text-xs text-gray-500">Default timezone for date/time display in the UI, emails, WhatsApp messages, and PDF documents.</p>
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">Timezone</h3>
+                <p class="text-xs text-gray-500 dark:text-muted">Default timezone for date/time display in the UI, emails, WhatsApp messages, and PDF documents.</p>
               </div>
             </div>
 
             <div class="app-panel-body space-y-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Default timezone</label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1">Default timezone</label>
                 <select
                   [ngModel]="defaultTimezone()"
                   (ngModelChange)="setDefaultTimezone($event)"
-                  class="app-input w-full max-w-xs bg-white"
+                  class="app-input w-full max-w-xs bg-white dark:bg-surface"
                 >
                   <option value="">Browser default (no override)</option>
                   @for (tz of commonTimezones(); track tz.value) {
                     <option [value]="tz.value">{{ tz.label }}</option>
                   }
                 </select>
-                <p class="mt-1 text-xs text-gray-500">
+                <p class="mt-1 text-xs text-gray-500 dark:text-muted">
                   All timestamps are stored as UTC. This setting controls how dates are displayed.
                   Leave empty to use each user's browser timezone.
                 </p>
               </div>
 
               @if (defaultTimezone()) {
-                <div class="rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm text-blue-800">
+                <div class="rounded-lg border border-blue-100 dark:border-blue-500/25 bg-blue-50 dark:bg-blue-500/15 p-3 text-sm text-blue-800 dark:text-blue-300">
                   Current time in {{ defaultTimezone() }}:
                   <span class="font-semibold">{{ timezonePreview() }}</span>
                 </div>
@@ -177,7 +177,7 @@ import { SettingsToastService } from './settings-toast.service';
                   @if (timezoneSaving()) { Saving… } @else { Save Timezone }
                 </button>
                 @if (timezoneSaved()) {
-                  <span class="text-sm text-green-600 flex items-center gap-1">
+                  <span class="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                       <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
                     </svg>
@@ -194,31 +194,31 @@ import { SettingsToastService } from './settings-toast.service';
           <div class="app-panel">
             <div class="app-panel-header app-panel-header--green">
               <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--green">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-600" viewBox="0 0 20 20" fill="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-600 dark:text-green-400" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z" clip-rule="evenodd" />
                 </svg>
               </div>
               <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-semibold text-gray-900">Cost / Sales Decimal Precision</h3>
-                <p class="text-xs text-gray-500">Controls how many decimal places are displayed for cost and sales prices in order lines and documents.</p>
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">Cost / Sales Decimal Precision</h3>
+                <p class="text-xs text-gray-500 dark:text-muted">Controls how many decimal places are displayed for cost and sales prices in order lines and documents.</p>
               </div>
             </div>
 
             <div class="app-panel-body space-y-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Decimal places</label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1">Decimal places</label>
                 <select
                   [ngModel]="costSalesPrecision()"
                   (ngModelChange)="costSalesPrecision.set(+$event)"
-                  class="app-input w-full max-w-xs bg-white"
+                  class="app-input w-full max-w-xs bg-white dark:bg-surface"
                 >
                   @for (p of [0, 1, 2, 3, 4, 5, 6, 7, 8]; track p) {
                     <option [value]="p">{{ p }} ({{ p === 5 ? 'default' : p === 0 ? 'integer' : p + ' dp' }})</option>
                   }
                 </select>
-                <p class="mt-1 text-xs text-gray-500">
+                <p class="mt-1 text-xs text-gray-500 dark:text-muted">
                   Example at {{ costSalesPrecision() }} dp:
-                  <span class="font-mono font-semibold text-gray-700">{{ 123.456789 | number:'1.0-' + costSalesPrecision() }}</span>
+                  <span class="font-mono font-semibold text-gray-700 dark:text-ink-dim">{{ 123.456789 | number:'1.0-' + costSalesPrecision() }}</span>
                 </p>
               </div>
 
@@ -231,7 +231,7 @@ import { SettingsToastService } from './settings-toast.service';
                   @if (costSalesPrecisionSaving()) { Saving… } @else { Save Precision }
                 </button>
                 @if (costSalesPrecisionSaved()) {
-                  <span class="text-sm text-green-600 flex items-center gap-1">
+                  <span class="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                       <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
                     </svg>
@@ -248,30 +248,30 @@ import { SettingsToastService } from './settings-toast.service';
           <div class="app-panel">
             <div class="app-panel-header app-panel-header--purple">
               <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--purple">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-purple-600" viewBox="0 0 20 20" fill="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-purple-600 dark:text-purple-400" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M5.75 2a.75.75 0 01.75.75V4h7V2.75a.75.75 0 011.5 0V4h.25A2.75 2.75 0 0118 6.75v8.5A2.75 2.75 0 0115.25 18H4.75A2.75 2.75 0 012 15.25v-8.5A2.75 2.75 0 014.75 4H5V2.75A.75.75 0 015.75 2zM4.75 5.5c-.69 0-1.25.56-1.25 1.25v8.5c0 .69.56 1.25 1.25 1.25h10.5c.69 0 1.25-.56 1.25-1.25v-8.5c0-.69-.56-1.25-1.25-1.25H4.75z" clip-rule="evenodd" />
                 </svg>
               </div>
               <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-semibold text-gray-900">Date Format</h3>
-                <p class="text-xs text-gray-500">Controls how dates are displayed across the application.</p>
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">Date Format</h3>
+                <p class="text-xs text-gray-500 dark:text-muted">Controls how dates are displayed across the application.</p>
               </div>
             </div>
 
             <div class="app-panel-body space-y-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Format</label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1">Format</label>
                 <select
                   [ngModel]="dateFormat()"
                   (ngModelChange)="dateFormat.set($event)"
-                  class="app-input w-full max-w-xs bg-white"
+                  class="app-input w-full max-w-xs bg-white dark:bg-surface"
                 >
                   <option value="ISO">ISO (YYYY-MM-DD) — default</option>
                   <option value="AMERICAN">American (MM/DD/YYYY)</option>
                   <option value="EUROPEAN">European (DD/MM/YYYY)</option>
                 </select>
-                <p class="mt-1 text-xs text-gray-500">
-                  Example: <span class="font-mono font-semibold text-gray-700">{{ dateFormatExample() }}</span>
+                <p class="mt-1 text-xs text-gray-500 dark:text-muted">
+                  Example: <span class="font-mono font-semibold text-gray-700 dark:text-ink-dim">{{ dateFormatExample() }}</span>
                 </p>
               </div>
 
@@ -284,7 +284,7 @@ import { SettingsToastService } from './settings-toast.service';
                   @if (dateFormatSaving()) { Saving… } @else { Save Date Format }
                 </button>
                 @if (dateFormatSaved()) {
-                  <span class="text-sm text-green-600 flex items-center gap-1">
+                  <span class="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                       <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
                     </svg>
@@ -301,20 +301,20 @@ import { SettingsToastService } from './settings-toast.service';
           <div class="app-panel">
             <div class="app-panel-header app-panel-header--indigo">
               <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--indigo">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-600" viewBox="0 0 20 20" fill="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-600 dark:text-indigo-400" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" />
                 </svg>
               </div>
               <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-semibold text-gray-900">Role Dashboards</h3>
-                <p class="text-xs text-gray-500">Configure default landing page per role.</p>
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">Role Dashboards</h3>
+                <p class="text-xs text-gray-500 dark:text-muted">Configure default landing page per role.</p>
               </div>
             </div>
 
             <div class="app-panel-body space-y-3">
               @for (role of availableRoles; track role.key) {
                 <div class="flex items-center gap-3">
-                  <span class="w-24 text-sm font-medium text-gray-700">{{ role.label }}</span>
+                  <span class="w-24 text-sm font-medium text-gray-700 dark:text-ink-dim">{{ role.label }}</span>
                   <select
                     [ngModel]="roleDashboards()[role.key]"
                     (ngModelChange)="setRoleDashboard(role.key, $event)"
@@ -338,7 +338,7 @@ import { SettingsToastService } from './settings-toast.service';
                   @if (roleDashboardsSaving()) { Saving… } @else { Save Dashboards }
                 </button>
                 @if (roleDashboardsSaved()) {
-                  <span class="text-sm text-green-600 flex items-center gap-1">
+                  <span class="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                       <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
                     </svg>
@@ -355,24 +355,24 @@ import { SettingsToastService } from './settings-toast.service';
           <div class="app-panel">
             <div class="app-panel-header app-panel-header--amber">
               <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--amber">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-600 dark:text-amber-400" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z" clip-rule="evenodd" />
                 </svg>
               </div>
               <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-semibold text-gray-900">Follow-Up Settings</h3>
-                <p class="text-xs text-gray-500">Configure default follow-up reminder timing for comments.</p>
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">Follow-Up Settings</h3>
+                <p class="text-xs text-gray-500 dark:text-muted">Configure default follow-up reminder timing for comments.</p>
               </div>
             </div>
 
             <div class="app-panel-body">
               <div>
-                <p class="text-sm font-medium text-gray-900">Default follow-up days</p>
-                <p class="text-xs text-gray-500">When a user adds a follow-up to a comment, the date will default to this many days from today.</p>
+                <p class="text-sm font-medium text-gray-900 dark:text-ink">Default follow-up days</p>
+                <p class="text-xs text-gray-500 dark:text-muted">When a user adds a follow-up to a comment, the date will default to this many days from today.</p>
               </div>
               <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
                 <div class="w-full sm:w-40">
-                  <label class="block text-sm font-medium text-gray-700">Days</label>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">Days</label>
                   <input
                     type="number"
                     min="1"
@@ -391,7 +391,7 @@ import { SettingsToastService } from './settings-toast.service';
                   @if (followUpSaving()) { Saving… } @else { Save }
                 </button>
                 @if (followUpSaved()) {
-                  <span class="text-sm text-green-600 flex items-center gap-1">
+                  <span class="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                       <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
                     </svg>

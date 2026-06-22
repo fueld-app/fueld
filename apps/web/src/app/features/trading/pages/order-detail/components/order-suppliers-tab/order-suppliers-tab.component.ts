@@ -12,18 +12,18 @@ import type { InquirySupplierComparisonRow, InquiryQuoteMatrixRow, SupplierInqui
   template: `
     <div class="mt-4">
       <!-- Supplier Comparison Context -->
-      <div class="rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-emerald-50 shadow-sm">
+      <div class="rounded-3xl border border-slate-200 dark:border-slate-500/30 bg-gradient-to-br from-slate-50 via-white to-emerald-50 shadow-sm">
         <div class="border-b border-slate-200/70 px-5 py-4">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Inquiry intelligence</div>
-              <h3 class="mt-1 text-base font-semibold text-slate-900">Supplier Comparison Context</h3>
-              <p class="text-sm text-slate-500">Delivery history and quote hit-rate for suppliers at this port.</p>
+              <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-300">Inquiry intelligence</div>
+              <h3 class="mt-1 text-base font-semibold text-slate-900 dark:text-slate-300">Supplier Comparison Context</h3>
+              <p class="text-sm text-slate-500 dark:text-slate-300">Delivery history and quote hit-rate for suppliers at this port.</p>
             </div>
             <div class="flex flex-wrap items-center gap-2 text-xs">
-              <span class="rounded-full border border-slate-200 bg-white/80 px-2.5 py-1 font-medium text-slate-600">{{ suppliers().length }} supplier{{ suppliers().length === 1 ? '' : 's' }} ranked</span>
+              <span class="rounded-full border border-slate-200 dark:border-slate-500/30 bg-white/80 px-2.5 py-1 font-medium text-slate-600 dark:text-slate-400">{{ suppliers().length }} supplier{{ suppliers().length === 1 ? '' : 's' }} ranked</span>
               @if (selectedSupplierId()) {
-                <span class="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700">Reviewing {{ selectedSupplierName() }}</span>
+                <span class="rounded-full border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/15 px-2.5 py-1 font-medium text-emerald-700 dark:text-emerald-400">Reviewing {{ selectedSupplierName() }}</span>
               }
             </div>
           </div>
@@ -43,26 +43,26 @@ import type { InquirySupplierComparisonRow, InquiryQuoteMatrixRow, SupplierInqui
                   [class.bg-white]="selectedSupplierId() !== supplier.supplierId"
                 >
                   <div class="flex flex-wrap items-center gap-2">
-                    <span class="text-sm font-semibold text-slate-900">{{ supplier.supplierName }}</span>
-                    @if (isTopSupplier()(supplier)) { <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">Best here</span> }
+                    <span class="text-sm font-semibold text-slate-900 dark:text-slate-300">{{ supplier.supplierName }}</span>
+                    @if (isTopSupplier()(supplier)) { <span class="rounded-full bg-emerald-100 dark:bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">Best here</span> }
                     @if (selectedSupplierId() === supplier.supplierId) { <span class="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white">Selected</span> }
                   </div>
                   @if (supplier.products.length) {
                     <div class="mt-1 flex flex-wrap gap-1">
-                      @for (product of supplier.products; track product) { <span class="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">{{ product }}</span> }
+                      @for (product of supplier.products; track product) { <span class="rounded-md bg-slate-100 dark:bg-slate-500/15 px-1.5 py-0.5 text-[10px] text-slate-600 dark:text-slate-400">{{ product }}</span> }
                     </div>
                   }
                   <div class="mt-2 flex flex-wrap gap-1.5">
-                    @if (supplier.performance.deliveredCountOverall > 0) { <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-200">{{ supplier.performance.deliveredCountOverall }} delivered</span> }
-                    @if (supplier.performance.deliveredCountAtPlace > 0) { <span class="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-blue-200">{{ supplier.performance.deliveredCountAtPlace }} at this place</span> }
-                    @if (supplier.performance.quotedCount > 0) { <span class="rounded-full bg-fuchsia-50 px-2 py-0.5 text-[10px] font-medium text-fuchsia-700 ring-1 ring-fuchsia-200">{{ quoteRateLabel()(supplier.performance) }}</span> }
-                    @if (supplier.performance.averageResponseHours !== null) { <span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-amber-200">{{ averageResponseLabel()(supplier.performance) }}</span> }
+                    @if (supplier.performance.deliveredCountOverall > 0) { <span class="rounded-full bg-emerald-50 dark:bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-200 dark:ring-emerald-500/30">{{ supplier.performance.deliveredCountOverall }} delivered</span> }
+                    @if (supplier.performance.deliveredCountAtPlace > 0) { <span class="rounded-full bg-blue-50 dark:bg-blue-500/15 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-400 ring-1 ring-blue-200 dark:ring-blue-500/30">{{ supplier.performance.deliveredCountAtPlace }} at this place</span> }
+                    @if (supplier.performance.quotedCount > 0) { <span class="rounded-full bg-fuchsia-50 dark:bg-fuchsia-500/15 px-2 py-0.5 text-[10px] font-medium text-fuchsia-700 dark:text-fuchsia-400 ring-1 ring-fuchsia-200 dark:ring-fuchsia-500/30">{{ quoteRateLabel()(supplier.performance) }}</span> }
+                    @if (supplier.performance.averageResponseHours !== null) { <span class="rounded-full bg-amber-50 dark:bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-500/30">{{ averageResponseLabel()(supplier.performance) }}</span> }
                   </div>
                   @if (!readonly()) {
                     <button (click)="select.emit(supplier)"
                       [disabled]="selectedSupplierId() === supplier.supplierId"
                       class="mt-3 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors"
-                      [class.bg-brand-600]="selectedSupplierId() !== supplier.supplierId"
+                      [class.bg-brand-700]="selectedSupplierId() !== supplier.supplierId"
                       [class.text-white]="selectedSupplierId() !== supplier.supplierId"
                       [class.bg-slate-100]="selectedSupplierId() === supplier.supplierId"
                       [class.text-slate-500]="selectedSupplierId() === supplier.supplierId"
@@ -77,17 +77,17 @@ import type { InquirySupplierComparisonRow, InquiryQuoteMatrixRow, SupplierInqui
 
       <!-- Quote Matrix -->
       @if (replies().length > 0) {
-        <div class="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-          <div class="border-b border-slate-200 px-5 py-4">
+        <div class="mt-4 overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-500/30 bg-white dark:bg-surface shadow-sm">
+          <div class="border-b border-slate-200 dark:border-slate-500/30 px-5 py-4">
             <div class="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Line comparison</div>
-                <h3 class="text-base font-semibold text-slate-900">Quote Matrix</h3>
-                <p class="text-sm text-slate-500">Compare all supplier responses by line item.</p>
+                <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-300">Line comparison</div>
+                <h3 class="text-base font-semibold text-slate-900 dark:text-slate-300">Quote Matrix</h3>
+                <p class="text-sm text-slate-500 dark:text-slate-300">Compare all supplier responses by line item.</p>
               </div>
               <div class="flex flex-wrap items-center gap-2 text-xs">
-                <span class="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 font-medium text-slate-600">{{ replies().length }} repl{{ replies().length === 1 ? 'y' : 'ies' }}</span>
-                <span class="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 font-medium text-slate-600">{{ matrixRows().length }} line{{ matrixRows().length === 1 ? '' : 's' }}</span>
+                <span class="rounded-full border border-slate-200 dark:border-slate-500/30 bg-slate-50 dark:bg-slate-500/15 px-2.5 py-1 font-medium text-slate-600 dark:text-slate-400">{{ replies().length }} repl{{ replies().length === 1 ? 'y' : 'ies' }}</span>
+                <span class="rounded-full border border-slate-200 dark:border-slate-500/30 bg-slate-50 dark:bg-slate-500/15 px-2.5 py-1 font-medium text-slate-600 dark:text-slate-400">{{ matrixRows().length }} line{{ matrixRows().length === 1 ? '' : 's' }}</span>
               </div>
             </div>
           </div>
@@ -95,20 +95,20 @@ import type { InquirySupplierComparisonRow, InquiryQuoteMatrixRow, SupplierInqui
             <table class="min-w-full border-separate border-spacing-0 text-sm">
               <thead>
                 <tr>
-                  <th class="sticky left-0 z-10 min-w-64 border-b border-slate-200 bg-white px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Line item</th>
+                  <th class="sticky left-0 z-10 min-w-64 border-b border-slate-200 dark:border-slate-500/30 bg-white dark:bg-surface px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Line item</th>
                   @for (reply of replies(); track reply.id) {
-                    <th class="min-w-52 border-b border-slate-200 px-4 py-3 text-left align-top" [class.bg-slate-50]="selectedReplySupplierId() === reply.supplierId">
+                    <th class="min-w-52 border-b border-slate-200 dark:border-slate-500/30 px-4 py-3 text-left align-top" [class.bg-slate-50]="selectedReplySupplierId() === reply.supplierId">
                       <div class="flex items-center gap-2">
-                        <span class="font-semibold text-slate-900">{{ reply.supplierName }}</span>
+                        <span class="font-semibold text-slate-900 dark:text-slate-300">{{ reply.supplierName }}</span>
                         @if (selectedReplySupplierId() === reply.supplierId) { <span class="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white">Selected</span> }
                       </div>
                       <div class="mt-2 flex flex-wrap gap-1.5">
-                        @if (recommendation()(reply.id)?.bestOverall) { <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-200">Best overall</span> }
-                        @if (recommendation()(reply.id)?.lowestComparable) { <span class="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700 ring-1 ring-sky-200">Lowest total</span> }
-                        @if (recommendation()(reply.id)?.mostComplete) { <span class="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-700 ring-1 ring-violet-200">Most complete</span> }
-                        @if (recommendation()(reply.id)?.fastest) { <span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 ring-1 ring-amber-200">Fastest</span> }
+                        @if (recommendation()(reply.id)?.bestOverall) { <span class="rounded-full bg-emerald-50 dark:bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-200 dark:ring-emerald-500/30">Best overall</span> }
+                        @if (recommendation()(reply.id)?.lowestComparable) { <span class="rounded-full bg-sky-50 dark:bg-sky-500/15 px-2 py-0.5 text-[10px] font-semibold text-sky-700 dark:text-sky-400 ring-1 ring-sky-200 dark:ring-sky-500/30">Lowest total</span> }
+                        @if (recommendation()(reply.id)?.mostComplete) { <span class="rounded-full bg-violet-50 dark:bg-violet-500/15 px-2 py-0.5 text-[10px] font-semibold text-violet-700 dark:text-violet-400 ring-1 ring-violet-200 dark:ring-violet-500/30">Most complete</span> }
+                        @if (recommendation()(reply.id)?.fastest) { <span class="rounded-full bg-amber-50 dark:bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400 ring-1 ring-amber-200 dark:ring-amber-500/30">Fastest</span> }
                       </div>
-                      <div class="mt-1 text-[11px] text-slate-500">{{ summary()(reply) }}</div>
+                      <div class="mt-1 text-[11px] text-slate-500 dark:text-slate-300">{{ summary()(reply) }}</div>
                       @if (reply.responseHours !== null) { <div class="mt-1 text-[11px] text-slate-400">{{ responseHoursLabel()(reply.responseHours) }} response</div> }
                     </th>
                   }
@@ -117,19 +117,19 @@ import type { InquirySupplierComparisonRow, InquiryQuoteMatrixRow, SupplierInqui
               <tbody>
                 @for (row of matrixRows(); track row.orderItemId) {
                   <tr>
-                    <td class="sticky left-0 z-10 border-b border-slate-100 bg-white px-4 py-3 align-top">
-                      <div class="font-semibold text-slate-900">{{ row.productType }}</div>
-                      <div class="mt-1 text-xs text-slate-500">{{ row.quantity }}{{ row.unit }}@if (row.description) { · {{ row.description }} }</div>
+                    <td class="sticky left-0 z-10 border-b border-slate-100 dark:border-slate-500/25 bg-white dark:bg-surface px-4 py-3 align-top">
+                      <div class="font-semibold text-slate-900 dark:text-slate-300">{{ row.productType }}</div>
+                      <div class="mt-1 text-xs text-slate-500 dark:text-slate-300">{{ row.quantity }}{{ row.unit }}@if (row.description) { · {{ row.description }} }</div>
                     </td>
                     @for (cell of row.cells; track cell.supplierInquiryId) {
-                      <td class="border-b border-slate-100 px-4 py-3 align-top" [class.bg-slate-50]="cell.isSelectedSupplier">
+                      <td class="border-b border-slate-100 dark:border-slate-500/25 px-4 py-3 align-top" [class.bg-slate-50]="cell.isSelectedSupplier">
                         @if (cell.price !== null && showPrices()) {
-                          <div class="font-semibold text-slate-900">{{ cell.price }} {{ cell.currency }}</div>
-                          @if (cell.note) { <div class="mt-1 text-xs text-slate-500">{{ cell.note }}</div> }
+                          <div class="font-semibold text-slate-900 dark:text-slate-300">{{ cell.price }} {{ cell.currency }}</div>
+                          @if (cell.note) { <div class="mt-1 text-xs text-slate-500 dark:text-slate-300">{{ cell.note }}</div> }
                         } @else if (cell.price !== null && !showPrices()) {
                           <div class="font-medium text-slate-400 italic">Hidden</div>
                         } @else {
-                          <div class="font-medium text-slate-500">{{ cell.note || cell.status }}</div>
+                          <div class="font-medium text-slate-500 dark:text-slate-300">{{ cell.note || cell.status }}</div>
                         }
                       </td>
                     }

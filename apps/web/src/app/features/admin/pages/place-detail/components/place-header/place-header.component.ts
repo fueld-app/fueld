@@ -12,7 +12,7 @@ import { PlaceDetailStore } from '../../place-detail.store';
     <div class="mb-6">
       <div class="flex items-center gap-3 mb-1">
         <span class="text-3xl">{{ store.countryFlag() }}</span>
-        <h1 class="text-2xl font-bold text-gray-900">{{ store.place()!.name }}</h1>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-ink">{{ store.place()!.name }}</h1>
         @if (store.place()!.placeType) {
           <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium"
                 [class]="store.placeTypeBadgeClass(store.place()!.placeType!)">
@@ -20,7 +20,7 @@ import { PlaceDetailStore } from '../../place-detail.store';
           </span>
         }
         @if (store.syncing()) {
-          <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-600">
+          <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-500/15 px-2.5 py-1 text-xs font-medium text-blue-600 dark:text-blue-400">
             <svg class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
@@ -34,7 +34,7 @@ import { PlaceDetailStore } from '../../place-detail.store';
               [href]="'https://www.seasearcher.com/place/' + store.place()!.lliPlaceId"
               target="_blank"
               rel="noopener noreferrer"
-              class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-line px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors"
             >
               <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
@@ -46,7 +46,7 @@ import { PlaceDetailStore } from '../../place-detail.store';
           @if (store.canDeleteEntity()) {
             <button
               (click)="store.confirmDeletePlace()"
-              class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+              class="rounded-lg border border-red-200 dark:border-red-500/30 px-3 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/15 transition-colors"
             >
               Delete
             </button>
@@ -55,32 +55,32 @@ import { PlaceDetailStore } from '../../place-detail.store';
       </div>
 
       <div class="flex items-center gap-3">
-        <p class="hidden md:block text-sm text-gray-500">
+        <p class="hidden md:block text-sm text-gray-500 dark:text-muted">
           {{ store.place()!.country }}
           @if (store.place()!.countryIso && store.place()!.countryIso !== store.place()!.country) { ({{ store.place()!.countryIso }}) }
           @if (store.place()!.area) { · {{ store.place()!.area }} }
           @if (store.place()!.subRegion) { · {{ store.place()!.subRegion }} }
         </p>
         @if (store.localTime()) {
-          <span class="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-mono font-medium text-gray-700" title="Local time at port">
+          <span class="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-surface-3 px-2.5 py-1 text-xs font-mono font-medium text-gray-700 dark:text-ink-dim" title="Local time at port">
             🕐 {{ store.localTime() }}
           </span>
         }
         @if (store.place()!.lliLastUpdated) {
-          <span class="inline-flex items-center gap-1 text-xs text-gray-400" title="Last synced with Seasearcher">
+          <span class="inline-flex items-center gap-1 text-xs text-gray-400 dark:text-muted" title="Last synced with Seasearcher">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" />
             </svg>
             Synced {{ store.place()!.lliLastUpdated | date:'short' }}
           </span>
         }
-        <span class="text-gray-300">|</span>
-        <span class="text-xs text-gray-500">Responsible:</span>
+        <span class="text-gray-300 dark:text-muted">|</span>
+        <span class="text-xs text-gray-500 dark:text-muted">Responsible:</span>
         <select
           [ngModel]="store.responsibleUserId() ?? ''"
           (ngModelChange)="store.onResponsibleUserChange($event)"
           [disabled]="store.savingResponsible()"
-          class="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
+          class="rounded-md border border-gray-200 dark:border-line bg-white dark:bg-surface px-2 py-1 text-xs text-gray-700 dark:text-ink-dim focus:border-brand-600 focus:ring-1 focus:ring-brand-600 disabled:opacity-50"
         >
           <option value="">— None —</option>
           @for (u of store.teamUsers(); track u.id) {
@@ -88,7 +88,7 @@ import { PlaceDetailStore } from '../../place-detail.store';
           }
         </select>
         @if (store.savingResponsible()) {
-          <svg class="h-3.5 w-3.5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+          <svg class="h-3.5 w-3.5 animate-spin text-gray-400 dark:text-muted" viewBox="0 0 24 24" fill="none">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
           </svg>
@@ -96,17 +96,17 @@ import { PlaceDetailStore } from '../../place-detail.store';
       </div>
 
       @if (store.parentPlaceName()) {
-        <p class="mt-1 text-sm text-gray-500">
+        <p class="mt-1 text-sm text-gray-500 dark:text-muted">
           Parent:
           @if (store.parentLocalId()) {
             <a [routerLink]="['/places', store.parentLocalId()]"
-               class="text-brand-600 hover:text-brand-800 font-medium hover:underline">
+               class="text-brand-600 dark:text-brand-400 hover:text-brand-800 font-medium hover:underline">
               {{ store.parentPlaceName() }}
             </a>
           } @else {
             <button (click)="store.navigateToParent()"
                     [disabled]="store.navigatingParentId()"
-                    class="text-brand-600 hover:text-brand-800 font-medium hover:underline disabled:opacity-50 inline-flex items-center gap-1">
+                    class="text-brand-600 dark:text-brand-400 hover:text-brand-800 font-medium hover:underline disabled:opacity-50 inline-flex items-center gap-1">
               @if (store.navigatingParentId()) {
                 <svg class="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>

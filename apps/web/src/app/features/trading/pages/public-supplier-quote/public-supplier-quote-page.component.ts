@@ -11,42 +11,42 @@ import { API } from '@app/core/config/api';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule],
   template: `
-    <div class="min-h-screen bg-slate-100 px-4 py-10">
-      <div class="mx-auto max-w-3xl rounded-3xl border border-slate-200 bg-white shadow-xl">
-        <div class="border-b border-slate-200 px-8 py-6">
-          <h1 class="text-2xl font-semibold text-slate-900">Supplier Quote</h1>
-          <p class="mt-1 text-sm text-slate-500">Submit one price per line item without logging in.</p>
+    <div class="min-h-screen bg-slate-100 dark:bg-slate-500/15 px-4 py-10">
+      <div class="mx-auto max-w-3xl rounded-3xl border border-slate-200 dark:border-slate-500/30 bg-white dark:bg-surface shadow-xl">
+        <div class="border-b border-slate-200 dark:border-slate-500/30 px-8 py-6">
+          <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-300">Supplier Quote</h1>
+          <p class="mt-1 text-sm text-slate-500 dark:text-slate-300">Submit one price per line item without logging in.</p>
         </div>
 
         @if (loading()) {
           <div class="px-8 py-14 text-center text-sm text-slate-400">Loading quote request...</div>
         } @else if (loadError()) {
           <div class="px-8 py-14 text-center">
-            <p class="text-sm font-medium text-red-600">{{ loadError() }}</p>
+            <p class="text-sm font-medium text-red-600 dark:text-red-400">{{ loadError() }}</p>
           </div>
         } @else if (inquiry()) {
           <div class="space-y-6 px-8 py-6">
-            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-              <div class="grid gap-3 text-sm text-slate-600 md:grid-cols-2">
+            <div class="rounded-2xl border border-slate-200 dark:border-slate-500/30 bg-slate-50 dark:bg-slate-500/15 p-5">
+              <div class="grid gap-3 text-sm text-slate-600 dark:text-slate-400 md:grid-cols-2">
                 <div>
                   <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Supplier</div>
-                  <div class="mt-1 font-medium text-slate-900">{{ inquiry()!.supplierName }}</div>
+                  <div class="mt-1 font-medium text-slate-900 dark:text-slate-300">{{ inquiry()!.supplierName }}</div>
                   @if (inquiry()!.contactName) {
-                    <div class="mt-1 text-xs text-slate-500">Attention {{ inquiry()!.contactName }}</div>
+                    <div class="mt-1 text-xs text-slate-500 dark:text-slate-300">Attention {{ inquiry()!.contactName }}</div>
                   }
                 </div>
                 <div>
                   <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Voyage</div>
-                  <div class="mt-1 font-medium text-slate-900">{{ inquiry()!.vesselName }} · {{ inquiry()!.portName }}</div>
+                  <div class="mt-1 font-medium text-slate-900 dark:text-slate-300">{{ inquiry()!.vesselName }} · {{ inquiry()!.portName }}</div>
                   @if (inquiry()!.eta) {
-                    <div class="mt-1 text-xs text-slate-500">ETA {{ formatDate(inquiry()!.eta!) }}</div>
+                    <div class="mt-1 text-xs text-slate-500 dark:text-slate-300">ETA {{ formatDate(inquiry()!.eta!) }}</div>
                   }
                 </div>
               </div>
             </div>
 
             @if (inquiry()!.responseDeadlineAt) {
-              <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <div class="rounded-2xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/15 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
                 Please reply by <strong>{{ formatDateTime(inquiry()!.responseDeadlineAt!) }}</strong>.
               </div>
             }
@@ -78,17 +78,17 @@ import { API } from '@app/core/config/api';
             @if (canDeliver()) {
               <div class="space-y-3">
                 @for (item of inquiry()!.items; track item.orderItemId) {
-                  <div class="rounded-2xl border border-slate-200 p-4">
+                  <div class="rounded-2xl border border-slate-200 dark:border-slate-500/30 p-4">
                     <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div>
-                        <div class="text-sm font-semibold text-slate-900">{{ item.productType }}</div>
-                        <div class="mt-1 text-sm text-slate-600">{{ item.quantity }} {{ item.unit }}@if (item.description) { · {{ item.description }} }</div>
+                        <div class="text-sm font-semibold text-slate-900 dark:text-slate-300">{{ item.productType }}</div>
+                        <div class="mt-1 text-sm text-slate-600 dark:text-slate-400">{{ item.quantity }} {{ item.unit }}@if (item.description) { · {{ item.description }} }</div>
                       </div>
                       <div class="w-full md:w-56">
-                        <label class="mb-2 flex items-center gap-2 text-xs font-medium text-slate-600">
+                        <label class="mb-2 flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-400">
                           <input
                             type="checkbox"
-                            class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                            class="h-4 w-4 rounded border-slate-300 text-brand-600 dark:text-brand-400 focus:ring-brand-600"
                             [ngModel]="quotedItemMap()[item.orderItemId]"
                             (ngModelChange)="setQuotedItem(item.orderItemId, $event)"
                           />
@@ -102,16 +102,14 @@ import { API } from '@app/core/config/api';
                           [ngModel]="priceByItem()[item.orderItemId] || ''"
                           (ngModelChange)="setItemPrice(item.orderItemId, $event)"
                           [disabled]="!quotedItemMap()[item.orderItemId]"
-                          class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-right text-sm text-slate-900
-                                 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none
-                                 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                          class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-right text-sm text-slate-900 dark:text-slate-300 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
                         />
                         <label class="mt-3 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Line note</label>
                         <textarea
                           rows="2"
                           [ngModel]="noteByItem()[item.orderItemId] || ''"
                           (ngModelChange)="setItemNote(item.orderItemId, $event)"
-                          class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                          class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 dark:text-slate-300 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
                           [placeholder]="quotedItemMap()[item.orderItemId] ? 'Optional note for this line' : 'Why is this line not quoted?'"
                         ></textarea>
                       </div>
@@ -127,7 +125,7 @@ import { API } from '@app/core/config/api';
                     type="datetime-local"
                     [ngModel]="quoteValidUntil()"
                     (ngModelChange)="quoteValidUntil.set($event)"
-                    class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                    class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 dark:text-slate-300 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
                   />
                 </div>
                 <div>
@@ -136,7 +134,7 @@ import { API } from '@app/core/config/api';
                     type="text"
                     [ngModel]="deliveryWindow()"
                     (ngModelChange)="deliveryWindow.set($event)"
-                    class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                    class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 dark:text-slate-300 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
                     placeholder="Ex. 12 Mar AM barge"
                   />
                 </div>
@@ -146,7 +144,7 @@ import { API } from '@app/core/config/api';
                     type="text"
                     [ngModel]="supplierPaymentTerms()"
                     (ngModelChange)="supplierPaymentTerms.set($event)"
-                    class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                    class="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 dark:text-slate-300 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
                     placeholder="Ex. Net 30 days"
                   />
                 </div>
@@ -156,7 +154,7 @@ import { API } from '@app/core/config/api';
                     rows="3"
                     [ngModel]="supplierComment()"
                     (ngModelChange)="supplierComment.set($event)"
-                    class="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                    class="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 dark:text-slate-300 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
                     placeholder="Add any remarks, assumptions, or exclusions"
                   ></textarea>
                 </div>
@@ -168,17 +166,17 @@ import { API } from '@app/core/config/api';
                   rows="4"
                   [ngModel]="declineReason()"
                   (ngModelChange)="declineReason.set($event)"
-                  class="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  class="mt-2 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 dark:text-slate-300 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
                   placeholder="Please explain why this stem cannot be supplied"
                 ></textarea>
               </div>
             }
 
             @if (submitError()) {
-              <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{{ submitError() }}</div>
+              <div class="rounded-2xl border border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/15 px-4 py-3 text-sm text-rose-700 dark:text-rose-400">{{ submitError() }}</div>
             }
             @if (submitSuccess()) {
-              <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">Quote submitted successfully.</div>
+              <div class="rounded-2xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/15 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400">Quote submitted successfully.</div>
             }
 
             <div class="flex justify-end">
@@ -186,7 +184,7 @@ import { API } from '@app/core/config/api';
                 type="button"
                 (click)="submit()"
                 [disabled]="submitting() || !canSubmit()"
-                class="rounded-full bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                class="rounded-full bg-brand-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {{ submitting() ? 'Submitting...' : canDeliver() ? 'Submit Quote' : 'Submit Response' }}
               </button>

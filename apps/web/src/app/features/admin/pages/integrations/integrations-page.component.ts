@@ -31,15 +31,15 @@ import { WhatsAppIntegrationCardComponent } from './whatsapp-integration-card.co
   template: `
     <div>
       <div class="mb-6">
-        <h1 class="text-2xl font-bold text-gray-900">Integrations</h1>
-        <p class="mt-1 text-sm text-gray-500">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-ink">Integrations</h1>
+        <p class="mt-1 text-sm text-gray-500 dark:text-muted">
           Manage API credentials for third-party data providers. Credentials are encrypted at rest.
         </p>
       </div>
 
       @if (loading()) {
         <div class="flex items-center justify-center py-12">
-          <svg class="h-8 w-8 animate-spin text-brand-600" viewBox="0 0 24 24" fill="none">
+          <svg class="h-8 w-8 animate-spin text-brand-600 dark:text-brand-400" viewBox="0 0 24 24" fill="none">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
           </svg>

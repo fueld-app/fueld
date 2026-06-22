@@ -47,12 +47,12 @@ interface LliSearchResult {
   template: `
     @if (open()) {
       <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-        <div class="w-full max-w-lg rounded-2xl bg-white shadow-2xl" role="dialog" aria-modal="true">
-          <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-            <h2 class="text-lg font-semibold text-gray-900">New Inquiry</h2>
+        <div class="w-full max-w-lg rounded-2xl bg-white dark:bg-surface shadow-2xl" role="dialog" aria-modal="true">
+          <div class="flex items-center justify-between border-b border-gray-200 dark:border-line px-6 py-4">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-ink">New Inquiry</h2>
             <button
               (click)="close.emit()"
-              class="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              class="rounded-md p-1 text-gray-400 dark:text-muted hover:bg-gray-100 dark:hover:bg-surface-tint-strong hover:text-gray-600"
               aria-label="Close"
             >
               <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -64,7 +64,7 @@ interface LliSearchResult {
           <div class="space-y-4 px-6 py-5">
             <!-- Client -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1.5">Client</label>
+              <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1.5">Client</label>
               <app-searchable-dropdown
                 [options]="clientOptions()"
                 [selected]="newClientId()"
@@ -75,7 +75,7 @@ interface LliSearchResult {
                 (selectionChange)="onNewClientChange($event)"
               />
               @if (newInquiryCreditSummary()) {
-                <p class="mt-1.5 text-xs text-green-700">
+                <p class="mt-1.5 text-xs text-green-700 dark:text-green-400">
                   Credit available: {{ newInquiryCreditSummary()!.available | number : '1.2-2' }}
                   {{ newInquiryCreditSummary()!.currency }} · Max {{ newInquiryCreditSummary()!.maxDays }} days
                 </p>
@@ -84,7 +84,7 @@ interface LliSearchResult {
 
             <!-- Vessel -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1.5">Vessel</label>
+              <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1.5">Vessel</label>
               <app-searchable-dropdown
                 [options]="vesselOptions()"
                 [selected]="newVesselId()"
@@ -98,7 +98,7 @@ interface LliSearchResult {
 
             <!-- Port -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1.5">Port</label>
+              <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1.5">Port</label>
               <app-searchable-dropdown
                 [options]="placeOptions()"
                 [selected]="newPlaceId()"
@@ -111,7 +111,7 @@ interface LliSearchResult {
             </div>
 
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1.5">Responsible Trader <span class="text-gray-400 font-normal">(optional)</span></label>
+              <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1.5">Responsible Trader <span class="text-gray-400 dark:text-muted font-normal">(optional)</span></label>
               <app-searchable-dropdown
                 [options]="responsibleOptions()"
                 [selected]="newResponsibleUserId()"
@@ -119,50 +119,47 @@ interface LliSearchResult {
                 [clearable]="true"
                 (selectionChange)="newResponsibleUserId.set($event || '')"
               />
-              <p class="mt-1 text-xs text-gray-500">Defaults to you if left empty. You can change Responsible later on the order detail page.</p>
+              <p class="mt-1 text-xs text-gray-500 dark:text-muted">Defaults to you if left empty. You can change Responsible later on the order detail page.</p>
             </div>
 
             <!-- ETA/ETD date range -->
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label for="new-eta" class="block text-sm font-medium text-gray-700 mb-1.5">ETA</label>
+                <label for="new-eta" class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1.5">ETA</label>
                 <input
                   id="new-eta"
                   type="date"
                   [ngModel]="newEta()"
                   (ngModelChange)="onEtaChange($event)"
-                  class="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm shadow-sm
-                         focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3.5 py-2.5 text-sm shadow-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
                 />
               </div>
               <div>
-                <label for="new-etd" class="block text-sm font-medium text-gray-700 mb-1.5">ETD <span class="text-gray-400 font-normal">(optional)</span></label>
+                <label for="new-etd" class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1.5">ETD <span class="text-gray-400 dark:text-muted font-normal">(optional)</span></label>
                 <input
                   id="new-etd"
                   type="date"
                   [min]="etdMinDate()"
                   [ngModel]="newEtd()"
                   (ngModelChange)="newEtd.set($event)"
-                  class="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm shadow-sm
-                         focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3.5 py-2.5 text-sm shadow-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
                 />
               </div>
             </div>
           </div>
 
-          <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-4">
+          <div class="flex items-center justify-end gap-3 border-t border-gray-200 dark:border-line px-6 py-4">
             <button
               (click)="close.emit()"
-              class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700
-                     shadow-sm hover:bg-gray-50"
+              class="rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim shadow-sm hover:bg-gray-50 dark:hover:bg-surface-tint"
             >
               Cancel
             </button>
             <button
               (click)="createInquiry()"
               [disabled]="creating() || !canCreateInquiry()"
-              class="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold
-                     text-white shadow-sm transition-colors hover:bg-brand-700
+              class="inline-flex items-center gap-2 rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold
+                     text-white shadow-sm transition-colors hover:bg-brand-800
                      disabled:opacity-50 disabled:cursor-not-allowed"
             >
               @if (creating()) {

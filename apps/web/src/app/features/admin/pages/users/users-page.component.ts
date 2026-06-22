@@ -27,8 +27,8 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
       <!-- Header -->
       <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
-          <h1 class="text-2xl font-bold text-gray-900">Users</h1>
-          <p class="mt-1 text-sm text-gray-500">
+          <h1 class="text-2xl font-bold text-gray-900 dark:text-ink">Users</h1>
+          <p class="mt-1 text-sm text-gray-500 dark:text-muted">
             Manage team members, invite new users, and control access.
           </p>
         </div>
@@ -46,7 +46,7 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
       <!-- Users Table -->
       @if (loading()) {
         <div class="flex items-center justify-center py-12">
-          <svg class="h-8 w-8 animate-spin text-brand-600" viewBox="0 0 24 24" fill="none">
+          <svg class="h-8 w-8 animate-spin text-brand-600 dark:text-brand-400" viewBox="0 0 24 24" fill="none">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
           </svg>
@@ -55,7 +55,7 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
         <!-- Search & Team Filter -->
         <div class="flex flex-wrap items-center gap-3 mb-4">
           <div class="relative flex-1 min-w-[200px] max-w-xs">
-            <svg xmlns="http://www.w3.org/2000/svg" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" viewBox="0 0 20 20" fill="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-muted pointer-events-none" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
             </svg>
             <input
@@ -68,7 +68,7 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
             @if (searchQuery()) {
               <button
                 (click)="searchQuery.set('')"
-                class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-muted hover:text-gray-600"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
@@ -90,28 +90,28 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
           <select
             [ngModel]="filterStatus()"
             (ngModelChange)="filterStatus.set($event)"
-            class="app-input text-gray-600">
+            class="app-input text-gray-600 dark:text-ink-dim">
             <option value="active">Active</option>
             <option value="deactivated">Deactivated</option>
             <option value="">All</option>
           </select>
           @if (searchQuery() || filterTeam() || filterStatus()) {
-            <span class="text-xs text-gray-400">{{ filteredUsers().length }} of {{ users().length }} users</span>
+            <span class="text-xs text-gray-400 dark:text-muted">{{ filteredUsers().length }} of {{ users().length }} users</span>
           }
         </div>
 
         @if (passwordResetError()) {
-          <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+          <div class="mb-4 rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 px-4 py-3 text-sm text-red-700 dark:text-red-400" role="alert">
             {{ passwordResetError() }}
           </div>
         }
 
         @if (passwordResetLinkResult()) {
-          <div class="mb-4 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3">
+          <div class="mb-4 rounded-xl border border-indigo-200 dark:border-indigo-500/30 bg-indigo-50 dark:bg-indigo-500/15 px-4 py-3">
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
-                <p class="text-sm font-semibold text-indigo-900">Password reset link</p>
-                <p class="mt-0.5 text-xs text-indigo-700">
+                <p class="text-sm font-semibold text-indigo-900 dark:text-indigo-300">Password reset link</p>
+                <p class="mt-0.5 text-xs text-indigo-700 dark:text-indigo-400">
                   For <span class="font-medium">{{ passwordResetTargetEmail() }}</span>
                   @if (passwordResetExpiresAt()) {
                     · Expires {{ formatDate(passwordResetExpiresAt()) }}
@@ -123,7 +123,7 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
               </div>
               <button
                 (click)="clearPasswordResetLink()"
-                class="rounded-md px-2 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100 transition-colors"
+                class="rounded-md px-2 py-1 text-xs font-medium text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-colors"
                 title="Dismiss"
               >
                 Close
@@ -132,7 +132,7 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
 
             <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
               <input
-                class="w-full flex-1 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-xs font-mono text-gray-700"
+                class="w-full flex-1 rounded-lg border border-indigo-200 dark:border-indigo-500/30 bg-white dark:bg-surface px-3 py-2 text-xs font-mono text-gray-700 dark:text-ink-dim"
                 [value]="passwordResetLinkResult()"
                 readonly
               />
@@ -147,17 +147,17 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
         }
 
         @if (reinviteError()) {
-          <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+          <div class="mb-4 rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 px-4 py-3 text-sm text-red-700 dark:text-red-400" role="alert">
             {{ reinviteError() }}
           </div>
         }
 
         @if (reinviteLinkResult()) {
-          <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+          <div class="mb-4 rounded-xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/15 px-4 py-3">
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
-                <p class="text-sm font-semibold text-emerald-900">Invite link ready</p>
-                <p class="mt-0.5 text-xs text-emerald-700">
+                <p class="text-sm font-semibold text-emerald-900 dark:text-emerald-300">Invite link ready</p>
+                <p class="mt-0.5 text-xs text-emerald-700 dark:text-emerald-400">
                   For <span class="font-medium">{{ reinviteTargetEmail() }}</span>
                   @if (reinviteExpiresAt()) {
                     · Expires {{ formatDate(reinviteExpiresAt()) }}
@@ -169,7 +169,7 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
               </div>
               <button
                 (click)="clearReinviteLink()"
-                class="rounded-md px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100 transition-colors"
+                class="rounded-md px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors"
                 title="Dismiss"
               >
                 Close
@@ -178,7 +178,7 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
 
             <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
               <input
-                class="w-full flex-1 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-mono text-gray-700"
+                class="w-full flex-1 rounded-lg border border-emerald-200 dark:border-emerald-500/30 bg-white dark:bg-surface px-3 py-2 text-xs font-mono text-gray-700 dark:text-ink-dim"
                 [value]="reinviteLinkResult()"
                 readonly
               />
@@ -200,33 +200,33 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
               </svg>
             </div>
             <div>
-              <h2 class="text-base font-semibold text-gray-900">User Directory</h2>
-              <p class="mt-1 text-sm text-gray-600">Monitor authentication status, team assignment, IP locks, and live sessions.</p>
+              <h2 class="text-base font-semibold text-gray-900 dark:text-ink">User Directory</h2>
+              <p class="mt-1 text-sm text-gray-600 dark:text-ink-dim">Monitor authentication status, team assignment, IP locks, and live sessions.</p>
             </div>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
               <thead>
-                <tr class="border-b border-gray-200 bg-gray-50/80">
-                <th class="px-4 py-3 text-left font-medium text-gray-600">Name</th>
-                <th class="px-4 py-3 text-left font-medium text-gray-600">Email</th>
-                <th class="px-4 py-3 text-left font-medium text-gray-600">Phone</th>
-                <th class="px-4 py-3 text-left font-medium text-gray-600">Role</th>
-                <th class="px-4 py-3 text-left font-medium text-gray-600">Team</th>
-                <th class="px-4 py-3 text-center font-medium text-gray-600">Auth</th>
-                <th class="px-4 py-3 text-center font-medium text-gray-600">Status</th>
-                <th class="px-4 py-3 text-center font-medium text-gray-600">IP Lock</th>
-                <th class="px-4 py-3 text-center font-medium text-gray-600">Sessions</th>
-                <th class="px-4 py-3 text-left font-medium text-gray-600">Joined</th>
-                <th class="px-4 py-3 w-28 text-right font-medium text-gray-600">Actions</th>
+                <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80">
+                <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Name</th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Email</th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Phone</th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Role</th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Team</th>
+                <th class="px-4 py-3 text-center font-medium text-gray-600 dark:text-ink-dim">Auth</th>
+                <th class="px-4 py-3 text-center font-medium text-gray-600 dark:text-ink-dim">Status</th>
+                <th class="px-4 py-3 text-center font-medium text-gray-600 dark:text-ink-dim">IP Lock</th>
+                <th class="px-4 py-3 text-center font-medium text-gray-600 dark:text-ink-dim">Sessions</th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Joined</th>
+                <th class="px-4 py-3 w-28 text-right font-medium text-gray-600 dark:text-ink-dim">Actions</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-gray-100">
+              <tbody class="divide-y divide-gray-100 dark:divide-line">
               @for (user of filteredUsers(); track user.id) {
                 <tr class="transition-colors hover:bg-gray-50/50" [class.opacity-50]="!user.isActive">
                   <td class="px-4 py-3">
                     <div class="flex items-center gap-2.5">
-                      <div class="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">
+                      <div class="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 dark:bg-brand-700/15 text-xs font-bold text-brand-700 dark:text-brand-400">
                         {{ initials(user.name) }}
                       </div>
                       @if (editingNameId() === user.id) {
@@ -236,7 +236,7 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
                             [(ngModel)]="editingNameValue"
                             name="name"
                             placeholder="Full name"
-                            class="w-40 rounded-md border border-gray-300 px-2 py-1 text-sm font-medium focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                            class="w-40 rounded-md border border-gray-300 dark:border-line-strong px-2 py-1 text-sm font-medium focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
                             (blur)="saveNameEdit(user.id)"
                             (keydown.escape)="editingNameId.set(null)"
                           />
@@ -244,19 +244,19 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
                       } @else {
                         <button
                           (click)="startEditName(user)"
-                          class="font-medium text-gray-900 hover:text-brand-600 transition-colors cursor-pointer"
+                          class="font-medium text-gray-900 dark:text-ink hover:text-brand-600 transition-colors cursor-pointer"
                           title="Click to edit name"
                         >
                           {{ user.name }}
                         </button>
                       }
                       @if (user.id === currentUserId()) {
-                        <span class="inline-flex items-center rounded-full bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium text-brand-700">You</span>
+                        <span class="inline-flex items-center rounded-full bg-brand-50 dark:bg-brand-700/15 px-1.5 py-0.5 text-[10px] font-medium text-brand-700 dark:text-brand-400">You</span>
                       }
                     </div>
                   </td>
-                  <td class="px-4 py-3 text-gray-600">{{ user.email }}</td>
-                  <td class="px-4 py-3 text-gray-600">
+                  <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">{{ user.email }}</td>
+                  <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">
                     @if (editingPhoneId() === user.id) {
                       <form (ngSubmit)="savePhoneEdit(user.id)" class="flex items-center gap-1">
                         <input
@@ -264,7 +264,7 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
                           [(ngModel)]="editingPhoneValue"
                           name="phone"
                           placeholder="+45 2613 1217"
-                          class="w-32 rounded-md border border-gray-300 px-2 py-1 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                          class="w-32 rounded-md border border-gray-300 dark:border-line-strong px-2 py-1 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
                           (blur)="savePhoneEdit(user.id)"
                           (keydown.escape)="editingPhoneId.set(null)"
                         />
@@ -272,7 +272,7 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
                     } @else {
                       <button
                         (click)="startEditPhone(user)"
-                        class="text-xs text-gray-500 hover:text-brand-600 transition-colors cursor-pointer"
+                        class="text-xs text-gray-500 dark:text-muted hover:text-brand-600 transition-colors cursor-pointer"
                         title="Click to edit phone"
                       >
                         {{ user.phone || '—' }}
@@ -285,7 +285,7 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
                         [ngModel]="editingRole()"
                         (ngModelChange)="editingRole.set($event)"
                         (blur)="saveRole(user.id)"
-                        class="rounded-md border border-gray-300 px-2 py-1 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                        class="rounded-md border border-gray-300 dark:border-line-strong px-2 py-1 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
                       >
                         @for (r of roles; track r.value) {
                           <option [value]="r.value">{{ r.label }}</option>
@@ -311,14 +311,14 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
                   <td class="px-4 py-3">
                     <div class="flex flex-wrap gap-1">
                       @for (team of teamsList(); track team.id) {
-                        <label class="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-1 text-xs cursor-pointer hover:bg-gray-50 transition-colors">
+                        <label class="inline-flex items-center gap-1 rounded-md border border-gray-200 dark:border-line bg-white dark:bg-surface px-2 py-1 text-xs cursor-pointer hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors">
                           <input
                             type="checkbox"
                             [checked]="user.teamIds.includes(team.id)"
                             (change)="toggleUserTeam(user.id, team.id, $any($event.target).checked)"
-                            class="h-3.5 w-3.5 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                            class="h-3.5 w-3.5 rounded border-gray-300 dark:border-line-strong text-brand-600 dark:text-brand-400 focus:ring-brand-600"
                           />
-                          <span class="text-gray-700">{{ team.name }}</span>
+                          <span class="text-gray-700 dark:text-ink-dim">{{ team.name }}</span>
                         </label>
                       }
                     </div>
@@ -326,27 +326,27 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
                   <td class="px-4 py-3 text-center">
                     <div class="flex flex-wrap justify-center gap-1">
                       @if (user.is2faEnabled) {
-                        <span class="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">2FA</span>
+                        <span class="inline-flex items-center rounded-full bg-green-50 dark:bg-green-500/15 px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-400">2FA</span>
                       }
                       @if (user.hasPasskeys) {
-                        <span class="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">Passkey</span>
+                        <span class="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-500/15 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-400">Passkey</span>
                       }
                       @if (user.hasMicrosoftSso) {
-                        <span class="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">Microsoft</span>
+                        <span class="inline-flex items-center rounded-full bg-indigo-50 dark:bg-indigo-500/15 px-2 py-0.5 text-xs font-medium text-indigo-700 dark:text-indigo-400">Microsoft</span>
                       }
                       @if (!user.is2faEnabled && !user.hasPasskeys && !user.hasMicrosoftSso) {
-                        <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">None</span>
+                        <span class="inline-flex items-center rounded-full bg-gray-100 dark:bg-surface-3 px-2 py-0.5 text-xs font-medium text-gray-500 dark:text-muted">None</span>
                       }
                     </div>
                   </td>
                   <td class="px-4 py-3 text-center">
                     @if (user.isActive) {
-                      <span class="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
+                      <span class="inline-flex items-center gap-1 rounded-full bg-green-50 dark:bg-green-500/15 px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-400">
                         <span class="h-1.5 w-1.5 rounded-full bg-green-500"></span>
                         Active
                       </span>
                     } @else {
-                      <span class="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600">
+                      <span class="inline-flex items-center gap-1 rounded-full bg-red-50 dark:bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-600 dark:text-red-400">
                         <span class="h-1.5 w-1.5 rounded-full bg-red-400"></span>
                         Deactivated
                       </span>
@@ -356,7 +356,7 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
                     @if (user.allowedIps && user.allowedIps.length > 0) {
                       <button
                         (click)="openIpModal(user)"
-                        class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 hover:bg-amber-100 transition-colors cursor-pointer"
+                        class="inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors cursor-pointer"
                         [class.cursor-not-allowed]="user.id === currentUserId()"
                         [disabled]="user.id === currentUserId()"
                       >
@@ -368,7 +368,7 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
                     } @else {
                       <button
                         (click)="openIpModal(user)"
-                        class="text-xs text-gray-300 hover:text-brand-500 transition-colors cursor-pointer"
+                        class="text-xs text-gray-300 dark:text-muted hover:text-brand-500 transition-colors cursor-pointer"
                         [class.cursor-not-allowed]="user.id === currentUserId()"
                         [disabled]="user.id === currentUserId()"
                         title="Configure IP restrictions"
@@ -383,26 +383,26 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
                     @if (userSessionCount(user.id) > 0) {
                       <button
                         (click)="toggleSessionDetails(user.id)"
-                        class="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 hover:bg-green-100 transition-colors cursor-pointer"
+                        class="inline-flex items-center gap-1 rounded-full bg-green-50 dark:bg-green-500/15 px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-500/20 transition-colors cursor-pointer"
                       >
                         <span class="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse"></span>
                         {{ userSessionCount(user.id) }}
                       </button>
                     } @else {
-                      <span class="text-xs text-gray-300">—</span>
+                      <span class="text-xs text-gray-300 dark:text-muted">—</span>
                     }
                   </td>
-                  <td class="px-4 py-3 text-xs text-gray-500">{{ formatDate(user.createdAt) }}</td>
+                  <td class="px-4 py-3 text-xs text-gray-500 dark:text-muted">{{ formatDate(user.createdAt) }}</td>
                   <td class="px-4 py-3 text-right">
                     @if (user.id !== currentUserId()) {
                       <div class="relative inline-flex" (click)="$event.stopPropagation()">
                         <button
                           (click)="toggleActionsMenu(user.id, $event)"
-                          class="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                          class="inline-flex items-center gap-1 rounded-md border border-gray-200 dark:border-line bg-white dark:bg-surface px-2.5 py-1.5 text-xs font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors"
                           [attr.aria-expanded]="actionsMenuUserId() === user.id"
                         >
                           Actions
-                          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-gray-400 dark:text-muted" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                             <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 10.94l3.71-3.71a.75.75 0 1 1 1.06 1.06l-4.24 4.24a.75.75 0 0 1-1.06 0L5.21 8.29a.75.75 0 0 1 .02-1.08z" clip-rule="evenodd" />
                           </svg>
                         </button>
@@ -414,31 +414,31 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
                   <tr>
                   <td colspan="11" class="bg-gray-50/80 px-4 py-3">
                       <div class="ml-10">
-                        <p class="text-xs font-medium text-gray-500 mb-2">Active Sessions</p>
+                        <p class="text-xs font-medium text-gray-500 dark:text-muted mb-2">Active Sessions</p>
                         <div class="space-y-2">
                           @for (session of getUserSessions(user.id); track session.socketId) {
-                            <div class="flex items-center gap-4 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs">
+                            <div class="flex items-center gap-4 rounded-lg border border-gray-200 dark:border-line bg-white dark:bg-surface px-3 py-2 text-xs">
                               <div class="flex items-center gap-1.5">
                                 <span class="h-1.5 w-1.5 rounded-full bg-green-500"></span>
-                                <span class="font-medium text-gray-700">{{ session.platform ?? 'Unknown' }}</span>
+                                <span class="font-medium text-gray-700 dark:text-ink-dim">{{ session.platform ?? 'Unknown' }}</span>
                               </div>
                               @if (session.currentUrl) {
-                                <span class="text-gray-500 truncate max-w-48" [title]="session.currentUrl">{{ session.currentUrl }}</span>
+                                <span class="text-gray-500 dark:text-muted truncate max-w-48" [title]="session.currentUrl">{{ session.currentUrl }}</span>
                               }
                               @if (session.clientIp) {
-                                <span class="font-mono text-gray-400">{{ session.clientIp }}</span>
+                                <span class="font-mono text-gray-400 dark:text-muted">{{ session.clientIp }}</span>
                               }
                               @if (session.city || session.country) {
-                                <span class="text-gray-400">
+                                <span class="text-gray-400 dark:text-muted">
                                   <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 inline -mt-0.5 mr-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                                   {{ session.city ? session.city + ', ' + session.country : session.country }}
                                 </span>
                               }
                               @if (session.timezone) {
-                                <span class="text-gray-400">🕐 {{ session.timezone }}</span>
+                                <span class="text-gray-400 dark:text-muted">🕐 {{ session.timezone }}</span>
                               }
                               @if (session.language) {
-                                <span class="text-gray-400">{{ session.language }}</span>
+                                <span class="text-gray-400 dark:text-muted">{{ session.language }}</span>
                               }
                             </div>
                           }
@@ -449,7 +449,7 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
                 }
               } @empty {
                 <tr>
-                  <td colspan="11" class="px-4 py-8 text-center text-gray-400">No users found</td>
+                  <td colspan="11" class="px-4 py-8 text-center text-gray-400 dark:text-muted">No users found</td>
                 </tr>
               }
               </tbody>
@@ -461,7 +461,7 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
         @if (actionsMenuPos(); as pos) {
           @if (actionsMenuUser(); as menuUser) {
             <div
-              class="fixed z-[9999] w-40 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
+              class="fixed z-[9999] w-40 overflow-hidden rounded-lg border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm"
               [style.top.px]="pos.top"
               [style.left.px]="pos.left"
               (click)="$event.stopPropagation()"
@@ -470,14 +470,14 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
                 @if (menuUser.is2faEnabled) {
                   <button
                     (click)="reset2fa(menuUser); closeActionsMenu()"
-                    class="block w-full px-3 py-2 text-left text-xs font-medium text-amber-700 hover:bg-amber-50"
+                    class="block w-full px-3 py-2 text-left text-xs font-medium text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/15"
                   >
                     Reset 2FA
                   </button>
                 }
                 <button
                   (click)="sendPasswordReset(menuUser); closeActionsMenu()"
-                  class="block w-full px-3 py-2 text-left text-xs font-medium text-indigo-700 hover:bg-indigo-50"
+                  class="block w-full px-3 py-2 text-left text-xs font-medium text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/15"
                   [disabled]="passwordResetSendingId() === menuUser.id"
                   [class.opacity-50]="passwordResetSendingId() === menuUser.id"
                 >
@@ -485,8 +485,8 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
                 </button>
                 <button
                   (click)="toggleActive(menuUser); closeActionsMenu()"
-                  class="block w-full px-3 py-2 text-left text-xs font-medium hover:bg-gray-50"
-                  [class]="menuUser.isActive ? 'text-red-700' : 'text-green-700'"
+                  class="block w-full px-3 py-2 text-left text-xs font-medium hover:bg-gray-50 dark:hover:bg-surface-tint"
+                  [class]="menuUser.isActive ? 'text-red-700 dark:text-red-400' : 'text-green-700 dark:text-green-400'"
                 >
                   {{ menuUser.isActive ? 'Deactivate' : 'Activate' }}
                 </button>
@@ -506,43 +506,43 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
                   </svg>
                 </div>
                 <div>
-                  <h2 class="text-base font-semibold text-gray-900">Pending Invitations</h2>
-                  <p class="mt-1 text-sm text-gray-600">Track open invites and expiration windows before access is activated.</p>
+                  <h2 class="text-base font-semibold text-gray-900 dark:text-ink">Pending Invitations</h2>
+                  <p class="mt-1 text-sm text-gray-600 dark:text-ink-dim">Track open invites and expiration windows before access is activated.</p>
                 </div>
               </div>
               <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                   <thead>
-                    <tr class="border-b border-gray-200 bg-gray-50/80">
-                    <th class="px-4 py-3 text-left font-medium text-gray-600">Name</th>
-                    <th class="px-4 py-3 text-left font-medium text-gray-600">Email</th>
-                    <th class="px-4 py-3 text-left font-medium text-gray-600">Role</th>
-                    <th class="px-4 py-3 text-left font-medium text-gray-600">Invited By</th>
-                    <th class="px-4 py-3 text-left font-medium text-gray-600">Expires</th>
-                    <th class="px-4 py-3 text-left font-medium text-gray-600">Status</th>
-                    <th class="px-4 py-3 text-right font-medium text-gray-600">Actions</th>
+                    <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80">
+                    <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Name</th>
+                    <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Email</th>
+                    <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Role</th>
+                    <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Invited By</th>
+                    <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Expires</th>
+                    <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Status</th>
+                    <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim">Actions</th>
                     </tr>
                   </thead>
-                  <tbody class="divide-y divide-gray-100">
+                  <tbody class="divide-y divide-gray-100 dark:divide-line">
                   @for (inv of pendingInvitations(); track inv.id) {
                     <tr class="transition-colors hover:bg-gray-50/50">
-                      <td class="px-4 py-3 font-medium text-gray-900">{{ inv.name }}</td>
-                      <td class="px-4 py-3 text-gray-600">{{ inv.email }}</td>
+                      <td class="px-4 py-3 font-medium text-gray-900 dark:text-ink">{{ inv.name }}</td>
+                      <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">{{ inv.email }}</td>
                       <td class="px-4 py-3">
                         <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
                               [class]="roleBadgeClass(inv.role)">
                           {{ roleLabel(inv.role) }}
                         </span>
                       </td>
-                      <td class="px-4 py-3 text-gray-600">{{ inv.invitedByName }}</td>
-                      <td class="px-4 py-3 text-xs text-gray-500">{{ formatDate(inv.expiresAt) }}</td>
+                      <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">{{ inv.invitedByName }}</td>
+                      <td class="px-4 py-3 text-xs text-gray-500 dark:text-muted">{{ formatDate(inv.expiresAt) }}</td>
                       <td class="px-4 py-3">
                         @if (inv.acceptedAt) {
-                          <span class="text-xs font-medium text-green-600">Accepted</span>
+                          <span class="text-xs font-medium text-green-600 dark:text-green-400">Accepted</span>
                         } @else if (isExpired(inv.expiresAt)) {
-                          <span class="text-xs font-medium text-red-500">Expired</span>
+                          <span class="text-xs font-medium text-red-500 dark:text-red-300">Expired</span>
                         } @else {
-                          <span class="text-xs font-medium text-amber-600">Pending</span>
+                          <span class="text-xs font-medium text-amber-600 dark:text-amber-400">Pending</span>
                         }
                       </td>
                       <td class="px-4 py-3 text-right">
@@ -550,7 +550,7 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
                           <button
                             (click)="reinvite(inv)"
                             [disabled]="reinvitingId() === inv.id"
-                            class="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50 transition-colors disabled:opacity-50"
+                            class="inline-flex items-center gap-1 rounded-md border border-gray-200 dark:border-line bg-white dark:bg-surface px-2.5 py-1.5 text-xs font-medium text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/15 transition-colors disabled:opacity-50"
                           >
                             @if (reinvitingId() === inv.id) {
                               <svg class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -591,9 +591,9 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
       <!-- IP Restriction Modal -->
       @if (ipModalUser()) {
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl" (click)="$event.stopPropagation()">
-            <h2 class="text-lg font-bold text-gray-900 mb-1">IP Restrictions</h2>
-            <p class="text-sm text-gray-500 mb-4">
+          <div class="w-full max-w-md rounded-2xl bg-white dark:bg-surface p-6 shadow-2xl" (click)="$event.stopPropagation()">
+            <h2 class="text-lg font-bold text-gray-900 dark:text-ink mb-1">IP Restrictions</h2>
+            <p class="text-sm text-gray-500 dark:text-muted mb-4">
               Configure allowed IP addresses for <strong>{{ ipModalUser()!.name }}</strong>.
               Leave empty for unrestricted access. Supports individual IPs and CIDR notation (e.g. 192.168.1.0/24).
             </p>
@@ -611,7 +611,7 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
                   />
                   <button
                     (click)="removeIp($index)"
-                    class="rounded-md p-1.5 text-gray-400 hover:text-red-500 transition-colors"
+                    class="rounded-md p-1.5 text-gray-400 dark:text-muted hover:text-red-500 transition-colors"
                     title="Remove"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -624,7 +624,7 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
               <!-- Add IP button -->
               <button
                 (click)="addIpRow()"
-                class="app-button-add border-dashed px-3 py-1.5 text-xs text-gray-500 hover:text-brand-600"
+                class="app-button-add border-dashed px-3 py-1.5 text-xs text-gray-500 dark:text-muted hover:text-brand-600"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
@@ -634,17 +634,17 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
             </div>
 
             @if (ipError()) {
-              <div class="mt-3 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+              <div class="mt-3 rounded-lg bg-red-50 dark:bg-red-500/15 border border-red-200 dark:border-red-500/30 p-3 text-sm text-red-700 dark:text-red-400">
                 {{ ipError() }}
               </div>
             }
 
-            <div class="flex items-center justify-between gap-2 pt-4 mt-4 border-t border-gray-100">
+            <div class="flex items-center justify-between gap-2 pt-4 mt-4 border-t border-gray-100 dark:border-line">
               <div>
                 @if (ipList().length > 0) {
                   <button
                     (click)="clearAllIps()"
-                    class="text-xs text-red-500 hover:text-red-700 transition-colors"
+                    class="text-xs text-red-500 dark:text-red-300 hover:text-red-700 transition-colors"
                   >
                     Remove all restrictions
                   </button>
@@ -653,7 +653,7 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
               <div class="flex gap-2">
                 <button
                   (click)="closeIpModal()"
-                  class="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 transition-colors"
+                  class="rounded-lg bg-gray-100 dark:bg-surface-3 px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-200 transition-colors"
                 >
                   Cancel
                 </button>
@@ -892,21 +892,21 @@ export class UsersPageComponent implements OnInit, OnDestroy {
   roleBadgeClass(role: string): string {
     switch (role) {
       case 'ADMIN':
-        return 'bg-purple-50 text-purple-700 ring-1 ring-purple-200';
+        return 'bg-purple-50 text-purple-700 ring-1 ring-purple-200 dark:bg-purple-500/15 dark:text-purple-300 dark:ring-purple-500/30';
       case 'TRADER':
-        return 'bg-blue-50 text-blue-700 ring-1 ring-blue-200';
+        return 'bg-blue-50 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-500/30';
       case 'FINANCE':
-        return 'bg-amber-50 text-amber-700 ring-1 ring-amber-200';
+        return 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/30';
       case 'TEAMLEAD':
-        return 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200';
+        return 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:ring-emerald-500/30';
       case 'CREDITMANAGER':
-        return 'bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200';
+        return 'bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200 dark:bg-cyan-500/15 dark:text-cyan-300 dark:ring-cyan-500/30';
       case 'OPERATIONSMANAGER':
-        return 'bg-orange-50 text-orange-700 ring-1 ring-orange-200';
+        return 'bg-orange-50 text-orange-700 ring-1 ring-orange-200 dark:bg-orange-500/15 dark:text-orange-300 dark:ring-orange-500/30';
       case 'LIGHT':
-        return 'bg-pink-50 text-pink-700 ring-1 ring-pink-200';
+        return 'bg-pink-50 text-pink-700 ring-1 ring-pink-200 dark:bg-pink-500/15 dark:text-pink-300 dark:ring-pink-500/30';
       default:
-        return 'bg-gray-100 text-gray-600 ring-1 ring-gray-200';
+        return 'bg-gray-100 text-gray-600 ring-1 ring-gray-200 dark:bg-surface-3 dark:text-ink-dim dark:ring-line';
     }
   }
 

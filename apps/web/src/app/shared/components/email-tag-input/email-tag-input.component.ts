@@ -40,14 +40,14 @@ interface ContactSuggestion {
   template: `
     <div
       class="flex flex-wrap items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm transition-colors min-h-[38px] cursor-text"
-      [class]="focused() ? 'border-brand-500 ring-2 ring-brand-500/20' : 'border-gray-300'"
+      [class]="focused() ? 'border-brand-500 ring-2 ring-brand-500/20' : 'border-gray-300 dark:border-line-strong'"
       (click)="focusInput()"
     >
       <!-- Tags -->
       @for (tag of tags(); track tag.email) {
         <span
           class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium max-w-[220px]"
-          [class]="tag.locked ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-700'"
+          [class]="tag.locked ? 'bg-blue-100 dark:bg-blue-500/15 text-blue-800 dark:text-blue-300' : 'bg-gray-100 dark:bg-surface-3 text-gray-700 dark:text-ink-dim'"
           [title]="tag.name ? tag.name + ' <' + tag.email + '>' : tag.email"
         >
           <span class="truncate">{{ tag.name || tag.email }}</span>
@@ -55,7 +55,7 @@ interface ContactSuggestion {
             <button
               type="button"
               (click)="removeTag(tag); $event.stopPropagation()"
-              class="ml-0.5 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full hover:bg-gray-300 text-gray-500 hover:text-gray-700"
+              class="ml-0.5 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full hover:bg-gray-300 text-gray-500 dark:text-muted hover:text-gray-700"
             >
               <svg class="h-2.5 w-2.5" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
@@ -76,7 +76,7 @@ interface ContactSuggestion {
           (blur)="onBlur()"
           (keydown)="onKeydown($event)"
           (input)="onInput($event)"
-          class="min-w-[120px] flex-1 border-none bg-transparent p-0 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-0"
+          class="min-w-[120px] flex-1 border-none bg-transparent p-0 text-sm placeholder:text-gray-400 dark:placeholder:text-muted focus:outline-none focus:ring-0"
         />
       }
     </div>
@@ -84,18 +84,18 @@ interface ContactSuggestion {
     <!-- Dropdown suggestions -->
     @if (showDropdown() && suggestions().length > 0) {
       <div class="relative">
-        <div class="absolute z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+        <div class="absolute z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-lg">
           @for (s of suggestions(); track s.email) {
             <button
               type="button"
               (mousedown)="selectSuggestion(s); $event.preventDefault()"
-              class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 transition-colors"
+              class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors"
             >
               <div class="flex-1 min-w-0">
-                <span class="font-medium text-gray-900 truncate">{{ s.name }}</span>
-                <span class="text-gray-500 ml-1 truncate">&lt;{{ s.email }}&gt;</span>
+                <span class="font-medium text-gray-900 dark:text-ink truncate">{{ s.name }}</span>
+                <span class="text-gray-500 dark:text-muted ml-1 truncate">&lt;{{ s.email }}&gt;</span>
               </div>
-              <span class="shrink-0 text-xs text-gray-400">{{ s.source === 'contact' ? 'Contact' : 'Email' }}</span>
+              <span class="shrink-0 text-xs text-gray-400 dark:text-muted">{{ s.source === 'contact' ? 'Contact' : 'Email' }}</span>
             </button>
           }
         </div>

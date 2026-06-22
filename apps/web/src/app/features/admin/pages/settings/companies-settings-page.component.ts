@@ -28,15 +28,15 @@ import { CompaniesSettingsTypeListCardComponent } from './companies-settings-typ
     <div>
       <!-- Header -->
       <div class="mb-6">
-        <h1 class="text-2xl font-bold text-gray-900">Company & Vessel Settings</h1>
-        <p class="mt-1 text-sm text-gray-500">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-ink">Company & Vessel Settings</h1>
+        <p class="mt-1 text-sm text-gray-500 dark:text-muted">
           Configure company types, segmentation, vessel–company roles, and vessel types.
         </p>
       </div>
 
       @if (loading()) {
         <div class="flex items-center justify-center py-12">
-          <svg class="h-8 w-8 animate-spin text-brand-600" viewBox="0 0 24 24" fill="none">
+          <svg class="h-8 w-8 animate-spin text-brand-600 dark:text-brand-400" viewBox="0 0 24 24" fill="none">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
           </svg>
@@ -86,20 +86,20 @@ import { CompaniesSettingsTypeListCardComponent } from './companies-settings-typ
           <div class="app-panel min-[900px]:col-span-2 flex flex-col">
             <div class="app-panel-header app-panel-header--purple">
               <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--purple">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-purple-600" viewBox="0 0 20 20" fill="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-purple-600 dark:text-purple-400" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
                 </svg>
               </div>
               <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-semibold text-gray-900">Vessel–Company Roles</h3>
-                <p class="text-xs text-gray-500">Configure the available role options when linking companies to vessels.</p>
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">Vessel–Company Roles</h3>
+                <p class="text-xs text-gray-500 dark:text-muted">Configure the available role options when linking companies to vessels.</p>
               </div>
             </div>
 
             <div class="app-panel-body space-y-4 flex-1 min-h-0 overflow-y-auto">
               @if (rolesLoading()) {
                 <div class="flex items-center justify-center py-6">
-                  <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+                  <svg class="h-5 w-5 animate-spin text-gray-400 dark:text-muted" viewBox="0 0 24 24" fill="none">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                   </svg>
@@ -107,7 +107,7 @@ import { CompaniesSettingsTypeListCardComponent } from './companies-settings-typ
               } @else {
                 <div class="space-y-2">
                   <!-- Header row -->
-                  <div class="flex items-center gap-3 text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  <div class="flex items-center gap-3 text-xs font-medium text-gray-500 dark:text-muted uppercase tracking-wide">
                     <div class="w-[22px] shrink-0"></div>
                     <div class="flex-1 min-w-0 px-1">Key</div>
                     <div class="flex-1 min-w-0 px-1">Label</div>
@@ -121,7 +121,7 @@ import { CompaniesSettingsTypeListCardComponent } from './companies-settings-typ
                         <button
                           (click)="moveRoleUp(i)"
                           [disabled]="i === 0"
-                          class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors"
+                          class="text-gray-400 dark:text-muted hover:text-gray-600 disabled:opacity-30 transition-colors"
                           title="Move up"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -131,7 +131,7 @@ import { CompaniesSettingsTypeListCardComponent } from './companies-settings-typ
                         <button
                           (click)="moveRoleDown(i)"
                           [disabled]="i === roles().length - 1"
-                          class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors"
+                          class="text-gray-400 dark:text-muted hover:text-gray-600 disabled:opacity-30 transition-colors"
                           title="Move down"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -166,7 +166,7 @@ import { CompaniesSettingsTypeListCardComponent } from './companies-settings-typ
                       <button
                         (click)="removeRole(i)"
                         [disabled]="roles().length <= 1"
-                        class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 transition-colors shrink-0"
+                        class="rounded-md p-1.5 text-gray-400 dark:text-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/15 disabled:opacity-30 transition-colors shrink-0"
                         title="Remove role"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -201,7 +201,7 @@ import { CompaniesSettingsTypeListCardComponent } from './companies-settings-typ
                   </button>
 
                   @if (rolesSaved()) {
-                    <span class="text-sm text-green-600 flex items-center gap-1">
+                    <span class="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
                       </svg>
@@ -219,25 +219,25 @@ import { CompaniesSettingsTypeListCardComponent } from './companies-settings-typ
           <div class="app-panel min-[900px]:col-span-2 min-[2000px]:col-span-2">
             <div class="app-panel-header app-panel-header--violet">
               <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--violet">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-violet-600" viewBox="0 0 20 20" fill="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-violet-600 dark:text-violet-400" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M2 4.5A2.5 2.5 0 014.5 2h11A2.5 2.5 0 0118 4.5v3.757c0 .663-.263 1.299-.732 1.768l-7.2 7.2a2.5 2.5 0 01-3.536 0l-3.768-3.768A2.5 2.5 0 012 11.69V4.5zm5-1a1 1 0 100 2 1 1 0 000-2z" />
                 </svg>
               </div>
               <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-semibold text-gray-900">Company Segmentation</h3>
-                <p class="text-xs text-gray-500">Define segment categories and options that can be assigned to companies.</p>
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">Company Segmentation</h3>
+                <p class="text-xs text-gray-500 dark:text-muted">Define segment categories and options that can be assigned to companies.</p>
               </div>
             </div>
 
             <div class="app-panel-body space-y-5">
               @for (cat of segmentCategories(); track cat.key; let ci = $index) {
-                <div class="rounded-lg border border-gray-200 bg-gray-50/50 p-4 space-y-3">
+                <div class="rounded-lg border border-gray-200 dark:border-line bg-gray-50/50 p-4 space-y-3">
                   <div class="flex items-center gap-3">
                     <div class="flex flex-col gap-0.5 shrink-0">
-                      <button (click)="moveSegmentCategoryUp(ci)" [disabled]="ci === 0" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move up">
+                      <button (click)="moveSegmentCategoryUp(ci)" [disabled]="ci === 0" class="text-gray-400 dark:text-muted hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move up">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
                       </button>
-                      <button (click)="moveSegmentCategoryDown(ci)" [disabled]="ci === segmentCategories().length - 1" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move down">
+                      <button (click)="moveSegmentCategoryDown(ci)" [disabled]="ci === segmentCategories().length - 1" class="text-gray-400 dark:text-muted hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move down">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
                       </button>
                     </div>
@@ -259,7 +259,7 @@ import { CompaniesSettingsTypeListCardComponent } from './companies-settings-typ
                     <button
                       (click)="removeSegmentCategory(ci)"
                       [disabled]="segmentCategories().length <= 1"
-                      class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 transition-colors shrink-0"
+                      class="rounded-md p-1.5 text-gray-400 dark:text-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/15 disabled:opacity-30 transition-colors shrink-0"
                       title="Remove category"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -273,10 +273,10 @@ import { CompaniesSettingsTypeListCardComponent } from './companies-settings-typ
                     @for (opt of cat.options; track opt.key; let oi = $index) {
                       <div class="flex items-center gap-2">
                         <div class="flex flex-col gap-0.5 shrink-0">
-                          <button (click)="moveSegmentOptionUp(ci, oi)" [disabled]="oi === 0" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move up">
+                          <button (click)="moveSegmentOptionUp(ci, oi)" [disabled]="oi === 0" class="text-gray-400 dark:text-muted hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move up">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
                           </button>
-                          <button (click)="moveSegmentOptionDown(ci, oi)" [disabled]="oi === cat.options.length - 1" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move down">
+                          <button (click)="moveSegmentOptionDown(ci, oi)" [disabled]="oi === cat.options.length - 1" class="text-gray-400 dark:text-muted hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move down">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
                           </button>
                         </div>
@@ -290,7 +290,7 @@ import { CompaniesSettingsTypeListCardComponent } from './companies-settings-typ
                         <button
                           (click)="removeSegmentOption(ci, oi)"
                           [disabled]="cat.options.length <= 1"
-                          class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 transition-colors shrink-0"
+                          class="rounded-md p-1.5 text-gray-400 dark:text-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/15 disabled:opacity-30 transition-colors shrink-0"
                           title="Remove option"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -301,7 +301,7 @@ import { CompaniesSettingsTypeListCardComponent } from './companies-settings-typ
                     }
                     <button
                       (click)="addSegmentOption(ci)"
-                      class="text-xs text-violet-600 hover:text-violet-700 font-medium flex items-center gap-1"
+                      class="text-xs text-violet-600 dark:text-violet-400 hover:text-violet-700 font-medium flex items-center gap-1"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
                         <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
@@ -331,7 +331,7 @@ import { CompaniesSettingsTypeListCardComponent } from './companies-settings-typ
                   @if (segmentsSaving()) { Saving… } @else { Save Segments }
                 </button>
                 @if (segmentsSaved()) {
-                  <span class="text-sm text-green-600 flex items-center gap-1">
+                  <span class="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                       <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
                     </svg>

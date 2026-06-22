@@ -48,8 +48,8 @@ interface CompanySearchResult {
       <!-- Header -->
       <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
-          <h1 class="text-2xl font-bold text-gray-900">Companies</h1>
-          <p class="mt-1 text-sm text-gray-500">
+          <h1 class="text-2xl font-bold text-gray-900 dark:text-ink">Companies</h1>
+          <p class="mt-1 text-sm text-gray-500 dark:text-muted">
             Manage clients, suppliers, brokers and agents.
             Import from Seasearcher or create manually.
           </p>
@@ -61,7 +61,7 @@ interface CompanySearchResult {
         <!-- Typeahead search -->
         <div class="relative flex-1">
           <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-            <svg class="h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <svg class="h-4 w-4 text-gray-400 dark:text-muted" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
             </svg>
           </div>
@@ -71,12 +71,11 @@ interface CompanySearchResult {
             (ngModelChange)="onSearchInput($event)"
             (focus)="onSearchFocus()"
             placeholder="Search companies to import or create (min. 2 characters)…"
-            class="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm
-                   focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+            class="w-full rounded-lg border border-gray-300 dark:border-line-strong py-2 pl-9 pr-3 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
           />
           @if (searching()) {
             <div class="absolute inset-y-0 right-0 flex items-center pr-3">
-              <svg class="h-4 w-4 animate-spin text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <svg class="h-4 w-4 animate-spin text-gray-400 dark:text-muted" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
               </svg>
@@ -85,35 +84,35 @@ interface CompanySearchResult {
 
           <!-- Typeahead dropdown -->
           @if (dropdownOpen() && searchDone()) {
-            <div class="absolute z-20 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-80 overflow-y-auto">
+            <div class="absolute z-20 mt-1 w-full rounded-lg border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-lg max-h-80 overflow-y-auto">
               @for (r of searchResults(); track r.seasearcherId ?? r.localId) {
-                <div (click)="onTypeaheadClick(r)" class="flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0 cursor-pointer">
+                <div (click)="onTypeaheadClick(r)" class="flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors border-b border-gray-50 last:border-0 cursor-pointer">
                   <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-2">
-                      <span class="text-sm font-medium text-gray-900 truncate">{{ r.name }}</span>
+                      <span class="text-sm font-medium text-gray-900 dark:text-ink truncate">{{ r.name }}</span>
                       @if (r.isSanctioned) {
-                        <span class="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Sanctioned</span>
+                        <span class="inline-flex rounded-full bg-red-100 dark:bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">Sanctioned</span>
                       }
                     </div>
                     <div class="flex items-center gap-2 mt-0.5">
                       @if (r.country) {
-                        <span class="text-xs text-gray-500">{{ flagEmoji(r.countryCode) }} {{ r.country }}</span>
+                        <span class="text-xs text-gray-500 dark:text-muted">{{ flagEmoji(r.countryCode) }} {{ r.country }}</span>
                       }
                       @if (r.companyImo) {
-                        <span class="text-xs text-gray-400">IMO {{ r.companyImo }}</span>
+                        <span class="text-xs text-gray-400 dark:text-muted">IMO {{ r.companyImo }}</span>
                       }
                       @if (r.fleetSize) {
-                        <span class="text-xs text-gray-400">Fleet: {{ r.fleetSize }}</span>
+                        <span class="text-xs text-gray-400 dark:text-muted">Fleet: {{ r.fleetSize }}</span>
                       }
                     </div>
                   </div>
                   <div class="shrink-0">
                     @if (r.source === 'local') {
-                      <span class="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">Local</span>
+                      <span class="inline-flex rounded-full bg-green-100 dark:bg-green-500/15 px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-400">Local</span>
                     } @else {
                       <button
                         (click)="importCompany(r.seasearcherId!, $event)"
-                        class="inline-flex items-center gap-1 rounded-md bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100 transition-colors"
+                        class="inline-flex items-center gap-1 rounded-md bg-brand-50 dark:bg-brand-700/15 px-2 py-1 text-xs font-medium text-brand-700 dark:text-brand-400 hover:bg-brand-100 dark:hover:bg-brand-500/20 transition-colors"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                           <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
@@ -126,16 +125,16 @@ interface CompanySearchResult {
               }
 
               @if (!searchResults().length) {
-                <div class="px-3 py-3 text-center text-sm text-gray-500">
+                <div class="px-3 py-3 text-center text-sm text-gray-500 dark:text-muted">
                   No companies found matching "{{ searchTerm() }}"
                 </div>
               }
 
               <!-- Always show create manually option -->
-              <div class="border-t border-gray-100 px-3 py-2.5">
+              <div class="border-t border-gray-100 dark:border-line px-3 py-2.5">
                 <button
                   (click)="openCreateModal(); $event.stopPropagation()"
-                  class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 transition-colors"
+                  class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium text-brand-700 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-500/15 transition-colors"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
@@ -152,7 +151,7 @@ interface CompanySearchResult {
         <select
           [ngModel]="filterType()"
           (ngModelChange)="filterType.set($event); currentPage.set(1); loadCompanies(); updateUrlParams()"
-          class="rounded-lg border border-gray-300 py-2 pl-3 pr-8 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+          class="rounded-lg border border-gray-300 dark:border-line-strong py-2 pl-3 pr-8 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
         >
           <option value="">All Types</option>
           @for (type of availableTypes(); track type) {
@@ -164,7 +163,7 @@ interface CompanySearchResult {
         <select
           [ngModel]="filterResponsible()"
           (ngModelChange)="filterResponsible.set($event); currentPage.set(1); loadCompanies(); updateUrlParams()"
-          class="rounded-lg border border-gray-300 py-2 pl-3 pr-8 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+          class="rounded-lg border border-gray-300 dark:border-line-strong py-2 pl-3 pr-8 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
         >
           <option value="">All Responsible</option>
           @for (u of users(); track u.id) {
@@ -177,7 +176,7 @@ interface CompanySearchResult {
           <select
             [ngModel]="filterSegment()"
             (ngModelChange)="filterSegment.set($event); currentPage.set(1); loadCompanies(); updateUrlParams()"
-            class="rounded-lg border border-gray-300 py-2 pl-3 pr-8 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+            class="rounded-lg border border-gray-300 dark:border-line-strong py-2 pl-3 pr-8 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
           >
             <option value="">All Segments</option>
             @for (cat of segmentCategories(); track cat.key) {
@@ -197,40 +196,40 @@ interface CompanySearchResult {
       <!-- Companies table -->
       @if (loading()) {
         <div class="flex items-center justify-center py-12">
-          <svg class="h-8 w-8 animate-spin text-brand-600" viewBox="0 0 24 24" fill="none">
+          <svg class="h-8 w-8 animate-spin text-brand-600 dark:text-brand-400" viewBox="0 0 24 24" fill="none">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
           </svg>
         </div>
       } @else {
-        <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div class="overflow-x-auto rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm">
           <table class="w-full text-sm">
             <thead>
-              <tr class="border-b border-gray-200 bg-gray-50/80">
-                <th app-sort-header field="name" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Name</th>
-                <th app-sort-header field="type" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Type</th>
-                <th app-sort-header field="country" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Country</th>
-                <th class="px-4 py-3 text-left font-medium text-gray-600">Sanctioned</th>
-                <th app-sort-header field="creditLimit" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-right font-medium text-gray-600">Credit Limit</th>
-                <th class="px-4 py-3 text-center font-medium text-gray-600">Contacts</th>
-                <th app-sort-header field="responsible" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Responsible</th>
-                <th class="px-4 py-3 text-left font-medium text-gray-600">Source</th>
+              <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80">
+                <th app-sort-header field="name" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Name</th>
+                <th app-sort-header field="type" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Type</th>
+                <th app-sort-header field="country" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Country</th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Sanctioned</th>
+                <th app-sort-header field="creditLimit" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim">Credit Limit</th>
+                <th class="px-4 py-3 text-center font-medium text-gray-600 dark:text-ink-dim">Contacts</th>
+                <th app-sort-header field="responsible" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Responsible</th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Source</th>
                 <th class="px-4 py-3 w-10"></th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-100">
+            <tbody class="divide-y divide-gray-100 dark:divide-line">
               @for (company of companies(); track company.id) {
                 <tr class="transition-colors hover:bg-gray-50/50 cursor-pointer" (click)="goToCompany(company.id)">
                   <td class="px-4 py-3">
-                    <span class="font-medium text-gray-900">{{ company.name }}</span>
+                    <span class="font-medium text-gray-900 dark:text-ink">{{ company.name }}</span>
                     @if (company.parentName) {
-                      <span class="ml-1.5 inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-600">
+                      <span class="ml-1.5 inline-flex items-center rounded-full bg-indigo-50 dark:bg-indigo-500/15 px-2 py-0.5 text-[10px] font-medium text-indigo-600 dark:text-indigo-400">
                         Child of {{ company.parentName }}
                       </span>
                     }
                     @if (isCompanyFrozen(company.id)) {
                       <div class="mt-1">
-                        <span class="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700">
+                        <span class="inline-flex items-center gap-1 rounded-full border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold text-red-700 dark:text-red-400">
                           <span class="inline-flex h-1.5 w-1.5 rounded-full bg-red-500"></span>
                           Credit Frozen
                         </span>
@@ -239,7 +238,7 @@ interface CompanySearchResult {
                     @if (getSegmentBadges(company).length > 0) {
                       <div class="flex flex-wrap gap-1 mt-0.5">
                         @for (badge of getSegmentBadges(company); track badge) {
-                          <span class="inline-flex items-center rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-700">{{ badge }}</span>
+                          <span class="inline-flex items-center rounded-full bg-violet-50 dark:bg-violet-500/15 px-2 py-0.5 text-[10px] font-medium text-violet-700 dark:text-violet-400">{{ badge }}</span>
                         }
                       </div>
                     }
@@ -254,48 +253,48 @@ interface CompanySearchResult {
                       }
                     </div>
                   </td>
-                  <td class="px-4 py-3 text-gray-600">
+                  <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">
                     {{ flagEmoji(company.countryIso) }} {{ company.country ?? '—' }}
                     @if (company.countryIso && company.countryIso !== company.country) {
-                      <span class="text-gray-400 text-xs ml-1">({{ company.countryIso }})</span>
+                      <span class="text-gray-400 dark:text-muted text-xs ml-1">({{ company.countryIso }})</span>
                     }
                   </td>
                   <td class="px-4 py-3">
                     @if (company.isSanctioned) {
-                      <span class="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                      <span class="inline-flex items-center gap-1 rounded-full bg-red-100 dark:bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                           <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
                         </svg>
                         Yes
                       </span>
                     } @else {
-                      <span class="text-xs text-gray-400">No</span>
+                      <span class="text-xs text-gray-400 dark:text-muted">No</span>
                     }
                   </td>
-                  <td class="px-4 py-3 text-right text-gray-700 font-medium tabular-nums">
+                  <td class="px-4 py-3 text-right text-gray-700 dark:text-ink-dim font-medium tabular-nums">
                     @if (company.creditLimit && +company.creditLimit > 0) {
                       {{ formatCreditLimit(+company.creditLimit) }}
                     } @else {
-                      <span class="text-gray-400">—</span>
+                      <span class="text-gray-400 dark:text-muted">—</span>
                     }
                   </td>
-                  <td class="px-4 py-3 text-center text-gray-600">
+                  <td class="px-4 py-3 text-center text-gray-600 dark:text-ink-dim">
                     {{ company.contactsCount ?? 0 }}
                   </td>
-                  <td class="px-4 py-3 text-sm text-gray-600">
+                  <td class="px-4 py-3 text-sm text-gray-600 dark:text-ink-dim">
                     {{ company.responsibleUserName ?? '—' }}
                   </td>
                   <td class="px-4 py-3">
                     @if (company.seasearcherId) {
-                      <span class="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">Imported</span>
+                      <span class="inline-flex rounded-full bg-blue-50 dark:bg-blue-500/15 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-400">Imported</span>
                     } @else {
-                      <span class="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">Manual</span>
+                      <span class="inline-flex rounded-full bg-gray-100 dark:bg-surface-3 px-2 py-0.5 text-xs font-medium text-gray-600 dark:text-ink-dim">Manual</span>
                     }
                   </td>
                   <td class="px-4 py-3">
                     <button
                       (click)="confirmDelete(company, $event)"
-                      class="rounded-md p-1 text-gray-400 hover:text-red-500 transition-colors"
+                      class="rounded-md p-1 text-gray-400 dark:text-muted hover:text-red-500 transition-colors"
                       title="Delete"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -306,7 +305,7 @@ interface CompanySearchResult {
                 </tr>
               } @empty {
                 <tr>
-                  <td colspan="9" class="px-4 py-8 text-center text-gray-400">No companies found</td>
+                  <td colspan="9" class="px-4 py-8 text-center text-gray-400 dark:text-muted">No companies found</td>
                 </tr>
               }
             </tbody>

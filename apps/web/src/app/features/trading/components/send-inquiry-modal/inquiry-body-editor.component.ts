@@ -13,9 +13,9 @@ import { FormsModule } from '@angular/forms';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule],
   template: `
-    <div class="border border-gray-300 rounded-lg overflow-hidden">
+    <div class="border border-gray-300 dark:border-line-strong rounded-lg overflow-hidden">
       <!-- Toolbar -->
-      <div class="flex items-center gap-1 border-b border-gray-200 bg-gray-50 px-2 py-1.5">
+      <div class="flex items-center gap-1 border-b border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 px-2 py-1.5">
         <button type="button" (click)="execCommand('bold')" class="toolbar-btn" title="Bold">
           <strong>B</strong>
         </button>
@@ -36,7 +36,7 @@ import { FormsModule } from '@angular/forms';
       <div
         #bodyEditor
         contenteditable="true"
-        class="inquiry-email-canvas min-h-[200px] max-h-[300px] overflow-y-auto px-4 py-3 text-sm text-gray-900 focus:outline-none"
+        class="inquiry-email-canvas min-h-[200px] max-h-[300px] overflow-y-auto px-4 py-3 text-sm text-gray-900 dark:text-ink focus:outline-none"
         (input)="onBodyInput()"
       ></div>
     </div>

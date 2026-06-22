@@ -19,97 +19,97 @@ import { API } from '@app/core/config/api';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, RouterLink],
   template: `
-    <div class="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-      <div class="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg">
+    <div class="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-bg-2 px-4">
+      <div class="w-full max-w-md rounded-2xl bg-white dark:bg-surface p-8 shadow-lg">
         @if (loading()) {
           <div class="flex flex-col items-center py-8">
-            <svg class="h-8 w-8 animate-spin text-brand-600" viewBox="0 0 24 24" fill="none">
+            <svg class="h-8 w-8 animate-spin text-brand-600 dark:text-brand-400" viewBox="0 0 24 24" fill="none">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
             </svg>
-            <p class="mt-3 text-sm text-gray-500">Validating invitation…</p>
+            <p class="mt-3 text-sm text-gray-500 dark:text-muted">Validating invitation…</p>
           </div>
         } @else if (invalidMessage()) {
           <div class="text-center py-8">
-            <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
-              <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-500/15">
+              <svg class="h-6 w-6 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
               </svg>
             </div>
-            <h2 class="mt-4 text-lg font-bold text-gray-900">Invalid Invitation</h2>
-            <p class="mt-2 text-sm text-gray-600">{{ invalidMessage() }}</p>
-            <a routerLink="/login" class="mt-4 inline-block text-sm font-medium text-brand-600 hover:text-brand-700">
+            <h2 class="mt-4 text-lg font-bold text-gray-900 dark:text-ink">Invalid Invitation</h2>
+            <p class="mt-2 text-sm text-gray-600 dark:text-ink-dim">{{ invalidMessage() }}</p>
+            <a routerLink="/login" class="mt-4 inline-block text-sm font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700">
               Go to Login →
             </a>
           </div>
         } @else if (success()) {
           <div class="text-center py-8">
-            <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-              <svg class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-500/15">
+              <svg class="h-6 w-6 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
               </svg>
             </div>
-            <h2 class="mt-4 text-lg font-bold text-gray-900">Account Created!</h2>
-            <p class="mt-2 text-sm text-gray-600">Your account has been set up. You can now log in.</p>
-            <a routerLink="/login" class="mt-4 inline-flex items-center rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 transition-colors">
+            <h2 class="mt-4 text-lg font-bold text-gray-900 dark:text-ink">Account Created!</h2>
+            <p class="mt-2 text-sm text-gray-600 dark:text-ink-dim">Your account has been set up. You can now log in.</p>
+            <a routerLink="/login" class="mt-4 inline-flex items-center rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-800 transition-colors">
               Go to Login
             </a>
           </div>
         } @else {
           <!-- Signup Form -->
           <div>
-            <h2 class="text-xl font-bold text-gray-900">Join Fueld</h2>
-            <p class="mt-1 text-sm text-gray-500">Complete your account setup.</p>
+            <h2 class="text-xl font-bold text-gray-900 dark:text-ink">Join Fueld</h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-muted">Complete your account setup.</p>
 
             <div class="mt-6 space-y-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1">Name</label>
                 <input
                   type="text"
                   [value]="inviteName()"
                   disabled
-                  class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600"
+                  class="w-full rounded-lg border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 px-3 py-2 text-sm text-gray-600 dark:text-ink-dim"
                 />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1">Email</label>
                 <input
                   type="email"
                   [value]="inviteEmail()"
                   disabled
-                  class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600"
+                  class="w-full rounded-lg border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 px-3 py-2 text-sm text-gray-600 dark:text-ink-dim"
                 />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1">Role</label>
                 <input
                   type="text"
                   [value]="inviteRole()"
                   disabled
-                  class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600"
+                  class="w-full rounded-lg border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 px-3 py-2 text-sm text-gray-600 dark:text-ink-dim"
                 />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1">Password</label>
                 <input
                   type="password"
                   [(ngModel)]="password"
                   placeholder="Minimum 8 characters"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                  class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
                 />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1">Confirm Password</label>
                 <input
                   type="password"
                   [(ngModel)]="confirmPassword"
                   placeholder="Repeat password"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                  class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
                 />
               </div>
 
               @if (error()) {
-                <div class="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+                <div class="rounded-lg bg-red-50 dark:bg-red-500/15 border border-red-200 dark:border-red-500/30 p-3 text-sm text-red-700 dark:text-red-400">
                   {{ error() }}
                 </div>
               }
@@ -117,7 +117,7 @@ import { API } from '@app/core/config/api';
               <button
                 (click)="submit()"
                 [disabled]="submitting()"
-                class="w-full rounded-lg bg-brand-600 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 transition-colors disabled:opacity-50"
+                class="w-full rounded-lg bg-brand-700 py-2.5 text-sm font-semibold text-white hover:bg-brand-800 transition-colors disabled:opacity-50"
               >
                 @if (submitting()) {
                   Creating account…

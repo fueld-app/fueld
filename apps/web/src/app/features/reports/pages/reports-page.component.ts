@@ -33,32 +33,32 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
     <div class="space-y-6 pb-8">
       <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <nav class="mb-3 flex items-center gap-1.5 text-sm text-gray-500">
+          <nav class="mb-3 flex items-center gap-1.5 text-sm text-gray-500 dark:text-muted">
             <a routerLink="/" class="transition-colors hover:text-brand-600">Dashboard</a>
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
             </svg>
-            <span class="font-medium text-gray-900">Reports</span>
+            <span class="font-medium text-gray-900 dark:text-ink">Reports</span>
           </nav>
           <div class="flex flex-wrap items-center gap-3">
-            <h1 class="text-2xl font-bold text-gray-900">Reports</h1>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-ink">Reports</h1>
             @if (data(); as reportData) {
-              <span class="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
+              <span class="inline-flex items-center rounded-full border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/15 px-2.5 py-1 text-xs font-medium text-blue-700 dark:text-blue-400">
                 Scope: {{ describeScope(reportData.access.scope) }}
               </span>
               @if (reportData.access.canViewFinance) {
-                <span class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                <span class="inline-flex items-center rounded-full border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/15 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
                   Finance-enabled
                 </span>
               }
               @if (reportData.access.canManageSharedViews) {
-                <span class="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
+                <span class="inline-flex items-center rounded-full border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-400">
                   Shared views
                 </span>
               }
             }
           </div>
-          <p class="mt-1 max-w-3xl text-sm text-gray-500">Historical, filterable reporting for trader performance, collections, commercial conversion, and margin analysis, with comparison windows, drill-downs, and exception monitoring.</p>
+          <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-muted">Historical, filterable reporting for trader performance, collections, commercial conversion, and margin analysis, with comparison windows, drill-downs, and exception monitoring.</p>
         </div>
 
         <div class="flex items-center gap-3">
@@ -78,86 +78,86 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
           <button
             type="button"
             (click)="clearFilters()"
-            class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50"
+            class="inline-flex items-center justify-center rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim transition-colors hover:border-gray-400 hover:bg-gray-50 dark:hover:bg-surface-tint"
           >
             Reset filters
           </button>
         </div>
       </div>
 
-      <section class="min-w-0 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm" data-testid="reports-filter-bar">
+      <section class="min-w-0 rounded-2xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm" data-testid="reports-filter-bar">
         <div class="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400">Report Filters</h2>
-            <p class="text-sm text-gray-500">Choose a reporting slice, then compare it against a prior period or open the underlying records.</p>
+            <h2 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-muted">Report Filters</h2>
+            <p class="text-sm text-gray-500 dark:text-muted">Choose a reporting slice, then compare it against a prior period or open the underlying records.</p>
           </div>
-          <div class="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-600">
+          <div class="rounded-full border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 px-3 py-1 text-xs font-medium text-gray-600 dark:text-ink-dim">
             Comparison: {{ comparisonModeLabel(comparisonMode()) }}
           </div>
         </div>
         <div class="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-6">
           <div class="relative min-w-0" #dateDropdown>
-            <label class="flex min-w-0 flex-col gap-1 text-sm text-gray-600">
+            <label class="flex min-w-0 flex-col gap-1 text-sm text-gray-600 dark:text-ink-dim">
               <span>Date Range</span>
               <button
                 type="button"
                 (click)="dateDropdownOpen.set(!dateDropdownOpen())"
-                class="flex w-full min-w-0 items-center justify-between gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm transition-colors hover:bg-gray-50 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
+                class="flex w-full min-w-0 items-center justify-between gap-2 rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-2 text-sm text-gray-900 dark:text-ink shadow-sm transition-colors hover:bg-gray-50 dark:hover:bg-surface-tint focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
                 data-testid="reports-date-filter-trigger"
               >
                 <span class="flex items-center gap-2 truncate">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-gray-400 dark:text-muted" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                     <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd" />
                   </svg>
                   <span class="truncate">{{ dateRangeLabel() }}</span>
                 </span>
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-gray-400 dark:text-muted" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                   <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 011.06 0L10 11.94l3.72-3.72a.75.75 0 111.06 1.06l-4.25 4.25a.75.75 0 01-1.06 0L5.22 9.28a.75.75 0 010-1.06z" clip-rule="evenodd" />
                 </svg>
               </button>
             </label>
 
             @if (dateDropdownOpen()) {
-              <div class="absolute left-0 z-30 mt-2 w-full min-w-0 max-w-[calc(100vw-2rem)] origin-top-left rounded-xl border border-gray-200 bg-white shadow-lg ring-1 ring-black/5 max-h-[calc(100vh-140px)] overflow-y-auto sm:w-[22rem]">
+              <div class="absolute left-0 z-30 mt-2 w-full min-w-0 max-w-[calc(100vw-2rem)] origin-top-left rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-lg ring-1 ring-black/5 max-h-[calc(100vh-140px)] overflow-y-auto sm:w-[22rem]">
                 <div class="py-1">
                   @for (preset of datePresets; track preset.key) {
                     <button
                       type="button"
                       (click)="selectDatePreset(preset.key)"
                       class="flex w-full items-center justify-between px-4 py-2 text-sm transition-colors"
-                      [class]="selectedDatePreset() === preset.key ? 'bg-brand-50 text-brand-700 font-medium' : 'text-gray-700 hover:bg-gray-50'"
+                      [class]="selectedDatePreset() === preset.key ? 'bg-brand-50 dark:bg-brand-700/15 text-brand-700 dark:text-brand-400 font-medium' : 'text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint'"
                       [attr.data-testid]="'reports-date-preset-' + preset.key"
                     >
                       <span>{{ preset.label }}</span>
                       @if (selectedDatePreset() === preset.key) {
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-brand-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-brand-600 dark:text-brand-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                           <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
                         </svg>
                       }
                     </button>
                   }
                 </div>
-                <div class="border-t border-gray-100 px-4 py-3">
-                  <p class="mb-2 text-xs font-medium uppercase tracking-[0.18em] text-gray-500">Custom Range</p>
+                <div class="border-t border-gray-100 dark:border-line px-4 py-3">
+                  <p class="mb-2 text-xs font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-muted">Custom Range</p>
                   <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <input
                       type="date"
                       [value]="customDateFrom()"
                       (change)="customDateFrom.set(($any($event.target).value || ''))"
-                      class="w-full min-w-0 flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      class="w-full min-w-0 flex-1 rounded-md border border-gray-300 dark:border-line-strong px-2 py-1.5 text-xs text-gray-900 dark:text-ink focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
                     />
-                    <span class="shrink-0 px-1 text-xs text-gray-400">to</span>
+                    <span class="shrink-0 px-1 text-xs text-gray-400 dark:text-muted">to</span>
                     <input
                       type="date"
                       [value]="customDateTo()"
                       (change)="customDateTo.set(($any($event.target).value || ''))"
-                      class="w-full min-w-0 flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                      class="w-full min-w-0 flex-1 rounded-md border border-gray-300 dark:border-line-strong px-2 py-1.5 text-xs text-gray-900 dark:text-ink focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
                     />
                   </div>
                   <button
                     type="button"
                     (click)="applyCustomRange()"
-                    class="mt-2 w-full rounded-md bg-brand-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-brand-700"
+                    class="mt-2 w-full rounded-md bg-brand-700 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-brand-800"
                     data-testid="reports-date-custom-apply"
                   >
                     Apply
@@ -166,45 +166,45 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
               </div>
             }
           </div>
-          <label class="flex min-w-0 flex-col gap-1 text-sm text-gray-600">
+          <label class="flex min-w-0 flex-col gap-1 text-sm text-gray-600 dark:text-ink-dim">
             <span>Trader</span>
-            <select [value]="traderId() ?? ''" (change)="onTraderChange($event)" class="w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
+            <select [value]="traderId() ?? ''" (change)="onTraderChange($event)" class="w-full min-w-0 rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-2 text-sm text-gray-900 dark:text-ink shadow-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100">
               <option value="">All</option>
               @for (option of data()?.filterOptions?.traders ?? []; track option.id) {
                 <option [value]="option.id">{{ option.label }}</option>
               }
             </select>
           </label>
-          <label class="flex min-w-0 flex-col gap-1 text-sm text-gray-600">
+          <label class="flex min-w-0 flex-col gap-1 text-sm text-gray-600 dark:text-ink-dim">
             <span>Team</span>
-            <select [value]="teamId() ?? ''" (change)="onTeamChange($event)" class="w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
+            <select [value]="teamId() ?? ''" (change)="onTeamChange($event)" class="w-full min-w-0 rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-2 text-sm text-gray-900 dark:text-ink shadow-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100">
               <option value="">All</option>
               @for (option of data()?.filterOptions?.teams ?? []; track option.id) {
                 <option [value]="option.id">{{ option.label }}</option>
               }
             </select>
           </label>
-          <label class="flex min-w-0 flex-col gap-1 text-sm text-gray-600">
+          <label class="flex min-w-0 flex-col gap-1 text-sm text-gray-600 dark:text-ink-dim">
             <span>Customer</span>
-            <select [value]="customerId() ?? ''" (change)="onCustomerChange($event)" class="w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
+            <select [value]="customerId() ?? ''" (change)="onCustomerChange($event)" class="w-full min-w-0 rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-2 text-sm text-gray-900 dark:text-ink shadow-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100">
               <option value="">All</option>
               @for (option of data()?.filterOptions?.customers ?? []; track option.id) {
                 <option [value]="option.id">{{ option.label }}</option>
               }
             </select>
           </label>
-          <label class="flex min-w-0 flex-col gap-1 text-sm text-gray-600">
+          <label class="flex min-w-0 flex-col gap-1 text-sm text-gray-600 dark:text-ink-dim">
             <span>Product</span>
-            <select [value]="productType() ?? ''" (change)="onProductTypeChange($event)" class="w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
+            <select [value]="productType() ?? ''" (change)="onProductTypeChange($event)" class="w-full min-w-0 rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-2 text-sm text-gray-900 dark:text-ink shadow-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100">
               <option value="">All</option>
               @for (option of data()?.filterOptions?.products ?? []; track option.id) {
                 <option [value]="option.id">{{ option.label }}</option>
               }
             </select>
           </label>
-          <label class="flex min-w-0 flex-col gap-1 text-sm text-gray-600">
+          <label class="flex min-w-0 flex-col gap-1 text-sm text-gray-600 dark:text-ink-dim">
             <span>Comparison</span>
-            <select data-testid="reports-comparison-mode" [value]="comparisonMode()" (change)="onComparisonModeChange($event)" class="w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
+            <select data-testid="reports-comparison-mode" [value]="comparisonMode()" (change)="onComparisonModeChange($event)" class="w-full min-w-0 rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-2 text-sm text-gray-900 dark:text-ink shadow-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100">
               <option value="NONE">None</option>
               <option value="PREVIOUS_PERIOD">Previous period</option>
               <option value="PREVIOUS_MONTH">Previous month</option>
@@ -216,101 +216,101 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
       </section>
 
       @if (error()) {
-        <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div class="rounded-xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 px-4 py-3 text-sm text-red-700 dark:text-red-400">
           {{ error() }}
         </div>
       }
 
       @if (loading() && !data()) {
-        <div class="rounded-2xl border border-gray-200 bg-white px-5 py-10 text-center text-sm text-gray-500 shadow-sm">
+        <div class="rounded-2xl border border-gray-200 dark:border-line bg-white dark:bg-surface px-5 py-10 text-center text-sm text-gray-500 dark:text-muted shadow-sm">
           Loading report data…
         </div>
       } @else if (data(); as reportData) {
         <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           @for (card of summaryCards(); track card.label) {
-            <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-              <p class="text-xs font-medium uppercase tracking-[0.18em] text-gray-400">{{ card.label }}</p>
-              <p class="mt-3 text-2xl font-semibold text-gray-900">{{ card.value }}</p>
-              <p class="mt-2 text-sm text-gray-500">{{ card.description }}</p>
+            <div class="rounded-2xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm">
+              <p class="text-xs font-medium uppercase tracking-[0.18em] text-gray-400 dark:text-muted">{{ card.label }}</p>
+              <p class="mt-3 text-2xl font-semibold text-gray-900 dark:text-ink">{{ card.value }}</p>
+              <p class="mt-2 text-sm text-gray-500 dark:text-muted">{{ card.description }}</p>
             </div>
           }
         </div>
 
         @if (reportData.variance.summary; as varianceSummary) {
-          <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm" data-testid="reports-variance-section">
+          <section class="rounded-2xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm" data-testid="reports-variance-section">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 class="text-lg font-semibold text-gray-900">Variance</h2>
-                <p class="text-sm text-gray-500">{{ reportData.variance.comparison?.label || 'Comparison disabled' }}</p>
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-ink">Variance</h2>
+                <p class="text-sm text-gray-500 dark:text-muted">{{ reportData.variance.comparison?.label || 'Comparison disabled' }}</p>
               </div>
-              <div class="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-600">
+              <div class="rounded-full border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 px-3 py-1 text-xs font-medium text-gray-600 dark:text-ink-dim">
                 Current window vs prior baseline
               </div>
             </div>
             <div class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-              <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                <div class="text-xs uppercase tracking-[0.18em] text-gray-400">Revenue</div>
-                <div class="mt-2 text-lg font-semibold text-gray-900">{{ formatCurrency(varianceSummary.totalRevenue.deltaValue) }}</div>
-                <div class="text-sm text-gray-500">{{ varianceSummary.totalRevenue.deltaPct ?? '—' }}%</div>
+              <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 p-4">
+                <div class="text-xs uppercase tracking-[0.18em] text-gray-400 dark:text-muted">Revenue</div>
+                <div class="mt-2 text-lg font-semibold text-gray-900 dark:text-ink">{{ formatCurrency(varianceSummary.totalRevenue.deltaValue) }}</div>
+                <div class="text-sm text-gray-500 dark:text-muted">{{ varianceSummary.totalRevenue.deltaPct ?? '—' }}%</div>
               </div>
-              <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                <div class="text-xs uppercase tracking-[0.18em] text-gray-400">Net Profit</div>
-                <div class="mt-2 text-lg font-semibold text-gray-900">{{ formatCurrency(varianceSummary.totalNetProfit.deltaValue) }}</div>
-                <div class="text-sm text-gray-500">{{ varianceSummary.totalNetProfit.deltaPct ?? '—' }}%</div>
+              <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 p-4">
+                <div class="text-xs uppercase tracking-[0.18em] text-gray-400 dark:text-muted">Net Profit</div>
+                <div class="mt-2 text-lg font-semibold text-gray-900 dark:text-ink">{{ formatCurrency(varianceSummary.totalNetProfit.deltaValue) }}</div>
+                <div class="text-sm text-gray-500 dark:text-muted">{{ varianceSummary.totalNetProfit.deltaPct ?? '—' }}%</div>
               </div>
-              <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                <div class="text-xs uppercase tracking-[0.18em] text-gray-400">Outstanding</div>
-                <div class="mt-2 text-lg font-semibold text-gray-900">{{ formatCurrency(varianceSummary.totalOutstanding.deltaValue) }}</div>
-                <div class="text-sm text-gray-500">{{ varianceSummary.totalOutstanding.deltaPct ?? '—' }}%</div>
+              <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 p-4">
+                <div class="text-xs uppercase tracking-[0.18em] text-gray-400 dark:text-muted">Outstanding</div>
+                <div class="mt-2 text-lg font-semibold text-gray-900 dark:text-ink">{{ formatCurrency(varianceSummary.totalOutstanding.deltaValue) }}</div>
+                <div class="text-sm text-gray-500 dark:text-muted">{{ varianceSummary.totalOutstanding.deltaPct ?? '—' }}%</div>
               </div>
-              <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                <div class="text-xs uppercase tracking-[0.18em] text-gray-400">Win Rate</div>
-                <div class="mt-2 text-lg font-semibold text-gray-900">{{ varianceSummary.winRate.deltaValue }} pts</div>
-                <div class="text-sm text-gray-500">{{ varianceSummary.winRate.deltaPct ?? '—' }}%</div>
+              <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 p-4">
+                <div class="text-xs uppercase tracking-[0.18em] text-gray-400 dark:text-muted">Win Rate</div>
+                <div class="mt-2 text-lg font-semibold text-gray-900 dark:text-ink">{{ varianceSummary.winRate.deltaValue }} pts</div>
+                <div class="text-sm text-gray-500 dark:text-muted">{{ varianceSummary.winRate.deltaPct ?? '—' }}%</div>
               </div>
-              <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                <div class="text-xs uppercase tracking-[0.18em] text-gray-400">Avg Deal</div>
-                <div class="mt-2 text-lg font-semibold text-gray-900">{{ formatCurrency(varianceSummary.avgDealSize.deltaValue) }}</div>
-                <div class="text-sm text-gray-500">{{ varianceSummary.avgDealSize.deltaPct ?? '—' }}%</div>
+              <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 p-4">
+                <div class="text-xs uppercase tracking-[0.18em] text-gray-400 dark:text-muted">Avg Deal</div>
+                <div class="mt-2 text-lg font-semibold text-gray-900 dark:text-ink">{{ formatCurrency(varianceSummary.avgDealSize.deltaValue) }}</div>
+                <div class="text-sm text-gray-500 dark:text-muted">{{ varianceSummary.avgDealSize.deltaPct ?? '—' }}%</div>
               </div>
             </div>
             <div class="mt-6 grid gap-4 xl:grid-cols-3">
               <div>
-                <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400">Trader Movers</h3>
+                <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-muted">Trader Movers</h3>
                 <div class="mt-3 space-y-2">
                   @for (row of reportData.variance.topTraderMovers; track row.key) {
-                    <button type="button" [attr.data-testid]="'reports-variance-trader-' + row.key" (click)="openOrderDrilldown('TRADER', row.key)" class="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm hover:bg-white">
-                      <span class="font-medium text-gray-900">{{ row.label }}</span>
-                      <span class="text-gray-500">{{ formatCurrency(row.deltaValue) }}</span>
+                    <button type="button" [attr.data-testid]="'reports-variance-trader-' + row.key" (click)="openOrderDrilldown('TRADER', row.key)" class="flex w-full items-center justify-between rounded-lg border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 px-3 py-2 text-left text-sm hover:bg-white">
+                      <span class="font-medium text-gray-900 dark:text-ink">{{ row.label }}</span>
+                      <span class="text-gray-500 dark:text-muted">{{ formatCurrency(row.deltaValue) }}</span>
                     </button>
                   } @empty {
-                    <p class="text-sm text-gray-500">No comparison data available.</p>
+                    <p class="text-sm text-gray-500 dark:text-muted">No comparison data available.</p>
                   }
                 </div>
               </div>
               <div>
-                <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400">Customer Movers</h3>
+                <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-muted">Customer Movers</h3>
                 <div class="mt-3 space-y-2">
                   @for (row of reportData.variance.topCustomerMovers; track row.key) {
-                    <button type="button" [attr.data-testid]="'reports-variance-customer-' + row.key" (click)="openOrderDrilldown('CUSTOMER', row.key)" class="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm hover:bg-white">
-                      <span class="font-medium text-gray-900">{{ row.label }}</span>
-                      <span class="text-gray-500">{{ formatCurrency(row.deltaValue) }}</span>
+                    <button type="button" [attr.data-testid]="'reports-variance-customer-' + row.key" (click)="openOrderDrilldown('CUSTOMER', row.key)" class="flex w-full items-center justify-between rounded-lg border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 px-3 py-2 text-left text-sm hover:bg-white">
+                      <span class="font-medium text-gray-900 dark:text-ink">{{ row.label }}</span>
+                      <span class="text-gray-500 dark:text-muted">{{ formatCurrency(row.deltaValue) }}</span>
                     </button>
                   } @empty {
-                    <p class="text-sm text-gray-500">No comparison data available.</p>
+                    <p class="text-sm text-gray-500 dark:text-muted">No comparison data available.</p>
                   }
                 </div>
               </div>
               <div>
-                <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400">Product Movers</h3>
+                <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-muted">Product Movers</h3>
                 <div class="mt-3 space-y-2">
                   @for (row of reportData.variance.topProductMovers; track row.key) {
-                    <button type="button" [attr.data-testid]="'reports-variance-product-' + row.key" (click)="openOrderDrilldown('PRODUCT', row.key)" class="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm hover:bg-white">
-                      <span class="font-medium text-gray-900">{{ row.label }}</span>
-                      <span class="text-gray-500">{{ formatCurrency(row.deltaValue) }}</span>
+                    <button type="button" [attr.data-testid]="'reports-variance-product-' + row.key" (click)="openOrderDrilldown('PRODUCT', row.key)" class="flex w-full items-center justify-between rounded-lg border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 px-3 py-2 text-left text-sm hover:bg-white">
+                      <span class="font-medium text-gray-900 dark:text-ink">{{ row.label }}</span>
+                      <span class="text-gray-500 dark:text-muted">{{ formatCurrency(row.deltaValue) }}</span>
                     </button>
                   } @empty {
-                    <p class="text-sm text-gray-500">No comparison data available.</p>
+                    <p class="text-sm text-gray-500 dark:text-muted">No comparison data available.</p>
                   }
                 </div>
               </div>
@@ -336,25 +336,25 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
           />
         }
 
-        <section class="rounded-2xl border border-gray-200 bg-white shadow-sm">
-          <div class="flex flex-col gap-3 border-b border-gray-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <section class="rounded-2xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm">
+          <div class="flex flex-col gap-3 border-b border-gray-100 dark:border-line px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 class="text-lg font-semibold text-gray-900">Trader Performance</h2>
-              <p class="text-sm text-gray-500">Revenue, profitability, and win-rate by visible trader.</p>
+              <h2 class="text-lg font-semibold text-gray-900 dark:text-ink">Trader Performance</h2>
+              <p class="text-sm text-gray-500 dark:text-muted">Revenue, profitability, and win-rate by visible trader.</p>
             </div>
             <div class="flex gap-2">
-              <button type="button" (click)="exportReport('trader-performance', 'csv')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50">
+              <button type="button" (click)="exportReport('trader-performance', 'csv')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim transition-colors hover:border-gray-400 hover:bg-gray-50 dark:hover:bg-surface-tint">
                 Export CSV
               </button>
-              <button type="button" (click)="exportReport('trader-performance', 'xlsx')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50">
+              <button type="button" (click)="exportReport('trader-performance', 'xlsx')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim transition-colors hover:border-gray-400 hover:bg-gray-50 dark:hover:bg-surface-tint">
                 Export XLSX
               </button>
             </div>
           </div>
           <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200 text-sm">
-              <thead class="bg-gray-50">
-                <tr class="text-left text-gray-500">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-line text-sm">
+              <thead class="bg-gray-50 dark:bg-bg-2">
+                <tr class="text-left text-gray-500 dark:text-muted">
                   <th class="px-5 py-3 font-medium">Trader</th>
                   <th class="px-5 py-3 font-medium">Team</th>
                   <th class="px-5 py-3 font-medium">Orders</th>
@@ -366,12 +366,12 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
                   <th class="px-5 py-3 font-medium"></th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-gray-100 bg-white text-gray-700">
+              <tbody class="divide-y divide-gray-100 dark:divide-line bg-white dark:bg-surface text-gray-700 dark:text-ink-dim">
                 @for (row of reportData.traderPerformance.rows; track row.traderId) {
                   <tr>
                     <td class="px-5 py-3">
-                      <div class="font-medium text-gray-900">{{ row.traderName }}</div>
-                      <div class="text-xs text-gray-500">{{ row.traderEmail }}</div>
+                      <div class="font-medium text-gray-900 dark:text-ink">{{ row.traderName }}</div>
+                      <div class="text-xs text-gray-500 dark:text-muted">{{ row.traderEmail }}</div>
                     </td>
                     <td class="px-5 py-3">{{ row.teamName || '—' }}</td>
                     <td class="px-5 py-3">{{ row.orderCount }}</td>
@@ -381,14 +381,14 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
                     <td class="px-5 py-3">{{ formatPercent(row.winRate) }}</td>
                     <td class="px-5 py-3">{{ formatCurrency(row.avgDealSize) }}</td>
                     <td class="px-5 py-3 text-right">
-                      <button type="button" [attr.data-testid]="'reports-trader-drilldown-' + row.traderId" (click)="openOrderDrilldown('TRADER', row.traderId)" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">
+                      <button type="button" [attr.data-testid]="'reports-trader-drilldown-' + row.traderId" (click)="openOrderDrilldown('TRADER', row.traderId)" class="rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-2 text-xs font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint">
                         Drill-down
                       </button>
                     </td>
                   </tr>
                 } @empty {
                   <tr>
-                    <td colspan="9" class="px-5 py-8 text-center text-sm text-gray-500">No trader performance data found for the selected period.</td>
+                    <td colspan="9" class="px-5 py-8 text-center text-sm text-gray-500 dark:text-muted">No trader performance data found for the selected period.</td>
                   </tr>
                 }
               </tbody>
@@ -397,31 +397,31 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
         </section>
 
         @if (drilldownData() || drilldownLoading() || drilldownError()) {
-          <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm" data-testid="reports-drilldown-panel">
+          <section class="rounded-2xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm" data-testid="reports-drilldown-panel">
             <div class="flex items-center justify-between gap-4">
               <div>
-                <h2 class="text-lg font-semibold text-gray-900">Drill-down</h2>
-                <p class="text-sm text-gray-500">{{ drilldownData()?.title || 'Inspect the source records behind a summary row.' }}</p>
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-ink">Drill-down</h2>
+                <p class="text-sm text-gray-500 dark:text-muted">{{ drilldownData()?.title || 'Inspect the source records behind a summary row.' }}</p>
               </div>
-              <button type="button" data-testid="reports-drilldown-close" (click)="closeDrilldown()" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+              <button type="button" data-testid="reports-drilldown-close" (click)="closeDrilldown()" class="rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint">
                 Close
               </button>
             </div>
             @if (drilldownData(); as detailBadge) {
-              <div class="mt-3 inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
+              <div class="mt-3 inline-flex items-center rounded-full border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/15 px-3 py-1 text-xs font-medium text-blue-700 dark:text-blue-400">
                 {{ detailBadge.totalCount }} record{{ detailBadge.totalCount === 1 ? '' : 's' }} in {{ detailBadge.dataset.toLowerCase() }}
               </div>
             }
 
             @if (drilldownLoading()) {
-              <div class="mt-4 text-sm text-gray-500">Loading drill-down…</div>
+              <div class="mt-4 text-sm text-gray-500 dark:text-muted">Loading drill-down…</div>
             } @else if (drilldownError()) {
-              <div class="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ drilldownError() }}</div>
+              <div class="mt-4 rounded-xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 px-4 py-3 text-sm text-red-700 dark:text-red-400">{{ drilldownError() }}</div>
             } @else if (drilldownData(); as detail) {
               <div class="mt-4 overflow-x-auto">
                 @if (detail.dataset === 'ORDERS') {
-                  <table class="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead class="bg-gray-50 text-left text-gray-500">
+                  <table class="min-w-full divide-y divide-gray-200 dark:divide-line text-sm">
+                    <thead class="bg-gray-50 dark:bg-bg-2 text-left text-gray-500 dark:text-muted">
                       <tr>
                         <th class="px-4 py-3 font-medium">Customer</th>
                         <th class="px-4 py-3 font-medium">Vessel</th>
@@ -431,7 +431,7 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
                         <th class="px-4 py-3 font-medium">Net</th>
                       </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-100 bg-white text-gray-700">
+                    <tbody class="divide-y divide-gray-100 dark:divide-line bg-white dark:bg-surface text-gray-700 dark:text-ink-dim">
                       @for (row of detail.orders; track row.orderId) {
                         <tr>
                           <td class="px-4 py-3">{{ row.clientName }}</td>
@@ -442,13 +442,13 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
                           <td class="px-4 py-3">{{ formatCurrency(row.totalNetProfit) }}</td>
                         </tr>
                       } @empty {
-                        <tr><td colspan="6" class="px-4 py-6 text-center text-sm text-gray-500">No order rows matched this drill-down.</td></tr>
+                        <tr><td colspan="6" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-muted">No order rows matched this drill-down.</td></tr>
                       }
                     </tbody>
                   </table>
                 } @else {
-                  <table class="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead class="bg-gray-50 text-left text-gray-500">
+                  <table class="min-w-full divide-y divide-gray-200 dark:divide-line text-sm">
+                    <thead class="bg-gray-50 dark:bg-bg-2 text-left text-gray-500 dark:text-muted">
                       <tr>
                         <th class="px-4 py-3 font-medium">Invoice</th>
                         <th class="px-4 py-3 font-medium">Customer</th>
@@ -457,7 +457,7 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
                         <th class="px-4 py-3 font-medium">Outstanding</th>
                       </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-100 bg-white text-gray-700">
+                    <tbody class="divide-y divide-gray-100 dark:divide-line bg-white dark:bg-surface text-gray-700 dark:text-ink-dim">
                       @for (row of detail.invoices; track row.invoiceId) {
                         <tr>
                           <td class="px-4 py-3">{{ row.invoiceNumber }}</td>
@@ -467,7 +467,7 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
                           <td class="px-4 py-3">{{ formatCurrency(row.outstandingAmount) }}</td>
                         </tr>
                       } @empty {
-                        <tr><td colspan="5" class="px-4 py-6 text-center text-sm text-gray-500">No invoice rows matched this drill-down.</td></tr>
+                        <tr><td colspan="5" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-muted">No invoice rows matched this drill-down.</td></tr>
                       }
                     </tbody>
                   </table>
@@ -478,29 +478,29 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
         }
 
         <section class="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
-          <div class="rounded-2xl border border-gray-200 bg-white shadow-sm">
-            <div class="flex flex-col gap-3 border-b border-gray-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div class="rounded-2xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm">
+            <div class="flex flex-col gap-3 border-b border-gray-100 dark:border-line px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 class="text-lg font-semibold text-gray-900">Invoice Aging</h2>
-                <p class="text-sm text-gray-500">Open invoices bucketed by due-date age.</p>
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-ink">Invoice Aging</h2>
+                <p class="text-sm text-gray-500 dark:text-muted">Open invoices bucketed by due-date age.</p>
               </div>
               <div class="flex gap-2">
-                <button type="button" (click)="exportReport('invoice-aging', 'csv')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50">
+                <button type="button" (click)="exportReport('invoice-aging', 'csv')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim transition-colors hover:border-gray-400 hover:bg-gray-50 dark:hover:bg-surface-tint">
                   Export CSV
                 </button>
-                <button type="button" (click)="exportReport('invoice-aging', 'xlsx')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50">
+                <button type="button" (click)="exportReport('invoice-aging', 'xlsx')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim transition-colors hover:border-gray-400 hover:bg-gray-50 dark:hover:bg-surface-tint">
                   Export XLSX
                 </button>
               </div>
             </div>
 
-            <div class="grid gap-3 border-b border-gray-100 px-5 py-4 sm:grid-cols-5">
+            <div class="grid gap-3 border-b border-gray-100 dark:border-line px-5 py-4 sm:grid-cols-5">
               @for (bucket of reportData.invoiceAging.buckets; track bucket.label) {
-                <div class="rounded-xl border border-gray-200 bg-gray-50/80 p-3" [attr.data-testid]="'reports-aging-bucket-' + bucket.label">
-                  <p class="text-xs font-medium uppercase tracking-[0.18em] text-gray-400">{{ bucket.label }}</p>
-                  <p class="mt-2 text-lg font-semibold text-gray-900">{{ bucket.count }}</p>
-                  <p class="text-sm text-gray-500">{{ formatCurrency(bucket.outstandingAmount) }}</p>
-                  <button type="button" [attr.data-testid]="'reports-invoice-drilldown-' + bucket.label" (click)="openInvoiceDrilldown(bucket.label)" class="mt-3 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">
+                <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50/80 p-3" [attr.data-testid]="'reports-aging-bucket-' + bucket.label">
+                  <p class="text-xs font-medium uppercase tracking-[0.18em] text-gray-400 dark:text-muted">{{ bucket.label }}</p>
+                  <p class="mt-2 text-lg font-semibold text-gray-900 dark:text-ink">{{ bucket.count }}</p>
+                  <p class="text-sm text-gray-500 dark:text-muted">{{ formatCurrency(bucket.outstandingAmount) }}</p>
+                  <button type="button" [attr.data-testid]="'reports-invoice-drilldown-' + bucket.label" (click)="openInvoiceDrilldown(bucket.label)" class="mt-3 rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-2 text-xs font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint">
                     Open invoices
                   </button>
                 </div>
@@ -508,9 +508,9 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
             </div>
 
             <div class="overflow-x-auto">
-              <table class="min-w-full divide-y divide-gray-200 text-sm">
-                <thead class="bg-gray-50">
-                  <tr class="text-left text-gray-500">
+              <table class="min-w-full divide-y divide-gray-200 dark:divide-line text-sm">
+                <thead class="bg-gray-50 dark:bg-bg-2">
+                  <tr class="text-left text-gray-500 dark:text-muted">
                     <th class="px-5 py-3 font-medium">Invoice</th>
                     <th class="px-5 py-3 font-medium">Client</th>
                     <th class="px-5 py-3 font-medium">Trader</th>
@@ -519,12 +519,12 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
                     <th class="px-5 py-3 font-medium">Bucket</th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-100 bg-white text-gray-700">
+                <tbody class="divide-y divide-gray-100 dark:divide-line bg-white dark:bg-surface text-gray-700 dark:text-ink-dim">
                   @for (row of reportData.invoiceAging.rows.slice(0, 12); track row.invoiceId) {
                     <tr>
                       <td class="px-5 py-3">
-                        <div class="font-medium text-gray-900">{{ row.invoiceNumber }}</div>
-                        <div class="text-xs text-gray-500">{{ row.vesselName }}</div>
+                        <div class="font-medium text-gray-900 dark:text-ink">{{ row.invoiceNumber }}</div>
+                        <div class="text-xs text-gray-500 dark:text-muted">{{ row.vesselName }}</div>
                       </td>
                       <td class="px-5 py-3">{{ row.clientName }}</td>
                       <td class="px-5 py-3">{{ row.traderName || '—' }}</td>
@@ -534,7 +534,7 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
                     </tr>
                   } @empty {
                     <tr>
-                      <td colspan="6" class="px-5 py-8 text-center text-sm text-gray-500">No open invoices matched the selected range.</td>
+                      <td colspan="6" class="px-5 py-8 text-center text-sm text-gray-500 dark:text-muted">No open invoices matched the selected range.</td>
                     </tr>
                   }
                 </tbody>
@@ -542,65 +542,65 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
             </div>
           </div>
 
-          <div class="rounded-2xl border border-gray-200 bg-white shadow-sm">
-            <div class="flex flex-col gap-3 border-b border-gray-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div class="rounded-2xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm">
+            <div class="flex flex-col gap-3 border-b border-gray-100 dark:border-line px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 class="text-lg font-semibold text-gray-900">Commercial Summary</h2>
-                <p class="text-sm text-gray-500">Conversion, loss reasons, and pipeline status.</p>
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-ink">Commercial Summary</h2>
+                <p class="text-sm text-gray-500 dark:text-muted">Conversion, loss reasons, and pipeline status.</p>
               </div>
               <div class="flex gap-2">
-                <button type="button" (click)="exportReport('commercial-summary', 'csv')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50">
+                <button type="button" (click)="exportReport('commercial-summary', 'csv')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim transition-colors hover:border-gray-400 hover:bg-gray-50 dark:hover:bg-surface-tint">
                   Export CSV
                 </button>
-                <button type="button" (click)="exportReport('commercial-summary', 'xlsx')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50">
+                <button type="button" (click)="exportReport('commercial-summary', 'xlsx')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim transition-colors hover:border-gray-400 hover:bg-gray-50 dark:hover:bg-surface-tint">
                   Export XLSX
                 </button>
               </div>
             </div>
 
-            <div class="grid gap-3 border-b border-gray-100 px-5 py-4 sm:grid-cols-2">
-              <div class="rounded-xl border border-gray-200 bg-gray-50/80 p-4">
-                <p class="text-xs font-medium uppercase tracking-[0.18em] text-gray-400">Win Rate</p>
-                <p class="mt-2 text-2xl font-semibold text-gray-900">{{ formatPercent(reportData.commercialSummary.conversion.winRate) }}</p>
-                <p class="mt-1 text-sm text-gray-500">Won {{ reportData.commercialSummary.conversion.totalWon }} / Lost {{ reportData.commercialSummary.conversion.totalLost }}</p>
+            <div class="grid gap-3 border-b border-gray-100 dark:border-line px-5 py-4 sm:grid-cols-2">
+              <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50/80 p-4">
+                <p class="text-xs font-medium uppercase tracking-[0.18em] text-gray-400 dark:text-muted">Win Rate</p>
+                <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-ink">{{ formatPercent(reportData.commercialSummary.conversion.winRate) }}</p>
+                <p class="mt-1 text-sm text-gray-500 dark:text-muted">Won {{ reportData.commercialSummary.conversion.totalWon }} / Lost {{ reportData.commercialSummary.conversion.totalLost }}</p>
               </div>
-              <div class="rounded-xl border border-gray-200 bg-gray-50/80 p-4">
-                <p class="text-xs font-medium uppercase tracking-[0.18em] text-gray-400">Avg Days To Close</p>
-                <p class="mt-2 text-2xl font-semibold text-gray-900">{{ reportData.commercialSummary.conversion.avgDaysToClose ?? '—' }}</p>
-                <p class="mt-1 text-sm text-gray-500">Based on won orders in the selected period.</p>
+              <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50/80 p-4">
+                <p class="text-xs font-medium uppercase tracking-[0.18em] text-gray-400 dark:text-muted">Avg Days To Close</p>
+                <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-ink">{{ reportData.commercialSummary.conversion.avgDaysToClose ?? '—' }}</p>
+                <p class="mt-1 text-sm text-gray-500 dark:text-muted">Based on won orders in the selected period.</p>
               </div>
             </div>
 
             <div class="space-y-4 px-5 py-4">
               <div>
-                <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400">Top Loss Reasons</h3>
+                <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-muted">Top Loss Reasons</h3>
                 <div class="mt-3 space-y-2">
                   @for (reason of reportData.commercialSummary.lossAnalysis.reasons.slice(0, 5); track reason.reason) {
-                    <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50/70 px-3 py-2 text-sm">
-                      <span class="font-medium text-gray-800">{{ reason.reason }}</span>
-                      <span class="text-gray-500">{{ reason.count }} · {{ formatPercent(reason.percentage) }}</span>
+                    <div class="flex items-center justify-between rounded-lg border border-gray-200 dark:border-line bg-gray-50/70 px-3 py-2 text-sm">
+                      <span class="font-medium text-gray-800 dark:text-ink">{{ reason.reason }}</span>
+                      <span class="text-gray-500 dark:text-muted">{{ reason.count }} · {{ formatPercent(reason.percentage) }}</span>
                     </div>
                   } @empty {
-                    <p class="text-sm text-gray-500">No cancelled orders with loss reasons in the selected period.</p>
+                    <p class="text-sm text-gray-500 dark:text-muted">No cancelled orders with loss reasons in the selected period.</p>
                   }
                 </div>
               </div>
 
               <div>
-                <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400">Pipeline</h3>
+                <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-muted">Pipeline</h3>
                 <div class="mt-3 space-y-3">
                   @for (stage of reportData.commercialSummary.pipeline; track stage.status) {
                     <div>
-                      <div class="mb-1 flex items-center justify-between text-sm text-gray-600">
+                      <div class="mb-1 flex items-center justify-between text-sm text-gray-600 dark:text-ink-dim">
                         <span>{{ stage.status }}</span>
                         <span>{{ stage.count }} · {{ formatCurrency(stage.totalValue) }}</span>
                       </div>
-                      <div class="h-2 rounded-full bg-gray-100">
+                      <div class="h-2 rounded-full bg-gray-100 dark:bg-surface-3">
                         <div class="h-2 rounded-full bg-brand-500" [style.width.%]="pipelineWidth(stage.count, reportData.commercialSummary.pipeline)"></div>
                       </div>
                     </div>
                   } @empty {
-                    <p class="text-sm text-gray-500">No pipeline data in the selected period.</p>
+                    <p class="text-sm text-gray-500 dark:text-muted">No pipeline data in the selected period.</p>
                   }
                 </div>
               </div>
@@ -608,17 +608,17 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
           </div>
         </section>
 
-        <section class="rounded-2xl border border-gray-200 bg-white shadow-sm">
-          <div class="flex flex-col gap-3 border-b border-gray-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <section class="rounded-2xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm">
+          <div class="flex flex-col gap-3 border-b border-gray-100 dark:border-line px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 class="text-lg font-semibold text-gray-900">Margin Analysis</h2>
-              <p class="text-sm text-gray-500">Net margin by customer, product, vessel, and month.</p>
+              <h2 class="text-lg font-semibold text-gray-900 dark:text-ink">Margin Analysis</h2>
+              <p class="text-sm text-gray-500 dark:text-muted">Net margin by customer, product, vessel, and month.</p>
             </div>
             <div class="flex gap-2">
-              <button type="button" (click)="exportReport('margin-analysis', 'csv')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50">
+              <button type="button" (click)="exportReport('margin-analysis', 'csv')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim transition-colors hover:border-gray-400 hover:bg-gray-50 dark:hover:bg-surface-tint">
                 Export CSV
               </button>
-              <button type="button" (click)="exportReport('margin-analysis', 'xlsx')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50">
+              <button type="button" (click)="exportReport('margin-analysis', 'xlsx')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim transition-colors hover:border-gray-400 hover:bg-gray-50 dark:hover:bg-surface-tint">
                 Export XLSX
               </button>
             </div>
@@ -626,118 +626,118 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
 
           <div class="grid gap-6 p-5 xl:grid-cols-3">
             <div>
-              <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400">Top Customers</h3>
+              <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-muted">Top Customers</h3>
               <div class="mt-3 space-y-2">
                 @for (row of reportData.marginAnalysis.byCustomer.slice(0, 5); track row.key) {
-                  <div class="rounded-xl border border-gray-200 bg-gray-50/70 px-3 py-3">
+                  <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50/70 px-3 py-3">
                     <div class="flex items-center justify-between gap-3">
-                      <span class="font-medium text-gray-900">{{ row.label }}</span>
-                      <span class="text-sm text-gray-500">{{ row.netMarginPct ?? '—' }}%</span>
+                      <span class="font-medium text-gray-900 dark:text-ink">{{ row.label }}</span>
+                      <span class="text-sm text-gray-500 dark:text-muted">{{ row.netMarginPct ?? '—' }}%</span>
                     </div>
-                    <div class="mt-1 text-sm text-gray-600">{{ formatCurrency(row.totalNetProfit) }} net on {{ formatCurrency(row.totalRevenue) }} revenue</div>
-                    <button type="button" [attr.data-testid]="'reports-customer-drilldown-' + row.key" (click)="openOrderDrilldown('CUSTOMER', row.key)" class="mt-3 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">
+                    <div class="mt-1 text-sm text-gray-600 dark:text-ink-dim">{{ formatCurrency(row.totalNetProfit) }} net on {{ formatCurrency(row.totalRevenue) }} revenue</div>
+                    <button type="button" [attr.data-testid]="'reports-customer-drilldown-' + row.key" (click)="openOrderDrilldown('CUSTOMER', row.key)" class="mt-3 rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-2 text-xs font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint">
                       Open orders
                     </button>
                   </div>
                 } @empty {
-                  <p class="text-sm text-gray-500">No customer margin data in the selected period.</p>
+                  <p class="text-sm text-gray-500 dark:text-muted">No customer margin data in the selected period.</p>
                 }
               </div>
             </div>
             <div>
-              <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400">Top Products</h3>
+              <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-muted">Top Products</h3>
               <div class="mt-3 space-y-2">
                 @for (row of reportData.marginAnalysis.byProduct.slice(0, 5); track row.key) {
-                  <div class="rounded-xl border border-gray-200 bg-gray-50/70 px-3 py-3">
+                  <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50/70 px-3 py-3">
                     <div class="flex items-center justify-between gap-3">
-                      <span class="font-medium text-gray-900">{{ row.label }}</span>
-                      <span class="text-sm text-gray-500">{{ row.netMarginPct ?? '—' }}%</span>
+                      <span class="font-medium text-gray-900 dark:text-ink">{{ row.label }}</span>
+                      <span class="text-sm text-gray-500 dark:text-muted">{{ row.netMarginPct ?? '—' }}%</span>
                     </div>
-                    <div class="mt-1 text-sm text-gray-600">{{ formatCurrency(row.totalNetProfit) }} net on {{ formatCurrency(row.totalRevenue) }} revenue</div>
-                    <button type="button" [attr.data-testid]="'reports-product-drilldown-' + row.key" (click)="openOrderDrilldown('PRODUCT', row.key)" class="mt-3 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">
+                    <div class="mt-1 text-sm text-gray-600 dark:text-ink-dim">{{ formatCurrency(row.totalNetProfit) }} net on {{ formatCurrency(row.totalRevenue) }} revenue</div>
+                    <button type="button" [attr.data-testid]="'reports-product-drilldown-' + row.key" (click)="openOrderDrilldown('PRODUCT', row.key)" class="mt-3 rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-2 text-xs font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint">
                       Open orders
                     </button>
                   </div>
                 } @empty {
-                  <p class="text-sm text-gray-500">No product margin data in the selected period.</p>
+                  <p class="text-sm text-gray-500 dark:text-muted">No product margin data in the selected period.</p>
                 }
               </div>
             </div>
             <div>
-              <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400">Monthly Trend</h3>
+              <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-muted">Monthly Trend</h3>
               <div class="mt-3 space-y-2">
                 @for (point of reportData.marginAnalysis.monthlyTrend; track point.month) {
-                  <div class="rounded-xl border border-gray-200 bg-gray-50/70 px-3 py-3">
+                  <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50/70 px-3 py-3">
                     <div class="flex items-center justify-between gap-3">
-                      <span class="font-medium text-gray-900">{{ point.month }}</span>
-                      <span class="text-sm text-gray-500">{{ point.netMarginPct ?? '—' }}%</span>
+                      <span class="font-medium text-gray-900 dark:text-ink">{{ point.month }}</span>
+                      <span class="text-sm text-gray-500 dark:text-muted">{{ point.netMarginPct ?? '—' }}%</span>
                     </div>
-                    <div class="mt-1 text-sm text-gray-600">{{ formatCurrency(point.totalNetProfit) }} net on {{ formatCurrency(point.totalRevenue) }} revenue</div>
+                    <div class="mt-1 text-sm text-gray-600 dark:text-ink-dim">{{ formatCurrency(point.totalNetProfit) }} net on {{ formatCurrency(point.totalRevenue) }} revenue</div>
                   </div>
                 } @empty {
-                  <p class="text-sm text-gray-500">No margin trend data in the selected period.</p>
+                  <p class="text-sm text-gray-500 dark:text-muted">No margin trend data in the selected period.</p>
                 }
               </div>
             </div>
           </div>
         </section>
 
-        <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm" data-testid="reports-exceptions-section">
+        <section class="rounded-2xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm" data-testid="reports-exceptions-section">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 class="text-lg font-semibold text-gray-900">Exceptions</h2>
-              <p class="text-sm text-gray-500">High-signal issues surfaced from the current report scope, ready for export or scheduled delivery.</p>
+              <h2 class="text-lg font-semibold text-gray-900 dark:text-ink">Exceptions</h2>
+              <p class="text-sm text-gray-500 dark:text-muted">High-signal issues surfaced from the current report scope, ready for export or scheduled delivery.</p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
-              <div class="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-medium text-red-700" data-testid="reports-exceptions-total">
+              <div class="rounded-full border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 px-3 py-1 text-xs font-medium text-red-700 dark:text-red-400" data-testid="reports-exceptions-total">
                 {{ reportData.exceptions.totalCount }} open exception{{ reportData.exceptions.totalCount === 1 ? '' : 's' }}
               </div>
-              <button type="button" data-testid="reports-exceptions-export-csv" (click)="exportReport('exceptions', 'csv')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+              <button type="button" data-testid="reports-exceptions-export-csv" (click)="exportReport('exceptions', 'csv')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint">
                 Export CSV
               </button>
-              <button type="button" data-testid="reports-exceptions-export-xlsx" (click)="exportReport('exceptions', 'xlsx')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+              <button type="button" data-testid="reports-exceptions-export-xlsx" (click)="exportReport('exceptions', 'xlsx')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint">
                 Export XLSX
               </button>
             </div>
           </div>
           <div class="mt-4 flex flex-wrap gap-2">
             @for (entry of reportData.exceptions.byType; track entry.type) {
-              <span class="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700" [attr.data-testid]="'reports-exception-chip-' + entry.type">
+              <span class="inline-flex items-center rounded-full border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/15 px-3 py-1 text-xs font-medium text-amber-700 dark:text-amber-400" [attr.data-testid]="'reports-exception-chip-' + entry.type">
                 {{ exceptionTypeLabel(entry.type) }} · {{ entry.count }}
               </span>
             } @empty {
-              <span class="text-sm text-gray-500">No active exceptions in this scope.</span>
+              <span class="text-sm text-gray-500 dark:text-muted">No active exceptions in this scope.</span>
             }
           </div>
           <div class="mt-4 grid gap-3 lg:grid-cols-2">
             @for (row of reportData.exceptions.rows; track row.type + '-' + row.entityId) {
-              <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3" [attr.data-testid]="'reports-exception-row-' + row.entityId">
+              <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 px-4 py-3" [attr.data-testid]="'reports-exception-row-' + row.entityId">
                 <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <div class="mb-2 inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]" [class.border-red-200]="row.severity === 'HIGH'" [class.bg-red-50]="row.severity === 'HIGH'" [class.text-red-700]="row.severity === 'HIGH'" [class.border-amber-200]="row.severity !== 'HIGH'" [class.bg-amber-50]="row.severity !== 'HIGH'" [class.text-amber-700]="row.severity !== 'HIGH'">
                       {{ row.severity }}
                     </div>
-                    <div class="font-medium text-gray-900">{{ row.title }}</div>
-                    <div class="text-sm text-gray-500">{{ row.description }}</div>
+                    <div class="font-medium text-gray-900 dark:text-ink">{{ row.title }}</div>
+                    <div class="text-sm text-gray-500 dark:text-muted">{{ row.description }}</div>
                   </div>
                   <div class="text-right text-sm">
-                    <div class="font-medium text-gray-900">{{ row.primaryValue }}</div>
-                    <div class="text-gray-500">{{ row.secondaryValue || exceptionTypeLabel(row.type) }}</div>
+                    <div class="font-medium text-gray-900 dark:text-ink">{{ row.primaryValue }}</div>
+                    <div class="text-gray-500 dark:text-muted">{{ row.secondaryValue || exceptionTypeLabel(row.type) }}</div>
                   </div>
                 </div>
               </div>
             } @empty {
-              <p class="text-sm text-gray-500">No report exceptions matched the selected filters.</p>
+              <p class="text-sm text-gray-500 dark:text-muted">No report exceptions matched the selected filters.</p>
             }
           </div>
         </section>
 
         @if (reportData.access.canManageSchedules || reportData.schedules.length > 0) {
-          <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <section class="rounded-2xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <h2 class="text-lg font-semibold text-gray-900">Scheduled Delivery</h2>
-                <p class="text-sm text-gray-500">Email report summaries on a daily UTC hour.</p>
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-ink">Scheduled Delivery</h2>
+                <p class="text-sm text-gray-500 dark:text-muted">Email report summaries on a daily UTC hour.</p>
               </div>
               @if (reportData.access.canManageSchedules) {
                 <app-reports-schedule-form
@@ -777,32 +777,32 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
 
             <div class="mt-4 space-y-3">
               @for (schedule of reportData.schedules; track schedule.id) {
-                <div class="flex flex-col gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 lg:flex-row lg:items-center lg:justify-between" [attr.data-testid]="'reports-schedule-card-' + schedule.id">
+                <div class="flex flex-col gap-3 rounded-xl border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 px-4 py-3 lg:flex-row lg:items-center lg:justify-between" [attr.data-testid]="'reports-schedule-card-' + schedule.id">
                   <div>
-                    <div class="font-medium text-gray-900">{{ schedule.name }}</div>
-                    <div class="text-sm text-gray-500">{{ scheduleModeLabel(schedule.reportMode) }} · {{ schedule.reportType === 'MARGIN_ANALYSIS' ? 'Margin analysis' : 'Summary' }} · {{ schedule.hourUtc }}:00 UTC · {{ formatRecipientRoles(schedule.recipientRoles) }}</div>
-                    <div class="text-xs text-gray-500">Delivery: {{ describeDeliveryMode(schedule.deliveryMode) }} · {{ describeBodyMode(schedule.bodyMode) }} · {{ schedule.isActive ? 'Active' : 'Paused' }}</div>
+                    <div class="font-medium text-gray-900 dark:text-ink">{{ schedule.name }}</div>
+                    <div class="text-sm text-gray-500 dark:text-muted">{{ scheduleModeLabel(schedule.reportMode) }} · {{ schedule.reportType === 'MARGIN_ANALYSIS' ? 'Margin analysis' : 'Summary' }} · {{ schedule.hourUtc }}:00 UTC · {{ formatRecipientRoles(schedule.recipientRoles) }}</div>
+                    <div class="text-xs text-gray-500 dark:text-muted">Delivery: {{ describeDeliveryMode(schedule.deliveryMode) }} · {{ describeBodyMode(schedule.bodyMode) }} · {{ schedule.isActive ? 'Active' : 'Paused' }}</div>
                     @if (schedule.reportMode === 'EXCEPTIONS') {
-                      <div class="text-xs text-gray-500">{{ schedule.sendOnlyWhenNonEmpty ? 'Send only when non-empty' : 'Always send' }} · {{ formatExceptionTypes(schedule.exceptionTypes) }}</div>
+                      <div class="text-xs text-gray-500 dark:text-muted">{{ schedule.sendOnlyWhenNonEmpty ? 'Send only when non-empty' : 'Always send' }} · {{ formatExceptionTypes(schedule.exceptionTypes) }}</div>
                     }
-                    <div class="text-xs text-gray-500">Last sent: {{ schedule.lastSentAt || 'Not sent yet' }}</div>
+                    <div class="text-xs text-gray-500 dark:text-muted">Last sent: {{ schedule.lastSentAt || 'Not sent yet' }}</div>
                   </div>
                   @if (reportData.access.canManageSchedules) {
                     <div class="flex gap-2">
-                      <button type="button" [attr.data-testid]="'reports-schedule-edit-' + schedule.id" (click)="startEditSchedule(schedule)" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50">
+                      <button type="button" [attr.data-testid]="'reports-schedule-edit-' + schedule.id" (click)="startEditSchedule(schedule)" class="inline-flex items-center justify-center rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim transition-colors hover:bg-gray-50 dark:hover:bg-surface-tint">
                         Edit
                       </button>
-                      <button type="button" [attr.data-testid]="'reports-schedule-toggle-' + schedule.id" (click)="toggleScheduleActive(schedule)" class="inline-flex items-center justify-center rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-50">
+                      <button type="button" [attr.data-testid]="'reports-schedule-toggle-' + schedule.id" (click)="toggleScheduleActive(schedule)" class="inline-flex items-center justify-center rounded-lg border border-amber-200 dark:border-amber-500/30 bg-white dark:bg-surface px-3 py-2 text-sm font-medium text-amber-700 dark:text-amber-400 transition-colors hover:bg-amber-50 dark:hover:bg-amber-500/15">
                         {{ schedule.isActive ? 'Pause' : 'Resume' }}
                       </button>
-                      <button type="button" [attr.data-testid]="'reports-schedule-delete-' + schedule.id" (click)="deleteSchedule(schedule.id)" class="inline-flex items-center justify-center rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50">
+                      <button type="button" [attr.data-testid]="'reports-schedule-delete-' + schedule.id" (click)="deleteSchedule(schedule.id)" class="inline-flex items-center justify-center rounded-lg border border-red-200 dark:border-red-500/30 bg-white dark:bg-surface px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 transition-colors hover:bg-red-50 dark:hover:bg-red-500/15">
                         Delete
                       </button>
                     </div>
                   }
                 </div>
               } @empty {
-                <p class="text-sm text-gray-500">No report schedules configured.</p>
+                <p class="text-sm text-gray-500 dark:text-muted">No report schedules configured.</p>
               }
             </div>
           </section>

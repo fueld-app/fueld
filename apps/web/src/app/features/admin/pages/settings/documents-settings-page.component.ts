@@ -37,15 +37,15 @@ interface InquirySettingsDto {
     <div>
       <!-- Header -->
       <div class="mb-6">
-        <h1 class="text-2xl font-bold text-gray-900">Documents & Inquiry Settings</h1>
-        <p class="mt-1 text-sm text-gray-500">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-ink">Documents & Inquiry Settings</h1>
+        <p class="mt-1 text-sm text-gray-500 dark:text-muted">
           Configure attachment types, delivery and port documentation, inquiry cancellation reasons, and supplier inquiry behaviour.
         </p>
       </div>
 
       @if (loading()) {
         <div class="flex items-center justify-center py-12">
-          <svg class="h-8 w-8 animate-spin text-brand-600" viewBox="0 0 24 24" fill="none">
+          <svg class="h-8 w-8 animate-spin text-brand-600 dark:text-brand-400" viewBox="0 0 24 24" fill="none">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
           </svg>
@@ -74,49 +74,49 @@ interface InquirySettingsDto {
           <div class="app-panel">
             <div class="app-panel-header app-panel-header--amber">
               <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--amber">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-600 dark:text-amber-400" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd" />
                 </svg>
               </div>
               <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-semibold text-gray-900">Delivery Documentation</h3>
-                <p class="text-xs text-gray-500">Configure which attachment types are required to close (mark delivered) an order.</p>
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">Delivery Documentation</h3>
+                <p class="text-xs text-gray-500 dark:text-muted">Configure which attachment types are required to close (mark delivered) an order.</p>
               </div>
             </div>
 
             <div class="app-panel-body space-y-4">
-              <div class="flex items-center justify-between gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <div class="flex items-center justify-between gap-4 rounded-lg border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 p-4">
                 <div>
-                  <p class="text-sm font-medium text-gray-900">Require delivery documentation</p>
-                  <p class="text-xs text-gray-500">When enabled, orders cannot be marked as delivered without at least one attachment of the selected types.</p>
+                  <p class="text-sm font-medium text-gray-900 dark:text-ink">Require delivery documentation</p>
+                  <p class="text-xs text-gray-500 dark:text-muted">When enabled, orders cannot be marked as delivered without at least one attachment of the selected types.</p>
                 </div>
                 <button
                   (click)="requireDeliveryDocumentation.set(!requireDeliveryDocumentation())"
                   [disabled]="deliveryDocumentationSaving()"
                   [class]="requireDeliveryDocumentation()
                     ? 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-amber-500 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 disabled:opacity-50'
-                    : 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 disabled:opacity-50'"
+                    : 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 dark:bg-surface-3 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 disabled:opacity-50'"
                 >
                   <span
                     [class]="requireDeliveryDocumentation()
-                      ? 'pointer-events-none inline-block h-5 w-5 translate-x-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'
-                      : 'pointer-events-none inline-block h-5 w-5 translate-x-0 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'"
+                      ? 'pointer-events-none inline-block h-5 w-5 translate-x-5 transform rounded-full bg-white dark:bg-surface shadow ring-0 transition duration-200 ease-in-out'
+                      : 'pointer-events-none inline-block h-5 w-5 translate-x-0 transform rounded-full bg-white dark:bg-surface shadow ring-0 transition duration-200 ease-in-out'"
                   ></span>
                 </button>
               </div>
 
               @if (requireDeliveryDocumentation()) {
                 <div class="space-y-2">
-                  <p class="text-sm font-medium text-gray-700">Valid delivery documentation types</p>
-                  <p class="text-xs text-gray-500">Select which configured attachment types satisfy the delivery closeout rule.</p>
+                  <p class="text-sm font-medium text-gray-700 dark:text-ink-dim">Valid delivery documentation types</p>
+                  <p class="text-xs text-gray-500 dark:text-muted">Select which configured attachment types satisfy the delivery closeout rule.</p>
                   <div class="flex flex-wrap gap-2">
                     @for (type of attachmentTypes(); track type) {
-                      <label class="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm cursor-pointer hover:bg-gray-50 transition-colors">
+                      <label class="inline-flex items-center gap-1.5 rounded-md border border-gray-200 dark:border-line bg-white dark:bg-surface px-3 py-1.5 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors">
                         <input
                           type="checkbox"
                           [checked]="deliveryDocumentationTypes().includes(type)"
                           (change)="toggleDeliveryDocumentationType(type, $any($event.target).checked)"
-                          class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                          class="h-4 w-4 rounded border-gray-300 dark:border-line-strong text-amber-600 dark:text-amber-400 focus:ring-amber-500"
                         />
                         <span class="font-mono text-xs uppercase">{{ type }}</span>
                       </label>
@@ -134,7 +134,7 @@ interface InquirySettingsDto {
                   @if (deliveryDocumentationSaving()) { Saving… } @else { Save Delivery Documentation }
                 </button>
                 @if (deliveryDocumentationSaved()) {
-                  <span class="text-sm text-green-600 flex items-center gap-1">
+                  <span class="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                       <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
                     </svg>
@@ -151,38 +151,38 @@ interface InquirySettingsDto {
           <div class="app-panel">
             <div class="app-panel-header app-panel-header--teal">
               <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--teal">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-teal-600" viewBox="0 0 24 24" fill="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-teal-600 dark:text-teal-400" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M6.75 3A2.75 2.75 0 0 0 4 5.75v12.5A2.75 2.75 0 0 0 6.75 21h10.5A2.75 2.75 0 0 0 20 18.25V8.81a2.75 2.75 0 0 0-.806-1.944l-2.06-2.06A2.75 2.75 0 0 0 15.19 4H6.75Zm.75 5.5a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5A.75.75 0 0 1 7.5 8.5Zm0 3.75a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5a.75.75 0 0 1-.75-.75Zm0 3.75a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1-.75-.75Z" />
                 </svg>
               </div>
               <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-semibold text-gray-900">Port Documentation</h3>
-                <p class="text-xs text-gray-500">Enable order-level port document generation for deployments that use this workflow.</p>
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">Port Documentation</h3>
+                <p class="text-xs text-gray-500 dark:text-muted">Enable order-level port document generation for deployments that use this workflow.</p>
               </div>
             </div>
 
             <div class="app-panel-body space-y-4">
-              <div class="flex items-center justify-between gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <div class="flex items-center justify-between gap-4 rounded-lg border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 p-4">
                 <div>
-                  <p class="text-sm font-medium text-gray-900">Feature enabled</p>
-                  <p class="text-xs text-gray-500">Phase 1 uses a deployment-level toggle. License-based entitlement can replace this later.</p>
+                  <p class="text-sm font-medium text-gray-900 dark:text-ink">Feature enabled</p>
+                  <p class="text-xs text-gray-500 dark:text-muted">Phase 1 uses a deployment-level toggle. License-based entitlement can replace this later.</p>
                 </div>
                 <button
                   (click)="portDocumentationEnabled.set(!portDocumentationEnabled())"
                   [disabled]="portDocumentationSaving()"
                   [class]="portDocumentationEnabled()
                     ? 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-teal-500 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:opacity-50'
-                    : 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:opacity-50'"
+                    : 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 dark:bg-surface-3 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:opacity-50'"
                 >
                   <span
                     [class]="portDocumentationEnabled()
-                      ? 'pointer-events-none inline-block h-5 w-5 translate-x-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'
-                      : 'pointer-events-none inline-block h-5 w-5 translate-x-0 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'"
+                      ? 'pointer-events-none inline-block h-5 w-5 translate-x-5 transform rounded-full bg-white dark:bg-surface shadow ring-0 transition duration-200 ease-in-out'
+                      : 'pointer-events-none inline-block h-5 w-5 translate-x-0 transform rounded-full bg-white dark:bg-surface shadow ring-0 transition duration-200 ease-in-out'"
                   ></span>
                 </button>
               </div>
 
-              <div class="rounded-lg border border-dashed border-gray-200 bg-white p-4 text-xs text-gray-500">
+              <div class="rounded-lg border border-dashed border-gray-200 dark:border-line bg-white dark:bg-surface p-4 text-xs text-gray-500 dark:text-muted">
                 Phase 1 target: Bunker Instructions generation, Gate List export, and Flange Worksheet attachment from the order workflow.
               </div>
 
@@ -195,7 +195,7 @@ interface InquirySettingsDto {
                   @if (portDocumentationSaving()) { Saving… } @else { Save Port Documentation Settings }
                 </button>
                 @if (portDocumentationSaved()) {
-                  <span class="text-sm text-green-600 flex items-center gap-1">
+                  <span class="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                       <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
                     </svg>
@@ -212,13 +212,13 @@ interface InquirySettingsDto {
           <div class="app-panel">
             <div class="app-panel-header app-panel-header--rose">
               <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--rose">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-rose-600" viewBox="0 0 20 20" fill="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-rose-600 dark:text-rose-400" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.53-10.53a.75.75 0 0 0-1.06-1.06L10 8.94 7.53 6.47a.75.75 0 0 0-1.06 1.06L8.94 10l-2.47 2.47a.75.75 0 1 0 1.06 1.06L10 11.06l2.47 2.47a.75.75 0 0 0 1.06-1.06L11.06 10l2.47-2.47Z" clip-rule="evenodd" />
                 </svg>
               </div>
               <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-semibold text-gray-900">Inquiry Cancel Reasons</h3>
-                <p class="text-xs text-gray-500">Configure selectable reasons required when cancelling an inquiry.</p>
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">Inquiry Cancel Reasons</h3>
+                <p class="text-xs text-gray-500 dark:text-muted">Configure selectable reasons required when cancelling an inquiry.</p>
               </div>
             </div>
 
@@ -226,10 +226,10 @@ interface InquirySettingsDto {
               @for (reason of inquiryCancelReasons(); track $index; let i = $index) {
                 <div class="flex items-center gap-2">
                   <div class="flex flex-col gap-0.5 shrink-0">
-                    <button (click)="moveInquiryCancelReasonUp(i)" [disabled]="i === 0" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move up">
+                    <button (click)="moveInquiryCancelReasonUp(i)" [disabled]="i === 0" class="text-gray-400 dark:text-muted hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move up">
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
                     </button>
-                    <button (click)="moveInquiryCancelReasonDown(i)" [disabled]="i === inquiryCancelReasons().length - 1" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move down">
+                    <button (click)="moveInquiryCancelReasonDown(i)" [disabled]="i === inquiryCancelReasons().length - 1" class="text-gray-400 dark:text-muted hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move down">
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
                     </button>
                   </div>
@@ -242,7 +242,7 @@ interface InquirySettingsDto {
                   <button
                     (click)="removeInquiryCancelReason(i)"
                     [disabled]="inquiryCancelReasons().length <= 1"
-                    class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 transition-colors shrink-0"
+                    class="rounded-md p-1.5 text-gray-400 dark:text-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/15 disabled:opacity-30 transition-colors shrink-0"
                     title="Remove reason"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -270,7 +270,7 @@ interface InquirySettingsDto {
                   @if (inquiryCancelReasonsSaving()) { Saving… } @else { Save Reasons }
                 </button>
                 @if (inquiryCancelReasonsSaved()) {
-                  <span class="text-sm text-green-600 flex items-center gap-1">
+                  <span class="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                       <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
                     </svg>
@@ -287,19 +287,19 @@ interface InquirySettingsDto {
           <div class="app-panel">
             <div class="app-panel-header app-panel-header--sky">
               <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--sky">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-sky-600" viewBox="0 0 24 24" fill="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-sky-600 dark:text-sky-400" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M4 4.75A2.75 2.75 0 0 1 6.75 2h10.5A2.75 2.75 0 0 1 20 4.75v10.5A2.75 2.75 0 0 1 17.25 18H9.56l-4.78 3.52A.75.75 0 0 1 3.6 20.9V18.8A2.75 2.75 0 0 1 2 16.25V4.75A2.75 2.75 0 0 1 4.75 2Zm2.75 1.5a1.25 1.25 0 0 0-1.25 1.25v7.95c0 .69.56 1.25 1.25 1.25h10.5c.69 0 1.25-.56 1.25-1.25V7.5c0-.69-.56-1.25-1.25-1.25H6.75Z" />
                 </svg>
               </div>
               <div class="flex-1 min-w-0">
-                <h3 class="text-sm font-semibold text-gray-900">Supplier Inquiry Settings</h3>
-                <p class="text-xs text-gray-500">Control supplier response links, quote alerts, and automatic no-reply handling for inquiries.</p>
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">Supplier Inquiry Settings</h3>
+                <p class="text-xs text-gray-500 dark:text-muted">Control supplier response links, quote alerts, and automatic no-reply handling for inquiries.</p>
               </div>
             </div>
 
             <div class="app-panel-body">
               @if (inquirySaveSuccess()) {
-                <div class="mb-4 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+                <div class="mb-4 flex items-center gap-2 rounded-lg border border-green-200 dark:border-green-500/30 bg-green-50 dark:bg-green-500/15 p-3 text-sm text-green-700 dark:text-green-400">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                   </svg>
@@ -307,7 +307,7 @@ interface InquirySettingsDto {
                 </div>
               }
               @if (inquirySaveError()) {
-                <div class="mb-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                <div class="mb-4 flex items-center gap-2 rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 p-3 text-sm text-red-700 dark:text-red-400">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
                   </svg>
@@ -317,41 +317,41 @@ interface InquirySettingsDto {
 
               <div class="flex items-center justify-between gap-4">
                 <div>
-                  <p class="text-sm font-medium text-gray-900">Enable supplier response link</p>
-                  <p class="text-xs text-gray-500">Include the public quote URL in inquiry emails so suppliers can submit line-item prices directly.</p>
+                  <p class="text-sm font-medium text-gray-900 dark:text-ink">Enable supplier response link</p>
+                  <p class="text-xs text-gray-500 dark:text-muted">Include the public quote URL in inquiry emails so suppliers can submit line-item prices directly.</p>
                 </div>
                 <button
                   (click)="toggleInquiryResponseUrl()"
                   [disabled]="inquirySaving()"
                   [class]="inquiryResponseUrlEnabled()
                     ? 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-sky-500 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:opacity-50'
-                    : 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:opacity-50'"
+                    : 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 dark:bg-surface-3 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:opacity-50'"
                 >
                   <span
                     [class]="inquiryResponseUrlEnabled()
-                      ? 'pointer-events-none inline-block h-5 w-5 translate-x-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'
-                      : 'pointer-events-none inline-block h-5 w-5 translate-x-0 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'"
+                      ? 'pointer-events-none inline-block h-5 w-5 translate-x-5 transform rounded-full bg-white dark:bg-surface shadow ring-0 transition duration-200 ease-in-out'
+                      : 'pointer-events-none inline-block h-5 w-5 translate-x-0 transform rounded-full bg-white dark:bg-surface shadow ring-0 transition duration-200 ease-in-out'"
                   ></span>
                 </button>
               </div>
 
-              <div class="mt-5 border-t border-gray-100 pt-5">
+              <div class="mt-5 border-t border-gray-100 dark:border-line pt-5">
                 <div class="flex items-center justify-between gap-4">
                   <div>
-                    <p class="text-sm font-medium text-gray-900">Auto-mark stale inquiries as no reply</p>
-                    <p class="text-xs text-gray-500">Convert unanswered inquiries from SENT to NO_REPLY after the configured number of hours.</p>
+                    <p class="text-sm font-medium text-gray-900 dark:text-ink">Auto-mark stale inquiries as no reply</p>
+                    <p class="text-xs text-gray-500 dark:text-muted">Convert unanswered inquiries from SENT to NO_REPLY after the configured number of hours.</p>
                   </div>
                   <button
                     (click)="toggleInquiryAutoNoReply()"
                     [disabled]="inquirySaving()"
                     [class]="inquiryAutoNoReplyEnabled()
                       ? 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-sky-500 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:opacity-50'
-                      : 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:opacity-50'"
+                      : 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 dark:bg-surface-3 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:opacity-50'"
                   >
                     <span
                       [class]="inquiryAutoNoReplyEnabled()
-                        ? 'pointer-events-none inline-block h-5 w-5 translate-x-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'
-                        : 'pointer-events-none inline-block h-5 w-5 translate-x-0 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'"
+                        ? 'pointer-events-none inline-block h-5 w-5 translate-x-5 transform rounded-full bg-white dark:bg-surface shadow ring-0 transition duration-200 ease-in-out'
+                        : 'pointer-events-none inline-block h-5 w-5 translate-x-0 transform rounded-full bg-white dark:bg-surface shadow ring-0 transition duration-200 ease-in-out'"
                     ></span>
                   </button>
                 </div>
@@ -359,7 +359,7 @@ interface InquirySettingsDto {
                 @if (inquiryAutoNoReplyEnabled()) {
                   <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
                     <div class="w-full sm:w-40">
-                      <label class="block text-sm font-medium text-gray-700">Hours</label>
+                      <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">Hours</label>
                       <input
                         type="number"
                         min="1"
@@ -380,14 +380,14 @@ interface InquirySettingsDto {
                 }
               </div>
 
-              <div class="mt-5 border-t border-gray-100 pt-5">
+              <div class="mt-5 border-t border-gray-100 dark:border-line pt-5">
                 <div>
-                  <p class="text-sm font-medium text-gray-900">Default response deadline</p>
-                  <p class="text-xs text-gray-500">Number of hours from when an inquiry is sent until the response deadline shown to suppliers. Leave blank to disable the deadline feature.</p>
+                  <p class="text-sm font-medium text-gray-900 dark:text-ink">Default response deadline</p>
+                  <p class="text-xs text-gray-500 dark:text-muted">Number of hours from when an inquiry is sent until the response deadline shown to suppliers. Leave blank to disable the deadline feature.</p>
                 </div>
                 <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
                   <div class="w-full sm:w-40">
-                    <label class="block text-sm font-medium text-gray-700">Hours</label>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">Hours</label>
                     <input
                       type="number"
                       min="1"
@@ -408,69 +408,69 @@ interface InquirySettingsDto {
                 </div>
               </div>
 
-              <div class="mt-5 border-t border-gray-100 pt-5">
+              <div class="mt-5 border-t border-gray-100 dark:border-line pt-5">
                 <div>
-                  <p class="text-sm font-medium text-gray-900">Supplier quote alerts</p>
-                  <p class="text-xs text-gray-500">Alert the responsible trader when a supplier submits a quote or decline through the public Fueld response form.</p>
+                  <p class="text-sm font-medium text-gray-900 dark:text-ink">Supplier quote alerts</p>
+                  <p class="text-xs text-gray-500 dark:text-muted">Alert the responsible trader when a supplier submits a quote or decline through the public Fueld response form.</p>
                 </div>
 
                 <div class="mt-4 space-y-4">
                   <div class="flex items-center justify-between gap-4">
                     <div>
-                      <p class="text-sm font-medium text-gray-900">Email alert</p>
-                      <p class="text-xs text-gray-500">Send an internal notification email with a link to the order.</p>
+                      <p class="text-sm font-medium text-gray-900 dark:text-ink">Email alert</p>
+                      <p class="text-xs text-gray-500 dark:text-muted">Send an internal notification email with a link to the order.</p>
                     </div>
                     <button
                       (click)="toggleInquiryQuoteAlertEmail()"
                       [disabled]="inquirySaving()"
                       [class]="inquiryQuoteAlertEmailEnabled()
                         ? 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-sky-500 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:opacity-50'
-                        : 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:opacity-50'"
+                        : 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 dark:bg-surface-3 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:opacity-50'"
                     >
                       <span
                         [class]="inquiryQuoteAlertEmailEnabled()
-                          ? 'pointer-events-none inline-block h-5 w-5 translate-x-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'
-                          : 'pointer-events-none inline-block h-5 w-5 translate-x-0 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'"
+                          ? 'pointer-events-none inline-block h-5 w-5 translate-x-5 transform rounded-full bg-white dark:bg-surface shadow ring-0 transition duration-200 ease-in-out'
+                          : 'pointer-events-none inline-block h-5 w-5 translate-x-0 transform rounded-full bg-white dark:bg-surface shadow ring-0 transition duration-200 ease-in-out'"
                       ></span>
                     </button>
                   </div>
 
                   <div class="flex items-center justify-between gap-4">
                     <div>
-                      <p class="text-sm font-medium text-gray-900">Push alert</p>
-                      <p class="text-xs text-gray-500">Send a browser push notification that opens the order detail page.</p>
+                      <p class="text-sm font-medium text-gray-900 dark:text-ink">Push alert</p>
+                      <p class="text-xs text-gray-500 dark:text-muted">Send a browser push notification that opens the order detail page.</p>
                     </div>
                     <button
                       (click)="toggleInquiryQuoteAlertPush()"
                       [disabled]="inquirySaving()"
                       [class]="inquiryQuoteAlertPushEnabled()
                         ? 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-sky-500 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:opacity-50'
-                        : 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:opacity-50'"
+                        : 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 dark:bg-surface-3 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:opacity-50'"
                     >
                       <span
                         [class]="inquiryQuoteAlertPushEnabled()
-                          ? 'pointer-events-none inline-block h-5 w-5 translate-x-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'
-                          : 'pointer-events-none inline-block h-5 w-5 translate-x-0 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'"
+                          ? 'pointer-events-none inline-block h-5 w-5 translate-x-5 transform rounded-full bg-white dark:bg-surface shadow ring-0 transition duration-200 ease-in-out'
+                          : 'pointer-events-none inline-block h-5 w-5 translate-x-0 transform rounded-full bg-white dark:bg-surface shadow ring-0 transition duration-200 ease-in-out'"
                       ></span>
                     </button>
                   </div>
 
                   <div class="flex items-center justify-between gap-4">
                     <div>
-                      <p class="text-sm font-medium text-gray-900">WhatsApp group alert</p>
-                      <p class="text-xs text-gray-500">Post the supplier response to the default WhatsApp group when WhatsApp is configured.</p>
+                      <p class="text-sm font-medium text-gray-900 dark:text-ink">WhatsApp group alert</p>
+                      <p class="text-xs text-gray-500 dark:text-muted">Post the supplier response to the default WhatsApp group when WhatsApp is configured.</p>
                     </div>
                     <button
                       (click)="toggleInquiryQuoteAlertWhatsApp()"
                       [disabled]="inquirySaving()"
                       [class]="inquiryQuoteAlertWhatsAppEnabled()
                         ? 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-sky-500 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:opacity-50'
-                        : 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:opacity-50'"
+                        : 'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 dark:bg-surface-3 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:opacity-50'"
                     >
                       <span
                         [class]="inquiryQuoteAlertWhatsAppEnabled()
-                          ? 'pointer-events-none inline-block h-5 w-5 translate-x-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'
-                          : 'pointer-events-none inline-block h-5 w-5 translate-x-0 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'"
+                          ? 'pointer-events-none inline-block h-5 w-5 translate-x-5 transform rounded-full bg-white dark:bg-surface shadow ring-0 transition duration-200 ease-in-out'
+                          : 'pointer-events-none inline-block h-5 w-5 translate-x-0 transform rounded-full bg-white dark:bg-surface shadow ring-0 transition duration-200 ease-in-out'"
                       ></span>
                     </button>
                   </div>

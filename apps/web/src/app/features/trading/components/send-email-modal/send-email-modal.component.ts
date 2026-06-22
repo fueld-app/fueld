@@ -80,26 +80,26 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
       >
         <!-- Modal panel -->
         <div
-          class="w-full max-w-3xl rounded-2xl bg-white shadow-2xl flex flex-col max-h-[90vh]"
+          class="w-full max-w-3xl rounded-2xl bg-white dark:bg-surface shadow-2xl flex flex-col max-h-[90vh]"
           role="dialog"
           aria-modal="true"
           aria-labelledby="modal-title"
         >
           <!-- Header -->
           <div
-            class="flex items-center justify-between border-b border-gray-200 px-6 py-4 shrink-0"
+            class="flex items-center justify-between border-b border-gray-200 dark:border-line px-6 py-4 shrink-0"
           >
             <div>
-              <h2 id="modal-title" class="text-lg font-semibold text-gray-900">
+              <h2 id="modal-title" class="text-lg font-semibold text-gray-900 dark:text-ink">
                 Send {{ docLabel() }}
               </h2>
-              <p class="text-sm text-gray-500 mt-0.5">
+              <p class="text-sm text-gray-500 dark:text-muted mt-0.5">
                 {{ hasPrimaryDocument() ? 'Compose email with PDF attachment' : 'Compose email with selected document attachments' }}
               </p>
             </div>
             <button
               (click)="close()"
-              class="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              class="rounded-md p-1 text-gray-400 dark:text-muted hover:bg-gray-100 dark:hover:bg-surface-tint-strong hover:text-gray-600"
               aria-label="Close"
             >
               <svg
@@ -120,13 +120,13 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
           <div class="space-y-4 px-6 py-5 overflow-y-auto flex-1">
             <!-- From (read-only) -->
             <div>
-              <label class="block text-sm font-medium text-gray-500">From</label>
+              <label class="block text-sm font-medium text-gray-500 dark:text-muted">From</label>
               <div
-                class="mt-1 flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-700"
+                class="mt-1 flex items-center gap-2 rounded-lg border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 px-3.5 py-2.5 text-sm text-gray-700 dark:text-ink-dim"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  class="h-4 w-4 text-gray-400 shrink-0"
+                  class="h-4 w-4 text-gray-400 dark:text-muted shrink-0"
                   viewBox="0 0 20 20"
                   fill="currentColor"
                 >
@@ -137,7 +137,7 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
                   />
                 </svg>
                 <span class="font-medium">{{ senderName() }}</span>
-                <span class="text-gray-400"
+                <span class="text-gray-400 dark:text-muted"
                   >&lt;{{ senderEmail() }}&gt;</span
                 >
               </div>
@@ -145,7 +145,7 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
 
             <!-- To -->
             <div>
-              <label class="block text-sm font-medium text-gray-700">To</label>
+              <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">To</label>
               <div class="mt-1">
                 <app-email-tag-input
                   #toInput
@@ -160,14 +160,14 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
             <!-- CC -->
             <div>
               <div class="flex items-center justify-between">
-                <label class="block text-sm font-medium text-gray-700"
+                <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim"
                   >CC</label
                 >
                 @if (!showBcc()) {
                   <button
                     type="button"
                     (click)="showBcc.set(true)"
-                    class="text-xs text-brand-600 hover:text-brand-700 font-medium"
+                    class="text-xs text-brand-600 dark:text-brand-400 hover:text-brand-700 font-medium"
                   >
                     + BCC
                   </button>
@@ -188,13 +188,13 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
             @if (showBcc()) {
               <div>
                 <div class="flex items-center justify-between">
-                  <label class="block text-sm font-medium text-gray-700"
+                  <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim"
                     >BCC</label
                   >
                   <button
                     type="button"
                     (click)="showBcc.set(false)"
-                    class="text-xs text-gray-400 hover:text-gray-600"
+                    class="text-xs text-gray-400 dark:text-muted hover:text-gray-600"
                   >
                     Hide
                   </button>
@@ -215,36 +215,34 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
             <div>
               <label
                 for="email-subject"
-                class="block text-sm font-medium text-gray-700"
+                class="block text-sm font-medium text-gray-700 dark:text-ink-dim"
                 >Subject</label
               >
               <input
                 id="email-subject"
                 type="text"
                 [(ngModel)]="subject"
-                class="mt-1 w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm shadow-sm
-                       placeholder:text-gray-400 focus:border-brand-500 focus:outline-none
-                       focus:ring-2 focus:ring-brand-500/20"
+                class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3.5 py-2.5 text-sm shadow-sm placeholder:text-gray-400 dark:placeholder:text-muted focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
               />
             </div>
 
             <!-- Rich text editor -->
             <div>
               <div class="flex items-center justify-between mb-1">
-                <label class="block text-sm font-medium text-gray-700"
+                <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim"
                   >Email body</label
                 >
               </div>
 
               <!-- Mini toolbar -->
               <div
-                class="flex items-center gap-0.5 rounded-t-lg border border-b-0 border-gray-300 bg-gray-50 px-2 py-1.5"
+                class="flex items-center gap-0.5 rounded-t-lg border border-b-0 border-gray-300 dark:border-line-strong bg-gray-50 dark:bg-bg-2 px-2 py-1.5"
               >
                 <button
                   type="button"
                   (click)="execCmd('bold')"
                   title="Bold"
-                  class="rounded p-1.5 text-gray-500 hover:bg-gray-200 hover:text-gray-700"
+                  class="rounded p-1.5 text-gray-500 dark:text-muted hover:bg-gray-200 hover:text-gray-700"
                 >
                   <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                     <path
@@ -258,7 +256,7 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
                   type="button"
                   (click)="execCmd('italic')"
                   title="Italic"
-                  class="rounded p-1.5 text-gray-500 hover:bg-gray-200 hover:text-gray-700"
+                  class="rounded p-1.5 text-gray-500 dark:text-muted hover:bg-gray-200 hover:text-gray-700"
                 >
                   <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                     <path
@@ -272,7 +270,7 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
                   type="button"
                   (click)="execCmd('underline')"
                   title="Underline"
-                  class="rounded p-1.5 text-gray-500 hover:bg-gray-200 hover:text-gray-700"
+                  class="rounded p-1.5 text-gray-500 dark:text-muted hover:bg-gray-200 hover:text-gray-700"
                 >
                   <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                     <path
@@ -287,7 +285,7 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
                   type="button"
                   (click)="execCmd('insertUnorderedList')"
                   title="Bullet list"
-                  class="rounded p-1.5 text-gray-500 hover:bg-gray-200 hover:text-gray-700"
+                  class="rounded p-1.5 text-gray-500 dark:text-muted hover:bg-gray-200 hover:text-gray-700"
                 >
                   <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                     <path
@@ -301,7 +299,7 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
                   type="button"
                   (click)="insertLink()"
                   title="Insert link"
-                  class="rounded p-1.5 text-gray-500 hover:bg-gray-200 hover:text-gray-700"
+                  class="rounded p-1.5 text-gray-500 dark:text-muted hover:bg-gray-200 hover:text-gray-700"
                 >
                   <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                     <path
@@ -318,7 +316,7 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
               <div
                 #bodyEditor
                 contenteditable="true"
-                class="rounded-b-lg border border-gray-300 bg-white p-4 text-sm text-gray-700 min-h-[200px] max-h-[350px] overflow-y-auto focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                class="rounded-b-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface p-4 text-sm text-gray-700 dark:text-ink-dim min-h-[200px] max-h-[350px] overflow-y-auto focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
                 (input)="onBodyInput()"
               ></div>
             </div>
@@ -327,11 +325,11 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
             @if (hasPrimaryDocument()) {
             <div class="flex items-center gap-3">
               <div
-                class="flex-1 flex items-center gap-2 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-600"
+                class="flex-1 flex items-center gap-2 rounded-lg border border-dashed border-gray-300 dark:border-line-strong bg-gray-50 dark:bg-bg-2 px-4 py-3 text-sm text-gray-600 dark:text-ink-dim"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  class="h-5 w-5 text-red-500 shrink-0"
+                  class="h-5 w-5 text-red-500 dark:text-red-300 shrink-0"
                   viewBox="0 0 20 20"
                   fill="currentColor"
                 >
@@ -344,13 +342,13 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
                 <span class="font-medium">{{
                   pdfFileName() || 'Document.pdf'
                 }}</span>
-                <span class="text-gray-400 text-xs">(auto-generated)</span>
+                <span class="text-gray-400 dark:text-muted text-xs">(auto-generated)</span>
               </div>
               <button
                 type="button"
                 (click)="previewPdf()"
                 [disabled]="loadingPreview()"
-                class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors disabled:opacity-50"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-2.5 text-sm font-medium text-gray-700 dark:text-ink-dim shadow-sm hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors disabled:opacity-50"
               >
                 @if (loadingPreview()) {
                   <svg
@@ -396,36 +394,36 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
             }
 
             @if (showExtraAttachments()) {
-              <div class="rounded-xl border border-gray-200 bg-gray-50/80 p-4">
+              <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50/80 p-4">
                 <div class="flex items-start justify-between gap-3">
                   <div>
-                    <h3 class="text-sm font-semibold text-gray-900">{{ attachmentSectionTitle() }}</h3>
-                    <p class="mt-0.5 text-xs text-gray-500">{{ attachmentSectionDescription() }}</p>
+                    <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">{{ attachmentSectionTitle() }}</h3>
+                    <p class="mt-0.5 text-xs text-gray-500 dark:text-muted">{{ attachmentSectionDescription() }}</p>
                   </div>
-                  <span class="rounded-full bg-white px-2 py-1 text-[11px] font-medium text-gray-500 ring-1 ring-gray-200">
+                  <span class="rounded-full bg-white dark:bg-surface px-2 py-1 text-[11px] font-medium text-gray-500 dark:text-muted ring-1 ring-gray-200 dark:ring-line">
                     {{ selectedAttachmentIds().length }} selected
                   </span>
                 </div>
                 <div class="mt-3 space-y-2">
                   @for (attachment of visibleExtraAttachments(); track attachment.id) {
-                    <div class="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 transition-colors hover:border-brand-300 hover:bg-brand-50/40">
+                    <div class="flex items-center gap-3 rounded-lg border border-gray-200 dark:border-line bg-white dark:bg-surface px-3 py-2.5 text-sm text-gray-700 dark:text-ink-dim transition-colors hover:border-brand-300 hover:bg-brand-50/40">
                       <input
                         type="checkbox"
-                        class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                        class="h-4 w-4 rounded border-gray-300 dark:border-line-strong text-brand-600 dark:text-brand-400 focus:ring-brand-600"
                         [checked]="isAttachmentSelected(attachment.id)"
                         (change)="toggleAttachmentSelection(attachment.id, $any($event.target).checked)"
                       />
                       <div class="min-w-0 flex-1">
-                        <div class="truncate font-medium text-gray-800">{{ attachment.fileName }}</div>
+                        <div class="truncate font-medium text-gray-800 dark:text-ink">{{ attachment.fileName }}</div>
                         @if (attachment.label) {
-                          <div class="truncate text-xs text-gray-500">{{ attachment.label }}</div>
+                          <div class="truncate text-xs text-gray-500 dark:text-muted">{{ attachment.label }}</div>
                         }
                       </div>
                       <button
                         type="button"
                         (click)="previewAttachment(attachment)"
                         [disabled]="previewingAttachmentId() === attachment.id || !attachment.previewUrl"
-                        class="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 disabled:opacity-50"
+                        class="inline-flex items-center gap-1 rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-2.5 py-1.5 text-xs font-medium text-gray-700 dark:text-ink-dim shadow-sm transition-colors hover:bg-gray-50 dark:hover:bg-surface-tint disabled:opacity-50"
                       >
                         @if (previewingAttachmentId() === attachment.id) {
                           <svg
@@ -454,17 +452,17 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
 
             <!-- PDF Preview iframe -->
             @if (!isMobilePreview && pdfPreviewUrl()) {
-              <div class="rounded-lg border border-gray-200 overflow-hidden">
+              <div class="rounded-lg border border-gray-200 dark:border-line overflow-hidden">
                 <div
-                  class="flex items-center justify-between bg-gray-50 px-4 py-2 border-b border-gray-200"
+                  class="flex items-center justify-between bg-gray-50 dark:bg-bg-2 px-4 py-2 border-b border-gray-200 dark:border-line"
                 >
-                  <span class="text-sm font-medium text-gray-700"
+                  <span class="text-sm font-medium text-gray-700 dark:text-ink-dim"
                     >PDF Preview</span
                   >
                   <button
                     type="button"
                     (click)="closePdfPreview()"
-                    class="rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600"
+                    class="rounded p-1 text-gray-400 dark:text-muted hover:bg-gray-200 hover:text-gray-600"
                   >
                     <svg
                       class="h-4 w-4"
@@ -490,18 +488,16 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
               <div>
                 <label
                   for="wa-phone"
-                  class="block text-sm font-medium text-gray-700"
+                  class="block text-sm font-medium text-gray-700 dark:text-ink-dim"
                   >WhatsApp number
-                  <span class="text-gray-400 font-normal">(optional)</span>
+                  <span class="text-gray-400 dark:text-muted font-normal">(optional)</span>
                 </label>
                 <input
                   id="wa-phone"
                   type="tel"
                   [(ngModel)]="waPhoneNumber"
                   placeholder="+45 12345678"
-                  class="mt-1 w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm shadow-sm
-                         placeholder:text-gray-400 focus:border-green-500 focus:outline-none
-                         focus:ring-2 focus:ring-green-500/20"
+                  class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3.5 py-2.5 text-sm shadow-sm placeholder:text-gray-400 dark:placeholder:text-muted focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
                 />
               </div>
             }
@@ -509,12 +505,11 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
 
           <!-- Footer -->
           <div
-            class="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-4 shrink-0"
+            class="flex items-center justify-end gap-3 border-t border-gray-200 dark:border-line px-6 py-4 shrink-0"
           >
             <button
               (click)="close()"
-              class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700
-                     shadow-sm hover:bg-gray-50"
+              class="rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim shadow-sm hover:bg-gray-50 dark:hover:bg-surface-tint"
             >
               Cancel
             </button>
@@ -568,8 +563,8 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
             <button
               (click)="doSend()"
               [disabled]="sending() || !hasRecipient()"
-              class="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold
-                     text-white shadow-sm transition-colors hover:bg-brand-700 disabled:opacity-50
+              class="inline-flex items-center gap-2 rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold
+                     text-white shadow-sm transition-colors hover:bg-brand-800 disabled:opacity-50
                      disabled:cursor-not-allowed"
             >
               @if (sending()) {

@@ -3,6 +3,7 @@ import { RouterOutlet } from '@angular/router';
 import { AppUpdateService } from './core/pwa/app-update.service';
 import { PushService } from './core/pwa/push.service';
 import { DateFormatService } from './core/services/date-format.service';
+import { ThemeService } from './core/theme.service';
 
 @Component({
   selector: 'app-root',
@@ -15,6 +16,8 @@ export class App implements OnInit {
   private readonly appUpdate = inject(AppUpdateService);
   private readonly push = inject(PushService);
   private readonly dateFormatSvc = inject(DateFormatService);
+  // Eagerly instantiate so the OS-change listener + effect are active app-wide.
+  private readonly theme = inject(ThemeService);
 
   ngOnInit(): void {
     this.initViewportHeightFix();

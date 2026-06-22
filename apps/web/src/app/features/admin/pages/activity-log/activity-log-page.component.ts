@@ -28,14 +28,14 @@ import { API } from '@app/core/config/api';
       <!-- Header -->
       <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
-          <h1 class="text-2xl font-bold text-gray-900">Activity &amp; Sessions</h1>
-          <p class="mt-1 text-sm text-gray-500">
+          <h1 class="text-2xl font-bold text-gray-900 dark:text-ink">Activity &amp; Sessions</h1>
+          <p class="mt-1 text-sm text-gray-500 dark:text-muted">
             Real-time user sessions and activity audit log.
           </p>
         </div>
         <div class="flex items-center gap-3">
           <!-- Retention setting -->
-          <div class="flex items-center gap-2 text-sm text-gray-600">
+          <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-ink-dim">
             <span>Retention:</span>
             <input
               type="number"
@@ -52,14 +52,14 @@ import { API } from '@app/core/config/api';
       </div>
 
       <!-- Tabs -->
-      <div class="border-b border-gray-200 mb-6">
+      <div class="border-b border-gray-200 dark:border-line mb-6">
         <nav class="flex gap-6">
           <button
             (click)="activeTab.set('sessions')"
             class="pb-3 text-sm font-medium border-b-2 transition-colors"
             [class]="activeTab() === 'sessions'
-              ? 'border-brand-600 text-brand-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+              ? 'border-brand-600 text-brand-600 dark:text-brand-400'
+              : 'border-transparent text-gray-500 dark:text-muted hover:text-gray-700 hover:border-gray-300'"
           >
             <div class="flex items-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -68,7 +68,7 @@ import { API } from '@app/core/config/api';
               </svg>
               Live Sessions
               @if (sessions().length > 0) {
-                <span class="inline-flex items-center justify-center rounded-full bg-green-100 text-green-700 text-xs font-bold px-2 py-0.5">
+                <span class="inline-flex items-center justify-center rounded-full bg-green-100 dark:bg-green-500/15 text-green-700 dark:text-green-400 text-xs font-bold px-2 py-0.5">
                   {{ sessions().length }}
                 </span>
               }
@@ -79,8 +79,8 @@ import { API } from '@app/core/config/api';
             data-testid="activity-log-tab"
             class="pb-3 text-sm font-medium border-b-2 transition-colors"
             [class]="activeTab() === 'log'
-              ? 'border-brand-600 text-brand-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+              ? 'border-brand-600 text-brand-600 dark:text-brand-400'
+              : 'border-transparent text-gray-500 dark:text-muted hover:text-gray-700 hover:border-gray-300'"
           >
             <div class="flex items-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -95,8 +95,8 @@ import { API } from '@app/core/config/api';
       <!-- ══════════ Sessions Tab ══════════ -->
       @if (activeTab() === 'sessions') {
         @if (sessions().length === 0) {
-          <div class="text-center py-12 text-gray-500">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <div class="text-center py-12 text-gray-500 dark:text-muted">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto mb-3 text-gray-300 dark:text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
               <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
             </svg>
             <p class="font-medium">No active sessions</p>
@@ -106,16 +106,16 @@ import { API } from '@app/core/config/api';
           <!-- Session summary cards -->
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             <div class="app-kpi-card p-4">
-              <p class="text-sm text-gray-500">Active Sessions</p>
-              <p class="text-2xl font-bold text-gray-900 mt-1">{{ sessions().length }}</p>
+              <p class="text-sm text-gray-500 dark:text-muted">Active Sessions</p>
+              <p class="text-2xl font-bold text-gray-900 dark:text-ink mt-1">{{ sessions().length }}</p>
             </div>
             <div class="app-kpi-card p-4">
-              <p class="text-sm text-gray-500">Unique Users</p>
-              <p class="text-2xl font-bold text-gray-900 mt-1">{{ uniqueUserCount() }}</p>
+              <p class="text-sm text-gray-500 dark:text-muted">Unique Users</p>
+              <p class="text-2xl font-bold text-gray-900 dark:text-ink mt-1">{{ uniqueUserCount() }}</p>
             </div>
             <div class="app-kpi-card p-4">
-              <p class="text-sm text-gray-500">Avg. Sessions / User</p>
-              <p class="text-2xl font-bold text-gray-900 mt-1">{{ avgSessionsPerUser() }}</p>
+              <p class="text-sm text-gray-500 dark:text-muted">Avg. Sessions / User</p>
+              <p class="text-2xl font-bold text-gray-900 dark:text-ink mt-1">{{ avgSessionsPerUser() }}</p>
             </div>
           </div>
 
@@ -128,25 +128,25 @@ import { API } from '@app/core/config/api';
                 </svg>
               </div>
               <div>
-                <h2 class="text-base font-semibold text-gray-900">Live Session Feed</h2>
-                <p class="mt-1 text-sm text-gray-600">Current presence, device, and geography for active users.</p>
+                <h2 class="text-base font-semibold text-gray-900 dark:text-ink">Live Session Feed</h2>
+                <p class="mt-1 text-sm text-gray-600 dark:text-ink-dim">Current presence, device, and geography for active users.</p>
               </div>
             </div>
             <div class="overflow-x-auto">
               <table class="w-full text-sm">
               <thead>
-                <tr class="border-b border-gray-200 bg-gray-50/80">
-                  <th class="px-4 py-3 text-left font-medium text-gray-600">User</th>
-                  <th class="px-4 py-3 text-left font-medium text-gray-600">Current Page</th>
-                  <th class="px-4 py-3 text-left font-medium text-gray-600">Platform</th>
-                  <th class="px-4 py-3 text-left font-medium text-gray-600">IP</th>
-                  <th class="px-4 py-3 text-left font-medium text-gray-600">Location</th>
-                  <th class="px-4 py-3 text-left font-medium text-gray-600">Timezone</th>
-                  <th class="px-4 py-3 text-left font-medium text-gray-600">Language</th>
-                  <th class="px-4 py-3 text-left font-medium text-gray-600">Connected</th>
+                <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80">
+                  <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">User</th>
+                  <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Current Page</th>
+                  <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Platform</th>
+                  <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">IP</th>
+                  <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Location</th>
+                  <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Timezone</th>
+                  <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Language</th>
+                  <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Connected</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-gray-100">
+              <tbody class="divide-y divide-gray-100 dark:divide-line">
                 @for (s of sessions(); track s.socketId) {
                   <tr class="transition-colors hover:bg-gray-50/50">
                     <td class="px-4 py-3">
@@ -156,30 +156,30 @@ import { API } from '@app/core/config/api';
                           <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500"></span>
                         </span>
                         <div>
-                          <p class="font-medium text-gray-900">{{ s.userName || 'Unknown' }}</p>
-                          <p class="text-xs text-gray-500">{{ s.userEmail }}</p>
+                          <p class="font-medium text-gray-900 dark:text-ink">{{ s.userName || 'Unknown' }}</p>
+                          <p class="text-xs text-gray-500 dark:text-muted">{{ s.userEmail }}</p>
                         </div>
                       </div>
                     </td>
-                    <td class="px-4 py-3 text-gray-600">
+                    <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">
                       @if (s.pageTitle) {
-                        <a [href]="s.currentUrl || '/'" class="text-xs font-medium text-brand-600 hover:text-brand-800 hover:underline">{{ s.pageTitle }}</a>
+                        <a [href]="s.currentUrl || '/'" class="text-xs font-medium text-brand-600 dark:text-brand-400 hover:text-brand-800 hover:underline">{{ s.pageTitle }}</a>
                       } @else if (s.currentUrl) {
-                        <a [href]="s.currentUrl" class="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-brand-600 hover:text-brand-800 hover:underline font-mono">{{ s.currentUrl }}</a>
+                        <a [href]="s.currentUrl" class="rounded bg-gray-100 dark:bg-surface-3 px-1.5 py-0.5 text-xs text-brand-600 dark:text-brand-400 hover:text-brand-800 hover:underline font-mono">{{ s.currentUrl }}</a>
                       } @else {
                         <div class="flex flex-col gap-1">
-                          <span class="inline-flex w-fit items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                          <span class="inline-flex w-fit items-center rounded-full bg-amber-100 dark:bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:text-amber-300">
                             Page unknown
                           </span>
-                          <span class="text-[11px] text-gray-400">Connected, waiting for presence update</span>
+                          <span class="text-[11px] text-gray-400 dark:text-muted">Connected, waiting for presence update</span>
                         </div>
                       }
                     </td>
-                    <td class="px-4 py-3 text-gray-600 text-xs">{{ s.platform || '—' }}</td>
-                    <td class="px-4 py-3 text-gray-600">
+                    <td class="px-4 py-3 text-gray-600 dark:text-ink-dim text-xs">{{ s.platform || '—' }}</td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">
                       <code class="text-xs">{{ s.clientIp || '—' }}</code>
                     </td>
-                    <td class="px-4 py-3 text-gray-600 text-xs">
+                    <td class="px-4 py-3 text-gray-600 dark:text-ink-dim text-xs">
                       @if (s.city && s.country) {
                         {{ s.city }}, {{ s.country }}
                       } @else if (s.country) {
@@ -188,9 +188,9 @@ import { API } from '@app/core/config/api';
                         —
                       }
                     </td>
-                    <td class="px-4 py-3 text-gray-600 text-xs">{{ s.timezone || '—' }}</td>
-                    <td class="px-4 py-3 text-gray-600 text-xs">{{ s.language || '—' }}</td>
-                    <td class="px-4 py-3 text-gray-600 text-xs">{{ formatTime(s.connectedAt) }}</td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-ink-dim text-xs">{{ s.timezone || '—' }}</td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-ink-dim text-xs">{{ s.language || '—' }}</td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-ink-dim text-xs">{{ formatTime(s.connectedAt) }}</td>
                   </tr>
                 }
               </tbody>
@@ -253,7 +253,7 @@ import { API } from '@app/core/config/api';
               (ngModelChange)="filterDateFrom.set($event); loadLogs()"
               class="app-input px-2 py-1.5"
             />
-            <span class="text-gray-400 text-xs">–</span>
+            <span class="text-gray-400 dark:text-muted text-xs">–</span>
             <input
               type="date"
               [ngModel]="filterDateTo()"
@@ -263,7 +263,7 @@ import { API } from '@app/core/config/api';
           </div>
           <button
             (click)="loadLogs()"
-            class="rounded-md bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-200 transition-colors"
+            class="rounded-md bg-gray-100 dark:bg-surface-3 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-200 transition-colors"
           >
             Apply
           </button>
@@ -271,14 +271,14 @@ import { API } from '@app/core/config/api';
 
         @if (logsLoading()) {
           <div class="flex items-center justify-center py-12">
-            <svg class="h-8 w-8 animate-spin text-brand-600" viewBox="0 0 24 24" fill="none">
+            <svg class="h-8 w-8 animate-spin text-brand-600 dark:text-brand-400" viewBox="0 0 24 24" fill="none">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
             </svg>
           </div>
         } @else if (logs().length === 0) {
-          <div class="text-center py-12 text-gray-500">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <div class="text-center py-12 text-gray-500 dark:text-muted">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto mb-3 text-gray-300 dark:text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
               <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m5.231 13.481L15 17.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v16.5c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9zm3.75 11.625a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
             </svg>
             <p class="font-medium">No activity logs found</p>
@@ -293,37 +293,37 @@ import { API } from '@app/core/config/api';
                 </svg>
               </div>
               <div>
-                <h2 class="text-base font-semibold text-gray-900">Audit Timeline</h2>
-                <p class="mt-1 text-sm text-gray-600">Filter by actor, action, entity, and date to inspect operational history.</p>
+                <h2 class="text-base font-semibold text-gray-900 dark:text-ink">Audit Timeline</h2>
+                <p class="mt-1 text-sm text-gray-600 dark:text-ink-dim">Filter by actor, action, entity, and date to inspect operational history.</p>
               </div>
             </div>
             <div class="overflow-x-auto">
               <table class="w-full text-sm">
               <thead>
-                <tr class="border-b border-gray-200 bg-gray-50/80">
-                  <th app-sort-header field="createdAt" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Time</th>
-                  <th app-sort-header field="user" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">User</th>
-                  <th app-sort-header field="action" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-center font-medium text-gray-600">Action</th>
-                  <th app-sort-header field="entityType" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Page / Entity</th>
-                  <th class="px-4 py-3 text-left font-medium text-gray-600">Details</th>
-                  <th app-sort-header field="clientIp" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">IP</th>
-                  <th app-sort-header field="platform" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Platform</th>
+                <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80">
+                  <th app-sort-header field="createdAt" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Time</th>
+                  <th app-sort-header field="user" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">User</th>
+                  <th app-sort-header field="action" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-center font-medium text-gray-600 dark:text-ink-dim">Action</th>
+                  <th app-sort-header field="entityType" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Page / Entity</th>
+                  <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Details</th>
+                  <th app-sort-header field="clientIp" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">IP</th>
+                  <th app-sort-header field="platform" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Platform</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-gray-100">
+              <tbody class="divide-y divide-gray-100 dark:divide-line">
                 @for (log of logs(); track log.id) {
                   <tr class="transition-colors hover:bg-gray-50/50 cursor-pointer" (click)="expandedLogId.set(expandedLogId() === log.id ? null : log.id)">
-                    <td class="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
+                    <td class="px-4 py-3 text-gray-500 dark:text-muted text-xs whitespace-nowrap">
                       <div class="flex items-center gap-1.5">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-gray-400 transition-transform" [class.rotate-90]="expandedLogId() === log.id" viewBox="0 0 20 20" fill="currentColor">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-gray-400 dark:text-muted transition-transform" [class.rotate-90]="expandedLogId() === log.id" viewBox="0 0 20 20" fill="currentColor">
                           <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
                         </svg>
                         {{ formatTimestamp(log.createdAt) }}
                       </div>
                     </td>
                     <td class="px-4 py-3">
-                      <p class="font-medium text-gray-900 text-xs">{{ log.userName || 'System' }}</p>
-                      <p class="text-[11px] text-gray-500">{{ log.userEmail }}</p>
+                      <p class="font-medium text-gray-900 dark:text-ink text-xs">{{ log.userName || 'System' }}</p>
+                      <p class="text-[11px] text-gray-500 dark:text-muted">{{ log.userEmail }}</p>
                     </td>
                     <td class="px-4 py-3 text-center">
                       <span
@@ -335,63 +335,63 @@ import { API } from '@app/core/config/api';
                     </td>
                     <td class="px-4 py-3">
                       @if (log.entityName && log.entityType) {
-                        <span class="text-xs text-gray-700">{{ formatEntityLabel(log.entityType) }}</span>
-                        <span class="text-xs text-gray-400 mx-1">›</span>
-                        <span class="text-xs font-medium text-gray-800">{{ log.entityName }}</span>
+                        <span class="text-xs text-gray-700 dark:text-ink-dim">{{ formatEntityLabel(log.entityType) }}</span>
+                        <span class="text-xs text-gray-400 dark:text-muted mx-1">›</span>
+                        <span class="text-xs font-medium text-gray-800 dark:text-ink">{{ log.entityName }}</span>
                       } @else if (log.pageTitle) {
-                        <a [href]="log.httpPath || '/'" class="text-xs font-medium text-brand-600 hover:text-brand-800 hover:underline">{{ log.pageTitle }}</a>
+                        <a [href]="log.httpPath || '/'" class="text-xs font-medium text-brand-600 dark:text-brand-400 hover:text-brand-800 hover:underline">{{ log.pageTitle }}</a>
                       } @else if (log.entityType && log.entityType !== 'page') {
-                        <span class="text-xs text-gray-700 capitalize">{{ formatEntityLabel(log.entityType) }}</span>
+                        <span class="text-xs text-gray-700 dark:text-ink-dim capitalize">{{ formatEntityLabel(log.entityType) }}</span>
                         @if (log.entityId) {
-                          <span class="text-[11px] text-gray-400 ml-1">#{{ log.entityId.slice(0, 8) }}</span>
+                          <span class="text-[11px] text-gray-400 dark:text-muted ml-1">#{{ log.entityId.slice(0, 8) }}</span>
                         }
                       } @else if (log.httpPath) {
-                        <a [href]="log.httpPath" class="text-xs text-brand-600 hover:text-brand-800 hover:underline font-mono">{{ log.httpPath }}</a>
+                        <a [href]="log.httpPath" class="text-xs text-brand-600 dark:text-brand-400 hover:text-brand-800 hover:underline font-mono">{{ log.httpPath }}</a>
                       } @else {
-                        <span class="text-xs text-gray-400">\u2014</span>
+                        <span class="text-xs text-gray-400 dark:text-muted">\u2014</span>
                       }
                     </td>
                     <td class="px-4 py-3">
                       @if (log.action === 'COPY' && log.metadata) {
-                        <span class="text-[11px] text-gray-500 italic line-clamp-1" [title]="getCopiedText(log.metadata)">\u201c{{ getCopiedText(log.metadata) }}\u201d</span>
+                        <span class="text-[11px] text-gray-500 dark:text-muted italic line-clamp-1" [title]="getCopiedText(log.metadata)">\u201c{{ getCopiedText(log.metadata) }}\u201d</span>
                       } @else if (log.httpMethod && log.action !== 'PAGE_VIEW') {
-                        <code class="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-500">{{ log.httpMethod }} {{ log.httpPath }}</code>
+                        <code class="rounded bg-gray-100 dark:bg-surface-3 px-1.5 py-0.5 text-[11px] text-gray-500 dark:text-muted">{{ log.httpMethod }} {{ log.httpPath }}</code>
                       } @else {
-                        <span class="text-xs text-gray-400">\u2014</span>
+                        <span class="text-xs text-gray-400 dark:text-muted">\u2014</span>
                       }
                     </td>
                     <td class="px-4 py-3">
-                      <code class="text-[11px] text-gray-500">{{ log.clientIp || '\u2014' }}</code>
+                      <code class="text-[11px] text-gray-500 dark:text-muted">{{ log.clientIp || '\u2014' }}</code>
                     </td>
-                    <td class="px-4 py-3 text-[11px] text-gray-500">{{ log.platform || '\u2014' }}</td>
+                    <td class="px-4 py-3 text-[11px] text-gray-500 dark:text-muted">{{ log.platform || '\u2014' }}</td>
                   </tr>
                   @if (expandedLogId() === log.id) {
                     <tr class="bg-gray-50/80">
                       <td colspan="7" class="px-6 py-4">
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
                           <div>
-                            <p class="font-medium text-gray-500 mb-0.5">User Agent</p>
-                            <p class="text-gray-700 break-all">{{ formatUserAgent(log.userAgent) }}</p>
+                            <p class="font-medium text-gray-500 dark:text-muted mb-0.5">User Agent</p>
+                            <p class="text-gray-700 dark:text-ink-dim break-all">{{ formatUserAgent(log.userAgent) }}</p>
                           </div>
                           <div>
-                            <p class="font-medium text-gray-500 mb-0.5">IP Address</p>
-                            <p class="text-gray-700 font-mono">{{ log.clientIp || '—' }}</p>
+                            <p class="font-medium text-gray-500 dark:text-muted mb-0.5">IP Address</p>
+                            <p class="text-gray-700 dark:text-ink-dim font-mono">{{ log.clientIp || '—' }}</p>
                           </div>
                           <div>
-                            <p class="font-medium text-gray-500 mb-0.5">Platform</p>
-                            <p class="text-gray-700">{{ log.platform || '—' }}</p>
+                            <p class="font-medium text-gray-500 dark:text-muted mb-0.5">Platform</p>
+                            <p class="text-gray-700 dark:text-ink-dim">{{ log.platform || '—' }}</p>
                           </div>
                           <div>
-                            <p class="font-medium text-gray-500 mb-0.5">Timezone</p>
-                            <p class="text-gray-700">{{ log.timezone || '—' }}</p>
+                            <p class="font-medium text-gray-500 dark:text-muted mb-0.5">Timezone</p>
+                            <p class="text-gray-700 dark:text-ink-dim">{{ log.timezone || '—' }}</p>
                           </div>
                           <div>
-                            <p class="font-medium text-gray-500 mb-0.5">Language</p>
-                            <p class="text-gray-700">{{ log.language || '—' }}</p>
+                            <p class="font-medium text-gray-500 dark:text-muted mb-0.5">Language</p>
+                            <p class="text-gray-700 dark:text-ink-dim">{{ log.language || '—' }}</p>
                           </div>
                           <div>
-                            <p class="font-medium text-gray-500 mb-0.5">Location</p>
-                            <p class="text-gray-700">
+                            <p class="font-medium text-gray-500 dark:text-muted mb-0.5">Location</p>
+                            <p class="text-gray-700 dark:text-ink-dim">
                               @if (log.city && log.country) {
                                 {{ log.city }}, {{ log.country }}
                               } @else if (log.country) {
@@ -402,33 +402,33 @@ import { API } from '@app/core/config/api';
                             </p>
                           </div>
                           <div>
-                            <p class="font-medium text-gray-500 mb-0.5">Page Title</p>
-                            <p class="text-gray-700">{{ log.pageTitle || '—' }}</p>
+                            <p class="font-medium text-gray-500 dark:text-muted mb-0.5">Page Title</p>
+                            <p class="text-gray-700 dark:text-ink-dim">{{ log.pageTitle || '—' }}</p>
                           </div>
                           <div>
-                            <p class="font-medium text-gray-500 mb-0.5">Entity Type</p>
-                            <p class="text-gray-700 capitalize">{{ log.entityType || '—' }}</p>
+                            <p class="font-medium text-gray-500 dark:text-muted mb-0.5">Entity Type</p>
+                            <p class="text-gray-700 dark:text-ink-dim capitalize">{{ log.entityType || '—' }}</p>
                           </div>
                           <div>
-                            <p class="font-medium text-gray-500 mb-0.5">Entity ID</p>
-                            <p class="text-gray-700 font-mono break-all">{{ log.entityId || '—' }}</p>
+                            <p class="font-medium text-gray-500 dark:text-muted mb-0.5">Entity ID</p>
+                            <p class="text-gray-700 dark:text-ink-dim font-mono break-all">{{ log.entityId || '—' }}</p>
                           </div>
                           <div>
-                            <p class="font-medium text-gray-500 mb-0.5">Entity Name</p>
-                            <p class="text-gray-700">{{ log.entityName || '—' }}</p>
+                            <p class="font-medium text-gray-500 dark:text-muted mb-0.5">Entity Name</p>
+                            <p class="text-gray-700 dark:text-ink-dim">{{ log.entityName || '—' }}</p>
                           </div>
                           <div>
-                            <p class="font-medium text-gray-500 mb-0.5">HTTP</p>
+                            <p class="font-medium text-gray-500 dark:text-muted mb-0.5">HTTP</p>
                             @if (log.httpMethod) {
-                              <p class="text-gray-700 font-mono">{{ log.httpMethod }} {{ log.httpPath }}</p>
+                              <p class="text-gray-700 dark:text-ink-dim font-mono">{{ log.httpMethod }} {{ log.httpPath }}</p>
                             } @else {
-                              <p class="text-gray-700">—</p>
+                              <p class="text-gray-700 dark:text-ink-dim">—</p>
                             }
                           </div>
                           @if (log.metadata) {
                             <div class="col-span-2 md:col-span-4">
-                              <p class="font-medium text-gray-500 mb-0.5">Metadata</p>
-                              <pre class="text-gray-700 bg-gray-100 rounded-md px-3 py-2 overflow-x-auto text-[11px]">{{ formatMetadata(log.metadata) }}</pre>
+                              <p class="font-medium text-gray-500 dark:text-muted mb-0.5">Metadata</p>
+                              <pre class="text-gray-700 dark:text-ink-dim bg-gray-100 dark:bg-surface-3 rounded-md px-3 py-2 overflow-x-auto text-[11px]">{{ formatMetadata(log.metadata) }}</pre>
                             </div>
                           }
                         </div>

@@ -16,16 +16,16 @@ import { PdfPreviewModalComponent } from '@app/shared/components/pdf-preview-mod
     <div class="space-y-6 pb-2 min-w-0">
       <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <a routerLink="/resources/platts" class="text-sm font-medium text-brand-700 hover:text-brand-800">← Back to Platts archive</a>
-          <h1 class="mt-2 text-2xl font-bold text-gray-900">{{ report()?.title || 'Platts report' }}</h1>
+          <a routerLink="/resources/platts" class="text-sm font-medium text-brand-700 dark:text-brand-400 hover:text-brand-800">← Back to Platts archive</a>
+          <h1 class="mt-2 text-2xl font-bold text-gray-900 dark:text-ink">{{ report()?.title || 'Platts report' }}</h1>
           @if (report(); as currentReport) {
-            <p class="text-sm text-gray-500">{{ currentReport.publicationDate | date:'fullDate' }} · {{ currentReport.sourceFileName }}</p>
+            <p class="text-sm text-gray-500 dark:text-muted">{{ currentReport.publicationDate | date:'fullDate' }} · {{ currentReport.sourceFileName }}</p>
           }
         </div>
         @if (report(); as currentReport) {
           <div class="flex flex-wrap gap-2">
-            <button (click)="previewSource()" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">View Source PDF</button>
-            <button (click)="reparse()" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Reparse</button>
+            <button (click)="previewSource()" class="rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint">View Source PDF</button>
+            <button (click)="reparse()" class="rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint">Reparse</button>
             @if (auth.isAdmin() && !currentReport.isCanonical && currentReport.status === 'READY') {
               <button (click)="makeCanonical()" class="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600">Make Canonical</button>
             }
@@ -34,70 +34,70 @@ import { PdfPreviewModalComponent } from '@app/shared/components/pdf-preview-mod
       </div>
 
       @if (error()) {
-        <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ error() }}</div>
+        <div class="rounded-xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 px-4 py-3 text-sm text-red-700 dark:text-red-400">{{ error() }}</div>
       }
 
       @if (notice()) {
-        <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{{ notice() }}</div>
+        <div class="rounded-xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/15 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400">{{ notice() }}</div>
       }
 
       @if (loading()) {
-        <div class="rounded-xl border border-gray-200 bg-white p-5 text-sm text-gray-500 shadow-sm">Loading report…</div>
+        <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 text-sm text-gray-500 dark:text-muted shadow-sm">Loading report…</div>
       }
 
       @if (report(); as currentReport) {
         <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div class="min-w-0 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Status</div>
-            <div class="mt-2 text-lg font-semibold text-gray-900">{{ currentReport.status }}</div>
+          <div class="min-w-0 rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm">
+            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Status</div>
+            <div class="mt-2 text-lg font-semibold text-gray-900 dark:text-ink">{{ currentReport.status }}</div>
           </div>
-          <div class="min-w-0 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Canonical</div>
-            <div class="mt-2 text-lg font-semibold text-gray-900">{{ currentReport.isCanonical ? 'Yes' : 'No' }}</div>
+          <div class="min-w-0 rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm">
+            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Canonical</div>
+            <div class="mt-2 text-lg font-semibold text-gray-900 dark:text-ink">{{ currentReport.isCanonical ? 'Yes' : 'No' }}</div>
           </div>
-          <div class="min-w-0 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Uploaded By</div>
-            <div class="mt-2 text-lg font-semibold text-gray-900">{{ currentReport.uploadedByName || 'Unknown' }}</div>
+          <div class="min-w-0 rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm">
+            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Uploaded By</div>
+            <div class="mt-2 text-lg font-semibold text-gray-900 dark:text-ink">{{ currentReport.uploadedByName || 'Unknown' }}</div>
           </div>
-          <div class="min-w-0 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Parsed At</div>
-            <div class="mt-2 text-lg font-semibold text-gray-900">{{ currentReport.parsedAt ? (currentReport.parsedAt | date:'medium') : 'Pending' }}</div>
+          <div class="min-w-0 rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm">
+            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Parsed At</div>
+            <div class="mt-2 text-lg font-semibold text-gray-900 dark:text-ink">{{ currentReport.parsedAt ? (currentReport.parsedAt | date:'medium') : 'Pending' }}</div>
           </div>
         </section>
 
         <section class="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-          <div class="min-w-0 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 class="text-lg font-semibold text-gray-900">Commentary</h2>
+          <div class="min-w-0 rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-ink">Commentary</h2>
             @if (currentReport.commentary.length === 0) {
-              <p class="mt-3 text-sm text-gray-500">No commentary was extracted.</p>
+              <p class="mt-3 text-sm text-gray-500 dark:text-muted">No commentary was extracted.</p>
             }
             <div class="mt-4 max-h-[30rem] space-y-3 overflow-y-auto pr-2">
               @for (paragraph of currentReport.commentary; track paragraph) {
-                <p class="text-sm leading-6 text-gray-700">{{ paragraph }}</p>
+                <p class="text-sm leading-6 text-gray-700 dark:text-ink-dim">{{ paragraph }}</p>
               }
             </div>
           </div>
 
           <div class="min-w-0 space-y-6">
-            <section class="min-w-0 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-              <h2 class="text-lg font-semibold text-gray-900">Import History</h2>
+            <section class="min-w-0 rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm">
+              <h2 class="text-lg font-semibold text-gray-900 dark:text-ink">Import History</h2>
               <div class="mt-4 space-y-3">
                 @for (item of currentReport.imports; track item.id) {
-                  <div class="rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
-                    <div class="font-medium text-gray-900">{{ item.importMode | titlecase }}</div>
-                    <div class="mt-1 text-xs text-gray-500">{{ item.createdAt | date:'medium' }}</div>
-                    <div class="mt-2 break-all font-mono text-xs text-gray-500">{{ item.sha256Hex }}</div>
+                  <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 p-3 text-sm text-gray-700 dark:text-ink-dim">
+                    <div class="font-medium text-gray-900 dark:text-ink">{{ item.importMode | titlecase }}</div>
+                    <div class="mt-1 text-xs text-gray-500 dark:text-muted">{{ item.createdAt | date:'medium' }}</div>
+                    <div class="mt-2 break-all font-mono text-xs text-gray-500 dark:text-muted">{{ item.sha256Hex }}</div>
                   </div>
                 }
               </div>
             </section>
 
-            <section class="min-w-0 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-              <h2 class="text-lg font-semibold text-gray-900">Source</h2>
-              <dl class="mt-4 space-y-2 text-sm text-gray-700">
-                <div><dt class="text-gray-500">File</dt><dd>{{ currentReport.sourceFileName }}</dd></div>
-                <div><dt class="text-gray-500">Size</dt><dd>{{ currentReport.sourceFileSize | number }} bytes</dd></div>
-                <div><dt class="text-gray-500">Parser Version</dt><dd>{{ currentReport.parserVersion || 'N/A' }}</dd></div>
+            <section class="min-w-0 rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm">
+              <h2 class="text-lg font-semibold text-gray-900 dark:text-ink">Source</h2>
+              <dl class="mt-4 space-y-2 text-sm text-gray-700 dark:text-ink-dim">
+                <div><dt class="text-gray-500 dark:text-muted">File</dt><dd>{{ currentReport.sourceFileName }}</dd></div>
+                <div><dt class="text-gray-500 dark:text-muted">Size</dt><dd>{{ currentReport.sourceFileSize | number }} bytes</dd></div>
+                <div><dt class="text-gray-500 dark:text-muted">Parser Version</dt><dd>{{ currentReport.parserVersion || 'N/A' }}</dd></div>
               </dl>
             </section>
           </div>
@@ -105,10 +105,10 @@ import { PdfPreviewModalComponent } from '@app/shared/components/pdf-preview-mod
 
         <section class="space-y-4">
           @for (section of getVisibleSections(currentReport); track section.id) {
-            <div class="max-w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-              <div class="border-b border-gray-200 px-5 py-4">
-                <h2 class="text-lg font-semibold text-gray-900">{{ section.heading }}</h2>
-                <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">{{ section.type }}</p>
+            <div class="max-w-full overflow-hidden rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm">
+              <div class="border-b border-gray-200 dark:border-line px-5 py-4">
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-ink">{{ section.heading }}</h2>
+                <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">{{ section.type }}</p>
               </div>
 
               <div class="overflow-x-auto">
@@ -116,53 +116,53 @@ import { PdfPreviewModalComponent } from '@app/shared/components/pdf-preview-mod
                   <div class="space-y-3 p-4 md:hidden">
                     @for (entry of getVisibleAssessmentEntries(section); track entry.id) {
                       @if (getAssessmentMetadata(entry); as assessment) {
-                        <article class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                        <article class="rounded-lg border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 p-4">
                           <div class="flex items-start justify-between gap-3">
                             <div class="min-w-0">
-                              <h3 class="text-sm font-semibold text-gray-900">{{ assessment.product || '—' }}</h3>
-                              <p class="mt-1 text-xs text-gray-500">{{ assessment.basisHeader || entry.marketBasis || '—' }}</p>
+                              <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">{{ assessment.product || '—' }}</h3>
+                              <p class="mt-1 text-xs text-gray-500 dark:text-muted">{{ assessment.basisHeader || entry.marketBasis || '—' }}</p>
                             </div>
-                            <span class="shrink-0 rounded-full bg-white px-2 py-1 font-mono text-[11px] text-gray-600 ring-1 ring-gray-200">{{ assessment.code || '—' }}</span>
+                            <span class="shrink-0 rounded-full bg-white dark:bg-surface px-2 py-1 font-mono text-[11px] text-gray-600 dark:text-ink-dim ring-1 ring-gray-200 dark:ring-line">{{ assessment.code || '—' }}</span>
                           </div>
                           <dl class="mt-4 grid grid-cols-2 gap-3 text-sm">
                             <div>
-                              <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Range</dt>
-                              <dd class="mt-1 text-gray-700">{{ assessment.rangeText || '—' }}</dd>
+                              <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Range</dt>
+                              <dd class="mt-1 text-gray-700 dark:text-ink-dim">{{ assessment.rangeText || '—' }}</dd>
                             </div>
                             <div>
-                              <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Mid</dt>
-                              <dd class="mt-1 text-gray-700">{{ assessment.mid || '—' }}</dd>
+                              <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Mid</dt>
+                              <dd class="mt-1 text-gray-700 dark:text-ink-dim">{{ assessment.mid || '—' }}</dd>
                             </div>
                             <div class="col-span-2">
-                              <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Change</dt>
-                              <dd class="mt-1 text-gray-700">{{ assessment.change || '—' }}</dd>
+                              <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Change</dt>
+                              <dd class="mt-1 text-gray-700 dark:text-ink-dim">{{ assessment.change || '—' }}</dd>
                             </div>
                           </dl>
                         </article>
                       }
                     }
                   </div>
-                  <table class="hidden min-w-full divide-y divide-gray-200 text-sm md:table">
-                    <thead class="bg-gray-50">
+                  <table class="hidden min-w-full divide-y divide-gray-200 dark:divide-line text-sm md:table">
+                    <thead class="bg-gray-50 dark:bg-bg-2">
                       <tr>
-                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Product</th>
-                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Basis</th>
-                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Code</th>
-                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Range</th>
-                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Mid</th>
-                        <th class="px-4 py-3 text-left font-semibold text-gray-600">Change</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Product</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Basis</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Code</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Range</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Mid</th>
+                        <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Change</th>
                       </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-100">
+                    <tbody class="divide-y divide-gray-100 dark:divide-line">
                       @for (entry of getVisibleAssessmentEntries(section); track entry.id) {
                         @if (getAssessmentMetadata(entry); as assessment) {
                           <tr>
-                            <td class="px-4 py-3 text-gray-700">{{ assessment.product || '—' }}</td>
-                            <td class="px-4 py-3 text-gray-700">{{ assessment.basisHeader || entry.marketBasis || '—' }}</td>
-                            <td class="px-4 py-3 font-mono text-gray-700">{{ assessment.code || '—' }}</td>
-                            <td class="px-4 py-3 text-gray-700">{{ assessment.rangeText || '—' }}</td>
-                            <td class="px-4 py-3 text-gray-700">{{ assessment.mid || '—' }}</td>
-                            <td class="px-4 py-3 text-gray-700">{{ assessment.change || '—' }}</td>
+                            <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ assessment.product || '—' }}</td>
+                            <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ assessment.basisHeader || entry.marketBasis || '—' }}</td>
+                            <td class="px-4 py-3 font-mono text-gray-700 dark:text-ink-dim">{{ assessment.code || '—' }}</td>
+                            <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ assessment.rangeText || '—' }}</td>
+                            <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ assessment.mid || '—' }}</td>
+                            <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ assessment.change || '—' }}</td>
                           </tr>
                         }
                       }
@@ -172,33 +172,33 @@ import { PdfPreviewModalComponent } from '@app/shared/components/pdf-preview-mod
                   <div class="space-y-3 p-4 md:hidden">
                     @for (entry of getVisibleDeliveryBasisEntries(section); track entry.id) {
                       @if (getDeliveryBasisMetadata(entry); as deliveryBasis) {
-                        <article class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                        <article class="rounded-lg border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 p-4">
                           <div class="flex items-start justify-between gap-3">
                             <div class="min-w-0">
-                              <h3 class="text-sm font-semibold text-gray-900">{{ deliveryBasis.product || '—' }}</h3>
-                              <p class="mt-1 break-words text-sm text-gray-700">{{ deliveryBasis.deliveryBasis || '—' }}</p>
+                              <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">{{ deliveryBasis.product || '—' }}</h3>
+                              <p class="mt-1 break-words text-sm text-gray-700 dark:text-ink-dim">{{ deliveryBasis.deliveryBasis || '—' }}</p>
                             </div>
-                            <span class="shrink-0 rounded-full bg-white px-2 py-1 font-mono text-[11px] text-gray-600 ring-1 ring-gray-200">{{ deliveryBasis.code || '—' }}</span>
+                            <span class="shrink-0 rounded-full bg-white dark:bg-surface px-2 py-1 font-mono text-[11px] text-gray-600 dark:text-ink-dim ring-1 ring-gray-200 dark:ring-line">{{ deliveryBasis.code || '—' }}</span>
                           </div>
                         </article>
                       }
                     }
                   </div>
-                  <table class="hidden min-w-full divide-y divide-gray-200 text-sm md:table">
-                  <thead class="bg-gray-50">
+                  <table class="hidden min-w-full divide-y divide-gray-200 dark:divide-line text-sm md:table">
+                  <thead class="bg-gray-50 dark:bg-bg-2">
                     <tr>
-                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Product</th>
-                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Code</th>
-                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Delivery Basis</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Product</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Code</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Delivery Basis</th>
                     </tr>
                   </thead>
-                  <tbody class="divide-y divide-gray-100">
+                  <tbody class="divide-y divide-gray-100 dark:divide-line">
                     @for (entry of getVisibleDeliveryBasisEntries(section); track entry.id) {
                       @if (getDeliveryBasisMetadata(entry); as deliveryBasis) {
                         <tr>
-                          <td class="px-4 py-3 text-gray-700">{{ deliveryBasis.product || '—' }}</td>
-                          <td class="px-4 py-3 font-mono text-gray-700">{{ deliveryBasis.code || '—' }}</td>
-                          <td class="px-4 py-3 text-gray-700">{{ deliveryBasis.deliveryBasis || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ deliveryBasis.product || '—' }}</td>
+                          <td class="px-4 py-3 font-mono text-gray-700 dark:text-ink-dim">{{ deliveryBasis.code || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ deliveryBasis.deliveryBasis || '—' }}</td>
                         </tr>
                       }
                     }
@@ -208,61 +208,61 @@ import { PdfPreviewModalComponent } from '@app/shared/components/pdf-preview-mod
                 <div class="space-y-3 p-4 md:hidden">
                   @for (entry of getVisibleMarketDataEntries(section); track entry.id) {
                     @if (getMarketDataMetadata(entry); as marketData) {
-                      <article class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                      <article class="rounded-lg border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 p-4">
                         <div class="flex items-start justify-between gap-3">
                           <div class="min-w-0">
-                            <h3 class="text-sm font-semibold text-gray-900">{{ marketData.marketContext || entry.instrument || entry.windowLabel || entry.marketBasis || '—' }}</h3>
-                            <p class="mt-1 text-xs text-gray-500">{{ entry.company || '—' }} · {{ entry.action || '—' }}</p>
+                            <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">{{ marketData.marketContext || entry.instrument || entry.windowLabel || entry.marketBasis || '—' }}</h3>
+                            <p class="mt-1 text-xs text-gray-500 dark:text-muted">{{ entry.company || '—' }} · {{ entry.action || '—' }}</p>
                           </div>
-                          <span class="shrink-0 rounded-full bg-white px-2 py-1 text-[11px] font-medium text-gray-600 ring-1 ring-gray-200">{{ marketData.statusText || '—' }}</span>
+                          <span class="shrink-0 rounded-full bg-white dark:bg-surface px-2 py-1 text-[11px] font-medium text-gray-600 dark:text-ink-dim ring-1 ring-gray-200 dark:ring-line">{{ marketData.statusText || '—' }}</span>
                         </div>
                         <dl class="mt-4 grid grid-cols-2 gap-3 text-sm">
                           <div>
-                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Counterparty</dt>
-                            <dd class="mt-1 text-gray-700">{{ entry.counterparty || '—' }}</dd>
+                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Counterparty</dt>
+                            <dd class="mt-1 text-gray-700 dark:text-ink-dim">{{ entry.counterparty || '—' }}</dd>
                           </div>
                           <div>
-                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Time</dt>
-                            <dd class="mt-1 text-gray-700">{{ entry.timestampText || '—' }}</dd>
+                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Time</dt>
+                            <dd class="mt-1 text-gray-700 dark:text-ink-dim">{{ entry.timestampText || '—' }}</dd>
                           </div>
                           <div>
-                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Price</dt>
-                            <dd class="mt-1 text-gray-700">{{ entry.priceRaw || '—' }}</dd>
+                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Price</dt>
+                            <dd class="mt-1 text-gray-700 dark:text-ink-dim">{{ entry.priceRaw || '—' }}</dd>
                           </div>
                           <div>
-                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Quantity</dt>
-                            <dd class="mt-1 text-gray-700">{{ entry.quantityRaw || '—' }}</dd>
+                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Quantity</dt>
+                            <dd class="mt-1 text-gray-700 dark:text-ink-dim">{{ entry.quantityRaw || '—' }}</dd>
                           </div>
                         </dl>
                       </article>
                     }
                   }
                 </div>
-                <table class="hidden min-w-full divide-y divide-gray-200 text-sm md:table">
-                  <thead class="bg-gray-50">
+                <table class="hidden min-w-full divide-y divide-gray-200 dark:divide-line text-sm md:table">
+                  <thead class="bg-gray-50 dark:bg-bg-2">
                     <tr>
-                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Context</th>
-                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Participant</th>
-                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Action</th>
-                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Counterparty</th>
-                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Price</th>
-                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Quantity</th>
-                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Time</th>
-                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Context</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Participant</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Action</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Counterparty</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Price</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Quantity</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Time</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Status</th>
                     </tr>
                   </thead>
-                  <tbody class="divide-y divide-gray-100">
+                  <tbody class="divide-y divide-gray-100 dark:divide-line">
                     @for (entry of getVisibleMarketDataEntries(section); track entry.id) {
                       @if (getMarketDataMetadata(entry); as marketData) {
                         <tr>
-                          <td class="px-4 py-3 text-gray-700">{{ marketData.marketContext || entry.instrument || entry.windowLabel || entry.marketBasis || '—' }}</td>
-                          <td class="px-4 py-3 text-gray-700">{{ entry.company || '—' }}</td>
-                          <td class="px-4 py-3 text-gray-700">{{ entry.action || '—' }}</td>
-                          <td class="px-4 py-3 text-gray-700">{{ entry.counterparty || '—' }}</td>
-                          <td class="px-4 py-3 text-gray-700">{{ entry.priceRaw || '—' }}</td>
-                          <td class="px-4 py-3 text-gray-700">{{ entry.quantityRaw || '—' }}</td>
-                          <td class="px-4 py-3 text-gray-700">{{ entry.timestampText || '—' }}</td>
-                          <td class="px-4 py-3 text-gray-700">{{ marketData.statusText || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ marketData.marketContext || entry.instrument || entry.windowLabel || entry.marketBasis || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ entry.company || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ entry.action || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ entry.counterparty || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ entry.priceRaw || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ entry.quantityRaw || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ entry.timestampText || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ marketData.statusText || '—' }}</td>
                         </tr>
                       }
                     }
@@ -272,61 +272,61 @@ import { PdfPreviewModalComponent } from '@app/shared/components/pdf-preview-mod
                 <div class="space-y-3 p-4 md:hidden">
                   @for (entry of getVisibleMocEntries(section); track entry.id) {
                     @if (getMocMetadata(entry); as moc) {
-                      <article class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                      <article class="rounded-lg border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 p-4">
                         <div class="flex items-start justify-between gap-3">
                           <div class="min-w-0">
-                            <h3 class="text-sm font-semibold text-gray-900">{{ entry.marketBasis || entry.marketRegion || '—' }}</h3>
-                            <p class="mt-1 text-xs text-gray-500">{{ entry.company || '—' }} · {{ entry.action || '—' }}</p>
+                            <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">{{ entry.marketBasis || entry.marketRegion || '—' }}</h3>
+                            <p class="mt-1 text-xs text-gray-500 dark:text-muted">{{ entry.company || '—' }} · {{ entry.action || '—' }}</p>
                           </div>
-                          <span class="shrink-0 rounded-full bg-white px-2 py-1 text-[11px] font-medium text-gray-600 ring-1 ring-gray-200">{{ moc.statusText || '—' }}</span>
+                          <span class="shrink-0 rounded-full bg-white dark:bg-surface px-2 py-1 text-[11px] font-medium text-gray-600 dark:text-ink-dim ring-1 ring-gray-200 dark:ring-line">{{ moc.statusText || '—' }}</span>
                         </div>
                         <dl class="mt-4 grid grid-cols-2 gap-3 text-sm">
                           <div>
-                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Counterparty</dt>
-                            <dd class="mt-1 text-gray-700">{{ entry.counterparty || '—' }}</dd>
+                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Counterparty</dt>
+                            <dd class="mt-1 text-gray-700 dark:text-ink-dim">{{ entry.counterparty || '—' }}</dd>
                           </div>
                           <div>
-                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Time</dt>
-                            <dd class="mt-1 text-gray-700">{{ entry.timestampText || '—' }}</dd>
+                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Time</dt>
+                            <dd class="mt-1 text-gray-700 dark:text-ink-dim">{{ entry.timestampText || '—' }}</dd>
                           </div>
                           <div>
-                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Price</dt>
-                            <dd class="mt-1 text-gray-700">{{ entry.priceRaw || '—' }}</dd>
+                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Price</dt>
+                            <dd class="mt-1 text-gray-700 dark:text-ink-dim">{{ entry.priceRaw || '—' }}</dd>
                           </div>
                           <div>
-                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Quantity</dt>
-                            <dd class="mt-1 text-gray-700">{{ entry.quantityRaw || '—' }}</dd>
+                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Quantity</dt>
+                            <dd class="mt-1 text-gray-700 dark:text-ink-dim">{{ entry.quantityRaw || '—' }}</dd>
                           </div>
                         </dl>
                       </article>
                     }
                   }
                 </div>
-                <table class="hidden min-w-full divide-y divide-gray-200 text-sm md:table">
-                  <thead class="bg-gray-50">
+                <table class="hidden min-w-full divide-y divide-gray-200 dark:divide-line text-sm md:table">
+                  <thead class="bg-gray-50 dark:bg-bg-2">
                     <tr>
-                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Basis</th>
-                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Participant</th>
-                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Action</th>
-                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Counterparty</th>
-                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Price</th>
-                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Quantity</th>
-                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Time</th>
-                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Basis</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Participant</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Action</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Counterparty</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Price</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Quantity</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Time</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Status</th>
                     </tr>
                   </thead>
-                  <tbody class="divide-y divide-gray-100">
+                  <tbody class="divide-y divide-gray-100 dark:divide-line">
                     @for (entry of getVisibleMocEntries(section); track entry.id) {
                       @if (getMocMetadata(entry); as moc) {
                         <tr>
-                          <td class="px-4 py-3 text-gray-700">{{ entry.marketBasis || entry.marketRegion || '—' }}</td>
-                          <td class="px-4 py-3 text-gray-700">{{ entry.company || '—' }}</td>
-                          <td class="px-4 py-3 text-gray-700">{{ entry.action || '—' }}</td>
-                          <td class="px-4 py-3 text-gray-700">{{ entry.counterparty || '—' }}</td>
-                          <td class="px-4 py-3 text-gray-700">{{ entry.priceRaw || '—' }}</td>
-                          <td class="px-4 py-3 text-gray-700">{{ entry.quantityRaw || '—' }}</td>
-                          <td class="px-4 py-3 text-gray-700">{{ entry.timestampText || '—' }}</td>
-                          <td class="px-4 py-3 text-gray-700">{{ moc.statusText || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ entry.marketBasis || entry.marketRegion || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ entry.company || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ entry.action || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ entry.counterparty || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ entry.priceRaw || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ entry.quantityRaw || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ entry.timestampText || '—' }}</td>
+                          <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ moc.statusText || '—' }}</td>
                         </tr>
                       }
                     }
@@ -335,65 +335,65 @@ import { PdfPreviewModalComponent } from '@app/shared/components/pdf-preview-mod
                 } @else {
                 <div class="space-y-3 p-4 md:hidden">
                   @for (entry of getVisibleStructuredEntries(section); track entry.id) {
-                    <article class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                    <article class="rounded-lg border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 p-4">
                       <div class="flex items-start justify-between gap-3">
                         <div class="min-w-0">
-                          <h3 class="text-sm font-semibold text-gray-900">{{ entry.company || '—' }}</h3>
-                          <p class="mt-1 text-xs text-gray-500">{{ entry.action || '—' }} · {{ entry.marketRegion || entry.marketBasis || '—' }}</p>
+                          <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">{{ entry.company || '—' }}</h3>
+                          <p class="mt-1 text-xs text-gray-500 dark:text-muted">{{ entry.action || '—' }} · {{ entry.marketRegion || entry.marketBasis || '—' }}</p>
                         </div>
-                        <span class="shrink-0 rounded-full bg-white px-2 py-1 text-[11px] font-medium text-gray-600 ring-1 ring-gray-200">{{ getEntryStatus(entry) || '—' }}</span>
+                        <span class="shrink-0 rounded-full bg-white dark:bg-surface px-2 py-1 text-[11px] font-medium text-gray-600 dark:text-ink-dim ring-1 ring-gray-200 dark:ring-line">{{ getEntryStatus(entry) || '—' }}</span>
                       </div>
                       <dl class="mt-4 grid grid-cols-2 gap-3 text-sm">
                         <div>
-                          <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Counterparty</dt>
-                          <dd class="mt-1 text-gray-700">{{ entry.counterparty || '—' }}</dd>
+                          <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Counterparty</dt>
+                          <dd class="mt-1 text-gray-700 dark:text-ink-dim">{{ entry.counterparty || '—' }}</dd>
                         </div>
                         <div>
-                          <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Time</dt>
-                          <dd class="mt-1 text-gray-700">{{ entry.timestampText || '—' }}</dd>
+                          <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Time</dt>
+                          <dd class="mt-1 text-gray-700 dark:text-ink-dim">{{ entry.timestampText || '—' }}</dd>
                         </div>
                         <div>
-                          <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Price</dt>
-                          <dd class="mt-1 text-gray-700">{{ entry.priceRaw || '—' }}</dd>
+                          <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Price</dt>
+                          <dd class="mt-1 text-gray-700 dark:text-ink-dim">{{ entry.priceRaw || '—' }}</dd>
                         </div>
                         <div>
-                          <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Quantity</dt>
-                          <dd class="mt-1 text-gray-700">{{ entry.quantityRaw || '—' }}</dd>
+                          <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Quantity</dt>
+                          <dd class="mt-1 text-gray-700 dark:text-ink-dim">{{ entry.quantityRaw || '—' }}</dd>
                         </div>
                         <div class="col-span-2">
-                          <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Instrument</dt>
-                          <dd class="mt-1 text-gray-700">{{ entry.instrument || entry.windowLabel || '—' }}</dd>
+                          <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Instrument</dt>
+                          <dd class="mt-1 text-gray-700 dark:text-ink-dim">{{ entry.instrument || entry.windowLabel || '—' }}</dd>
                         </div>
                       </dl>
                     </article>
                   }
                 </div>
-                <table class="hidden min-w-full divide-y divide-gray-200 text-sm md:table">
-                  <thead class="bg-gray-50">
+                <table class="hidden min-w-full divide-y divide-gray-200 dark:divide-line text-sm md:table">
+                  <thead class="bg-gray-50 dark:bg-bg-2">
                     <tr>
-                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Company</th>
-                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Action</th>
-                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Counterparty</th>
-                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Price</th>
-                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Quantity</th>
-                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Market</th>
-                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Instrument</th>
-                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Time</th>
-                      <th class="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Company</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Action</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Counterparty</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Price</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Quantity</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Market</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Instrument</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Time</th>
+                      <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Status</th>
                     </tr>
                   </thead>
-                  <tbody class="divide-y divide-gray-100">
+                  <tbody class="divide-y divide-gray-100 dark:divide-line">
                     @for (entry of getVisibleStructuredEntries(section); track entry.id) {
                       <tr>
-                        <td class="px-4 py-3 text-gray-700">{{ entry.company || '—' }}</td>
-                        <td class="px-4 py-3 text-gray-700">{{ entry.action || '—' }}</td>
-                        <td class="px-4 py-3 text-gray-700">{{ entry.counterparty || '—' }}</td>
-                        <td class="px-4 py-3 text-gray-700">{{ entry.priceRaw || '—' }}</td>
-                        <td class="px-4 py-3 text-gray-700">{{ entry.quantityRaw || '—' }}</td>
-                        <td class="px-4 py-3 text-gray-700">{{ entry.marketRegion || entry.marketBasis || '—' }}</td>
-                        <td class="px-4 py-3 text-gray-700">{{ entry.instrument || entry.windowLabel || '—' }}</td>
-                        <td class="px-4 py-3 text-gray-700">{{ entry.timestampText || '—' }}</td>
-                        <td class="px-4 py-3 text-gray-700">{{ getEntryStatus(entry) || '—' }}</td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ entry.company || '—' }}</td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ entry.action || '—' }}</td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ entry.counterparty || '—' }}</td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ entry.priceRaw || '—' }}</td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ entry.quantityRaw || '—' }}</td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ entry.marketRegion || entry.marketBasis || '—' }}</td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ entry.instrument || entry.windowLabel || '—' }}</td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ entry.timestampText || '—' }}</td>
+                        <td class="px-4 py-3 text-gray-700 dark:text-ink-dim">{{ getEntryStatus(entry) || '—' }}</td>
                       </tr>
                     }
                   </tbody>

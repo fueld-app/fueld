@@ -15,8 +15,8 @@ import { RiskComplianceCardComponent } from '../components/risk-compliance-card/
   template: `
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
       @if (store.enrichmentLoading()) {
-        <div class="rounded-xl border border-gray-200 bg-white shadow-sm p-6 flex items-center justify-center lg:col-span-2">
-          <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+        <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm p-6 flex items-center justify-center lg:col-span-2">
+          <svg class="h-5 w-5 animate-spin text-gray-400 dark:text-muted" viewBox="0 0 24 24" fill="none">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
           </svg>

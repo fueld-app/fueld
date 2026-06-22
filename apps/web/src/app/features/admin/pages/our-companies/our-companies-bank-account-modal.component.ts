@@ -17,88 +17,88 @@ import { emptyBankAccountForm } from './our-companies.types';
   template: `
     @if (open()) {
       <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-        <div class="rounded-xl bg-white p-6 shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto" (click)="$event.stopPropagation()">
-          <h3 class="text-lg font-semibold text-gray-900">{{ editing() ? 'Edit' : 'Add' }} Bank Account</h3>
+        <div class="rounded-xl bg-white dark:bg-surface p-6 shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto" (click)="$event.stopPropagation()">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-ink">{{ editing() ? 'Edit' : 'Add' }} Bank Account</h3>
           <form class="mt-4 space-y-4" (ngSubmit)="submit()">
             <div class="grid grid-cols-2 gap-4">
               <div class="col-span-2">
-                <label class="block text-xs font-medium text-gray-600">Label *</label>
+                <label class="block text-xs font-medium text-gray-600 dark:text-ink-dim">Label *</label>
                 <input type="text" [(ngModel)]="formData.label" name="label" required placeholder="e.g. USD Main Account"
                   class="app-input mt-1 w-full" />
               </div>
               <div>
-                <label class="block text-xs font-medium text-gray-600">Bank Name *</label>
+                <label class="block text-xs font-medium text-gray-600 dark:text-ink-dim">Bank Name *</label>
                 <input type="text" [(ngModel)]="formData.bankName" name="bankName" required placeholder="e.g. HSBC"
                   class="app-input mt-1 w-full" />
               </div>
               <div>
-                <label class="block text-xs font-medium text-gray-600">Currency *</label>
+                <label class="block text-xs font-medium text-gray-600 dark:text-ink-dim">Currency *</label>
                 <select [(ngModel)]="formData.currency" name="currency" required
-                  class="app-input-mono-uppercase mt-1 w-full bg-white">
+                  class="app-input-mono-uppercase mt-1 w-full bg-white dark:bg-surface">
                   @for (c of currencies(); track c) {
                     <option [value]="c">{{ c }}</option>
                   }
                 </select>
               </div>
               <div class="col-span-2">
-                <label class="block text-xs font-medium text-gray-600">Beneficiary Name</label>
+                <label class="block text-xs font-medium text-gray-600 dark:text-ink-dim">Beneficiary Name</label>
                 <input type="text" [(ngModel)]="formData.accountName" name="accountName" placeholder="Account holder name"
                   class="app-input mt-1 w-full" />
               </div>
               <div>
-                <label class="block text-xs font-medium text-gray-600">IBAN</label>
+                <label class="block text-xs font-medium text-gray-600 dark:text-ink-dim">IBAN</label>
                 <input type="text" [(ngModel)]="formData.iban" name="iban" placeholder="e.g. AE07033\u2026"
                   class="app-input-mono mt-1 w-full" />
               </div>
               <div>
-                <label class="block text-xs font-medium text-gray-600">Account Number</label>
+                <label class="block text-xs font-medium text-gray-600 dark:text-ink-dim">Account Number</label>
                 <input type="text" [(ngModel)]="formData.accountNumber" name="accountNumber"
                   class="app-input-mono mt-1 w-full" />
               </div>
               <div>
-                <label class="block text-xs font-medium text-gray-600">SWIFT / BIC</label>
+                <label class="block text-xs font-medium text-gray-600 dark:text-ink-dim">SWIFT / BIC</label>
                 <input type="text" [(ngModel)]="formData.swiftBic" name="swiftBic" placeholder="e.g. BBMEAEAD"
                   class="app-input-mono mt-1 w-full" />
               </div>
               <div>
-                <label class="block text-xs font-medium text-gray-600">Sort Code</label>
+                <label class="block text-xs font-medium text-gray-600 dark:text-ink-dim">Sort Code</label>
                 <input type="text" [(ngModel)]="formData.sortCode" name="sortCode"
                   class="app-input-mono mt-1 w-full" />
               </div>
               <div>
-                <label class="block text-xs font-medium text-gray-600">Routing Number</label>
+                <label class="block text-xs font-medium text-gray-600 dark:text-ink-dim">Routing Number</label>
                 <input type="text" [(ngModel)]="formData.routingNumber" name="routingNumber"
                   class="app-input-mono mt-1 w-full" />
               </div>
               <div class="col-span-2">
-                <label class="block text-xs font-medium text-gray-600">Intermediary Bank</label>
+                <label class="block text-xs font-medium text-gray-600 dark:text-ink-dim">Intermediary Bank</label>
                 <input type="text" [(ngModel)]="formData.intermediaryBank" name="intermediaryBank" placeholder="e.g. SWIFT BSUIFRPP / CACIB"
                   class="app-input-mono mt-1 w-full" />
               </div>
               <div class="col-span-2">
-                <label class="block text-xs font-medium text-gray-600">Branch Address</label>
+                <label class="block text-xs font-medium text-gray-600 dark:text-ink-dim">Branch Address</label>
                 <input type="text" [(ngModel)]="formData.branchAddress" name="branchAddress"
                   class="app-input mt-1 w-full" />
               </div>
               <div class="col-span-2">
-                <label class="block text-xs font-medium text-gray-600">Notes</label>
+                <label class="block text-xs font-medium text-gray-600 dark:text-ink-dim">Notes</label>
                 <textarea [(ngModel)]="formData.notes" name="notes" rows="2"
                   class="app-input mt-1 w-full resize-none"></textarea>
               </div>
               <div class="col-span-2 flex items-center gap-2">
                 <input type="checkbox" id="isDefault" [(ngModel)]="formData.isDefault" name="isDefault"
-                  class="rounded border-gray-300 text-brand-600 focus:ring-brand-500" />
-                <label for="isDefault" class="text-sm text-gray-700">Set as default account for this company</label>
+                  class="rounded border-gray-300 dark:border-line-strong text-brand-600 dark:text-brand-400 focus:ring-brand-600" />
+                <label for="isDefault" class="text-sm text-gray-700 dark:text-ink-dim">Set as default account for this company</label>
               </div>
             </div>
 
             @if (error()) {
-              <p class="text-sm text-red-600">{{ error() }}</p>
+              <p class="text-sm text-red-600 dark:text-red-400">{{ error() }}</p>
             }
 
             <div class="flex justify-end gap-2 pt-2">
               <button type="button" (click)="cancel.emit()"
-                class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+                class="rounded-lg border border-gray-300 dark:border-line-strong px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint">Cancel</button>
               <button type="submit" [disabled]="saving()"
                 class="app-button-primary disabled:opacity-50">
                 {{ saving() ? 'Saving\u2026' : editing() ? 'Update' : 'Create' }}

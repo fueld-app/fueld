@@ -22,7 +22,7 @@ import { Role } from '@fueld/types';
           [value]="name()"
           (input)="nameChange.emit(($any($event.target).value || '').trimStart())"
           placeholder="Schedule name"
-          class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
+          class="rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm text-gray-900 dark:text-ink focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
         />
         <input
           type="text"
@@ -30,13 +30,13 @@ import { Role } from '@fueld/types';
           [value]="description()"
           (input)="descriptionChange.emit(($any($event.target).value || '').trimStart())"
           placeholder="Description (optional)"
-          class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
+          class="rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm text-gray-900 dark:text-ink focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
         />
         <select
           data-testid="reports-schedule-mode"
           [value]="mode()"
           (change)="modeChange.emit($any($event.target).value)"
-          class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
+          class="rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm text-gray-900 dark:text-ink focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
         >
           <option value="SUMMARY">Summary</option>
           <option value="EXCEPTIONS">Exceptions</option>
@@ -45,7 +45,7 @@ import { Role } from '@fueld/types';
           data-testid="reports-schedule-report-type"
           [value]="reportType()"
           (change)="reportTypeChange.emit($any($event.target).value)"
-          class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
+          class="rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm text-gray-900 dark:text-ink focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
         >
           <option value="SUMMARY">Summary</option>
           <option value="MARGIN_ANALYSIS">Margin analysis</option>
@@ -54,7 +54,7 @@ import { Role } from '@fueld/types';
           data-testid="reports-schedule-delivery-mode"
           [value]="deliveryMode()"
           (change)="deliveryModeChange.emit($any($event.target).value)"
-          class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
+          class="rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm text-gray-900 dark:text-ink focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
         >
           <option value="HTML">HTML summary</option>
           <option value="CSV">CSV attachment</option>
@@ -65,7 +65,7 @@ import { Role } from '@fueld/types';
           data-testid="reports-schedule-body-mode"
           [value]="bodyMode()"
           (change)="bodyModeChange.emit($any($event.target).value)"
-          class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
+          class="rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm text-gray-900 dark:text-ink focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
         >
           <option value="HTML_SUMMARY">Include HTML summary</option>
           <option value="ATTACHMENT_ONLY">Attachment only email</option>
@@ -74,7 +74,7 @@ import { Role } from '@fueld/types';
           data-testid="reports-schedule-hour"
           [value]="hourUtc()"
           (change)="onHourChange($event)"
-          class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
+          class="rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm text-gray-900 dark:text-ink focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
         >
           @for (hour of utcHours(); track hour) {
             <option [value]="hour">{{ hour }}:00 UTC</option>
@@ -86,7 +86,7 @@ import { Role } from '@fueld/types';
           [value]="extraEmails()"
           (input)="extraEmailsChange.emit(($any($event.target).value || '').trimStart())"
           placeholder="Extra emails, comma-separated"
-          class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
+          class="rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm text-gray-900 dark:text-ink focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
         />
       </div>
 
@@ -109,25 +109,25 @@ import { Role } from '@fueld/types';
             </button>
           }
         </div>
-        <label class="flex items-center gap-2 text-sm text-gray-600">
+        <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-ink-dim">
           <input
             data-testid="reports-schedule-send-only-non-empty"
             type="checkbox"
             [checked]="sendOnlyWhenNonEmpty()"
             (change)="sendOnlyWhenNonEmptyChange.emit($any($event.target).checked)"
-            class="rounded border-gray-300"
+            class="rounded border-gray-300 dark:border-line-strong"
           />
           Send only when exceptions exist
         </label>
       }
 
       @if (editing()) {
-        <label class="flex items-center gap-2 text-sm text-gray-600">
+        <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-ink-dim">
           <input
             type="checkbox"
             [checked]="isActive()"
             (change)="isActiveChange.emit($any($event.target).checked)"
-            class="rounded border-gray-300"
+            class="rounded border-gray-300 dark:border-line-strong"
           />
           Active schedule
         </label>
@@ -165,7 +165,7 @@ import { Role } from '@fueld/types';
           <button
             type="button"
             (click)="cancel.emit()"
-            class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            class="inline-flex items-center justify-center rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim transition-colors hover:bg-gray-50 dark:hover:bg-surface-tint"
           >
             Cancel
           </button>

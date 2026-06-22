@@ -67,37 +67,37 @@ interface VesselSearchResult {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, RouterLink],
   template: `
-    <div class="rounded-xl border border-gray-200 bg-white shadow-sm min-[900px]:order-[17] min-[900px]:col-span-2">
-      <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
+    <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm min-[900px]:order-[17] min-[900px]:col-span-2">
+      <div class="border-b border-gray-100 dark:border-line px-5 py-3 flex items-center justify-between">
         <div class="flex items-center gap-2">
-          <h2 class="text-sm font-semibold text-gray-700">Fleet</h2>
+          <h2 class="text-sm font-semibold text-gray-700 dark:text-ink-dim">Fleet</h2>
           @if (isParent()) {
             <div class="flex gap-1">
               <button (click)="modeToggle.emit()"
                 class="rounded-md px-2 py-0.5 text-[10px] font-medium transition-colors"
-                [class]="mode() === 'own' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
+                [class]="mode() === 'own' ? 'bg-brand-50 dark:bg-brand-700/15 text-brand-700 dark:text-brand-400' : 'text-gray-400 dark:text-muted hover:text-gray-600'"
               >Own</button>
               <button (click)="modeToggle.emit()"
                 class="rounded-md px-2 py-0.5 text-[10px] font-medium transition-colors"
-                [class]="mode() === 'group' ? 'bg-brand-50 text-brand-700' : 'text-gray-400 hover:text-gray-600'"
+                [class]="mode() === 'group' ? 'bg-brand-50 dark:bg-brand-700/15 text-brand-700 dark:text-brand-400' : 'text-gray-400 dark:text-muted hover:text-gray-600'"
               >Group</button>
             </div>
           }
         </div>
         <div class="flex items-center gap-2">
           @if (totalMatches(); as totalMatches) {
-            <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
+            <span class="inline-flex items-center rounded-full bg-gray-100 dark:bg-surface-3 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:text-ink-dim">
               {{ totalMatches }} vessels
             </span>
           }
           @if (limitNotice(); as notice) {
-            <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700"
+            <span class="inline-flex items-center rounded-full bg-amber-50 dark:bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400"
                   [title]="'Showing first ' + notice.queried + ' of ' + notice.total + ' linked companies in group map mode'">
               {{ notice.queried }}/{{ notice.total }} companies
             </span>
           }
           <button (click)="openAdd()"
-            class="rounded-md bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 hover:bg-brand-100 transition-colors">
+            class="rounded-md bg-brand-50 dark:bg-brand-700/15 px-2 py-1 text-[11px] font-medium text-brand-700 dark:text-brand-400 hover:bg-brand-100 dark:hover:bg-brand-500/20 transition-colors">
             + Add manual
           </button>
         </div>
@@ -105,13 +105,13 @@ interface VesselSearchResult {
 
       @if (mode() === 'own') {
         @if (showForm()) {
-          <div class="border-b border-gray-100 px-5 py-4 bg-gray-50/50">
+          <div class="border-b border-gray-100 dark:border-line px-5 py-4 bg-gray-50/50">
             <div class="space-y-2">
               @if (!editingId()) {
                 <div class="relative">
                   @if (selectedVessel()) {
-                    <div class="flex items-center justify-between rounded-md border border-brand-300 bg-brand-50 px-3 py-1.5 text-sm">
-                      <span class="font-medium text-brand-800">{{ selectedVessel()!.name }}</span>
+                    <div class="flex items-center justify-between rounded-md border border-brand-300 bg-brand-50 dark:bg-brand-700/15 px-3 py-1.5 text-sm">
+                      <span class="font-medium text-brand-800 dark:text-brand-300">{{ selectedVessel()!.name }}</span>
                       <button (click)="clearSelectedVessel()"
                         class="ml-2 text-brand-400 hover:text-brand-600 transition-colors">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -122,17 +122,17 @@ interface VesselSearchResult {
                   } @else {
                     <input [ngModel]="vesselSearch()" (ngModelChange)="onVesselSearch($event)"
                       placeholder="Search vessel..."
-                      class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500" />
+                      class="w-full rounded-md border border-gray-200 dark:border-line px-3 py-1.5 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600" />
                     @if (vesselSearchResults().length) {
-                      <div class="absolute z-10 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto">
+                      <div class="absolute z-10 mt-1 w-full rounded-md border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-lg max-h-48 overflow-y-auto">
                         @for (v of vesselSearchResults(); track v.key) {
                           <button (click)="selectVessel(v)"
-                            class="w-full px-3 py-2 text-left text-sm hover:bg-brand-50 transition-colors flex items-center justify-between">
-                            <span class="font-medium text-gray-900">{{ v.name }}</span>
+                            class="w-full px-3 py-2 text-left text-sm hover:bg-brand-50 dark:hover:bg-brand-500/15 transition-colors flex items-center justify-between">
+                            <span class="font-medium text-gray-900 dark:text-ink">{{ v.name }}</span>
                             @if (v.source === 'seasearcher') {
-                              <span class="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">Import</span>
+                              <span class="rounded-full border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/15 px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:text-blue-400">Import</span>
                             } @else if (v.imo) {
-                              <span class="text-xs text-gray-400">IMO {{ v.imo }}</span>
+                              <span class="text-xs text-gray-400 dark:text-muted">IMO {{ v.imo }}</span>
                             }
                           </button>
                         }
@@ -143,9 +143,9 @@ interface VesselSearchResult {
               }
 
               <div>
-                <label class="block text-xs font-medium text-gray-500 mb-1">Role</label>
+                <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Role</label>
                 <select [ngModel]="form().role" (ngModelChange)="form.set({ ...form(), role: $event })"
-                  class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
+                  class="w-full rounded-md border border-gray-200 dark:border-line px-3 py-1.5 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600">
                   @for (grp of roleGroups(); track grp.group) {
                     <optgroup [label]="grp.group">
                       @for (role of grp.roles; track role.key) {
@@ -157,38 +157,38 @@ interface VesselSearchResult {
               </div>
 
               @if (!editingId() && selectedVessel() && selectedVesselRoleExists()) {
-                <div class="text-[11px] text-amber-600">This vessel already has that role.</div>
+                <div class="text-[11px] text-amber-600 dark:text-amber-400">This vessel already has that role.</div>
               }
 
               <div>
-                <label class="block text-xs font-medium text-gray-500 mb-1">Contact Person</label>
+                <label class="block text-xs font-medium text-gray-500 dark:text-muted mb-1">Contact Person</label>
                 @if (contactsLoading()) {
-                  <div class="text-xs text-gray-400 py-1">Loading contacts...</div>
+                  <div class="text-xs text-gray-400 dark:text-muted py-1">Loading contacts...</div>
                 } @else if (contacts().length) {
                   <select [ngModel]="form().contactId" (ngModelChange)="form.set({ ...form(), contactId: $event || null })"
-                    class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
+                    class="w-full rounded-md border border-gray-200 dark:border-line px-3 py-1.5 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600">
                     <option [ngValue]="null">— None —</option>
                     @for (ct of contacts(); track ct.id) {
                       <option [ngValue]="ct.id">{{ ct.name }}{{ ct.role ? ' (' + ct.role + ')' : '' }}</option>
                     }
                   </select>
                 } @else {
-                  <div class="text-xs text-gray-400 py-1">No contacts on file</div>
+                  <div class="text-xs text-gray-400 dark:text-muted py-1">No contacts on file</div>
                 }
               </div>
 
               <textarea [ngModel]="form().note" (ngModelChange)="form.set({ ...form(), note: $event })"
                 placeholder="Notes" rows="2"
-                class="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                class="w-full rounded-md border border-gray-200 dark:border-line px-3 py-1.5 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
               ></textarea>
               <div class="flex justify-end gap-2">
                 <button (click)="cancelForm()"
-                  class="rounded-md border border-gray-200 px-3 py-1 text-xs text-gray-600 hover:bg-gray-50 transition-colors">
+                  class="rounded-md border border-gray-200 dark:border-line px-3 py-1 text-xs text-gray-600 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors">
                   Cancel
                 </button>
                 <button (click)="save()"
                   [disabled]="saving() || (!editingId() && !selectedVessel())"
-                  class="rounded-md bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors">
+                  class="rounded-md bg-brand-700 px-3 py-1 text-xs font-medium text-white hover:bg-brand-800 disabled:opacity-50 transition-colors">
                   {{ editingId() ? 'Update' : 'Add' }}
                 </button>
               </div>
@@ -198,7 +198,7 @@ interface VesselSearchResult {
 
         @if (fleetLoading() || vesselsLoading()) {
           <div class="flex items-center justify-center py-8">
-            <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+            <svg class="h-5 w-5 animate-spin text-gray-400 dark:text-muted" viewBox="0 0 24 24" fill="none">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
             </svg>
@@ -207,16 +207,16 @@ interface VesselSearchResult {
           <div class="overflow-auto max-h-[500px]">
             <table class="w-full text-sm">
               <thead class="sticky top-0 z-10">
-                <tr class="border-b border-gray-100 bg-gray-50">
-                  <th class="px-5 py-2 text-left font-medium text-gray-500">Vessel</th>
-                  <th class="px-5 py-2 text-left font-medium text-gray-500">Type</th>
-                  <th class="px-5 py-2 text-left font-medium text-gray-500">Flag</th>
-                  <th class="px-5 py-2 text-right font-medium text-gray-500">DWT</th>
-                  <th class="px-5 py-2 text-right font-medium text-gray-500">GT</th>
-                  <th class="px-5 py-2 text-left font-medium text-gray-500">Built</th>
-                  <th class="px-5 py-2 text-left font-medium text-gray-500">Destination</th>
-                  <th class="px-5 py-2 text-left font-medium text-gray-500">Status</th>
-                  <th class="px-5 py-2 text-left font-medium text-gray-500">Link</th>
+                <tr class="border-b border-gray-100 dark:border-line bg-gray-50 dark:bg-bg-2">
+                  <th class="px-5 py-2 text-left font-medium text-gray-500 dark:text-muted">Vessel</th>
+                  <th class="px-5 py-2 text-left font-medium text-gray-500 dark:text-muted">Type</th>
+                  <th class="px-5 py-2 text-left font-medium text-gray-500 dark:text-muted">Flag</th>
+                  <th class="px-5 py-2 text-right font-medium text-gray-500 dark:text-muted">DWT</th>
+                  <th class="px-5 py-2 text-right font-medium text-gray-500 dark:text-muted">GT</th>
+                  <th class="px-5 py-2 text-left font-medium text-gray-500 dark:text-muted">Built</th>
+                  <th class="px-5 py-2 text-left font-medium text-gray-500 dark:text-muted">Destination</th>
+                  <th class="px-5 py-2 text-left font-medium text-gray-500 dark:text-muted">Status</th>
+                  <th class="px-5 py-2 text-left font-medium text-gray-500 dark:text-muted">Link</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-50">
@@ -226,7 +226,7 @@ interface VesselSearchResult {
                       <td class="px-5 py-2.5">
                         <button (click)="navigateToVessel.emit(v.id); $event.stopPropagation()"
                           [disabled]="navigatingVesselId() === v.id"
-                          class="font-medium text-brand-600 hover:text-brand-800 hover:underline text-left disabled:opacity-50"
+                          class="font-medium text-brand-600 dark:text-brand-400 hover:text-brand-800 hover:underline text-left disabled:opacity-50"
                         >
                           @if (navigatingVesselId() === v.id) {
                             <svg class="inline h-3 w-3 animate-spin mr-0.5" viewBox="0 0 24 24" fill="none">
@@ -236,40 +236,40 @@ interface VesselSearchResult {
                           }
                           {{ v.name }}
                         </button>
-                        <span class="ml-1 text-xs text-gray-400">{{ v.imo }}</span>
+                        <span class="ml-1 text-xs text-gray-400 dark:text-muted">{{ v.imo }}</span>
                         @if (v.hasSanctions) {
-                          <span class="ml-1 text-xs text-red-600">⚠️</span>
+                          <span class="ml-1 text-xs text-red-600 dark:text-red-400">⚠️</span>
                         }
                         @if (linkedRoles(v).length) {
                           <div class="mt-1 flex flex-wrap gap-1">
                             @for (role of linkedRoles(v); track role) {
-                              <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">{{ formatRole(role) }}</span>
+                              <span class="inline-flex items-center rounded-full bg-gray-100 dark:bg-surface-3 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:text-ink-dim">{{ formatRole(role) }}</span>
                             }
                           </div>
                         }
                       </td>
-                      <td class="px-5 py-2.5 text-gray-600 capitalize">{{ v.type || '—' }}</td>
-                      <td class="px-5 py-2.5 text-gray-600">{{ v.flag?.name ?? '—' }}</td>
-                      <td class="px-5 py-2.5 text-right text-gray-600 font-mono text-xs">{{ v.deadWeightTonnage ? v.deadWeightTonnage.toLocaleString() : '—' }}</td>
-                      <td class="px-5 py-2.5 text-right text-gray-600 font-mono text-xs">{{ v.grossTonnage ? v.grossTonnage.toLocaleString() : '—' }}</td>
-                      <td class="px-5 py-2.5 text-gray-600">{{ v.buildYear ?? '—' }}</td>
-                      <td class="px-5 py-2.5 text-gray-600">
+                      <td class="px-5 py-2.5 text-gray-600 dark:text-ink-dim capitalize">{{ v.type || '—' }}</td>
+                      <td class="px-5 py-2.5 text-gray-600 dark:text-ink-dim">{{ v.flag?.name ?? '—' }}</td>
+                      <td class="px-5 py-2.5 text-right text-gray-600 dark:text-ink-dim font-mono text-xs">{{ v.deadWeightTonnage ? v.deadWeightTonnage.toLocaleString() : '—' }}</td>
+                      <td class="px-5 py-2.5 text-right text-gray-600 dark:text-ink-dim font-mono text-xs">{{ v.grossTonnage ? v.grossTonnage.toLocaleString() : '—' }}</td>
+                      <td class="px-5 py-2.5 text-gray-600 dark:text-ink-dim">{{ v.buildYear ?? '—' }}</td>
+                      <td class="px-5 py-2.5 text-gray-600 dark:text-ink-dim">
                         @if (v.destination?.place) { {{ v.destination!.place!.name }} } @else { — }
                       </td>
                       <td class="px-5 py-2.5">
                         <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                          [class]="v.status === 'Live' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'">
+                          [class]="v.status === 'Live' ? 'bg-green-100 dark:bg-green-500/15 text-green-700 dark:text-green-400' : 'bg-gray-100 dark:bg-surface-3 text-gray-600 dark:text-ink-dim'">
                           {{ v.status }}
                         </span>
                       </td>
                       <td class="px-5 py-2.5">
                         <div class="flex items-center gap-2">
                           @if (isAutoMatch(v)) {
-                            <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">Registered Owner</span>
-                            <span class="ml-2 inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">Auto</span>
+                            <span class="inline-flex items-center rounded-full bg-gray-100 dark:bg-surface-3 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:text-ink-dim">Registered Owner</span>
+                            <span class="ml-2 inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-500/15 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-400">Auto</span>
                           } @else {
                             <select [ngModel]="fleetRoleFor(v)" (ngModelChange)="fleetRoleChange.emit({ vessel: v, role: $event })"
-                              class="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
+                              class="rounded-md border border-gray-200 dark:border-line bg-white dark:bg-surface px-2 py-1 text-xs focus:border-brand-600 focus:ring-1 focus:ring-brand-600">
                               @for (grp of roleGroups(); track grp.group) {
                                 <optgroup [label]="grp.group">
                                   @for (role of grp.roles; track role.key) {
@@ -278,7 +278,7 @@ interface VesselSearchResult {
                                 </optgroup>
                               }
                             </select>
-                            <span class="text-[11px] text-gray-400">
+                            <span class="text-[11px] text-gray-400 dark:text-muted">
                               @if (linkingFleetKey() === rowKey(v)) { Linking… } @else { {{ fleetLinkLabel(v) }} }
                             </span>
                           }
@@ -290,36 +290,36 @@ interface VesselSearchResult {
                 @for (vc of manualRows(); track vc.id) {
                   <tr class="hover:bg-gray-50/50 transition-colors">
                     <td class="px-5 py-2.5">
-                      <a [routerLink]="['/vessels', vc.vesselId]" class="font-medium text-brand-700 hover:text-brand-900 hover:underline">
+                      <a [routerLink]="['/vessels', vc.vesselId]" class="font-medium text-brand-700 dark:text-brand-400 hover:text-brand-900 hover:underline">
                         {{ vc.vesselName ?? 'Unknown vessel' }}
                       </a>
                       @if (vc.vesselImo) {
-                        <span class="ml-1 text-xs text-gray-400">{{ vc.vesselImo }}</span>
+                        <span class="ml-1 text-xs text-gray-400 dark:text-muted">{{ vc.vesselImo }}</span>
                       }
                       <div class="mt-1 flex flex-wrap gap-1">
-                        <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">{{ formatRole(vc.role) }}</span>
-                        <span class="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">Manual</span>
+                        <span class="inline-flex items-center rounded-full bg-gray-100 dark:bg-surface-3 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:text-ink-dim">{{ formatRole(vc.role) }}</span>
+                        <span class="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-500/15 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-400">Manual</span>
                       </div>
                     </td>
-                    <td class="px-5 py-2.5 text-gray-600">—</td>
-                    <td class="px-5 py-2.5 text-gray-600">—</td>
-                    <td class="px-5 py-2.5 text-right text-gray-600 font-mono text-xs">—</td>
-                    <td class="px-5 py-2.5 text-right text-gray-600 font-mono text-xs">—</td>
-                    <td class="px-5 py-2.5 text-gray-600">—</td>
-                    <td class="px-5 py-2.5 text-gray-600">—</td>
+                    <td class="px-5 py-2.5 text-gray-600 dark:text-ink-dim">—</td>
+                    <td class="px-5 py-2.5 text-gray-600 dark:text-ink-dim">—</td>
+                    <td class="px-5 py-2.5 text-right text-gray-600 dark:text-ink-dim font-mono text-xs">—</td>
+                    <td class="px-5 py-2.5 text-right text-gray-600 dark:text-ink-dim font-mono text-xs">—</td>
+                    <td class="px-5 py-2.5 text-gray-600 dark:text-ink-dim">—</td>
+                    <td class="px-5 py-2.5 text-gray-600 dark:text-ink-dim">—</td>
                     <td class="px-5 py-2.5">
-                      <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600">Manual</span>
+                      <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 dark:bg-surface-3 text-gray-600 dark:text-ink-dim">Manual</span>
                     </td>
                     <td class="px-5 py-2.5">
                       <div class="flex items-center gap-1">
                         <button (click)="openEditManual(vc)"
-                          class="rounded p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors" title="Edit">
+                          class="rounded p-1 text-gray-400 dark:text-muted hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-surface-tint-strong transition-colors" title="Edit">
                           <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
                             <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
                           </svg>
                         </button>
                         <button (click)="deleteVesselAssoc.emit({ vesselId: vc.vesselId, assocId: vc.id, vesselName: vc.vesselName, role: vc.role })"
-                          class="rounded p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Delete Association">
+                          class="rounded p-1 text-gray-400 dark:text-muted hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/15 transition-colors" title="Delete Association">
                           <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
                           </svg>
@@ -332,14 +332,14 @@ interface VesselSearchResult {
             </table>
           </div>
         } @else {
-          <div class="px-5 py-6 text-center text-sm text-gray-400">No vessels added yet</div>
+          <div class="px-5 py-6 text-center text-sm text-gray-400 dark:text-muted">No vessels added yet</div>
         }
       }
 
       @if (mode() === 'group') {
         @if (groupVesselsLoading()) {
           <div class="flex items-center justify-center py-8">
-            <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+            <svg class="h-5 w-5 animate-spin text-gray-400 dark:text-muted" viewBox="0 0 24 24" fill="none">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
             </svg>
@@ -348,22 +348,22 @@ interface VesselSearchResult {
           <div class="overflow-auto max-h-[500px]">
             <table class="w-full text-sm">
               <thead class="sticky top-0 z-10">
-                <tr class="border-b border-gray-100 bg-gray-50">
-                  <th class="px-5 py-2 text-left font-medium text-gray-500">Client</th>
-                  <th class="px-5 py-2 text-left font-medium text-gray-500">Vessel</th>
-                  <th class="px-5 py-2 text-left font-medium text-gray-500">Role</th>
-                  <th class="px-5 py-2 text-left font-medium text-gray-500">Source</th>
+                <tr class="border-b border-gray-100 dark:border-line bg-gray-50 dark:bg-bg-2">
+                  <th class="px-5 py-2 text-left font-medium text-gray-500 dark:text-muted">Client</th>
+                  <th class="px-5 py-2 text-left font-medium text-gray-500 dark:text-muted">Vessel</th>
+                  <th class="px-5 py-2 text-left font-medium text-gray-500 dark:text-muted">Role</th>
+                  <th class="px-5 py-2 text-left font-medium text-gray-500 dark:text-muted">Source</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-50">
                 @for (v of groupVessels(); track v.id) {
                   <tr class="hover:bg-gray-50/50 transition-colors">
-                    <td class="px-5 py-2.5 text-gray-700">{{ v.companyName }}</td>
+                    <td class="px-5 py-2.5 text-gray-700 dark:text-ink-dim">{{ v.companyName }}</td>
                     <td class="px-5 py-2.5">
                       @if (v.localVesselId || v.seasearcherVesselId) {
                         <button type="button" (click)="openGroupVessel.emit(v)"
                           [disabled]="navigatingVesselId() === (v.seasearcherVesselId || v.localVesselId)"
-                          class="font-medium text-brand-600 hover:text-brand-800 hover:underline text-left disabled:opacity-50"
+                          class="font-medium text-brand-600 dark:text-brand-400 hover:text-brand-800 hover:underline text-left disabled:opacity-50"
                         >
                           @if (navigatingVesselId() === (v.seasearcherVesselId || v.localVesselId)) {
                             <svg class="inline h-3 w-3 animate-spin mr-0.5" viewBox="0 0 24 24" fill="none">
@@ -374,16 +374,16 @@ interface VesselSearchResult {
                           {{ v.vesselName }}
                         </button>
                       } @else {
-                        <span class="font-medium text-gray-900">{{ v.vesselName }}</span>
+                        <span class="font-medium text-gray-900 dark:text-ink">{{ v.vesselName }}</span>
                       }
                       @if (v.vesselImo) {
-                        <span class="ml-1 text-xs text-gray-400">{{ v.vesselImo }}</span>
+                        <span class="ml-1 text-xs text-gray-400 dark:text-muted">{{ v.vesselImo }}</span>
                       }
                     </td>
-                    <td class="px-5 py-2.5 text-gray-600">{{ formatRole(v.role) }}</td>
+                    <td class="px-5 py-2.5 text-gray-600 dark:text-ink-dim">{{ formatRole(v.role) }}</td>
                     <td class="px-5 py-2.5">
                       <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
-                        [class]="v.source === 'manual' ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600'">
+                        [class]="v.source === 'manual' ? 'bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-400' : 'bg-gray-100 dark:bg-surface-3 text-gray-600 dark:text-ink-dim'">
                         {{ v.source || 'linked' }}
                       </span>
                     </td>
@@ -393,7 +393,7 @@ interface VesselSearchResult {
             </table>
           </div>
         } @else {
-          <div class="px-5 py-6 text-center text-sm text-gray-400">No vessels in group</div>
+          <div class="px-5 py-6 text-center text-sm text-gray-400 dark:text-muted">No vessels in group</div>
         }
       }
     </div>

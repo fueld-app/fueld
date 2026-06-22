@@ -48,8 +48,8 @@ interface VesselSearchResult {
       <!-- Header -->
       <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
-          <h1 class="text-2xl font-bold text-gray-900">Vessels</h1>
-          <p class="mt-1 text-sm text-gray-500">
+          <h1 class="text-2xl font-bold text-gray-900 dark:text-ink">Vessels</h1>
+          <p class="mt-1 text-sm text-gray-500 dark:text-muted">
             Manage vessels. Import from Seasearcher or create manually.
           </p>
         </div>
@@ -60,7 +60,7 @@ interface VesselSearchResult {
         <!-- Typeahead search -->
         <div class="relative flex-1">
           <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-            <svg class="h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <svg class="h-4 w-4 text-gray-400 dark:text-muted" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
             </svg>
           </div>
@@ -70,12 +70,11 @@ interface VesselSearchResult {
             (ngModelChange)="onSearchInput($event)"
             (focus)="onSearchFocus()"
             placeholder="Search vessels by name, IMO or MMSI…"
-            class="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm
-                   focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+            class="w-full rounded-lg border border-gray-300 dark:border-line-strong py-2 pl-9 pr-3 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
           />
           @if (searching()) {
             <div class="absolute inset-y-0 right-0 flex items-center pr-3">
-              <svg class="h-4 w-4 animate-spin text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <svg class="h-4 w-4 animate-spin text-gray-400 dark:text-muted" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
               </svg>
@@ -84,38 +83,38 @@ interface VesselSearchResult {
 
           <!-- Typeahead dropdown -->
           @if (dropdownOpen() && searchDone()) {
-            <div class="absolute z-20 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-80 overflow-y-auto">
+            <div class="absolute z-20 mt-1 w-full rounded-lg border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-lg max-h-80 overflow-y-auto">
               @for (r of searchResults(); track r.seasearcherId ?? r.localId) {
-                <div (click)="onTypeaheadClick(r)" class="flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0 cursor-pointer">
+                <div (click)="onTypeaheadClick(r)" class="flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors border-b border-gray-50 last:border-0 cursor-pointer">
                   <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-2">
-                      <span class="text-sm font-medium text-gray-900 truncate">{{ r.name }}</span>
+                      <span class="text-sm font-medium text-gray-900 dark:text-ink truncate">{{ r.name }}</span>
                       @if (r.isSanctioned) {
-                        <span class="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Sanctioned</span>
+                        <span class="inline-flex rounded-full bg-red-100 dark:bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">Sanctioned</span>
                       }
                     </div>
                     <div class="flex items-center gap-2 mt-0.5">
                       @if (r.imo) {
-                        <span class="text-xs text-gray-400">IMO {{ r.imo }}</span>
+                        <span class="text-xs text-gray-400 dark:text-muted">IMO {{ r.imo }}</span>
                       }
                       @if (r.flag) {
-                        <span class="text-xs text-gray-500">{{ flagEmoji(r.flagCode) }} {{ r.flag }}</span>
+                        <span class="text-xs text-gray-500 dark:text-muted">{{ flagEmoji(r.flagCode) }} {{ r.flag }}</span>
                       }
                       @if (r.type) {
-                        <span class="text-xs text-gray-400 capitalize">{{ r.type }}</span>
+                        <span class="text-xs text-gray-400 dark:text-muted capitalize">{{ r.type }}</span>
                       }
                       @if (r.dwt) {
-                        <span class="text-xs text-gray-400">{{ r.dwt.toLocaleString() }} DWT</span>
+                        <span class="text-xs text-gray-400 dark:text-muted">{{ r.dwt.toLocaleString() }} DWT</span>
                       }
                     </div>
                   </div>
                   <div class="shrink-0">
                     @if (r.source === 'local') {
-                      <span class="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">Local</span>
+                      <span class="inline-flex rounded-full bg-green-100 dark:bg-green-500/15 px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-400">Local</span>
                     } @else {
                       <button
                         (click)="importVessel(r.seasearcherId!, $event)"
-                        class="inline-flex items-center gap-1 rounded-md bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100 transition-colors"
+                        class="inline-flex items-center gap-1 rounded-md bg-brand-50 dark:bg-brand-700/15 px-2 py-1 text-xs font-medium text-brand-700 dark:text-brand-400 hover:bg-brand-100 dark:hover:bg-brand-500/20 transition-colors"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                           <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
@@ -128,16 +127,16 @@ interface VesselSearchResult {
               }
 
               @if (!searchResults().length) {
-                <div class="px-3 py-3 text-center text-sm text-gray-500">
+                <div class="px-3 py-3 text-center text-sm text-gray-500 dark:text-muted">
                   No vessels found matching "{{ searchTerm() }}"
                 </div>
               }
 
               <!-- Always show create manually option -->
-              <div class="border-t border-gray-100 px-3 py-2.5">
+              <div class="border-t border-gray-100 dark:border-line px-3 py-2.5">
                 <button
                   (click)="openCreateModal(); $event.stopPropagation()"
-                  class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 transition-colors"
+                  class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium text-brand-700 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-500/15 transition-colors"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
@@ -158,60 +157,60 @@ interface VesselSearchResult {
       <!-- Vessels table -->
       @if (loading()) {
         <div class="flex items-center justify-center py-12">
-          <svg class="h-8 w-8 animate-spin text-brand-600" viewBox="0 0 24 24" fill="none">
+          <svg class="h-8 w-8 animate-spin text-brand-600 dark:text-brand-400" viewBox="0 0 24 24" fill="none">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
           </svg>
         </div>
       } @else {
-        <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div class="overflow-x-auto rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm">
           <table class="w-full text-sm">
             <thead>
-              <tr class="border-b border-gray-100 bg-gray-50/60">
-                <th app-sort-header field="name" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-5 py-3 text-left font-medium text-gray-500">Vessel</th>
-                <th app-sort-header field="type" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-5 py-3 text-left font-medium text-gray-500">Type</th>
-                <th app-sort-header field="flag" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-5 py-3 text-left font-medium text-gray-500">Flag</th>
-                <th class="px-5 py-3 text-left font-medium text-gray-500">Sanctioned</th>
-                <th app-sort-header field="dwt" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-5 py-3 text-right font-medium text-gray-500">DWT</th>
-                <th app-sort-header field="gt" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-5 py-3 text-right font-medium text-gray-500">GT</th>
-                <th app-sort-header field="buildYear" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-5 py-3 text-left font-medium text-gray-500">Built</th>
-                <th class="px-5 py-3 text-left font-medium text-gray-500">Source</th>
-                <th class="px-5 py-3 text-right font-medium text-gray-500"></th>
+              <tr class="border-b border-gray-100 dark:border-line bg-gray-50/60">
+                <th app-sort-header field="name" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-5 py-3 text-left font-medium text-gray-500 dark:text-muted">Vessel</th>
+                <th app-sort-header field="type" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-5 py-3 text-left font-medium text-gray-500 dark:text-muted">Type</th>
+                <th app-sort-header field="flag" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-5 py-3 text-left font-medium text-gray-500 dark:text-muted">Flag</th>
+                <th class="px-5 py-3 text-left font-medium text-gray-500 dark:text-muted">Sanctioned</th>
+                <th app-sort-header field="dwt" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-5 py-3 text-right font-medium text-gray-500 dark:text-muted">DWT</th>
+                <th app-sort-header field="gt" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-5 py-3 text-right font-medium text-gray-500 dark:text-muted">GT</th>
+                <th app-sort-header field="buildYear" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-5 py-3 text-left font-medium text-gray-500 dark:text-muted">Built</th>
+                <th class="px-5 py-3 text-left font-medium text-gray-500 dark:text-muted">Source</th>
+                <th class="px-5 py-3 text-right font-medium text-gray-500 dark:text-muted"></th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-50">
               @for (v of vessels(); track v.id) {
                 <tr class="hover:bg-gray-50/50 transition-colors cursor-pointer" (click)="goToVessel(v.id)">
                   <td class="px-5 py-3">
-                    <div class="font-medium text-gray-900">{{ v.name }}</div>
-                    <div class="text-xs text-gray-400">
+                    <div class="font-medium text-gray-900 dark:text-ink">{{ v.name }}</div>
+                    <div class="text-xs text-gray-400 dark:text-muted">
                       @if (v.imo) { IMO {{ v.imo }} }
                       @if (v.mmsi) { · MMSI {{ v.mmsi }} }
                     </div>
                   </td>
-                  <td class="px-5 py-3 text-gray-600 capitalize">{{ v.type || '—' }}</td>
-                  <td class="px-5 py-3 text-gray-600">{{ flagEmoji(v.flagCode) }} {{ v.flag || '—' }}</td>
+                  <td class="px-5 py-3 text-gray-600 dark:text-ink-dim capitalize">{{ v.type || '—' }}</td>
+                  <td class="px-5 py-3 text-gray-600 dark:text-ink-dim">{{ flagEmoji(v.flagCode) }} {{ v.flag || '—' }}</td>
                   <td class="px-5 py-3">
                     @if (v.sanctionStatus === 'SANCTIONED') {
-                      <span class="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Yes</span>
+                      <span class="inline-flex rounded-full bg-red-100 dark:bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">Yes</span>
                     } @else {
-                      <span class="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">No</span>
+                      <span class="inline-flex rounded-full bg-green-100 dark:bg-green-500/15 px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-400">No</span>
                     }
                   </td>
-                  <td class="px-5 py-3 text-right text-gray-600 font-mono text-xs">{{ v.deadWeightTonnage ? v.deadWeightTonnage.toLocaleString() : '—' }}</td>
-                  <td class="px-5 py-3 text-right text-gray-600 font-mono text-xs">{{ v.grossTonnage ? v.grossTonnage.toLocaleString() : '—' }}</td>
-                  <td class="px-5 py-3 text-gray-600">{{ v.buildYear ?? '—' }}</td>
+                  <td class="px-5 py-3 text-right text-gray-600 dark:text-ink-dim font-mono text-xs">{{ v.deadWeightTonnage ? v.deadWeightTonnage.toLocaleString() : '—' }}</td>
+                  <td class="px-5 py-3 text-right text-gray-600 dark:text-ink-dim font-mono text-xs">{{ v.grossTonnage ? v.grossTonnage.toLocaleString() : '—' }}</td>
+                  <td class="px-5 py-3 text-gray-600 dark:text-ink-dim">{{ v.buildYear ?? '—' }}</td>
                   <td class="px-5 py-3">
                     @if (v.seasearcherId) {
-                      <span class="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-600">Seasearcher</span>
+                      <span class="inline-flex rounded-full bg-blue-50 dark:bg-blue-500/15 px-2 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400">Seasearcher</span>
                     } @else {
-                      <span class="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">Manual</span>
+                      <span class="inline-flex rounded-full bg-gray-100 dark:bg-surface-3 px-2 py-0.5 text-xs font-medium text-gray-500 dark:text-muted">Manual</span>
                     }
                   </td>
                   <td class="px-5 py-3 text-right">
                     <button
                       (click)="confirmDelete(v, $event)"
-                      class="rounded p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                      class="rounded p-1 text-gray-400 dark:text-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/15 transition-colors"
                       title="Delete"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -222,7 +221,7 @@ interface VesselSearchResult {
                 </tr>
               } @empty {
                 <tr>
-                  <td colspan="9" class="px-5 py-12 text-center text-gray-400">
+                  <td colspan="9" class="px-5 py-12 text-center text-gray-400 dark:text-muted">
                     No vessels yet. Use the search bar above to import from Seasearcher or create manually.
                   </td>
                 </tr>
@@ -243,19 +242,19 @@ interface VesselSearchResult {
       <!-- Delete Confirmation Modal -->
       @if (deleteTarget()) {
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div class="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
-            <h3 class="text-lg font-semibold text-gray-900">Delete Vessel</h3>
-            <p class="mt-2 text-sm text-gray-600">
+          <div class="w-full max-w-sm rounded-xl bg-white dark:bg-surface p-6 shadow-xl">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-ink">Delete Vessel</h3>
+            <p class="mt-2 text-sm text-gray-600 dark:text-ink-dim">
               Are you sure you want to delete <strong>{{ deleteTarget()!.name }}</strong>?
               This action cannot be undone.
             </p>
             @if (deleteError()) {
-              <p class="mt-2 text-sm text-red-600">{{ deleteError() }}</p>
+              <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ deleteError() }}</p>
             }
             <div class="mt-4 flex justify-end gap-3">
               <button
                 (click)="deleteTarget.set(null); deleteError.set('')"
-                class="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                class="rounded-lg border border-gray-200 dark:border-line px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint"
               >Cancel</button>
               <button
                 (click)="executeDelete()"
@@ -272,71 +271,71 @@ interface VesselSearchResult {
       <!-- Create Modal -->
       @if (showCreateModal()) {
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">Create Vessel</h3>
+          <div class="w-full max-w-md rounded-xl bg-white dark:bg-surface p-6 shadow-xl">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-ink mb-4">Create Vessel</h3>
 
             <div class="space-y-3">
               <!-- Name -->
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Vessel Name *</label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1">Vessel Name *</label>
                 <input
                   type="text"
                   [ngModel]="createForm().name"
                   (ngModelChange)="updateCreateForm('name', $event)"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                  class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
                 />
               </div>
 
               <!-- IMO + MMSI row -->
               <div class="grid grid-cols-2 gap-3">
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">IMO</label>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1">IMO</label>
                   <input
                     type="text"
                     [ngModel]="createForm().imo"
                     (ngModelChange)="updateCreateForm('imo', $event)"
-                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                    class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
                   />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">MMSI</label>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1">MMSI</label>
                   <input
                     type="text"
                     [ngModel]="createForm().mmsi"
                     (ngModelChange)="updateCreateForm('mmsi', $event)"
-                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                    class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
                   />
                 </div>
               </div>
 
               <!-- Phone -->
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1">Phone</label>
                 <input
                   type="tel"
                   [ngModel]="createForm().phone"
                   (ngModelChange)="updateCreateForm('phone', $event)"
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                  class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
                 />
               </div>
 
               <!-- Flag + Type row -->
               <div class="grid grid-cols-2 gap-3">
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Flag</label>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1">Flag</label>
                   <input
                     type="text"
                     [ngModel]="createForm().flag"
                     (ngModelChange)="updateCreateForm('flag', $event)"
-                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+                    class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
                   />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1">Type</label>
                   <select
                     [ngModel]="createForm().type"
                     (ngModelChange)="updateCreateForm('type', $event)"
-                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white"
+                    class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none bg-white dark:bg-surface"
                   >
                     <option value="">— Select Type —</option>
                     @for (t of vesselTypes(); track t) {
@@ -348,18 +347,18 @@ interface VesselSearchResult {
             </div>
 
             @if (createError()) {
-              <p class="mt-3 text-sm text-red-600">{{ createError() }}</p>
+              <p class="mt-3 text-sm text-red-600 dark:text-red-400">{{ createError() }}</p>
             }
 
             <div class="mt-5 flex justify-end gap-3">
               <button
                 (click)="showCreateModal.set(false)"
-                class="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                class="rounded-lg border border-gray-200 dark:border-line px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint"
               >Cancel</button>
               <button
                 (click)="createManually()"
                 [disabled]="creating()"
-                class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                class="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50"
               >
                 @if (creating()) { Creating… } @else { Create }
               </button>

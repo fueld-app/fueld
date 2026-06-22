@@ -26,19 +26,19 @@ import { SettingsToastService } from './settings-toast.service';
       <div class="app-panel">
         <div class="app-panel-header app-panel-header--emerald">
           <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--emerald">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-emerald-600 dark:text-emerald-400" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5zm4.707 3.707a1 1 0 00-1.414-1.414l-3 3a1 1 0 000 1.414l3 3a1 1 0 001.414-1.414L8.414 9H10a3 3 0 013 3v1a1 1 0 102 0v-1a5 5 0 00-5-5H8.414l1.293-1.293z" clip-rule="evenodd" />
             </svg>
           </div>
           <div class="flex-1 min-w-0">
-            <h3 class="text-sm font-semibold text-gray-900">Products</h3>
-            <p class="text-xs text-gray-500">Configure products / services with optional default description, unit, and pricing.</p>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">Products</h3>
+            <p class="text-xs text-gray-500 dark:text-muted">Configure products / services with optional default description, unit, and pricing.</p>
           </div>
         </div>
 
         <div class="app-panel-body space-y-3 flex-1 min-h-0 overflow-y-auto">
           @for (item of catalogItems(); track $index; let i = $index) {
-            <div class="space-y-2 rounded-lg border border-gray-200 p-3">
+            <div class="space-y-2 rounded-lg border border-gray-200 dark:border-line p-3">
               <div class="flex items-center gap-2">
                 <input
                   type="text"
@@ -49,7 +49,7 @@ import { SettingsToastService } from './settings-toast.service';
                 />
                 <button
                   (click)="removeCatalogItem(i)"
-                  class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
+                  class="rounded-md p-1.5 text-gray-400 dark:text-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/15 transition-colors shrink-0"
                   title="Remove item"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -108,7 +108,7 @@ import { SettingsToastService } from './settings-toast.service';
               @if (catalogSaving()) { Saving… } @else { Save Products }
             </button>
             @if (catalogSaved()) {
-              <span class="text-sm text-green-600 flex items-center gap-1">
+              <span class="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
                 </svg>
@@ -125,13 +125,13 @@ import { SettingsToastService } from './settings-toast.service';
       <div class="app-panel">
         <div class="app-panel-header app-panel-header--amber">
           <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--amber">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-600 dark:text-amber-400" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M2 4.75A.75.75 0 012.75 4h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 4.75zm0 5A.75.75 0 012.75 9h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 9.75zm0 5a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75a.75.75 0 01-.75-.75z" clip-rule="evenodd" />
             </svg>
           </div>
           <div class="flex-1 min-w-0">
-            <h3 class="text-sm font-semibold text-gray-900">Order Categories</h3>
-            <p class="text-xs text-gray-500">Group orders into business lines (fuels, services, environmental, etc.).</p>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">Order Categories</h3>
+            <p class="text-xs text-gray-500 dark:text-muted">Group orders into business lines (fuels, services, environmental, etc.).</p>
           </div>
         </div>
 
@@ -161,7 +161,7 @@ import { SettingsToastService } from './settings-toast.service';
               />
               <button
                 (click)="removeOrderCategory(i)"
-                class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
+                class="rounded-md p-1.5 text-gray-400 dark:text-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/15 transition-colors shrink-0"
                 title="Remove category"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -189,7 +189,7 @@ import { SettingsToastService } from './settings-toast.service';
               @if (orderCategoriesSaving()) { Saving… } @else { Save Categories }
             </button>
             @if (orderCategoriesSaved()) {
-              <span class="text-sm text-green-600 flex items-center gap-1">
+              <span class="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
                 </svg>
@@ -206,13 +206,13 @@ import { SettingsToastService } from './settings-toast.service';
       <div class="app-panel">
         <div class="app-panel-header app-panel-header--rose">
           <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--rose">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-rose-600" viewBox="0 0 20 20" fill="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-rose-600 dark:text-rose-400" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z" clip-rule="evenodd" />
             </svg>
           </div>
           <div class="flex-1 min-w-0">
-            <h3 class="text-sm font-semibold text-gray-900">Tax Rates</h3>
-            <p class="text-xs text-gray-500">Configure flat tax rates per product.</p>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">Tax Rates</h3>
+            <p class="text-xs text-gray-500 dark:text-muted">Configure flat tax rates per product.</p>
           </div>
         </div>
 
@@ -245,7 +245,7 @@ import { SettingsToastService } from './settings-toast.service';
               />
               <button
                 (click)="removeTaxRate(i)"
-                class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
+                class="rounded-md p-1.5 text-gray-400 dark:text-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/15 transition-colors shrink-0"
                 title="Remove rate"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -273,7 +273,7 @@ import { SettingsToastService } from './settings-toast.service';
               @if (taxRatesSaving()) { Saving… } @else { Save Tax Rates }
             </button>
             @if (taxRatesSaved()) {
-              <span class="text-sm text-green-600 flex items-center gap-1">
+              <span class="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
                 </svg>

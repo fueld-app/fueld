@@ -8,7 +8,11 @@ test('trader cannot access credit routes', async ({ page }) => {
   });
 
   await page.goto('/credit/suppliers');
-  await expect(page).toHaveURL(/\/$/);
+  // The credit guard kicks unauthorized traders out of /credit/*. The redirect
+  // may chain (root → role dashboard), so assert the URL leaves /credit rather
+  // than asserting a specific intermediate destination, which races across
+  // browsers (firefox resolves the full chain before the assertion polls).
+  await expect(page).not.toHaveURL(/\/credit/);
 });
 
 test('credit manager can access credit routes', async ({ page }) => {

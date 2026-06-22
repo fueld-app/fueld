@@ -37,12 +37,12 @@ function describeAction(action: string, httpPath: string | null): string {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (info()) {
-      <div class="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-3 py-1 text-xs text-gray-500 ring-1 ring-gray-200/60">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+      <div class="inline-flex items-center gap-1.5 rounded-full bg-gray-50 dark:bg-bg-2 px-3 py-1 text-xs text-gray-500 dark:text-muted ring-1 ring-gray-200/60">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-gray-400 dark:text-muted" viewBox="0 0 20 20" fill="currentColor">
           <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm.75-13a.75.75 0 0 0-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 0 0 0-1.5h-3.25V5Z" clip-rule="evenodd" />
         </svg>
         <span>{{ actionText() }}</span>
-        <span class="font-medium text-gray-700">{{ info()!.userName ?? info()!.userEmail ?? 'Unknown' }}</span>
+        <span class="font-medium text-gray-700 dark:text-ink-dim">{{ info()!.userName ?? info()!.userEmail ?? 'Unknown' }}</span>
         <span>&middot;</span>
         <span>{{ timeAgo() }}</span>
       </div>

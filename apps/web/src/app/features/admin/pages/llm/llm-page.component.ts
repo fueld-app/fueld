@@ -512,9 +512,9 @@ function getIkCpuSweepCandidates(current: LlmTuningConfig): IkCpuSweepEntry[] {
 } @else {
   <div class="space-y-6 p-6">
     <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-bold text-gray-900">LLM Administration</h1>
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-ink">LLM Administration</h1>
       <button (click)="refreshStatus()" [disabled]="refreshing()"
-        class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50">
+        class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim bg-white dark:bg-surface border border-gray-300 dark:border-line-strong rounded-md hover:bg-gray-50 dark:hover:bg-surface-tint disabled:opacity-50">
         {{ refreshing() ? 'Refreshing…' : '↻ Refresh' }}
       </button>
     </div>
@@ -522,113 +522,113 @@ function getIkCpuSweepCandidates(current: LlmTuningConfig): IkCpuSweepEntry[] {
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
       <!-- Status Card -->
-      <div class="bg-white rounded-lg shadow p-6 lg:col-span-2">
+      <div class="bg-white dark:bg-surface rounded-lg shadow p-6 lg:col-span-2">
         <div class="flex items-center gap-3 mb-4">
-          <h2 class="text-lg font-semibold text-gray-900">Status</h2>
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-ink">Status</h2>
           <span class="px-2 py-0.5 text-xs font-medium rounded-full"
-            [class]="status()?.healthy ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
+            [class]="status()?.healthy ? 'bg-green-100 dark:bg-green-500/15 text-green-800 dark:text-green-300' : 'bg-red-100 dark:bg-red-500/15 text-red-800 dark:text-red-300'">
             {{ status()?.healthy ? 'Online' : 'Offline' }}
           </span>
           @if (status()?.searchAvailable) {
-            <span class="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800">Search</span>
+            <span class="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 dark:bg-blue-500/15 text-blue-800 dark:text-blue-300">Search</span>
           }
         </div>
         @if (status(); as s) {
           <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div><span class="text-gray-500">Model</span><p class="font-mono mt-1">{{ s.model ?? '—' }}</p></div>
-            <div><span class="text-gray-500">Size</span><p class="font-mono mt-1">{{ s.modelSizeMb ? s.modelSizeMb + ' MB' : '—' }}</p></div>
-            <div><span class="text-gray-500">Latency</span><p class="font-mono mt-1">{{ s.latencyMs != null ? s.latencyMs + ' ms' : '—' }}</p></div>
-            <div><span class="text-gray-500">Endpoint</span><p class="font-mono mt-1 truncate">{{ s.baseUrl }}</p></div>
+            <div><span class="text-gray-500 dark:text-muted">Model</span><p class="font-mono mt-1">{{ s.model ?? '—' }}</p></div>
+            <div><span class="text-gray-500 dark:text-muted">Size</span><p class="font-mono mt-1">{{ s.modelSizeMb ? s.modelSizeMb + ' MB' : '—' }}</p></div>
+            <div><span class="text-gray-500 dark:text-muted">Latency</span><p class="font-mono mt-1">{{ s.latencyMs != null ? s.latencyMs + ' ms' : '—' }}</p></div>
+            <div><span class="text-gray-500 dark:text-muted">Endpoint</span><p class="font-mono mt-1 truncate">{{ s.baseUrl }}</p></div>
           </div>
-          <div class="mt-4 flex flex-wrap items-center gap-2 text-xs text-gray-500">
-            <span class="px-2 py-1 rounded-full bg-gray-100 text-gray-700">Runtime: {{ s.runtime }}</span>
-            <span class="px-2 py-1 rounded-full bg-gray-100 text-gray-700">Profile: {{ profileLabel(s.profile) }}</span>
+          <div class="mt-4 flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-muted">
+            <span class="px-2 py-1 rounded-full bg-gray-100 dark:bg-surface-3 text-gray-700 dark:text-ink-dim">Runtime: {{ s.runtime }}</span>
+            <span class="px-2 py-1 rounded-full bg-gray-100 dark:bg-surface-3 text-gray-700 dark:text-ink-dim">Profile: {{ profileLabel(s.profile) }}</span>
           </div>
           @if (s.launchArgs.length) {
-            <details class="mt-3 text-xs text-gray-500">
+            <details class="mt-3 text-xs text-gray-500 dark:text-muted">
               <summary class="cursor-pointer hover:text-gray-700">Effective launch arguments</summary>
               <pre class="mt-2 rounded-md bg-gray-900 p-3 text-[11px] text-green-400 overflow-x-auto whitespace-pre-wrap">{{ 'llama-server ' + s.launchArgs.join(' ') }}</pre>
             </details>
           }
         } @else {
-          <p class="text-sm text-gray-500">Unable to reach LLM server</p>
+          <p class="text-sm text-gray-500 dark:text-muted">Unable to reach LLM server</p>
         }
       </div>
 
       <!-- Installation & Server Card -->
-      <div class="bg-white rounded-lg shadow p-6 lg:col-span-2">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">Installation & Server</h2>
+      <div class="bg-white dark:bg-surface rounded-lg shadow p-6 lg:col-span-2">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-ink mb-4">Installation & Server</h2>
         @if (installedVersion(); as iv) {
           <div class="mb-3 flex items-center gap-2">
-            <span class="text-sm text-gray-500">Current version:</span>
-            <span class="px-2 py-0.5 text-xs font-semibold bg-green-100 text-green-800 rounded-full">{{ iv }}</span>
+            <span class="text-sm text-gray-500 dark:text-muted">Current version:</span>
+            <span class="px-2 py-0.5 text-xs font-semibold bg-green-100 dark:bg-green-500/15 text-green-800 dark:text-green-300 rounded-full">{{ iv }}</span>
           </div>
         }
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Runtime</label>
+            <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1">Runtime</label>
             <select
               [ngModel]="selectedRuntime()"
               (ngModelChange)="onRuntimeChange($event)"
-              class="block w-full rounded-md border border-gray-300 bg-white py-2 px-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              class="block w-full rounded-md border border-gray-300 dark:border-line-strong bg-white dark:bg-surface py-2 px-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
               <option value="mainline">llama.cpp (mainline)</option>
               <option value="ik">ik_llama.cpp</option>
             </select>
-            <p class="mt-1 text-xs text-gray-500">ik_llama.cpp is source-build oriented and preferred for CPU/CUDA tuning.</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-muted">ik_llama.cpp is source-build oriented and preferred for CPU/CUDA tuning.</p>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Deployment profile</label>
+            <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1">Deployment profile</label>
             <select
               [ngModel]="selectedProfile()"
               (ngModelChange)="onProfileChange($event)"
-              class="block w-full rounded-md border border-gray-300 bg-white py-2 px-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              class="block w-full rounded-md border border-gray-300 dark:border-line-strong bg-white dark:bg-surface py-2 px-3 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
               <option value="cpu">CPU-only</option>
               <option value="cuda">NVIDIA CUDA</option>
               <option value="apple-silicon-experimental">Apple Silicon Experimental</option>
             </select>
-            <p class="mt-1 text-xs text-gray-500">Profile controls the default launch flags used for the server.</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-muted">Profile controls the default launch flags used for the server.</p>
           </div>
         </div>
         <div class="flex items-end gap-3 mb-4">
           <div class="flex-1 relative">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Runtime version / ref</label>
+            <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1">Runtime version / ref</label>
             <div class="flex gap-2">
               <!-- Custom dropdown -->
               <div class="relative flex-1">
                 <button type="button" (click)="toggleVersionDropdown()"
-                  class="relative w-full cursor-pointer rounded-md border border-gray-300 bg-white py-2 pl-3 pr-10 text-left text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                  class="relative w-full cursor-pointer rounded-md border border-gray-300 dark:border-line-strong bg-white dark:bg-surface py-2 pl-3 pr-10 text-left text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
                   @if (selectedVersion()) {
                     <span class="block truncate">{{ versionDisplayLabel(selectedVersion()) }}</span>
                   } @else {
-                    <span class="block truncate text-gray-400">{{ versionsLoading() ? 'Loading…' : 'Select a version' }}</span>
+                    <span class="block truncate text-gray-400 dark:text-muted">{{ versionsLoading() ? 'Loading…' : 'Select a version' }}</span>
                   }
                   <span class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                    <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                    <svg class="h-4 w-4 text-gray-400 dark:text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                   </span>
                 </button>
                 @if (versionDropdownOpen()) {
                   <div class="fixed inset-0 z-[19]" (click)="versionDropdownOpen.set(false)"></div>
-                  <div class="absolute z-20 mt-1 w-full max-h-60 overflow-auto rounded-md bg-white shadow-lg ring-1 ring-black/5">
+                  <div class="absolute z-20 mt-1 w-full max-h-60 overflow-auto rounded-md bg-white dark:bg-surface shadow-lg ring-1 ring-black/5">
                     @if (versionsLoading()) {
-                      <div class="px-3 py-4 text-sm text-gray-500 text-center">Loading versions…</div>
+                      <div class="px-3 py-4 text-sm text-gray-500 dark:text-muted text-center">Loading versions…</div>
                     } @else if (versions().length === 0) {
-                      <div class="px-3 py-4 text-sm text-gray-500 text-center">No versions found</div>
+                      <div class="px-3 py-4 text-sm text-gray-500 dark:text-muted text-center">No versions found</div>
                     } @else {
                       @for (v of versions(); track v.tag) {
                         <button (click)="selectVersion(v.tag)"
-                          class="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center justify-between gap-2"
+                          class="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 dark:hover:bg-blue-500/15 flex items-center justify-between gap-2"
                           [class.bg-blue-50]="v.tag === selectedVersion()">
                           <div class="flex items-center gap-2 min-w-0">
                             @if (v.tag === installedVersion()) {
-                              <span class="flex-shrink-0 w-4 h-4 text-green-600">✓</span>
+                              <span class="flex-shrink-0 w-4 h-4 text-green-600 dark:text-green-400">✓</span>
                             } @else {
                               <span class="flex-shrink-0 w-4"></span>
                             }
                             <span class="font-medium">{{ versionDisplayLabel(v.tag) }}</span>
                           </div>
-                          <div class="flex items-center gap-3 text-xs text-gray-400 flex-shrink-0">
+                          <div class="flex items-center gap-3 text-xs text-gray-400 dark:text-muted flex-shrink-0">
                             @if (v.date) {
                               <span>{{ v.date }}</span>
                             }
@@ -651,80 +651,80 @@ function getIkCpuSweepCandidates(current: LlmTuningConfig): IkCpuSweepEntry[] {
               </button>
             </div>
             <div class="flex items-center gap-2 mt-2">
-              <label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
-                <input type="checkbox" [checked]="buildFromSource()" (change)="buildFromSource.set(!buildFromSource())" class="rounded border-gray-300" [disabled]="selectedRuntime() === 'ik'">
+              <label class="flex items-center gap-1.5 text-xs text-gray-600 dark:text-ink-dim cursor-pointer">
+                <input type="checkbox" [checked]="buildFromSource()" (change)="buildFromSource.set(!buildFromSource())" class="rounded border-gray-300 dark:border-line-strong" [disabled]="selectedRuntime() === 'ik'">
                 Build from source
               </label>
-              <span class="text-xs text-gray-400">For ik_llama.cpp, source build is required. Mainline can still use pre-built archives.</span>
+              <span class="text-xs text-gray-400 dark:text-muted">For ik_llama.cpp, source build is required. Mainline can still use pre-built archives.</span>
             </div>
           </div>
         </div>
         @if (installStatus(); as is) {
-          <div class="flex items-center gap-4 text-sm text-gray-600 mb-4">
-            <span>Binary: <strong [class]="is.binaryInstalled ? 'text-green-700' : 'text-red-700'">{{ is.binaryInstalled ? '✓' : '✗' }}</strong></span>
-            <span>Model: <strong [class]="is.modelInstalled ? 'text-green-700' : 'text-red-700'">{{ is.modelInstalled ? is.modelFilename ?? '✓' : '✗' }}</strong></span>
+          <div class="flex items-center gap-4 text-sm text-gray-600 dark:text-ink-dim mb-4">
+            <span>Binary: <strong [class]="is.binaryInstalled ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'">{{ is.binaryInstalled ? '✓' : '✗' }}</strong></span>
+            <span>Model: <strong [class]="is.modelInstalled ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'">{{ is.modelInstalled ? is.modelFilename ?? '✓' : '✗' }}</strong></span>
             @if (is.llamaCppVersion) { <span>Version: <strong>{{ is.llamaCppVersion }}</strong></span> }
             <span>Runtime: <strong>{{ is.runtime }}</strong></span>
             <span>Profile: <strong>{{ profileLabel(is.profile) }}</strong></span>
             @if (is.binFiles.length) {
-              <details class="text-xs text-gray-500">
+              <details class="text-xs text-gray-500 dark:text-muted">
                 <summary class="cursor-pointer hover:text-gray-700">{{ is.binFiles.length }} files in bin/</summary>
                 <div class="mt-1 font-mono">{{ is.binFiles.join(', ') }}</div>
               </details>
             }
           </div>
-          <div class="mb-4 text-xs text-gray-500">
+          <div class="mb-4 text-xs text-gray-500 dark:text-muted">
             Source repo: <span class="font-mono">{{ runtimeSourceRepo(selectedRuntime()) }}</span>
           </div>
         }
         @if (runtimeCompatibilityWarning(); as warning) {
-          <div class="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          <div class="mb-4 rounded-md border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/15 px-3 py-2 text-xs text-amber-900 dark:text-amber-300">
             {{ warning }}
           </div>
         }
-        <div class="mb-4 rounded-lg border border-gray-200 p-4">
+        <div class="mb-4 rounded-lg border border-gray-200 dark:border-line p-4">
           <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
-              <h3 class="text-sm font-semibold text-gray-900">Advanced Tuning</h3>
-              <p class="text-xs text-gray-500">Persisted launch settings. Server environment variables still take precedence if they are set.</p>
+              <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">Advanced Tuning</h3>
+              <p class="text-xs text-gray-500 dark:text-muted">Persisted launch settings. Server environment variables still take precedence if they are set.</p>
             </div>
             <button
               type="button"
               (click)="resetTuningToDefaults()"
-              class="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+              class="rounded-md border border-gray-300 dark:border-line-strong px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint"
             >
               Reset To Profile Defaults
             </button>
           </div>
           <div class="mb-3 flex flex-wrap items-center gap-2">
-            <span class="text-xs font-medium text-gray-500">Presets</span>
+            <span class="text-xs font-medium text-gray-500 dark:text-muted">Presets</span>
             <button
               type="button"
               (click)="applyTuningPreset('throughput')"
-              [class]="selectedTuningPreset() === 'throughput' ? 'rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white' : 'rounded-full border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50'"
+              [class]="selectedTuningPreset() === 'throughput' ? 'rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white' : 'rounded-full border border-gray-300 dark:border-line-strong px-3 py-1 text-xs font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint'"
             >
               Throughput
             </button>
             <button
               type="button"
               (click)="applyTuningPreset('balanced')"
-              [class]="selectedTuningPreset() === 'balanced' ? 'rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white' : 'rounded-full border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50'"
+              [class]="selectedTuningPreset() === 'balanced' ? 'rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white' : 'rounded-full border border-gray-300 dark:border-line-strong px-3 py-1 text-xs font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint'"
             >
               Balanced
             </button>
             <button
               type="button"
               (click)="applyTuningPreset('low-memory')"
-              [class]="selectedTuningPreset() === 'low-memory' ? 'rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white' : 'rounded-full border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50'"
+              [class]="selectedTuningPreset() === 'low-memory' ? 'rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white' : 'rounded-full border border-gray-300 dark:border-line-strong px-3 py-1 text-xs font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint'"
             >
               Low Memory
             </button>
             @if (selectedTuningPreset() === 'custom') {
-              <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">Custom</span>
+              <span class="rounded-full bg-amber-100 dark:bg-amber-500/15 px-3 py-1 text-xs font-medium text-amber-800 dark:text-amber-300">Custom</span>
             }
           </div>
           @if (savedRecommendation(); as recommendation) {
-            <div class="mb-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-900">
+            <div class="mb-3 rounded-md border border-green-200 dark:border-green-500/30 bg-green-50 dark:bg-green-500/15 px-3 py-2 text-xs text-green-900 dark:text-green-300">
               <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                 <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
                   <span><strong>Saved recommendation:</strong> {{ recommendationDisplayLabel(recommendation) }}</span>
@@ -758,7 +758,7 @@ function getIkCpuSweepCandidates(current: LlmTuningConfig): IkCpuSweepEntry[] {
                     type="button"
                     (click)="applySavedRecommendation()"
                     [disabled]="!hasRecommendationDrift()"
-                    class="rounded-md border border-green-300 bg-white px-3 py-1.5 text-xs font-medium text-green-800 hover:bg-green-100 disabled:opacity-50"
+                    class="rounded-md border border-green-300 bg-white dark:bg-surface px-3 py-1.5 text-xs font-medium text-green-800 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-500/20 disabled:opacity-50"
                   >
                     Apply Recommended
                   </button>
@@ -766,7 +766,7 @@ function getIkCpuSweepCandidates(current: LlmTuningConfig): IkCpuSweepEntry[] {
                     type="button"
                     (click)="rebenchmarkSavedRecommendation()"
                     [disabled]="recommendationBenchmarkRunning() || benchmarkRunning() || benchmarkSweepRunning() || starting() || stopping() || installing()"
-                    class="rounded-md border border-green-300 bg-white px-3 py-1.5 text-xs font-medium text-green-800 hover:bg-green-100 disabled:opacity-50"
+                    class="rounded-md border border-green-300 bg-white dark:bg-surface px-3 py-1.5 text-xs font-medium text-green-800 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-500/20 disabled:opacity-50"
                   >
                     {{ recommendationBenchmarkRunning() ? 'Re-benchmarking…' : 'Re-benchmark Recommended' }}
                   </button>
@@ -778,7 +778,7 @@ function getIkCpuSweepCandidates(current: LlmTuningConfig): IkCpuSweepEntry[] {
                   <div class="mt-2 overflow-x-auto">
                     <table class="min-w-full text-left text-xs">
                       <thead>
-                        <tr class="border-b border-green-200 text-green-800/80">
+                        <tr class="border-b border-green-200 dark:border-green-500/30 text-green-800/80">
                           <th class="py-1 pr-3 font-medium">When</th>
                           <th class="py-1 pr-3 font-medium">Preset</th>
                           <th class="py-1 pr-3 font-medium">Tokens/s</th>
@@ -787,7 +787,7 @@ function getIkCpuSweepCandidates(current: LlmTuningConfig): IkCpuSweepEntry[] {
                       </thead>
                       <tbody>
                         @for (entry of recommendation.history; track entry.recordedAt) {
-                          <tr class="border-b border-green-100 last:border-b-0">
+                          <tr class="border-b border-green-100 dark:border-green-500/25 last:border-b-0">
                             <td class="py-1 pr-3">{{ entry.recordedAt | date:'short' }}</td>
                             <td class="py-1 pr-3">{{ recommendationHistoryLabel(entry) }}</td>
                             <td class="py-1 pr-3 font-mono">{{ entry.averageTokensPerSecond != null ? entry.averageTokensPerSecond : '—' }}</td>
@@ -800,212 +800,212 @@ function getIkCpuSweepCandidates(current: LlmTuningConfig): IkCpuSweepEntry[] {
                 </details>
               }
               @if (recommendationTrendLabel(recommendation) === 'Regressing') {
-                <div class="mt-3 rounded-md border border-amber-200 bg-amber-100/70 px-3 py-2 text-xs text-amber-950">
+                <div class="mt-3 rounded-md border border-amber-200 dark:border-amber-500/30 bg-amber-100/70 px-3 py-2 text-xs text-amber-950">
                   Recent performance is trending down. Run the preset sweep again to confirm the best preset has not changed for this host.
                 </div>
               }
             </div>
             @if (hasRecommendationDrift()) {
-              <div class="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              <div class="mb-3 rounded-md border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/15 px-3 py-2 text-xs text-amber-900 dark:text-amber-300">
                 Current tuning differs from the saved recommendation for this runtime/profile.
               </div>
             }
           }
-          <p class="mb-3 text-xs text-gray-500">Use a preset as a starting point, then benchmark and fine-tune if needed.</p>
+          <p class="mb-3 text-xs text-gray-500 dark:text-muted">Use a preset as a starting point, then benchmark and fine-tune if needed.</p>
           <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
-            <label class="block text-xs text-gray-600">
+            <label class="block text-xs text-gray-600 dark:text-ink-dim">
               <span class="mb-1 block font-medium">Context Size</span>
-              <input type="number" min="256" [ngModel]="tuning().ctxSize" (ngModelChange)="updateNumericTuning('ctxSize', $event, 256)" class="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
-              <span class="mt-1 block text-[11px] text-gray-500">Maximum tokens kept in memory. Larger contexts use more RAM.</span>
+              <input type="number" min="256" [ngModel]="tuning().ctxSize" (ngModelChange)="updateNumericTuning('ctxSize', $event, 256)" class="block w-full rounded-md border border-gray-300 dark:border-line-strong px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+              <span class="mt-1 block text-[11px] text-gray-500 dark:text-muted">Maximum tokens kept in memory. Larger contexts use more RAM.</span>
             </label>
-            <label class="block text-xs text-gray-600">
+            <label class="block text-xs text-gray-600 dark:text-ink-dim">
               <span class="mb-1 block font-medium">Threads</span>
-              <input type="number" min="1" [ngModel]="tuning().threads" (ngModelChange)="updateNumericTuning('threads', $event, 1)" class="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
-              <span class="mt-1 block text-[11px] text-gray-500">CPU worker threads for token generation. Higher is not always faster.</span>
+              <input type="number" min="1" [ngModel]="tuning().threads" (ngModelChange)="updateNumericTuning('threads', $event, 1)" class="block w-full rounded-md border border-gray-300 dark:border-line-strong px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+              <span class="mt-1 block text-[11px] text-gray-500 dark:text-muted">CPU worker threads for token generation. Higher is not always faster.</span>
             </label>
-            <label class="block text-xs text-gray-600">
+            <label class="block text-xs text-gray-600 dark:text-ink-dim">
               <span class="mb-1 block font-medium">Threads Batch</span>
-              <input type="number" min="1" [ngModel]="tuning().threadsBatch" (ngModelChange)="updateNumericTuning('threadsBatch', $event, 1)" class="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
-              <span class="mt-1 block text-[11px] text-gray-500">Threads used for prompt ingestion and batched work. Good for first-token latency.</span>
+              <input type="number" min="1" [ngModel]="tuning().threadsBatch" (ngModelChange)="updateNumericTuning('threadsBatch', $event, 1)" class="block w-full rounded-md border border-gray-300 dark:border-line-strong px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+              <span class="mt-1 block text-[11px] text-gray-500 dark:text-muted">Threads used for prompt ingestion and batched work. Good for first-token latency.</span>
             </label>
-            <label class="block text-xs text-gray-600">
+            <label class="block text-xs text-gray-600 dark:text-ink-dim">
               <span class="mb-1 block font-medium">Parallel</span>
-              <input type="number" min="1" [ngModel]="tuning().parallel" (ngModelChange)="updateNumericTuning('parallel', $event, 1)" class="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
-              <span class="mt-1 block text-[11px] text-gray-500">How many requests can decode at once. Keep this at 1 for best single-chat speed.</span>
+              <input type="number" min="1" [ngModel]="tuning().parallel" (ngModelChange)="updateNumericTuning('parallel', $event, 1)" class="block w-full rounded-md border border-gray-300 dark:border-line-strong px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+              <span class="mt-1 block text-[11px] text-gray-500 dark:text-muted">How many requests can decode at once. Keep this at 1 for best single-chat speed.</span>
             </label>
-            <label class="block text-xs text-gray-600">
+            <label class="block text-xs text-gray-600 dark:text-ink-dim">
               <span class="mb-1 block font-medium">GPU Layers</span>
-              <input type="number" min="0" [ngModel]="tuning().gpuLayers" (ngModelChange)="updateNumericTuning('gpuLayers', $event, 0)" class="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
-              <span class="mt-1 block text-[11px] text-gray-500">Layers to offload to GPU. Leave at 0 for CPU-only ik_llama.cpp on macOS.</span>
+              <input type="number" min="0" [ngModel]="tuning().gpuLayers" (ngModelChange)="updateNumericTuning('gpuLayers', $event, 0)" class="block w-full rounded-md border border-gray-300 dark:border-line-strong px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+              <span class="mt-1 block text-[11px] text-gray-500 dark:text-muted">Layers to offload to GPU. Leave at 0 for CPU-only ik_llama.cpp on macOS.</span>
             </label>
-            <label class="block text-xs text-gray-600">
+            <label class="block text-xs text-gray-600 dark:text-ink-dim">
               <span class="mb-1 block font-medium">Batch Size</span>
-              <input type="number" min="1" [ngModel]="tuning().batchSize" (ngModelChange)="updateNumericTuning('batchSize', $event, 1)" class="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
-              <span class="mt-1 block text-[11px] text-gray-500">Logical batch size. Larger values can improve throughput but increase memory use.</span>
+              <input type="number" min="1" [ngModel]="tuning().batchSize" (ngModelChange)="updateNumericTuning('batchSize', $event, 1)" class="block w-full rounded-md border border-gray-300 dark:border-line-strong px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+              <span class="mt-1 block text-[11px] text-gray-500 dark:text-muted">Logical batch size. Larger values can improve throughput but increase memory use.</span>
             </label>
-            <label class="block text-xs text-gray-600">
+            <label class="block text-xs text-gray-600 dark:text-ink-dim">
               <span class="mb-1 block font-medium">Ubatch Size</span>
-              <input type="number" min="1" [ngModel]="tuning().ubatchSize" (ngModelChange)="updateNumericTuning('ubatchSize', $event, 1)" class="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
-              <span class="mt-1 block text-[11px] text-gray-500">Physical micro-batch size. This is a strong throughput knob for CPU runs.</span>
+              <input type="number" min="1" [ngModel]="tuning().ubatchSize" (ngModelChange)="updateNumericTuning('ubatchSize', $event, 1)" class="block w-full rounded-md border border-gray-300 dark:border-line-strong px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+              <span class="mt-1 block text-[11px] text-gray-500 dark:text-muted">Physical micro-batch size. This is a strong throughput knob for CPU runs.</span>
             </label>
-            <label class="block text-xs text-gray-600">
+            <label class="block text-xs text-gray-600 dark:text-ink-dim">
               <span class="mb-1 block font-medium">Cache RAM (MiB)</span>
-              <input type="number" min="-1" [ngModel]="tuning().cacheRamMiB" (ngModelChange)="updateNumericTuning('cacheRamMiB', $event, -1)" class="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
-              <span class="mt-1 block text-[11px] text-gray-500">Prompt cache memory limit. Use 0 to disable or -1 for no limit.</span>
+              <input type="number" min="-1" [ngModel]="tuning().cacheRamMiB" (ngModelChange)="updateNumericTuning('cacheRamMiB', $event, -1)" class="block w-full rounded-md border border-gray-300 dark:border-line-strong px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+              <span class="mt-1 block text-[11px] text-gray-500 dark:text-muted">Prompt cache memory limit. Use 0 to disable or -1 for no limit.</span>
             </label>
-            <label class="block text-xs text-gray-600">
+            <label class="block text-xs text-gray-600 dark:text-ink-dim">
               <span class="mb-1 block font-medium">Cache Type K</span>
-              <select [ngModel]="tuning().cacheTypeK" (ngModelChange)="updateStringTuning('cacheTypeK', $event)" class="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+              <select [ngModel]="tuning().cacheTypeK" (ngModelChange)="updateStringTuning('cacheTypeK', $event)" class="block w-full rounded-md border border-gray-300 dark:border-line-strong px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
                 @for (option of cacheTypeOptions; track option.value) {
                   <option [value]="option.value">{{ option.label }}</option>
                 }
               </select>
-              <span class="mt-1 block text-[11px] text-gray-500">{{ cacheTypeDescription(tuning().cacheTypeK) }}</span>
+              <span class="mt-1 block text-[11px] text-gray-500 dark:text-muted">{{ cacheTypeDescription(tuning().cacheTypeK) }}</span>
             </label>
-            <label class="block text-xs text-gray-600">
+            <label class="block text-xs text-gray-600 dark:text-ink-dim">
               <span class="mb-1 block font-medium">Cache Type V</span>
-              <select [ngModel]="tuning().cacheTypeV" (ngModelChange)="updateStringTuning('cacheTypeV', $event)" class="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+              <select [ngModel]="tuning().cacheTypeV" (ngModelChange)="updateStringTuning('cacheTypeV', $event)" class="block w-full rounded-md border border-gray-300 dark:border-line-strong px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
                 @for (option of cacheTypeOptions; track option.value) {
                   <option [value]="option.value">{{ option.label }}</option>
                 }
               </select>
-              <span class="mt-1 block text-[11px] text-gray-500">{{ cacheTypeDescription(tuning().cacheTypeV) }}</span>
+              <span class="mt-1 block text-[11px] text-gray-500 dark:text-muted">{{ cacheTypeDescription(tuning().cacheTypeV) }}</span>
             </label>
-            <label class="block text-xs text-gray-600 xl:col-span-2">
+            <label class="block text-xs text-gray-600 dark:text-ink-dim xl:col-span-2">
               <span class="mb-1 block font-medium">Prompt Cache Path</span>
-              <input type="text" [ngModel]="tuning().promptCachePath" (ngModelChange)="updateStringTuning('promptCachePath', $event)" placeholder="Leave empty to disable" class="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
-              <span class="mt-1 block text-[11px] text-gray-500">Optional file path for reusing repeated prompts across requests and restarts. Required for the unsafe prompt-cache toggles below.</span>
+              <input type="text" [ngModel]="tuning().promptCachePath" (ngModelChange)="updateStringTuning('promptCachePath', $event)" placeholder="Leave empty to disable" class="block w-full rounded-md border border-gray-300 dark:border-line-strong px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+              <span class="mt-1 block text-[11px] text-gray-500 dark:text-muted">Optional file path for reusing repeated prompts across requests and restarts. Required for the unsafe prompt-cache toggles below.</span>
             </label>
-            <label class="flex items-center gap-2 rounded-md border border-gray-200 px-3 py-2 text-xs text-gray-600 xl:self-end">
-              <input type="checkbox" [ngModel]="tuning().flashAttn" (ngModelChange)="updateBooleanTuning('flashAttn', $event)" class="rounded border-gray-300">
+            <label class="flex items-center gap-2 rounded-md border border-gray-200 dark:border-line px-3 py-2 text-xs text-gray-600 dark:text-ink-dim xl:self-end">
+              <input type="checkbox" [ngModel]="tuning().flashAttn" (ngModelChange)="updateBooleanTuning('flashAttn', $event)" class="rounded border-gray-300 dark:border-line-strong">
               <span>
-                <span class="block font-medium text-gray-700">Flash Attention</span>
-                <span class="block text-gray-500">Faster attention kernels when the selected build and backend support them.</span>
+                <span class="block font-medium text-gray-700 dark:text-ink-dim">Flash Attention</span>
+                <span class="block text-gray-500 dark:text-muted">Faster attention kernels when the selected build and backend support them.</span>
               </span>
             </label>
-            <label class="flex items-center gap-2 rounded-md border border-gray-200 px-3 py-2 text-xs text-gray-600 xl:self-end">
-              <input type="checkbox" [ngModel]="tuning().noWarmup" (ngModelChange)="updateBooleanTuning('noWarmup', $event)" class="rounded border-gray-300">
+            <label class="flex items-center gap-2 rounded-md border border-gray-200 dark:border-line px-3 py-2 text-xs text-gray-600 dark:text-ink-dim xl:self-end">
+              <input type="checkbox" [ngModel]="tuning().noWarmup" (ngModelChange)="updateBooleanTuning('noWarmup', $event)" class="rounded border-gray-300 dark:border-line-strong">
               <span>
-                <span class="block font-medium text-gray-700">Skip Warmup</span>
-                <span class="block text-gray-500">Starts faster by skipping the empty warmup pass. Useful during frequent restarts.</span>
+                <span class="block font-medium text-gray-700 dark:text-ink-dim">Skip Warmup</span>
+                <span class="block text-gray-500 dark:text-muted">Starts faster by skipping the empty warmup pass. Useful during frequent restarts.</span>
               </span>
             </label>
           </div>
-          <details class="mt-4 rounded-md border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-xs text-gray-700">
-            <summary class="cursor-pointer font-medium text-gray-800">Experimental Tuning</summary>
-            <p class="mt-2 text-[11px] text-gray-500">These flags come from the ik_llama.cpp CLI. They can improve throughput on some models, but they are less predictable than the core settings above.</p>
+          <details class="mt-4 rounded-md border border-dashed border-gray-300 dark:border-line-strong bg-gray-50 dark:bg-bg-2 px-4 py-3 text-xs text-gray-700 dark:text-ink-dim">
+            <summary class="cursor-pointer font-medium text-gray-800 dark:text-ink">Experimental Tuning</summary>
+            <p class="mt-2 text-[11px] text-gray-500 dark:text-muted">These flags come from the ik_llama.cpp CLI. They can improve throughput on some models, but they are less predictable than the core settings above.</p>
             <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-              <label class="block text-xs text-gray-600">
+              <label class="block text-xs text-gray-600 dark:text-ink-dim">
                 <span class="mb-1 block font-medium">Attention Max Batch</span>
-                <input type="number" min="0" [ngModel]="tuning().attentionMaxBatch" (ngModelChange)="updateNumericTuning('attentionMaxBatch', $event, 0)" class="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
-                <span class="mt-1 block text-[11px] text-gray-500">Caps attention work per step. Leave at 0 to let the runtime choose automatically.</span>
+                <input type="number" min="0" [ngModel]="tuning().attentionMaxBatch" (ngModelChange)="updateNumericTuning('attentionMaxBatch', $event, 0)" class="block w-full rounded-md border border-gray-300 dark:border-line-strong px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                <span class="mt-1 block text-[11px] text-gray-500 dark:text-muted">Caps attention work per step. Leave at 0 to let the runtime choose automatically.</span>
               </label>
-              <label class="flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs text-gray-600">
-                <input type="checkbox" [ngModel]="tuning().graphReuse" (ngModelChange)="updateBooleanTuning('graphReuse', $event)" class="rounded border-gray-300">
+              <label class="flex items-center gap-2 rounded-md border border-gray-200 dark:border-line bg-white dark:bg-surface px-3 py-2 text-xs text-gray-600 dark:text-ink-dim">
+                <input type="checkbox" [ngModel]="tuning().graphReuse" (ngModelChange)="updateBooleanTuning('graphReuse', $event)" class="rounded border-gray-300 dark:border-line-strong">
                 <span>
-                  <span class="block font-medium text-gray-700">Graph Reuse</span>
-                  <span class="block text-gray-500">Reuses compute graphs between steps. Usually helps throughput.</span>
+                  <span class="block font-medium text-gray-700 dark:text-ink-dim">Graph Reuse</span>
+                  <span class="block text-gray-500 dark:text-muted">Reuses compute graphs between steps. Usually helps throughput.</span>
                 </span>
               </label>
-              <label class="flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs text-gray-600">
-                <input type="checkbox" [ngModel]="tuning().kCacheHadamard" (ngModelChange)="updateBooleanTuning('kCacheHadamard', $event)" class="rounded border-gray-300">
+              <label class="flex items-center gap-2 rounded-md border border-gray-200 dark:border-line bg-white dark:bg-surface px-3 py-2 text-xs text-gray-600 dark:text-ink-dim">
+                <input type="checkbox" [ngModel]="tuning().kCacheHadamard" (ngModelChange)="updateBooleanTuning('kCacheHadamard', $event)" class="rounded border-gray-300 dark:border-line-strong">
                 <span>
-                  <span class="block font-medium text-gray-700">K-Cache Hadamard</span>
-                  <span class="block text-gray-500">Experimental K-cache transform. Benchmark before keeping it enabled.</span>
+                  <span class="block font-medium text-gray-700 dark:text-ink-dim">K-Cache Hadamard</span>
+                  <span class="block text-gray-500 dark:text-muted">Experimental K-cache transform. Benchmark before keeping it enabled.</span>
                 </span>
               </label>
             </div>
           </details>
-          <details class="mt-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-900">
+          <details class="mt-4 rounded-md border border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/15 px-4 py-3 text-xs text-rose-900 dark:text-rose-300">
             <summary class="cursor-pointer font-medium text-rose-950">
               Unsafe Experimental
               @if (hasUnsafeExperimentalEnabled()) {
-                <span class="ml-2 inline-flex rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-950">Unsafe options enabled</span>
+                <span class="ml-2 inline-flex rounded-full bg-amber-200 dark:bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-950">Unsafe options enabled</span>
               }
             </summary>
-            <p class="mt-2 text-[11px] text-rose-800">Defaults are intentionally off. These flags are niche, less documented, or easier to misuse. Benchmark every change and expect regressions on some models.</p>
+            <p class="mt-2 text-[11px] text-rose-800 dark:text-rose-300">Defaults are intentionally off. These flags are niche, less documented, or easier to misuse. Benchmark every change and expect regressions on some models.</p>
             <div class="mt-3 flex items-center justify-end">
               <button
                 type="button"
                 (click)="resetUnsafeExperimentalTuning()"
                 [disabled]="!hasUnsafeExperimentalEnabled()"
-                class="rounded-md border border-rose-300 bg-white px-3 py-1.5 text-[11px] font-medium text-rose-900 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                class="rounded-md border border-rose-300 bg-white dark:bg-surface px-3 py-1.5 text-[11px] font-medium text-rose-900 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Reset Unsafe Flags
               </button>
             </div>
             <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-              <label class="block text-xs text-rose-900" [class.opacity-60]="!hasCacheRamEnabled()">
+              <label class="block text-xs text-rose-900 dark:text-rose-300" [class.opacity-60]="!hasCacheRamEnabled()">
                 <span class="mb-1 flex items-center gap-2 font-medium">
                   <span>Cache RAM Similarity</span>
                   @if (tuning().cacheRamSimilarity > 0) {
-                    <span class="inline-flex rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-950">Active</span>
+                    <span class="inline-flex rounded-full bg-amber-200 dark:bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-950">Active</span>
                   }
                 </span>
-                <input type="number" min="0" max="1" step="0.05" [ngModel]="tuning().cacheRamSimilarity" (ngModelChange)="updateFloatTuning('cacheRamSimilarity', $event, 0, 1)" [disabled]="!hasCacheRamEnabled()" class="block w-full rounded-md border border-rose-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-rose-400 focus:outline-none focus:ring-1 focus:ring-rose-400 disabled:cursor-not-allowed">
-                <span class="mt-1 block text-[11px] text-rose-800">Prompt-cache similarity threshold. Higher values make cache reuse stricter. Enable Cache RAM above 0 first.</span>
+                <input type="number" min="0" max="1" step="0.05" [ngModel]="tuning().cacheRamSimilarity" (ngModelChange)="updateFloatTuning('cacheRamSimilarity', $event, 0, 1)" [disabled]="!hasCacheRamEnabled()" class="block w-full rounded-md border border-rose-200 dark:border-rose-500/30 bg-white dark:bg-surface px-3 py-2 text-sm shadow-sm focus:border-rose-400 focus:outline-none focus:ring-1 focus:ring-rose-400 disabled:cursor-not-allowed">
+                <span class="mt-1 block text-[11px] text-rose-800 dark:text-rose-300">Prompt-cache similarity threshold. Higher values make cache reuse stricter. Enable Cache RAM above 0 first.</span>
               </label>
-              <label class="block text-xs text-rose-900" [class.opacity-60]="!hasCacheRamEnabled()">
+              <label class="block text-xs text-rose-900 dark:text-rose-300" [class.opacity-60]="!hasCacheRamEnabled()">
                 <span class="mb-1 flex items-center gap-2 font-medium">
                   <span>Cache RAM Min Tokens</span>
                   @if (tuning().cacheRamMinTokens > 0) {
-                    <span class="inline-flex rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-950">Active</span>
+                    <span class="inline-flex rounded-full bg-amber-200 dark:bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-950">Active</span>
                   }
                 </span>
-                <input type="number" min="0" [ngModel]="tuning().cacheRamMinTokens" (ngModelChange)="updateNumericTuning('cacheRamMinTokens', $event, 0)" [disabled]="!hasCacheRamEnabled()" class="block w-full rounded-md border border-rose-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-rose-400 focus:outline-none focus:ring-1 focus:ring-rose-400 disabled:cursor-not-allowed">
-                <span class="mt-1 block text-[11px] text-rose-800">Minimum shared cached tokens before prompt-cache reuse activates. Enable Cache RAM above 0 first.</span>
+                <input type="number" min="0" [ngModel]="tuning().cacheRamMinTokens" (ngModelChange)="updateNumericTuning('cacheRamMinTokens', $event, 0)" [disabled]="!hasCacheRamEnabled()" class="block w-full rounded-md border border-rose-200 dark:border-rose-500/30 bg-white dark:bg-surface px-3 py-2 text-sm shadow-sm focus:border-rose-400 focus:outline-none focus:ring-1 focus:ring-rose-400 disabled:cursor-not-allowed">
+                <span class="mt-1 block text-[11px] text-rose-800 dark:text-rose-300">Minimum shared cached tokens before prompt-cache reuse activates. Enable Cache RAM above 0 first.</span>
               </label>
-              <label class="block text-xs text-rose-900">
+              <label class="block text-xs text-rose-900 dark:text-rose-300">
                 <span class="mb-1 flex items-center gap-2 font-medium">
                   <span>Defrag Threshold</span>
                   @if (tuning().defragThreshold >= 0) {
-                    <span class="inline-flex rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-950">Active</span>
+                    <span class="inline-flex rounded-full bg-amber-200 dark:bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-950">Active</span>
                   }
                 </span>
-                <input type="number" step="0.1" [ngModel]="tuning().defragThreshold" (ngModelChange)="updateFloatTuning('defragThreshold', $event, -1, 1_000_000)" class="block w-full rounded-md border border-rose-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-rose-400 focus:outline-none focus:ring-1 focus:ring-rose-400">
-                <span class="mt-1 block text-[11px] text-rose-800">KV-cache defragmentation threshold. Leave at -1 to disable.</span>
+                <input type="number" step="0.1" [ngModel]="tuning().defragThreshold" (ngModelChange)="updateFloatTuning('defragThreshold', $event, -1, 1_000_000)" class="block w-full rounded-md border border-rose-200 dark:border-rose-500/30 bg-white dark:bg-surface px-3 py-2 text-sm shadow-sm focus:border-rose-400 focus:outline-none focus:ring-1 focus:ring-rose-400">
+                <span class="mt-1 block text-[11px] text-rose-800 dark:text-rose-300">KV-cache defragmentation threshold. Leave at -1 to disable.</span>
               </label>
-              <label class="flex items-center gap-2 rounded-md border border-rose-200 bg-white px-3 py-2 text-xs text-rose-900">
+              <label class="flex items-center gap-2 rounded-md border border-rose-200 dark:border-rose-500/30 bg-white dark:bg-surface px-3 py-2 text-xs text-rose-900 dark:text-rose-300">
                 <input type="checkbox" [ngModel]="tuning().mergeQkv" (ngModelChange)="updateBooleanTuning('mergeQkv', $event)" class="rounded border-rose-300">
                 <span>
-                  <span class="block font-medium text-rose-950">Merge QKV @if (tuning().mergeQkv) { <span class="ml-2 inline-flex rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-950">Active</span> }</span>
-                  <span class="block text-rose-800">Tries merged Q/K/V execution. Can help some models, can hurt others.</span>
+                  <span class="block font-medium text-rose-950">Merge QKV @if (tuning().mergeQkv) { <span class="ml-2 inline-flex rounded-full bg-amber-200 dark:bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-950">Active</span> }</span>
+                  <span class="block text-rose-800 dark:text-rose-300">Tries merged Q/K/V execution. Can help some models, can hurt others.</span>
                 </span>
               </label>
-              <label class="flex items-center gap-2 rounded-md border border-rose-200 bg-white px-3 py-2 text-xs text-rose-900">
+              <label class="flex items-center gap-2 rounded-md border border-rose-200 dark:border-rose-500/30 bg-white dark:bg-surface px-3 py-2 text-xs text-rose-900 dark:text-rose-300">
                 <input type="checkbox" [ngModel]="tuning().mergeUpGateExperts" (ngModelChange)="updateBooleanTuning('mergeUpGateExperts', $event)" class="rounded border-rose-300">
                 <span>
-                  <span class="block font-medium text-rose-950">Merge Up/Gate Experts @if (tuning().mergeUpGateExperts) { <span class="ml-2 inline-flex rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-950">Active</span> }</span>
-                  <span class="block text-rose-800">Expert-path fusion for some architectures. Benchmark only if you know the model benefits.</span>
+                  <span class="block font-medium text-rose-950">Merge Up/Gate Experts @if (tuning().mergeUpGateExperts) { <span class="ml-2 inline-flex rounded-full bg-amber-200 dark:bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-950">Active</span> }</span>
+                  <span class="block text-rose-800 dark:text-rose-300">Expert-path fusion for some architectures. Benchmark only if you know the model benefits.</span>
                 </span>
               </label>
-              <label class="flex items-center gap-2 rounded-md border border-rose-200 bg-white px-3 py-2 text-xs text-rose-900">
+              <label class="flex items-center gap-2 rounded-md border border-rose-200 dark:border-rose-500/30 bg-white dark:bg-surface px-3 py-2 text-xs text-rose-900 dark:text-rose-300">
                 <input type="checkbox" [ngModel]="tuning().schedulerAsync" (ngModelChange)="updateBooleanTuning('schedulerAsync', $event)" class="rounded border-rose-300">
                 <span>
-                  <span class="block font-medium text-rose-950">Scheduler Async @if (tuning().schedulerAsync) { <span class="ml-2 inline-flex rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-950">Active</span> }</span>
-                  <span class="block text-rose-800">Async graph scheduling. Potential throughput gain, but higher stability risk.</span>
+                  <span class="block font-medium text-rose-950">Scheduler Async @if (tuning().schedulerAsync) { <span class="ml-2 inline-flex rounded-full bg-amber-200 dark:bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-950">Active</span> }</span>
+                  <span class="block text-rose-800 dark:text-rose-300">Async graph scheduling. Potential throughput gain, but higher stability risk.</span>
                 </span>
               </label>
-              <label class="flex items-center gap-2 rounded-md border border-rose-200 bg-white px-3 py-2 text-xs text-rose-900" [class.opacity-60]="!hasPromptCachePath()">
+              <label class="flex items-center gap-2 rounded-md border border-rose-200 dark:border-rose-500/30 bg-white dark:bg-surface px-3 py-2 text-xs text-rose-900 dark:text-rose-300" [class.opacity-60]="!hasPromptCachePath()">
                 <input type="checkbox" [ngModel]="tuning().promptCacheAll" (ngModelChange)="updateBooleanTuning('promptCacheAll', $event)" [disabled]="!hasPromptCachePath()" class="rounded border-rose-300 disabled:cursor-not-allowed">
                 <span>
-                  <span class="block font-medium text-rose-950">Prompt Cache All @if (tuning().promptCacheAll) { <span class="ml-2 inline-flex rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-950">Active</span> }</span>
-                  <span class="block text-rose-800">Stores user input and generations in the prompt cache. Set Prompt Cache Path first.</span>
+                  <span class="block font-medium text-rose-950">Prompt Cache All @if (tuning().promptCacheAll) { <span class="ml-2 inline-flex rounded-full bg-amber-200 dark:bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-950">Active</span> }</span>
+                  <span class="block text-rose-800 dark:text-rose-300">Stores user input and generations in the prompt cache. Set Prompt Cache Path first.</span>
                 </span>
               </label>
-              <label class="flex items-center gap-2 rounded-md border border-rose-200 bg-white px-3 py-2 text-xs text-rose-900" [class.opacity-60]="!hasPromptCachePath()">
+              <label class="flex items-center gap-2 rounded-md border border-rose-200 dark:border-rose-500/30 bg-white dark:bg-surface px-3 py-2 text-xs text-rose-900 dark:text-rose-300" [class.opacity-60]="!hasPromptCachePath()">
                 <input type="checkbox" [ngModel]="tuning().promptCacheReadOnly" (ngModelChange)="updateBooleanTuning('promptCacheReadOnly', $event)" [disabled]="!hasPromptCachePath()" class="rounded border-rose-300 disabled:cursor-not-allowed">
                 <span>
-                  <span class="block font-medium text-rose-950">Prompt Cache Read-Only @if (tuning().promptCacheReadOnly) { <span class="ml-2 inline-flex rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-950">Active</span> }</span>
-                  <span class="block text-rose-800">Reads from an existing prompt cache file without updating it. Set Prompt Cache Path first.</span>
+                  <span class="block font-medium text-rose-950">Prompt Cache Read-Only @if (tuning().promptCacheReadOnly) { <span class="ml-2 inline-flex rounded-full bg-amber-200 dark:bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-950">Active</span> }</span>
+                  <span class="block text-rose-800 dark:text-rose-300">Reads from an existing prompt cache file without updating it. Set Prompt Cache Path first.</span>
                 </span>
               </label>
             </div>
             @if (!hasPromptCachePath()) {
-              <p class="mt-3 text-[11px] text-rose-800">Prompt-cache toggles stay disabled until Prompt Cache Path is set.</p>
+              <p class="mt-3 text-[11px] text-rose-800 dark:text-rose-300">Prompt-cache toggles stay disabled until Prompt Cache Path is set.</p>
             }
             @if (!hasCacheRamEnabled()) {
-              <p class="mt-2 text-[11px] text-rose-800">Cache RAM detail controls stay disabled until Cache RAM is set above 0.</p>
+              <p class="mt-2 text-[11px] text-rose-800 dark:text-rose-300">Cache RAM detail controls stay disabled until Cache RAM is set above 0.</p>
             }
           </details>
         </div>
@@ -1021,23 +1021,23 @@ function getIkCpuSweepCandidates(current: LlmTuningConfig): IkCpuSweepEntry[] {
           @if (serverMessage(); as msg) {
             @if (msg.includes('\\n')) {
               <div class="w-full mt-2">
-                <p class="text-sm font-medium" [class]="serverMessageSuccess() ? 'text-green-700' : 'text-red-700'">{{ msg.split('\\n')[0] }}</p>
+                <p class="text-sm font-medium" [class]="serverMessageSuccess() ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'">{{ msg.split('\\n')[0] }}</p>
                 <pre class="bg-gray-900 text-red-400 text-xs p-3 rounded-md overflow-x-auto max-h-48 overflow-y-auto mt-1 whitespace-pre-wrap">{{ msg.split('\\n').slice(1).join('\\n').trim() }}</pre>
               </div>
             } @else {
-              <span class="text-sm" [class]="serverMessageSuccess() ? 'text-green-700' : 'text-red-700'">{{ msg }}</span>
+              <span class="text-sm" [class]="serverMessageSuccess() ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'">{{ msg }}</span>
             }
           }
         </div>
         @if (showInstallLog()) {
           <div class="mt-4">
             <div class="mb-1 flex items-center gap-3">
-              <button (click)="showInstallLog.set(!showInstallLog())" class="text-sm text-blue-600 hover:underline">Toggle log</button>
+              <button (click)="showInstallLog.set(!showInstallLog())" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">Toggle log</button>
               <button
                 type="button"
                 (click)="copyInstallLog()"
                 [disabled]="!installLog()"
-                class="text-sm text-blue-600 hover:underline disabled:text-gray-400"
+                class="text-sm text-blue-600 dark:text-blue-400 hover:underline disabled:text-gray-400"
               >
                 Copy log
               </button>
@@ -1045,16 +1045,16 @@ function getIkCpuSweepCandidates(current: LlmTuningConfig): IkCpuSweepEntry[] {
             @if (installProgress(); as ip) {
               <div class="mb-2 space-y-1">
                 @if (ip.elapsedSec !== null) {
-                  <span class="text-xs text-gray-500">Elapsed: {{ formatDuration(ip.elapsedSec) }}</span>
+                  <span class="text-xs text-gray-500 dark:text-muted">Elapsed: {{ formatDuration(ip.elapsedSec) }}</span>
                 }
                 @if (ip.buildCurrent !== null && ip.buildTotal !== null && ip.buildTotal > 0) {
                   <div class="flex items-center gap-2">
-                    <div class="flex-1 bg-gray-200 rounded-full h-2.5">
+                    <div class="flex-1 bg-gray-200 dark:bg-surface-3 rounded-full h-2.5">
                       <div class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" [style.width.%]="(ip.buildCurrent / ip.buildTotal) * 100"></div>
                     </div>
-                    <span class="text-xs text-gray-600 font-mono whitespace-nowrap">{{ ip.buildCurrent }}/{{ ip.buildTotal }}</span>
+                    <span class="text-xs text-gray-600 dark:text-ink-dim font-mono whitespace-nowrap">{{ ip.buildCurrent }}/{{ ip.buildTotal }}</span>
                     @if (ip.elapsedSec && ip.buildCurrent > 0) {
-                      <span class="text-xs text-gray-500 whitespace-nowrap">~{{ formatDuration(Math.round((ip.elapsedSec / ip.buildCurrent) * (ip.buildTotal - ip.buildCurrent))) }} left</span>
+                      <span class="text-xs text-gray-500 dark:text-muted whitespace-nowrap">~{{ formatDuration(Math.round((ip.elapsedSec / ip.buildCurrent) * (ip.buildTotal - ip.buildCurrent))) }} left</span>
                     }
                   </div>
                 }
@@ -1068,20 +1068,20 @@ function getIkCpuSweepCandidates(current: LlmTuningConfig): IkCpuSweepEntry[] {
       </div>
 
       <!-- Model Management Card -->
-      <div class="bg-white rounded-lg shadow p-6 lg:col-span-2">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">Model Management</h2>
-        <div class="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+      <div class="bg-white dark:bg-surface rounded-lg shadow p-6 lg:col-span-2">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-ink mb-4">Model Management</h2>
+        <div class="mb-4 rounded-lg border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 p-4">
           <div class="flex flex-col gap-3 md:flex-row md:items-end">
-            <label class="block flex-1 text-sm text-gray-700">
+            <label class="block flex-1 text-sm text-gray-700 dark:text-ink-dim">
               <span class="mb-1 block font-medium">Max Model Install Size (MB)</span>
               <input
                 type="number"
                 min="1"
                 [ngModel]="modelSizeLimitMb()"
                 (ngModelChange)="modelSizeLimitMb.set(clampBenchmarkValue($event, 1, 1048576))"
-                class="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                class="block w-full rounded-md border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               >
-              <span class="mt-1 block text-[11px] text-gray-500">
+              <span class="mt-1 block text-[11px] text-gray-500 dark:text-muted">
                 Files above this limit are blocked in the model browser. If MAX_MODEL_SIZE_MB is set on the server, that environment value still overrides the saved setting.
               </span>
             </label>
@@ -1095,41 +1095,41 @@ function getIkCpuSweepCandidates(current: LlmTuningConfig): IkCpuSweepEntry[] {
             </button>
           </div>
           @if (installStatus(); as is) {
-            <p class="mt-2 text-xs text-gray-500">
+            <p class="mt-2 text-xs text-gray-500 dark:text-muted">
               Effective limit: {{ is.maxModelSizeMb | number }} MB
             </p>
           }
         </div>
         <div class="relative mb-4">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Search HuggingFace Models</label>
+          <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1">Search HuggingFace Models</label>
           <div class="relative">
             <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-              <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+              <svg class="h-4 w-4 text-gray-400 dark:text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
             </div>
             <input type="text" [ngModel]="modelSearchQuery()" (ngModelChange)="onModelSearchInput($event)"
               placeholder="e.g. Qwen3, Phi-4, Llama, Gemma"
-              class="block w-full rounded-lg border border-gray-300 bg-white py-2.5 pl-10 pr-10 text-sm shadow-sm placeholder:text-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors" />
+              class="block w-full rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface py-2.5 pl-10 pr-10 text-sm shadow-sm placeholder:text-gray-400 dark:placeholder:text-muted focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors" />
             @if (modelSearching()) {
               <div class="absolute inset-y-0 right-0 flex items-center pr-3">
-                <div class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600"></div>
+                <div class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 dark:border-line-strong border-t-blue-600"></div>
               </div>
             }
           </div>
           @if (modelSearchResults().length > 0) {
             <div class="fixed inset-0 z-[9]" (click)="modelSearchResults.set([])"></div>
-            <div class="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-[400px] overflow-y-auto">
+            <div class="absolute z-10 mt-1 w-full bg-white dark:bg-surface border border-gray-200 dark:border-line rounded-lg shadow-lg max-h-[400px] overflow-y-auto">
               @for (m of modelSearchResults(); track m.id) {
                 <button (click)="selectModelRepo(m.id)"
-                  class="block w-full text-left px-4 py-3 hover:bg-blue-50 border-b border-gray-100 last:border-0 transition-colors">
+                  class="block w-full text-left px-4 py-3 hover:bg-blue-50 dark:hover:bg-blue-500/15 border-b border-gray-100 dark:border-line last:border-0 transition-colors">
                   <div class="flex items-start justify-between gap-2">
                     <div class="min-w-0 flex-1">
                       <div class="flex items-center gap-2">
-                        <span class="font-semibold text-sm text-gray-900 truncate">{{ m.id }}</span>
+                        <span class="font-semibold text-sm text-gray-900 dark:text-ink truncate">{{ m.id }}</span>
                         @if (m.parameterCount) {
-                          <span class="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-semibold bg-purple-100 text-purple-800 rounded">{{ m.parameterCount }}</span>
+                          <span class="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-semibold bg-purple-100 dark:bg-purple-500/15 text-purple-800 dark:text-purple-300 rounded">{{ m.parameterCount }}</span>
                         }
                       </div>
-                      <div class="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                      <div class="flex items-center gap-3 mt-1 text-xs text-gray-500 dark:text-muted">
                         <span class="flex items-center gap-1" title="Downloads">
                           <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                           {{ m.downloads | number }}
@@ -1142,16 +1142,16 @@ function getIkCpuSweepCandidates(current: LlmTuningConfig): IkCpuSweepEntry[] {
                           <span title="Last updated">{{ m.lastModified }}</span>
                         }
                         @if (m.ggufFileCount) {
-                          <span class="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px]" title="GGUF variants">{{ m.ggufFileCount }} files</span>
+                          <span class="px-1.5 py-0.5 bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-400 rounded text-[10px]" title="GGUF variants">{{ m.ggufFileCount }} files</span>
                         }
                         @if (m.contextLength) {
-                          <span class="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[10px]" title="Context length">{{ m.contextLength | number }}ctx</span>
+                          <span class="px-1.5 py-0.5 bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 rounded text-[10px]" title="Context length">{{ m.contextLength | number }}ctx</span>
                         }
                         @if (m.architecture) {
-                          <span class="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px]">{{ m.architecture }}</span>
+                          <span class="px-1.5 py-0.5 bg-gray-100 dark:bg-surface-3 text-gray-600 dark:text-ink-dim rounded text-[10px]">{{ m.architecture }}</span>
                         }
                         @if (m.license) {
-                          <span class="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px]">{{ m.license }}</span>
+                          <span class="px-1.5 py-0.5 bg-gray-100 dark:bg-surface-3 text-gray-600 dark:text-ink-dim rounded text-[10px]">{{ m.license }}</span>
                         }
                       </div>
                     </div>
@@ -1165,19 +1165,19 @@ function getIkCpuSweepCandidates(current: LlmTuningConfig): IkCpuSweepEntry[] {
           <div class="mb-4">
             <div class="mb-2 flex items-center justify-between gap-3">
               <div>
-                <h3 class="text-sm font-medium text-gray-900">{{ repo }}</h3>
-                <p class="mt-1 text-xs text-gray-500">
+                <h3 class="text-sm font-medium text-gray-900 dark:text-ink">{{ repo }}</h3>
+                <p class="mt-1 text-xs text-gray-500 dark:text-muted">
                   Hugging Face repos usually publish every quantization variant. This view shows the most useful options first.
                 </p>
               </div>
-              <button (click)="selectedRepo.set(null); repoFiles.set([])" class="text-xs text-gray-500 hover:text-gray-700">✕ Close</button>
+              <button (click)="selectedRepo.set(null); repoFiles.set([])" class="text-xs text-gray-500 dark:text-muted hover:text-gray-700">✕ Close</button>
             </div>
             @if (repoFilesLoading()) {
-              <p class="text-sm text-gray-500">Loading files…</p>
+              <p class="text-sm text-gray-500 dark:text-muted">Loading files…</p>
             } @else if (repoFiles().length === 0) {
-              <p class="text-sm text-gray-500">No GGUF files found</p>
+              <p class="text-sm text-gray-500 dark:text-muted">No GGUF files found</p>
             } @else {
-              <div class="mb-3 flex items-center justify-between gap-3 text-xs text-gray-500">
+              <div class="mb-3 flex items-center justify-between gap-3 text-xs text-gray-500 dark:text-muted">
                 <span>
                   Showing {{ visibleRepoFiles().length }} of {{ repoFiles().length }} variants
                 </span>
@@ -1185,7 +1185,7 @@ function getIkCpuSweepCandidates(current: LlmTuningConfig): IkCpuSweepEntry[] {
                   <button
                     type="button"
                     (click)="showAllRepoFiles.set(true)"
-                    class="rounded-md border border-gray-300 px-2.5 py-1 font-medium text-gray-700 hover:bg-gray-50"
+                    class="rounded-md border border-gray-300 dark:border-line-strong px-2.5 py-1 font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint"
                   >
                     Show all {{ repoFiles().length }}
                   </button>
@@ -1193,7 +1193,7 @@ function getIkCpuSweepCandidates(current: LlmTuningConfig): IkCpuSweepEntry[] {
                   <button
                     type="button"
                     (click)="showAllRepoFiles.set(false)"
-                    class="rounded-md border border-gray-300 px-2.5 py-1 font-medium text-gray-700 hover:bg-gray-50"
+                    class="rounded-md border border-gray-300 dark:border-line-strong px-2.5 py-1 font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint"
                   >
                     Show recommended only
                   </button>
@@ -1201,33 +1201,33 @@ function getIkCpuSweepCandidates(current: LlmTuningConfig): IkCpuSweepEntry[] {
               </div>
               <div class="space-y-2">
                 @for (f of visibleRepoFiles(); track f.filename) {
-                  <div class="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm">
+                  <div class="flex items-center justify-between gap-3 rounded-lg border border-gray-200 dark:border-line bg-white dark:bg-surface px-4 py-3 text-sm">
                     <div class="min-w-0 flex-1">
                       <div class="flex flex-wrap items-center gap-2">
-                        <span class="text-sm font-semibold text-gray-900">
+                        <span class="text-sm font-semibold text-gray-900 dark:text-ink">
                           {{ ggufFriendlyLabel(f) }}
                         </span>
                       </div>
                       <div class="flex flex-wrap items-center gap-2">
-                        <span class="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800">
+                        <span class="rounded-full bg-blue-100 dark:bg-blue-500/15 px-2.5 py-1 text-xs font-semibold text-blue-800 dark:text-blue-300">
                           {{ ggufVariantLabel(f) }}
                         </span>
                         @if (ggufDownloadSizeMb(f) != null) {
-                          <span class="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">
+                          <span class="rounded-full bg-gray-100 dark:bg-surface-3 px-2.5 py-1 text-xs font-semibold text-gray-700 dark:text-ink-dim">
                             Download {{ ggufDownloadSizeMb(f) }} MB
                           </span>
                         }
                         @if (f.splitParts) {
-                          <span class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                          <span class="rounded-full bg-amber-100 dark:bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-800 dark:text-amber-300">
                             {{ f.splitParts }} parts
                           </span>
                         }
                       </div>
-                      <p class="mt-2 text-xs text-gray-600">{{ ggufVariantDescription(f) }}</p>
-                      <p class="mt-1 truncate font-mono text-[11px] text-gray-400">{{ f.filename }}</p>
+                      <p class="mt-2 text-xs text-gray-600 dark:text-ink-dim">{{ ggufVariantDescription(f) }}</p>
+                      <p class="mt-1 truncate font-mono text-[11px] text-gray-400 dark:text-muted">{{ f.filename }}</p>
                     </div>
                     @if (f.tooLarge) {
-                      <span class="rounded-md bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700">Too large</span>
+                      <span class="rounded-md bg-red-100 dark:bg-red-500/15 px-3 py-1.5 text-xs font-medium text-red-700 dark:text-red-400">Too large</span>
                     } @else {
                       <button (click)="installModel(repo, f.filename)" [disabled]="modelInstalling()"
                         class="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50">
@@ -1238,7 +1238,7 @@ function getIkCpuSweepCandidates(current: LlmTuningConfig): IkCpuSweepEntry[] {
                 }
               </div>
               @if (!showAllRepoFiles() && hiddenRepoFileCount() > 0) {
-                <p class="mt-3 text-xs text-gray-500">
+                <p class="mt-3 text-xs text-gray-500 dark:text-muted">
                   {{ hiddenRepoFileCount() }} additional niche quantization variants are hidden by default.
                 </p>
               }
@@ -1246,22 +1246,22 @@ function getIkCpuSweepCandidates(current: LlmTuningConfig): IkCpuSweepEntry[] {
           </div>
         }
         @if (installStatus()?.modelInstalled) {
-          <div class="flex items-center justify-between p-3 bg-gray-50 rounded-md">
+          <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-bg-2 rounded-md">
             <div class="text-sm">
-              <span class="text-gray-500">Installed:</span>
+              <span class="text-gray-500 dark:text-muted">Installed:</span>
               <span class="font-mono ml-1">{{ installStatus()?.modelFilename }}</span>
-              @if (installStatus()?.modelSizeMb) { <span class="text-gray-400 ml-1">({{ installStatus()?.modelSizeMb }} MB)</span> }
+              @if (installStatus()?.modelSizeMb) { <span class="text-gray-400 dark:text-muted ml-1">({{ installStatus()?.modelSizeMb }} MB)</span> }
             </div>
             <button (click)="removeModel()" [disabled]="modelRemoving()"
-              class="px-3 py-1 text-xs font-medium text-red-700 bg-red-100 rounded hover:bg-red-200 disabled:opacity-50">
+              class="px-3 py-1 text-xs font-medium text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-500/15 rounded hover:bg-red-200 disabled:opacity-50">
               {{ modelRemoving() ? 'Removing…' : 'Remove' }}
             </button>
           </div>
         }
         @if (modelMessage(); as msg) {
-          <p class="mt-2 text-sm" [class]="modelMessageSuccess() ? 'text-green-700' : 'text-red-700'">{{ msg }}</p>
+          <p class="mt-2 text-sm" [class]="modelMessageSuccess() ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'">{{ msg }}</p>
           @if (modelDownloadProgress(); as prog) {
-            <div class="mt-1 w-full bg-gray-200 rounded-full h-2">
+            <div class="mt-1 w-full bg-gray-200 dark:bg-surface-3 rounded-full h-2">
               <div class="bg-blue-600 h-2 rounded-full transition-all duration-500" [style.width.%]="prog.progressPct ?? 0"></div>
             </div>
           }
@@ -1269,54 +1269,54 @@ function getIkCpuSweepCandidates(current: LlmTuningConfig): IkCpuSweepEntry[] {
       </div>
 
       <!-- Prompts & Knowledge Base Card -->
-      <div class="bg-white rounded-lg shadow p-6 lg:col-span-2">
+      <div class="bg-white dark:bg-surface rounded-lg shadow p-6 lg:col-span-2">
         <div class="flex items-center justify-between mb-4">
-          <h2 class="text-lg font-semibold text-gray-900">Prompts & Knowledge Base</h2>
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-ink">Prompts & Knowledge Base</h2>
           <div class="flex items-center gap-2">
             @if (showNewPromptInput()) {
               <input type="text" [ngModel]="newPromptId()" (ngModelChange)="newPromptId.set($event)"
-                placeholder="prompt-slug" class="w-40 rounded-lg border border-gray-300 bg-white py-1.5 px-3 text-xs shadow-sm placeholder:text-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors" />
+                placeholder="prompt-slug" class="w-40 rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface py-1.5 px-3 text-xs shadow-sm placeholder:text-gray-400 dark:placeholder:text-muted focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors" />
               <button (click)="createNewPrompt()" [disabled]="creatingPrompt() || !newPromptId().trim()"
                 class="px-2 py-1 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700 disabled:opacity-50">Create</button>
-              <button (click)="showNewPromptInput.set(false); newPromptId.set('')" class="text-xs text-gray-500 hover:text-gray-700">Cancel</button>
+              <button (click)="showNewPromptInput.set(false); newPromptId.set('')" class="text-xs text-gray-500 dark:text-muted hover:text-gray-700">Cancel</button>
             } @else {
-              <button (click)="showNewPromptInput.set(true)" class="px-2 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded hover:bg-blue-200">+ New</button>
+              <button (click)="showNewPromptInput.set(true)" class="px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-500/15 rounded hover:bg-blue-200">+ New</button>
             }
           </div>
         </div>
         @if (promptsLoading()) {
-          <p class="text-sm text-gray-500">Loading…</p>
+          <p class="text-sm text-gray-500 dark:text-muted">Loading…</p>
         } @else if (prompts().length === 0) {
-          <p class="text-sm text-gray-500">No prompts found. Create one to get started.</p>
+          <p class="text-sm text-gray-500 dark:text-muted">No prompts found. Create one to get started.</p>
         } @else {
           <div class="flex flex-wrap gap-1 mb-4 border-b pb-2">
             @for (p of prompts(); track p.id) {
               <button (click)="selectPrompt(p.id)"
                 class="px-3 py-1.5 text-xs font-medium rounded-t-md border border-b-0 transition-colors"
-                [class]="selectedPromptId() === p.id ? 'bg-white text-blue-700 border-gray-300' : 'bg-gray-50 text-gray-600 border-transparent hover:bg-gray-100'">
+                [class]="selectedPromptId() === p.id ? 'bg-white dark:bg-surface text-blue-700 dark:text-blue-400 border-gray-300 dark:border-line-strong' : 'bg-gray-50 dark:bg-bg-2 text-gray-600 dark:text-ink-dim border-transparent hover:bg-gray-100 dark:hover:bg-surface-tint-strong'">
                 {{ p.id }}
               </button>
             }
           </div>
           @if (selectedPrompt(); as prompt) {
             <div class="space-y-3">
-              <div class="flex items-center justify-between text-xs text-gray-500">
+              <div class="flex items-center justify-between text-xs text-gray-500 dark:text-muted">
                 <span>{{ prompt.filename }} · {{ prompt.sizeBytes }} bytes · Updated {{ prompt.updatedAt | date:'short' }}</span>
-                <button (click)="deleteCurrentPrompt()" class="text-red-600 hover:text-red-800 text-xs">Delete</button>
+                <button (click)="deleteCurrentPrompt()" class="text-red-600 dark:text-red-400 hover:text-red-800 text-xs">Delete</button>
               </div>
               <textarea [ngModel]="promptEditorContent()" (ngModelChange)="promptEditorContent.set($event)"
-                rows="16" class="block w-full rounded-lg border border-gray-300 bg-white py-2.5 px-3 shadow-sm font-mono text-xs placeholder:text-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"></textarea>
+                rows="16" class="block w-full rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface py-2.5 px-3 shadow-sm font-mono text-xs placeholder:text-gray-400 dark:placeholder:text-muted focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"></textarea>
               <div class="flex items-center gap-3">
                 <button (click)="savePrompt()" [disabled]="promptSaving()"
                   class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50">
                   {{ promptSaving() ? 'Saving…' : 'Save' }}
                 </button>
                 <button (click)="promptEditorContent.set(selectedPrompt()?.content ?? '')"
-                  class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+                  class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim bg-white dark:bg-surface border border-gray-300 dark:border-line-strong rounded-md hover:bg-gray-50 dark:hover:bg-surface-tint">
                   Revert
                 </button>
                 @if (promptMessage(); as msg) {
-                  <span class="text-sm" [class]="promptMessageSuccess() ? 'text-green-700' : 'text-red-700'">{{ msg }}</span>
+                  <span class="text-sm" [class]="promptMessageSuccess() ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'">{{ msg }}</span>
                 }
               </div>
             </div>
@@ -1325,29 +1325,29 @@ function getIkCpuSweepCandidates(current: LlmTuningConfig): IkCpuSweepEntry[] {
       </div>
 
       <!-- Config Debug Card -->
-      <div class="bg-white rounded-lg shadow p-6 lg:col-span-2">
+      <div class="bg-white dark:bg-surface rounded-lg shadow p-6 lg:col-span-2">
         <div class="mb-3 flex items-center justify-between gap-3">
           <div>
-            <h2 class="text-lg font-semibold text-gray-900">Persisted Config</h2>
-            <p class="text-sm text-gray-500">Exact runtime config JSON used for tuning and recommendation persistence.</p>
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-ink">Persisted Config</h2>
+            <p class="text-sm text-gray-500 dark:text-muted">Exact runtime config JSON used for tuning and recommendation persistence.</p>
           </div>
           <div class="flex items-center gap-2">
             @if (configDebug(); as debug) {
               <span class="rounded-full px-2.5 py-1 text-xs font-medium"
-                [class]="debug.persisted ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'">
+                [class]="debug.persisted ? 'bg-green-100 dark:bg-green-500/15 text-green-800 dark:text-green-300' : 'bg-amber-100 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300'">
                 {{ debug.persisted ? 'Saved File' : 'Generated Defaults' }}
               </span>
               <button
                 type="button"
                 (click)="downloadConfigDebug()"
-                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                class="rounded-md border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint"
               >
                 Download Config
               </button>
               <button
                 type="button"
                 (click)="copyConfigDebug()"
-                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                class="rounded-md border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint"
               >
                 Copy JSON
               </button>
@@ -1355,71 +1355,71 @@ function getIkCpuSweepCandidates(current: LlmTuningConfig): IkCpuSweepEntry[] {
           </div>
         </div>
         @if (configDebug(); as debug) {
-          <p class="mb-2 text-xs text-gray-500">Path: <span class="font-mono text-gray-700">{{ debug.configPath }}</span></p>
+          <p class="mb-2 text-xs text-gray-500 dark:text-muted">Path: <span class="font-mono text-gray-700 dark:text-ink-dim">{{ debug.configPath }}</span></p>
           <pre class="overflow-x-auto rounded-md bg-gray-950 p-4 text-[11px] text-green-300 whitespace-pre-wrap">{{ debug.rawJson }}</pre>
         } @else {
-          <p class="text-sm text-gray-500">Config unavailable.</p>
+          <p class="text-sm text-gray-500 dark:text-muted">Config unavailable.</p>
         }
       </div>
 
       <!-- Test Prompt Card -->
-      <div class="bg-white rounded-lg shadow p-6">
+      <div class="bg-white dark:bg-surface rounded-lg shadow p-6">
         <div class="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 class="text-lg font-semibold text-gray-900">Test Prompt</h2>
-            <p class="text-xs text-gray-500">Compare production-style answers with raw reasoning output from the same local runtime.</p>
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-ink">Test Prompt</h2>
+            <p class="text-xs text-gray-500 dark:text-muted">Compare production-style answers with raw reasoning output from the same local runtime.</p>
           </div>
-          <div class="inline-flex rounded-md border border-gray-300 bg-white p-1">
+          <div class="inline-flex rounded-md border border-gray-300 dark:border-line-strong bg-white dark:bg-surface p-1">
             <button type="button" (click)="thinkingMode.set('production')"
-              [class]="thinkingMode() === 'production' ? 'rounded px-3 py-1.5 text-xs font-medium bg-slate-900 text-white' : 'rounded px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50'">
+              [class]="thinkingMode() === 'production' ? 'rounded px-3 py-1.5 text-xs font-medium bg-slate-900 text-white' : 'rounded px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint'">
               Production Answers
             </button>
             <button type="button" (click)="thinkingMode.set('thinking')"
-              [class]="thinkingMode() === 'thinking' ? 'rounded px-3 py-1.5 text-xs font-medium bg-slate-900 text-white' : 'rounded px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50'">
+              [class]="thinkingMode() === 'thinking' ? 'rounded px-3 py-1.5 text-xs font-medium bg-slate-900 text-white' : 'rounded px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint'">
               Raw Reasoning
             </button>
           </div>
         </div>
         <textarea [ngModel]="testPrompt()" (ngModelChange)="testPrompt.set($event)" rows="3"
-          class="block w-full rounded-lg border border-gray-300 bg-white py-2.5 px-3 text-sm font-mono shadow-sm placeholder:text-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors mb-3"></textarea>
+          class="block w-full rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface py-2.5 px-3 text-sm font-mono shadow-sm placeholder:text-gray-400 dark:placeholder:text-muted focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors mb-3"></textarea>
         <button (click)="runTestPrompt()" [disabled]="testRunning()"
           class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50">
           {{ testRunning() ? 'Running…' : 'Send' }}
         </button>
         @if (testResult(); as r) {
-          <div class="mt-4 p-3 rounded-md text-sm" [class]="r.success ? 'bg-green-50' : 'bg-red-50'">
+          <div class="mt-4 p-3 rounded-md text-sm" [class]="r.success ? 'bg-green-50 dark:bg-green-500/15' : 'bg-red-50 dark:bg-red-500/15'">
             @if (r.success) {
               @if (r.reasoning) {
-                <div class="mb-3 rounded-md border border-amber-200 bg-amber-50 p-3">
-                  <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-800">Reasoning</p>
+                <div class="mb-3 rounded-md border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/15 p-3">
+                  <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">Reasoning</p>
                   <p class="whitespace-pre-wrap text-sm text-amber-950">{{ r.reasoning }}</p>
                 </div>
               }
               <p class="whitespace-pre-wrap">{{ r.output }}</p>
-              <p class="mt-2 text-xs text-gray-500">{{ r.durationMs }}ms · {{ r.tokensUsed }} tokens</p>
+              <p class="mt-2 text-xs text-gray-500 dark:text-muted">{{ r.durationMs }}ms · {{ r.tokensUsed }} tokens</p>
             } @else {
-              <p class="text-red-700">{{ r.error }}</p>
+              <p class="text-red-700 dark:text-red-400">{{ r.error }}</p>
             }
           </div>
         }
       </div>
 
       <!-- Benchmark Card -->
-      <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">Benchmark</h2>
-        <p class="mb-3 text-xs text-gray-500">Current response mode: <strong>{{ thinkingModeLabel() }}</strong>. Thinking mode is slower but useful for side-by-side comparisons.</p>
+      <div class="bg-white dark:bg-surface rounded-lg shadow p-6">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-ink mb-4">Benchmark</h2>
+        <p class="mb-3 text-xs text-gray-500 dark:text-muted">Current response mode: <strong>{{ thinkingModeLabel() }}</strong>. Thinking mode is slower but useful for side-by-side comparisons.</p>
         <textarea [ngModel]="benchmarkPrompt()" (ngModelChange)="benchmarkPrompt.set($event)" rows="3"
-          class="mb-3 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm font-mono shadow-sm placeholder:text-gray-400 transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500"></textarea>
+          class="mb-3 block w-full rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-2.5 text-sm font-mono shadow-sm placeholder:text-gray-400 dark:placeholder:text-muted transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500"></textarea>
         <div class="mb-3 grid grid-cols-2 gap-3">
-          <label class="block text-xs text-gray-600">
+          <label class="block text-xs text-gray-600 dark:text-ink-dim">
             <span class="mb-1 block font-medium">Repeat Count</span>
             <input type="number" min="1" max="10" [ngModel]="benchmarkRepeatCount()" (ngModelChange)="benchmarkRepeatCount.set(clampBenchmarkValue($event, 1, 10))"
-              class="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+              class="block w-full rounded-md border border-gray-300 dark:border-line-strong px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
           </label>
-          <label class="block text-xs text-gray-600">
+          <label class="block text-xs text-gray-600 dark:text-ink-dim">
             <span class="mb-1 block font-medium">Max Tokens</span>
             <input type="number" min="1" max="2048" [ngModel]="benchmarkMaxTokens()" (ngModelChange)="benchmarkMaxTokens.set(clampBenchmarkValue($event, 1, 2048))"
-              class="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+              class="block w-full rounded-md border border-gray-300 dark:border-line-strong px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
           </label>
         </div>
         <button (click)="runBenchmark()" [disabled]="benchmarkRunning()"
@@ -1427,7 +1427,7 @@ function getIkCpuSweepCandidates(current: LlmTuningConfig): IkCpuSweepEntry[] {
           {{ benchmarkRunning() ? 'Benchmarking…' : 'Run Benchmark' }}
         </button>
         <button (click)="runPresetBenchmarkSweep()" [disabled]="benchmarkRunning() || benchmarkSweepRunning() || starting() || stopping() || installing()"
-          class="ml-2 px-4 py-2 text-sm font-medium text-slate-900 bg-slate-100 rounded-md hover:bg-slate-200 disabled:opacity-50">
+          class="ml-2 px-4 py-2 text-sm font-medium text-slate-900 dark:text-slate-300 bg-slate-100 dark:bg-slate-500/15 rounded-md hover:bg-slate-200 disabled:opacity-50">
           {{ benchmarkSweepRunning() ? 'Sweeping…' : 'Benchmark Presets' }}
         </button>
         @if (selectedRuntime() === 'ik' && selectedProfile() === 'cpu') {
@@ -1437,23 +1437,23 @@ function getIkCpuSweepCandidates(current: LlmTuningConfig): IkCpuSweepEntry[] {
           </button>
         }
         @if (benchmarkResult(); as result) {
-          <div class="mt-4 rounded-md border border-gray-200 p-3 text-sm">
+          <div class="mt-4 rounded-md border border-gray-200 dark:border-line p-3 text-sm">
             <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
-              <div><span class="text-gray-500">Successful Runs</span><p class="mt-1 font-mono">{{ result.successCount }} / {{ result.repeatCount }}</p></div>
-              <div><span class="text-gray-500">Avg Duration</span><p class="mt-1 font-mono">{{ result.averageDurationMs != null ? result.averageDurationMs + ' ms' : '—' }}</p></div>
-              <div><span class="text-gray-500">Avg Tokens/s</span><p class="mt-1 font-mono">{{ result.averageTokensPerSecond != null ? result.averageTokensPerSecond : '—' }}</p></div>
-              <div><span class="text-gray-500">Total Tokens</span><p class="mt-1 font-mono">{{ result.totalTokensUsed != null ? result.totalTokensUsed : '—' }}</p></div>
+              <div><span class="text-gray-500 dark:text-muted">Successful Runs</span><p class="mt-1 font-mono">{{ result.successCount }} / {{ result.repeatCount }}</p></div>
+              <div><span class="text-gray-500 dark:text-muted">Avg Duration</span><p class="mt-1 font-mono">{{ result.averageDurationMs != null ? result.averageDurationMs + ' ms' : '—' }}</p></div>
+              <div><span class="text-gray-500 dark:text-muted">Avg Tokens/s</span><p class="mt-1 font-mono">{{ result.averageTokensPerSecond != null ? result.averageTokensPerSecond : '—' }}</p></div>
+              <div><span class="text-gray-500 dark:text-muted">Total Tokens</span><p class="mt-1 font-mono">{{ result.totalTokensUsed != null ? result.totalTokensUsed : '—' }}</p></div>
             </div>
             @if (result.outputSample) {
-              <details class="mt-3 text-xs text-gray-500">
+              <details class="mt-3 text-xs text-gray-500 dark:text-muted">
                 <summary class="cursor-pointer hover:text-gray-700">Sample output</summary>
-                <pre class="mt-2 whitespace-pre-wrap rounded bg-gray-50 p-2 text-xs text-gray-700">{{ result.outputSample }}</pre>
+                <pre class="mt-2 whitespace-pre-wrap rounded bg-gray-50 dark:bg-bg-2 p-2 text-xs text-gray-700 dark:text-ink-dim">{{ result.outputSample }}</pre>
               </details>
             }
             <div class="mt-3 overflow-x-auto">
               <table class="min-w-full text-xs">
                 <thead>
-                  <tr class="border-b border-gray-200 text-left text-gray-500">
+                  <tr class="border-b border-gray-200 dark:border-line text-left text-gray-500 dark:text-muted">
                     <th class="py-1 pr-3 font-medium">Run</th>
                     <th class="py-1 pr-3 font-medium">Status</th>
                     <th class="py-1 pr-3 font-medium">Duration</th>
@@ -1463,9 +1463,9 @@ function getIkCpuSweepCandidates(current: LlmTuningConfig): IkCpuSweepEntry[] {
                 </thead>
                 <tbody>
                   @for (run of result.runs; track run.run) {
-                    <tr class="border-b border-gray-100 align-top">
+                    <tr class="border-b border-gray-100 dark:border-line align-top">
                       <td class="py-1 pr-3 font-mono">{{ run.run }}</td>
-                      <td class="py-1 pr-3" [class]="run.success ? 'text-green-700' : 'text-red-700'">{{ run.success ? 'OK' : 'Failed' }}</td>
+                      <td class="py-1 pr-3" [class]="run.success ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'">{{ run.success ? 'OK' : 'Failed' }}</td>
                       <td class="py-1 pr-3 font-mono">{{ run.durationMs }} ms</td>
                       <td class="py-1 pr-3 font-mono">{{ run.tokensUsed != null ? run.tokensUsed : '—' }}</td>
                       <td class="py-1 pr-3 font-mono">{{ run.tokensPerSecond != null ? run.tokensPerSecond : '—' }}</td>
@@ -1473,7 +1473,7 @@ function getIkCpuSweepCandidates(current: LlmTuningConfig): IkCpuSweepEntry[] {
                     @if (run.error) {
                       <tr>
                         <td></td>
-                        <td colspan="4" class="pb-2 pr-3 text-red-700">{{ run.error }}</td>
+                        <td colspan="4" class="pb-2 pr-3 text-red-700 dark:text-red-400">{{ run.error }}</td>
                       </tr>
                     }
                   }
@@ -1483,29 +1483,29 @@ function getIkCpuSweepCandidates(current: LlmTuningConfig): IkCpuSweepEntry[] {
           </div>
         }
         @if (benchmarkSweepResult(); as sweep) {
-          <div class="mt-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm">
+          <div class="mt-4 rounded-md border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/15 p-3 text-sm">
             <div class="mb-3 flex items-center justify-between gap-3">
               <div>
-                <h3 class="text-sm font-semibold text-slate-900">Preset Sweep</h3>
-                <p class="text-xs text-slate-600">Each preset restarts the server, runs the configured benchmark, then restores your previous tuning.</p>
+                <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-300">Preset Sweep</h3>
+                <p class="text-xs text-slate-600 dark:text-slate-400">Each preset restarts the server, runs the configured benchmark, then restores your previous tuning.</p>
               </div>
               @if (sweep.recommendedPreset) {
-                <span class="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-800">Recommended: {{ presetLabel(sweep.recommendedPreset) }}</span>
+                <span class="rounded-full bg-green-100 dark:bg-green-500/15 px-3 py-1 text-xs font-semibold text-green-800 dark:text-green-300">Recommended: {{ presetLabel(sweep.recommendedPreset) }}</span>
               }
             </div>
             <div class="space-y-2">
               @for (entry of sweep.entries; track entry.preset) {
-                <div class="rounded-md border border-white/70 bg-white px-3 py-2">
+                <div class="rounded-md border border-white/70 bg-white dark:bg-surface px-3 py-2">
                   <div class="flex items-center justify-between gap-3">
-                    <div class="font-medium text-slate-900">{{ entry.label }}</div>
+                    <div class="font-medium text-slate-900 dark:text-slate-300">{{ entry.label }}</div>
                     @if (entry.result) {
-                      <div class="flex items-center gap-4 text-xs text-slate-600">
+                      <div class="flex items-center gap-4 text-xs text-slate-600 dark:text-slate-400">
                         <span>{{ entry.result.averageDurationMs != null ? entry.result.averageDurationMs + ' ms' : '—' }}</span>
                         <span>{{ entry.result.averageTokensPerSecond != null ? entry.result.averageTokensPerSecond + ' tok/s' : '—' }}</span>
                         <span>{{ entry.result.successCount }}/{{ entry.result.repeatCount }} ok</span>
                       </div>
                     } @else {
-                      <span class="text-xs text-red-700">{{ entry.error ?? 'Benchmark failed' }}</span>
+                      <span class="text-xs text-red-700 dark:text-red-400">{{ entry.error ?? 'Benchmark failed' }}</span>
                     }
                   </div>
                 </div>
@@ -1514,32 +1514,32 @@ function getIkCpuSweepCandidates(current: LlmTuningConfig): IkCpuSweepEntry[] {
           </div>
         }
         @if (ikCpuSweepResult(); as sweep) {
-          <div class="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm">
+          <div class="mt-4 rounded-md border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/15 p-3 text-sm">
             <div class="mb-3 flex items-center justify-between gap-3">
               <div>
                 <h3 class="text-sm font-semibold text-emerald-950">ik CPU Sweep</h3>
-                <p class="text-xs text-emerald-800">Benchmarks several safe CPU thread and batch combinations, then applies the best one to the current tuning.</p>
+                <p class="text-xs text-emerald-800 dark:text-emerald-300">Benchmarks several safe CPU thread and batch combinations, then applies the best one to the current tuning.</p>
               </div>
               @if (sweep.recommendedKey) {
-                <span class="rounded-full bg-white px-3 py-1 text-xs font-semibold text-emerald-900 border border-emerald-200">Recommended: {{ ikSweepRecommendedLabel(sweep) }}</span>
+                <span class="rounded-full bg-white dark:bg-surface px-3 py-1 text-xs font-semibold text-emerald-900 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30">Recommended: {{ ikSweepRecommendedLabel(sweep) }}</span>
               }
             </div>
             <div class="space-y-2">
               @for (entry of sweep.entries; track entry.key) {
-                <div class="rounded-md border border-white/70 bg-white px-3 py-2">
+                <div class="rounded-md border border-white/70 bg-white dark:bg-surface px-3 py-2">
                   <div class="flex items-center justify-between gap-3">
                     <div>
-                      <div class="font-medium text-slate-900">{{ entry.label }}</div>
-                      <div class="text-[11px] text-slate-500">T={{ entry.tuning.threads }} · TB={{ entry.tuning.threadsBatch }} · B={{ entry.tuning.batchSize }} · UB={{ entry.tuning.ubatchSize }}</div>
+                      <div class="font-medium text-slate-900 dark:text-slate-300">{{ entry.label }}</div>
+                      <div class="text-[11px] text-slate-500 dark:text-slate-300">T={{ entry.tuning.threads }} · TB={{ entry.tuning.threadsBatch }} · B={{ entry.tuning.batchSize }} · UB={{ entry.tuning.ubatchSize }}</div>
                     </div>
                     @if (entry.result) {
-                      <div class="flex items-center gap-4 text-xs text-slate-600">
+                      <div class="flex items-center gap-4 text-xs text-slate-600 dark:text-slate-400">
                         <span>{{ entry.result.averageDurationMs != null ? entry.result.averageDurationMs + ' ms' : '—' }}</span>
                         <span>{{ entry.result.averageTokensPerSecond != null ? entry.result.averageTokensPerSecond + ' tok/s' : '—' }}</span>
                         <span>{{ entry.result.successCount }}/{{ entry.result.repeatCount }} ok</span>
                       </div>
                     } @else {
-                      <span class="text-xs text-red-700">{{ entry.error ?? 'Benchmark failed' }}</span>
+                      <span class="text-xs text-red-700 dark:text-red-400">{{ entry.error ?? 'Benchmark failed' }}</span>
                     }
                   </div>
                 </div>
@@ -1550,61 +1550,61 @@ function getIkCpuSweepCandidates(current: LlmTuningConfig): IkCpuSweepEntry[] {
       </div>
 
       <!-- Test RFQ Parsing Card -->
-      <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">Test RFQ Parsing</h2>
+      <div class="bg-white dark:bg-surface rounded-lg shadow p-6">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-ink mb-4">Test RFQ Parsing</h2>
         <textarea [ngModel]="rfqText()" (ngModelChange)="rfqText.set($event)" rows="6"
-          class="block w-full rounded-lg border border-gray-300 bg-white py-2.5 px-3 text-sm font-mono shadow-sm placeholder:text-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors mb-3"></textarea>
+          class="block w-full rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface py-2.5 px-3 text-sm font-mono shadow-sm placeholder:text-gray-400 dark:placeholder:text-muted focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors mb-3"></textarea>
         <button (click)="runTestRfq()" [disabled]="rfqRunning()"
           class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50">
           {{ rfqRunning() ? 'Parsing…' : 'Parse' }}
         </button>
         @if (rfqResult(); as r) {
-          <div class="mt-4 p-3 rounded-md text-sm" [class]="r.success ? 'bg-green-50' : 'bg-red-50'">
+          <div class="mt-4 p-3 rounded-md text-sm" [class]="r.success ? 'bg-green-50 dark:bg-green-500/15' : 'bg-red-50 dark:bg-red-500/15'">
             @if (r.success && r.parsed) {
               <div class="space-y-3">
                 <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                  <div><span class="text-gray-500">Vessel</span><p class="font-medium">{{ r.parsed.vesselName ?? '—' }}</p></div>
-                  <div><span class="text-gray-500">IMO</span><p class="font-medium">{{ r.parsed.imo ?? '—' }}</p></div>
-                  <div><span class="text-gray-500">Port</span><p class="font-medium">{{ r.parsed.port ?? '—' }}</p></div>
-                  <div><span class="text-gray-500">ETA</span><p class="font-medium">{{ r.parsed.eta ?? '—' }}</p></div>
+                  <div><span class="text-gray-500 dark:text-muted">Vessel</span><p class="font-medium">{{ r.parsed.vesselName ?? '—' }}</p></div>
+                  <div><span class="text-gray-500 dark:text-muted">IMO</span><p class="font-medium">{{ r.parsed.imo ?? '—' }}</p></div>
+                  <div><span class="text-gray-500 dark:text-muted">Port</span><p class="font-medium">{{ r.parsed.port ?? '—' }}</p></div>
+                  <div><span class="text-gray-500 dark:text-muted">ETA</span><p class="font-medium">{{ r.parsed.eta ?? '—' }}</p></div>
                 </div>
                 @if (r.parsed.products?.length) {
                   <div>
-                    <span class="text-gray-500 text-xs">Products</span>
+                    <span class="text-gray-500 dark:text-muted text-xs">Products</span>
                     <div class="mt-1 border rounded-md divide-y">
                       @for (p of r.parsed.products; track p.name) {
                         <div class="flex items-center justify-between px-3 py-1.5 text-sm">
                           <span class="font-medium">{{ p.name }}</span>
-                          <span class="text-gray-600">{{ p.quantity }} {{ p.unit }}</span>
+                          <span class="text-gray-600 dark:text-ink-dim">{{ p.quantity }} {{ p.unit }}</span>
                         </div>
                       }
                     </div>
                   </div>
                 }
                 @if (r.parsed.confidence != null) {
-                  <div class="text-xs text-gray-500">Confidence: {{ r.parsed.confidence }}</div>
+                  <div class="text-xs text-gray-500 dark:text-muted">Confidence: {{ r.parsed.confidence }}</div>
                 }
                 <details class="text-xs">
-                  <summary class="text-blue-600 cursor-pointer">Raw JSON</summary>
-                  <pre class="mt-1 whitespace-pre-wrap text-xs text-gray-600 bg-gray-50 p-2 rounded">{{ r.parsed | json }}</pre>
+                  <summary class="text-blue-600 dark:text-blue-400 cursor-pointer">Raw JSON</summary>
+                  <pre class="mt-1 whitespace-pre-wrap text-xs text-gray-600 dark:text-ink-dim bg-gray-50 dark:bg-bg-2 p-2 rounded">{{ r.parsed | json }}</pre>
                 </details>
               </div>
-              <p class="mt-2 text-xs text-gray-500">{{ r.durationMs }}ms · {{ r.tokensUsed }} tokens</p>
+              <p class="mt-2 text-xs text-gray-500 dark:text-muted">{{ r.durationMs }}ms · {{ r.tokensUsed }} tokens</p>
             } @else if (r.success) {
               <p class="whitespace-pre-wrap">{{ r.output }}</p>
             } @else {
-              <p class="text-red-700">{{ r.error }}</p>
+              <p class="text-red-700 dark:text-red-400">{{ r.error }}</p>
             }
           </div>
         }
       </div>
 
       <!-- Test Web Search Card -->
-      <div class="bg-white rounded-lg shadow p-6 lg:col-span-2">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">Test Web Search</h2>
+      <div class="bg-white dark:bg-surface rounded-lg shadow p-6 lg:col-span-2">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-ink mb-4">Test Web Search</h2>
         <div class="flex gap-3 mb-3">
           <input type="text" [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)"
-            class="block flex-1 rounded-lg border border-gray-300 bg-white py-2.5 px-3 text-sm shadow-sm placeholder:text-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+            class="block flex-1 rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface py-2.5 px-3 text-sm shadow-sm placeholder:text-gray-400 dark:placeholder:text-muted focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
             placeholder="Ask a question that requires internet search…" />
           <button (click)="runTestSearch()" [disabled]="searchRunning()"
             class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap">
@@ -1612,22 +1612,22 @@ function getIkCpuSweepCandidates(current: LlmTuningConfig): IkCpuSweepEntry[] {
           </button>
         </div>
         @if (searchResult(); as r) {
-          <div class="p-3 rounded-md text-sm" [class]="r.success ? 'bg-green-50' : 'bg-red-50'">
+          <div class="p-3 rounded-md text-sm" [class]="r.success ? 'bg-green-50 dark:bg-green-500/15' : 'bg-red-50 dark:bg-red-500/15'">
             @if (r.success) {
               <p class="whitespace-pre-wrap">{{ r.output }}</p>
-              <p class="mt-2 text-xs text-gray-500">{{ r.durationMs }}ms · {{ r.tokensUsed }} tokens</p>
+              <p class="mt-2 text-xs text-gray-500 dark:text-muted">{{ r.durationMs }}ms · {{ r.tokensUsed }} tokens</p>
               @if (r.searchResults?.length) {
                 <details class="mt-2">
-                  <summary class="text-xs text-blue-600 cursor-pointer">{{ r.searchResults!.length }} sources</summary>
+                  <summary class="text-xs text-blue-600 dark:text-blue-400 cursor-pointer">{{ r.searchResults!.length }} sources</summary>
                   <ul class="mt-1 space-y-1">
                     @for (sr of r.searchResults; track sr.url) {
-                      <li class="text-xs"><a [href]="sr.url" target="_blank" class="text-blue-600 hover:underline">{{ sr.title }}</a></li>
+                      <li class="text-xs"><a [href]="sr.url" target="_blank" class="text-blue-600 dark:text-blue-400 hover:underline">{{ sr.title }}</a></li>
                     }
                   </ul>
                 </details>
               }
             } @else {
-              <p class="text-red-700">{{ r.error }}</p>
+              <p class="text-red-700 dark:text-red-400">{{ r.error }}</p>
             }
           </div>
         }

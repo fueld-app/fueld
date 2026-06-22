@@ -24,31 +24,31 @@ import { API } from '@app/core/config/api';
   template: `
     @if (open()) {
       <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" (click)="close()">
-        <div class="rounded-xl bg-white p-6 shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto" (click)="$event.stopPropagation()">
-          <h3 class="text-lg font-semibold text-gray-900">
+        <div class="rounded-xl bg-white dark:bg-surface p-6 shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto" (click)="$event.stopPropagation()">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-ink">
             Apply for Credit
           </h3>
-          <p class="mt-1 text-sm text-gray-500">
+          <p class="mt-1 text-sm text-gray-500 dark:text-muted">
             Submit a credit application for
             <strong>{{ counterpartyName() }}</strong>.
             This will be reviewed by credit managers.
           </p>
 
           @if (error()) {
-            <div class="mt-3 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">{{ error() }}</div>
+            <div class="mt-3 rounded-lg bg-red-50 dark:bg-red-500/15 border border-red-200 dark:border-red-500/30 p-3 text-sm text-red-700 dark:text-red-400">{{ error() }}</div>
           }
 
           @if (success()) {
-            <div class="mt-3 rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-700">
+            <div class="mt-3 rounded-lg bg-green-50 dark:bg-green-500/15 border border-green-200 dark:border-green-500/30 p-3 text-sm text-green-700 dark:text-green-400">
               Credit application submitted successfully! It will be reviewed by credit managers.
             </div>
           } @else {
             <div class="mt-4 space-y-4">
               <!-- Type -->
               <div>
-                <label class="block text-sm font-medium text-gray-700">Credit Type *</label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">Credit Type *</label>
                 <select [ngModel]="type()" (ngModelChange)="type.set($event)"
-                  class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white">
+                  class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none bg-white dark:bg-surface">
                   <option value="CUSTOMER">Customer Credit</option>
                   <option value="SUPPLIER">Supplier Credit</option>
                 </select>
@@ -57,16 +57,16 @@ import { API } from '@app/core/config/api';
               <div class="grid grid-cols-2 gap-4">
                 <!-- Amount -->
                 <div>
-                  <label class="block text-sm font-medium text-gray-700">Requested Amount *</label>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">Requested Amount *</label>
                   <input type="number" step="0.01" [ngModel]="amount()" (ngModelChange)="amount.set(normalizeAmountInput($event))"
                     placeholder="100000"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
+                    class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none" />
                 </div>
                 <!-- Currency -->
                 <div>
-                  <label class="block text-sm font-medium text-gray-700">Currency *</label>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">Currency *</label>
                   <select [ngModel]="currency()" (ngModelChange)="currency.set($event)"
-                    class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none bg-white">
+                    class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none bg-white dark:bg-surface">
                     <option value="USD">USD</option>
                     <option value="EUR">EUR</option>
                     <option value="GBP">GBP</option>
@@ -77,18 +77,18 @@ import { API } from '@app/core/config/api';
 
               <!-- Days -->
               <div>
-                <label class="block text-sm font-medium text-gray-700">Credit Period (days)</label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">Credit Period (days)</label>
                 <input type="number" [ngModel]="days()" (ngModelChange)="days.set(normalizeDaysInput($event))"
                   placeholder="30"
-                  class="mt-1 w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none" />
+                  class="mt-1 w-full max-w-xs rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none" />
               </div>
 
               <!-- Reason -->
               <div>
-                <label class="block text-sm font-medium text-gray-700">Reason / Justification</label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">Reason / Justification</label>
                 <textarea [ngModel]="reason()" (ngModelChange)="reason.set($event)" rows="3"
                   placeholder="Explain why this credit is needed..."
-                  class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none resize-none">
+                  class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none resize-none">
                 </textarea>
               </div>
             </div>
@@ -96,11 +96,11 @@ import { API } from '@app/core/config/api';
             <!-- Footer buttons -->
             <div class="mt-6 flex items-center justify-end gap-3">
               <button (click)="close()"
-                class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                class="rounded-lg border border-gray-300 dark:border-line-strong px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors">
                 Cancel
               </button>
               <button (click)="submit()" [disabled]="submitting() || !amount()"
-                class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 transition-colors disabled:opacity-50">
+                class="rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-800 transition-colors disabled:opacity-50">
                 @if (submitting()) {
                   <svg class="inline h-4 w-4 animate-spin mr-1.5" viewBox="0 0 24 24" fill="none">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>

@@ -19,15 +19,15 @@ export interface OrderSecondaryTab {
   template: `
     @if (visibleTabs().length > 0) {
       <div class="mt-6">
-        <div class="flex items-center gap-1 border-b border-gray-200 overflow-x-auto scrollbar-none">
+        <div class="flex items-center gap-1 border-b border-gray-200 dark:border-line overflow-x-auto scrollbar-none">
           @for (tab of visibleTabs(); track tab.id) {
             <button
               type="button"
               (click)="selectTab(tab.id)"
               class="whitespace-nowrap px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px"
               [class]="activeTab() === tab.id
-                ? 'border-brand-600 text-brand-700'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                ? 'border-brand-600 text-brand-700 dark:text-brand-400'
+                : 'border-transparent text-gray-500 dark:text-muted hover:text-gray-700 hover:border-gray-300'"
             >
               {{ tab.label }}
             </button>

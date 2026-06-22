@@ -54,14 +54,14 @@ interface CompanySearchResultOption {
       <!-- Header -->
       <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
-          <h1 class="text-2xl font-bold text-gray-900">Customer Credit</h1>
-          <p class="mt-1 text-sm text-gray-500">
+          <h1 class="text-2xl font-bold text-gray-900 dark:text-ink">Customer Credit</h1>
+          <p class="mt-1 text-sm text-gray-500 dark:text-muted">
             Credit lines given to customers. Performance shows average days to pay.
           </p>
         </div>
         <button
           (click)="openCreateModal()"
-          class="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 transition-colors"
+          class="inline-flex items-center gap-1.5 rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-800 transition-colors"
         >
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
             <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
@@ -71,15 +71,15 @@ interface CompanySearchResultOption {
       </div>
 
       @if (canManageCreditOverrides() && (pendingOverrides().length || pendingOverridesLoading() || pendingOverridesError())) {
-        <div class="mb-6 rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 via-white to-sky-50 shadow-sm">
-          <div class="flex flex-col gap-3 border-b border-blue-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div class="mb-6 rounded-2xl border border-blue-200 dark:border-blue-500/30 bg-gradient-to-br from-blue-50 via-white to-sky-50 shadow-sm">
+          <div class="flex flex-col gap-3 border-b border-blue-100 dark:border-blue-500/25 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 class="text-sm font-semibold text-gray-900">Pending Credit Overrides</h2>
-              <p class="mt-1 text-xs text-gray-600">Approve or reject frozen customer exceptions without leaving the credit queue.</p>
+              <h2 class="text-sm font-semibold text-gray-900 dark:text-ink">Pending Credit Overrides</h2>
+              <p class="mt-1 text-xs text-gray-600 dark:text-ink-dim">Approve or reject frozen customer exceptions without leaving the credit queue.</p>
             </div>
             <button
               type="button"
-              class="inline-flex items-center gap-1.5 self-start rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-50 transition-colors disabled:opacity-50"
+              class="inline-flex items-center gap-1.5 self-start rounded-lg border border-blue-200 dark:border-blue-500/30 bg-white dark:bg-surface px-3 py-2 text-xs font-medium text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/15 transition-colors disabled:opacity-50"
               [disabled]="pendingOverridesLoading()"
               (click)="loadPendingOverrides()"
             >
@@ -89,46 +89,46 @@ interface CompanySearchResultOption {
 
           <div class="px-5 py-4">
             @if (pendingOverridesLoading()) {
-              <div class="flex items-center gap-2 text-sm text-gray-500">
-                <svg class="h-4 w-4 animate-spin text-blue-600" viewBox="0 0 24 24" fill="none">
+              <div class="flex items-center gap-2 text-sm text-gray-500 dark:text-muted">
+                <svg class="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400" viewBox="0 0 24 24" fill="none">
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                 </svg>
                 Loading pending overrides...
               </div>
             } @else if (pendingOverridesError()) {
-              <div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ pendingOverridesError() }}</div>
+              <div class="rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 px-3 py-2 text-sm text-red-700 dark:text-red-400">{{ pendingOverridesError() }}</div>
             } @else if (pendingOverrides().length) {
               <div class="space-y-3">
                 @for (override of pendingOverrides(); track override.id) {
-                  <div class="rounded-xl border border-blue-100 bg-white/80 px-4 py-4">
+                  <div class="rounded-xl border border-blue-100 dark:border-blue-500/25 bg-white/80 px-4 py-4">
                     <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                       <div class="min-w-0 flex-1">
                         <div class="flex flex-wrap items-center gap-2">
-                          <a [routerLink]="['/companies', override.counterpartyId]" class="text-sm font-semibold text-blue-700 hover:text-blue-900 hover:underline">
+                          <a [routerLink]="['/companies', override.counterpartyId]" class="text-sm font-semibold text-blue-700 dark:text-blue-400 hover:text-blue-900 hover:underline">
                             {{ override.counterpartyName }}
                           </a>
-                          <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700 uppercase">
+                          <span class="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase">
                             Pending
                           </span>
                         </div>
-                        <p class="mt-1 text-xs text-gray-500">
+                        <p class="mt-1 text-xs text-gray-500 dark:text-muted">
                           Requested by {{ override.requestedByUserName }} on {{ formatDateTime(override.createdAt) }}
                         </p>
-                        <p class="mt-2 text-sm text-gray-800">{{ override.reason }}</p>
+                        <p class="mt-2 text-sm text-gray-800 dark:text-ink">{{ override.reason }}</p>
 
                         @if (ignoredCreditEnforcementVesselsFor(override.counterpartyId).length) {
-                          <div class="mt-3 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2">
-                            <p class="text-xs font-semibold uppercase tracking-wide text-sky-800">Ignored Vessel Credit Exceptions</p>
-                            <p class="mt-1 text-xs text-sky-700">
+                          <div class="mt-3 rounded-lg border border-sky-200 dark:border-sky-500/30 bg-sky-50 dark:bg-sky-500/15 px-3 py-2">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-sky-800 dark:text-sky-300">Ignored Vessel Credit Exceptions</p>
+                            <p class="mt-1 text-xs text-sky-700 dark:text-sky-400">
                               Maritime-context hits tied to these linked vessels are excluded from credit enforcement for this customer.
                             </p>
                             <div class="mt-2 flex flex-wrap gap-2">
                               @for (vessel of ignoredCreditEnforcementVesselsFor(override.counterpartyId); track vessel.id) {
-                                <span class="inline-flex items-center rounded-full border border-sky-200 bg-white px-2.5 py-1 text-[11px] font-medium text-sky-800">
+                                <span class="inline-flex items-center rounded-full border border-sky-200 dark:border-sky-500/30 bg-white dark:bg-surface px-2.5 py-1 text-[11px] font-medium text-sky-800 dark:text-sky-300">
                                   {{ vessel.vesselName || vessel.vesselImo || 'Unknown vessel' }}
                                   @if (vessel.vesselImo) {
-                                    <span class="ml-1 text-sky-600">IMO {{ vessel.vesselImo }}</span>
+                                    <span class="ml-1 text-sky-600 dark:text-sky-400">IMO {{ vessel.vesselImo }}</span>
                                   }
                                 </span>
                               }
@@ -140,7 +140,7 @@ interface CompanySearchResultOption {
                           <div class="mt-3 flex flex-wrap gap-2">
                             @for (approval of override.approvals; track approval.id) {
                               <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium"
-                                [class]="approval.decision === 'APPROVED' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'">
+                                [class]="approval.decision === 'APPROVED' ? 'bg-green-100 dark:bg-green-500/15 text-green-700 dark:text-green-400' : 'bg-red-100 dark:bg-red-500/15 text-red-700 dark:text-red-400'">
                                 {{ approval.userName }}
                                 <span>{{ approval.decision }}</span>
                               </span>
@@ -153,7 +153,7 @@ interface CompanySearchResultOption {
                         <div class="flex items-center gap-2">
                           <button
                             type="button"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs font-medium text-green-700 hover:bg-green-100 transition-colors disabled:opacity-50"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-green-200 dark:border-green-500/30 bg-green-50 dark:bg-green-500/15 px-3 py-2 text-xs font-medium text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-500/20 transition-colors disabled:opacity-50"
                             [disabled]="pendingDecisionId() === override.id"
                             (click)="decidePendingOverride(override, 'APPROVED')"
                           >
@@ -161,7 +161,7 @@ interface CompanySearchResultOption {
                           </button>
                           <button
                             type="button"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-100 transition-colors disabled:opacity-50"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 px-3 py-2 text-xs font-medium text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors disabled:opacity-50"
                             [disabled]="pendingDecisionId() === override.id"
                             (click)="decidePendingOverride(override, 'REJECTED')"
                           >
@@ -174,7 +174,7 @@ interface CompanySearchResultOption {
                 }
               </div>
             } @else {
-              <p class="text-sm text-gray-500">No overrides are waiting for approval.</p>
+              <p class="text-sm text-gray-500 dark:text-muted">No overrides are waiting for approval.</p>
             }
           </div>
         </div>
@@ -183,49 +183,49 @@ interface CompanySearchResultOption {
       <!-- Table -->
       @if (loading()) {
         <div class="flex items-center justify-center py-12">
-          <svg class="h-8 w-8 animate-spin text-brand-600" viewBox="0 0 24 24" fill="none">
+          <svg class="h-8 w-8 animate-spin text-brand-600 dark:text-brand-400" viewBox="0 0 24 24" fill="none">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
           </svg>
         </div>
       } @else {
-        <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div class="overflow-x-auto rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm">
           <table class="w-full text-sm">
             <thead>
-              <tr class="border-b border-gray-200 bg-gray-50/80">
-                <th app-sort-header field="updatedAt" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Updated</th>
-                <th class="px-4 py-3 text-left font-medium text-gray-600">Customer(s)</th>
-                <th class="px-4 py-3 text-left font-medium text-gray-600">Our Companies</th>
-                <th app-sort-header field="expires" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Expires</th>
-                <th app-sort-header field="periodDays" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Period</th>
-                <th app-sort-header field="creditAmount" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-right font-medium text-gray-600">Credit</th>
-                <th class="px-4 py-3 text-right font-medium text-gray-600">Used</th>
-                <th class="px-4 py-3 text-right font-medium text-gray-600">Available</th>
-                <th class="px-4 py-3 text-center font-medium text-gray-600">Performance</th>
-                <th class="px-4 py-3 text-center font-medium text-gray-600">From Delivery</th>
-                <th class="px-4 py-3 text-center font-medium text-gray-600">Qualified</th>
+              <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80">
+                <th app-sort-header field="updatedAt" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Updated</th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Customer(s)</th>
+                <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Our Companies</th>
+                <th app-sort-header field="expires" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Expires</th>
+                <th app-sort-header field="periodDays" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Period</th>
+                <th app-sort-header field="creditAmount" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim">Credit</th>
+                <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim">Used</th>
+                <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim">Available</th>
+                <th class="px-4 py-3 text-center font-medium text-gray-600 dark:text-ink-dim">Performance</th>
+                <th class="px-4 py-3 text-center font-medium text-gray-600 dark:text-ink-dim">From Delivery</th>
+                <th class="px-4 py-3 text-center font-medium text-gray-600 dark:text-ink-dim">Qualified</th>
                 <th class="px-4 py-3 w-20"></th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-100">
+            <tbody class="divide-y divide-gray-100 dark:divide-line">
               @for (line of creditLines(); track line.id) {
                 <tr class="transition-colors hover:bg-gray-50/50">
-                  <td class="px-4 py-3 text-gray-500 text-xs">{{ formatDate(line.updatedAt) }}</td>
+                  <td class="px-4 py-3 text-gray-500 dark:text-muted text-xs">{{ formatDate(line.updatedAt) }}</td>
                   <td class="px-4 py-3">
                     <div class="flex flex-wrap gap-1">
                       @for (name of line.counterpartyNames; track name; let i = $index) {
                         <a [routerLink]="['/companies', line.counterpartyIds[i]]"
-                          class="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors">
+                          class="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-500/15 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors">
                           {{ name }}
                         </a>
                         @if (frozenCounterpartyIds().has(line.counterpartyIds[i])) {
-                          <span class="inline-flex items-center gap-0.5 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700 uppercase">
+                          <span class="inline-flex items-center gap-0.5 rounded-full bg-red-100 dark:bg-red-500/15 px-1.5 py-0.5 text-[10px] font-bold text-red-700 dark:text-red-400 uppercase">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/></svg>
                             Frozen
                           </span>
                         }
                       } @empty {
-                        <span class="text-gray-400">-</span>
+                        <span class="text-gray-400 dark:text-muted">-</span>
                       }
                     </div>
                   </td>
@@ -233,66 +233,66 @@ interface CompanySearchResultOption {
                     @if (line.ownCompanyNames.length) {
                       <div class="flex flex-wrap gap-1">
                         @for (name of line.ownCompanyNames; track name) {
-                          <span class="inline-flex items-center rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">{{ name }}</span>
+                          <span class="inline-flex items-center rounded-full bg-brand-50 dark:bg-brand-700/15 px-2 py-0.5 text-xs font-medium text-brand-700 dark:text-brand-400">{{ name }}</span>
                         }
                       </div>
                     } @else {
-                      <span class="text-gray-400">All</span>
+                      <span class="text-gray-400 dark:text-muted">All</span>
                     }
                   </td>
-                  <td class="px-4 py-3 text-gray-600">
+                  <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">
                     @if (line.expires) {
-                      <span [class]="isExpired(line.expires) ? 'text-red-600 font-medium' : ''">
+                      <span [class]="isExpired(line.expires) ? 'text-red-600 dark:text-red-400 font-medium' : ''">
                         {{ formatDate(line.expires) }}
                       </span>
                     } @else {
-                      <span class="text-gray-400">-</span>
+                      <span class="text-gray-400 dark:text-muted">-</span>
                     }
                   </td>
-                  <td class="px-4 py-3 text-gray-600">{{ line.periodDays }} days</td>
-                  <td class="px-4 py-3 text-right font-medium text-gray-900">{{ formatAmount(line.creditAmount, line.currency) }}</td>
+                  <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">{{ line.periodDays }} days</td>
+                  <td class="px-4 py-3 text-right font-medium text-gray-900 dark:text-ink">{{ formatAmount(line.creditAmount, line.currency) }}</td>
                   <td class="px-4 py-3 text-right">
-                    <span [class]="parseFloat(line.usedAmount) > 0 ? 'text-amber-600 font-medium' : 'text-gray-400'">
+                    <span [class]="parseFloat(line.usedAmount) > 0 ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-gray-400 dark:text-muted'">
                       {{ formatAmount(line.usedAmount, line.currency) }}
                     </span>
                   </td>
                   <td class="px-4 py-3 text-right">
-                    <span [class]="parseFloat(line.availableAmount) > 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'">
+                    <span [class]="parseFloat(line.availableAmount) > 0 ? 'text-green-600 dark:text-green-400 font-medium' : 'text-red-600 dark:text-red-400 font-medium'">
                       {{ formatAmount(line.availableAmount, line.currency) }}
                     </span>
                   </td>
                   <td class="px-4 py-3 text-center">
                     @if (line.performanceDays !== null) {
-                      <span [class]="line.performanceDays! <= line.periodDays ? 'text-green-600 font-medium' : 'text-amber-600 font-medium'">
+                      <span [class]="line.performanceDays! <= line.periodDays ? 'text-green-600 dark:text-green-400 font-medium' : 'text-amber-600 dark:text-amber-400 font-medium'">
                         {{ line.performanceDays }} days
                       </span>
                     } @else {
-                      <span class="text-gray-400">-</span>
+                      <span class="text-gray-400 dark:text-muted">-</span>
                     }
                   </td>
                   <td class="px-4 py-3 text-center">
                     <button (click)="toggleFromDelivery(line)" class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors"
-                      [class]="line.fromDelivery ? 'bg-brand-600' : 'bg-gray-300'">
-                      <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                      [class]="line.fromDelivery ? 'bg-brand-700' : 'bg-gray-300'">
+                      <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white dark:bg-surface transition-transform"
                         [class]="line.fromDelivery ? 'translate-x-4' : 'translate-x-0.5'"></span>
                     </button>
                   </td>
                   <td class="px-4 py-3 text-center">
                     <button (click)="toggleQualified(line)" class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors"
-                      [class]="line.qualified ? 'bg-brand-600' : 'bg-gray-300'">
-                      <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                      [class]="line.qualified ? 'bg-brand-700' : 'bg-gray-300'">
+                      <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white dark:bg-surface transition-transform"
                         [class]="line.qualified ? 'translate-x-4' : 'translate-x-0.5'"></span>
                     </button>
                   </td>
                   <td class="px-4 py-3">
                     <div class="flex items-center gap-1">
-                      <button (click)="openEditModal(line)" class="rounded-md p-1 text-gray-400 hover:text-brand-600 transition-colors" title="Edit">
+                      <button (click)="openEditModal(line)" class="rounded-md p-1 text-gray-400 dark:text-muted hover:text-brand-600 transition-colors" title="Edit">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                           <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
                           <path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" />
                         </svg>
                       </button>
-                      <button (click)="confirmDelete(line)" class="rounded-md p-1 text-gray-400 hover:text-red-500 transition-colors" title="Delete">
+                      <button (click)="confirmDelete(line)" class="rounded-md p-1 text-gray-400 dark:text-muted hover:text-red-500 transition-colors" title="Delete">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                           <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
                         </svg>
@@ -302,7 +302,7 @@ interface CompanySearchResultOption {
                 </tr>
               } @empty {
                 <tr>
-                  <td colspan="12" class="px-4 py-8 text-center text-gray-400">
+                  <td colspan="12" class="px-4 py-8 text-center text-gray-400 dark:text-muted">
                     No customer credit lines yet. Click "Add Credit Line" to create one.
                   </td>
                 </tr>
@@ -345,15 +345,15 @@ interface CompanySearchResultOption {
       <!-- Delete confirmation modal -->
       @if (deleteTarget()) {
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" (click)="deleteTarget.set(null)">
-          <div class="rounded-xl bg-white p-6 shadow-xl max-w-sm mx-4" (click)="$event.stopPropagation()">
-            <h3 class="text-lg font-semibold text-gray-900">Delete credit line?</h3>
-            <p class="mt-2 text-sm text-gray-500">
+          <div class="rounded-xl bg-white dark:bg-surface p-6 shadow-xl max-w-sm mx-4" (click)="$event.stopPropagation()">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-ink">Delete credit line?</h3>
+            <p class="mt-2 text-sm text-gray-500 dark:text-muted">
               Are you sure you want to delete the credit line for
               <strong>{{ deleteTarget()!.counterpartyNames.join(', ') }}</strong>?
             </p>
             <div class="mt-4 flex justify-end gap-2">
               <button (click)="deleteTarget.set(null)"
-                class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+                class="rounded-lg border border-gray-300 dark:border-line-strong px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint">Cancel</button>
               <button (click)="executeDelete()" [disabled]="deleting()"
                 class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
                 @if (deleting()) { Deleting... } @else { Delete }

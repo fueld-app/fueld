@@ -18,45 +18,45 @@ import { API } from '@app/core/config/api';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, RouterLink],
   template: `
-    <div class="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-      <div class="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-8 shadow-lg">
-        <h1 class="text-2xl font-bold text-gray-900">Reset your password</h1>
-        <p class="mt-2 text-sm text-gray-500">
+    <div class="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-bg-2 px-4">
+      <div class="w-full max-w-md rounded-2xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-8 shadow-lg">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-ink">Reset your password</h1>
+        <p class="mt-2 text-sm text-gray-500 dark:text-muted">
           Choose a new password for your account.
         </p>
 
         @if (tokenMissing()) {
-          <div class="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+          <div class="mt-6 rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 px-4 py-3 text-sm text-red-700 dark:text-red-400" role="alert">
             Invalid or missing password reset token.
           </div>
 
           <a
             routerLink="/login"
-            class="mt-6 inline-flex items-center rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 transition-colors"
+            class="mt-6 inline-flex items-center rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-800 transition-colors"
           >
             Back to Login
           </a>
         } @else if (success()) {
-          <div class="mt-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700" role="alert">
+          <div class="mt-6 rounded-lg border border-green-200 dark:border-green-500/30 bg-green-50 dark:bg-green-500/15 px-4 py-3 text-sm text-green-700 dark:text-green-400" role="alert">
             Password updated. You can now sign in with your new password.
           </div>
 
           <a
             routerLink="/login"
-            class="mt-6 inline-flex items-center rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 transition-colors"
+            class="mt-6 inline-flex items-center rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-800 transition-colors"
           >
             Go to Login
           </a>
         } @else {
           @if (errorMessage()) {
-            <div class="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+            <div class="mt-6 rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 px-4 py-3 text-sm text-red-700 dark:text-red-400" role="alert">
               {{ errorMessage() }}
             </div>
           }
 
           <form class="mt-6 space-y-5" (ngSubmit)="onSubmit()">
             <div>
-              <label for="password" class="block text-sm font-medium text-gray-700">New password</label>
+              <label for="password" class="block text-sm font-medium text-gray-700 dark:text-ink-dim">New password</label>
               <input
                 id="password"
                 type="password"
@@ -64,14 +64,14 @@ import { API } from '@app/core/config/api';
                 [(ngModel)]="password"
                 name="password"
                 required
-                class="mt-1.5 block w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                class="mt-1.5 block w-full rounded-lg border border-gray-300 dark:border-line-strong px-3.5 py-2.5 text-sm shadow-sm placeholder:text-gray-400 dark:placeholder:text-muted focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
                 placeholder="••••••••"
               />
-              <p class="mt-1 text-xs text-gray-500">Minimum 8 characters.</p>
+              <p class="mt-1 text-xs text-gray-500 dark:text-muted">Minimum 8 characters.</p>
             </div>
 
             <div>
-              <label for="confirmPassword" class="block text-sm font-medium text-gray-700">Confirm new password</label>
+              <label for="confirmPassword" class="block text-sm font-medium text-gray-700 dark:text-ink-dim">Confirm new password</label>
               <input
                 id="confirmPassword"
                 type="password"
@@ -79,7 +79,7 @@ import { API } from '@app/core/config/api';
                 [(ngModel)]="confirmPassword"
                 name="confirmPassword"
                 required
-                class="mt-1.5 block w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                class="mt-1.5 block w-full rounded-lg border border-gray-300 dark:border-line-strong px-3.5 py-2.5 text-sm shadow-sm placeholder:text-gray-400 dark:placeholder:text-muted focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
                 placeholder="••••••••"
               />
             </div>
@@ -87,7 +87,7 @@ import { API } from '@app/core/config/api';
             <button
               type="submit"
               [disabled]="submitting()"
-              class="w-full rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:opacity-50"
+              class="w-full rounded-lg bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-800 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:ring-offset-2 disabled:opacity-50"
             >
               @if (submitting()) {
                 Updating…
@@ -97,7 +97,7 @@ import { API } from '@app/core/config/api';
             </button>
 
             <div class="text-center">
-              <a routerLink="/login" class="text-sm font-medium text-brand-600 hover:text-brand-700 transition-colors">
+              <a routerLink="/login" class="text-sm font-medium text-brand-600 dark:text-brand-400 hover:text-brand-700 transition-colors">
                 ← Back to login
               </a>
             </div>

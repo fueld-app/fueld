@@ -24,30 +24,30 @@ import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
     <div class="space-y-6 pb-2 min-w-0">
       <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 class="text-2xl font-bold text-gray-900">Platts</h1>
-          <p class="text-sm text-gray-500">Historic and current Platts reports for the whole team, with canonical daily selection and source PDF access.</p>
+          <h1 class="text-2xl font-bold text-gray-900 dark:text-ink">Platts</h1>
+          <p class="text-sm text-gray-500 dark:text-muted">Historic and current Platts reports for the whole team, with canonical daily selection and source PDF access.</p>
         </div>
         <div class="flex flex-wrap gap-3">
-          <label class="inline-flex cursor-pointer items-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+          <label class="inline-flex cursor-pointer items-center rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint">
             <input type="file" accept="application/pdf" class="sr-only" (change)="onSingleFileChange($event)" />
             Choose PDF
           </label>
           <button
             (click)="uploadSingle()"
             [disabled]="uploading() || !selectedSingleFile()"
-            class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+            class="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50"
           >
             {{ uploading() ? 'Uploading…' : 'Upload Report' }}
           </button>
           @if (auth.isAdmin()) {
-            <label class="inline-flex cursor-pointer items-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+            <label class="inline-flex cursor-pointer items-center rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint">
               <input type="file" accept="application/pdf" multiple class="sr-only" (change)="onBulkFilesChange($event)" />
               Choose Historic PDFs
             </label>
             <button
               (click)="uploadBulk()"
               [disabled]="bulkUploading() || bulkFiles().length === 0"
-              class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              class="rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint disabled:opacity-50"
             >
               {{ bulkUploading() ? 'Importing…' : 'Bulk Import History' }}
             </button>
@@ -56,30 +56,30 @@ import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
       </div>
 
       @if (error()) {
-        <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ error() }}</div>
+        <div class="rounded-xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 px-4 py-3 text-sm text-red-700 dark:text-red-400">{{ error() }}</div>
       }
 
       @if (notice()) {
-        <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{{ notice() }}</div>
+        <div class="rounded-xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/15 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400">{{ notice() }}</div>
       }
 
-      <section class="max-w-full rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+      <section class="max-w-full rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm">
         <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
           <div class="xl:col-span-2">
-            <label class="text-xs font-semibold uppercase tracking-wide text-gray-500">Search</label>
-            <input [(ngModel)]="search" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="Title or file name" />
+            <label class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Search</label>
+            <input [(ngModel)]="search" class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm" placeholder="Title or file name" />
           </div>
           <div>
-            <label class="text-xs font-semibold uppercase tracking-wide text-gray-500">From</label>
-            <input [(ngModel)]="fromDate" type="date" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+            <label class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">From</label>
+            <input [(ngModel)]="fromDate" type="date" class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm" />
           </div>
           <div>
-            <label class="text-xs font-semibold uppercase tracking-wide text-gray-500">To</label>
-            <input [(ngModel)]="toDate" type="date" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+            <label class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">To</label>
+            <input [(ngModel)]="toDate" type="date" class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm" />
           </div>
           <div>
-            <label class="text-xs font-semibold uppercase tracking-wide text-gray-500">Status</label>
-            <select [(ngModel)]="statusFilter" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            <label class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Status</label>
+            <select [(ngModel)]="statusFilter" class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm">
               <option value="">All</option>
               <option value="UPLOADED">Uploaded</option>
               <option value="PARSING">Parsing</option>
@@ -89,29 +89,29 @@ import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
             </select>
           </div>
           <div class="flex items-end gap-3">
-            <label class="flex items-center gap-2 text-sm text-gray-600">
-              <input [(ngModel)]="canonicalOnly" type="checkbox" class="rounded border-gray-300" />
+            <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-ink-dim">
+              <input [(ngModel)]="canonicalOnly" type="checkbox" class="rounded border-gray-300 dark:border-line-strong" />
               Canonical only
             </label>
-            <button (click)="reloadFromStart()" [disabled]="loading()" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+            <button (click)="reloadFromStart()" [disabled]="loading()" class="rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint disabled:opacity-50">
               {{ loading() ? 'Loading…' : 'Apply' }}
             </button>
           </div>
         </div>
       </section>
 
-      <section class="max-w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      <section class="max-w-full overflow-hidden rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm">
         @if (reports().length === 0 && !loading()) {
-          <div class="px-4 py-10 text-center text-sm text-gray-500">No Platts reports found for the current filters.</div>
+          <div class="px-4 py-10 text-center text-sm text-gray-500 dark:text-muted">No Platts reports found for the current filters.</div>
         } @else {
           <div class="space-y-3 p-4 md:hidden">
             @for (report of reports(); track report.id) {
-              <article class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <article class="rounded-lg border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 p-4">
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
-                    <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">{{ report.publicationDate | dateLabel }}</div>
-                    <h2 class="mt-1 text-sm font-semibold text-gray-900">{{ report.title }}</h2>
-                    <p class="mt-1 break-words text-xs text-gray-500">{{ report.sourceFileName }}</p>
+                    <div class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">{{ report.publicationDate | dateLabel }}</div>
+                    <h2 class="mt-1 text-sm font-semibold text-gray-900 dark:text-ink">{{ report.title }}</h2>
+                    <p class="mt-1 break-words text-xs text-gray-500 dark:text-muted">{{ report.sourceFileName }}</p>
                   </div>
                   <span class="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold" [class]="statusClass(report.status)">
                     {{ report.status }}
@@ -120,27 +120,27 @@ import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
 
                 <dl class="mt-4 grid grid-cols-2 gap-3 text-sm">
                   <div>
-                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Canonical</dt>
-                    <dd class="mt-1 text-gray-700">{{ report.isCanonical ? 'Yes' : 'No' }}</dd>
+                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Canonical</dt>
+                    <dd class="mt-1 text-gray-700 dark:text-ink-dim">{{ report.isCanonical ? 'Yes' : 'No' }}</dd>
                   </div>
                   <div>
-                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Uploaded By</dt>
-                    <dd class="mt-1 text-gray-700">{{ report.uploadedByName || 'Unknown' }}</dd>
+                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Uploaded By</dt>
+                    <dd class="mt-1 text-gray-700 dark:text-ink-dim">{{ report.uploadedByName || 'Unknown' }}</dd>
                   </div>
                   <div class="col-span-2">
-                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Created</dt>
-                    <dd class="mt-1 text-gray-700">{{ report.createdAt | date:'medium' }}</dd>
+                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Created</dt>
+                    <dd class="mt-1 text-gray-700 dark:text-ink-dim">{{ report.createdAt | date:'medium' }}</dd>
                   </div>
                 </dl>
 
                 @if (report.parseError) {
-                  <div class="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{{ report.parseError }}</div>
+                  <div class="mt-4 rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 px-3 py-2 text-xs text-red-700 dark:text-red-400">{{ report.parseError }}</div>
                 }
 
                 <div class="mt-4 flex flex-wrap gap-2">
-                  <a [routerLink]="['/resources/platts', report.id]" class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">Open</a>
-                  <button (click)="previewSource(report)" class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">PDF</button>
-                  <button (click)="reparse(report)" class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">Reparse</button>
+                  <a [routerLink]="['/resources/platts', report.id]" class="rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint">Open</a>
+                  <button (click)="previewSource(report)" class="rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint">PDF</button>
+                  <button (click)="reparse(report)" class="rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint">Reparse</button>
                   @if (auth.isAdmin() && !report.isCanonical && report.status === 'READY') {
                     <button (click)="makeCanonical(report)" class="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-600">Make Canonical</button>
                   }
@@ -150,25 +150,25 @@ import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
           </div>
 
           <div class="hidden overflow-x-auto md:block">
-            <table class="min-w-full divide-y divide-gray-200 text-sm">
-            <thead class="bg-gray-50">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-line text-sm">
+            <thead class="bg-gray-50 dark:bg-bg-2">
               <tr>
-                <th class="px-4 py-3 text-left font-semibold text-gray-600">Publication Date</th>
-                <th class="px-4 py-3 text-left font-semibold text-gray-600">Title</th>
-                <th class="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
-                <th class="px-4 py-3 text-left font-semibold text-gray-600">Canonical</th>
-                <th class="px-4 py-3 text-left font-semibold text-gray-600">Uploaded By</th>
-                <th class="px-4 py-3 text-left font-semibold text-gray-600">Created</th>
-                <th class="px-4 py-3 text-right font-semibold text-gray-600">Actions</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Publication Date</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Title</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Status</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Canonical</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Uploaded By</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-600 dark:text-ink-dim">Created</th>
+                <th class="px-4 py-3 text-right font-semibold text-gray-600 dark:text-ink-dim">Actions</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-100">
+            <tbody class="divide-y divide-gray-100 dark:divide-line">
               @for (report of reports(); track report.id) {
                 <tr class="align-top">
-                  <td class="px-4 py-3 text-gray-900">{{ report.publicationDate | dateLabel }}</td>
+                  <td class="px-4 py-3 text-gray-900 dark:text-ink">{{ report.publicationDate | dateLabel }}</td>
                   <td class="px-4 py-3">
-                    <div class="font-medium text-gray-900">{{ report.title }}</div>
-                    <div class="text-xs text-gray-500">{{ report.sourceFileName }}</div>
+                    <div class="font-medium text-gray-900 dark:text-ink">{{ report.title }}</div>
+                    <div class="text-xs text-gray-500 dark:text-muted">{{ report.sourceFileName }}</div>
                   </td>
                   <td class="px-4 py-3">
                     <span class="rounded-full px-2.5 py-1 text-xs font-semibold"
@@ -176,23 +176,23 @@ import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
                       {{ report.status }}
                     </span>
                     @if (report.parseError) {
-                      <div class="mt-2 max-w-xs text-xs text-red-600">{{ report.parseError }}</div>
+                      <div class="mt-2 max-w-xs text-xs text-red-600 dark:text-red-400">{{ report.parseError }}</div>
                     }
                   </td>
                   <td class="px-4 py-3">
                     @if (report.isCanonical) {
-                      <span class="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">Canonical</span>
+                      <span class="rounded-full bg-emerald-100 dark:bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">Canonical</span>
                     } @else {
-                      <span class="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">Historical</span>
+                      <span class="rounded-full bg-gray-100 dark:bg-surface-3 px-2.5 py-1 text-xs font-semibold text-gray-600 dark:text-ink-dim">Historical</span>
                     }
                   </td>
-                  <td class="px-4 py-3 text-gray-600">{{ report.uploadedByName || 'Unknown' }}</td>
-                  <td class="px-4 py-3 text-gray-600">{{ report.createdAt | date:'medium' }}</td>
+                  <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">{{ report.uploadedByName || 'Unknown' }}</td>
+                  <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">{{ report.createdAt | date:'medium' }}</td>
                   <td class="px-4 py-3 text-right">
                     <div class="flex flex-wrap justify-end gap-2">
-                      <a [routerLink]="['/resources/platts', report.id]" class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">Open</a>
-                      <button (click)="previewSource(report)" class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">PDF</button>
-                      <button (click)="reparse(report)" class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">Reparse</button>
+                      <a [routerLink]="['/resources/platts', report.id]" class="rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint">Open</a>
+                      <button (click)="previewSource(report)" class="rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint">PDF</button>
+                      <button (click)="reparse(report)" class="rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint">Reparse</button>
                       @if (auth.isAdmin() && !report.isCanonical && report.status === 'READY') {
                         <button (click)="makeCanonical(report)" class="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-600">Make Canonical</button>
                       }
@@ -205,12 +205,12 @@ import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
           </div>
         }
 
-        <div class="flex flex-col gap-3 border-t border-gray-200 px-4 py-3 text-sm text-gray-600 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex flex-col gap-3 border-t border-gray-200 dark:border-line px-4 py-3 text-sm text-gray-600 dark:text-ink-dim sm:flex-row sm:items-center sm:justify-between">
           <div>{{ total() }} report(s)</div>
           <div class="flex items-center justify-between gap-3 sm:justify-start">
-            <button (click)="previousPage()" [disabled]="page() <= 1 || loading()" class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50">Previous</button>
+            <button (click)="previousPage()" [disabled]="page() <= 1 || loading()" class="rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-surface-tint disabled:opacity-50">Previous</button>
             <span>Page {{ page() }}</span>
-            <button (click)="nextPage()" [disabled]="page() * pageSize >= total() || loading()" class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50">Next</button>
+            <button (click)="nextPage()" [disabled]="page() * pageSize >= total() || loading()" class="rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-surface-tint disabled:opacity-50">Next</button>
           </div>
         </div>
       </section>

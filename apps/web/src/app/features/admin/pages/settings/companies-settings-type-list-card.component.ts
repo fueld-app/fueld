@@ -10,8 +10,8 @@ import { Component, ChangeDetectionStrategy, input, output } from '@angular/core
           <ng-content select="[icon]" />
         </div>
         <div class="flex-1 min-w-0">
-          <h3 class="text-sm font-semibold text-gray-900">{{ title() }}</h3>
-          <p class="text-xs text-gray-500">{{ description() }}</p>
+          <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">{{ title() }}</h3>
+          <p class="text-xs text-gray-500 dark:text-muted">{{ description() }}</p>
         </div>
       </div>
 
@@ -19,10 +19,10 @@ import { Component, ChangeDetectionStrategy, input, output } from '@angular/core
         @for (item of items(); track $index; let i = $index) {
           <div class="flex items-center gap-2">
             <div class="flex flex-col gap-0.5 shrink-0">
-              <button (click)="moveUp.emit(i)" [disabled]="i === 0" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move up">
+              <button (click)="moveUp.emit(i)" [disabled]="i === 0" class="text-gray-400 dark:text-muted hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move up">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
               </button>
-              <button (click)="moveDown.emit(i)" [disabled]="i === items().length - 1" class="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move down">
+              <button (click)="moveDown.emit(i)" [disabled]="i === items().length - 1" class="text-gray-400 dark:text-muted hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move down">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
               </button>
             </div>
@@ -35,7 +35,7 @@ import { Component, ChangeDetectionStrategy, input, output } from '@angular/core
             <button
               (click)="remove.emit(i)"
               [disabled]="items().length <= 1"
-              class="rounded-md p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 transition-colors shrink-0"
+              class="rounded-md p-1.5 text-gray-400 dark:text-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/15 disabled:opacity-30 transition-colors shrink-0"
               title="Remove"
             >
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -56,7 +56,7 @@ import { Component, ChangeDetectionStrategy, input, output } from '@angular/core
             {{ saving() ? 'Saving…' : 'Save' }}
           </button>
           @if (saved()) {
-            <span class="text-sm text-green-600 flex items-center gap-1">
+            <span class="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                 <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
               </svg>

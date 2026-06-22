@@ -6,6 +6,8 @@ import { firstValueFrom, Subscription } from 'rxjs';
 import { API } from '@app/core/config/api';
 import { WebSocketService } from '@app/core/websocket/websocket.service';
 import { AuthService } from '@app/core/auth/auth.service';
+import { ThemeService } from '@app/core/theme.service';
+import { swapLeafletTileLayer } from '@app/shared/utils/leaflet-theme';
 import { flagFromIso3, flagFromUnlocode } from '@app/shared/utils/flags';
 import type {
   ApiResponse,
@@ -243,6 +245,8 @@ export class PlaceDetailStore {
   private readonly pageTitle = inject(Title);
   private readonly wsService = inject(WebSocketService);
   private readonly authService = inject(AuthService);
+  private readonly theme = inject(ThemeService);
+  private tileLayer: any = null;
 
   // Core state
   readonly place = signal<PlaceDto | null>(null);
@@ -360,6 +364,17 @@ export class PlaceDetailStore {
   private currentLliPlaceId: string | null = null;
 
   constructor() {
+    effect(() => {
+      // Re-theme the base tiles when the app theme changes.
+      this.theme.resolved();
+      if (this.map) {
+        this.tileLayer = swapLeafletTileLayer(L, this.map, this.tileLayer, this.theme.resolved(), {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+          maxZoom: 20,
+          subdomains: 'abcd',
+        });
+      }
+    });
     effect(() => {
       const p = this.place();
       if (p?.name) {
@@ -642,11 +657,11 @@ export class PlaceDetailStore {
     });
     console.log('[PlaceDetailStore] Leaflet map created:', !!this.map);
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    this.tileLayer = swapLeafletTileLayer(L, this.map, null, this.theme.resolved(), {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
       maxZoom: 20,
       subdomains: 'abcd',
-    }).addTo(this.map);
+    });
 
     this.vesselLayer = L.layerGroup().addTo(this.map);
 
@@ -713,7 +728,7 @@ export class PlaceDetailStore {
         icon: vesselIcon(v.heading, v.lengthOverall, zoom, v.lat),
       });
       const popupLines = [
-        `<a href="javascript:void(0)" class="vessel-nav-link text-blue-600 hover:underline font-semibold" data-vessel-id="${v.id}">${v.name}</a>`,
+        `<a href="javascript:void(0)" class="vessel-nav-link text-blue-600 dark:text-blue-400 hover:underline font-semibold" data-vessel-id="${v.id}">${v.name}</a>`,
         v.imo ? `IMO: ${v.imo}` : null,
         v.vesselType ? `Type: ${v.vesselType}` : null,
         v.flag ? `Flag: ${v.flag}` : null,
@@ -761,27 +776,6 @@ export class PlaceDetailStore {
     if (status === 'PAID') return '/trading/completed-orders';
     if (status === 'CANCELLED') return '/trading/cancelled-orders';
     return '/trading/orders';
-  }
-
-  orderStatusClass(status: string): string {
-    switch (status) {
-      case 'INQUIRY':
-        return 'bg-blue-50 text-blue-700';
-      case 'OFFER':
-        return 'bg-violet-50 text-violet-700';
-      case 'CONFIRMED':
-        return 'bg-emerald-50 text-emerald-700';
-      case 'DELIVERED':
-        return 'bg-teal-50 text-teal-700';
-      case 'INVOICED':
-        return 'bg-amber-50 text-amber-700';
-      case 'PAID':
-        return 'bg-green-50 text-green-700';
-      case 'CANCELLED':
-        return 'bg-red-50 text-red-700';
-      default:
-        return 'bg-gray-50 text-gray-700';
-    }
   }
 
   // ─── Facilities ──────────────────────────────────────────────────

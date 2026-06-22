@@ -10,10 +10,10 @@ import { PlaceDetailStore } from '../../place-detail.store';
       <div class="app-panel overflow-hidden flex flex-col"
            [class]="store.mapFullscreen() ? 'fixed inset-0 z-[70] rounded-none border-0 h-screen' : 'h-[420px]'">
         <div class="app-panel-header app-panel-header--sky justify-between px-5 py-3">
-          <h2 class="text-sm font-semibold text-gray-700">
+          <h2 class="text-sm font-semibold text-gray-700 dark:text-ink-dim">
             Location
             @if (store.vesselsLoading()) {
-              <span class="ml-2 inline-flex items-center gap-1 text-xs font-normal text-gray-400">
+              <span class="ml-2 inline-flex items-center gap-1 text-xs font-normal text-gray-400 dark:text-muted">
                 <svg class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
@@ -21,15 +21,15 @@ import { PlaceDetailStore } from '../../place-detail.store';
                 Loading vessels…
               </span>
             } @else if (store.nearbyVessels().length) {
-              <span class="ml-2 text-xs font-normal text-gray-400">
+              <span class="ml-2 text-xs font-normal text-gray-400 dark:text-muted">
                 {{ store.nearbyVessels().length }} vessels nearby
               </span>
             }
           </h2>
           <div class="flex items-center gap-3">
-            <span class="font-mono text-xs text-gray-400">{{ store.place()!.lat }}° N, {{ store.place()!.long }}° E</span>
+            <span class="font-mono text-xs text-gray-400 dark:text-muted">{{ store.place()!.lat }}° N, {{ store.place()!.long }}° E</span>
             <button (click)="store.toggleMapFullscreen()"
-              class="rounded-md p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              class="rounded-md p-1 text-gray-400 dark:text-muted hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-surface-tint-strong transition-colors"
               [title]="store.mapFullscreen() ? 'Exit fullscreen' : 'Fullscreen'">
               @if (store.mapFullscreen()) {
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">

@@ -57,8 +57,8 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
       <!-- Header -->
       <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
-          <h1 class="text-2xl font-bold text-gray-900">Places</h1>
-          <p class="mt-1 text-sm text-gray-500">
+          <h1 class="text-2xl font-bold text-gray-900 dark:text-ink">Places</h1>
+          <p class="mt-1 text-sm text-gray-500 dark:text-muted">
             Manage ports, terminals, anchorages and other places.
           </p>
         </div>
@@ -69,7 +69,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
         <!-- Typeahead search (LLI + local) -->
         <div class="relative flex-1">
           <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-            <svg class="h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <svg class="h-4 w-4 text-gray-400 dark:text-muted" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
             </svg>
           </div>
@@ -83,7 +83,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
           />
           @if (lliSearching()) {
             <div class="absolute inset-y-0 right-0 flex items-center pr-3">
-              <svg class="h-4 w-4 animate-spin text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <svg class="h-4 w-4 animate-spin text-gray-400 dark:text-muted" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
               </svg>
@@ -92,12 +92,12 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
 
           <!-- Typeahead dropdown -->
           @if (lliDropdownOpen() && searchDone()) {
-            <div class="absolute z-20 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-80 overflow-y-auto">
+            <div class="absolute z-20 mt-1 w-full rounded-lg border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-lg max-h-80 overflow-y-auto">
               @for (r of lliResults(); track r.lliPlaceId ?? r.localId) {
-                <div (click)="onTypeaheadClick(r)" class="flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0 cursor-pointer">
+                <div (click)="onTypeaheadClick(r)" class="flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors border-b border-gray-50 last:border-0 cursor-pointer">
                   <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-2">
-                      <span class="text-sm font-medium text-gray-900 truncate">{{ r.name }}</span>
+                      <span class="text-sm font-medium text-gray-900 dark:text-ink truncate">{{ r.name }}</span>
                       @if (r.type) {
                         <span class="inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium"
                               [class]="placeTypeBadgeClass(r.type)">
@@ -105,12 +105,12 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
                         </span>
                       }
                       @if (r.source === 'local') {
-                        <span class="inline-flex shrink-0 items-center rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
+                        <span class="inline-flex shrink-0 items-center rounded-full bg-gray-100 dark:bg-surface-3 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:text-muted">
                           Local
                         </span>
                       }
                     </div>
-                    <div class="mt-0.5 text-xs text-gray-500 truncate">
+                    <div class="mt-0.5 text-xs text-gray-500 dark:text-muted truncate">
                       {{ r.country }}
                       @if (r.unlocode) { · {{ r.unlocode }} }
                       @if (r.area) { · {{ r.area }} }
@@ -129,7 +129,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
                 </div>
               } @empty {
                 <div class="px-3 py-4 text-center">
-                  <p class="text-sm text-gray-500">No places found matching "{{ lliSearchTerm() }}"</p>
+                  <p class="text-sm text-gray-500 dark:text-muted">No places found matching "{{ lliSearchTerm() }}"</p>
                   <button
                     (click)="openCreateModal(); $event.stopPropagation()"
                     class="app-button-primary mt-2 px-3 py-1.5 text-xs font-semibold"
@@ -147,7 +147,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
         <select
           [(ngModel)]="localTypeFilter"
           (ngModelChange)="currentPage.set(1); loadPlaces(); updateUrlParams()"
-          class="app-input w-full bg-white sm:w-40"
+          class="app-input w-full bg-white dark:bg-surface sm:w-40"
         >
           <option value="">All types</option>
           <option value="POR">Port</option>
@@ -159,7 +159,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
         <select
           [ngModel]="filterResponsible()"
           (ngModelChange)="filterResponsible.set($event); currentPage.set(1); loadPlaces(); updateUrlParams()"
-          class="app-input w-full bg-white sm:w-48"
+          class="app-input w-full bg-white dark:bg-surface sm:w-48"
         >
           <option value="">All Responsible</option>
           @for (u of users(); track u.id) {
@@ -168,8 +168,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
         </select>
         <button
           (click)="loadPlaces()"
-          class="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700
-                 hover:bg-gray-200 transition-colors"
+          class="rounded-lg bg-gray-100 dark:bg-surface-3 px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-200 transition-colors"
         >
           Refresh
         </button>
@@ -189,32 +188,32 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
             </svg>
           </div>
           <div>
-            <h2 class="text-base font-semibold text-gray-900">Place Registry</h2>
-            <p class="mt-1 text-sm text-gray-600">Browse local and imported places, then inspect operational usage at a glance.</p>
+            <h2 class="text-base font-semibold text-gray-900 dark:text-ink">Place Registry</h2>
+            <p class="mt-1 text-sm text-gray-600 dark:text-ink-dim">Browse local and imported places, then inspect operational usage at a glance.</p>
           </div>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
           <thead>
-            <tr class="border-b border-gray-200 bg-gray-50/80">
-              <th app-sort-header field="name" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Name</th>
-              <th app-sort-header field="country" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Country</th>
-              <th app-sort-header field="placeType" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Type</th>
-              <th app-sort-header field="unlocode" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">UNLOCODE</th>
-              <th app-sort-header field="area" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600">Area</th>
-              <th class="px-4 py-3 text-left font-medium text-gray-600">Source</th>
-              <th class="px-4 py-3 text-center font-medium text-gray-600">Orders</th>
-              <th class="px-4 py-3 text-right font-medium text-gray-600"></th>
+            <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80">
+              <th app-sort-header field="name" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Name</th>
+              <th app-sort-header field="country" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Country</th>
+              <th app-sort-header field="placeType" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Type</th>
+              <th app-sort-header field="unlocode" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">UNLOCODE</th>
+              <th app-sort-header field="area" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Area</th>
+              <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Source</th>
+              <th class="px-4 py-3 text-center font-medium text-gray-600 dark:text-ink-dim">Orders</th>
+              <th class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim"></th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-100">
+          <tbody class="divide-y divide-gray-100 dark:divide-line">
             @for (place of places(); track place.id) {
               <tr (click)="openPlace(place.id)" class="cursor-pointer transition-colors hover:bg-gray-50/50">
-                <td class="px-4 py-3 font-medium text-brand-700 hover:underline">{{ place.name }}</td>
-                <td class="px-4 py-3 text-gray-600">
+                <td class="px-4 py-3 font-medium text-brand-700 dark:text-brand-400 hover:underline">{{ place.name }}</td>
+                <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">
                   <span class="mr-1.5">{{ countryFlag(place) }}</span>{{ place.country }}
                   @if (place.countryIso && place.countryIso !== place.country) {
-                    <span class="ml-1 text-xs text-gray-400">({{ place.countryIso }})</span>
+                    <span class="ml-1 text-xs text-gray-400 dark:text-muted">({{ place.countryIso }})</span>
                   }
                 </td>
                 <td class="px-4 py-3">
@@ -225,31 +224,31 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
                     </span>
                   }
                 </td>
-                <td class="px-4 py-3 text-gray-500 font-mono text-xs">{{ place.unlocode ?? '—' }}</td>
-                <td class="px-4 py-3 text-gray-500">{{ place.area ?? '—' }}</td>
+                <td class="px-4 py-3 text-gray-500 dark:text-muted font-mono text-xs">{{ place.unlocode ?? '—' }}</td>
+                <td class="px-4 py-3 text-gray-500 dark:text-muted">{{ place.area ?? '—' }}</td>
                 <td class="px-4 py-3">
                   @if (place.lliPlaceId) {
-                    <span class="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">Imported</span>
+                    <span class="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-500/15 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-400">Imported</span>
                   } @else {
-                    <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">Manual</span>
+                    <span class="inline-flex items-center rounded-full bg-gray-100 dark:bg-surface-3 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:text-ink-dim">Manual</span>
                   }
                 </td>
                 <td class="px-4 py-3 text-center">
                   @if (place.orderCount) {
                     <span class="inline-flex items-center gap-1 text-xs">
-                      <span class="font-medium text-gray-700">{{ place.orderCount }}</span>
+                      <span class="font-medium text-gray-700 dark:text-ink-dim">{{ place.orderCount }}</span>
                       @if (place.activeOrderCount) {
-                        <span class="rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700">{{ place.activeOrderCount }} active</span>
+                        <span class="rounded-full bg-green-100 dark:bg-green-500/15 px-1.5 py-0.5 text-[10px] font-medium text-green-700 dark:text-green-400">{{ place.activeOrderCount }} active</span>
                       }
                     </span>
                   } @else {
-                    <span class="text-xs text-gray-300">—</span>
+                    <span class="text-xs text-gray-300 dark:text-muted">—</span>
                   }
                 </td>
                 <td class="px-4 py-3 text-right">
                   <button
                     (click)="confirmDelete(place); $event.stopPropagation()"
-                    class="rounded-md p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                    class="rounded-md p-1.5 text-gray-400 dark:text-muted hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/15 transition-colors"
                     title="Delete place"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -260,7 +259,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
               </tr>
             } @empty {
               <tr>
-                <td colspan="8" class="px-4 py-8 text-center text-sm text-gray-400 italic">
+                <td colspan="8" class="px-4 py-8 text-center text-sm text-gray-400 dark:text-muted italic">
                   @if (loading()) {
                     Loading places…
                   } @else {
@@ -277,9 +276,9 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
       <!-- Mobile cards -->
       <div class="space-y-3 md:hidden">
         @for (place of places(); track place.id) {
-          <div (click)="openPlace(place.id)" class="cursor-pointer rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-brand-300 transition-colors">
+          <div (click)="openPlace(place.id)" class="cursor-pointer rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-4 shadow-sm hover:border-brand-300 transition-colors">
             <div class="flex items-center justify-between mb-2">
-              <span class="font-semibold text-gray-900">{{ place.name }}</span>
+              <span class="font-semibold text-gray-900 dark:text-ink">{{ place.name }}</span>
               @if (place.placeType) {
                 <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
                       [class]="placeTypeBadgeClass(place.placeType)">
@@ -287,7 +286,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
                 </span>
               }
             </div>
-            <div class="grid grid-cols-2 gap-1 text-xs text-gray-500">
+            <div class="grid grid-cols-2 gap-1 text-xs text-gray-500 dark:text-muted">
               <span>{{ countryFlag(place) }} {{ place.country }}</span>
               <span>🏷️ {{ place.unlocode ?? '—' }}</span>
               <span>🌍 {{ place.area ?? '—' }}</span>
@@ -296,7 +295,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
           </div>
         } @empty {
           @if (!loading()) {
-            <div class="text-center py-8 text-sm text-gray-400 italic">
+            <div class="text-center py-8 text-sm text-gray-400 dark:text-muted italic">
               No places found.
             </div>
           }
@@ -314,21 +313,21 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
       <!-- Import success toast -->
       @if (deleteTarget()) {
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div class="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
-            <h3 class="text-lg font-semibold text-gray-900">Delete Place</h3>
-            <p class="mt-2 text-sm text-gray-600">
+          <div class="w-full max-w-sm rounded-xl bg-white dark:bg-surface p-6 shadow-xl">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-ink">Delete Place</h3>
+            <p class="mt-2 text-sm text-gray-600 dark:text-ink-dim">
               Are you sure you want to delete <strong>{{ deleteTarget()!.name }}</strong>?
               This cannot be undone.
             </p>
             @if (deleteError()) {
-              <div class="mt-3 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+              <div class="mt-3 rounded-lg bg-red-50 dark:bg-red-500/15 border border-red-200 dark:border-red-500/30 p-3 text-sm text-red-700 dark:text-red-400">
                 {{ deleteError() }}
               </div>
             }
             <div class="mt-5 flex justify-end gap-3">
               <button
                 (click)="deleteTarget.set(null)"
-                class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                class="rounded-lg border border-gray-300 dark:border-line-strong px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors"
               >
                 Cancel
               </button>
@@ -353,12 +352,12 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
       <!-- Create Place Modal -->
       @if (showCreateModal()) {
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div class="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
-            <h3 class="text-lg font-semibold text-gray-900">Create Place</h3>
-            <p class="mt-1 text-sm text-gray-500">Add a place manually that isn't in Lloyd's List Intelligence.</p>
+          <div class="w-full max-w-lg rounded-xl bg-white dark:bg-surface p-6 shadow-xl">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-ink">Create Place</h3>
+            <p class="mt-1 text-sm text-gray-500 dark:text-muted">Add a place manually that isn't in Lloyd's List Intelligence.</p>
 
             @if (createError()) {
-              <div class="mt-3 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+              <div class="mt-3 rounded-lg bg-red-50 dark:bg-red-500/15 border border-red-200 dark:border-red-500/30 p-3 text-sm text-red-700 dark:text-red-400">
                 {{ createError() }}
               </div>
             }
@@ -366,14 +365,14 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
             <form class="mt-4 space-y-4" (ngSubmit)="executeCreate()">
               <div class="grid grid-cols-2 gap-4">
                 <div class="col-span-2 sm:col-span-1">
-                  <label class="block text-sm font-medium text-gray-700">Name *</label>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">Name *</label>
                   <input type="text" [(ngModel)]="createForm.name" name="name" required
                     class="app-input mt-1 w-full" />
                 </div>
                 <div class="col-span-2 sm:col-span-1">
-                  <label class="block text-sm font-medium text-gray-700">Country *</label>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">Country *</label>
                   <select [ngModel]="createForm.countryIso" (ngModelChange)="onCountryChange($event)" name="country" required
-                    class="app-input mt-1 w-full bg-white">
+                    class="app-input mt-1 w-full bg-white dark:bg-surface">
                     <option value="">Select country…</option>
                     @for (c of countries; track c.code) {
                       <option [value]="c.code">{{ c.name }}</option>
@@ -381,9 +380,9 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
                   </select>
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-gray-700">Type</label>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">Type</label>
                   <select [(ngModel)]="createForm.placeType" name="placeType"
-                    class="app-input mt-1 w-full bg-white">
+                    class="app-input mt-1 w-full bg-white dark:bg-surface">
                     <option [ngValue]="undefined">—</option>
                     <option value="POR">Port</option>
                     <option value="PSP">Sub Port</option>
@@ -393,24 +392,24 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
                   </select>
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-gray-700">UNLOCODE</label>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">UNLOCODE</label>
                   <input type="text" [(ngModel)]="createForm.unlocode" name="unlocode"
                     class="app-input-mono-uppercase mt-1 w-full" />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-gray-700">Latitude</label>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">Latitude</label>
                   <input type="number" step="any" [(ngModel)]="createForm.lat" name="lat"
                     class="app-input mt-1 w-full" />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-gray-700">Longitude</label>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">Longitude</label>
                   <input type="number" step="any" [(ngModel)]="createForm.long" name="long"
                     class="app-input mt-1 w-full" />
                 </div>
                 <div class="col-span-2">
-                  <label class="block text-sm font-medium text-gray-700">Area</label>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">Area</label>
                   <select [(ngModel)]="createForm.area" name="area"
-                    class="app-input mt-1 w-full bg-white">
+                    class="app-input mt-1 w-full bg-white dark:bg-surface">
                     <option [ngValue]="undefined">—</option>
                     @for (a of areas; track a) {
                       <option [value]="a">{{ a }}</option>
@@ -421,7 +420,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
 
               <div class="flex justify-end gap-3 pt-2">
                 <button type="button" (click)="showCreateModal.set(false)"
-                  class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                  class="rounded-lg border border-gray-300 dark:border-line-strong px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors">
                   Cancel
                 </button>
                 <button type="submit" [disabled]="creating()"

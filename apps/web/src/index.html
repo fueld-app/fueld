@@ -8,7 +8,20 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#1f2937">
+  <script>
+    try {
+      var p = localStorage.getItem('fueld-app-theme');
+      var dark;
+      if (p === 'light') dark = false;
+      else if (p === 'dark') dark = true;
+      else dark = matchMedia('(prefers-color-scheme: dark)').matches; /* device / null */
+      document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    } catch (_) {
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+  </script>
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f6f7fb" />
+  <meta name="theme-color" media="(prefers-color-scheme: dark)"  content="#06080d" />
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <link rel="manifest" href="manifest.webmanifest">

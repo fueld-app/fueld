@@ -1,11 +1,19 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { test as base, expect, type JSCoverageEntry, type Page } from '@playwright/test';
+import { test as base, expect, type Page } from '@playwright/test';
+
+// JSCoverageEntry was removed as a named export in @playwright/test 1.61;
+// derive the entry type from stopJSCoverage()'s return signature instead.
+type JSCoverageEntry = Awaited<ReturnType<Page['coverage']['stopJSCoverage']>>[number];
 
 type CoveragePayload = {
   js: JSCoverageEntry[];
   css: Awaited<ReturnType<Page['coverage']['stopCSSCoverage']>>;
 };
+
+// Re-export Page so specs that import { type Page } from '../fixtures/coverage'
+// continue to resolve (coverage.ts is the shared test fixture entry point).
+// (declared once at the bottom alongside `export { expect }`)
 
 const enabled = process.env['PW_COVERAGE'] === '1';
 const outputDir = process.env['PW_COVERAGE_DIR'] ?? 'coverage/e2e/raw';
@@ -45,3 +53,4 @@ export const test = base.extend({
 });
 
 export { expect };
+export type { Page };

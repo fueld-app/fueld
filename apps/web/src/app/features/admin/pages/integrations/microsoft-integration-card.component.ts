@@ -22,22 +22,22 @@ import { IntegrationsToastService } from './integrations-toast.service';
     <div class="app-panel">
       <div class="app-panel-header app-panel-header--sky">
         <div class="app-panel-icon-shell app-panel-icon-shell--rounded app-panel-icon-shell--sky">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-sky-600" viewBox="0 0 23 23" fill="currentColor">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-sky-600 dark:text-sky-400" viewBox="0 0 23 23" fill="currentColor">
             <path d="M0 0h11v11H0zM12 0h11v11H12zM0 12h11v11H0zM12 12h11v11H12z"/>
           </svg>
         </div>
         <div class="flex-1 min-w-0">
-          <h3 class="text-base font-semibold text-gray-900">Microsoft 365 / Entra ID</h3>
-          <p class="text-sm text-gray-500">SSO login &amp; send email via Microsoft Graph (Mail.Send).</p>
+          <h3 class="text-base font-semibold text-gray-900 dark:text-ink">Microsoft 365 / Entra ID</h3>
+          <p class="text-sm text-gray-500 dark:text-muted">SSO login &amp; send email via Microsoft Graph (Mail.Send).</p>
         </div>
         <div>
           @if (status()?.configured) {
-            <span class="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700 ring-1 ring-green-600/20">
+            <span class="inline-flex items-center gap-1.5 rounded-full bg-green-50 dark:bg-green-500/15 px-2.5 py-1 text-xs font-medium text-green-700 dark:text-green-400 ring-1 ring-green-600/20">
               <span class="h-1.5 w-1.5 rounded-full bg-green-500"></span>
               Configured
             </span>
           } @else {
-            <span class="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-600 ring-1 ring-gray-500/10">
+            <span class="inline-flex items-center gap-1.5 rounded-full bg-gray-50 dark:bg-bg-2 px-2.5 py-1 text-xs font-medium text-gray-600 dark:text-ink-dim ring-1 ring-gray-500/10">
               <span class="h-1.5 w-1.5 rounded-full bg-gray-400"></span>
               Not Configured
             </span>
@@ -47,7 +47,7 @@ import { IntegrationsToastService } from './integrations-toast.service';
 
       <div class="px-6 py-5">
         @if (msSaveSuccess()) {
-          <div class="mb-4 flex items-center gap-2 rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-700">
+          <div class="mb-4 flex items-center gap-2 rounded-lg bg-green-50 dark:bg-green-500/15 border border-green-200 dark:border-green-500/30 p-3 text-sm text-green-700 dark:text-green-400">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
             </svg>
@@ -55,7 +55,7 @@ import { IntegrationsToastService } from './integrations-toast.service';
           </div>
         }
         @if (msSaveError()) {
-          <div class="mb-4 flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+          <div class="mb-4 flex items-center gap-2 rounded-lg bg-red-50 dark:bg-red-500/15 border border-red-200 dark:border-red-500/30 p-3 text-sm text-red-700 dark:text-red-400">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
             </svg>
@@ -64,33 +64,33 @@ import { IntegrationsToastService } from './integrations-toast.service';
         }
 
         @if (status()?.configured) {
-          <div class="mb-4 text-sm text-gray-500 space-y-1">
-            <p><span class="font-medium text-gray-700">Client ID:</span> {{ status()?.msClientId }}</p>
-            <p><span class="font-medium text-gray-700">Tenant ID:</span> {{ status()?.msTenantId || 'common' }}</p>
+          <div class="mb-4 text-sm text-gray-500 dark:text-muted space-y-1">
+            <p><span class="font-medium text-gray-700 dark:text-ink-dim">Client ID:</span> {{ status()?.msClientId }}</p>
+            <p><span class="font-medium text-gray-700 dark:text-ink-dim">Tenant ID:</span> {{ status()?.msTenantId || 'common' }}</p>
             @if (status()?.updatedBy) {
-              <p class="text-xs text-gray-400">Last updated by {{ status()?.updatedBy }}</p>
+              <p class="text-xs text-gray-400 dark:text-muted">Last updated by {{ status()?.updatedBy }}</p>
             }
           </div>
         }
 
         <div class="grid gap-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700">Tenant ID (Directory ID)</label>
+            <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">Tenant ID (Directory ID)</label>
             <input type="text" [ngModel]="msTenantId()" (ngModelChange)="msTenantId.set($event)"
-              class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+              class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm font-mono focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
               placeholder="e.g. 72f988bf-86f1-41af-91ab-2d7cd011db47" />
-            <p class="mt-1 text-xs text-gray-500">Azure Portal → Microsoft Entra ID → Overview.</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-muted">Azure Portal → Microsoft Entra ID → Overview.</p>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700">Client ID (Application ID)</label>
+            <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">Client ID (Application ID)</label>
             <input type="text" [ngModel]="msClientId()" (ngModelChange)="msClientId.set($event)"
-              class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+              class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm font-mono focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
               placeholder="e.g. 6731de76-14a6-49ae-97bc-6eba6914391e" />
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700">Client Secret</label>
+            <label class="block text-sm font-medium text-gray-700 dark:text-ink-dim">Client Secret</label>
             <input type="password" [ngModel]="msClientSecret()" (ngModelChange)="msClientSecret.set($event)"
-              class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+              class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
               [placeholder]="status()?.configured ? 'Enter new secret to update' : 'Enter client secret'"
               autocomplete="new-password" />
           </div>
@@ -109,7 +109,7 @@ import { IntegrationsToastService } from './integrations-toast.service';
               Save Microsoft Settings
             }
           </button>
-          <span class="text-xs text-gray-400">Credentials are stored encrypted. Enable SSO in Security settings.</span>
+          <span class="text-xs text-gray-400 dark:text-muted">Credentials are stored encrypted. Enable SSO in Security settings.</span>
         </div>
       </div>
     </div>

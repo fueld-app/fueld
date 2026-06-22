@@ -25,10 +25,12 @@ test('record a payment and order becomes paid', async ({ page }) => {
   await createOrderFromInquiry(page);
 
   // Record a payment sufficient to cover the order total (100 MT × $500 = $50,000)
-  await page.getByRole('button', { name: 'Add payment' }).click();
+  const addPaymentBtn = page.getByRole('button', { name: 'Add payment' });
+  await addPaymentBtn.scrollIntoViewIfNeeded();
+  await addPaymentBtn.click();
 
   const heading = page.getByRole('heading', { name: 'Record payment' });
-  await expect(heading).toBeVisible();
+  await expect(heading).toBeVisible({ timeout: 15_000 });
   const modal = heading.locator('..').locator('..');
 
   await modal.locator('input[type="number"]').fill('50000');

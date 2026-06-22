@@ -26,39 +26,39 @@ import { AppHealthService } from '@app/core/runtime/app-health.service';
     <div class="space-y-6 p-6">
       <div class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 class="text-2xl font-bold text-gray-900">Backup & Restore</h1>
-          <p class="text-sm text-gray-500">
+          <h1 class="text-2xl font-bold text-gray-900 dark:text-ink">Backup & Restore</h1>
+          <p class="text-sm text-gray-500 dark:text-muted">
             Full-instance encrypted export and destructive restore for VPS migration.
           </p>
         </div>
         <button
           (click)="refresh()"
           [disabled]="loading()"
-          class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          class="rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint disabled:opacity-50"
         >
           {{ loading() ? 'Refreshing…' : 'Refresh Status' }}
         </button>
       </div>
 
       @if (error()) {
-        <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div class="rounded-xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 px-4 py-3 text-sm text-red-700 dark:text-red-400">
           {{ error() }}
         </div>
       }
 
       <div class="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
-        <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+        <section class="rounded-2xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-6 shadow-sm">
           <div class="flex items-center justify-between gap-4">
             <div>
-              <h2 class="text-lg font-semibold text-gray-900">Server Status</h2>
-              <p class="text-sm text-gray-500">Runtime restore state, versioning, and command prerequisites.</p>
+              <h2 class="text-lg font-semibold text-gray-900 dark:text-ink">Server Status</h2>
+              <p class="text-sm text-gray-500 dark:text-muted">Runtime restore state, versioning, and command prerequisites.</p>
             </div>
             @if (status()?.restoreInProgress) {
-              <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-amber-800">
+              <span class="rounded-full bg-amber-100 dark:bg-amber-500/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">
                 Restore In Progress
               </span>
             } @else {
-              <span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-800">
+              <span class="rounded-full bg-emerald-100 dark:bg-emerald-500/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">
                 Ready
               </span>
             }
@@ -66,26 +66,26 @@ import { AppHealthService } from '@app/core/runtime/app-health.service';
 
           @if (capabilities(); as caps) {
             <div class="mt-6 grid gap-4 md:grid-cols-2">
-              <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Versions</p>
+              <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 p-4">
+                <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Versions</p>
                 <dl class="mt-3 space-y-2 text-sm">
-                  <div class="flex justify-between gap-4"><dt class="text-gray-500">App</dt><dd class="font-mono text-gray-900">{{ caps.current.appVersion }}</dd></div>
-                  <div class="flex justify-between gap-4"><dt class="text-gray-500">Deploy</dt><dd class="font-mono text-gray-900">{{ caps.current.deployVersion }}</dd></div>
-                  <div class="flex justify-between gap-4"><dt class="text-gray-500">Schema</dt><dd class="font-mono text-gray-900">{{ caps.current.schemaVersion }}</dd></div>
-                  <div class="flex justify-between gap-4"><dt class="text-gray-500">Format</dt><dd class="font-mono text-gray-900">v{{ caps.current.backupFormatVersion }}</dd></div>
+                  <div class="flex justify-between gap-4"><dt class="text-gray-500 dark:text-muted">App</dt><dd class="font-mono text-gray-900 dark:text-ink">{{ caps.current.appVersion }}</dd></div>
+                  <div class="flex justify-between gap-4"><dt class="text-gray-500 dark:text-muted">Deploy</dt><dd class="font-mono text-gray-900 dark:text-ink">{{ caps.current.deployVersion }}</dd></div>
+                  <div class="flex justify-between gap-4"><dt class="text-gray-500 dark:text-muted">Schema</dt><dd class="font-mono text-gray-900 dark:text-ink">{{ caps.current.schemaVersion }}</dd></div>
+                  <div class="flex justify-between gap-4"><dt class="text-gray-500 dark:text-muted">Format</dt><dd class="font-mono text-gray-900 dark:text-ink">v{{ caps.current.backupFormatVersion }}</dd></div>
                 </dl>
               </div>
 
-              <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Prerequisites</p>
+              <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 p-4">
+                <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Prerequisites</p>
                 <div class="mt-3 space-y-2 text-sm">
-                  <div class="flex items-center justify-between gap-4"><span class="text-gray-500">pg_dump</span><strong [class]="caps.commands.pgDump ? okClass : badClass">{{ yesNo(caps.commands.pgDump) }}</strong></div>
-                  <div class="flex items-center justify-between gap-4"><span class="text-gray-500">psql</span><strong [class]="caps.commands.psql ? okClass : badClass">{{ yesNo(caps.commands.psql) }}</strong></div>
-                  <div class="flex items-center justify-between gap-4"><span class="text-gray-500">tar</span><strong [class]="caps.commands.tar ? okClass : badClass">{{ yesNo(caps.commands.tar) }}</strong></div>
-                  <div class="flex items-center justify-between gap-4"><span class="text-gray-500">Database URL</span><strong [class]="caps.prerequisites.databaseUrlConfigured ? okClass : badClass">{{ yesNo(caps.prerequisites.databaseUrlConfigured) }}</strong></div>
-                  <div class="flex items-center justify-between gap-4"><span class="text-gray-500">Credential encryption</span><strong [class]="caps.prerequisites.credentialEncryptionAvailable ? okClass : badClass">{{ credentialEncryptionLabel(caps) }}</strong></div>
+                  <div class="flex items-center justify-between gap-4"><span class="text-gray-500 dark:text-muted">pg_dump</span><strong [class]="caps.commands.pgDump ? okClass : badClass">{{ yesNo(caps.commands.pgDump) }}</strong></div>
+                  <div class="flex items-center justify-between gap-4"><span class="text-gray-500 dark:text-muted">psql</span><strong [class]="caps.commands.psql ? okClass : badClass">{{ yesNo(caps.commands.psql) }}</strong></div>
+                  <div class="flex items-center justify-between gap-4"><span class="text-gray-500 dark:text-muted">tar</span><strong [class]="caps.commands.tar ? okClass : badClass">{{ yesNo(caps.commands.tar) }}</strong></div>
+                  <div class="flex items-center justify-between gap-4"><span class="text-gray-500 dark:text-muted">Database URL</span><strong [class]="caps.prerequisites.databaseUrlConfigured ? okClass : badClass">{{ yesNo(caps.prerequisites.databaseUrlConfigured) }}</strong></div>
+                  <div class="flex items-center justify-between gap-4"><span class="text-gray-500 dark:text-muted">Credential encryption</span><strong [class]="caps.prerequisites.credentialEncryptionAvailable ? okClass : badClass">{{ credentialEncryptionLabel(caps) }}</strong></div>
                 </div>
-                <p class="mt-3 text-xs text-gray-500">
+                <p class="mt-3 text-xs text-gray-500 dark:text-muted">
                   {{ caps.runtime.mode === 'production'
                     ? 'Production requires an explicit CREDENTIALS_ENCRYPTION_KEY.'
                     : 'Local development can fall back to DATABASE_URL, but an explicit key is recommended for portable restores.' }}
@@ -93,112 +93,112 @@ import { AppHealthService } from '@app/core/runtime/app-health.service';
               </div>
 
               @if (appHealth(); as health) {
-                <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 md:col-span-2">
-                  <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Build Info</p>
+                <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50 dark:bg-bg-2 p-4 md:col-span-2">
+                  <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Build Info</p>
                   <dl class="mt-3 grid gap-3 text-sm md:grid-cols-2 xl:grid-cols-4">
                     <div>
-                      <dt class="text-gray-500">Build time</dt>
-                      <dd class="mt-1 text-gray-900">{{ health.buildTime | date:'medium' }}</dd>
+                      <dt class="text-gray-500 dark:text-muted">Build time</dt>
+                      <dd class="mt-1 text-gray-900 dark:text-ink">{{ health.buildTime | date:'medium' }}</dd>
                     </div>
                     <div>
-                      <dt class="text-gray-500">Git SHA</dt>
-                      <dd class="mt-1 font-mono text-gray-900" [title]="health.gitSha">{{ shortSha(health.gitSha) }}</dd>
+                      <dt class="text-gray-500 dark:text-muted">Git SHA</dt>
+                      <dd class="mt-1 font-mono text-gray-900 dark:text-ink" [title]="health.gitSha">{{ shortSha(health.gitSha) }}</dd>
                     </div>
                     <div>
-                      <dt class="text-gray-500">Schema version</dt>
-                      <dd class="mt-1 font-mono text-gray-900">{{ caps.current.schemaVersion }}</dd>
+                      <dt class="text-gray-500 dark:text-muted">Schema version</dt>
+                      <dd class="mt-1 font-mono text-gray-900 dark:text-ink">{{ caps.current.schemaVersion }}</dd>
                     </div>
                     <div>
-                      <dt class="text-gray-500">Deploy version</dt>
-                      <dd class="mt-1 font-mono text-gray-900" [title]="health.deployVersion">{{ health.deployVersion }}</dd>
+                      <dt class="text-gray-500 dark:text-muted">Deploy version</dt>
+                      <dd class="mt-1 font-mono text-gray-900 dark:text-ink" [title]="health.deployVersion">{{ health.deployVersion }}</dd>
                     </div>
                   </dl>
                 </div>
               }
             </div>
 
-            <div class="mt-4 rounded-xl border border-dashed border-gray-300 p-4 text-sm text-gray-600">
-              <p><strong class="text-gray-900">Managed paths</strong></p>
-              <p class="mt-2 font-mono text-xs text-gray-500">{{ caps.paths.uploadsRoot }}</p>
-              <p class="font-mono text-xs text-gray-500">{{ caps.paths.promptsDir }}</p>
+            <div class="mt-4 rounded-xl border border-dashed border-gray-300 dark:border-line-strong p-4 text-sm text-gray-600 dark:text-ink-dim">
+              <p><strong class="text-gray-900 dark:text-ink">Managed paths</strong></p>
+              <p class="mt-2 font-mono text-xs text-gray-500 dark:text-muted">{{ caps.paths.uploadsRoot }}</p>
+              <p class="font-mono text-xs text-gray-500 dark:text-muted">{{ caps.paths.promptsDir }}</p>
             </div>
           }
 
           @if (status(); as restoreStatus) {
-            <div class="mt-4 rounded-xl border border-gray-200 p-4 text-sm text-gray-600">
-              <p><strong class="text-gray-900">Restore confirmation phrase</strong></p>
-              <p class="mt-2 font-mono text-sm text-gray-700">{{ restoreStatus.confirmationPhrase }}</p>
+            <div class="mt-4 rounded-xl border border-gray-200 dark:border-line p-4 text-sm text-gray-600 dark:text-ink-dim">
+              <p><strong class="text-gray-900 dark:text-ink">Restore confirmation phrase</strong></p>
+              <p class="mt-2 font-mono text-sm text-gray-700 dark:text-ink-dim">{{ restoreStatus.confirmationPhrase }}</p>
               @if (restoreStatus.startedAt) {
-                <p class="mt-2 text-xs text-gray-500">Started {{ restoreStatus.startedAt | date:'medium' }}</p>
+                <p class="mt-2 text-xs text-gray-500 dark:text-muted">Started {{ restoreStatus.startedAt | date:'medium' }}</p>
               }
             </div>
           }
         </section>
 
         <section class="space-y-6">
-          <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 class="text-lg font-semibold text-gray-900">Create Backup</h2>
-            <p class="mt-1 text-sm text-gray-500">Exports database, uploads, and prompt markdown files into an encrypted archive.</p>
+          <div class="rounded-2xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-6 shadow-sm">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-ink">Create Backup</h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-muted">Exports database, uploads, and prompt markdown files into an encrypted archive.</p>
 
-            <label class="mt-4 block text-sm font-medium text-gray-700">Archive password</label>
+            <label class="mt-4 block text-sm font-medium text-gray-700 dark:text-ink-dim">Archive password</label>
             <input
               type="password"
               [(ngModel)]="exportPassword"
               autocomplete="new-password"
               autocapitalize="off"
               spellcheck="false"
-              class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+              class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
               placeholder="Minimum 8 characters"
             />
 
             <button
               (click)="exportBackup()"
               [disabled]="exporting() || !canExport()"
-              class="mt-4 w-full rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+              class="mt-4 w-full rounded-lg bg-brand-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-800 disabled:opacity-50"
             >
               {{ exporting() ? 'Building Backup…' : 'Download Encrypted Backup' }}
             </button>
           </div>
 
-          <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 class="text-lg font-semibold text-gray-900">Validate Archive</h2>
-            <p class="mt-1 text-sm text-gray-500">Checks format, schema compatibility, and restore prerequisites before you replace live data.</p>
+          <div class="rounded-2xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-6 shadow-sm">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-ink">Validate Archive</h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-muted">Checks format, schema compatibility, and restore prerequisites before you replace live data.</p>
 
-            <label class="mt-4 block text-sm font-medium text-gray-700">Backup file</label>
+            <label class="mt-4 block text-sm font-medium text-gray-700 dark:text-ink-dim">Backup file</label>
             <div class="mt-1 flex items-center gap-3">
-              <label class="inline-flex cursor-pointer items-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+              <label class="inline-flex cursor-pointer items-center rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-4 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint">
                 <input type="file" class="sr-only" (change)="onFileChange($event)" />
                 Choose Backup File
               </label>
-              <span class="min-w-0 truncate text-sm text-gray-500">
+              <span class="min-w-0 truncate text-sm text-gray-500 dark:text-muted">
                 {{ selectedFile()?.name ?? 'No file chosen' }}
               </span>
             </div>
             @if (selectedFile()) {
-              <p class="mt-2 text-xs text-gray-500">{{ selectedFile()?.name }} • {{ formatBytes(selectedFile()?.size ?? 0) }}</p>
+              <p class="mt-2 text-xs text-gray-500 dark:text-muted">{{ selectedFile()?.name }} • {{ formatBytes(selectedFile()?.size ?? 0) }}</p>
             }
 
-            <label class="mt-4 block text-sm font-medium text-gray-700">Archive password</label>
+            <label class="mt-4 block text-sm font-medium text-gray-700 dark:text-ink-dim">Archive password</label>
             <input
               type="password"
               [(ngModel)]="importPassword"
               autocomplete="new-password"
               autocapitalize="off"
               spellcheck="false"
-              class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+              class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm outline-none focus:border-brand-600 focus:ring-1 focus:ring-brand-600"
             />
 
             <div class="mt-4 flex gap-3">
               <button
                 (click)="validateArchive()"
                 [disabled]="validating() || !canValidate()"
-                class="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                class="flex-1 rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint disabled:opacity-50"
               >
                 {{ validating() ? 'Validating…' : 'Validate Backup' }}
               </button>
               <button
                 (click)="clearValidation()"
-                class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                class="rounded-lg border border-gray-300 dark:border-line-strong bg-white dark:bg-surface px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint"
               >
                 Clear
               </button>
@@ -206,20 +206,20 @@ import { AppHealthService } from '@app/core/runtime/app-health.service';
 
             @if (validation(); as result) {
               <div class="mt-5 space-y-4 rounded-xl border p-4"
-                [class]="result.compatible ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'">
+                [class]="result.compatible ? 'border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/15' : 'border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15'">
                 <div class="flex items-center justify-between gap-4">
-                  <strong [class]="result.compatible ? 'text-emerald-800' : 'text-red-800'">
+                  <strong [class]="result.compatible ? 'text-emerald-800 dark:text-emerald-300' : 'text-red-800 dark:text-red-300'">
                     {{ result.compatible ? 'Backup is compatible' : 'Backup is not compatible' }}
                   </strong>
                   @if (result.manifest) {
-                    <span class="font-mono text-xs text-gray-600">{{ result.manifest.schemaVersion }}</span>
+                    <span class="font-mono text-xs text-gray-600 dark:text-ink-dim">{{ result.manifest.schemaVersion }}</span>
                   }
                 </div>
 
                 @if (result.issues.length) {
                   <div>
-                    <p class="text-xs font-semibold uppercase tracking-wide text-red-700">Issues</p>
-                    <ul class="mt-2 space-y-1 text-sm text-red-700">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-red-700 dark:text-red-400">Issues</p>
+                    <ul class="mt-2 space-y-1 text-sm text-red-700 dark:text-red-400">
                       @for (issue of result.issues; track issue) {
                         <li>• {{ issue }}</li>
                       }
@@ -229,8 +229,8 @@ import { AppHealthService } from '@app/core/runtime/app-health.service';
 
                 @if (result.warnings.length) {
                   <div>
-                    <p class="text-xs font-semibold uppercase tracking-wide text-amber-700">Warnings</p>
-                    <ul class="mt-2 space-y-1 text-sm text-amber-700">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">Warnings</p>
+                    <ul class="mt-2 space-y-1 text-sm text-amber-700 dark:text-amber-400">
                       @for (warning of result.warnings; track warning) {
                         <li>• {{ warning }}</li>
                       }
@@ -239,28 +239,28 @@ import { AppHealthService } from '@app/core/runtime/app-health.service';
                 }
 
                 @if (result.manifest) {
-                  <div class="grid gap-3 rounded-lg border border-white/60 bg-white/70 p-3 text-sm text-gray-700 md:grid-cols-2">
-                    <div><span class="text-gray-500">App version</span><p class="font-mono">{{ result.manifest.appVersion }}</p></div>
-                    <div><span class="text-gray-500">Created</span><p>{{ result.manifest.createdAt | date:'medium' }}</p></div>
-                    <div><span class="text-gray-500">Uploads</span><p>{{ result.manifest.contents.uploadFileCount ?? 0 }} files</p></div>
-                    <div><span class="text-gray-500">Prompts</span><p>{{ result.manifest.contents.promptFileCount ?? 0 }} files</p></div>
+                  <div class="grid gap-3 rounded-lg border border-white/60 bg-white/70 p-3 text-sm text-gray-700 dark:text-ink-dim md:grid-cols-2">
+                    <div><span class="text-gray-500 dark:text-muted">App version</span><p class="font-mono">{{ result.manifest.appVersion }}</p></div>
+                    <div><span class="text-gray-500 dark:text-muted">Created</span><p>{{ result.manifest.createdAt | date:'medium' }}</p></div>
+                    <div><span class="text-gray-500 dark:text-muted">Uploads</span><p>{{ result.manifest.contents.uploadFileCount ?? 0 }} files</p></div>
+                    <div><span class="text-gray-500 dark:text-muted">Prompts</span><p>{{ result.manifest.contents.promptFileCount ?? 0 }} files</p></div>
                   </div>
                 }
               </div>
             }
           </div>
 
-          <div class="rounded-2xl border border-red-200 bg-red-50 p-6 shadow-sm">
-            <h2 class="text-lg font-semibold text-red-900">Restore Backup</h2>
-            <p class="mt-1 text-sm text-red-800">
+          <div class="rounded-2xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/15 p-6 shadow-sm">
+            <h2 class="text-lg font-semibold text-red-900 dark:text-red-300">Restore Backup</h2>
+            <p class="mt-1 text-sm text-red-800 dark:text-red-300">
               This fully replaces the current database, deletes target-only uploads and prompts, and cannot be undone by the app.
             </p>
 
-            <label class="mt-4 block text-sm font-medium text-red-900">Confirmation phrase</label>
+            <label class="mt-4 block text-sm font-medium text-red-900 dark:text-red-300">Confirmation phrase</label>
             <input
               type="text"
               [(ngModel)]="restoreConfirmation"
-              class="mt-1 w-full rounded-lg border border-red-300 bg-white px-3 py-2 font-mono text-sm outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+              class="mt-1 w-full rounded-lg border border-red-300 bg-white dark:bg-surface px-3 py-2 font-mono text-sm outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
               [placeholder]="status()?.confirmationPhrase ?? 'RESTORE ALL DATA'"
             />
 

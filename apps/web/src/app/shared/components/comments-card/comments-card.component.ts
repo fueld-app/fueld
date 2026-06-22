@@ -45,9 +45,9 @@ interface Comment {
     <div class="app-panel h-[420px] flex flex-col overflow-hidden">
       <!-- Header -->
       <div class="app-panel-header app-panel-header--blue justify-between px-5 py-3">
-        <h2 class="text-sm font-semibold text-gray-700">Comments</h2>
+        <h2 class="text-sm font-semibold text-gray-700 dark:text-ink-dim">Comments</h2>
         @if (comments().length) {
-          <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
+          <span class="inline-flex items-center rounded-full bg-gray-100 dark:bg-surface-3 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:text-ink-dim">
             {{ comments().length }}
           </span>
         }
@@ -56,7 +56,7 @@ interface Comment {
       <!-- Comment input -->
       <div class="border-b border-gray-50 px-5 py-3 shrink-0">
         <div class="flex gap-3">
-          <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-medium text-brand-700">
+          <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-100 dark:bg-brand-700/15 text-xs font-medium text-brand-700 dark:text-brand-400">
             {{ currentUserInitials() }}
           </div>
           <div class="min-w-0 flex-1">
@@ -64,29 +64,29 @@ interface Comment {
               [(ngModel)]="newContent"
               placeholder="Write a comment…"
               rows="2"
-              class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none resize-none"
+              class="w-full rounded-lg border border-gray-200 dark:border-line px-3 py-2 text-sm text-gray-700 dark:text-ink-dim placeholder-gray-400 focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none resize-none"
             ></textarea>
 
             <div class="mt-1.5 flex items-center gap-3 flex-wrap">
               @if (enableFollowUp()) {
                 <!-- Follow-up date row -->
-                <label class="inline-flex h-8 items-center gap-1.5 text-xs text-gray-500 cursor-pointer select-none">
+                <label class="inline-flex h-8 items-center gap-1.5 text-xs text-gray-500 dark:text-muted cursor-pointer select-none">
                   <input
                     type="checkbox"
                     [checked]="showFollowUpInput()"
                     (change)="toggleFollowUpInput()"
-                    class="h-3.5 w-3.5 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                    class="h-3.5 w-3.5 rounded border-gray-300 dark:border-line-strong text-amber-600 dark:text-amber-400 focus:ring-amber-500"
                   />
                   Follow-up
                 </label>
                 @if (showFollowUpInput()) {
-                  <div class="inline-flex h-8 items-center gap-1 rounded-md border border-gray-200 bg-white px-2 text-xs text-gray-600">
+                  <div class="inline-flex h-8 items-center gap-1 rounded-md border border-gray-200 dark:border-line bg-white dark:bg-surface px-2 text-xs text-gray-600 dark:text-ink-dim">
                     <span>in</span>
                     <input
                       type="number"
                       [ngModel]="newFollowUpDays"
                       (ngModelChange)="onFollowUpDaysChange($event)"
-                      class="h-full w-16 border-0 bg-transparent p-0 text-right text-xs font-medium leading-none text-gray-700 outline-none focus:ring-0"
+                      class="h-full w-16 border-0 bg-transparent p-0 text-right text-xs font-medium leading-none text-gray-700 dark:text-ink-dim outline-none focus:ring-0"
                     />
                     <span>days</span>
                   </div>
@@ -94,7 +94,7 @@ interface Comment {
                     type="date"
                     [ngModel]="newFollowUpDate"
                     (ngModelChange)="onFollowUpDateChange($event)"
-                    class="h-8 rounded-md border border-gray-200 px-2 text-xs leading-none text-gray-700 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
+                    class="h-8 rounded-md border border-gray-200 dark:border-line px-2 text-xs leading-none text-gray-700 dark:text-ink-dim focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
                   />
                 }
               }
@@ -102,7 +102,7 @@ interface Comment {
                 <button
                   (click)="addComment()"
                   [disabled]="!newContent.trim() || saving()"
-                  class="inline-flex h-8 items-center rounded-lg bg-brand-600 px-3 text-xs font-medium text-white hover:bg-brand-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  class="inline-flex h-8 items-center rounded-lg bg-brand-700 px-3 text-xs font-medium text-white hover:bg-brand-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   @if (saving()) {
                     <svg class="inline h-3.5 w-3.5 animate-spin mr-1" viewBox="0 0 24 24" fill="none">
@@ -121,7 +121,7 @@ interface Comment {
       <!-- Comments list -->
       @if (loading()) {
         <div class="flex-1 min-h-0 flex items-center justify-center py-8">
-          <svg class="h-5 w-5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+          <svg class="h-5 w-5 animate-spin text-gray-400 dark:text-muted" viewBox="0 0 24 24" fill="none">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
           </svg>
@@ -132,17 +132,17 @@ interface Comment {
             <div class="px-5 py-3 group hover:bg-gray-50/50 transition-colors">
               <div class="flex items-start gap-3">
                 <!-- Avatar -->
-                <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-xs font-medium text-gray-600">
+                <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 dark:bg-surface-3 text-xs font-medium text-gray-600 dark:text-ink-dim">
                   {{ initials(c.userName) }}
                 </div>
 
                 <!-- Content -->
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center gap-2">
-                    <span class="text-sm font-medium text-gray-900">{{ c.userName }}</span>
-                    <span class="text-[11px] text-gray-400">{{ c.createdAt | date:'short' }}</span>
+                    <span class="text-sm font-medium text-gray-900 dark:text-ink">{{ c.userName }}</span>
+                    <span class="text-[11px] text-gray-400 dark:text-muted">{{ c.createdAt | date:'short' }}</span>
                     @if (c.updatedAt !== c.createdAt) {
-                      <span class="text-[10px] text-gray-400 italic">(edited)</span>
+                      <span class="text-[10px] text-gray-400 dark:text-muted italic">(edited)</span>
                     }
                   </div>
 
@@ -151,27 +151,27 @@ interface Comment {
                     <textarea
                       [(ngModel)]="editContent"
                       rows="2"
-                      class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none resize-none"
+                      class="mt-1 w-full rounded-lg border border-gray-200 dark:border-line px-3 py-2 text-sm text-gray-700 dark:text-ink-dim focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none resize-none"
                     ></textarea>
                     <div class="mt-1.5 flex items-center gap-3 flex-wrap">
                       @if (enableFollowUp()) {
-                        <label class="inline-flex h-8 items-center gap-1.5 text-xs text-gray-500 cursor-pointer select-none">
+                        <label class="inline-flex h-8 items-center gap-1.5 text-xs text-gray-500 dark:text-muted cursor-pointer select-none">
                           <input
                             type="checkbox"
                             [checked]="editShowFollowUpInput()"
                             (change)="toggleEditFollowUpInput()"
-                            class="h-3.5 w-3.5 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                            class="h-3.5 w-3.5 rounded border-gray-300 dark:border-line-strong text-amber-600 dark:text-amber-400 focus:ring-amber-500"
                           />
                           Follow-up
                         </label>
                         @if (editShowFollowUpInput()) {
-                          <div class="inline-flex h-8 items-center gap-1 rounded-md border border-gray-200 bg-white px-2 text-xs text-gray-600">
+                          <div class="inline-flex h-8 items-center gap-1 rounded-md border border-gray-200 dark:border-line bg-white dark:bg-surface px-2 text-xs text-gray-600 dark:text-ink-dim">
                             <span>in</span>
                             <input
                               type="number"
                               [ngModel]="editFollowUpDays"
                               (ngModelChange)="onEditFollowUpDaysChange($event)"
-                              class="h-full w-16 border-0 bg-transparent p-0 text-right text-xs font-medium leading-none text-gray-700 outline-none focus:ring-0"
+                              class="h-full w-16 border-0 bg-transparent p-0 text-right text-xs font-medium leading-none text-gray-700 dark:text-ink-dim outline-none focus:ring-0"
                             />
                             <span>days</span>
                           </div>
@@ -179,33 +179,33 @@ interface Comment {
                             type="date"
                             [ngModel]="editFollowUpDate"
                             (ngModelChange)="onEditFollowUpDateChange($event)"
-                            class="h-8 rounded-md border border-gray-200 px-2 text-xs leading-none text-gray-700 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
+                            class="h-8 rounded-md border border-gray-200 dark:border-line px-2 text-xs leading-none text-gray-700 dark:text-ink-dim focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
                           />
                         }
                       }
                       <button
                         (click)="saveEdit(c.id)"
                         [disabled]="!editContent.trim() || saving()"
-                        class="rounded-md bg-brand-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                        class="rounded-md bg-brand-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-brand-800 disabled:opacity-50"
                       >
                         Save
                       </button>
                       <button
                         (click)="cancelEdit()"
-                        class="rounded-md px-2.5 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100"
+                        class="rounded-md px-2.5 py-1 text-xs font-medium text-gray-500 dark:text-muted hover:bg-gray-100 dark:hover:bg-surface-tint-strong"
                       >
                         Cancel
                       </button>
                     </div>
                   } @else {
                     <!-- Display mode -->
-                    <p class="mt-0.5 text-sm text-gray-600 whitespace-pre-line">{{ c.content }}</p>
+                    <p class="mt-0.5 text-sm text-gray-600 dark:text-ink-dim whitespace-pre-line">{{ c.content }}</p>
 
                     <!-- Follow-up badge -->
                     @if (c.followUpDate) {
                       <div class="mt-1.5 flex items-center gap-1.5">
                         @if (c.followUpCompleted) {
-                          <span class="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200 px-2 py-0.5 text-[11px] font-medium text-green-700 line-through">
+                          <span class="inline-flex items-center gap-1 rounded-full bg-green-50 dark:bg-green-500/15 border border-green-200 dark:border-green-500/30 px-2 py-0.5 text-[11px] font-medium text-green-700 dark:text-green-400 line-through">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                               <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
                             </svg>
@@ -224,7 +224,7 @@ interface Comment {
                           <button
                             (click)="markFollowUpDone(c.id)"
                             [disabled]="saving()"
-                            class="rounded-full p-0.5 text-gray-400 hover:bg-green-50 hover:text-green-600 transition-colors"
+                            class="rounded-full p-0.5 text-gray-400 dark:text-muted hover:bg-green-50 dark:hover:bg-green-500/15 hover:text-green-600 transition-colors"
                             title="Mark follow-up done"
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -242,7 +242,7 @@ interface Comment {
                   <div class="shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       (click)="startEdit(c)"
-                      class="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                      class="rounded-md p-1 text-gray-400 dark:text-muted hover:bg-gray-100 dark:hover:bg-surface-tint-strong hover:text-gray-600"
                       title="Edit"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -251,7 +251,7 @@ interface Comment {
                     </button>
                     <button
                       (click)="removeComment(c.id)"
-                      class="rounded-md p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"
+                      class="rounded-md p-1 text-gray-400 dark:text-muted hover:bg-red-50 dark:hover:bg-red-500/15 hover:text-red-500"
                       title="Delete"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -265,7 +265,7 @@ interface Comment {
           }
         </div>
       } @else {
-        <div class="flex-1 min-h-0 px-5 py-8 text-center text-sm text-gray-400">
+        <div class="flex-1 min-h-0 px-5 py-8 text-center text-sm text-gray-400 dark:text-muted">
           No comments yet — be the first to add one.
         </div>
       }
