@@ -321,18 +321,44 @@ import type {
               </td>
               }
 
-              <!-- Delete -->
+              <!-- Reorder + Delete -->
               @if (!readonly()) {
                 <td class="relative w-0 p-0">
-                  <button
-                    (click)="removeRow(i)"
-                    class="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-gray-300 dark:text-muted opacity-0 transition-all hover:bg-red-50 dark:hover:bg-red-500/15 hover:text-red-500 group-hover:opacity-100"
-                    aria-label="Remove item"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                      <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022 1.005 11.36A2.75 2.75 0 0 0 7.763 20h4.474a2.75 2.75 0 0 0 2.744-2.689l1.005-11.36.149.022a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z" clip-rule="evenodd" />
-                    </svg>
-                  </button>
+                  <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 transition-all group-hover:opacity-100">
+                    <button
+                      type="button"
+                      (click)="moveRow(i, -1)"
+                      [disabled]="i === 0"
+                      class="rounded-md p-1 text-gray-300 dark:text-muted transition-all hover:bg-gray-100 dark:hover:bg-surface-tint-strong hover:text-gray-600 disabled:opacity-20 disabled:hover:bg-transparent"
+                      aria-label="Move up"
+                      title="Move up"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M14.77 12.79a.75.75 0 01-1.06-.02L10 8.832 6.29 12.77a.75.75 0 11-1.08-1.04l4.25-4.5a.75.75 0 011.08 0l4.25 4.5a.75.75 0 01-.02 1.06z" clip-rule="evenodd" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      (click)="moveRow(i, 1)"
+                      [disabled]="i === rows().length - 1"
+                      class="rounded-md p-1 text-gray-300 dark:text-muted transition-all hover:bg-gray-100 dark:hover:bg-surface-tint-strong hover:text-gray-600 disabled:opacity-20 disabled:hover:bg-transparent"
+                      aria-label="Move down"
+                      title="Move down"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                      </svg>
+                    </button>
+                    <button
+                      (click)="removeRow(i)"
+                      class="rounded-md p-1 text-gray-300 dark:text-muted transition-all hover:bg-red-50 dark:hover:bg-red-500/15 hover:text-red-500"
+                      aria-label="Remove item"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022 1.005 11.36A2.75 2.75 0 0 0 7.763 20h4.474a2.75 2.75 0 0 0 2.744-2.689l1.005-11.36.149.022a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z" clip-rule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
                 </td>
               }
             </tr>
@@ -411,15 +437,41 @@ import type {
               {{ row.productType || 'New Item' }}
             </span>
             @if (!readonly()) {
-              <button
-                (click)="removeRow(i)"
-                class="rounded-md p-1 text-gray-400 dark:text-muted hover:bg-red-50 dark:hover:bg-red-500/15 hover:text-red-500"
-                aria-label="Remove item"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
-                </svg>
-              </button>
+              <div class="flex items-center gap-1">
+                <button
+                  type="button"
+                  (click)="moveRow(i, -1)"
+                  [disabled]="i === 0"
+                  class="rounded-md p-1 text-gray-400 dark:text-muted hover:bg-gray-100 dark:hover:bg-surface-tint-strong disabled:opacity-30"
+                  aria-label="Move up"
+                  title="Move up"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M14.77 12.79a.75.75 0 01-1.06-.02L10 8.832 6.29 12.77a.75.75 0 11-1.08-1.04l4.25-4.5a.75.75 0 011.08 0l4.25 4.5a.75.75 0 01-.02 1.06z" clip-rule="evenodd" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  (click)="moveRow(i, 1)"
+                  [disabled]="i === rows().length - 1"
+                  class="rounded-md p-1 text-gray-400 dark:text-muted hover:bg-gray-100 dark:hover:bg-surface-tint-strong disabled:opacity-30"
+                  aria-label="Move down"
+                  title="Move down"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                  </svg>
+                </button>
+                <button
+                  (click)="removeRow(i)"
+                  class="rounded-md p-1 text-gray-400 dark:text-muted hover:bg-red-50 dark:hover:bg-red-500/15 hover:text-red-500"
+                  aria-label="Remove item"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+                  </svg>
+                </button>
+              </div>
             }
           </div>
 
@@ -1012,6 +1064,18 @@ export class OrderItemsComponent implements OnInit, OnDestroy {
 
   removeRow(index: number): void {
     this.rows.update((prev) => prev.filter((_, i) => i !== index));
+    this.emitChange();
+  }
+
+  /** Move a line item up (dir -1) or down (dir +1); persists via itemsChange. */
+  moveRow(index: number, dir: -1 | 1): void {
+    this.rows.update((prev) => {
+      const target = index + dir;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[target]] = [next[target]!, next[index]!];
+      return next;
+    });
     this.emitChange();
   }
 

@@ -1088,7 +1088,7 @@ export async function getOrderById(idOrNumber: string) {
       row.invoicingCompanyId
         ? getCounterpartyById(row.invoicingCompanyId)
         : Promise.resolve(null),
-      db.select().from(orderItems).where(eq(orderItems.orderId, row.id)),
+      db.select().from(orderItems).where(eq(orderItems.orderId, row.id)).orderBy(asc(orderItems.sortOrder), asc(orderItems.createdAt)),
       row.customerContactId
         ? db
             .select()
@@ -1477,7 +1477,7 @@ export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
   const defaultOrderSupplierId = supplierRows.length === 1 ? supplierRows[0]!.id : null;
 
   // Insert new items with profit calculation (base currency)
-  const values = items.map((item) => {
+  const values = items.map((item, index) => {
     const orderSupplierId = item.orderSupplierId ?? defaultOrderSupplierId;
     if (orderSupplierId && !supplierIds.has(orderSupplierId)) {
       throw new Error('Order item supplier must belong to the same order');
@@ -1511,6 +1511,7 @@ export async function saveOrderItems(orderId: string, items: SaveItemInput[]) {
 
     return {
       orderId,
+      sortOrder: index,
       orderSupplierId: orderSupplierId ?? null,
       productType: item.productType as any,
       quantity: item.quantity,

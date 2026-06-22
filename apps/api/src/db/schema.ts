@@ -967,6 +967,10 @@ export const orderItems = pgTable('order_items', {
   orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
   orderSupplierId: uuid('order_supplier_id').references(() => orderSuppliers.id, { onDelete: 'set null' }),
 
+  // Explicit line-item ordering within an order (move up/down). Assigned
+  // sequentially from the frontend row order on every save.
+  sortOrder: integer('sort_order').notNull().default(0),
+
   productType: text('product_type').notNull(),
   quantity: numeric('quantity', { precision: 12, scale: 3 }).notNull(),
   quantityMin: numeric('quantity_min', { precision: 12, scale: 3 }),
