@@ -330,12 +330,13 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   private readonly newInquiryModal = inject(NewInquiryModalService);
   private queryParamSub?: Subscription;
 
-  readonly mode = input<'inquiries' | 'active-orders' | 'delivered-orders' | 'completed-orders' | 'cancelled-orders' | undefined>('inquiries');
+  readonly mode = input<'inquiries' | 'active-orders' | 'delivered-orders' | 'invoiced-orders' | 'completed-orders' | 'cancelled-orders' | undefined>('inquiries');
   readonly resolvedMode = computed(() => this.mode() ?? 'inquiries');
 
   readonly isOrders = computed(() => this.resolvedMode() !== 'inquiries');
   readonly isActiveOrders = computed(() => this.resolvedMode() === 'active-orders');
   readonly isDeliveredOrders = computed(() => this.resolvedMode() === 'delivered-orders');
+  readonly isInvoicedOrders = computed(() => this.resolvedMode() === 'invoiced-orders');
   readonly isCompletedOrders = computed(() => this.resolvedMode() === 'completed-orders');
   readonly isCancelledOrders = computed(() => this.resolvedMode() === 'cancelled-orders');
   readonly baseRoute = computed(() => (
@@ -343,33 +344,39 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
       ? '/trading/orders'
       : this.isDeliveredOrders()
         ? '/trading/delivered-orders'
-        : this.isCompletedOrders()
-          ? '/trading/completed-orders'
-          : this.isCancelledOrders()
-            ? '/trading/cancelled-orders'
-            : '/trading/inquiries'
+        : this.isInvoicedOrders()
+          ? '/trading/invoiced-orders'
+          : this.isCompletedOrders()
+            ? '/trading/completed-orders'
+            : this.isCancelledOrders()
+              ? '/trading/cancelled-orders'
+              : '/trading/inquiries'
   ));
   readonly titleText = computed(() => (
     this.isActiveOrders()
       ? 'Active Orders'
       : this.isDeliveredOrders()
         ? 'Delivered Orders'
-        : this.isCompletedOrders()
-          ? 'Completed Orders'
-          : this.isCancelledOrders()
-            ? 'Cancelled Orders'
-        : 'Inquiries'
+        : this.isInvoicedOrders()
+          ? 'Invoiced Orders'
+          : this.isCompletedOrders()
+            ? 'Completed Orders'
+            : this.isCancelledOrders()
+              ? 'Cancelled Orders'
+          : 'Inquiries'
   ));
   readonly subtitleText = computed(() =>
     this.isActiveOrders()
-      ? 'Orders waiting for delivery or payment.'
+      ? 'Confirmed orders waiting for delivery.'
       : this.isDeliveredOrders()
         ? 'Orders that have been delivered but not yet invoiced or paid.'
-        : this.isCompletedOrders()
-          ? 'Orders that are paid and delivered.'
-          : this.isCancelledOrders()
-            ? 'Orders that have been cancelled.'
-        : 'Manage bunker inquiries and offers before confirmation.',
+        : this.isInvoicedOrders()
+          ? 'Orders that have been invoiced but not yet paid.'
+          : this.isCompletedOrders()
+            ? 'Orders that are paid and delivered.'
+            : this.isCancelledOrders()
+              ? 'Orders that have been cancelled.'
+          : 'Manage bunker inquiries and offers before confirmation.',
   );
   readonly searchPlaceholder = computed(() =>
     this.isOrders()
@@ -425,7 +432,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
 
   readonly defaultVisibleColumns = computed<string[]>(() => {
     const base = ['orderNumber', 'client', 'vessel', 'port', 'status', 'responsible', 'eta', 'createdAt'];
-    if (this.isDeliveredOrders() || this.isCompletedOrders()) {
+    if (this.isDeliveredOrders() || this.isInvoicedOrders() || this.isCompletedOrders()) {
       base.splice(base.indexOf('eta') + 1, 0, 'dueDate');
     }
     if (this.auth.canSeePrices()) {
@@ -557,9 +564,11 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
     try {
       const params = new URLSearchParams();
       if (this.isActiveOrders()) {
-        params.set('statuses', 'CONFIRMED,INVOICED');
+        params.set('statuses', 'CONFIRMED');
       } else if (this.isDeliveredOrders()) {
         params.set('statuses', 'DELIVERED');
+      } else if (this.isInvoicedOrders()) {
+        params.set('statuses', 'INVOICED');
       } else if (this.isCompletedOrders()) {
         params.set('statuses', 'PAID');
       } else if (this.isCancelledOrders()) {

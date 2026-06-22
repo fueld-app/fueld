@@ -118,6 +118,24 @@ export const routes: Routes = [
             title: 'Trading > Delivered Orders',
           },
           {
+            path: 'orders/invoiced',
+            redirectTo: 'invoiced-orders',
+            pathMatch: 'full',
+          },
+          {
+            path: 'orders/invoiced/:id',
+            redirectTo: 'invoiced-orders/:id',
+            pathMatch: 'full',
+          },
+          {
+            path: 'invoiced-orders',
+            loadComponent: () =>
+              import('./features/trading/pages/invoiced-orders-list/invoiced-orders-list-page.component').then(
+                (m) => m.InvoicedOrdersListPageComponent,
+              ),
+            title: 'Trading > Invoiced Orders',
+          },
+          {
             path: 'orders/completed',
             redirectTo: 'completed-orders',
             pathMatch: 'full',
@@ -168,6 +186,14 @@ export const routes: Routes = [
                 (m) => m.OrderDetailPageComponent,
               ),
             title: 'Trading > Delivered Orders',
+          },
+          {
+            path: 'invoiced-orders/:id',
+            loadComponent: () =>
+              import('./features/trading/pages/order-detail/order-detail-page.component').then(
+                (m) => m.OrderDetailPageComponent,
+              ),
+            title: 'Trading > Invoiced Orders',
           },
           {
             path: 'cancelled-orders/:id',

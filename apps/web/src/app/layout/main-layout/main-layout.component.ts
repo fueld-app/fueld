@@ -213,6 +213,7 @@ const NAVIGATION: NavItem[] = [
     children: [
       { label: 'Active Orders', route: '/trading/orders' },
       { label: 'Delivered Orders', route: '/trading/delivered-orders' },
+      { label: 'Invoiced Orders', route: '/trading/invoiced-orders' },
       { label: 'Completed Orders', route: '/trading/completed-orders' },
       { label: 'Cancelled Orders', route: '/trading/cancelled-orders' },
       { label: 'Inquiries', route: '/trading/inquiries' },
@@ -1249,9 +1250,13 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   private orderDetailRoute(status?: string):
     '/trading/orders'
     | '/trading/inquiries'
+    | '/trading/delivered-orders'
+    | '/trading/invoiced-orders'
     | '/trading/completed-orders'
     | '/trading/cancelled-orders' {
     if (status === 'INQUIRY' || status === 'OFFER') return '/trading/inquiries';
+    if (status === 'DELIVERED') return '/trading/delivered-orders';
+    if (status === 'INVOICED') return '/trading/invoiced-orders';
     if (status === 'PAID') return '/trading/completed-orders';
     if (status === 'CANCELLED') return '/trading/cancelled-orders';
     return '/trading/orders';

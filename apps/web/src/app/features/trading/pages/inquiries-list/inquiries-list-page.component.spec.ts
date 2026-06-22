@@ -99,9 +99,20 @@ describe('InquiriesListPageComponent', () => {
 
     expect(component.activeSortBy()).toBe('eta');
     expect(component.activeSortDir()).toBe('desc');
-    expect(latestOrdersRequest()).toContain('statuses=CONFIRMED%2CINVOICED');
+    expect(latestOrdersRequest()).toContain('statuses=CONFIRMED');
+    expect(latestOrdersRequest()).not.toContain('INVOICED');
     expect(latestOrdersRequest()).toContain('sortBy=eta');
     expect(latestOrdersRequest()).toContain('sortDir=desc');
+  });
+
+  it('loads only INVOICED orders for the invoiced-orders mode', async () => {
+    const fixture = TestBed.createComponent(InquiriesListPageComponent);
+    fixture.componentRef.setInput('mode', 'invoiced-orders');
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(latestOrdersRequest()).toContain('statuses=INVOICED');
+    expect(fixture.componentInstance.titleText()).toBe('Invoiced Orders');
   });
 
   it('shows gross, financing, and net metrics on order lists', async () => {
