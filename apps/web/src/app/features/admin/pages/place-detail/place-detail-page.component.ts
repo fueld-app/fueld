@@ -110,20 +110,19 @@ export class PlaceDetailPageComponent implements OnInit, OnDestroy {
   ] as const;
 
   private routeSub: Subscription | null = null;
+  private loadedId: string | null = null;
 
   ngOnInit(): void {
-    const id = this.route.snapshot.paramMap.get('id');
-    if (id) {
-      void this.store.loadPlace(id);
-    } else {
-      this.store.loading.set(false);
-    }
-
+    // The paramMap subscription fires immediately with the current id, so a
+    // separate snapshot read is redundant — and calling loadPlace twice for
+    // the same id races two HTTP requests whose resetState()/loading flips
+    // tear down the router-outlet (and the Leaflet map card) mid-init.
     this.routeSub = this.route.paramMap.subscribe((params) => {
       const newId = params.get('id');
-      if (newId) {
+      if (newId && newId !== this.loadedId) {
+        this.loadedId = newId;
         void this.store.loadPlace(newId);
-      } else {
+      } else if (!newId) {
         this.store.loading.set(false);
       }
     });
