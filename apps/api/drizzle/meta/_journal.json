@@ -638,6 +638,13 @@
       "when": 1779500000012,
       "tag": "0090_merge_legacy_products_into_catalog",
       "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1779500000013,
+      "tag": "0091_add_vessel_email",
+      "breakpoints": true
     }
   ]
 }

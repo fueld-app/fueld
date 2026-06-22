@@ -549,6 +549,7 @@ export interface VesselDto {
   builder: string | null;
   classificationSociety: string | null;
   phone: string | null;
+  email: string | null;
   lastSynced: string | null;
   sanctionStatus: string | null;
   ignoreForCreditEnforcement: boolean;

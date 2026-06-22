@@ -829,6 +829,7 @@ export const vessels = pgTable('vessels', {
   builder: text('builder'),
   classificationSociety: text('classification_society'),
   phone: text('phone'),
+  email: text('email'),
   sanctionStatus: text('sanction_status').default('UNCHECKED'),
   ignoreForCreditEnforcement: boolean('ignore_for_credit_enforcement').notNull().default(false),
   lastSanctionCheck: timestamp('last_sanction_check', { withTimezone: true }),

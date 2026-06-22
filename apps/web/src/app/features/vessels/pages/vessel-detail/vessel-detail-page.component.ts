@@ -506,6 +506,21 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                     }
                   </div>
                   <div>
+                    <dt class="text-gray-500 dark:text-muted">Email</dt>
+                    @if (editing()) {
+                      <dd class="mt-0.5">
+                        <input type="email" [value]="editEmail()" (input)="editEmail.set($any($event.target).value)"
+                          class="w-full rounded-md border border-gray-300 dark:border-line-strong px-2.5 py-1.5 text-sm font-medium text-gray-900 dark:text-ink focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100" />
+                      </dd>
+                    } @else {
+                      <dd class="mt-0.5 font-medium">
+                        @if (vessel()!.email) {
+                          <a [href]="'mailto:' + vessel()!.email" class="text-brand-700 dark:text-brand-400 hover:text-brand-900 hover:underline transition-colors">{{ vessel()!.email }}</a>
+                        } @else { — }
+                      </dd>
+                    }
+                  </div>
+                  <div>
                     <dt class="text-gray-500 dark:text-muted">Seasearcher ID</dt>
                     <dd class="mt-0.5 font-medium text-gray-900 dark:text-ink font-mono">{{ vessel()!.seasearcherId ?? '—' }}</dd>
                   </div>
@@ -1070,6 +1085,7 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
   readonly editBuilder = signal('');
   readonly editClassification = signal('');
   readonly editPhone = signal('');
+  readonly editEmail = signal('');
   readonly editLoa = signal('');
   readonly editBreadth = signal('');
   readonly editDepth = signal('');
@@ -1717,6 +1733,7 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
     this.editBuilder.set(v.builder ?? '');
     this.editClassification.set(v.classificationSociety ?? '');
     this.editPhone.set(v.phone ?? '');
+    this.editEmail.set(v.email ?? '');
     this.editLoa.set(v.loa != null ? String(v.loa) : '');
     this.editBreadth.set(v.breadth != null ? String(v.breadth) : '');
     this.editDepth.set(v.depth != null ? String(v.depth) : '');
@@ -1744,6 +1761,7 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
       if (this.editBuilder() !== (v.builder ?? '')) body['builder'] = this.editBuilder() || undefined;
       if (this.editClassification() !== (v.classificationSociety ?? '')) body['classificationSociety'] = this.editClassification() || undefined;
       if (this.editPhone() !== (v.phone ?? '')) body['phone'] = this.editPhone() || undefined;
+      if (this.editEmail() !== (v.email ?? '')) body['email'] = this.editEmail() || undefined;
 
       // Numeric fields — parse to number or undefined
       const byStr = this.editBuildYear().trim();

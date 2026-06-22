@@ -248,6 +248,7 @@ export async function updateVessel(
     builder: string;
     classificationSociety: string;
     phone: string;
+    email: string;
     ignoreForCreditEnforcement: boolean;
   }>,
 ) {

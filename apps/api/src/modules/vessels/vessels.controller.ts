@@ -371,6 +371,8 @@ export const vesselsController = new Elysia({ prefix: '/vessels' })
               { field: 'buildYear', value: (vessel) => vessel.buildYear ?? null },
               { field: 'builder', value: (vessel) => vessel.builder ?? null },
               { field: 'classificationSociety', value: (vessel) => vessel.classificationSociety ?? null },
+              { field: 'phone', value: (vessel) => vessel.phone ?? null },
+              { field: 'email', value: (vessel) => vessel.email ?? null },
               {
                 field: 'ignoreForCreditEnforcement',
                 value: (vessel) => vessel.ignoreForCreditEnforcement ?? false,
@@ -413,6 +415,8 @@ export const vesselsController = new Elysia({ prefix: '/vessels' })
         buildYear: t.Optional(t.Number()),
         builder: t.Optional(t.String()),
         classificationSociety: t.Optional(t.String()),
+        phone: t.Optional(t.String()),
+        email: t.Optional(t.String()),
         ignoreForCreditEnforcement: t.Optional(t.Boolean()),
       }),
       detail: {
