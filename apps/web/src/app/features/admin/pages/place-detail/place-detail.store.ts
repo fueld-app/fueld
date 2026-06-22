@@ -389,7 +389,6 @@ export class PlaceDetailStore {
       const p = this.place();
       const enrichment = this.enrichment();
       const container = this.mapContainer();
-      console.log('[PlaceDetailStore] map effect triggered:', { hasPlace: !!p, lat: p?.lat, long: p?.long, hasContainer: !!container, hasMap: !!this.map });
       if (!p?.lat || !p?.long || !container || this.map) return;
       // Poll until the container has a non-zero size, then init the map
       let attempts = 0;
@@ -399,12 +398,9 @@ export class PlaceDetailStore {
         if (!currentContainer || this.map) return;
         const rect = currentContainer.getBoundingClientRect();
         attempts++;
-        console.log(`[PlaceDetailStore] init attempt ${attempts}:`, rect.width, rect.height);
         if (rect.width === 0 || rect.height === 0) {
           if (attempts < maxAttempts) {
             requestAnimationFrame(tryInit);
-          } else {
-            console.warn('[PlaceDetailStore] gave up waiting for container size');
           }
           return;
         }
@@ -629,7 +625,6 @@ export class PlaceDetailStore {
   // ─── Map ─────────────────────────────────────────────────────────
 
   setMapContainer(el: HTMLElement | null): void {
-    console.log('[PlaceDetailStore] setMapContainer:', el, new Error().stack);
     this.mapContainer.set(el);
     if (!el) {
       this.map?.remove();
@@ -641,13 +636,11 @@ export class PlaceDetailStore {
   private initMap(): void {
     const p = this.place();
     const el = this.mapContainer();
-    console.log('[PlaceDetailStore] initMap called:', { hasPlace: !!p, lat: p?.lat, long: p?.long, hasEl: !!el, hasMap: !!this.map });
     if (!p?.lat || !p?.long || !el) return;
     if (this.map) return;
 
     // Ensure the container has a non-zero size before Leaflet measures it
     const rect = el.getBoundingClientRect();
-    console.log('[PlaceDetailStore] initMap container rect:', rect.width, rect.height);
     if (rect.width === 0 || rect.height === 0) return;
 
     delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -657,13 +650,11 @@ export class PlaceDetailStore {
       shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
     });
 
-    console.log('[PlaceDetailStore] creating Leaflet map at', p.lat, p.long);
     this.map = L.map(el, {
       center: [p.lat, p.long],
       zoom: 13,
       scrollWheelZoom: true,
     });
-    console.log('[PlaceDetailStore] Leaflet map created:', !!this.map);
 
     this.tileLayer = swapLeafletTileLayer(L, this.map, null, this.theme.resolved(), {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
