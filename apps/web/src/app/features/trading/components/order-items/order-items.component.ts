@@ -67,7 +67,7 @@ import type {
     <div class="hidden overflow-x-auto md:block">
       <table class="w-full text-sm">
         <thead>
-          <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80">
+          <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80 dark:bg-surface-2">
             <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim min-w-[140px]">Product</th>
             @if (showSupplierColumn()) {
               <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim min-w-[160px]">Supplier</th>
@@ -92,7 +92,7 @@ import type {
         </thead>
         <tbody class="divide-y divide-gray-100 dark:divide-line">
           @for (row of rows(); track row.id; let i = $index) {
-            <tr class="group relative transition-colors hover:bg-gray-50/50 align-top">
+            <tr class="group relative transition-colors hover:bg-gray-50/50 align-top dark:hover:bg-surface-tint">
               <!-- Product -->
               <td class="px-4 py-2">
                 @if (readonly()) {
@@ -368,7 +368,7 @@ import type {
         <!-- Totals row -->
         @if (rows().length > 0) {
           <tfoot>
-            <tr class="border-t-2 border-gray-200 dark:border-line bg-gray-50/50 font-semibold">
+            <tr class="border-t-2 border-gray-200 dark:border-line bg-gray-50/50 font-semibold dark:bg-surface-2">
               <td class="px-4 py-3 text-right text-gray-600 dark:text-ink-dim">Totals</td>
               <td></td>
               <td></td>
@@ -402,7 +402,7 @@ import type {
     <!-- ═════════════════════════════════════════════════════════════ -->
     <!--  Mobile Cards (visible only on mobile)                       -->
     <!-- ═════════════════════════════════════════════════════════════ -->
-    <div class="space-y-3 bg-gray-50/40 p-4 md:hidden">
+    <div class="space-y-3 bg-gray-50/40 p-4 md:hidden dark:bg-surface-2">
       @for (row of rows(); track row.id; let i = $index) {
         <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-4 shadow-sm">
           <!-- Card header -->

@@ -89,7 +89,7 @@ interface PlaceOptionDto {
               <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                   <thead>
-                    <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80">
+                    <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80 dark:bg-surface-2">
                       <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Name</th>
                       <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Role</th>
                       <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Company</th>
@@ -101,7 +101,7 @@ interface PlaceOptionDto {
                   </thead>
                   <tbody class="divide-y divide-gray-100 dark:divide-line">
                     @for (person of filteredPersonnel(); track person.id) {
-                      <tr class="hover:bg-gray-50/50 transition-colors">
+                      <tr class="hover:bg-gray-50/50 transition-colors dark:hover:bg-surface-tint">
                         <td class="px-4 py-3">
                           <div class="font-medium text-gray-900 dark:text-ink">{{ person.fullName }}</div>
                           @if (person.notes) {

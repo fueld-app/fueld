@@ -2,7 +2,6 @@ import {
   Component, ChangeDetectionStrategy, input, signal, inject, ElementRef, viewChild, OnInit,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { DatePipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
 import type { ApiResponse, CompanyAttachmentDto } from '@fueld/types';
 import { API } from '@app/core/config/api';
@@ -11,7 +10,7 @@ import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
 @Component({
   selector: 'app-files-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DateLabelPipe, DatePipe],
+  imports: [DateLabelPipe],
   template: `
     <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm min-[900px]:order-[10]">
       <div class="border-b border-gray-100 dark:border-line px-5 py-3 flex items-center justify-between">
@@ -21,7 +20,7 @@ import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
         </div>
       </div>
       <div class="px-5 py-4 space-y-4">
-        <div class="rounded-lg border border-dashed border-gray-200 dark:border-line bg-gray-50/60 p-4">
+        <div class="rounded-lg border border-dashed border-gray-200 dark:border-line bg-gray-50/60 p-4 dark:bg-surface-2">
           <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div class="min-w-0">
               <input
@@ -55,7 +54,7 @@ import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
         } @else {
           <div class="divide-y divide-gray-100 dark:divide-line overflow-hidden rounded-lg border border-gray-100 dark:border-line bg-white dark:bg-surface">
             @for (a of attachments(); track a.id) {
-              <div class="flex items-start justify-between gap-3 px-4 py-3 text-sm hover:bg-gray-50/70 transition-colors">
+              <div class="flex items-start justify-between gap-3 px-4 py-3 text-sm hover:bg-gray-50/70 transition-colors dark:hover:bg-surface-tint">
                 <div class="min-w-0 flex-1">
                   <button type="button" (click)="open(a)"
                     class="truncate max-w-full text-left font-medium text-brand-700 dark:text-brand-400 hover:text-brand-900 hover:underline">{{ a.fileName }}</button>

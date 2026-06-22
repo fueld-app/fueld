@@ -48,7 +48,7 @@ import { IntegrationsToastService } from './integrations-toast.service';
 
       <!-- Connected Info -->
       @if (status()?.configured) {
-        <div class="border-b border-gray-100 dark:border-line bg-gray-50/50 px-6 py-3">
+        <div class="border-b border-gray-100 dark:border-line bg-gray-50/50 px-6 py-3 dark:bg-surface-2">
           <div class="flex items-center gap-6 text-sm">
             <div>
               <span class="text-gray-500 dark:text-muted">Company:</span>

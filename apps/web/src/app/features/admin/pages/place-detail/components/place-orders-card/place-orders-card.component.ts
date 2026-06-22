@@ -37,7 +37,7 @@ import { StatusBadgeComponent } from '../../../../../../shared/components/status
             @for (order of store.placeOrders(); track order.id) {
               <a
                 [routerLink]="['/orders', order.id]"
-                class="block px-5 py-3 hover:bg-gray-50/50 transition-colors"
+                class="block px-5 py-3 hover:bg-gray-50/50 transition-colors dark:hover:bg-surface-tint"
               >
                 <div class="flex items-center justify-between">
                   <span class="text-sm font-medium text-brand-600 dark:text-brand-400">{{ order.reference ?? 'Order #' + order.id }}</span>

@@ -1,11 +1,11 @@
-import { Injectable, signal, inject } from '@angular/core';
+import { Service, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import type { ApiResponse } from '@fueld/types';
 import type { SupplierInquiryReplyRow, InquirySupplierPerformance } from '../order-detail.types';
 import { API_URL } from '@app/core/config/api';
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class OrderReplyService {
   private readonly http = inject(HttpClient);
 
@@ -100,8 +100,8 @@ export class OrderReplyService {
   }
 
   statusBadgeClass(status: string): string {
-    const map: Record<string, string> = { SENT: 'bg-blue-100 text-blue-700', QUOTED: 'bg-green-100 text-green-700', DECLINED: 'bg-red-100 text-red-700' };
-    return map[status] ?? 'bg-gray-100 text-gray-500';
+    const map: Record<string, string> = { SENT: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400', QUOTED: 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400', DECLINED: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400' };
+    return map[status] ?? 'bg-gray-100 text-gray-500 dark:bg-gray-500/15 dark:text-gray-400';
   }
 
   fmtDate(iso: string): string {

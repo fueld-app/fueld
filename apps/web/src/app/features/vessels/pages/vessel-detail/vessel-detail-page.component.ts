@@ -13,7 +13,7 @@ import {
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { DatePipe, DecimalPipe } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subscription, skip } from 'rxjs';
 import { Title } from '@angular/platform-browser';
@@ -125,7 +125,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
 @Component({
   selector: 'app-vessel-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DateLabelPipe, DatePipe, DecimalPipe, FormsModule, RouterLink, ActivityTimelineComponent, LastEditedBadgeComponent, CommentsCardComponent, VesselDetailCompaniesCardComponent, VesselDetailDeleteModalComponent, VesselDetailMergeModalComponent],
+  imports: [DateLabelPipe, DatePipe, FormsModule, RouterLink, ActivityTimelineComponent, LastEditedBadgeComponent, CommentsCardComponent, VesselDetailCompaniesCardComponent, VesselDetailDeleteModalComponent, VesselDetailMergeModalComponent],
   styles: [`
     :host ::ng-deep .leaflet-container { font-family: inherit; }
   `],
@@ -615,7 +615,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                 <div class="flex-1 min-h-0 overflow-auto">
                   <table class="w-full text-sm">
                     <thead class="sticky top-0 z-10">
-                      <tr class="border-b border-gray-100 dark:border-line bg-gray-50/60">
+                      <tr class="border-b border-gray-100 dark:border-line bg-gray-50/60 dark:bg-surface-2">
                         <th class="px-5 py-2 text-left font-medium text-gray-500 dark:text-muted">Status</th>
                         <th class="px-5 py-2 text-left font-medium text-gray-500 dark:text-muted">Client</th>
                         <th class="px-5 py-2 text-left font-medium text-gray-500 dark:text-muted">Port</th>
@@ -625,7 +625,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                     </thead>
                     <tbody class="divide-y divide-gray-50">
                       @for (o of vesselOrders(); track o.id) {
-                        <tr class="hover:bg-gray-50/50 transition-colors cursor-pointer" (click)="goToOrder(o.id, o.status)">
+                        <tr class="hover:bg-gray-50/50 transition-colors cursor-pointer dark:hover:bg-surface-tint" (click)="goToOrder(o.id, o.status)">
                           <td class="px-5 py-2.5">
                             <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
                               [class]="statusBadgeClass(o.status)">
@@ -929,7 +929,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
                   </thead>
                   <tbody class="divide-y divide-gray-50">
                     @for (m of movements(); track $index) {
-                      <tr class="hover:bg-gray-50/50 transition-colors">
+                      <tr class="hover:bg-gray-50/50 transition-colors dark:hover:bg-surface-tint">
                         <td class="px-5 py-2.5 font-medium">
                           @if (m.placeId || m.place?.id) {
                             <button (click)="navigateToPlace(m.placeId ?? m.place.id)" class="text-blue-700 dark:text-blue-400 hover:text-blue-900 hover:underline transition-colors cursor-pointer text-left">
@@ -1926,11 +1926,11 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
   // ─── Helpers ───────────────────────────────────────────────────────
   statusBadgeClass(status: string): string {
     switch (status) {
-      case 'CONFIRMED': return 'bg-green-100 text-green-700';
-      case 'DELIVERED': return 'bg-blue-100 text-blue-700';
-      case 'INQUIRY': return 'bg-amber-100 text-amber-700';
-      case 'CANCELLED': case 'LOST': return 'bg-red-100 text-red-700';
-      default: return 'bg-gray-100 text-gray-600';
+      case 'CONFIRMED': return 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400';
+      case 'DELIVERED': return 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400';
+      case 'INQUIRY': return 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400';
+      case 'CANCELLED': case 'LOST': return 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400';
+      default: return 'bg-gray-100 text-gray-600 dark:bg-gray-500/15 dark:text-gray-400';
     }
   }
 

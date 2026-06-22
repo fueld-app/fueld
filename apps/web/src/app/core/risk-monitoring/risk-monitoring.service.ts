@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Service, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { API } from '@app/core/config/api';
@@ -11,7 +11,7 @@ import type {
   RiskMonitoringSettingsDto,
 } from '@fueld/types';
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class RiskMonitoringService {
   private readonly http = inject(HttpClient);
 

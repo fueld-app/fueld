@@ -210,7 +210,7 @@ import { DatePipe } from '@angular/common';
               <div class="overflow-x-auto">
                 <table class="min-w-full text-xs">
                   <thead>
-                    <tr class="border-b border-gray-100 dark:border-line bg-gray-50/60">
+                    <tr class="border-b border-gray-100 dark:border-line bg-gray-50/60 dark:bg-surface-2">
                       <th class="px-4 py-2.5 text-left font-medium text-gray-500 dark:text-muted">Vessel</th>
                       <th class="px-4 py-2.5 text-left font-medium text-gray-500 dark:text-muted">IMO</th>
                       <th class="px-4 py-2.5 text-left font-medium text-gray-500 dark:text-muted">Status</th>
@@ -221,7 +221,7 @@ import { DatePipe } from '@angular/common';
                   </thead>
                   <tbody class="divide-y divide-gray-50">
                     @for (c of history(); track c.id) {
-                      <tr class="hover:bg-gray-50/50">
+                      <tr class="hover:bg-gray-50/50 dark:hover:bg-surface-tint">
                         <td class="px-4 py-2 font-medium text-gray-900 dark:text-ink">{{ c.vesselName }}</td>
                         <td class="px-4 py-2 text-gray-500 dark:text-muted font-mono">{{ c.vesselImo || '—' }}</td>
                         <td class="px-4 py-2">

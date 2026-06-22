@@ -1,4 +1,4 @@
-import { Injectable, signal, effect, inject, isDevMode } from '@angular/core';
+import { Service, signal, effect, inject, isDevMode } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { SwPush } from '@angular/service-worker';
 import { firstValueFrom } from 'rxjs';
@@ -19,7 +19,7 @@ interface PushSubscriptionPayload {
   };
 }
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class PushService {
   private readonly http = inject(HttpClient);
   private readonly swPush = inject(SwPush);

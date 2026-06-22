@@ -30,7 +30,7 @@ import { AuthService } from '@app/core/auth/auth.service';
       } @else {
         <ul class="divide-y divide-gray-100 dark:divide-line">
           @for (invoice of overdueInvoices(); track invoice.invoiceId) {
-            <li class="p-5 hover:bg-gray-50/50 transition-colors last:border-b-0">
+            <li class="p-5 hover:bg-gray-50/50 transition-colors last:border-b-0 dark:hover:bg-surface-tint">
               <div class="flex justify-between items-start">
                 <div>
                   <p class="text-sm font-medium text-gray-900 dark:text-ink">{{ invoice.invoiceNumber }}</p>

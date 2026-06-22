@@ -1,4 +1,4 @@
-import { Injectable, signal, computed, inject } from '@angular/core';
+import { Service, signal, computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { API_URL } from '../config/api';
@@ -8,7 +8,7 @@ export type DateFormatSetting = 'AMERICAN' | 'EUROPEAN' | 'ISO';
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /** Shared service for tenant-configurable date formatting. */
-@Injectable({ providedIn: 'root' })
+@Service()
 export class DateFormatService {
   private readonly http = inject(HttpClient);
 

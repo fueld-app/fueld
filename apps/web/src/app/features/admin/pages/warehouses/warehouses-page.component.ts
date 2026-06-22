@@ -341,7 +341,7 @@ const PRODUCT_TYPES: ProductType[] = [
               <label class="block">
                 <span class="text-xs font-medium text-gray-600 dark:text-ink-dim">Base unit</span>
                 <select [(ngModel)]="newSku.baseUnit" [disabled]="configuredUnits().length === 0"
-                  class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-400">
+                  class="mt-1 w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-400 dark:bg-surface-2">
                   @if (configuredUnits().length === 0) {
                     <option value="">No units configured</option>
                   } @else {

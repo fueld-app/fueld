@@ -60,7 +60,7 @@ import { API } from '@app/core/config/api';
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
               <thead>
-                <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80">
+                <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80 dark:bg-surface-2">
                 <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Group Name</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Companies</th>
                 <th class="px-4 py-3 w-24"></th>
@@ -68,7 +68,7 @@ import { API } from '@app/core/config/api';
               </thead>
               <tbody class="divide-y divide-gray-100 dark:divide-line">
               @for (group of groups(); track group.id) {
-                <tr class="transition-colors hover:bg-gray-50/50">
+                <tr class="transition-colors hover:bg-gray-50/50 dark:hover:bg-surface-tint">
                   <td class="px-4 py-3 font-medium text-gray-900 dark:text-ink">{{ group.name }}</td>
                   <td class="px-4 py-3">
                     @if (group.companyNames.length) {

@@ -56,7 +56,7 @@ import { PlaceDetailStore } from '../../place-detail.store';
         } @else if (store.expectedArrivals().length) {
           <div class="divide-y divide-gray-50">
             @for (a of store.expectedArrivals(); track a.id) {
-              <div class="px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors">
+              <div class="px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors dark:hover:bg-surface-tint">
                 <div class="flex items-center justify-between">
                   <div class="flex items-center gap-1.5 min-w-0">
                     @if (a.flagCode) {
@@ -103,7 +103,7 @@ import { PlaceDetailStore } from '../../place-detail.store';
         } @else {
           <div class="divide-y divide-gray-50">
             @for (v of store.nearbyVessels(); track v.id) {
-              <div class="px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors">
+              <div class="px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors dark:hover:bg-surface-tint">
                 <div class="flex items-center justify-between">
                   <div class="flex items-center gap-1.5 min-w-0">
                     @if (v.flagCode) {

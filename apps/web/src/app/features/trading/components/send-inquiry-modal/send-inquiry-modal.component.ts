@@ -436,7 +436,7 @@ export interface SendInquiryWhatsAppPayload {
                           }
                         </div>
                         @if (s.expanded && (s.companyEmails.length || s.contacts.length)) {
-                          <div class="mt-3 space-y-3 rounded-lg border border-gray-200 dark:border-line bg-white/80 p-3" (click)="$event.stopPropagation()">
+                          <div class="mt-3 space-y-3 rounded-lg border border-gray-200 dark:border-line bg-white/80 dark:bg-surface-2 p-3" (click)="$event.stopPropagation()">
                             @if (s.companyEmails.length) {
                               <div>
                                 <div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-muted">Company emails</div>
@@ -614,8 +614,8 @@ export interface SendInquiryWhatsAppPayload {
                     <button
                       type="button"
                       class="rounded-full px-3 py-1.5 text-sm font-medium transition-colors"
-                      [class.bg-white]="activePreviewTab() === 'email'"
-                      [class.text-gray-900]="activePreviewTab() === 'email'"
+                      [class.bg-surface]="activePreviewTab() === 'email'"
+                      [class.text-ink]="activePreviewTab() === 'email'"
                       [class.shadow-sm]="activePreviewTab() === 'email'"
                       [class.text-gray-500]="activePreviewTab() !== 'email'"
                       [class.cursor-not-allowed]="!hasPreviewEmail()"
@@ -627,8 +627,8 @@ export interface SendInquiryWhatsAppPayload {
                     <button
                       type="button"
                       class="rounded-full px-3 py-1.5 text-sm font-medium transition-colors"
-                      [class.bg-white]="activePreviewTab() === 'whatsapp'"
-                      [class.text-gray-900]="activePreviewTab() === 'whatsapp'"
+                      [class.bg-surface]="activePreviewTab() === 'whatsapp'"
+                      [class.text-ink]="activePreviewTab() === 'whatsapp'"
                       [class.shadow-sm]="activePreviewTab() === 'whatsapp'"
                       [class.text-gray-500]="activePreviewTab() !== 'whatsapp'"
                       [class.cursor-not-allowed]="!hasPreviewWhatsApp()"
@@ -1285,11 +1285,11 @@ export class SendInquiryModalComponent implements OnDestroy {
 
   statusBadgeClass(status: string): string {
     switch (status) {
-      case 'SENT': return 'bg-blue-100 text-blue-700';
-      case 'QUOTED': return 'bg-green-100 text-green-700';
-      case 'DECLINED': return 'bg-red-100 text-red-700';
-      case 'NO_REPLY': return 'bg-gray-100 text-gray-500';
-      default: return 'bg-gray-100 text-gray-500';
+      case 'SENT': return 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400';
+      case 'QUOTED': return 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400';
+      case 'DECLINED': return 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400';
+      case 'NO_REPLY': return 'bg-gray-100 text-gray-500 dark:bg-gray-500/15 dark:text-gray-400';
+      default: return 'bg-gray-100 text-gray-500 dark:bg-gray-500/15 dark:text-gray-400';
     }
   }
 

@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Service, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import type { ApiResponse } from '@fueld/types';
@@ -29,7 +29,7 @@ export function formatAppVersionLabel(health: AppHealthDto | null): string {
     : `Fueld v${health.appVersion}`;
 }
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class AppHealthService {
   private readonly http = inject(HttpClient);
 

@@ -11,14 +11,13 @@ import {
   ChangeDetectionStrategy,
   input,
 } from '@angular/core';
-import { DatePipe } from '@angular/common';
 import { DateLabelPipe } from '../../../../shared/pipes/date-format.pipe';
 import type { OrderTransferDto } from '@fueld/types';
 
 @Component({
   selector: 'app-internal-transfer-summary',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, DateLabelPipe],
+  imports: [DateLabelPipe],
   template: `
     @if (transfer(); as t) {
       <div class="rounded-2xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50/40 p-5 shadow-sm">

@@ -8,7 +8,6 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { DatePipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom, Subscription } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
@@ -22,7 +21,7 @@ import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
 @Component({
   selector: 'app-two-factor-setup-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DateLabelPipe, FormsModule, DatePipe, TwoFactorSetupProfileCardComponent],
+  imports: [DateLabelPipe, FormsModule, TwoFactorSetupProfileCardComponent],
   template: `
     <div class="mx-auto">
       @if (auth.mfaSetupRequired()) {
@@ -99,10 +98,9 @@ import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
             <button
               type="button"
               (click)="theme.set(opt.value)"
-              [class.bg-white]="theme.pref() === opt.value"
-              [class.shadow-sm]="theme.pref() === opt.value"
-              [class.text-brand-700]="theme.pref() === opt.value"
-              [class.font-semibold]="theme.pref() === opt.value"
+              [class]="theme.pref() === opt.value
+                ? 'bg-white dark:bg-surface text-brand-700 dark:text-brand-400 shadow-sm font-semibold'
+                : ''"
               class="flex-1 rounded-md px-3 py-2 text-sm text-gray-600 dark:text-ink-dim transition-colors hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-600"
               [attr.aria-pressed]="theme.pref() === opt.value"
             >

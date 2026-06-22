@@ -286,7 +286,7 @@ interface WhatsAppNotificationRule {
 
             <div class="mt-3 space-y-3">
               @for (rule of waNotificationRules(); track rule.id) {
-                <div class="rounded-lg border border-gray-200 dark:border-line bg-gray-50/50 p-3">
+                <div class="rounded-lg border border-gray-200 dark:border-line bg-gray-50/50 p-3 dark:bg-surface-2">
                   <div class="flex items-center justify-between">
                     <div class="flex items-center gap-3">
                       <button

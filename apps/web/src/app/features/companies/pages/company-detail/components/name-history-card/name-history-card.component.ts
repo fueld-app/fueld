@@ -1,5 +1,4 @@
 import { Component, ChangeDetectionStrategy, input } from '@angular/core';
-import { DatePipe } from '@angular/common';
 import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
 
 interface NameEntry { name: string; fromDate: string }
@@ -7,7 +6,7 @@ interface NameEntry { name: string; fromDate: string }
 @Component({
   selector: 'app-name-history-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DateLabelPipe, DatePipe],
+  imports: [DateLabelPipe],
   template: `
     <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm min-[900px]:order-12">
       <div class="border-b border-gray-100 dark:border-line px-5 py-3">

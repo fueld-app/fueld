@@ -23,7 +23,6 @@ import {
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
-import { DatePipe } from '@angular/common';
 import { DateLabelPipe } from '../../../../shared/pipes/date-format.pipe';
 import { firstValueFrom } from 'rxjs';
 import type {
@@ -41,7 +40,7 @@ import { API } from '@app/core/config/api';
 @Component({
   selector: 'app-inventory-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, DatePipe, DateLabelPipe],
+  imports: [FormsModule, DateLabelPipe],
   template: `
     <div>
       <!-- Header -->
@@ -145,7 +144,7 @@ import { API } from '@app/core/config/api';
             </thead>
             <tbody>
               @for (row of filteredBalances(); track row.warehouseId + ':' + row.skuId) {
-                <tr class="border-t border-gray-100 dark:border-line hover:bg-gray-50/50">
+                <tr class="border-t border-gray-100 dark:border-line hover:bg-gray-50/50 dark:hover:bg-surface-tint">
                   <td class="px-4 py-3 text-gray-900 dark:text-ink">{{ row.ownerCompanyName }}</td>
                   <td class="px-4 py-3 text-gray-900 dark:text-ink">
                     <div class="flex flex-col">

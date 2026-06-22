@@ -75,7 +75,7 @@ interface CompanySearchResultOption {
         <div class="overflow-x-auto rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm">
           <table class="w-full text-sm">
             <thead>
-              <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80">
+              <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80 dark:bg-surface-2">
                 <th app-sort-header field="updatedAt" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Updated</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Supplier(s)</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Our Companies</th>
@@ -89,7 +89,7 @@ interface CompanySearchResultOption {
             </thead>
             <tbody class="divide-y divide-gray-100 dark:divide-line">
               @for (line of creditLines(); track line.id) {
-                <tr class="transition-colors hover:bg-gray-50/50">
+                <tr class="transition-colors hover:bg-gray-50/50 dark:hover:bg-surface-tint">
                   <td class="px-4 py-3 text-gray-500 dark:text-muted text-xs">{{ formatDate(line.updatedAt) }}</td>
                   <td class="px-4 py-3">
                     <div class="flex flex-wrap gap-1">

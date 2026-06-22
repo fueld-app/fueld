@@ -1,4 +1,4 @@
-import { Injectable, signal, computed, inject } from '@angular/core';
+import { Service, signal, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
@@ -7,7 +7,7 @@ import type { OrderItemRow } from '../../../components/order-items/order-item.ty
 import type { PlattsSuggestionViewModel } from '../order-detail.types';
 import { API_URL } from '@app/core/config/api';
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class OrderPlattsService {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);

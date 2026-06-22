@@ -402,15 +402,15 @@ export class PlattsReportsPageComponent implements OnInit, OnDestroy {
   protected statusClass(status: string): string {
     switch (status) {
       case 'READY':
-        return 'bg-emerald-100 text-emerald-700';
+        return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400';
       case 'FAILED':
-        return 'bg-red-100 text-red-700';
+        return 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400';
       case 'PARSING':
-        return 'bg-amber-100 text-amber-700';
+        return 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400';
       case 'SUPERSEDED':
-        return 'bg-gray-200 text-gray-700';
+        return 'bg-gray-200 text-gray-700 dark:bg-gray-500/15 dark:text-gray-400';
       default:
-        return 'bg-blue-100 text-blue-700';
+        return 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400';
     }
   }
 

@@ -207,7 +207,7 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
               <thead>
-                <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80">
+                <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80 dark:bg-surface-2">
                 <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Name</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Email</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Phone</th>
@@ -223,7 +223,7 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
               </thead>
               <tbody class="divide-y divide-gray-100 dark:divide-line">
               @for (user of filteredUsers(); track user.id) {
-                <tr class="transition-colors hover:bg-gray-50/50" [class.opacity-50]="!user.isActive">
+                <tr class="transition-colors hover:bg-gray-50/50 dark:hover:bg-surface-tint" [class.opacity-50]="!user.isActive">
                   <td class="px-4 py-3">
                     <div class="flex items-center gap-2.5">
                       <div class="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 dark:bg-brand-700/15 text-xs font-bold text-brand-700 dark:text-brand-400">
@@ -412,7 +412,7 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
                 </tr>
                 @if (expandedSessionUserId() === user.id) {
                   <tr>
-                  <td colspan="11" class="bg-gray-50/80 px-4 py-3">
+                  <td colspan="11" class="bg-gray-50/80 px-4 py-3 dark:bg-surface-2">
                       <div class="ml-10">
                         <p class="text-xs font-medium text-gray-500 dark:text-muted mb-2">Active Sessions</p>
                         <div class="space-y-2">
@@ -513,7 +513,7 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
               <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                   <thead>
-                    <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80">
+                    <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80 dark:bg-surface-2">
                     <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Name</th>
                     <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Email</th>
                     <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Role</th>
@@ -525,7 +525,7 @@ import { UsersInviteModalComponent } from './users-invite-modal.component';
                   </thead>
                   <tbody class="divide-y divide-gray-100 dark:divide-line">
                   @for (inv of pendingInvitations(); track inv.id) {
-                    <tr class="transition-colors hover:bg-gray-50/50">
+                    <tr class="transition-colors hover:bg-gray-50/50 dark:hover:bg-surface-tint">
                       <td class="px-4 py-3 font-medium text-gray-900 dark:text-ink">{{ inv.name }}</td>
                       <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">{{ inv.email }}</td>
                       <td class="px-4 py-3">

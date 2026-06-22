@@ -21,7 +21,7 @@ import type { SortChangeEvent } from '../../../../shared/components';
 import type { ApiResponse, CounterpartyDto, OrderListRowDto, UserUiPreferences } from '@fueld/types';
 import { InquiriesListNewInquiryModalComponent } from './inquiries-list-new-inquiry-modal.component';
 import type { TeamUserOption } from './inquiries-list.types';
-import { DecimalPipe, DatePipe } from '@angular/common';
+import { DecimalPipe } from '@angular/common';
 import { DateLabelPipe } from '../../../../shared/pipes/date-format.pipe';
 import { DateFormatService } from '@app/core/services/date-format.service';
 import { firstValueFrom } from 'rxjs';
@@ -40,7 +40,7 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
 @Component({
   selector: 'app-inquiries-list-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, StatusBadgeComponent, FormsModule, DecimalPipe, DatePipe, DateLabelPipe, SearchableDropdownComponent, PaginationComponent, SortHeaderComponent, ColumnPickerComponent, InquiriesListNewInquiryModalComponent],
+  imports: [RouterLink, StatusBadgeComponent, FormsModule, DecimalPipe, DateLabelPipe, SearchableDropdownComponent, PaginationComponent, SortHeaderComponent, ColumnPickerComponent, InquiriesListNewInquiryModalComponent],
   template: `
     <div>
       <!-- Header -->
@@ -105,7 +105,7 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
         <div class="hidden md:block overflow-x-auto rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm">
           <table class="w-full text-sm">
             <thead>
-              <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80">
+              <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80 dark:bg-surface-2">
                 @for (col of visibleColumns(); track col.field) {
                   @if (col.sortable) {
                     <th app-sort-header [field]="col.field" [sortBy]="activeSortBy()" [sortDir]="activeSortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">{{ col.label }}</th>
@@ -118,7 +118,7 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
             </thead>
             <tbody class="divide-y divide-gray-100 dark:divide-line">
               @for (inq of inquiries(); track inq.id) {
-                <tr class="transition-colors hover:bg-gray-50/50 cursor-pointer" (click)="goToDetail(inq.orderNumber || inq.id)">
+                <tr class="transition-colors hover:bg-gray-50/50 cursor-pointer dark:hover:bg-surface-tint" (click)="goToDetail(inq.orderNumber || inq.id)">
                   @for (col of visibleColumns(); track col.field) {
                     @switch (col.field) {
                       @case ('orderNumber') {

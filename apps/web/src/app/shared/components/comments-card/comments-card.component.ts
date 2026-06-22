@@ -129,7 +129,7 @@ interface Comment {
       } @else if (comments().length) {
         <div class="divide-y divide-gray-50 flex-1 min-h-0 overflow-y-auto">
           @for (c of comments(); track c.id) {
-            <div class="px-5 py-3 group hover:bg-gray-50/50 transition-colors">
+            <div class="px-5 py-3 group hover:bg-gray-50/50 transition-colors dark:hover:bg-surface-tint">
               <div class="flex items-start gap-3">
                 <!-- Avatar -->
                 <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 dark:bg-surface-3 text-xs font-medium text-gray-600 dark:text-ink-dim">
@@ -365,9 +365,9 @@ export class CommentsCardComponent implements OnDestroy {
 
   followUpBadgeClass(dateStr: string): string {
     const today = todayDateString();
-    if (dateStr < today) return 'bg-red-50 border-red-200 text-red-700';
-    if (dateStr === today) return 'bg-amber-50 border-amber-200 text-amber-700';
-    return 'bg-gray-50 border-gray-200 text-gray-600';
+    if (dateStr < today) return 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-400';
+    if (dateStr === today) return 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30 text-amber-700 dark:text-amber-400';
+    return 'bg-gray-50 dark:bg-surface-2 border-gray-200 dark:border-line text-gray-600 dark:text-muted';
   }
 
   private initializeFollowUpInputs(): void {

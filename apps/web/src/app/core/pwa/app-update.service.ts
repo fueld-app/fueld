@@ -1,4 +1,4 @@
-import { Injectable, signal, effect, inject, isDevMode, OnDestroy } from '@angular/core';
+import { Service, signal, effect, inject, isDevMode, OnDestroy } from '@angular/core';
 import { SwUpdate } from '@angular/service-worker';
 import { Router, NavigationEnd } from '@angular/router';
 import { filter, Subscription } from 'rxjs';
@@ -7,7 +7,7 @@ import { AuthService } from '../auth/auth.service';
 
 const CHECK_INTERVAL_MS = 60_000; // 1 minute
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class AppUpdateService implements OnDestroy {
   private readonly swUpdate = inject(SwUpdate);
   private readonly wsService = inject(WebSocketService);

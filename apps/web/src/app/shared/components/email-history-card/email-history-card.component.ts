@@ -64,7 +64,7 @@ interface EmailLogEntry {
         } @else {
           <ul class="divide-y divide-gray-50">
             @for (email of filteredEmails(); track email.id) {
-              <li class="group px-5 py-3 transition-colors hover:bg-gray-50/60">
+              <li class="group px-5 py-3 transition-colors hover:bg-gray-50/60 dark:hover:bg-surface-tint">
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0 flex-1">
                     <!-- Subject + type badge -->

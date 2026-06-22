@@ -1714,15 +1714,15 @@ export class CompanyDetailStore {
   typeBadgeClass(type: string): string {
     switch (type) {
       case 'CLIENT':
-        return 'bg-blue-100 text-blue-700';
+        return 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400';
       case 'SUPPLIER':
-        return 'bg-green-100 text-green-700';
+        return 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400';
       case 'BROKER':
-        return 'bg-cyan-100 text-cyan-700';
+        return 'bg-cyan-100 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-400';
       case 'AGENT':
-        return 'bg-indigo-100 text-indigo-700';
+        return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-400';
       default:
-        return 'bg-gray-100 text-gray-700';
+        return 'bg-gray-100 text-gray-700 dark:bg-gray-500/15 dark:text-gray-400';
     }
   }
 
@@ -1764,17 +1764,17 @@ export class CompanyDetailStore {
   statusBadge(status: string): string {
     switch (status) {
       case 'DRAFT':
-        return 'bg-gray-100 text-gray-600';
+        return 'bg-gray-100 text-gray-600 dark:bg-gray-500/15 dark:text-gray-400';
       case 'CONFIRMED':
-        return 'bg-blue-100 text-blue-700';
+        return 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400';
       case 'DELIVERED':
-        return 'bg-green-100 text-green-700';
+        return 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400';
       case 'INVOICED':
-        return 'bg-purple-100 text-purple-700';
+        return 'bg-purple-100 text-purple-700 dark:bg-purple-500/15 dark:text-purple-400';
       case 'CANCELLED':
-        return 'bg-red-100 text-red-700';
+        return 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400';
       default:
-        return 'bg-gray-100 text-gray-600';
+        return 'bg-gray-100 text-gray-600 dark:bg-gray-500/15 dark:text-gray-400';
     }
   }
 
@@ -1813,15 +1813,15 @@ export class CompanyDetailStore {
   emailTypeBadgeClass(type: CompanyEmailType): string {
     switch (type) {
       case 'sales':
-        return 'bg-green-100 text-green-700';
+        return 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400';
       case 'invoice':
-        return 'bg-blue-100 text-blue-700';
+        return 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400';
       case 'inquiry':
-        return 'bg-amber-100 text-amber-700';
+        return 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400';
       case 'general':
-        return 'bg-gray-100 text-gray-600';
+        return 'bg-gray-100 text-gray-600 dark:bg-gray-500/15 dark:text-gray-400';
       default:
-        return 'bg-purple-100 text-purple-700';
+        return 'bg-purple-100 text-purple-700 dark:bg-purple-500/15 dark:text-purple-400';
     }
   }
 

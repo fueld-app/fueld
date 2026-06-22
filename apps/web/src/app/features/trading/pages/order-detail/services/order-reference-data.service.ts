@@ -1,4 +1,4 @@
-import { Injectable, signal, inject } from '@angular/core';
+import { Service, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import type { ApiResponse, CounterpartyDto, WarehouseDto, InventorySkuDto, DeliveryDocumentationSettingsDto } from '@fueld/types';
@@ -7,7 +7,7 @@ import { API_URL } from '@app/core/config/api';
 
 export interface TeamUserOption { id: string; name: string; email?: string }
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class OrderReferenceDataService {
   private readonly http = inject(HttpClient);
 

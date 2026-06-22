@@ -229,11 +229,11 @@ export class CompanyHeaderComponent {
 
   typeBadgeClass(type: string): string {
     switch (type) {
-      case 'CLIENT': return 'bg-blue-100 text-blue-700';
-      case 'SUPPLIER': return 'bg-green-100 text-green-700';
-      case 'BROKER': return 'bg-cyan-100 text-cyan-700';
-      case 'AGENT': return 'bg-indigo-100 text-indigo-700';
-      default: return 'bg-gray-100 text-gray-700';
+      case 'CLIENT': return 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400';
+      case 'SUPPLIER': return 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400';
+      case 'BROKER': return 'bg-cyan-100 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-400';
+      case 'AGENT': return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-400';
+      default: return 'bg-gray-100 text-gray-700 dark:bg-gray-500/15 dark:text-gray-400';
     }
   }
 }

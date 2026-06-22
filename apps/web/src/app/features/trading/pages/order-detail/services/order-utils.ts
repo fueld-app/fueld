@@ -63,11 +63,11 @@ export function normalizeTerms(value: string | null | undefined): string {
 
 export function statusBadgeClass(status: string): string {
   const map: Record<string, string> = {
-    SENT: 'bg-blue-100 text-blue-700',
-    QUOTED: 'bg-green-100 text-green-700',
-    DECLINED: 'bg-red-100 text-red-700',
+    SENT: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400',
+    QUOTED: 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400',
+    DECLINED: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400',
   };
-  return map[status] ?? 'bg-gray-100 text-gray-500';
+  return map[status] ?? 'bg-gray-100 text-gray-500 dark:bg-gray-500/15 dark:text-gray-400';
 }
 
 export function fmtHistoryDate(iso: string): string {

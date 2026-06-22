@@ -1,4 +1,4 @@
-import { Injectable, signal, inject } from '@angular/core';
+import { Service, signal, inject } from '@angular/core';
 import { HttpClient, type HttpResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import type {
@@ -9,7 +9,7 @@ import type {
 } from '@fueld/types';
 import { API_URL } from '@app/core/config/api';
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class OrderPortDocumentationService {
   private readonly http = inject(HttpClient);
 

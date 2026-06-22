@@ -1,11 +1,11 @@
-import { Injectable, signal, inject } from '@angular/core';
+import { Service, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import type { ApiResponse, OrderDto } from '@fueld/types';
 import type { OrderItemRow } from '../../../components/order-items/order-item.types';
 import { API_URL } from '@app/core/config/api';
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class OrderSaveService {
   private readonly http = inject(HttpClient);
 

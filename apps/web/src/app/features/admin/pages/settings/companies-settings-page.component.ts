@@ -231,7 +231,7 @@ import { CompaniesSettingsTypeListCardComponent } from './companies-settings-typ
 
             <div class="app-panel-body space-y-5">
               @for (cat of segmentCategories(); track cat.key; let ci = $index) {
-                <div class="rounded-lg border border-gray-200 dark:border-line bg-gray-50/50 p-4 space-y-3">
+                <div class="rounded-lg border border-gray-200 dark:border-line bg-gray-50/50 p-4 space-y-3 dark:bg-surface-2">
                   <div class="flex items-center gap-3">
                     <div class="flex flex-col gap-0.5 shrink-0">
                       <button (click)="moveSegmentCategoryUp(ci)" [disabled]="ci === 0" class="text-gray-400 dark:text-muted hover:text-gray-600 disabled:opacity-30 transition-colors" title="Move up">

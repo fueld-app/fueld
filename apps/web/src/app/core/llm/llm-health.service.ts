@@ -1,4 +1,4 @@
-import { Injectable, signal, computed, DestroyRef, inject } from '@angular/core';
+import { Service, signal, computed, DestroyRef, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { API } from '@app/core/config/api';
@@ -12,7 +12,7 @@ interface HealthResponse {
  * Shared service to track LLM health status across the app.
  * Polls every 60s by default; components can force an immediate refresh.
  */
-@Injectable({ providedIn: 'root' })
+@Service()
 export class LlmHealthService {
   private readonly http = inject(HttpClient);
   private readonly destroyRef = inject(DestroyRef);

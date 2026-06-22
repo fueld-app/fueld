@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Service, inject } from '@angular/core';
 import { HttpClient, type HttpResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { API_URL, toAbsoluteUrl } from '@app/core/config/api';
@@ -14,7 +14,7 @@ interface ShowToast {
   (type: 'error' | 'success' | 'info' | 'warning', message: string): void;
 }
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class OrderPdfService {
   private readonly http = inject(HttpClient);
 

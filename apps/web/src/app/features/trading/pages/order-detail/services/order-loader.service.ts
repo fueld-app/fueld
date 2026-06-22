@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Service, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import type { ApiResponse, OrderDto, OwnCompanyDto, OrderSupplierDto, CounterpartyDto } from '@fueld/types';
@@ -23,7 +23,7 @@ export interface OrderLoadResult {
   agent: any;
 }
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class OrderLoaderService {
   private readonly http = inject(HttpClient);
 

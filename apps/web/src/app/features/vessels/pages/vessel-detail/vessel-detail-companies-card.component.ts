@@ -6,7 +6,6 @@ import {
   output,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import type { VesselCompanyDto, VesselCompanyRole, VesselCompanyRoleOption, CompanyContactDto } from '@fueld/types';
 import { flagFromIso3 } from '../../../../shared/utils/flags';
@@ -35,7 +34,7 @@ export interface OwnershipEntry {
 @Component({
   selector: 'app-vessel-detail-companies-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DateLabelPipe, RouterLink, DatePipe, FormsModule],
+  imports: [DateLabelPipe, RouterLink, FormsModule],
   template: `
     <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm min-[900px]:order-5 min-[900px]:h-[449px] min-[900px]:flex min-[900px]:flex-col overflow-hidden">
       <div class="border-b border-gray-100 dark:border-line px-5 py-3 flex items-center justify-between">
@@ -54,7 +53,7 @@ export interface OwnershipEntry {
       </div>
 
       @if (showAddForm()) {
-        <div class="border-b border-gray-100 dark:border-line px-5 py-4 bg-gray-50/50">
+        <div class="border-b border-gray-100 dark:border-line px-5 py-4 bg-gray-50/50 dark:bg-surface-2">
           <div class="space-y-2">
             @if (!editingCompanyId()) {
               <div class="relative">
@@ -211,7 +210,7 @@ export interface OwnershipEntry {
       } @else {
         <div class="flex-1 min-h-0 divide-y divide-gray-50 overflow-y-auto">
           @for (vc of vesselCompanies(); track vc.id) {
-            <div class="px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors group">
+            <div class="px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors group dark:hover:bg-surface-tint">
               <div class="flex items-start justify-between gap-2">
                 <div class="min-w-0">
                   <div class="flex items-center gap-1.5 flex-wrap">

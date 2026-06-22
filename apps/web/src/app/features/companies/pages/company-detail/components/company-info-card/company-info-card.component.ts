@@ -8,7 +8,6 @@ import {
   effect,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { DatePipe } from '@angular/common';
 import type {
   CounterpartyDto,
   CompanyEmailDto,
@@ -49,7 +48,7 @@ interface CompanyEnrichment {
 @Component({
   selector: 'app-company-info-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DateLabelPipe, FormsModule, DatePipe],
+  imports: [DateLabelPipe, FormsModule],
   styles: [`
     :host { display: block; }
   `],
@@ -534,7 +533,7 @@ interface CompanyEnrichment {
           </div>
         } @else if (companyInfoTab() === 'offices') {
           @if (showAddOffice()) {
-            <div class="-mx-5 -mt-4 border-b border-gray-100 dark:border-line px-5 py-4 bg-gray-50/50">
+            <div class="-mx-5 -mt-4 border-b border-gray-100 dark:border-line px-5 py-4 bg-gray-50/50 dark:bg-surface-2">
               <div class="space-y-2">
                 <div class="grid grid-cols-2 gap-2">
                   <div>
@@ -608,7 +607,7 @@ interface CompanyEnrichment {
           @if (companyOffices().length) {
             <div class="divide-y divide-gray-50 -mx-5" [class.-mt-4]="!showAddOffice()">
               @for (office of companyOffices(); track office.id) {
-                <div class="group px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors">
+                <div class="group px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors dark:hover:bg-surface-tint">
                   <div class="flex items-start justify-between">
                     <div>
                       <span class="font-medium text-gray-900 dark:text-ink">{{ office.city }}</span>
@@ -686,7 +685,7 @@ interface CompanyEnrichment {
           </div>
         } @else if (companyInfoTab() === 'emails') {
           @if (showAddEmail()) {
-            <div class="-mx-5 -mt-4 border-b border-gray-100 dark:border-line px-5 py-4 bg-gray-50/50">
+            <div class="-mx-5 -mt-4 border-b border-gray-100 dark:border-line px-5 py-4 bg-gray-50/50 dark:bg-surface-2">
               <div class="space-y-2">
                 <div class="grid grid-cols-2 gap-2">
                   <div>
@@ -758,7 +757,7 @@ interface CompanyEnrichment {
           } @else {
             <div class="divide-y divide-gray-50 -mx-5">
               @for (e of companyEmails(); track e.id) {
-                <div class="px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors group">
+                <div class="px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors group dark:hover:bg-surface-tint">
                   <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
                       <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
@@ -986,11 +985,11 @@ export class CompanyInfoCardComponent {
 
   typeBadgeClass(type: string): string {
     switch (type) {
-      case 'CLIENT': return 'bg-blue-100 text-blue-700';
-      case 'SUPPLIER': return 'bg-green-100 text-green-700';
-      case 'BROKER': return 'bg-cyan-100 text-cyan-700';
-      case 'AGENT': return 'bg-indigo-100 text-indigo-700';
-      default: return 'bg-gray-100 text-gray-700';
+      case 'CLIENT': return 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400';
+      case 'SUPPLIER': return 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400';
+      case 'BROKER': return 'bg-cyan-100 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-400';
+      case 'AGENT': return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-400';
+      default: return 'bg-gray-100 text-gray-700 dark:bg-gray-500/15 dark:text-gray-400';
     }
   }
 
@@ -1085,11 +1084,11 @@ export class CompanyInfoCardComponent {
 
   emailTypeBadgeClass(type: CompanyEmailType): string {
     switch (type) {
-      case 'sales': return 'bg-green-100 text-green-700';
-      case 'invoice': return 'bg-blue-100 text-blue-700';
-      case 'inquiry': return 'bg-amber-100 text-amber-700';
-      case 'general': return 'bg-gray-100 text-gray-600';
-      default: return 'bg-purple-100 text-purple-700';
+      case 'sales': return 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400';
+      case 'invoice': return 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400';
+      case 'inquiry': return 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400';
+      case 'general': return 'bg-gray-100 text-gray-600 dark:bg-gray-500/15 dark:text-gray-400';
+      default: return 'bg-purple-100 text-purple-700 dark:bg-purple-500/15 dark:text-purple-400';
     }
   }
 

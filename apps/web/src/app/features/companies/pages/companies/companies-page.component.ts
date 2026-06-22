@@ -205,7 +205,7 @@ interface CompanySearchResult {
         <div class="overflow-x-auto rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm">
           <table class="w-full text-sm">
             <thead>
-              <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80">
+              <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80 dark:bg-surface-2">
                 <th app-sort-header field="name" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Name</th>
                 <th app-sort-header field="type" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Type</th>
                 <th app-sort-header field="country" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Country</th>
@@ -219,7 +219,7 @@ interface CompanySearchResult {
             </thead>
             <tbody class="divide-y divide-gray-100 dark:divide-line">
               @for (company of companies(); track company.id) {
-                <tr class="transition-colors hover:bg-gray-50/50 cursor-pointer" (click)="goToCompany(company.id)">
+                <tr class="transition-colors hover:bg-gray-50/50 cursor-pointer dark:hover:bg-surface-tint" (click)="goToCompany(company.id)">
                   <td class="px-4 py-3">
                     <span class="font-medium text-gray-900 dark:text-ink">{{ company.name }}</span>
                     @if (company.parentName) {
@@ -707,11 +707,11 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
 
   typeBadgeClass(type: string): string {
     switch (type) {
-      case 'CLIENT': return 'bg-blue-100 text-blue-700';
-      case 'SUPPLIER': return 'bg-green-100 text-green-700';
-      case 'BROKER': return 'bg-cyan-100 text-cyan-700';
-      case 'AGENT': return 'bg-indigo-100 text-indigo-700';
-      default: return 'bg-gray-100 text-gray-700';
+      case 'CLIENT': return 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400';
+      case 'SUPPLIER': return 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400';
+      case 'BROKER': return 'bg-cyan-100 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-400';
+      case 'AGENT': return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-400';
+      default: return 'bg-gray-100 text-gray-700 dark:bg-gray-500/15 dark:text-gray-400';
     }
   }
 

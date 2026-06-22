@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Service, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import type { ApiResponse } from '@fueld/types';
@@ -6,7 +6,7 @@ import type { InquirySupplierComparisonRow, SupplierInquiryReplyRow, InquirySupp
 
 import { API_URL } from '@app/core/config/api';
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class OrderInquiryService {
   private readonly http = inject(HttpClient);
 

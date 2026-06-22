@@ -12,7 +12,7 @@ import type { InquirySupplierComparisonRow, InquiryQuoteMatrixRow, SupplierInqui
   template: `
     <div class="mt-4">
       <!-- Supplier Comparison Context -->
-      <div class="rounded-3xl border border-slate-200 dark:border-slate-500/30 bg-gradient-to-br from-slate-50 via-white to-emerald-50 shadow-sm">
+      <div class="rounded-3xl border border-slate-200 dark:border-slate-500/30 bg-gradient-to-br from-slate-50 via-white to-emerald-50 dark:from-surface dark:via-surface-2 dark:to-surface-3 shadow-sm">
         <div class="border-b border-slate-200/70 px-5 py-4">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -37,10 +37,9 @@ import type { InquirySupplierComparisonRow, InquiryQuoteMatrixRow, SupplierInqui
             <div class="grid gap-3 lg:grid-cols-2">
               @for (supplier of suppliers(); track supplier.supplierId) {
                 <div class="rounded-2xl border px-4 py-3 shadow-sm transition-all"
-                  [class.border-emerald-300]="selectedSupplierId() === supplier.supplierId"
-                  [class.bg-emerald-50/80]="selectedSupplierId() === supplier.supplierId"
-                  [class.border-slate-200]="selectedSupplierId() !== supplier.supplierId"
-                  [class.bg-white]="selectedSupplierId() !== supplier.supplierId"
+                  [class]="selectedSupplierId() === supplier.supplierId
+                    ? 'border-emerald-300 bg-emerald-50/80 dark:border-emerald-500/40 dark:bg-emerald-500/15'
+                    : 'border-slate-200 dark:border-slate-500/30 bg-white dark:bg-surface'"
                 >
                   <div class="flex flex-wrap items-center gap-2">
                     <span class="text-sm font-semibold text-slate-900 dark:text-slate-300">{{ supplier.supplierName }}</span>
@@ -97,7 +96,7 @@ import type { InquirySupplierComparisonRow, InquiryQuoteMatrixRow, SupplierInqui
                 <tr>
                   <th class="sticky left-0 z-10 min-w-64 border-b border-slate-200 dark:border-slate-500/30 bg-white dark:bg-surface px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Line item</th>
                   @for (reply of replies(); track reply.id) {
-                    <th class="min-w-52 border-b border-slate-200 dark:border-slate-500/30 px-4 py-3 text-left align-top" [class.bg-slate-50]="selectedReplySupplierId() === reply.supplierId">
+                    <th class="min-w-52 border-b border-slate-200 dark:border-slate-500/30 px-4 py-3 text-left align-top" [class.bg-surface-2]="selectedReplySupplierId() === reply.supplierId">
                       <div class="flex items-center gap-2">
                         <span class="font-semibold text-slate-900 dark:text-slate-300">{{ reply.supplierName }}</span>
                         @if (selectedReplySupplierId() === reply.supplierId) { <span class="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white">Selected</span> }
@@ -122,7 +121,7 @@ import type { InquirySupplierComparisonRow, InquiryQuoteMatrixRow, SupplierInqui
                       <div class="mt-1 text-xs text-slate-500 dark:text-slate-300">{{ row.quantity }}{{ row.unit }}@if (row.description) { · {{ row.description }} }</div>
                     </td>
                     @for (cell of row.cells; track cell.supplierInquiryId) {
-                      <td class="border-b border-slate-100 dark:border-slate-500/25 px-4 py-3 align-top" [class.bg-slate-50]="cell.isSelectedSupplier">
+                      <td class="border-b border-slate-100 dark:border-slate-500/25 px-4 py-3 align-top" [class.bg-surface-2]="cell.isSelectedSupplier">
                         @if (cell.price !== null && showPrices()) {
                           <div class="font-semibold text-slate-900 dark:text-slate-300">{{ cell.price }} {{ cell.currency }}</div>
                           @if (cell.note) { <div class="mt-1 text-xs text-slate-500 dark:text-slate-300">{{ cell.note }}</div> }

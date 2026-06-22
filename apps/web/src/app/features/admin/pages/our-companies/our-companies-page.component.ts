@@ -145,7 +145,7 @@ interface CompanySearchResultOption {
 
               <!-- Bank Accounts Expandable Section -->
               @if (expandedCompanyId() === co.id) {
-                <div class="px-5 py-4 bg-gray-50/50">
+                <div class="px-5 py-4 bg-gray-50/50 dark:bg-surface-2">
                   <div class="flex items-center justify-between mb-3">
                     <h3 class="text-xs font-semibold text-gray-500 dark:text-muted uppercase tracking-wider">Bank Accounts</h3>
                     <button

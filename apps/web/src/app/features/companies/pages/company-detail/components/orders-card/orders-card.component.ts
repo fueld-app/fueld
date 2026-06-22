@@ -1,5 +1,4 @@
 import { Component, ChangeDetectionStrategy, input, output } from '@angular/core';
-import { DatePipe } from '@angular/common';
 import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
 
 interface CompanyOrder {
@@ -20,7 +19,7 @@ interface CompanyOrder {
 @Component({
   selector: 'app-orders-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DateLabelPipe, DatePipe],
+  imports: [DateLabelPipe],
   template: `
     <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm min-[900px]:order-[13]">
       <div class="border-b border-gray-100 dark:border-line px-5 py-3 flex items-center justify-between">
@@ -53,7 +52,7 @@ interface CompanyOrder {
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
-              <tr class="border-b border-gray-100 dark:border-line bg-gray-50/60">
+              <tr class="border-b border-gray-100 dark:border-line bg-gray-50/60 dark:bg-surface-2">
                 @if (mode() === 'group') {
                   <th class="px-5 py-2 text-left font-medium text-gray-500 dark:text-muted">Client</th>
                 }
@@ -65,7 +64,7 @@ interface CompanyOrder {
             </thead>
             <tbody class="divide-y divide-gray-50">
               @for (order of activeOrders(); track order.id) {
-                <tr class="hover:bg-gray-50/50 cursor-pointer transition-colors" (click)="orderClick.emit({ id: order.id, status: order.status })">
+                <tr class="hover:bg-gray-50/50 cursor-pointer transition-colors dark:hover:bg-surface-tint" (click)="orderClick.emit({ id: order.id, status: order.status })">
                   @if (mode() === 'group') {
                     <td class="px-5 py-2.5 text-gray-700 dark:text-ink-dim">{{ order.clientName || '—' }}</td>
                   }
@@ -116,12 +115,12 @@ export class OrdersCardComponent {
 
   statusBadge(status: string): string {
     switch (status) {
-      case 'DRAFT': return 'bg-gray-100 text-gray-600';
-      case 'CONFIRMED': return 'bg-blue-100 text-blue-700';
-      case 'DELIVERED': return 'bg-green-100 text-green-700';
-      case 'INVOICED': return 'bg-purple-100 text-purple-700';
-      case 'CANCELLED': return 'bg-red-100 text-red-700';
-      default: return 'bg-gray-100 text-gray-600';
+      case 'DRAFT': return 'bg-gray-100 text-gray-600 dark:bg-gray-500/15 dark:text-gray-400';
+      case 'CONFIRMED': return 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400';
+      case 'DELIVERED': return 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400';
+      case 'INVOICED': return 'bg-purple-100 text-purple-700 dark:bg-purple-500/15 dark:text-purple-400';
+      case 'CANCELLED': return 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400';
+      default: return 'bg-gray-100 text-gray-600 dark:bg-gray-500/15 dark:text-gray-400';
     }
   }
 }

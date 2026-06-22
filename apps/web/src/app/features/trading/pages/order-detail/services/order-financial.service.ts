@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Service, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import type { ApiResponse, CreditLineDto, BankAccountDto, OwnCompanyDto } from '@fueld/types';
@@ -13,7 +13,7 @@ export interface CreditSummary {
   maxDays: number;
 }
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class OrderFinancialService {
   private readonly http = inject(HttpClient);
   private readonly riskService = inject(RiskMonitoringService);

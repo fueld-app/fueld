@@ -1,4 +1,4 @@
-import { Injectable, signal, computed, inject } from '@angular/core';
+import { Service, signal, computed, inject, injectAsync, onIdle } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Role } from '@fueld/types';
@@ -14,7 +14,6 @@ import type {
   ApiResponse,
 } from '@fueld/types';
 import { firstValueFrom } from 'rxjs';
-import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
 import { WebSocketService } from '../websocket/websocket.service';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -45,7 +44,7 @@ function friendlyWebAuthnError(err: unknown, action: string): Error {
   return new Error(`${action} failed. Please try again.`);
 }
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class AuthService {
   /** Current user signal (null when logged out). */
   readonly user = signal<UserDto | null>(this.loadUser());
@@ -84,10 +83,10 @@ export class AuthService {
   /** Timer handle for proactive token refresh. */
   private refreshTimerId: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(
-    private readonly http: HttpClient,
-    private readonly router: Router,
-  ) {
+  private readonly http = inject(HttpClient);
+  private readonly router = inject(Router);
+
+  constructor() {
     // On page reload, refresh the access token then connect WebSocket
     // Tokens are in HTTP-only cookies set by the server
     if (this.isAuthenticated()) {
@@ -99,6 +98,14 @@ export class AuthService {
   }
 
   private readonly wsService = inject(WebSocketService);
+  // Lazy-load the passkey (WebAuthn) service: @simplewebauthn/browser is heavy
+  // and only needed during passkey sign-in / registration flows, so it is
+  // moved to a lazily-loaded chunk (prefetched during idle time) instead of the
+  // main entry bundle.
+  private readonly passkeyService = injectAsync(
+    () => import('./passkey.service').then((m) => m.PasskeyService),
+    { prefetch: onIdle },
+  );
 
   // Listen for force-logout events from the server (e.g. account deactivated by admin)
   private readonly forceLogoutSub = this.wsService
@@ -391,7 +398,8 @@ export class AuthService {
     // Step 2: Trigger the browser's WebAuthn prompt (biometric / security key)
     let assertionResponse;
     try {
-      assertionResponse = await startAuthentication({ optionsJSON: options });
+      const passkey = await this.passkeyService();
+      assertionResponse = await passkey.startAuthentication(options);
     } catch (err) {
       throw friendlyWebAuthnError(err, 'Passkey sign-in');
     }
@@ -434,7 +442,8 @@ export class AuthService {
     // Step 2: Trigger the browser's WebAuthn prompt (biometric / security key)
     let assertionResponse;
     try {
-      assertionResponse = await startAuthentication({ optionsJSON: options });
+      const passkey = await this.passkeyService();
+      assertionResponse = await passkey.startAuthentication(options);
     } catch (err) {
       throw friendlyWebAuthnError(err, 'Passkey verification');
     }
@@ -487,7 +496,8 @@ export class AuthService {
     // Step 2: Trigger the browser's WebAuthn prompt (create credential)
     let attestationResponse;
     try {
-      attestationResponse = await startRegistration({ optionsJSON: optionsRes.data });
+      const passkey = await this.passkeyService();
+      attestationResponse = await passkey.startRegistration(optionsRes.data);
     } catch (err) {
       throw friendlyWebAuthnError(err, 'Passkey registration');
     }

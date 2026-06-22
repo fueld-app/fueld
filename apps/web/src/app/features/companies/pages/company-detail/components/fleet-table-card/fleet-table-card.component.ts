@@ -105,7 +105,7 @@ interface VesselSearchResult {
 
       @if (mode() === 'own') {
         @if (showForm()) {
-          <div class="border-b border-gray-100 dark:border-line px-5 py-4 bg-gray-50/50">
+          <div class="border-b border-gray-100 dark:border-line px-5 py-4 bg-gray-50/50 dark:bg-surface-2">
             <div class="space-y-2">
               @if (!editingId()) {
                 <div class="relative">
@@ -222,7 +222,7 @@ interface VesselSearchResult {
               <tbody class="divide-y divide-gray-50">
                 @if (fleet()?.results?.length) {
                   @for (v of fleet()!.results; track v.id) {
-                    <tr class="hover:bg-gray-50/50 transition-colors">
+                    <tr class="hover:bg-gray-50/50 transition-colors dark:hover:bg-surface-tint">
                       <td class="px-5 py-2.5">
                         <button (click)="navigateToVessel.emit(v.id); $event.stopPropagation()"
                           [disabled]="navigatingVesselId() === v.id"
@@ -288,7 +288,7 @@ interface VesselSearchResult {
                   }
                 }
                 @for (vc of manualRows(); track vc.id) {
-                  <tr class="hover:bg-gray-50/50 transition-colors">
+                  <tr class="hover:bg-gray-50/50 transition-colors dark:hover:bg-surface-tint">
                     <td class="px-5 py-2.5">
                       <a [routerLink]="['/vessels', vc.vesselId]" class="font-medium text-brand-700 dark:text-brand-400 hover:text-brand-900 hover:underline">
                         {{ vc.vesselName ?? 'Unknown vessel' }}
@@ -357,7 +357,7 @@ interface VesselSearchResult {
               </thead>
               <tbody class="divide-y divide-gray-50">
                 @for (v of groupVessels(); track v.id) {
-                  <tr class="hover:bg-gray-50/50 transition-colors">
+                  <tr class="hover:bg-gray-50/50 transition-colors dark:hover:bg-surface-tint">
                     <td class="px-5 py-2.5 text-gray-700 dark:text-ink-dim">{{ v.companyName }}</td>
                     <td class="px-5 py-2.5">
                       @if (v.localVesselId || v.seasearcherVesselId) {

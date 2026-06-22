@@ -12,7 +12,7 @@ import {
   OnDestroy,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { DecimalPipe, DatePipe } from '@angular/common';
+import { DecimalPipe } from '@angular/common';
 import { Router, RouterOutlet, RouterLink, RouterLinkActive, NavigationEnd } from '@angular/router';
 import { firstValueFrom, Subscription, filter } from 'rxjs';
 import { Title } from '@angular/platform-browser';
@@ -284,7 +284,7 @@ const NAVIGATION: NavItem[] = [
 @Component({
   selector: 'app-main-layout',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DateLabelPipe, RouterOutlet, RouterLink, RouterLinkActive, UserMenuComponent, DecimalPipe, DatePipe],
+  imports: [DateLabelPipe, RouterOutlet, RouterLink, RouterLinkActive, UserMenuComponent, DecimalPipe],
   template: `
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <!--  Mobile Overlay Backdrop                                       -->

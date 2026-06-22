@@ -14,7 +14,6 @@ import { StatusBadgeComponent } from '../../../../shared/components/status-badge
 import { SearchableDropdownComponent, type DropdownOption } from '../../../../shared/components/searchable-dropdown/searchable-dropdown.component';
 import type { ApiResponse, OrderListRowDto } from '@fueld/types';
 import { OrderStatus } from '@fueld/types';
-import { DatePipe } from '@angular/common';
 import { DateLabelPipe } from '../../../../shared/pipes/date-format.pipe';
 import { API } from '@app/core/config/api';
 import { AuthService } from '@app/core/auth/auth.service';
@@ -28,7 +27,7 @@ interface TeamUserOption {
 @Component({
   selector: 'app-operations-board-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, StatusBadgeComponent, FormsModule, SearchableDropdownComponent, DatePipe, DateLabelPipe],
+  imports: [RouterLink, StatusBadgeComponent, FormsModule, SearchableDropdownComponent, DateLabelPipe],
   template: `
     <div class="h-full flex flex-col">
       <!-- Header -->
@@ -69,7 +68,7 @@ interface TeamUserOption {
         <!-- Kanban Board -->
         <div class="flex flex-1 gap-4 overflow-x-auto pb-2">
           @for (column of columns(); track column.status) {
-            <div class="flex w-80 min-w-[20rem] flex-col rounded-xl border border-gray-200 dark:border-line bg-gray-50/50">
+            <div class="flex w-80 min-w-[20rem] flex-col rounded-xl border border-gray-200 dark:border-line bg-gray-50/50 dark:bg-surface-2">
               <!-- Column header -->
               <div class="flex items-center justify-between border-b border-gray-200 dark:border-line px-4 py-3">
                 <div class="flex items-center gap-2">

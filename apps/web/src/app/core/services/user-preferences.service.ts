@@ -1,10 +1,10 @@
-import { Injectable, signal, inject, effect } from '@angular/core';
+import { Service, signal, inject, effect } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { API } from '@app/core/config/api';
 import type { ApiResponse, UserUiPreferences } from '@fueld/types';
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class UserPreferencesService {
   private readonly http = inject(HttpClient);
 

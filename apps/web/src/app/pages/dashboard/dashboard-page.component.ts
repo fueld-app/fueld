@@ -67,7 +67,7 @@ const UPCOMING_FOLLOW_UP_WINDOW_DAYS = 14;
               <button
                 (click)="toggleTeamView()"
                 [class.bg-brand-700]="teamView()"
-                [class.bg-gray-200]="!teamView()"
+                [class.bg-surface-3]="!teamView()"
                 class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-600 focus:ring-offset-2"
                 role="switch"
                 [attr.aria-checked]="teamView()"
@@ -170,7 +170,7 @@ const UPCOMING_FOLLOW_UP_WINDOW_DAYS = 14;
         (complete)="completeFollowUp($event)"
       />
 
-      @if (showFrozenCounterpartiesWidget() && (frozenCompaniesLoading() || frozenCompanies().length)) {
+      @if (showFrozenCounterpartiesWidget() && !frozenCompaniesLoading() && frozenCompanies().length) {
         <div class="mt-8 rounded-xl border border-red-200 dark:border-red-500/30 bg-white dark:bg-surface shadow-sm overflow-hidden">
           <div class="border-b border-red-100 dark:border-red-500/25 bg-red-50 dark:bg-red-500/15 px-5 py-3 flex items-center justify-between gap-3">
             <div class="flex items-center gap-2">
@@ -188,20 +188,12 @@ const UPCOMING_FOLLOW_UP_WINDOW_DAYS = 14;
               </span>
             }
           </div>
-          @if (frozenCompaniesLoading()) {
-            <div class="flex items-center justify-center py-6">
-              <svg class="h-5 w-5 animate-spin text-red-400" viewBox="0 0 24 24" fill="none">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-              </svg>
-            </div>
-          } @else {
-            <div class="divide-y divide-red-50">
+            <div class="divide-y divide-red-50 dark:divide-red-500/20">
               @for (company of frozenCompanies(); track company.id) {
                 <button
                   type="button"
                   (click)="goToCompany(company.id)"
-                  class="flex w-full items-center justify-between gap-4 px-5 py-3 text-left transition-colors hover:bg-red-50/60"
+                  class="flex w-full items-center justify-between gap-4 px-5 py-3 text-left transition-colors hover:bg-red-50/60 dark:hover:bg-red-500/10"
                 >
                   <div class="min-w-0 flex-1">
                     <div class="flex flex-wrap items-center gap-2">
@@ -226,7 +218,6 @@ const UPCOMING_FOLLOW_UP_WINDOW_DAYS = 14;
                 </button>
               }
             </div>
-          }
         </div>
       }
 
@@ -237,7 +228,7 @@ const UPCOMING_FOLLOW_UP_WINDOW_DAYS = 14;
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
               <thead>
-                <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80">
+                <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80 dark:bg-surface-2">
                   <th class="px-4 py-2 text-left font-medium text-gray-600 dark:text-ink-dim">Parent Company</th>
                   <th class="px-4 py-2 text-center font-medium text-gray-600 dark:text-ink-dim">Companies</th>
                   <th class="px-4 py-2 text-right font-medium text-gray-600 dark:text-ink-dim">Credit Limit</th>
@@ -247,7 +238,7 @@ const UPCOMING_FOLLOW_UP_WINDOW_DAYS = 14;
               </thead>
               <tbody class="divide-y divide-gray-100 dark:divide-line">
                 @for (g of topCreditGroups(); track g.id) {
-                  <tr class="hover:bg-gray-50/50 cursor-pointer transition-colors" (click)="goToCompanyGroup(g.id)">
+                  <tr class="hover:bg-gray-50/50 cursor-pointer transition-colors dark:hover:bg-surface-tint" (click)="goToCompanyGroup(g.id)">
                     <td class="px-4 py-2.5">
                       <span class="font-medium text-gray-900 dark:text-ink">{{ g.name }}</span>
                       @if (g.country) {

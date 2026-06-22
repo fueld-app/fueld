@@ -1,5 +1,4 @@
 import { Component, ChangeDetectionStrategy, input, output, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
 import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
 
 interface HierarchyNode {
@@ -35,7 +34,7 @@ interface HierarchyResponse {
 @Component({
   selector: 'app-registration-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DateLabelPipe, DatePipe],
+  imports: [DateLabelPipe],
   template: `
     <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm min-[900px]:order-8 flex flex-col overflow-hidden">
       <div class="border-b border-gray-100 dark:border-line px-5 py-3 flex items-center justify-between">

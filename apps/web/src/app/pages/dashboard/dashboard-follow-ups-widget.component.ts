@@ -4,14 +4,13 @@ import {
   input,
   output,
 } from '@angular/core';
-import { DatePipe } from '@angular/common';
 import { DateLabelPipe } from '../../shared/pipes/date-format.pipe';
 import type { DashboardFollowUpItem, FollowUpGroups } from './dashboard.types';
 
 @Component({
   selector: 'app-dashboard-follow-ups-widget',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, DateLabelPipe],
+  imports: [DateLabelPipe],
   template: `
     @if (groups().total) {
       <div class="mt-8 rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm overflow-hidden">
@@ -24,7 +23,7 @@ import type { DashboardFollowUpItem, FollowUpGroups } from './dashboard.types';
             {{ groups().total }}
           </span>
         </div>
-        <div class="border-b border-gray-100 dark:border-line px-5 py-3 flex flex-wrap gap-2 bg-gray-50/70">
+        <div class="border-b border-gray-100 dark:border-line px-5 py-3 flex flex-wrap gap-2 bg-gray-50/70 dark:bg-surface-2">
           @if (groups().overdue.length) {
             <span class="inline-flex items-center rounded-full bg-red-100 dark:bg-red-500/15 px-2 py-0.5 text-[10px] font-medium text-red-700 dark:text-red-400">
               Overdue {{ groups().overdue.length }}

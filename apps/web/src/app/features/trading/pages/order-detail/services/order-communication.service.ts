@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Service, inject, signal } from '@angular/core';
 import { HttpClient, type HttpResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import type { ApiResponse } from '@fueld/types';
@@ -11,7 +11,7 @@ import type {
 import type { SendInquiryPayload, SendInquiryWhatsAppPayload } from '../../../components/send-inquiry-modal/send-inquiry-modal.component';
 import type { SendEmailAttachmentOption } from '../../../components/send-email-modal/send-email-modal.component';
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class OrderCommunicationService {
   private readonly http = inject(HttpClient);
 

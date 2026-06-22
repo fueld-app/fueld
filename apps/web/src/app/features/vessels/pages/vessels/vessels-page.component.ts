@@ -166,7 +166,7 @@ interface VesselSearchResult {
         <div class="overflow-x-auto rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface shadow-sm">
           <table class="w-full text-sm">
             <thead>
-              <tr class="border-b border-gray-100 dark:border-line bg-gray-50/60">
+              <tr class="border-b border-gray-100 dark:border-line bg-gray-50/60 dark:bg-surface-2">
                 <th app-sort-header field="name" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-5 py-3 text-left font-medium text-gray-500 dark:text-muted">Vessel</th>
                 <th app-sort-header field="type" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-5 py-3 text-left font-medium text-gray-500 dark:text-muted">Type</th>
                 <th app-sort-header field="flag" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-5 py-3 text-left font-medium text-gray-500 dark:text-muted">Flag</th>
@@ -180,7 +180,7 @@ interface VesselSearchResult {
             </thead>
             <tbody class="divide-y divide-gray-50">
               @for (v of vessels(); track v.id) {
-                <tr class="hover:bg-gray-50/50 transition-colors cursor-pointer" (click)="goToVessel(v.id)">
+                <tr class="hover:bg-gray-50/50 transition-colors cursor-pointer dark:hover:bg-surface-tint" (click)="goToVessel(v.id)">
                   <td class="px-5 py-3">
                     <div class="font-medium text-gray-900 dark:text-ink">{{ v.name }}</div>
                     <div class="text-xs text-gray-400 dark:text-muted">

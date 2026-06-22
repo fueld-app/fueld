@@ -74,7 +74,7 @@ interface ActivityItem {
       } @else if (items().length) {
         <div class="divide-y divide-gray-50">
           @for (item of items(); track item.id) {
-            <div class="px-5 py-3 flex items-start gap-3 hover:bg-gray-50/50 transition-colors">
+            <div class="px-5 py-3 flex items-start gap-3 hover:bg-gray-50/50 transition-colors dark:hover:bg-surface-tint">
               <!-- Action icon -->
               <div class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
                 [class]="actionIconClass(item.action)">
@@ -418,15 +418,15 @@ export class ActivityTimelineComponent implements OnInit, OnDestroy {
   actionIconClass(action: string): string {
     switch (action) {
       case 'CREATE':
-        return 'bg-green-100 text-green-600';
+        return 'bg-green-100 text-green-600 dark:bg-green-500/15 dark:text-green-400';
       case 'UPDATE':
-        return 'bg-blue-100 text-blue-600';
+        return 'bg-blue-100 text-blue-600 dark:bg-blue-500/15 dark:text-blue-400';
       case 'DELETE':
-        return 'bg-red-100 text-red-600';
+        return 'bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-400';
       case 'EMAIL_SENT':
-        return 'bg-indigo-100 text-indigo-600';
+        return 'bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-400';
       default:
-        return 'bg-gray-100 text-gray-500';
+        return 'bg-gray-100 text-gray-500 dark:bg-gray-500/15 dark:text-gray-400';
     }
   }
 

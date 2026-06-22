@@ -90,7 +90,7 @@ const DOC_LABELS: Record<DocumentType, string> = {
           </div>
 
           <!-- Template variables reference -->
-          <div class="border-b border-gray-100 dark:border-line bg-gray-50/70 px-6 py-3">
+          <div class="border-b border-gray-100 dark:border-line bg-gray-50/70 px-6 py-3 dark:bg-surface-2">
             <details>
               <summary class="cursor-pointer text-sm font-medium text-gray-600 dark:text-ink-dim select-none">
                 Available template variables
@@ -207,7 +207,7 @@ const DOC_LABELS: Record<DocumentType, string> = {
               </thead>
               <tbody class="divide-y divide-gray-100 dark:divide-line">
                 @for (rule of rules(); track rule.id) {
-                  <tr class="hover:bg-gray-50/50">
+                  <tr class="hover:bg-gray-50/50 dark:hover:bg-surface-tint">
                     <td class="px-6 py-3">
                       <span
                         class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
@@ -247,7 +247,7 @@ const DOC_LABELS: Record<DocumentType, string> = {
           </div>
 
           <!-- Add new rule -->
-          <div class="border-t border-gray-200 dark:border-line bg-gray-50/50 px-6 py-4">
+          <div class="border-t border-gray-200 dark:border-line bg-gray-50/50 px-6 py-4 dark:bg-surface-2">
             <h3 class="text-sm font-medium text-gray-700 dark:text-ink-dim mb-3">Add rule</h3>
             <div class="flex flex-wrap items-end gap-3">
               <!-- Rule type -->

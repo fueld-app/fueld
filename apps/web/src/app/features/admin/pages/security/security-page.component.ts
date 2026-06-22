@@ -107,7 +107,7 @@ import { API } from '@app/core/config/api';
                 </p>
               }
             </div>
-            <div class="border-t border-gray-100 dark:border-line px-6 py-3 bg-gray-50/50 flex justify-end">
+            <div class="border-t border-gray-100 dark:border-line px-6 py-3 bg-gray-50/50 flex justify-end dark:bg-surface-2">
               <button
                 (click)="saveSso()"
                 [disabled]="saving()"
@@ -165,7 +165,7 @@ import { API } from '@app/core/config/api';
                 </div>
               </label>
             </div>
-            <div class="border-t border-gray-100 dark:border-line px-6 py-3 bg-gray-50/50 flex justify-end">
+            <div class="border-t border-gray-100 dark:border-line px-6 py-3 bg-gray-50/50 flex justify-end dark:bg-surface-2">
               <button
                 (click)="save2FA()"
                 [disabled]="saving()"
@@ -254,7 +254,7 @@ import { API } from '@app/core/config/api';
                 </p>
               </div>
             </div>
-            <div class="border-t border-gray-100 dark:border-line px-6 py-3 bg-gray-50/50 flex justify-end">
+            <div class="border-t border-gray-100 dark:border-line px-6 py-3 bg-gray-50/50 flex justify-end dark:bg-surface-2">
               <button
                 (click)="savePasskey()"
                 [disabled]="saving()"
@@ -328,7 +328,7 @@ import { API } from '@app/core/config/api';
                 <p class="mt-1 text-xs text-gray-500 dark:text-muted">Public verification links expire after this many days. Set 0 for no expiry.</p>
               </div>
             </div>
-            <div class="border-t border-gray-100 dark:border-line px-6 py-3 bg-gray-50/50 flex justify-end">
+            <div class="border-t border-gray-100 dark:border-line px-6 py-3 bg-gray-50/50 flex justify-end dark:bg-surface-2">
               <button
                 (click)="saveSession()"
                 [disabled]="saving()"
@@ -425,7 +425,7 @@ import { API } from '@app/core/config/api';
                 }
               </div>
             </div>
-            <div class="border-t border-gray-100 dark:border-line px-6 py-3 bg-gray-50/50 flex justify-end">
+            <div class="border-t border-gray-100 dark:border-line px-6 py-3 bg-gray-50/50 flex justify-end dark:bg-surface-2">
               <button
                 (click)="saveMicrosoftPolicy()"
                 [disabled]="saving() || hasApprovedDomainsValidationError()"

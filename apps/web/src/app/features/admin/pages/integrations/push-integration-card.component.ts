@@ -46,7 +46,7 @@ import { IntegrationsToastService } from './integrations-toast.service';
       </div>
 
       @if (status()?.configured) {
-        <div class="border-b border-gray-100 dark:border-line bg-gray-50/50 px-6 py-3">
+        <div class="border-b border-gray-100 dark:border-line bg-gray-50/50 px-6 py-3 dark:bg-surface-2">
           <div class="flex flex-wrap items-center gap-4 text-sm">
             @if (status()!.pushPublicKey) {
               <div class="truncate">

@@ -68,9 +68,9 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
             [class.border-sky-200]="loading()"
             [class.bg-sky-50]="loading()"
             [class.text-sky-700]="loading()"
-            [class.border-gray-200]="!loading()"
-            [class.bg-gray-50]="!loading()"
-            [class.text-gray-500]="!loading()"
+            [class.border-line]="!loading()"
+            [class.bg-surface-2]="!loading()"
+            [class.text-muted]="!loading()"
             data-testid="reports-loading-indicator"
           >
             {{ loading() ? (data() ? 'Updating…' : 'Loading…') : 'Live updates on' }}
@@ -496,7 +496,7 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
 
             <div class="grid gap-3 border-b border-gray-100 dark:border-line px-5 py-4 sm:grid-cols-5">
               @for (bucket of reportData.invoiceAging.buckets; track bucket.label) {
-                <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50/80 p-3" [attr.data-testid]="'reports-aging-bucket-' + bucket.label">
+                <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50/80 p-3 dark:bg-surface-2" [attr.data-testid]="'reports-aging-bucket-' + bucket.label">
                   <p class="text-xs font-medium uppercase tracking-[0.18em] text-gray-400 dark:text-muted">{{ bucket.label }}</p>
                   <p class="mt-2 text-lg font-semibold text-gray-900 dark:text-ink">{{ bucket.count }}</p>
                   <p class="text-sm text-gray-500 dark:text-muted">{{ formatCurrency(bucket.outstandingAmount) }}</p>
@@ -559,12 +559,12 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
             </div>
 
             <div class="grid gap-3 border-b border-gray-100 dark:border-line px-5 py-4 sm:grid-cols-2">
-              <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50/80 p-4">
+              <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50/80 p-4 dark:bg-surface-2">
                 <p class="text-xs font-medium uppercase tracking-[0.18em] text-gray-400 dark:text-muted">Win Rate</p>
                 <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-ink">{{ formatPercent(reportData.commercialSummary.conversion.winRate) }}</p>
                 <p class="mt-1 text-sm text-gray-500 dark:text-muted">Won {{ reportData.commercialSummary.conversion.totalWon }} / Lost {{ reportData.commercialSummary.conversion.totalLost }}</p>
               </div>
-              <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50/80 p-4">
+              <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50/80 p-4 dark:bg-surface-2">
                 <p class="text-xs font-medium uppercase tracking-[0.18em] text-gray-400 dark:text-muted">Avg Days To Close</p>
                 <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-ink">{{ reportData.commercialSummary.conversion.avgDaysToClose ?? '—' }}</p>
                 <p class="mt-1 text-sm text-gray-500 dark:text-muted">Based on won orders in the selected period.</p>
@@ -576,7 +576,7 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
                 <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-muted">Top Loss Reasons</h3>
                 <div class="mt-3 space-y-2">
                   @for (reason of reportData.commercialSummary.lossAnalysis.reasons.slice(0, 5); track reason.reason) {
-                    <div class="flex items-center justify-between rounded-lg border border-gray-200 dark:border-line bg-gray-50/70 px-3 py-2 text-sm">
+                    <div class="flex items-center justify-between rounded-lg border border-gray-200 dark:border-line bg-gray-50/70 px-3 py-2 text-sm dark:bg-surface-2">
                       <span class="font-medium text-gray-800 dark:text-ink">{{ reason.reason }}</span>
                       <span class="text-gray-500 dark:text-muted">{{ reason.count }} · {{ formatPercent(reason.percentage) }}</span>
                     </div>
@@ -629,7 +629,7 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
               <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-muted">Top Customers</h3>
               <div class="mt-3 space-y-2">
                 @for (row of reportData.marginAnalysis.byCustomer.slice(0, 5); track row.key) {
-                  <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50/70 px-3 py-3">
+                  <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50/70 px-3 py-3 dark:bg-surface-2">
                     <div class="flex items-center justify-between gap-3">
                       <span class="font-medium text-gray-900 dark:text-ink">{{ row.label }}</span>
                       <span class="text-sm text-gray-500 dark:text-muted">{{ row.netMarginPct ?? '—' }}%</span>
@@ -648,7 +648,7 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
               <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-muted">Top Products</h3>
               <div class="mt-3 space-y-2">
                 @for (row of reportData.marginAnalysis.byProduct.slice(0, 5); track row.key) {
-                  <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50/70 px-3 py-3">
+                  <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50/70 px-3 py-3 dark:bg-surface-2">
                     <div class="flex items-center justify-between gap-3">
                       <span class="font-medium text-gray-900 dark:text-ink">{{ row.label }}</span>
                       <span class="text-sm text-gray-500 dark:text-muted">{{ row.netMarginPct ?? '—' }}%</span>
@@ -667,7 +667,7 @@ type DatePresetKey = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'this
               <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-muted">Monthly Trend</h3>
               <div class="mt-3 space-y-2">
                 @for (point of reportData.marginAnalysis.monthlyTrend; track point.month) {
-                  <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50/70 px-3 py-3">
+                  <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50/70 px-3 py-3 dark:bg-surface-2">
                     <div class="flex items-center justify-between gap-3">
                       <span class="font-medium text-gray-900 dark:text-ink">{{ point.month }}</span>
                       <span class="text-sm text-gray-500 dark:text-muted">{{ point.netMarginPct ?? '—' }}%</span>

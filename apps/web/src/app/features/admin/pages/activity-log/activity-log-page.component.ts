@@ -135,7 +135,7 @@ import { API } from '@app/core/config/api';
             <div class="overflow-x-auto">
               <table class="w-full text-sm">
               <thead>
-                <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80">
+                <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80 dark:bg-surface-2">
                   <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">User</th>
                   <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Current Page</th>
                   <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Platform</th>
@@ -148,7 +148,7 @@ import { API } from '@app/core/config/api';
               </thead>
               <tbody class="divide-y divide-gray-100 dark:divide-line">
                 @for (s of sessions(); track s.socketId) {
-                  <tr class="transition-colors hover:bg-gray-50/50">
+                  <tr class="transition-colors hover:bg-gray-50/50 dark:hover:bg-surface-tint">
                     <td class="px-4 py-3">
                       <div class="flex items-center gap-2">
                         <span class="relative flex h-2.5 w-2.5">
@@ -300,7 +300,7 @@ import { API } from '@app/core/config/api';
             <div class="overflow-x-auto">
               <table class="w-full text-sm">
               <thead>
-                <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80">
+                <tr class="border-b border-gray-200 dark:border-line bg-gray-50/80 dark:bg-surface-2">
                   <th app-sort-header field="createdAt" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Time</th>
                   <th app-sort-header field="user" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">User</th>
                   <th app-sort-header field="action" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-center font-medium text-gray-600 dark:text-ink-dim">Action</th>
@@ -312,7 +312,7 @@ import { API } from '@app/core/config/api';
               </thead>
               <tbody class="divide-y divide-gray-100 dark:divide-line">
                 @for (log of logs(); track log.id) {
-                  <tr class="transition-colors hover:bg-gray-50/50 cursor-pointer" (click)="expandedLogId.set(expandedLogId() === log.id ? null : log.id)">
+                  <tr class="transition-colors hover:bg-gray-50/50 cursor-pointer dark:hover:bg-surface-tint" (click)="expandedLogId.set(expandedLogId() === log.id ? null : log.id)">
                     <td class="px-4 py-3 text-gray-500 dark:text-muted text-xs whitespace-nowrap">
                       <div class="flex items-center gap-1.5">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-gray-400 dark:text-muted transition-transform" [class.rotate-90]="expandedLogId() === log.id" viewBox="0 0 20 20" fill="currentColor">
@@ -366,7 +366,7 @@ import { API } from '@app/core/config/api';
                     <td class="px-4 py-3 text-[11px] text-gray-500 dark:text-muted">{{ log.platform || '\u2014' }}</td>
                   </tr>
                   @if (expandedLogId() === log.id) {
-                    <tr class="bg-gray-50/80">
+                    <tr class="bg-gray-50/80 dark:bg-surface-2">
                       <td colspan="7" class="px-6 py-4">
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
                           <div>
@@ -666,23 +666,23 @@ export class ActivityLogPageComponent implements OnInit, OnDestroy {
   actionBadge(action: string): string {
     switch (action) {
       case 'CREATE':
-        return 'bg-green-100 text-green-700';
+        return 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400';
       case 'UPDATE':
-        return 'bg-blue-100 text-blue-700';
+        return 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400';
       case 'DELETE':
-        return 'bg-red-100 text-red-700';
+        return 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400';
       case 'PAGE_VIEW':
-        return 'bg-purple-100 text-purple-700';
+        return 'bg-purple-100 text-purple-700 dark:bg-purple-500/15 dark:text-purple-400';
       case 'COPY':
-        return 'bg-amber-100 text-amber-700';
+        return 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400';
       case 'PRINT':
-        return 'bg-cyan-100 text-cyan-700';
+        return 'bg-cyan-100 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-400';
       case 'SCREENSHOT':
-        return 'bg-rose-100 text-rose-700';
+        return 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-400';
       case 'VIEW':
-        return 'bg-gray-100 text-gray-600';
+        return 'bg-gray-100 text-gray-600 dark:bg-gray-500/15 dark:text-gray-400';
       default:
-        return 'bg-gray-100 text-gray-600';
+        return 'bg-gray-100 text-gray-600 dark:bg-gray-500/15 dark:text-gray-400';
     }
   }
 

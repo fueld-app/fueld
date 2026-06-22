@@ -9,7 +9,7 @@ import type { ApiResponse } from '@fueld/types';
 @Component({
   selector: 'app-dashboard-redirect',
   standalone: true,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: '',
 })
 export class DashboardRedirectComponent implements OnInit {

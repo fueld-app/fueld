@@ -394,7 +394,7 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
             }
 
             @if (showExtraAttachments()) {
-              <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50/80 p-4">
+              <div class="rounded-xl border border-gray-200 dark:border-line bg-gray-50/80 p-4 dark:bg-surface-2">
                 <div class="flex items-start justify-between gap-3">
                   <div>
                     <h3 class="text-sm font-semibold text-gray-900 dark:text-ink">{{ attachmentSectionTitle() }}</h3>

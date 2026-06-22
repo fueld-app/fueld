@@ -2256,11 +2256,11 @@ export class LlmPageComponent implements OnInit, OnDestroy {
   recommendationTrendTone(recommendation: LlmPresetRecommendation): string {
     switch (this.recommendationTrendLabel(recommendation)) {
       case 'Improving':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-400';
       case 'Regressing':
-        return 'bg-amber-100 text-amber-900';
+        return 'bg-amber-100 text-amber-900 dark:bg-amber-500/15 dark:text-amber-400';
       default:
-        return 'bg-slate-100 text-slate-700';
+        return 'bg-slate-100 text-slate-700 dark:bg-slate-500/15 dark:text-slate-400';
     }
   }
 

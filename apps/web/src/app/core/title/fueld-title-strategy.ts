@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Service, inject } from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import { RouterStateSnapshot, TitleStrategy } from '@angular/router';
 
@@ -13,11 +13,9 @@ import { RouterStateSnapshot, TitleStrategy } from '@angular/router';
  * Detail pages can override dynamically via Title.setTitle():
  *   this.title.setTitle('Fueld | Vessels > MSC Oscar')
  */
-@Injectable({ providedIn: 'root' })
+@Service()
 export class FueldTitleStrategy extends TitleStrategy {
-  constructor(private readonly title: Title) {
-    super();
-  }
+  private readonly title = inject(Title);
 
   override updateTitle(snapshot: RouterStateSnapshot): void {
     const routeTitle = this.buildTitle(snapshot);

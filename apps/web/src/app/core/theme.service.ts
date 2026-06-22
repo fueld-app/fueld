@@ -1,5 +1,5 @@
 import { DOCUMENT } from '@angular/common';
-import { Injectable, computed, effect, inject, signal } from '@angular/core';
+import { Service, computed, effect, inject, signal } from '@angular/core';
 
 export type ThemePref = 'device' | 'light' | 'dark';
 
@@ -18,7 +18,7 @@ const KEY = 'fueld-app-theme';
  */
 export const THEME_TOGGLE_ENABLED = true;
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class ThemeService {
   private readonly doc = inject(DOCUMENT);
   private readonly mql = this.doc.defaultView?.matchMedia?.(

@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Service, inject } from '@angular/core';
 import { HttpClient, type HttpResponse } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -59,7 +59,7 @@ export interface OrderActionContext {
   showToast: (type: 'success' | 'error', msg: string) => void;
 }
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class OrderActionService {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);

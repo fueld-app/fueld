@@ -63,7 +63,7 @@ const PLACE_RULE_TYPE_OPTIONS: Array<{ value: CompanyPlaceSupplyRulePlaceType; l
       </div>
 
       @if (showAdd()) {
-        <div class="border-b border-gray-100 dark:border-line px-5 py-4 bg-gray-50/50">
+        <div class="border-b border-gray-100 dark:border-line px-5 py-4 bg-gray-50/50 dark:bg-surface-2">
           <div class="space-y-3">
             <div class="relative">
               @if (selectedPlace()) {
@@ -189,7 +189,7 @@ const PLACE_RULE_TYPE_OPTIONS: Array<{ value: CompanyPlaceSupplyRulePlaceType; l
       } @else {
         <div class="divide-y divide-gray-50 max-h-[420px] overflow-y-auto pb-2">
           @for (sp of supplyPorts(); track sp.id) {
-            <div class="px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors">
+            <div class="px-5 py-3 text-sm hover:bg-gray-50/50 transition-colors dark:hover:bg-surface-tint">
               <div class="flex items-center justify-between">
                 <div class="min-w-0">
                   <a [routerLink]="['/places', sp.placeId]" class="font-medium text-brand-700 dark:text-brand-400 hover:text-brand-900 hover:underline">{{ sp.placeName }}</a>
@@ -305,7 +305,7 @@ const PLACE_RULE_TYPE_OPTIONS: Array<{ value: CompanyPlaceSupplyRulePlaceType; l
                 </div>
               }
             </div>
-            <div class="min-h-0 overflow-y-auto bg-gray-50/70 px-6 py-5">
+            <div class="min-h-0 overflow-y-auto bg-gray-50/70 px-6 py-5 dark:bg-surface-2">
               <div class="flex items-start justify-between gap-3">
                 <div>
                   <h4 class="text-sm font-semibold text-gray-800 dark:text-ink">{{ editingRuleId() ? "Edit Rule" : "New Rule" }}</h4>

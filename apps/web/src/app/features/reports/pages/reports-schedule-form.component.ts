@@ -98,12 +98,9 @@ import { Role } from '@fueld/types';
               [attr.data-testid]="'reports-schedule-exception-type-' + type"
               (click)="toggleExceptionType(type)"
               class="rounded-full border px-3 py-1.5 text-sm font-medium transition-colors"
-              [class.border-red-600]="isExceptionTypeSelected(type)"
-              [class.bg-red-600]="isExceptionTypeSelected(type)"
-              [class.text-white]="isExceptionTypeSelected(type)"
-              [class.border-gray-300]="!isExceptionTypeSelected(type)"
-              [class.bg-white]="!isExceptionTypeSelected(type)"
-              [class.text-gray-700]="!isExceptionTypeSelected(type)"
+              [class]="isExceptionTypeSelected(type)
+                ? 'border-red-600 bg-red-600 text-white'
+                : 'border-gray-300 dark:border-line-strong bg-white dark:bg-surface text-gray-700 dark:text-ink-dim'"
             >
               {{ exceptionTypeLabel(type) }}
             </button>
@@ -139,12 +136,9 @@ import { Role } from '@fueld/types';
             type="button"
             (click)="toggleRole(role)"
             class="rounded-full border px-3 py-1.5 text-sm font-medium transition-colors"
-            [class.border-gray-900]="isRoleSelected(role)"
-            [class.bg-gray-900]="isRoleSelected(role)"
-            [class.text-white]="isRoleSelected(role)"
-            [class.border-gray-300]="!isRoleSelected(role)"
-            [class.bg-white]="!isRoleSelected(role)"
-            [class.text-gray-700]="!isRoleSelected(role)"
+            [class]="isRoleSelected(role)
+              ? 'border-gray-900 bg-gray-900 text-white dark:border-ink dark:bg-ink dark:text-bg'
+              : 'border-gray-300 dark:border-line-strong bg-white dark:bg-surface text-gray-700 dark:text-ink-dim'"
           >
             {{ roleLabel(role) }}
           </button>

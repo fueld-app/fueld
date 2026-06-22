@@ -1,4 +1,4 @@
-import { Injectable, signal } from '@angular/core';
+import { Service, signal } from '@angular/core';
 import { Subject, Observable, filter, map } from 'rxjs';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -19,7 +19,7 @@ interface WsMessage {
   message?: string;
 }
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class WebSocketService {
   private ws: WebSocket | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
