@@ -171,6 +171,18 @@ interface CompanySearchResult {
           }
         </select>
 
+        <!-- Filter by country -->
+        <select
+          [ngModel]="filterCountry()"
+          (ngModelChange)="filterCountry.set($event); currentPage.set(1); loadCompanies(); updateUrlParams()"
+          class="rounded-lg border border-gray-300 dark:border-line-strong py-2 pl-3 pr-8 text-sm focus:border-brand-600 focus:ring-1 focus:ring-brand-600 outline-none"
+        >
+          <option value="">All Countries</option>
+          @for (c of countries; track c.code) {
+            <option [value]="c.name">{{ flagEmoji(c.code) }} {{ c.name }}</option>
+          }
+        </select>
+
         <!-- Filter by segment -->
         @if (segmentCategories().length > 0) {
           <select
@@ -366,6 +378,7 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
   readonly loading = signal(true);
   readonly filterType = signal('');
   readonly filterResponsible = signal('');
+  readonly filterCountry = signal('');
   readonly filterSegment = signal(''); // format: "categoryKey:optionKey"
   readonly sortBy = signal('');
   readonly sortDir = signal<'asc' | 'desc'>('asc');
@@ -409,6 +422,8 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
     if (type) this.filterType.set(type);
     const responsible = params.get('responsible');
     if (responsible) this.filterResponsible.set(responsible);
+    const country = params.get('country');
+    if (country) this.filterCountry.set(country);
     const sortBy = params.get('sortBy');
     if (sortBy) this.sortBy.set(sortBy);
     const sortDir = params.get('sortDir') as 'asc' | 'desc';
@@ -457,6 +472,7 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
     params.set('limit', String(this.pageSize));
     if (this.filterType()) params.set('type', this.filterType());
     if (this.filterResponsible()) params.set('responsibleUserId', this.filterResponsible());
+    if (this.filterCountry()) params.set('country', this.filterCountry());
     if (this.filterSegment()) params.set('segment', this.filterSegment());
     if (this.sortBy()) params.set('sortBy', this.sortBy());
     if (this.sortBy()) params.set('sortDir', this.sortDir());
@@ -560,6 +576,7 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
       page: this.currentPage() > 1 ? String(this.currentPage()) : null,
       type: this.filterType() || null,
       responsible: this.filterResponsible() || null,
+      country: this.filterCountry() || null,
       segment: this.filterSegment() || null,
       sortBy: this.sortBy() || null,
       sortDir: this.sortBy() ? this.sortDir() : null,
