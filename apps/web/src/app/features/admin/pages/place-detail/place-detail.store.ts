@@ -356,6 +356,8 @@ export class PlaceDetailStore {
   // Map refs (managed by store; components render containers)
   private map: L.Map | null = null;
   private vesselLayer: L.LayerGroup | null = null;
+  private mapResizeObserver: ResizeObserver | null = null;
+  private mapResizeRaf = 0;
   private readonly mapContainer = signal<HTMLElement | null>(null);
   private wsSubs: Subscription[] = [];
   private vesselRefreshInterval: ReturnType<typeof setInterval> | null = null;
@@ -501,6 +503,12 @@ export class PlaceDetailStore {
   }
 
   private cleanupResources(): void {
+    this.mapResizeObserver?.disconnect();
+    this.mapResizeObserver = null;
+    if (this.mapResizeRaf) {
+      cancelAnimationFrame(this.mapResizeRaf);
+      this.mapResizeRaf = 0;
+    }
     this.map?.remove();
     this.map = null;
     this.mapContainer.set(null);
@@ -683,6 +691,20 @@ export class PlaceDetailStore {
         this.addVesselMarkers(this.nearbyVessels());
       }
     });
+
+    // Re-measure Leaflet whenever the container is resized or becomes
+    // visible (covers first render inside a routed tab, tab switches, and
+    // fullscreen toggles). ResizeObserver fires once on observe, which also
+    // acts as a post-init invalidateSize in case Leaflet measured too early.
+    this.mapResizeObserver?.disconnect();
+    this.mapResizeObserver = new ResizeObserver(() => {
+      if (this.mapResizeRaf) cancelAnimationFrame(this.mapResizeRaf);
+      this.mapResizeRaf = requestAnimationFrame(() => {
+        this.mapResizeRaf = 0;
+        this.map?.invalidateSize();
+      });
+    });
+    this.mapResizeObserver.observe(el);
 
     const enrichment = this.enrichment();
     if (enrichment?.geoJsonObject) {
