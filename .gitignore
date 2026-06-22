@@ -46,3 +46,5 @@ tmp/*.pdf
 # Google Cloud SDK (local dev tooling)
 google-cloud-sdk/
 google-cloud-cli-*.tar.gz
+# Pi agent temp scripts
+tmp/
