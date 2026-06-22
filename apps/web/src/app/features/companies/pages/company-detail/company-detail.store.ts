@@ -7,8 +7,7 @@ import { API } from '@app/core/config/api';
 import { WebSocketService } from '@app/core/websocket/websocket.service';
 import { AuthService } from '@app/core/auth/auth.service';
 import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring.service';
-import { flagFromIso3 } from '@app/shared/utils/flags';
-import { COUNTRIES } from '@app/shared/data/countries';
+import { COUNTRIES, countryLabel, countryFlagFromValue, countryFlagByIso3 } from '@app/shared/data/countries';
 import type {
   ApiResponse,
   CounterpartyDto,
@@ -476,7 +475,7 @@ export class CompanyDetailStore {
   readonly companyFlag = computed(() => {
     const c = this.company();
     if (!c?.countryIso) return '';
-    return flagFromIso3(c.countryIso);
+    return countryFlagByIso3(c.countryIso);
   });
   readonly roleOptions = signal<VesselCompanyRoleOption[]>([
     { key: 'REGISTERED_OWNER', label: 'Registered Owner', group: 'Legal & Financial' },
@@ -1727,22 +1726,15 @@ export class CompanyDetailStore {
   }
 
   countryFlag(iso3: string | null | undefined): string {
-    return flagFromIso3(iso3 ?? null);
+    return countryFlagByIso3(iso3 ?? null);
   }
 
   placeCountryFlag(value: string | null | undefined): string {
-    if (!value) return '';
-    const normalized = value.trim().toUpperCase();
-    const country = COUNTRIES.find((entry) => entry.code.toUpperCase() === normalized);
-    return country ? flagFromIso3(country.code) : '';
+    return countryFlagFromValue(value);
   }
 
   placeCountryLabel(value: string | null | undefined): string {
-    if (!value) return '';
-    const trimmed = value.trim();
-    const normalized = trimmed.toUpperCase();
-    const country = COUNTRIES.find((entry) => entry.code.toUpperCase() === normalized);
-    return country?.name ?? trimmed;
+    return countryLabel(value);
   }
 
   emptyPlaceSupplyRuleForm(): { countryIso: string; placeTypes: CompanyPlaceSupplyRulePlaceType[]; contactId: string | null; products: string[]; note: string } {

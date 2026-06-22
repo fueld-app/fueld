@@ -9,8 +9,7 @@ import type {
   ApiResponse, CompanyContactDto, CompanyPlaceSupplyRuleDto, CompanyPlaceSupplyRulePlaceType,
   CompanyPlaceSupplyRuleApplySummaryDto, PortSupplierDto, SupplyPortDto,
 } from '@fueld/types';
-import { COUNTRIES } from '../../../../../../shared/data/countries';
-import { flagFromIso3 } from '../../../../../../shared/utils/flags';
+import { COUNTRIES, countryLabel as resolveCountryLabel, countryFlagFromValue, countryFlagByIso3, countryNameByIso3 } from '../../../../../../shared/data/countries';
 import { API } from '@app/core/config/api';
 
 interface LocalPlaceOption {
@@ -547,23 +546,17 @@ export class SupplyPortsCardComponent implements OnChanges {
   }
 
   placeFlag(country: string): string {
-    const normalized = country.trim().toUpperCase();
-    const entry = COUNTRIES.find(c => c.code.toUpperCase() === normalized);
-    return entry ? flagFromIso3(entry.code) : '';
+    return countryFlagFromValue(country);
   }
 
   placeLabel(country: string): string {
-    const trimmed = country.trim();
-    const normalized = trimmed.toUpperCase();
-    const entry = COUNTRIES.find(c => c.code.toUpperCase() === normalized);
-    return entry?.name ?? trimmed;
+    return resolveCountryLabel(country);
   }
 
-  countryFlag(iso3: string): string { return flagFromIso3(iso3 ?? null); }
+  countryFlag(iso3: string): string { return countryFlagByIso3(iso3 ?? null); }
 
   countryLabel(iso3: string): string {
-    const c = COUNTRIES.find(entry => entry.code.toUpperCase() === iso3.toUpperCase());
-    return c?.name ?? iso3;
+    return countryNameByIso3(iso3);
   }
 
   ruleTypeLabel(type: CompanyPlaceSupplyRulePlaceType): string {

@@ -12,8 +12,7 @@ import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subject, of } from 'rxjs';
 import { debounceTime, switchMap, tap, catchError, takeUntil } from 'rxjs/operators';
 import type { CounterpartyDto, ApiResponse } from '@fueld/types';
-import { COUNTRIES, SORTED_COUNTRIES } from '../../../../shared/data/countries';
-import { flagFromIso3 } from '../../../../shared/utils/flags';
+import { COUNTRIES, SORTED_COUNTRIES, countryLabel, countryFlagFromValue, findCountry } from '../../../../shared/data/countries';
 import { PaginationComponent, SortHeaderComponent } from '../../../../shared/components';
 import type { SortChangeEvent } from '../../../../shared/components';
 import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring.service';
@@ -96,7 +95,7 @@ interface CompanySearchResult {
                     </div>
                     <div class="flex items-center gap-2 mt-0.5">
                       @if (r.country) {
-                        <span class="text-xs text-gray-500 dark:text-muted">{{ flagEmoji(r.countryCode) }} {{ r.country }}</span>
+                        <span class="text-xs text-gray-500 dark:text-muted">{{ flagEmoji(r.countryCode) }} {{ countryLabel(r.countryCode || r.country) }}</span>
                       }
                       @if (r.companyImo) {
                         <span class="text-xs text-gray-400 dark:text-muted">IMO {{ r.companyImo }}</span>
@@ -179,7 +178,7 @@ interface CompanySearchResult {
         >
           <option value="">All Countries</option>
           @for (c of countries; track c.code) {
-            <option [value]="c.name">{{ flagEmoji(c.code) }} {{ c.name }}</option>
+            <option [value]="c.code">{{ flagEmoji(c.code) }} {{ c.name }}</option>
           }
         </select>
 
@@ -266,7 +265,7 @@ interface CompanySearchResult {
                     </div>
                   </td>
                   <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">
-                    {{ flagEmoji(company.countryIso) }} {{ company.country ?? '—' }}
+                    {{ flagEmoji(company.countryIso) }} {{ countryLabel(company.countryIso || company.country) || '—' }}
                     @if (company.countryIso && company.countryIso !== company.country) {
                       <span class="text-gray-400 dark:text-muted text-xs ml-1">({{ company.countryIso }})</span>
                     }
@@ -422,8 +421,11 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
     if (type) this.filterType.set(type);
     const responsible = params.get('responsible');
     if (responsible) this.filterResponsible.set(responsible);
-    const country = params.get('country');
-    if (country) this.filterCountry.set(country);
+    const country = params.get('countryIso') ?? params.get('country');
+    if (country) {
+      const resolved = findCountry(country);
+      this.filterCountry.set(resolved?.code ?? country);
+    }
     const sortBy = params.get('sortBy');
     if (sortBy) this.sortBy.set(sortBy);
     const sortDir = params.get('sortDir') as 'asc' | 'desc';
@@ -472,7 +474,7 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
     params.set('limit', String(this.pageSize));
     if (this.filterType()) params.set('type', this.filterType());
     if (this.filterResponsible()) params.set('responsibleUserId', this.filterResponsible());
-    if (this.filterCountry()) params.set('country', this.filterCountry());
+    if (this.filterCountry()) params.set('countryIso', this.filterCountry());
     if (this.filterSegment()) params.set('segment', this.filterSegment());
     if (this.sortBy()) params.set('sortBy', this.sortBy());
     if (this.sortBy()) params.set('sortDir', this.sortDir());
@@ -557,7 +559,7 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
 
   // ─── Helpers ──────────────────────────────────────────────────────
   flagEmoji(code?: string | null): string {
-    return code ? flagFromIso3(code) : '';
+    return countryFlagFromValue(code ?? null);
   }
 
   // ─── Navigation ────────────────────────────────────────────────────
@@ -576,7 +578,7 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
       page: this.currentPage() > 1 ? String(this.currentPage()) : null,
       type: this.filterType() || null,
       responsible: this.filterResponsible() || null,
-      country: this.filterCountry() || null,
+      countryIso: this.filterCountry() || null,
       segment: this.filterSegment() || null,
       sortBy: this.sortBy() || null,
       sortDir: this.sortBy() ? this.sortDir() : null,

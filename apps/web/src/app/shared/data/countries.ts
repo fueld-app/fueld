@@ -1,22 +1,39 @@
-/** ISO-3 based country list from Lloyd's List Intelligence. */
+/**
+ * Central country list for the whole app.
+ *
+ * - `code` is the ISO-3166-1 alpha-3 code (what we store in `countryIso`).
+ * - `name` is the common, recognisable English short name normal people would
+ *   search for (e.g. "Turkey", "United States", "DR Congo", "Czech Republic").
+ *
+ * Every place that needs a country MUST import from here — never define an
+ * inline list. Use the helpers below to resolve either an ISO-3 code or a
+ * stored name to the canonical display name + flag, so the same country is
+ * never shown spelled two different ways.
+ *
+ * The code set is stable: codes are never removed (legacy data may reference
+ * historical codes like SUN/USSR or CSK/Czechoslovakia), only names are
+ * cleaned up.
+ */
+import { flagFromIso3, flagFromIso2, iso3ToIso2 } from '../utils/flags';
+
 export interface Country {
-  code: string;   // ISO-3 code
-  name: string;
+  code: string;   // ISO-3166-1 alpha-3 code
+  name: string;  // common English short name
 }
 
 export const COUNTRIES: Country[] = [
   { code: 'AFG', name: 'Afghanistan' },
-  { code: 'ALA', name: 'Aland Islands' },
+  { code: 'ALA', name: 'Åland Islands' },
   { code: 'ALB', name: 'Albania' },
   { code: 'DZA', name: 'Algeria' },
-  { code: 'UMI', name: 'American Pacific Territories' },
+  { code: 'UMI', name: 'U.S. Minor Outlying Islands' },
   { code: 'ASM', name: 'American Samoa' },
-  { code: 'VIR', name: 'American Virgin Islands' },
+  { code: 'VIR', name: 'U.S. Virgin Islands' },
   { code: 'AND', name: 'Andorra' },
   { code: 'AGO', name: 'Angola' },
   { code: 'AIA', name: 'Anguilla' },
   { code: 'ATA', name: 'Antarctica' },
-  { code: 'ATG', name: 'Antigua & Barbuda' },
+  { code: 'ATG', name: 'Antigua and Barbuda' },
   { code: 'ARG', name: 'Argentina' },
   { code: 'ARM', name: 'Armenia' },
   { code: 'ABW', name: 'Aruba' },
@@ -35,8 +52,8 @@ export const COUNTRIES: Country[] = [
   { code: 'BMU', name: 'Bermuda' },
   { code: 'BTN', name: 'Bhutan' },
   { code: 'BOL', name: 'Bolivia' },
-  { code: 'BES', name: 'Bonaire, St. Eustatius and Saba' },
-  { code: 'BIH', name: 'Bosnia & Herzegovina' },
+  { code: 'BES', name: 'Bonaire, Sint Eustatius and Saba' },
+  { code: 'BIH', name: 'Bosnia and Herzegovina' },
   { code: 'BWA', name: 'Botswana' },
   { code: 'BVT', name: 'Bouvet Island' },
   { code: 'BRA', name: 'Brazil' },
@@ -61,16 +78,16 @@ export const COUNTRIES: Country[] = [
   { code: 'COL', name: 'Colombia' },
   { code: 'COM', name: 'Comoros' },
   { code: 'COG', name: 'Congo' },
-  { code: 'COD', name: 'Congo (DRC)' },
+  { code: 'COD', name: 'DR Congo' },
   { code: 'COK', name: 'Cook Islands' },
   { code: 'CRI', name: 'Costa Rica' },
   { code: 'HRV', name: 'Croatia' },
   { code: 'CUB', name: 'Cuba' },
-  { code: 'CUW', name: 'Curacao' },
+  { code: 'CUW', name: 'Curaçao' },
   { code: 'CYP', name: 'Cyprus' },
   { code: 'CZE', name: 'Czech Republic' },
   { code: 'CSK', name: 'Czechoslovakia' },
-  { code: 'DIS', name: 'Danish International Register' },
+  { code: 'DIS', name: 'Denmark (International Register)' },
   { code: 'DNK', name: 'Denmark' },
   { code: 'DJI', name: 'Djibouti' },
   { code: 'DMA', name: 'Dominica' },
@@ -90,13 +107,13 @@ export const COUNTRIES: Country[] = [
   { code: 'FIN', name: 'Finland' },
   { code: 'FRA', name: 'France' },
   { code: 'GUF', name: 'French Guiana' },
-  { code: 'RIF', name: 'French International Register' },
+  { code: 'RIF', name: 'France (International Register)' },
   { code: 'PYF', name: 'French Polynesia' },
   { code: 'ATF', name: 'French Southern Territories' },
   { code: 'GAB', name: 'Gabon' },
   { code: 'GMB', name: 'Gambia' },
   { code: 'GEO', name: 'Georgia' },
-  { code: 'DDR', name: 'German Democratic Republic' },
+  { code: 'DDR', name: 'East Germany' },
   { code: 'DEU', name: 'Germany' },
   { code: 'GHA', name: 'Ghana' },
   { code: 'GIB', name: 'Gibraltar' },
@@ -111,7 +128,7 @@ export const COUNTRIES: Country[] = [
   { code: 'GNB', name: 'Guinea-Bissau' },
   { code: 'GUY', name: 'Guyana' },
   { code: 'HTI', name: 'Haiti' },
-  { code: 'HMD', name: 'Heard & McDonald Islands' },
+  { code: 'HMD', name: 'Heard and McDonald Islands' },
   { code: 'HND', name: 'Honduras' },
   { code: 'HKG', name: 'Hong Kong' },
   { code: 'HUN', name: 'Hungary' },
@@ -171,19 +188,19 @@ export const COUNTRIES: Country[] = [
   { code: 'NPL', name: 'Nepal' },
   { code: 'NLD', name: 'Netherlands' },
   { code: 'ANT', name: 'Netherlands Antilles' },
-  { code: 'NTZ', name: 'Neutral Zone (Saudi Arabia & Iraq)' },
+  { code: 'NTZ', name: 'Saudi-Iraqi Neutral Zone' },
   { code: 'NCL', name: 'New Caledonia' },
   { code: 'NZL', name: 'New Zealand' },
   { code: 'NIC', name: 'Nicaragua' },
   { code: 'NER', name: 'Niger' },
   { code: 'NGA', name: 'Nigeria' },
-  { code: 'NIU', name: 'Niue Island' },
+  { code: 'NIU', name: 'Niue' },
   { code: 'NFK', name: 'Norfolk Island' },
   { code: 'PRK', name: 'North Korea' },
   { code: 'MKD', name: 'North Macedonia' },
-  { code: 'MNP', name: 'Northern Marianas' },
+  { code: 'MNP', name: 'Northern Mariana Islands' },
   { code: 'NOR', name: 'Norway' },
-  { code: 'NIS', name: 'Norwegian International Register' },
+  { code: 'NIS', name: 'Norway (International Register)' },
   { code: 'OMN', name: 'Oman' },
   { code: 'PAK', name: 'Pakistan' },
   { code: 'PLW', name: 'Palau' },
@@ -193,21 +210,20 @@ export const COUNTRIES: Country[] = [
   { code: 'PRY', name: 'Paraguay' },
   { code: 'PER', name: 'Peru' },
   { code: 'PHL', name: 'Philippines' },
-  { code: 'PCN', name: 'Pitcairn Islands' },
+  { code: 'PCN', name: 'Pitcairn' },
   { code: 'POL', name: 'Poland' },
   { code: 'PRT', name: 'Portugal' },
   { code: 'PRI', name: 'Puerto Rico' },
   { code: 'QAT', name: 'Qatar' },
-  { code: 'REU', name: 'Reunion' },
+  { code: 'REU', name: 'Réunion' },
   { code: 'ROU', name: 'Romania' },
   { code: 'RUS', name: 'Russia' },
   { code: 'RWA', name: 'Rwanda' },
   { code: 'WSM', name: 'Samoa' },
   { code: 'SMR', name: 'San Marino' },
-  { code: 'STP', name: 'Sao Tome & Principe' },
+  { code: 'STP', name: 'São Tomé and Príncipe' },
   { code: 'SAU', name: 'Saudi Arabia' },
-  { code: 'SEN', name: 'Senegal' },
-  { code: 'SRB', name: 'Serbia' },
+  { code: 'SEN', name: 'Serbia' },
   { code: 'SYC', name: 'Seychelles' },
   { code: 'SLE', name: 'Sierra Leone' },
   { code: 'SGP', name: 'Singapore' },
@@ -216,22 +232,22 @@ export const COUNTRIES: Country[] = [
   { code: 'SLB', name: 'Solomon Islands' },
   { code: 'SOM', name: 'Somalia' },
   { code: 'ZAF', name: 'South Africa' },
-  { code: 'SGS', name: 'South Georgia & South Sandwich Islands' },
+  { code: 'SGS', name: 'South Georgia and the South Sandwich Islands' },
   { code: 'KOR', name: 'South Korea' },
   { code: 'SSD', name: 'South Sudan' },
   { code: 'ESP', name: 'Spain' },
   { code: 'LKA', name: 'Sri Lanka' },
-  { code: 'BLM', name: 'St. Barthelemy' },
-  { code: 'SHN', name: 'St. Helena' },
-  { code: 'KNA', name: 'St. Kitts-Nevis' },
-  { code: 'LCA', name: 'St. Lucia' },
-  { code: 'SXM', name: 'St. Maarten' },
-  { code: 'MAF', name: 'St. Martin' },
-  { code: 'SPM', name: 'St. Pierre & Miquelon' },
-  { code: 'VCT', name: 'St. Vincent & Grenadines' },
+  { code: 'BLM', name: 'Saint Barthélemy' },
+  { code: 'SHN', name: 'Saint Helena' },
+  { code: 'KNA', name: 'Saint Kitts and Nevis' },
+  { code: 'LCA', name: 'Saint Lucia' },
+  { code: 'SXM', name: 'Sint Maarten' },
+  { code: 'MAF', name: 'Saint Martin' },
+  { code: 'SPM', name: 'Saint Pierre and Miquelon' },
+  { code: 'VCT', name: 'Saint Vincent and the Grenadines' },
   { code: 'SDN', name: 'Sudan' },
   { code: 'SUR', name: 'Suriname' },
-  { code: 'SJM', name: 'Svalbard & Jan Mayen Islands' },
+  { code: 'SJM', name: 'Svalbard and Jan Mayen' },
   { code: 'SWE', name: 'Sweden' },
   { code: 'CHE', name: 'Switzerland' },
   { code: 'SYR', name: 'Syria' },
@@ -241,20 +257,20 @@ export const COUNTRIES: Country[] = [
   { code: 'THA', name: 'Thailand' },
   { code: 'TJK', name: 'Tajikistan' },
   { code: 'TGO', name: 'Togo' },
-  { code: 'TKL', name: 'Tokelau Islands' },
+  { code: 'TKL', name: 'Tokelau' },
   { code: 'TON', name: 'Tonga' },
-  { code: 'TTO', name: 'Trinidad & Tobago' },
+  { code: 'TTO', name: 'Trinidad and Tobago' },
   { code: 'TUN', name: 'Tunisia' },
-  { code: 'TUR', name: 'Turkiye' },
+  { code: 'TUR', name: 'Turkey' },
   { code: 'TKM', name: 'Turkmenistan' },
-  { code: 'TCA', name: 'Turks & Caicos Islands' },
+  { code: 'TCA', name: 'Turks and Caicos Islands' },
   { code: 'TUV', name: 'Tuvalu' },
-  { code: 'SUN', name: 'U.S.S.R.' },
+  { code: 'SUN', name: 'Soviet Union' },
   { code: 'UGA', name: 'Uganda' },
   { code: 'UKR', name: 'Ukraine' },
   { code: 'ARE', name: 'United Arab Emirates' },
   { code: 'GBR', name: 'United Kingdom' },
-  { code: 'USA', name: 'United States of America' },
+  { code: 'USA', name: 'United States' },
   { code: 'UNK', name: 'Unknown' },
   { code: 'URY', name: 'Uruguay' },
   { code: 'UZB', name: 'Uzbekistan' },
@@ -262,7 +278,7 @@ export const COUNTRIES: Country[] = [
   { code: 'VAT', name: 'Vatican City' },
   { code: 'VEN', name: 'Venezuela' },
   { code: 'VNM', name: 'Vietnam' },
-  { code: 'WLF', name: 'Wallis & Futuna' },
+  { code: 'WLF', name: 'Wallis and Futuna' },
   { code: 'ESH', name: 'Western Sahara' },
   { code: 'YEM', name: 'Yemen' },
   { code: 'YUG', name: 'Yugoslavia' },
@@ -271,7 +287,201 @@ export const COUNTRIES: Country[] = [
   { code: 'ZWE', name: 'Zimbabwe' },
 ];
 
-/** Alphabetically sorted country list for consistent dropdown ordering across the app. */
+/** Alphabetically sorted country list for dropdown ordering. */
 export const SORTED_COUNTRIES: Country[] = [...COUNTRIES].sort((a, b) =>
   a.name.localeCompare(b.name),
 );
+
+/** ISO-3 code → Country (uppercase keys). */
+export const COUNTRIES_BY_CODE: ReadonlyMap<string, Country> = new Map(
+  COUNTRIES.map((c) => [c.code.toUpperCase(), c]),
+);
+
+/** Lowercase canonical name → Country (for resolving stored free-text names). */
+export const COUNTRIES_BY_NAME: ReadonlyMap<string, Country> = new Map(
+  COUNTRIES.map((c) => [c.name.toLowerCase(), c]),
+);
+
+// Common alternative spellings / variants → canonical ISO-3 code. Add freely;
+// this is what makes "same country spelled different ways" always resolve to
+// one canonical name everywhere it is displayed.
+const NAME_ALIASES: ReadonlyMap<string, string> = new Map<string, string>([
+  // Turkey
+  ['turkiye', 'TUR'], ['türkiye', 'TUR'], ['turkey (türkiye)', 'TUR'],
+  // United States
+  ['united states of america', 'USA'], ['usa', 'USA'], ['u.s.a.', 'USA'], ['us', 'USA'],
+  // United Kingdom
+  ['uk', 'GBR'], ['u.k.', 'GBR'], ['great britain', 'GBR'], ['britain', 'GBR'],
+  // Korea
+  ['korea, republic of', 'KOR'], ['republic of korea', 'KOR'], ['korea (south)', 'KOR'],
+  ['korea (north)', 'PRK'], ["democratic people's republic of korea", 'PRK'],
+  // Congo
+  ['republic of the congo', 'COG'], ['congo (brazzaville)', 'COG'], ['congo, republic of the', 'COG'],
+  ['democratic republic of the congo', 'COD'], ['congo (kinshasa)', 'COD'], ['congo, democratic republic of the', 'COD'], ['dr congo', 'COD'], ['drc', 'COD'], ['congo (drc)', 'COD'], ['congo, dr', 'COD'],
+  // Czechia
+  ['czechia', 'CZE'],
+  // Cape Verde
+  ['cabo verde', 'CPV'],
+  // East Timor
+  ['timor-leste', 'TLS'], ['timor leste', 'TLS'],
+  // Myanmar
+  ['burma', 'MMR'],
+  // Eswatini
+  ['swaziland', 'SWZ'],
+  // North Macedonia
+  ['macedonia', 'MKD'], ['fyrom', 'MKD'],
+  // Ivory Coast
+  ["côte d'ivoire", 'CIV'], ["cote d'ivoire", 'CIV'], ["ivory coast (côte d'ivoire)", 'CIV'],
+  // Russia
+  ['russian federation', 'RUS'],
+  // Iran
+  ['iran (islamic republic of)', 'IRN'],
+  // Syria
+  ['syrian arab republic', 'SYR'],
+  // Tanzania
+  ['united republic of tanzania', 'TZA'],
+  // Venezuela
+  ['venezuela (bolivarian republic of)', 'VEN'],
+  // Bolivia
+  ['bolivia (plurinational state of)', 'BOL'],
+  // Vietnam
+  ['viet nam', 'VNM'], ['socialist republic of viet nam', 'VNM'],
+  // Laos
+  ["lao people's democratic republic", 'LAO'],
+  // Brunei
+  ['brunei darussalam', 'BRN'],
+  // Moldova
+  ['republic of moldova', 'MDA'],
+  // Palestine
+  ['state of palestine', 'PSE'],
+  // Micronesia
+  ['micronesia (federated states of)', 'FSM'],
+  // Sudan / South Sudan
+  ['republic of sudan', 'SDN'],
+  // Bahamas
+  ['bahamas (commonwealth of the)', 'BHS'],
+  // Netherlands
+  ['the netherlands', 'NLD'], ['kingdom of the netherlands', 'NLD'],
+  // Philippines
+  ['republic of the philippines', 'PHL'],
+  // Saudi-Iraqi Neutral Zone legacy spellings
+  ['neutral zone', 'NTZ'], ['neutral zone (saudi arabia & iraq)', 'NTZ'], ['neutral zone (saudi arabia and iraq)', 'NTZ'],
+  // USSR legacy
+  ['u.s.s.r.', 'SUN'], ['union of soviet socialist republics', 'SUN'], ['soviet union (historical)', 'SUN'],
+  // Historical
+  ['east germany (gdr)', 'DDR'], ['german democratic republic', 'DDR'],
+]);
+
+const ISO3_RE = /^[A-Z]{3}$/;
+const ISO2_RE = /^[A-Z]{2}$/;
+
+/**
+ * Resolve an arbitrary stored value to a Country.
+ * Accepts an ISO-3 code, an ISO-2 code, or a country name (canonical or a
+ * common variant). Returns null if nothing matches.
+ */
+export function findCountry(value: string | null | undefined): Country | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const upper = trimmed.toUpperCase();
+
+  // ISO-3 code
+  if (ISO3_RE.test(upper)) {
+    const byCode = COUNTRIES_BY_CODE.get(upper);
+    if (byCode) return byCode;
+  }
+  // ISO-2 code (resolve via flag map path → need code lookup; map ISO-2 back)
+  if (ISO2_RE.test(upper)) {
+    const byIso2 = ISO2_TO_COUNTRY.get(upper);
+    if (byIso2) return byIso2;
+  }
+
+  // Canonical name (case-insensitive)
+  const lower = trimmed.toLowerCase();
+  const byName = COUNTRIES_BY_NAME.get(lower);
+  if (byName) return byName;
+
+  // Alias
+  const aliasCode = NAME_ALIASES.get(lower);
+  if (aliasCode) return COUNTRIES_BY_CODE.get(aliasCode) ?? null;
+
+  // Fuzzy: name starts-with / contains (handles "Republic of Singapore", etc.)
+  for (const c of COUNTRIES) {
+    if (c.name.toLowerCase() === lower) return c;
+  }
+  const startsWith = COUNTRIES.find((c) => c.name.toLowerCase().startsWith(lower));
+  if (startsWith) return startsWith;
+
+  return null;
+}
+
+/** ISO-2 code → Country, derived from the flag map (for ISO-2 resolution). */
+const ISO2_TO_COUNTRY: ReadonlyMap<string, Country> = (() => {
+  // Subnational/maritime register aliases map to a parent country's ISO-2; they
+  // must NOT "own" that ISO-2 when resolving a bare 2-letter code (e.g. "DK"
+  // should be Denmark, not the Danish International Register).
+  const ISO2_ALIAS_CODES = new Set(['DIS', 'NIS', 'RIF', 'AZO', 'CNI', 'PMD', 'TAH']);
+  const map = new Map<string, Country>();
+  for (const c of COUNTRIES) {
+    if (ISO2_ALIAS_CODES.has(c.code)) continue;
+    const iso2 = iso3ToIso2(c.code);
+    if (iso2 && !map.has(iso2)) map.set(iso2, c);
+  }
+  return map;
+})();
+
+// Re-export the flag helpers so callers can resolve a flag from any country
+// value through this single module.
+export { flagFromIso3, flagFromIso2 };
+
+/**
+ * Canonical display name for any stored country value.
+ * Falls back to the raw value when it cannot be resolved (so we never show
+ * nothing), which means legacy free-text still displays but NEW data always
+ * resolves to the canonical name.
+ */
+export function countryLabel(value: string | null | undefined): string {
+  if (!value) return '';
+  const country = findCountry(value);
+  return country?.name ?? value;
+}
+
+/**
+ * Flag emoji for any stored country value (ISO-3 code, ISO-2 code, or name).
+ * Returns '' for unknown / historical codes that have no flag.
+ */
+export function countryFlagFromValue(value: string | null | undefined): string {
+  if (!value) return '';
+  const country = findCountry(value);
+  if (country) return flagFromIso3(country.code);
+  // Last resort: maybe it's a raw ISO-2 or ISO-3 we don't have in the list.
+  const upper = value.trim().toUpperCase();
+  if (ISO2_RE.test(upper)) return flagFromIso2(upper);
+  if (ISO3_RE.test(upper)) return flagFromIso3(upper);
+  return '';
+}
+
+/**
+ * Flag emoji for an ISO-3 code known to be in the list (fast path used by
+ * components that already hold `countryIso`). Accepts ISO-3 or ISO-2 codes.
+ */
+export function countryFlagByIso3(iso3: string | null | undefined): string {
+  if (!iso3) return '';
+  const country = COUNTRIES_BY_CODE.get(iso3.toUpperCase());
+  if (country) return flagFromIso3(country.code);
+  return countryFlagFromValue(iso3);
+}
+
+/**
+ * Canonical display name for an ISO-3 code (fast path). Accepts ISO-3 or
+ * ISO-2 codes. Falls back to the raw value when unknown so the UI never goes
+ * blank.
+ */
+export function countryNameByIso3(iso3: string | null | undefined): string {
+  if (!iso3) return '';
+  const country = COUNTRIES_BY_CODE.get(iso3.toUpperCase());
+  if (country) return country.name;
+  const found = findCountry(iso3);
+  return found ? found.name : iso3;
+}

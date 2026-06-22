@@ -12,11 +12,11 @@ import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subject, of } from 'rxjs';
 import { debounceTime, switchMap, tap, catchError, takeUntil } from 'rxjs/operators';
 import type { PlaceDto, ApiResponse, CreatePlaceDto } from '@fueld/types';
-import { COUNTRIES, SORTED_COUNTRIES } from '../../../../shared/data/countries';
+import { COUNTRIES, SORTED_COUNTRIES, countryLabel, countryFlagFromValue } from '../../../../shared/data/countries';
 import { AREAS } from '../../../../shared/data/areas';
 import { PaginationComponent, SortHeaderComponent } from '../../../../shared/components';
 import type { SortChangeEvent } from '../../../../shared/components';
-import { flagFromIso3, flagFromUnlocode } from '../../../../shared/utils/flags';
+import { flagFromUnlocode } from '../../../../shared/utils/flags';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Places Page — Browse local places + search & import from Lloyd's
@@ -111,7 +111,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
                       }
                     </div>
                     <div class="mt-0.5 text-xs text-gray-500 dark:text-muted truncate">
-                      {{ r.country }}
+                      {{ countryLabel(r.country) }}
                       @if (r.unlocode) { · {{ r.unlocode }} }
                       @if (r.area) { · {{ r.area }} }
                     </div>
@@ -211,7 +211,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
               <tr (click)="openPlace(place.id)" class="cursor-pointer transition-colors hover:bg-gray-50/50 dark:hover:bg-surface-tint">
                 <td class="px-4 py-3 font-medium text-brand-700 dark:text-brand-400 hover:underline">{{ place.name }}</td>
                 <td class="px-4 py-3 text-gray-600 dark:text-ink-dim">
-                  <span class="mr-1.5">{{ countryFlag(place) }}</span>{{ place.country }}
+                  <span class="mr-1.5">{{ countryFlag(place) }}</span>{{ countryLabel(place.countryIso || place.country) }}
                   @if (place.countryIso && place.countryIso !== place.country) {
                     <span class="ml-1 text-xs text-gray-400 dark:text-muted">({{ place.countryIso }})</span>
                   }
@@ -287,7 +287,7 @@ const PLACE_TYPE_LABELS: Record<string, string> = {
               }
             </div>
             <div class="grid grid-cols-2 gap-1 text-xs text-gray-500 dark:text-muted">
-              <span>{{ countryFlag(place) }} {{ place.country }}</span>
+              <span>{{ countryFlag(place) }} {{ countryLabel(place.countryIso || place.country) }}</span>
               <span>🏷️ {{ place.unlocode ?? '—' }}</span>
               <span>🌍 {{ place.area ?? '—' }}</span>
               <span>� {{ place.orderCount ?? 0 }} orders @if (place.activeOrderCount) { ({{ place.activeOrderCount }} active) }</span>
@@ -752,9 +752,9 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  /** Convert a 2-letter ISO country code to its flag emoji. */
+  /** Resolve a place's flag from its UNLOCODE or ISO code. */
   countryFlag(place: PlaceDto): string {
-    return flagFromUnlocode(place.unlocode) || flagFromIso3(place.countryIso);
+    return flagFromUnlocode(place.unlocode) || countryFlagFromValue(place.countryIso) || countryFlagFromValue(place.country);
   }
 
   openPlace(id: string): void {

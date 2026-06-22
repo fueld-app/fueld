@@ -14,8 +14,7 @@ import type {
   CompanyEmailType,
   OwnCompanyDto,
 } from '@fueld/types';
-import { flagFromIso3 } from '../../../../../../shared/utils/flags';
-import { COUNTRIES, type Country } from '../../../../../../shared/data/countries';
+import { COUNTRIES, type Country, countryLabel, countryFlagByIso3 } from '../../../../../../shared/data/countries';
 import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
 
 interface CompanyOfficeDto {
@@ -276,7 +275,7 @@ interface CompanyEnrichment {
                   @if (company()!.countryIso) {
                     <span class="mr-1">{{ countryFlag(company()!.countryIso) }}</span>
                   }
-                  {{ company()!.country ?? '—' }}
+                  {{ company()!.countryIso ? countryLabel(company()!.countryIso) : (company()!.country ?? '—') }}
                 </dd>
               }
             </div>
@@ -995,7 +994,7 @@ export class CompanyInfoCardComponent {
 
   // ─── Country picker ─────────────────────────────────────────────────
   countryFlag(iso3: string | null | undefined): string {
-    return flagFromIso3(iso3 ?? null);
+    return countryFlagByIso3(iso3 ?? null);
   }
 
   onCountrySearch(value: string): void {

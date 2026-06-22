@@ -440,6 +440,7 @@ export async function listCompanies(query?: {
   search?: string;
   type?: string;
   country?: string;
+  countryIso?: string;
   responsibleUserId?: string;
   segment?: string; // format: "categoryKey:optionKey"
   sortBy?: string;
@@ -451,6 +452,7 @@ export async function listCompanies(query?: {
   if (query?.search) conditions.push(ilike(counterparties.name, `%${escapeLikePattern(query.search)}%`));
   if (query?.type) conditions.push(sql`${counterparties.types} @> ${JSON.stringify([query.type])}::jsonb`);
   if (query?.country) conditions.push(ilike(counterparties.country, `%${escapeLikePattern(query.country)}%`));
+  if (query?.countryIso) conditions.push(eq(counterparties.countryIso, query.countryIso.toUpperCase()));
   if (query?.responsibleUserId) conditions.push(eq(counterparties.responsibleUserId, query.responsibleUserId));
   if (query?.segment) {
     const [catKey, optKey] = query.segment.split(':');

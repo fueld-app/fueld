@@ -12,7 +12,7 @@ import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subject, of } from 'rxjs';
 import { debounceTime, switchMap, tap, catchError, takeUntil } from 'rxjs/operators';
 import type { VesselDto, ApiResponse } from '@fueld/types';
-import { flagFromIso3 } from '../../../../shared/utils/flags';
+import { countryLabel, countryFlagFromValue } from '../../../../shared/data/countries';
 import { PaginationComponent, SortHeaderComponent } from '../../../../shared/components';
 import type { SortChangeEvent } from '../../../../shared/components';
 
@@ -178,7 +178,7 @@ interface VesselSearchResult {
                 <th class="px-5 py-3 text-right font-medium text-gray-500 dark:text-muted"></th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-50">
+            <tbody class="divide-y divide-gray-100 dark:divide-line">
               @for (v of vessels(); track v.id) {
                 <tr class="hover:bg-gray-50/50 transition-colors cursor-pointer dark:hover:bg-surface-tint" (click)="goToVessel(v.id)">
                   <td class="px-5 py-3">
@@ -189,7 +189,7 @@ interface VesselSearchResult {
                     </div>
                   </td>
                   <td class="px-5 py-3 text-gray-600 dark:text-ink-dim capitalize">{{ v.type || '—' }}</td>
-                  <td class="px-5 py-3 text-gray-600 dark:text-ink-dim">{{ flagEmoji(v.flagCode) }} {{ v.flag || '—' }}</td>
+                  <td class="px-5 py-3 text-gray-600 dark:text-ink-dim">{{ flagEmoji(v.flagCode) }} {{ (v.flagCode && countryLabel(v.flagCode)) || v.flag || '—' }}</td>
                   <td class="px-5 py-3">
                     @if (v.sanctionStatus === 'SANCTIONED') {
                       <span class="inline-flex rounded-full bg-red-100 dark:bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">Yes</span>
@@ -517,7 +517,7 @@ export class VesselsPageComponent implements OnInit, OnDestroy {
 
   // ─── Helpers ──────────────────────────────────────────────────────
   flagEmoji(code?: string | null): string {
-    return code ? flagFromIso3(code) : '';
+    return countryFlagFromValue(code ?? null);
   }
 
   // ─── Navigation ────────────────────────────────────────────────────
