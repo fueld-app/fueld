@@ -12,7 +12,7 @@ import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subject, of } from 'rxjs';
 import { debounceTime, switchMap, tap, catchError, takeUntil } from 'rxjs/operators';
 import type { VesselDto, ApiResponse } from '@fueld/types';
-import { countryLabel, countryFlagFromValue } from '../../../../shared/data/countries';
+import { countryLabel as resolveCountryLabel, countryFlagFromValue } from '../../../../shared/data/countries';
 import { PaginationComponent, SortHeaderComponent } from '../../../../shared/components';
 import type { SortChangeEvent } from '../../../../shared/components';
 
@@ -518,6 +518,10 @@ export class VesselsPageComponent implements OnInit, OnDestroy {
   // ─── Helpers ──────────────────────────────────────────────────────
   flagEmoji(code?: string | null): string {
     return countryFlagFromValue(code ?? null);
+  }
+
+  countryLabel(value: string | null | undefined): string {
+    return resolveCountryLabel(value);
   }
 
   // ─── Navigation ────────────────────────────────────────────────────

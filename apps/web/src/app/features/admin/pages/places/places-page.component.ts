@@ -12,7 +12,7 @@ import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subject, of } from 'rxjs';
 import { debounceTime, switchMap, tap, catchError, takeUntil } from 'rxjs/operators';
 import type { PlaceDto, ApiResponse, CreatePlaceDto } from '@fueld/types';
-import { COUNTRIES, SORTED_COUNTRIES, countryLabel, countryFlagFromValue } from '../../../../shared/data/countries';
+import { COUNTRIES, SORTED_COUNTRIES, countryLabel as resolveCountryLabel, countryFlagFromValue } from '../../../../shared/data/countries';
 import { AREAS } from '../../../../shared/data/areas';
 import { PaginationComponent, SortHeaderComponent } from '../../../../shared/components';
 import type { SortChangeEvent } from '../../../../shared/components';
@@ -755,6 +755,10 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
   /** Resolve a place's flag from its UNLOCODE or ISO code. */
   countryFlag(place: PlaceDto): string {
     return flagFromUnlocode(place.unlocode) || countryFlagFromValue(place.countryIso) || countryFlagFromValue(place.country);
+  }
+
+  countryLabel(value: string | null | undefined): string {
+    return resolveCountryLabel(value);
   }
 
   openPlace(id: string): void {

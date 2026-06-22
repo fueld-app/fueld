@@ -12,7 +12,7 @@ import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subject, of } from 'rxjs';
 import { debounceTime, switchMap, tap, catchError, takeUntil } from 'rxjs/operators';
 import type { CounterpartyDto, ApiResponse } from '@fueld/types';
-import { COUNTRIES, SORTED_COUNTRIES, countryLabel, countryFlagFromValue, findCountry } from '../../../../shared/data/countries';
+import { COUNTRIES, SORTED_COUNTRIES, countryLabel as resolveCountryLabel, countryFlagFromValue, findCountry } from '../../../../shared/data/countries';
 import { PaginationComponent, SortHeaderComponent } from '../../../../shared/components';
 import type { SortChangeEvent } from '../../../../shared/components';
 import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring.service';
@@ -560,6 +560,10 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
   // ─── Helpers ──────────────────────────────────────────────────────
   flagEmoji(code?: string | null): string {
     return countryFlagFromValue(code ?? null);
+  }
+
+  countryLabel(value: string | null | undefined): string {
+    return resolveCountryLabel(value);
   }
 
   // ─── Navigation ────────────────────────────────────────────────────

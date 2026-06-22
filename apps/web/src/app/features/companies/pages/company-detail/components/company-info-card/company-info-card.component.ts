@@ -14,7 +14,7 @@ import type {
   CompanyEmailType,
   OwnCompanyDto,
 } from '@fueld/types';
-import { COUNTRIES, type Country, countryLabel, countryFlagByIso3 } from '../../../../../../shared/data/countries';
+import { COUNTRIES, type Country, countryLabel as resolveCountryLabel, countryFlagByIso3 } from '../../../../../../shared/data/countries';
 import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
 
 interface CompanyOfficeDto {
@@ -995,6 +995,10 @@ export class CompanyInfoCardComponent {
   // ─── Country picker ─────────────────────────────────────────────────
   countryFlag(iso3: string | null | undefined): string {
     return countryFlagByIso3(iso3 ?? null);
+  }
+
+  countryLabel(value: string | null | undefined): string {
+    return resolveCountryLabel(value);
   }
 
   onCountrySearch(value: string): void {
