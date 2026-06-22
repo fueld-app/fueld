@@ -406,17 +406,19 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
 
   readonly allColumnOptions = computed<ColumnOption[]>(() => {
     const base: ColumnOption[] = [
-      { field: 'orderNumber', label: 'No.' },
-      { field: 'client', label: 'Client' },
-      { field: 'vessel', label: 'Vessel' },
-      { field: 'port', label: 'Port' },
-      { field: 'status', label: 'Status' },
-      { field: 'responsible', label: 'Responsible' },
-      { field: 'invoicingCompany', label: 'Invoicing' },
-      { field: 'eta', label: 'ETA' },
-      { field: 'dueDate', label: 'Due Date' },
-      { field: 'createdAt', label: 'Created' },
+      { field: 'orderNumber', label: 'No.', sortable: true },
+      { field: 'client', label: 'Client', sortable: true },
+      { field: 'vessel', label: 'Vessel', sortable: true },
+      { field: 'port', label: 'Port', sortable: true },
+      { field: 'status', label: 'Status', sortable: true },
+      { field: 'responsible', label: 'Responsible', sortable: true },
+      { field: 'invoicingCompany', label: 'Invoicing', sortable: true },
+      { field: 'eta', label: 'ETA', sortable: true },
+      { field: 'dueDate', label: 'Due Date', sortable: true },
+      { field: 'createdAt', label: 'Created', sortable: true },
     ];
+    // Financial columns are computed per-row, so the API cannot sort by them;
+    // leave them non-sortable to avoid a silent fallback to createdAt.
     if (this.auth.canSeePrices()) {
       base.push({ field: 'value', label: 'Value' });
     }

@@ -115,6 +115,35 @@ describe('InquiriesListPageComponent', () => {
     expect(fixture.componentInstance.titleText()).toBe('Invoiced Orders');
   });
 
+  it('sorts by the clicked column header asc/desc and reloads', async () => {
+    const fixture = TestBed.createComponent(InquiriesListPageComponent);
+    fixture.componentRef.setInput('mode', 'invoiced-orders');
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    // Mark non-financial columns as sortable in the column config.
+    const sortableFields = fixture
+      .componentInstance
+      .allColumnOptions()
+      .filter((c) => c.sortable)
+      .map((c) => c.field);
+    expect(sortableFields).toContain('client');
+    expect(sortableFields).toContain('dueDate');
+    // Financial columns are NOT sortable (API can't sort by them).
+    expect(sortableFields).not.toContain('value');
+
+    // Clicking 'client' asc, then desc, drives the request params.
+    fixture.componentInstance.onSort({ field: 'client', dir: 'asc' });
+    await fixture.whenStable();
+    expect(latestOrdersRequest()).toContain('sortBy=client');
+    expect(latestOrdersRequest()).toContain('sortDir=asc');
+
+    fixture.componentInstance.onSort({ field: 'client', dir: 'desc' });
+    await fixture.whenStable();
+    expect(latestOrdersRequest()).toContain('sortBy=client');
+    expect(latestOrdersRequest()).toContain('sortDir=desc');
+  });
+
   it('shows gross, financing, and net metrics on order lists', async () => {
     const fixture = TestBed.createComponent(InquiriesListPageComponent);
     fixture.componentRef.setInput('mode', 'active-orders');
