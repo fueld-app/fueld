@@ -15,6 +15,7 @@ import { firstValueFrom } from 'rxjs';
 import { SearchableDropdownComponent, type DropdownOption } from '../../../../shared/components/searchable-dropdown/searchable-dropdown.component';
 import type { ApiResponse, CounterpartyDto, VesselDto, PlaceDto, CreditLineDto } from '@fueld/types';
 import { API } from '@app/core/config/api';
+import { AuthService } from '@app/core/auth/auth.service';
 
 interface CompanySearchResult {
   source: 'local' | 'seasearcher';
@@ -74,11 +75,23 @@ interface LliSearchResult {
                 (searchChange)="searchClients($event)"
                 (selectionChange)="onNewClientChange($event)"
               />
-              @if (newInquiryCreditSummary()) {
-                <p class="mt-1.5 text-xs text-green-700 dark:text-green-400">
-                  Credit available: {{ newInquiryCreditSummary()!.available | number : '1.2-2' }}
-                  {{ newInquiryCreditSummary()!.currency }} · Max {{ newInquiryCreditSummary()!.maxDays }} days
-                </p>
+              @if (auth.canSeePrices()) {
+                @if (newInquiryCreditSummary()) {
+                  <p class="mt-1.5 text-xs text-green-700 dark:text-green-400">
+                    Credit available: {{ newInquiryCreditSummary()!.available | number : '1.2-2' }}
+                    {{ newInquiryCreditSummary()!.currency }} · Max {{ newInquiryCreditSummary()!.maxDays }} days
+                  </p>
+                }
+              } @else {
+                @if (newInquiryCreditSummary()) {
+                  <span class="mt-1.5 inline-flex items-center gap-1 rounded-full bg-green-100 dark:bg-green-500/15 px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-400">
+                    <span class="h-1.5 w-1.5 rounded-full bg-green-500"></span> Credit OK
+                  </span>
+                } @else {
+                  <span class="mt-1.5 inline-flex items-center gap-1 rounded-full bg-red-100 dark:bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
+                    <span class="h-1.5 w-1.5 rounded-full bg-red-500"></span> No credit line
+                  </span>
+                }
               }
             </div>
 
@@ -177,6 +190,7 @@ interface LliSearchResult {
   `,
 })
 export class InquiriesListNewInquiryModalComponent {
+  protected readonly auth = inject(AuthService);
   readonly open = input(false);
   readonly responsibleOptions = input<DropdownOption[]>([]);
   readonly close = output<void>();

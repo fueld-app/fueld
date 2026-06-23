@@ -312,7 +312,7 @@
         [currency]="order()?.currency ?? 'USD'"
         [loading]="paymentsLoading()"
         [canSeePrices]="auth.canSeePrices()"
-        [canRecordPayment]="canRecordPayment()"
+        [canRecordPayment]="canRecordPayment() && auth.canSeePrices()"
         (addPayment)="openPaymentModal()"
       />
     }

@@ -14,11 +14,13 @@ import { firstValueFrom } from 'rxjs';
 import type { ApiResponse } from '@fueld/types';
 
 import { API } from '@app/core/config/api';
+import { AuthService } from '@app/core/auth/auth.service';
 import {
   extractActivityChangeRows,
   formatActivityMetadataValue,
   formatMetadataLabel,
   getActivityMetadataAction,
+  isFinancialField,
 } from './activity-timeline.formatters';
 
 interface ActivityItem {
@@ -181,6 +183,7 @@ interface ActivityItem {
 })
 export class ActivityTimelineComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
+  private readonly auth = inject(AuthService);
 
   readonly entityType = input.required<string>();
   readonly entityId = input.required<string>();
@@ -400,14 +403,16 @@ export class ActivityTimelineComponent implements OnInit, OnDestroy {
   private readonly META_SKIP = new Set(['httpMethod', 'httpPath', 'userAgent', 'clientIp', 'action', 'changes']);
 
   changeRows(metadata: unknown): Array<{ field: string; from: string; to: string }> | null {
-    return extractActivityChangeRows(metadata, this.META_LABELS);
+    return extractActivityChangeRows(metadata, this.META_LABELS, !this.auth.canSeePrices());
   }
 
   metadataEntries(metadata: unknown): { key: string; value: string }[] | null {
     if (!metadata || typeof metadata !== 'object') return null;
+    const redact = !this.auth.canSeePrices();
     const entries: { key: string; value: string }[] = [];
     for (const [k, v] of Object.entries(metadata as Record<string, unknown>)) {
       if (this.META_SKIP.has(k) || v == null || v === '') continue;
+      if (redact && isFinancialField(k)) continue;
       const label = this.META_LABELS[k] ?? formatMetadataLabel(k);
       const value = formatActivityMetadataValue(v);
       if (value) entries.push({ key: label, value });
