@@ -20,7 +20,6 @@ type BadgeStatus = OrderStatus | InvoiceStatus | 'OVERDUE' | string;
   host: { class: 'inline-flex' },
   template: `
     <span class="status-pill" [attr.data-status]="dataStatus()">
-      <span class="status-dot"></span>
       {{ label() }}
     </span>
   `,

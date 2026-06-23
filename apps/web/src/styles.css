@@ -158,6 +158,15 @@ body {
     color: inherit;
   }
 
+  /* Safari renders native <select> shorter than buttons/inputs with the same
+     padding, so dropdowns look visibly smaller than adjacent fields (e.g. the
+     report Date Range button vs. the filter selects). Force single selects to
+     the standard input height so they line up. Compact inline order-item
+     selects keep their own size. */
+  select:not([multiple]):not([size]):not(.order-item-inline-select) {
+    min-height: calc(2.25rem + 2px);
+  }
+
   [data-theme='dark'] input:is([type='date'], [type='datetime-local'], [type='time']) {
     background-color: var(--surface-2);
     color: var(--ink);
@@ -564,14 +573,7 @@ body {
   .status-pill[data-status="sent"]            { background: var(--st-sent-bg);            color: var(--st-sent-fg);            border-color: var(--st-sent-line); }
   .status-pill[data-status="partially-paid"]  { background: var(--st-partially-paid-bg);  color: var(--st-partially-paid-fg);  border-color: var(--st-partially-paid-line); }
 
-  /* Optional leading dot inside a status pill; inherits the pill's theme-aware color. */
-  .status-pill .status-dot {
-    width: 0.375rem;
-    height: 0.375rem;
-    border-radius: 999px;
-    background: currentColor;
-    flex-shrink: 0;
-  }
+  /* Optional leading dot inside a status pill is no longer rendered. */
 }
 
 /* ─── Leaflet dark-mode theming ─────────────────────────────────────
