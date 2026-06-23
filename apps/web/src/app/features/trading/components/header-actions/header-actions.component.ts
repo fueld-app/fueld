@@ -210,6 +210,7 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
   readonly hasPortDocumentationDocuments = input<boolean>(false);
   readonly portDocumentationEnabled = input<boolean>(false);
   readonly isAdmin = input<boolean>(false);
+  readonly isLight = input<boolean>(false);
   readonly actionTriggered = output<HeaderAction>();
 
   readonly isOpen = signal(false);
@@ -274,8 +275,9 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
       status === OrderStatus.Confirmed
       || status === OrderStatus.Delivered
       || status === OrderStatus.Invoiced;
+    const isLight = this.isLight();
 
-    const nextActions = isInquiry
+    let nextActions = isInquiry
       ? (() => {
           const inquiryActions = ACTIONS
             .filter((action) =>
@@ -348,6 +350,15 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
                 ? { ...action, disabled: !canMarkPaid }
               : action,
           );
+
+    // LIGHT users only get cancel + mark delivered (no financial/email actions).
+    if (isLight) {
+      nextActions = nextActions.filter((action) =>
+        action.key === 'cancel-inquiry'
+        || action.key === 'cancel-order'
+        || action.key === 'mark-delivered',
+      );
+    }
 
     this.displayActions.set(nextActions);
   }

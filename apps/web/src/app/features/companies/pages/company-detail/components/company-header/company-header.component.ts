@@ -3,10 +3,12 @@ import {
   ChangeDetectionStrategy,
   input,
   output,
+  inject,
 } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { AuthService } from '@app/core/auth/auth.service';
 import type {
   CounterpartyDto,
   CompanyParentSummaryDto,
@@ -182,6 +184,7 @@ interface UserOption {
     <!-- Aggregated stats bar (shown when this is a parent with children) -->
     @if (groupAggregate(); as agg) {
       <div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        @if (auth.canSeePrices()) {
         <div class="rounded-lg border border-gray-200 dark:border-line bg-white dark:bg-surface px-4 py-3 shadow-sm">
           <div class="text-xs font-medium text-gray-500 dark:text-muted mb-0.5">Group Credit Limit</div>
           <div class="text-lg font-bold text-gray-900 dark:text-ink">{{ agg.totalCreditLimit | number:'1.0-0' }}</div>
@@ -190,6 +193,7 @@ interface UserOption {
           <div class="text-xs font-medium text-gray-500 dark:text-muted mb-0.5">Group Credit Used</div>
           <div class="text-lg font-bold text-gray-900 dark:text-ink">{{ agg.totalCreditUsed | number:'1.0-0' }}</div>
         </div>
+        }
         <div class="rounded-lg border border-gray-200 dark:border-line bg-white dark:bg-surface px-4 py-3 shadow-sm">
           <div class="text-xs font-medium text-gray-500 dark:text-muted mb-0.5">Group Fleet</div>
           <div class="text-lg font-bold text-gray-900 dark:text-ink">{{ agg.totalFleetSize }} vessels</div>
@@ -203,6 +207,7 @@ interface UserOption {
   `,
 })
 export class CompanyHeaderComponent {
+  protected readonly auth = inject(AuthService);
   readonly company = input.required<CounterpartyDto>();
   readonly companyFlag = input.required<string>();
   readonly companyTypes = input.required<string[]>();

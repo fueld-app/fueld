@@ -36,6 +36,7 @@
       [hasPortDocumentationDocuments]="(portDocSvc.portDocumentationContext()?.documents?.length ?? 0) > 0"
       [portDocumentationEnabled]="portDocSvc.portDocumentationContext()?.enabled ?? false"
       [isAdmin]="auth.isAdmin()"
+      [isLight]="auth.isLight()"
       (actionTriggered)="onAction($event)"
     />
     <app-order-settings-dropdown
@@ -177,6 +178,7 @@
       [creditLoading]="customerCreditLoading()"
       [creditFrozen]="customerCreditFrozen()"
       [canUseCredit]="canUseCustomerCredit()"
+      [showCreditDetails]="auth.canSeePrices()"
       [note]="order()?.customerNote ?? null"
       [showNote]="showCustomerPaymentNote()"
       [paymentTermOptions]="paymentTermOptions"
@@ -197,6 +199,7 @@
       [creditSummary]="supplierCreditSummary()"
       [creditLoading]="supplierCreditLoading()"
       [canUseCredit]="canUseSupplierCredit()"
+      [showCreditDetails]="auth.canSeePrices()"
       [note]="activeSupplierNote() ?? null"
       [showNote]="showSupplierPaymentNote()"
       [paymentTermOptions]="paymentTermOptions"

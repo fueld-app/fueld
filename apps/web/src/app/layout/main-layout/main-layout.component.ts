@@ -190,10 +190,12 @@ interface NavItem {
   label: string;
   icon: string;
   route?: string;
-  children?: { label: string; route: string; allowedRoles?: string[] }[];
+  children?: { label: string; route: string; allowedRoles?: string[]; hiddenForRoles?: string[] }[];
   adminOnly?: boolean;
   /** When set, item is visible to these roles (and always to ADMIN). */
   allowedRoles?: string[];
+  /** When set, item is hidden from these roles (e.g. LIGHT). */
+  hiddenForRoles?: string[];
 }
 
 const NAVIGATION: NavItem[] = [
@@ -206,6 +208,7 @@ const NAVIGATION: NavItem[] = [
     label: 'Reports',
     icon: 'M3 3h18v18H3V3zm4 12h2V9H7v6zm4 0h2V6h-2v9zm4 0h2v-4h-2v4z',
     route: '/reports',
+    hiddenForRoles: ['LIGHT'],
   },
   {
     label: 'Trading',
@@ -214,7 +217,7 @@ const NAVIGATION: NavItem[] = [
       { label: 'Active Orders', route: '/trading/orders' },
       { label: 'Delivered Orders', route: '/trading/delivered-orders' },
       { label: 'Invoiced Orders', route: '/trading/invoiced-orders' },
-      { label: 'Completed Orders', route: '/trading/completed-orders' },
+      { label: 'Completed Orders', route: '/trading/completed-orders', hiddenForRoles: ['LIGHT'] },
       { label: 'Cancelled Orders', route: '/trading/cancelled-orders' },
       { label: 'Inquiries', route: '/trading/inquiries' },
     ],
@@ -222,6 +225,7 @@ const NAVIGATION: NavItem[] = [
   {
     label: 'Credit',
     icon: 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z',
+    hiddenForRoles: ['LIGHT'],
     children: [
       { label: 'Applications', route: '/credit/applications' },
       { label: 'Suppliers', route: '/credit/suppliers', allowedRoles: ['ADMIN', 'CREDITMANAGER'] },
@@ -370,7 +374,7 @@ const NAVIGATION: NavItem[] = [
               @if (isGroupOpen(item.label) && !sidebarCollapsed()) {
                 <div class="ml-5 mt-1 space-y-0.5 border-l border-line pl-4">
                   @for (child of item.children; track child.label) {
-                    @if (!child.allowedRoles || child.allowedRoles.includes('ADMIN') && auth.isAdmin() || child.allowedRoles.includes(auth.userRole())) {
+                    @if ((!child.hiddenForRoles || !child.hiddenForRoles.includes(auth.userRole())) && (!child.allowedRoles || child.allowedRoles.includes('ADMIN') && auth.isAdmin() || child.allowedRoles.includes(auth.userRole()))) {
                     <a
                       [routerLink]="child.route"
                       routerLinkActive="text-ink bg-surface-3"
@@ -1087,6 +1091,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
     const role = this.auth.user()?.role;
     return NAVIGATION.filter((item) => {
       if (item.adminOnly) return this.auth.isAdmin();
+      if (item.hiddenForRoles && role && item.hiddenForRoles.includes(role)) return false;
       if (item.allowedRoles) return role ? item.allowedRoles.includes(role) : false;
       return true;
     });

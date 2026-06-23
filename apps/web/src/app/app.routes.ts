@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 import { authGuard } from './core/auth/auth.guard';
 import { adminGuard } from './core/auth/admin.guard';
 import { creditGuard } from './core/auth/credit.guard';
+import { lightGuard } from './core/auth/light.guard';
 
 export const routes: Routes = [
   // ─── Public routes ──────────────────────────────────────────────
@@ -80,6 +81,7 @@ export const routes: Routes = [
       },
       {
         path: 'reports',
+        canActivate: [lightGuard],
         loadComponent: () =>
           import('./features/reports/pages/reports-page.component').then(
             (m) => m.ReportsPageComponent,
@@ -147,6 +149,7 @@ export const routes: Routes = [
           },
           {
             path: 'completed-orders',
+            canActivate: [lightGuard],
             loadComponent: () =>
               import('./features/trading/pages/completed-orders-list/completed-orders-list-page.component').then(
                 (m) => m.CompletedOrdersListPageComponent,
@@ -173,6 +176,7 @@ export const routes: Routes = [
           },
           {
             path: 'completed-orders/:id',
+            canActivate: [lightGuard],
             loadComponent: () =>
               import('./features/trading/pages/order-detail/order-detail-page.component').then(
                 (m) => m.OrderDetailPageComponent,
@@ -263,6 +267,7 @@ export const routes: Routes = [
       // ── Credit ──
       {
         path: 'credit',
+        canActivate: [lightGuard],
         children: [
           { path: '', redirectTo: 'applications', pathMatch: 'full' as const },
           {

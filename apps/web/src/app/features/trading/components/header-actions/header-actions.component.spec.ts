@@ -7,6 +7,7 @@ describe('HeaderActionsComponent', () => {
     status?: OrderStatus;
     hasPortDocumentationDocuments?: boolean;
     portDocumentationEnabled?: boolean;
+    isLight?: boolean;
   }) {
     await TestBed.configureTestingModule({
       imports: [HeaderActionsComponent],
@@ -17,6 +18,7 @@ describe('HeaderActionsComponent', () => {
     fixture.componentRef.setInput('status', options?.status ?? OrderStatus.Confirmed);
     fixture.componentRef.setInput('hasPortDocumentationDocuments', options?.hasPortDocumentationDocuments ?? false);
     fixture.componentRef.setInput('portDocumentationEnabled', options?.portDocumentationEnabled ?? false);
+    if (options?.isLight) fixture.componentRef.setInput('isLight', true);
     fixture.detectChanges();
 
     return fixture.componentInstance;
@@ -57,5 +59,26 @@ describe('HeaderActionsComponent', () => {
     });
 
     expect(component.displayActions().some((action) => action.key === 'send-port-documentation')).toBe(false);
+  });
+
+  it('restricts LIGHT users to cancel + mark delivered only', async () => {
+    const component = await createComponent({ status: OrderStatus.Confirmed, isLight: true });
+    const keys = component.displayActions().map((a) => a.key);
+
+    expect(keys).toEqual(expect.arrayContaining(['cancel-order', 'mark-delivered']));
+    // No financial/email/document actions for LIGHT users.
+    expect(keys).not.toContain('send-invoice');
+    expect(keys).not.toContain('send-confirmation');
+    expect(keys).not.toContain('mark-paid');
+    expect(keys).not.toContain('generate-invoice');
+  });
+
+  it('shows cancel-inquiry (not cancel-order) for LIGHT users on an inquiry', async () => {
+    const component = await createComponent({ status: OrderStatus.Inquiry, isLight: true });
+    const keys = component.displayActions().map((a) => a.key);
+
+    expect(keys).toContain('cancel-inquiry');
+    expect(keys).not.toContain('cancel-order');
+    expect(keys).not.toContain('mark-delivered');
   });
 });

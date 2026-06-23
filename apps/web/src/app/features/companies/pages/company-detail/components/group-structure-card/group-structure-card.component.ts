@@ -1,7 +1,8 @@
-import { Component, ChangeDetectionStrategy, input, output, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, output, signal, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
 import type { CounterpartyDto, CompanyChildSummaryDto, CompanyParentSummaryDto } from '@fueld/types';
+import { AuthService } from '@app/core/auth/auth.service';
 
 @Component({
   selector: 'app-group-structure-card',
@@ -50,7 +51,7 @@ import type { CounterpartyDto, CompanyChildSummaryDto, CompanyParentSummaryDto }
               <div class="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 dark:bg-brand-700/15 text-brand-700 dark:text-brand-400 text-[10px] font-bold">P</div>
               <span class="text-sm font-medium text-gray-900 dark:text-ink">{{ company().name }}</span>
               @if (company().country) { <span class="text-xs text-gray-400 dark:text-muted">{{ company().country }}</span> }
-              <span class="ml-auto text-xs text-gray-500 dark:text-muted">Credit: {{ company().creditLimit | number:'1.0-0' }}</span>
+              @if (auth.canSeePrices()) { <span class="ml-auto text-xs text-gray-500 dark:text-muted">Credit: {{ company().creditLimit | number:'1.0-0' }}</span> }
               @if (company().fleetSize) { <span class="text-xs text-gray-500 dark:text-muted">Fleet: {{ company().fleetSize }}</span> }
             </div>
             @for (child of childCompanies(); track child.id) {
@@ -59,7 +60,7 @@ import type { CounterpartyDto, CompanyChildSummaryDto, CompanyParentSummaryDto }
                 <div class="flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 dark:bg-surface-3 text-gray-600 dark:text-ink-dim text-[10px] font-bold">C</div>
                 <a [routerLink]="['/companies', child.id]" class="text-sm font-medium text-brand-600 dark:text-brand-400 hover:underline">{{ child.name }}</a>
                 @if (child.country) { <span class="text-xs text-gray-400 dark:text-muted">{{ child.country }}</span> }
-                <span class="ml-auto text-xs text-gray-500 dark:text-muted">Credit: {{ child.creditLimit | number:'1.0-0' }}</span>
+                @if (auth.canSeePrices()) { <span class="ml-auto text-xs text-gray-500 dark:text-muted">Credit: {{ child.creditLimit | number:'1.0-0' }}</span> }
                 @if (child.fleetSize) { <span class="text-xs text-gray-500 dark:text-muted">Fleet: {{ child.fleetSize }}</span> }
                 @if (child.isSanctioned) { <span class="text-[10px] text-red-600 dark:text-red-400">⚠️</span> }
                 <button
@@ -121,6 +122,7 @@ import type { CounterpartyDto, CompanyChildSummaryDto, CompanyParentSummaryDto }
   `,
 })
 export class GroupStructureCardComponent {
+  protected readonly auth = inject(AuthService);
   readonly company = input.required<CounterpartyDto>();
   readonly childCompanies = input<CompanyChildSummaryDto[]>([]);
   readonly parentCompany = input<CompanyParentSummaryDto | null>(null);

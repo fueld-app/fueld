@@ -57,6 +57,7 @@ export type PaymentSide = 'customer' | 'supplier';
           }
         </div>
 
+        @if (showCreditDetails()) {
         <div class="mt-2 text-xs text-gray-500 dark:text-muted">
           @if (creditLoading()) {
             <span>Loading credit line...</span>
@@ -81,6 +82,26 @@ export type PaymentSide = 'customer' | 'supplier';
             }
           }
         </div>
+        } @else {
+        <!-- LIGHT users: no credit amounts/lines, just an ok/blocked status -->
+        <div class="mt-2">
+          @if (creditLoading()) {
+            <span class="inline-flex items-center gap-1 text-xs text-gray-400 dark:text-muted">Checking credit…</span>
+          } @else if (creditFrozen()) {
+            <span class="inline-flex items-center gap-1 rounded-full bg-red-100 dark:bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
+              <span class="h-1.5 w-1.5 rounded-full bg-red-500"></span> Credit blocked
+            </span>
+          } @else if (creditSummary()) {
+            <span class="inline-flex items-center gap-1 rounded-full bg-green-100 dark:bg-green-500/15 px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-400">
+              <span class="h-1.5 w-1.5 rounded-full bg-green-500"></span> Credit OK
+            </span>
+          } @else {
+            <span class="inline-flex items-center gap-1 rounded-full bg-red-100 dark:bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
+              <span class="h-1.5 w-1.5 rounded-full bg-red-500"></span> No credit line
+            </span>
+          }
+        </div>
+        }
       }
 
       <!-- Note toggle -->
@@ -121,6 +142,8 @@ export class OrderPaymentTermsCardComponent {
   readonly creditLoading = input(false);
   readonly creditFrozen = input(false);
   readonly canUseCredit = input(false);
+  /** When false (LIGHT users), hide credit amounts/lines and show only a status badge. */
+  readonly showCreditDetails = input(true);
   readonly note = input<string | null>(null);
   readonly showNote = input(false);
   readonly paymentTermOptions = input<DropdownOption[]>([]);

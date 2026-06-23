@@ -6,6 +6,7 @@ import {
   signal,
   computed,
   effect,
+  inject,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import type {
@@ -14,6 +15,7 @@ import type {
   CompanyEmailType,
   OwnCompanyDto,
 } from '@fueld/types';
+import { AuthService } from '@app/core/auth/auth.service';
 import { COUNTRIES, type Country, countryLabel as resolveCountryLabel, countryFlagByIso3 } from '../../../../../../shared/data/countries';
 import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
 
@@ -321,6 +323,7 @@ interface CompanyEnrichment {
                 <dd class="mt-0.5 font-medium text-gray-900 dark:text-ink">{{ company()!.fleetSize ?? '—' }}</dd>
               }
             </div>
+            @if (auth.canSeePrices()) {
             <div>
               <dt class="text-gray-500 dark:text-muted">Credit Limit</dt>
               @if (editing()) {
@@ -346,6 +349,7 @@ interface CompanyEnrichment {
                 </button>
               }
             </div>
+            }
             <div>
               <dt class="text-gray-500 dark:text-muted">Company IMO</dt>
               @if (editing()) {
@@ -799,6 +803,7 @@ interface CompanyEnrichment {
   `,
 })
 export class CompanyInfoCardComponent {
+  protected readonly auth = inject(AuthService);
   // ─── Inputs ─────────────────────────────────────────────────────────
   readonly company = input.required<CounterpartyDto>();
   readonly enrichment = input<CompanyEnrichment | null>(null);

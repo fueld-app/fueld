@@ -16,6 +16,7 @@ import { COUNTRIES, SORTED_COUNTRIES, countryLabel as resolveCountryLabel, count
 import { PaginationComponent, SortHeaderComponent } from '../../../../shared/components';
 import type { SortChangeEvent } from '../../../../shared/components';
 import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring.service';
+import { AuthService } from '@app/core/auth/auth.service';
 import { CompaniesCreateModalComponent } from './companies-create-modal.component';
 import { CompaniesDeleteModalComponent } from './companies-delete-modal.component';
 
@@ -221,7 +222,9 @@ interface CompanySearchResult {
                 <th app-sort-header field="type" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Type</th>
                 <th app-sort-header field="country" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Country</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Sanctioned</th>
+                @if (auth.canSeePrices()) {
                 <th app-sort-header field="creditLimit" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-right font-medium text-gray-600 dark:text-ink-dim">Credit Limit</th>
+                }
                 <th class="px-4 py-3 text-center font-medium text-gray-600 dark:text-ink-dim">Contacts</th>
                 <th app-sort-header field="responsible" [sortBy]="sortBy()" [sortDir]="sortDir()" (sortChange)="onSort($event)" class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Responsible</th>
                 <th class="px-4 py-3 text-left font-medium text-gray-600 dark:text-ink-dim">Source</th>
@@ -282,6 +285,7 @@ interface CompanySearchResult {
                       <span class="text-xs text-gray-400 dark:text-muted">No</span>
                     }
                   </td>
+                  @if (auth.canSeePrices()) {
                   <td class="px-4 py-3 text-right text-gray-700 dark:text-ink-dim font-medium tabular-nums">
                     @if (company.creditLimit && +company.creditLimit > 0) {
                       {{ formatCreditLimit(+company.creditLimit) }}
@@ -289,6 +293,7 @@ interface CompanySearchResult {
                       <span class="text-gray-400 dark:text-muted">—</span>
                     }
                   </td>
+                  }
                   <td class="px-4 py-3 text-center text-gray-600 dark:text-ink-dim">
                     {{ company.contactsCount ?? 0 }}
                   </td>
@@ -361,6 +366,7 @@ interface CompanySearchResult {
   `,
 })
 export class CompaniesPageComponent implements OnInit, OnDestroy {
+  protected readonly auth = inject(AuthService);
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
