@@ -246,6 +246,15 @@ export interface TenantSettings {
   companyTypes?: string[];
   // Configurable vessel types for dropdown classification
   vesselTypes?: string[];
+  // Configurable vessel person titles (Captain, Supercargo, etc.)
+  vesselPersonTitles?: string[];
+  // Configurable delivery methods for bunkers (Via Barge, Ex-tank, ...) + default
+  deliveryMethods?: string[];
+  defaultDeliveryMethod?: string;
+  // Bunker Booking email behaviour
+  bookingEmail?: {
+    autoSendOnConvert?: boolean;
+  };
   // Configurable reasons required when cancelling inquiries
   inquiryCancelReasons?: string[];
   inquirySettings?: {
@@ -838,6 +847,27 @@ export const vessels = pgTable('vessels', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+//  9b. VESSEL PERSONS (captain, supercargo, etc.)
+export const vesselPersons = pgTable('vessel_persons', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  vesselId: uuid('vessel_id').notNull().references(() => vessels.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  title: text('title').notNull(),
+  phone: text('phone'),
+  email: text('email'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const vesselPersonsRelations = relations(vesselPersons, ({ one }) => ({
+  vessel: one(vessels, { fields: [vesselPersons.vesselId], references: [vessels.id] }),
+  tenant: one(tenants, { fields: [vesselPersons.tenantId], references: [tenants.id] }),
+}));
+
+export type VesselPerson = typeof vesselPersons.$inferSelect;
+export type NewVesselPerson = typeof vesselPersons.$inferInsert;
+
 // ═══════════════════════════════════════════════════════════════════════
 //  10. ORDERS (the Trading Aggregate root)
 // ═══════════════════════════════════════════════════════════════════════
@@ -881,6 +911,10 @@ export const orders = pgTable('orders', {
   eta: timestamp('eta', { withTimezone: true }),
   etd: timestamp('etd', { withTimezone: true }),
   dueDate: date('due_date'),
+
+  // Delivery method for bunkers (e.g. 'Via Barge', 'Ex-tank', 'Pipeline') —
+  // configurable in Admin Settings; used in the Bunker Booking email.
+  deliveryMethod: text('delivery_method'),
 
   customerPaymentTermType: paymentTermTypeEnum('customer_payment_term_type'),
   customerCreditDays: integer('customer_credit_days'),

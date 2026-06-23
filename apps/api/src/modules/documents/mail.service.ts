@@ -30,7 +30,7 @@ function isLightColor(hex: string): boolean {
 
 // ─── Types ───────────────────────────────────────────────────────────
 
-export type DocumentEmailType = 'OFFER' | 'CONFIRMATION' | 'NOMINATION' | 'PROFORMA' | 'INVOICE' | 'PORT_DOCUMENTATION' | 'INQUIRY';
+export type DocumentEmailType = 'OFFER' | 'CONFIRMATION' | 'NOMINATION' | 'PROFORMA' | 'INVOICE' | 'PORT_DOCUMENTATION' | 'INQUIRY' | 'BUNKER_BOOKING';
 
 export interface SendDocumentEmailOptions {
   /** Document type being sent */
@@ -452,6 +452,11 @@ export function buildDocumentEmailHtml(params: {
       greeting: 'Good day',
       intro: `Please offer for the following:`,
     },
+    BUNKER_BOOKING: {
+      title: 'Bunker Booking',
+      greeting: 'Dear Captain',
+      intro: `Bunkers have been booked for <strong>${params.vesselName}</strong> at <strong>${params.portName}</strong>.`,
+    },
   };
 
   const l = labels[params.documentType];
@@ -541,6 +546,7 @@ export function buildDocumentEmailSubject(params: {
     INVOICE: 'Invoice',
     PORT_DOCUMENTATION: 'Port Documentation',
     INQUIRY: 'Inquiry',
+    BUNKER_BOOKING: 'Bunker Booking',
   };
 
   if (params.documentType === 'INVOICE' && params.invoiceNumber) {

@@ -33,6 +33,7 @@ export type HeaderAction =
   | 'send-invoice'
   | 'send-port-documentation'
   | 'send-inquiry'
+  | 'send-booking'
   | 'mark-delivered'
   | 'mark-paid'
   | 'reopen-order';
@@ -130,6 +131,12 @@ const ACTIONS: ActionItem[] = [
     color: 'text-teal-600',
   },
   // ─── Workflow actions ────────────────────────────────────────
+  {
+    key: 'send-booking',
+    label: 'Send Bunker Booking',
+    icon: SEND_ICON,
+    color: 'text-teal-600',
+  },
   {
     key: 'mark-delivered',
     label: 'Mark Delivered',

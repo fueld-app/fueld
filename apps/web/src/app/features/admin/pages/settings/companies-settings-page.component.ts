@@ -80,6 +80,48 @@ import { CompaniesSettingsTypeListCardComponent } from './companies-settings-typ
             (save)="saveVesselTypes()"
           />
 
+          <!-- Vessel Person Titles -->
+          <app-companies-settings-type-list-card
+            title="Vessel Person Titles"
+            description="Titles for vessel crew/persons (Captain, Supercargo, …)."
+            headerClass="app-panel-header--teal"
+            iconShellClass="app-panel-icon-shell--teal"
+            [items]="vesselPersonTitles()"
+            [saving]="vesselPersonTitlesSaving()"
+            [saved]="vesselPersonTitlesSaved()"
+            (moveUp)="moveVesselPersonTitleUp($event)"
+            (moveDown)="moveVesselPersonTitleDown($event)"
+            (itemChange)="updateVesselPersonTitle($event.index, $event.value)"
+            (remove)="removeVesselPersonTitle($event)"
+            (add)="addVesselPersonTitle()"
+            (save)="saveVesselPersonTitles()"
+          />
+
+          <!-- Delivery Methods -->
+          <app-companies-settings-type-list-card
+            title="Delivery Methods"
+            description="Delivery methods for bunkers (used on orders + the Bunker Booking email)."
+            headerClass="app-panel-header--teal"
+            iconShellClass="app-panel-icon-shell--teal"
+            [items]="deliveryMethods()"
+            [saving]="deliveryMethodsSaving()"
+            [saved]="deliveryMethodsSaved()"
+            (moveUp)="moveDeliveryMethodUp($event)"
+            (moveDown)="moveDeliveryMethodDown($event)"
+            (itemChange)="updateDeliveryMethod($event.index, $event.value)"
+            (remove)="removeDeliveryMethod($event)"
+            (add)="addDeliveryMethod()"
+            (save)="saveDeliveryMethods()"
+          />
+          <div class="app-panel">
+            <div class="flex items-center justify-between p-4">
+              <label class="text-sm font-medium text-gray-700 dark:text-ink-dim">Default delivery method</label>
+              <select [ngModel]="defaultDeliveryMethod()" (ngModelChange)="defaultDeliveryMethod.set($event); saveDeliveryMethods()" class="rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm bg-white dark:bg-surface">
+                @for (m of deliveryMethods(); track m) { <option [value]="m">{{ m }}</option> }
+              </select>
+            </div>
+          </div>
+
           <!-- ════════════════════════════════════════════════════════ -->
           <!--  Vessel–Company Role Options                            -->
           <!-- ════════════════════════════════════════════════════════ -->
@@ -363,6 +405,13 @@ export class CompaniesSettingsPageComponent implements OnInit {
   readonly vesselTypes = signal<string[]>([]);
   readonly vesselTypesSaving = signal(false);
   readonly vesselTypesSaved = signal(false);
+  readonly vesselPersonTitles = signal<string[]>([]);
+  readonly vesselPersonTitlesSaving = signal(false);
+  readonly vesselPersonTitlesSaved = signal(false);
+  readonly deliveryMethods = signal<string[]>([]);
+  readonly defaultDeliveryMethod = signal('');
+  readonly deliveryMethodsSaving = signal(false);
+  readonly deliveryMethodsSaved = signal(false);
 
   // Vessel-Company Roles
   readonly rolesLoading = signal(false);
@@ -385,6 +434,8 @@ export class CompaniesSettingsPageComponent implements OnInit {
   ngOnInit(): void {
     this.loadCompanyTypes();
     this.loadVesselTypes();
+    this.loadVesselPersonTitles();
+    this.loadDeliveryMethods();
     this.loadRoles();
     this.loadSegments();
   }
@@ -525,6 +576,70 @@ export class CompaniesSettingsPageComponent implements OnInit {
     } finally {
       this.vesselTypesSaving.set(false);
     }
+  }
+
+  // ─── Vessel Person Titles ──────────────────────────────────────────
+
+  private async loadVesselPersonTitles(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ vesselPersonTitles: string[] }>>(`${API}/admin/settings/vessel-person-titles`),
+      );
+      if (res.success) this.vesselPersonTitles.set(res.data.vesselPersonTitles);
+    } catch { /* silent */ }
+  }
+
+  updateVesselPersonTitle(index: number, value: string): void {
+    const updated = [...this.vesselPersonTitles()]; updated[index] = value; this.vesselPersonTitles.set(updated);
+  }
+  addVesselPersonTitle(): void { this.vesselPersonTitles.set([...this.vesselPersonTitles(), '']); }
+  removeVesselPersonTitle(index: number): void { this.vesselPersonTitles.set(this.vesselPersonTitles().filter((_, i) => i !== index)); }
+  moveVesselPersonTitleUp(index: number): void {
+    if (index === 0) return; const u = [...this.vesselPersonTitles()]; [u[index - 1], u[index]] = [u[index]!, u[index - 1]!]; this.vesselPersonTitles.set(u);
+  }
+  moveVesselPersonTitleDown(index: number): void {
+    const arr = this.vesselPersonTitles(); if (index === arr.length - 1) return; const u = [...arr]; [u[index], u[index + 1]] = [u[index + 1]!, u[index]!]; this.vesselPersonTitles.set(u);
+  }
+  async saveVesselPersonTitles(): Promise<void> {
+    const valid = this.vesselPersonTitles().filter((t) => t.trim());
+    if (!valid.length) { this.toastService.show('error', 'At least one title is required.'); return; }
+    this.vesselPersonTitlesSaving.set(true); this.vesselPersonTitlesSaved.set(false);
+    try {
+      const res = await firstValueFrom(this.http.put<ApiResponse<{ vesselPersonTitles: string[] }>>(`${API}/admin/settings/vessel-person-titles`, { vesselPersonTitles: valid }));
+      if (res.success) { this.vesselPersonTitles.set(res.data.vesselPersonTitles); this.vesselPersonTitlesSaved.set(true); setTimeout(() => this.vesselPersonTitlesSaved.set(false), 3000); }
+    } catch { this.toastService.show('error', 'Failed to save.'); } finally { this.vesselPersonTitlesSaving.set(false); }
+  }
+
+  // ─── Delivery Methods ──────────────────────────────────────────────
+
+  private async loadDeliveryMethods(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ deliveryMethods: string[]; defaultDeliveryMethod: string }>>(`${API}/admin/settings/delivery-methods`),
+      );
+      if (res.success) { this.deliveryMethods.set(res.data.deliveryMethods); this.defaultDeliveryMethod.set(res.data.defaultDeliveryMethod); }
+    } catch { /* silent */ }
+  }
+
+  updateDeliveryMethod(index: number, value: string): void {
+    const updated = [...this.deliveryMethods()]; updated[index] = value; this.deliveryMethods.set(updated);
+  }
+  addDeliveryMethod(): void { this.deliveryMethods.set([...this.deliveryMethods(), '']); }
+  removeDeliveryMethod(index: number): void { this.deliveryMethods.set(this.deliveryMethods().filter((_, i) => i !== index)); }
+  moveDeliveryMethodUp(index: number): void {
+    if (index === 0) return; const u = [...this.deliveryMethods()]; [u[index - 1], u[index]] = [u[index]!, u[index - 1]!]; this.deliveryMethods.set(u);
+  }
+  moveDeliveryMethodDown(index: number): void {
+    const arr = this.deliveryMethods(); if (index === arr.length - 1) return; const u = [...arr]; [u[index], u[index + 1]] = [u[index + 1]!, u[index]!]; this.deliveryMethods.set(u);
+  }
+  async saveDeliveryMethods(): Promise<void> {
+    const valid = this.deliveryMethods().filter((m) => m.trim());
+    if (!valid.length) { this.toastService.show('error', 'At least one delivery method is required.'); return; }
+    this.deliveryMethodsSaving.set(true); this.deliveryMethodsSaved.set(false);
+    try {
+      const res = await firstValueFrom(this.http.put<ApiResponse<{ deliveryMethods: string[]; defaultDeliveryMethod: string }>>(`${API}/admin/settings/delivery-methods`, { deliveryMethods: valid, defaultDeliveryMethod: this.defaultDeliveryMethod() }));
+      if (res.success) { this.deliveryMethods.set(res.data.deliveryMethods); this.defaultDeliveryMethod.set(res.data.defaultDeliveryMethod); this.deliveryMethodsSaved.set(true); setTimeout(() => this.deliveryMethodsSaved.set(false), 3000); }
+    } catch { this.toastService.show('error', 'Failed to save.'); } finally { this.deliveryMethodsSaving.set(false); }
   }
 
   // ─── Vessel-Company Roles ──────────────────────────────────────────

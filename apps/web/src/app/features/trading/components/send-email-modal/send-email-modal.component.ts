@@ -33,7 +33,7 @@ import { API_URL } from '@app/core/config/api';
 //  - WhatsApp send option
 // ═══════════════════════════════════════════════════════════════════════
 
-export type DocumentEmailType = 'OFFER' | 'CONFIRMATION' | 'NOMINATION' | 'PROFORMA' | 'INVOICE' | 'PORT_DOCUMENTATION';
+export type DocumentEmailType = 'OFFER' | 'CONFIRMATION' | 'NOMINATION' | 'PROFORMA' | 'INVOICE' | 'PORT_DOCUMENTATION' | 'BUNKER_BOOKING';
 
 export interface SendEmailAttachmentOption {
   id: string;
@@ -66,6 +66,7 @@ const DOC_LABELS: Record<DocumentEmailType, string> = {
   PROFORMA: 'Proforma Invoice',
   INVOICE: 'Invoice',
   PORT_DOCUMENTATION: 'Port Documentation',
+  BUNKER_BOOKING: 'Bunker Booking',
 };
 
 @Component({
@@ -663,7 +664,7 @@ export class SendEmailModalComponent {
   readonly docLabel = computed(
     () => DOC_LABELS[this.documentType()] ?? 'Document',
   );
-  readonly hasPrimaryDocument = computed(() => this.documentType() !== 'PORT_DOCUMENTATION');
+  readonly hasPrimaryDocument = computed(() => this.documentType() !== 'PORT_DOCUMENTATION' && this.documentType() !== 'BUNKER_BOOKING');
   readonly supportsWhatsApp = computed(() => this.hasPrimaryDocument());
   readonly recipientScope = computed<'customer' | 'supplier'>(() =>
     this.documentType() === 'NOMINATION' ? 'supplier' : 'customer',
@@ -817,7 +818,7 @@ export class SendEmailModalComponent {
     if (!oid) return;
 
     const docType = this.documentType();
-    if (docType === 'PORT_DOCUMENTATION') return;
+    if (docType === 'PORT_DOCUMENTATION' || docType === 'BUNKER_BOOKING') return;
     const pdfEndpoints: Record<DocumentEmailType, string> = {
       OFFER: 'offer',
       CONFIRMATION: 'offer',
@@ -825,6 +826,7 @@ export class SendEmailModalComponent {
       PROFORMA: 'proforma',
       INVOICE: 'invoice',
       PORT_DOCUMENTATION: 'invoice',
+      BUNKER_BOOKING: 'invoice',
     };
 
     this.loadingPreview.set(true);

@@ -78,6 +78,7 @@ interface CreateOrderInput {
   agentId?: string | null;
   agentContactId?: string | null;
   categoryKey?: string | null;
+  deliveryMethod?: string | null;
 }
 
 interface UpdateOrderInput {
@@ -111,6 +112,7 @@ interface UpdateOrderInput {
   agentId?: string | null;
   agentContactId?: string | null;
   categoryKey?: string | null;
+  deliveryMethod?: string | null;
 }
 
 interface SaveItemInput {
@@ -1187,6 +1189,7 @@ export async function getOrderById(idOrNumber: string) {
     brokerGetsAll: row.brokerGetsAll ?? false,
     agentId: row.agentId ?? null,
     agentContactId: row.agentContactId ?? null,
+    deliveryMethod: row.deliveryMethod ?? null,
     termsAndConditions: row.termsAndConditions ?? null,
     financingRateAnnual,
     financingDayCountConvention: orderEconomics.dayCountConvention,
@@ -1334,6 +1337,7 @@ export async function createOrder(input: CreateOrderInput) {
     agentContactId: input.agentContactId ?? null,
     categoryKey: input.categoryKey ?? null,
     placeRemark,
+    deliveryMethod: input.deliveryMethod ?? null,
   };
 
   const [created] = await db
@@ -1414,6 +1418,7 @@ export async function updateOrder(id: string, input: UpdateOrderInput, activityU
   if (input.agentId !== undefined) setData.agentId = input.agentId;
   if (input.agentContactId !== undefined) setData.agentContactId = input.agentContactId;
   if (input.categoryKey !== undefined) setData.categoryKey = input.categoryKey;
+  if (input.deliveryMethod !== undefined) setData.deliveryMethod = input.deliveryMethod ?? null;
 
   // Auto-set closedAt when status moves to CANCELLED or PAID
   if (input.status === 'CANCELLED' || input.status === 'PAID') {

@@ -652,6 +652,13 @@
       "when": 1779600000000,
       "tag": "0092_order_items_sort_order",
       "breakpoints": true
+    },
+    {
+      "idx": 93,
+      "version": "7",
+      "when": 1779700000000,
+      "tag": "0093_vessel_persons_and_delivery_method",
+      "breakpoints": true
     }
   ]
 }

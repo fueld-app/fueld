@@ -141,6 +141,7 @@ export class OrderSaveService {
           termsAndConditions: o.termsAndConditions ?? null,
           categoryKey: o.categoryKey ?? null, eta: o.eta, etd: o.etd,
           deliveredAt: o.deliveredAt ?? null,
+          deliveryMethod: (o as any).deliveryMethod ?? null,
         }),
       );
       if (!orderRes.success) { onError?.('Failed to save order.'); return false; }

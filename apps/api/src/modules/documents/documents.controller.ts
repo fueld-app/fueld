@@ -11,6 +11,7 @@ import { db } from '../../db';
 import { users, counterparties, invoices as invoicesTable, companyContacts, companyEmails, supplierInquiries, supplierInquiryItemQuotes, portSuppliers, emailLog, tenants, orders, orderAttachments, orderPortDocuments, orderSuppliers, orderTransferSides } from '../../db/schema';
 import { getEmailTemplate, getApplicableEmailRules, renderTemplate, type TemplateVariables } from '../admin/email-settings.service';
 import { getInquirySettings, getDeliveryDocumentationSettings } from '../admin/settings.service';
+import { composeBookingEmail, resolveBookingRecipients } from './booking-email.service';
 import { applyStaleSupplierInquiryStatuses, createSupplierQuoteToken, getSupplierQuoteExpiryDate, getSupplierQuoteFormUrl, getSupplierInquiryOrderContext, saveSupplierInquiryResponse } from './supplier-inquiry.service';
 import { createSupplierNominationLink, getSupplierNominationFormUrl, getSupplierNominationSummary } from './supplier-nomination.service';
 import {
@@ -470,6 +471,33 @@ export const documentsController = new Elysia({ prefix: '/orders' })
     },
   )
 
+  // ── GET /orders/:id/booking-email ──────────────────────────────────
+  //  Compose the Bunker Booking email (recipients + subject + body) for the
+  //  manual "Send Bunker Booking" action so the modal can be pre-filled.
+  .get(
+    '/:id/booking-email',
+    async ({ params, auth }) => {
+      try {
+        const orderId = await resolveOrderId(params.id);
+        if (!orderId) { return { success: false, data: null, message: 'Order not found' }; }
+        const order = await getOrderById(orderId);
+        if (!order) { return { success: false, data: null, message: 'Order not found' }; }
+
+        const { subject, body } = await composeBookingEmail(order);
+        const { to, cc } = await resolveBookingRecipients(order);
+
+        return { success: true, data: { to, cc, subject, body } };
+      } catch (err: any) {
+        console.error('[Documents] Booking email compose failed:', err);
+        return { success: false, data: null, message: err?.message ?? 'Failed to compose booking email' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: { tags: ['Documents'], summary: 'Compose the Bunker Booking email for an order' },
+    },
+  )
+
   // ── POST /orders/:id/send-email ──────────────────────────────────────
   .post(
     '/:id/send-email',
@@ -554,6 +582,10 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           break;
         }
         case 'PORT_DOCUMENTATION': {
+          break;
+        }
+        case 'BUNKER_BOOKING': {
+          // No PDF — the body is composed from order data + template.
           break;
         }
         default:
@@ -697,6 +729,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         INVOICE: 'Invoice',
         PORT_DOCUMENTATION: 'Port Documentation',
         INQUIRY: 'Inquiry',
+        BUNKER_BOOKING: 'Bunker Booking',
       };
 
       // Determine recipient based on document type

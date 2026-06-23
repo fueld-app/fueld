@@ -178,4 +178,11 @@ export const TEMPLATE_VARIABLES = [
   { key: 'name', label: 'Preferred greeting name', example: 'Jane Bunker' },
   { key: 'quoteFormUrl', label: 'Secure supplier quote form URL', example: 'https://app.fueld.com/supplier-quote/abc123' },
   { key: 'nominationResponseUrl', label: 'Secure supplier nomination response URL', example: 'https://app.fueld.com/supplier-nomination/abc123' },
+  // Bunker Booking email
+  { key: 'captainName', label: 'Captain name (vessel person)', example: 'Sergiy' },
+  { key: 'dates', label: 'Delivery dates (ETA → ETD)', example: '3rd to 7th of July' },
+  { key: 'agent', label: 'Agent company name', example: 'Altarmar' },
+  { key: 'physicalSupplier', label: 'Physical supplier company name', example: 'Trafigura' },
+  { key: 'deliveryMethod', label: 'Delivery method', example: 'Via Barge' },
+  { key: 'products', label: 'Product / Quantity lines block', example: 'Product: VLSFO 0.5%\nQnty: 350 - 400 MT' },
 ];

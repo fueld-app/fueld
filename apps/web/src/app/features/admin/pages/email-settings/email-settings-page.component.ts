@@ -15,7 +15,7 @@ import { API } from '@app/core/config/api';
 //  Admin  ›  Email Settings  —  Templates & CC/BCC Rules
 // ═══════════════════════════════════════════════════════════════════════
 
-type DocumentType = 'OFFER' | 'CONFIRMATION' | 'NOMINATION' | 'PROFORMA' | 'INVOICE' | 'INQUIRY';
+type DocumentType = 'OFFER' | 'CONFIRMATION' | 'NOMINATION' | 'PROFORMA' | 'INVOICE' | 'INQUIRY' | 'BUNKER_BOOKING';
 
 interface EmailTemplate {
   id: string;
@@ -39,7 +39,7 @@ interface TemplateVariable {
   example: string;
 }
 
-const DOC_TYPES: DocumentType[] = ['OFFER', 'CONFIRMATION', 'NOMINATION', 'PROFORMA', 'INVOICE', 'INQUIRY'];
+const DOC_TYPES: DocumentType[] = ['OFFER', 'CONFIRMATION', 'NOMINATION', 'PROFORMA', 'INVOICE', 'INQUIRY', 'BUNKER_BOOKING'];
 
 const DOC_LABELS: Record<DocumentType, string> = {
   OFFER: 'Offer',
@@ -48,6 +48,7 @@ const DOC_LABELS: Record<DocumentType, string> = {
   PROFORMA: 'Proforma Invoice',
   INVOICE: 'Invoice',
   INQUIRY: 'Inquiry',
+  BUNKER_BOOKING: 'Bunker Booking',
 };
 
 @Component({
@@ -70,6 +71,20 @@ const DOC_LABELS: Record<DocumentType, string> = {
           </svg>
         </div>
       } @else {
+        <!-- ═══════════════ Bunker Booking auto-send ═══════════════ -->
+        <div class="app-panel">
+          <div class="flex items-center justify-between p-5">
+            <div>
+              <h3 class="text-sm font-semibold text-gray-700 dark:text-ink-dim uppercase tracking-wider">Bunker Booking Email</h3>
+              <p class="mt-1 text-xs text-gray-500 dark:text-muted">Automatically email the vessel captain + agent when an inquiry is converted to an order. The template is configurable in the Bunker Booking section below; ops-team CC comes from email rules.</p>
+            </div>
+            <label class="inline-flex cursor-pointer items-center gap-2">
+              <input type="checkbox" [ngModel]="autoSendOnConvert()" (ngModelChange)="autoSendOnConvert.set($event); saveAutoSend()" class="h-4 w-4 rounded border-gray-300 dark:border-line-strong text-brand-600 focus:ring-brand-600" />
+              <span class="text-sm text-gray-700 dark:text-ink-dim">Auto-send on convert</span>
+            </label>
+          </div>
+        </div>
+
         <!-- ═══════════════ Email Templates ═══════════════ -->
 
         <div class="app-panel">
@@ -340,6 +355,7 @@ export class EmailSettingsPageComponent implements OnInit {
   // ── State ──
   readonly loading = signal(true);
   readonly templates = signal<EmailTemplate[]>([]);
+  readonly autoSendOnConvert = signal(false);
   readonly rules = signal<EmailRule[]>([]);
   readonly ownCompanies = signal<OwnCompanyDto[]>([]);
   readonly templateVariables = signal<TemplateVariable[]>([]);
@@ -379,11 +395,12 @@ export class EmailSettingsPageComponent implements OnInit {
   private async loadAll(): Promise<void> {
     this.loading.set(true);
     try {
-      const [templatesRes, rulesRes, companiesRes, varsRes] = await Promise.all([
+      const [templatesRes, rulesRes, companiesRes, varsRes, bookingRes] = await Promise.all([
         firstValueFrom(this.http.get<ApiResponse<EmailTemplate[]>>(`${API}/admin/settings/email-templates`)),
         firstValueFrom(this.http.get<ApiResponse<EmailRule[]>>(`${API}/admin/settings/email-rules`)),
         firstValueFrom(this.http.get<ApiResponse<OwnCompanyDto[]>>(`${API}/companies/own`)),
         firstValueFrom(this.http.get<ApiResponse<TemplateVariable[]>>(`${API}/admin/settings/email-templates/variables`)),
+        firstValueFrom(this.http.get<ApiResponse<{ autoSendOnConvert: boolean }>>(`${API}/admin/settings/booking-email`)),
       ]);
 
       if (templatesRes.success) {
@@ -396,6 +413,7 @@ export class EmailSettingsPageComponent implements OnInit {
       if (rulesRes.success) this.rules.set(rulesRes.data ?? []);
       if (companiesRes.success) this.ownCompanies.set(companiesRes.data ?? []);
       if (varsRes.success) this.templateVariables.set(varsRes.data ?? []);
+      if (bookingRes.success) this.autoSendOnConvert.set(bookingRes.data.autoSendOnConvert ?? false);
     } catch {
       // silent
     } finally {
@@ -448,6 +466,18 @@ export class EmailSettingsPageComponent implements OnInit {
       // silent
     } finally {
       this.savingTemplate.set(null);
+    }
+  }
+
+  async saveAutoSend(): Promise<void> {
+    try {
+      await firstValueFrom(
+        this.http.put<ApiResponse<{ autoSendOnConvert: boolean }>>(`${API}/admin/settings/booking-email`, {
+          autoSendOnConvert: this.autoSendOnConvert(),
+        }),
+      );
+    } catch {
+      // silent
     }
   }
 

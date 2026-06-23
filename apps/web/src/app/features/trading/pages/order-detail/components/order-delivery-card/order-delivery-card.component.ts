@@ -16,6 +16,19 @@ import type { SupplierNominationSummaryDto } from '@fueld/types';
     <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm h-full max-h-[520px] flex flex-col">
       <h3 class="text-sm font-semibold text-gray-700 dark:text-ink-dim uppercase tracking-wider">Delivery Details</h3>
       <div class="mt-3">
+        <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">Delivery Method</label>
+        <select
+          [ngModel]="deliveryMethod()"
+          (ngModelChange)="deliveryMethodChange.emit($event)"
+          class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20 bg-white dark:bg-surface"
+        >
+          <option value="">— Select —</option>
+          @for (m of deliveryMethodOptions(); track m) {
+            <option [value]="m">{{ m }}</option>
+          }
+        </select>
+      </div>
+      <div class="mt-3">
         <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">
           Delivered At
           @if (hasMultipleSuppliers() && supplierLabel()) {
@@ -88,6 +101,9 @@ import type { SupplierNominationSummaryDto } from '@fueld/types';
 })
 export class OrderDeliveryCardComponent {
   readonly deliveredAtLocal = input<string | null>(null);
+  readonly deliveryMethod = input<string | null>(null);
+  readonly deliveryMethodOptions = input<string[]>([]);
+  readonly deliveryMethodChange = output<string | null>();
   readonly nomination = input<SupplierNominationSummaryDto | null>(null);
   readonly internalDeliveredAt = input<string | null>(null);
   readonly dateMismatch = input(false);

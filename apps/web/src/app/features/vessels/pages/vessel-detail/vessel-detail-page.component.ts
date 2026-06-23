@@ -28,6 +28,7 @@ import { ActivityTimelineComponent } from '../../../../shared/components/activit
 import { LastEditedBadgeComponent } from '../../../../shared/components/last-edited-badge/last-edited-badge.component';
 import { CommentsCardComponent } from '../../../../shared/components/comments-card/comments-card.component';
 import { VesselDetailCompaniesCardComponent } from './vessel-detail-companies-card.component';
+import { VesselPersonsCardComponent } from './vessel-persons-card.component';
 import { VesselDetailDeleteModalComponent } from './vessel-detail-delete-modal.component';
 import { VesselDetailMergeModalComponent } from './vessel-detail-merge-modal.component';
 
@@ -125,7 +126,7 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
 @Component({
   selector: 'app-vessel-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DateLabelPipe, DatePipe, FormsModule, RouterLink, ActivityTimelineComponent, LastEditedBadgeComponent, CommentsCardComponent, VesselDetailCompaniesCardComponent, VesselDetailDeleteModalComponent, VesselDetailMergeModalComponent],
+  imports: [DateLabelPipe, DatePipe, FormsModule, RouterLink, ActivityTimelineComponent, LastEditedBadgeComponent, CommentsCardComponent, VesselDetailCompaniesCardComponent, VesselPersonsCardComponent, VesselDetailDeleteModalComponent, VesselDetailMergeModalComponent],
   styles: [`
     :host ::ng-deep .leaflet-container { font-family: inherit; }
   `],
@@ -702,6 +703,14 @@ function vesselIcon(heading: number | null, loa: number | null, zoom: number, la
           />
         </div>
 
+          <!-- Vessel Persons (crew) -->
+          <app-vessel-persons-card
+            [vesselId]="vesselId()"
+            [persons]="vesselPersons()"
+            [titleOptions]="vesselPersonTitles()"
+            (personsChange)="vesselPersons.set($event)"
+          />
+
         <!-- ═══ Right group: enrichment data ═══ -->
         <div class="contents">
 
@@ -1043,6 +1052,9 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
   readonly loading = signal(true);
   readonly canDeleteEntity = computed(() => this.authService.isAdmin());
   readonly vessel = signal<VesselDto | null>(null);
+  readonly vesselPersons = signal<Array<{ id: string; name: string; title: string; phone?: string | null; email?: string | null }>>([]);
+  readonly vesselPersonTitles = signal<string[]>(['Captain']);
+  readonly vesselId = computed(() => this.vessel()?.id ?? '');
   readonly syncing = signal(false);
   readonly creditEnforcementSaving = signal(false);
   readonly creditImpactLoading = signal(false);
@@ -1320,6 +1332,7 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
     const id = this.route.snapshot.paramMap.get('id');
     this.loadRoleOptions();
     this.loadVesselTypes();
+    this.loadVesselPersonTitles();
     if (id) this.loadVessel(id);
 
     // React to same-route navigation (e.g. clicking related vessel links)
@@ -1378,6 +1391,7 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
       );
       if (res.success && res.data) {
         this.vessel.set(res.data);
+        this.vesselPersons.set((res.data as any).persons ?? []);
         this.pageTitle.setTitle(`Fueld | Vessels > ${res.data.name}`);
         this.wsService.sendPresence(this.router.url, this.pageTitle.getTitle());
 
@@ -1717,6 +1731,19 @@ export class VesselDetailPageComponent implements OnInit, OnDestroy {
       }
     } catch (err) {
       console.error('Failed to load vessel types:', err);
+    }
+  }
+
+  private async loadVesselPersonTitles(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ vesselPersonTitles: string[] }>>(`${API}/admin/settings/my-vessel-person-titles`),
+      );
+      if (res.success && res.data) {
+        this.vesselPersonTitles.set(res.data.vesselPersonTitles);
+      }
+    } catch (err) {
+      console.error('Failed to load vessel person titles:', err);
     }
   }
 

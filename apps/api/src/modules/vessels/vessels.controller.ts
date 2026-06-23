@@ -44,6 +44,10 @@ import {
   addVesselCompany,
   updateVesselCompany,
   deleteVesselCompany,
+  listVesselPersons,
+  createVesselPerson,
+  updateVesselPerson,
+  deleteVesselPerson,
 } from './vessel.service';
 import type { ApiResponse, VesselCompanyRole } from '@fueld/types';
 
@@ -604,4 +608,97 @@ export const vesselsController = new Elysia({ prefix: '/vessels' })
         summary: 'Remove a company association from a vessel',
       },
     },
-  );
+  )
+
+  // ─── Vessel Persons (captain, supercargo, etc.) ───────────────────
+  .get(
+    '/local/:id/persons',
+    async ({ params }) => {
+      try {
+        const persons = await listVesselPersons(params.id);
+        return { success: true, data: persons } satisfies ApiResponse<typeof persons>;
+      } catch (err: any) {
+        console.error('[Vessels] Failed to load persons:', err);
+        return { success: false, data: [], message: 'Failed to load persons' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      detail: { tags: ['Vessels'], summary: 'Get persons (crew) for a vessel' },
+    },
+  )
+
+  .post(
+    '/local/:id/persons',
+    async ({ params, body, auth }) => {
+      try {
+        const person = await createVesselPerson(params.id, auth.tenantId, {
+          name: body.name,
+          title: body.title,
+          phone: body.phone,
+          email: body.email,
+        });
+        return { success: true, data: person } satisfies ApiResponse<typeof person>;
+      } catch (err: any) {
+        console.error('[Vessels] Failed to add person:', err);
+        return { success: false, data: null, message: err.message ?? 'Failed to add person' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({
+        name: t.String({ minLength: 1 }),
+        title: t.String({ minLength: 1 }),
+        phone: t.Optional(t.Nullable(t.String())),
+        email: t.Optional(t.Nullable(t.String())),
+      }),
+      detail: { tags: ['Vessels'], summary: 'Add a person (crew) to a vessel' },
+    },
+  )
+
+  .patch(
+    '/local/:id/persons/:personId',
+    async ({ params, body }) => {
+      try {
+        const updated = await updateVesselPerson(params.personId, {
+          name: body.name,
+          title: body.title,
+          phone: body.phone,
+          email: body.email,
+        });
+        if (!updated) return { success: false, data: null, message: 'Person not found' };
+        return { success: true, data: updated } satisfies ApiResponse<typeof updated>;
+      } catch (err: any) {
+        console.error('[Vessels] Failed to update person:', err);
+        return { success: false, data: null, message: err.message ?? 'Failed to update person' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String(), personId: t.String() }),
+      body: t.Object({
+        name: t.Optional(t.String({ minLength: 1 })),
+        title: t.Optional(t.String({ minLength: 1 })),
+        phone: t.Optional(t.Nullable(t.String())),
+        email: t.Optional(t.Nullable(t.String())),
+      }),
+      detail: { tags: ['Vessels'], summary: 'Update a vessel person' },
+    },
+  )
+
+  .delete(
+    '/local/:id/persons/:personId',
+    async ({ params }) => {
+      try {
+        const deleted = await deleteVesselPerson(params.personId);
+        if (!deleted) return { success: false, data: null, message: 'Person not found' };
+        return { success: true, data: deleted } satisfies ApiResponse<typeof deleted>;
+      } catch (err: any) {
+        console.error('[Vessels] Failed to delete person:', err);
+        return { success: false, data: null, message: err.message ?? 'Failed to delete person' };
+      }
+    },
+    {
+      params: t.Object({ id: t.String(), personId: t.String() }),
+      detail: { tags: ['Vessels'], summary: 'Remove a person from a vessel' },
+    },
+  );;

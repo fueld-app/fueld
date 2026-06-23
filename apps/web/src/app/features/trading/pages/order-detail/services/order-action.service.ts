@@ -48,6 +48,7 @@ export interface OrderActionContext {
   openPaymentModal: () => void;
   openSendEmailModal: (docType: string) => void;
   openSendInquiryModal: () => void;
+  openBookingEmailModal: () => void;
   syncOrderSupplierRecords: (orderId: string) => Promise<void>;
   clearSavedDraftItemIds: (rows: OrderItemRow[]) => void;
   normalizeDetailRoute: (status: OrderStatus, id: string) => Promise<void>;
@@ -125,6 +126,9 @@ export class OrderActionService {
         break;
       case 'send-inquiry':
         ctx.openSendInquiryModal();
+        break;
+      case 'send-booking':
+        ctx.openBookingEmailModal();
         break;
       case 'mark-paid':
         await this.markPaid(ctx);
@@ -291,6 +295,7 @@ export class OrderActionService {
         brokerGetsAll: o.brokerGetsAll ?? false, agentId: o.agentId ?? null,
         agentContactId: o.agentContactId ?? null, termsAndConditions: o.termsAndConditions ?? null,
         categoryKey: o.categoryKey ?? null, eta: o.eta, etd: o.etd, deliveredAt: o.deliveredAt ?? null,
+        deliveryMethod: (o as any).deliveryMethod ?? null,
       }));
       this.requireApiSuccess(orderRes);
 

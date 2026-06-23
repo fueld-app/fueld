@@ -1100,6 +1100,124 @@ export async function updateVesselTypeSettings(vesselTypes: string[]): Promise<{
   return getVesselTypeSettings();
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//  VESSEL PERSON TITLES (Captain, Supercargo, etc.)
+// ═══════════════════════════════════════════════════════════════════
+
+const DEFAULT_VESSEL_PERSON_TITLES = ['Captain', 'Supercargo', 'Chief Engineer', 'Agent'];
+
+export async function getVesselPersonTitleSettings(): Promise<{ vesselPersonTitles: string[] }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  return { vesselPersonTitles: settings.vesselPersonTitles ?? DEFAULT_VESSEL_PERSON_TITLES };
+}
+
+export async function updateVesselPersonTitleSettings(vesselPersonTitles: string[]): Promise<{ vesselPersonTitles: string[] }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const cleaned = Array.from(new Set(
+    vesselPersonTitles
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0),
+  ));
+
+  if (!cleaned.length) {
+    throw new Error('At least one vessel person title is required');
+  }
+
+  const settings = { ...(tenant.settings as any) };
+  settings.vesselPersonTitles = cleaned;
+
+  await db
+    .update(tenants)
+    .set({ settings, updatedAt: new Date() })
+    .where(eq(tenants.id, tenant.id));
+
+  return getVesselPersonTitleSettings();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  DELIVERY METHODS (Via Barge, Ex-tank, Pipeline, ...) + default
+// ═══════════════════════════════════════════════════════════════════
+
+const DEFAULT_DELIVERY_METHODS = ['Via Barge', 'Ex-tank', 'Pipeline', 'Truck'];
+
+export async function getDeliveryMethodSettings(): Promise<{ deliveryMethods: string[]; defaultDeliveryMethod: string }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  const deliveryMethods = settings.deliveryMethods ?? DEFAULT_DELIVERY_METHODS;
+  const defaultDeliveryMethod = settings.defaultDeliveryMethod ?? deliveryMethods[0] ?? '';
+  return { deliveryMethods, defaultDeliveryMethod };
+}
+
+export async function updateDeliveryMethodSettings(input: {
+  deliveryMethods: string[];
+  defaultDeliveryMethod?: string;
+}): Promise<{ deliveryMethods: string[]; defaultDeliveryMethod: string }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const cleaned = Array.from(new Set(
+    input.deliveryMethods
+      .map((m) => m.trim())
+      .filter((m) => m.length > 0),
+  ));
+
+  if (!cleaned.length) {
+    throw new Error('At least one delivery method is required');
+  }
+
+  const defaultDeliveryMethod = (input.defaultDeliveryMethod ?? '').trim();
+  if (defaultDeliveryMethod && !cleaned.includes(defaultDeliveryMethod)) {
+    throw new Error('Default delivery method must be one of the configured methods');
+  }
+
+  const settings = { ...(tenant.settings as any) };
+  settings.deliveryMethods = cleaned;
+  settings.defaultDeliveryMethod = defaultDeliveryMethod || cleaned[0]!;
+
+  await db
+    .update(tenants)
+    .set({ settings, updatedAt: new Date() })
+    .where(eq(tenants.id, tenant.id));
+
+  return getDeliveryMethodSettings();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  BUNKER BOOKING EMAIL
+// ═══════════════════════════════════════════════════════════════════
+
+export async function getBookingEmailSettings(): Promise<{ autoSendOnConvert: boolean }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = (tenant.settings ?? {}) as import('../../db/schema').TenantSettings;
+  return { autoSendOnConvert: settings.bookingEmail?.autoSendOnConvert ?? false };
+}
+
+export async function updateBookingEmailSettings(input: {
+  autoSendOnConvert: boolean;
+}): Promise<{ autoSendOnConvert: boolean }> {
+  const tenant = await db.query.tenants.findFirst();
+  if (!tenant) throw new Error('No tenant found');
+
+  const settings = { ...(tenant.settings as any) };
+  settings.bookingEmail = { ...(settings.bookingEmail ?? {}), autoSendOnConvert: !!input.autoSendOnConvert };
+
+  await db
+    .update(tenants)
+    .set({ settings, updatedAt: new Date() })
+    .where(eq(tenants.id, tenant.id));
+
+  return getBookingEmailSettings();
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  ATTACHMENT TYPE SETTINGS
 // ═══════════════════════════════════════════════════════════════════════

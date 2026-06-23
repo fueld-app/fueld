@@ -2225,6 +2225,10 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     this.updateActiveOrderSupplier((supplier) => ({ ...supplier, deliveredAt: iso }));
   }
 
+  onDeliveryMethodChange(value: string | null): void {
+    this.order.update((o) => (o ? { ...o, deliveryMethod: value || null } : o));
+  }
+
   onItemEconomicsChange(economics: OrderItemsEconomics): void {
     this.itemEconomics.set(economics);
   }
@@ -2328,6 +2332,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       openPaymentModal: () => self.openPaymentModal(),
       openSendEmailModal: (dt: string) => self.openSendEmailModal(dt as any),
       openSendInquiryModal: () => self.openSendInquiryModal(),
+      openBookingEmailModal: () => self.openBookingEmailModal(),
       syncOrderSupplierRecords: (oid) => self.syncOrderSupplierRecords(oid),
       clearSavedDraftItemIds: (rows) => self.saveSvc.clearSavedDraftItemIds(rows),
       normalizeDetailRoute: (s, id) => self.normalizeDetailRoute(s, id),
@@ -2369,6 +2374,12 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   openSendEmailModal(docType: DocumentEmailType): void {
     this.emailDocumentType.set(docType);
     this.commSvc.openSendEmailModal(docType, this.orderId(), this.activeOrderSupplier()?.id ?? null, this.emailModal(), this.order()?.orderNumber ?? null, (type, msg) => this.showToast(type, msg));
+  }
+
+  openBookingEmailModal(): void {
+    this.emailDocumentType.set('BUNKER_BOOKING');
+    this.emailPdfFileName.set('');
+    this.commSvc.openBookingEmailModal(this.orderId(), this.emailModal(), (type, msg) => this.showToast(type, msg));
   }
 
   onSendEmail(payload: SendEmailPayload): void {

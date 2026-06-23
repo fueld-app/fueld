@@ -4,7 +4,7 @@
 
 import { eq, ilike, or, and, sql, inArray, asc, desc } from 'drizzle-orm';
 import { db } from '../../db';
-import { vessels, orders, counterparties, places, vesselCompanies, companyContacts, users } from '../../db/schema';
+import { vessels, orders, counterparties, places, vesselCompanies, companyContacts, users, vesselPersons } from '../../db/schema';
 import type { VesselCompanyRole } from '@fueld/types';
 import {
   seasearcherVesselDetail,
@@ -138,7 +138,10 @@ export async function getVesselById(id: string) {
     .from(vessels)
     .where(eq(vessels.id, id))
     .limit(1);
-  return row ?? null;
+  if (!row) return null;
+
+  const persons = await listVesselPersons(id);
+  return { ...row, persons };
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -766,4 +769,81 @@ export async function deleteVesselCompany(id: string) {
   if (!info) return null;
   await db.delete(vesselCompanies).where(eq(vesselCompanies.id, id));
   return { id: info.id, companyName: info.companyName, role: info.role };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  VESSEL PERSONS (captain, supercargo, etc.)
+// ═══════════════════════════════════════════════════════════════════════
+
+function serializePerson(p: typeof vesselPersons.$inferSelect) {
+  return {
+    id: p.id,
+    vesselId: p.vesselId,
+    name: p.name,
+    title: p.title,
+    phone: p.phone ?? null,
+    email: p.email ?? null,
+    createdAt: p.createdAt.toISOString(),
+    updatedAt: p.updatedAt.toISOString(),
+  };
+}
+
+export async function listVesselPersons(vesselId: string) {
+  const rows = await db
+    .select()
+    .from(vesselPersons)
+    .where(eq(vesselPersons.vesselId, vesselId))
+    .orderBy(asc(vesselPersons.createdAt));
+  return rows.map(serializePerson);
+}
+
+export async function createVesselPerson(vesselId: string, tenantId: string, input: {
+  name: string;
+  title: string;
+  phone?: string | null;
+  email?: string | null;
+}) {
+  const [vessel] = await db.select({ id: vessels.id }).from(vessels).where(eq(vessels.id, vesselId)).limit(1);
+  if (!vessel) throw new Error('Vessel not found');
+
+  const [created] = await db
+    .insert(vesselPersons)
+    .values({
+      tenantId,
+      vesselId,
+      name: input.name.trim(),
+      title: input.title.trim(),
+      phone: input.phone?.trim() || null,
+      email: input.email?.trim() || null,
+    })
+    .returning();
+  return serializePerson(created!);
+}
+
+export async function updateVesselPerson(personId: string, input: {
+  name?: string;
+  title?: string;
+  phone?: string | null;
+  email?: string | null;
+}) {
+  const setData: Record<string, unknown> = { updatedAt: new Date() };
+  if (input.name !== undefined) setData.name = input.name.trim();
+  if (input.title !== undefined) setData.title = input.title.trim();
+  if (input.phone !== undefined) setData.phone = input.phone?.trim() || null;
+  if (input.email !== undefined) setData.email = input.email?.trim() || null;
+
+  const [updated] = await db
+    .update(vesselPersons)
+    .set(setData)
+    .where(eq(vesselPersons.id, personId))
+    .returning();
+  return updated ? serializePerson(updated) : null;
+}
+
+export async function deleteVesselPerson(personId: string) {
+  const [deleted] = await db
+    .delete(vesselPersons)
+    .where(eq(vesselPersons.id, personId))
+    .returning({ id: vesselPersons.id });
+  return deleted ?? null;
 }

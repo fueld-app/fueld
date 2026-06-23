@@ -47,6 +47,12 @@ import {
   updateAttachmentTypeSettings,
   getVesselTypeSettings,
   updateVesselTypeSettings,
+  getVesselPersonTitleSettings,
+  updateVesselPersonTitleSettings,
+  getDeliveryMethodSettings,
+  updateDeliveryMethodSettings,
+  getBookingEmailSettings,
+  updateBookingEmailSettings,
   getDeliveryDocumentationSettings,
   updateDeliveryDocumentationSettings,
   getPortDocumentationSettings,
@@ -525,6 +531,30 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     }
   }, {
     detail: { tags: ['Admin Settings'], summary: 'Get vessel type options for current tenant' },
+  })
+
+  .get('/my-delivery-methods', async () => {
+    try {
+      const data = await getDeliveryMethodSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get delivery methods + default for current tenant' },
+  })
+
+  .get('/my-vessel-person-titles', async () => {
+    try {
+      const data = await getVesselPersonTitleSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get vessel person titles for current tenant' },
   })
 
   .get('/delivery-documentation', async ({ auth }) => {
@@ -1595,6 +1625,97 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
       vesselTypes: t.Array(t.String({ minLength: 1 })),
     }),
     detail: { tags: ['Admin Settings'], summary: 'Update configurable vessel type options' },
+  })
+
+  .get('/vessel-person-titles', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getVesselPersonTitleSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get configurable vessel person titles' },
+  })
+
+  .put('/vessel-person-titles', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateVesselPersonTitleSettings(body.vesselPersonTitles);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      vesselPersonTitles: t.Array(t.String({ minLength: 1 })),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update configurable vessel person titles' },
+  })
+
+  .get('/delivery-methods', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getDeliveryMethodSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get configurable delivery methods + default' },
+  })
+
+  .put('/delivery-methods', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateDeliveryMethodSettings({
+        deliveryMethods: body.deliveryMethods,
+        defaultDeliveryMethod: body.defaultDeliveryMethod,
+      });
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      deliveryMethods: t.Array(t.String({ minLength: 1 })),
+      defaultDeliveryMethod: t.Optional(t.String()),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update configurable delivery methods + default' },
+  })
+
+  .get('/booking-email', async ({ auth }) => {
+    try {
+      requireAdmin(auth);
+      const data = await getBookingEmailSettings();
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Get Bunker Booking email settings' },
+  })
+
+  .put('/booking-email', async ({ auth, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await updateBookingEmailSettings({ autoSendOnConvert: body.autoSendOnConvert });
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    body: t.Object({
+      autoSendOnConvert: t.Boolean(),
+    }),
+    detail: { tags: ['Admin Settings'], summary: 'Update Bunker Booking email settings' },
   })
 
   // ═════════════════════════════════════════════════════════════════

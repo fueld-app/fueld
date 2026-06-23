@@ -16,6 +16,7 @@ export class OrderReferenceDataService {
   readonly configuredUnits = signal<DropdownOption[]>([]);
   readonly configuredUnitConversions = signal<{ productType?: string; fromUnit: string; toUnit: string; factor: number }[]>([]);
   readonly configuredCurrencies = signal<DropdownOption[]>([]);
+  readonly configuredDeliveryMethods = signal<string[]>([]);
   readonly configuredPriceReferences = signal<{ id: string; name: string; code: string }[]>([]);
   readonly configuredAttachmentTypes = signal<string[]>(['BDR', 'OTHER']);
   readonly deliveryDocumentationSettings = signal<DeliveryDocumentationSettingsDto>({
@@ -39,7 +40,7 @@ export class OrderReferenceDataService {
     if (this._eagerLoaded) return;
     this._eagerLoaded = true;
     try {
-      const [usersRes, productsRes, unitsRes, currenciesRes, categoriesRes, attachmentTypesRes, deliveryDocRes] = await Promise.all([
+      const [usersRes, productsRes, unitsRes, currenciesRes, categoriesRes, attachmentTypesRes, deliveryDocRes, deliveryMethodsRes] = await Promise.all([
         firstValueFrom(this.http.get<ApiResponse<TeamUserOption[]>>(`${API_URL}/lloyds/users`)),
         firstValueFrom(this.http.get<ApiResponse<{ products: string[] }>>(`${API_URL}/admin/settings/my-products`)),
         firstValueFrom(this.http.get<ApiResponse<{ units: string[] }>>(`${API_URL}/admin/settings/my-units`)),
@@ -47,12 +48,14 @@ export class OrderReferenceDataService {
         firstValueFrom(this.http.get<ApiResponse<{ categories: any[] }>>(`${API_URL}/admin/settings/order-categories`)),
         firstValueFrom(this.http.get<ApiResponse<{ attachmentTypes: string[] }>>(`${API_URL}/admin/settings/my-attachment-types`)),
         firstValueFrom(this.http.get<ApiResponse<DeliveryDocumentationSettingsDto>>(`${API_URL}/admin/settings/my-delivery-documentation`)),
+        firstValueFrom(this.http.get<ApiResponse<{ deliveryMethods: string[]; defaultDeliveryMethod: string }>>(`${API_URL}/admin/settings/my-delivery-methods`)),
       ]);
 
       if (usersRes.success) this.teamUsers.set(usersRes.data ?? []);
       if (productsRes.success) this.configuredProducts.set(productsRes.data.products.map((p: string) => ({ value: p, label: p })));
       if (unitsRes.success) this.configuredUnits.set(unitsRes.data.units.map((u: string) => ({ value: u, label: u })));
       if (currenciesRes.success) this.configuredCurrencies.set(currenciesRes.data.currencies.map((c: string) => ({ value: c, label: c })));
+      if (deliveryMethodsRes.success) this.configuredDeliveryMethods.set(deliveryMethodsRes.data.deliveryMethods ?? []);
       if (categoriesRes.success) this.orderCategories.set(categoriesRes.data.categories ?? []);
       if (attachmentTypesRes.success && attachmentTypesRes.data.attachmentTypes.length) this.configuredAttachmentTypes.set(attachmentTypesRes.data.attachmentTypes);
       if (deliveryDocRes.success) this.deliveryDocumentationSettings.set(deliveryDocRes.data);

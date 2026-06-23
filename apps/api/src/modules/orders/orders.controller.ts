@@ -39,7 +39,9 @@ import type { ApiResponse } from '@fueld/types';
 import { db } from '../../db';
 import { users } from '../../db/schema';
 import { eq } from 'drizzle-orm';
-import { getAttachmentTypeSettings, getInquiryCancelReasonSettings } from '../admin/settings.service';
+import { getAttachmentTypeSettings, getInquiryCancelReasonSettings, getBookingEmailSettings } from '../admin/settings.service';
+import { composeBookingEmail, resolveBookingRecipients } from '../documents/booking-email.service';
+import { sendDocumentEmail } from '../documents/mail.service';
 
 const PaymentTermTypeSchema = t.Union([
   t.Literal('CREDIT'),
@@ -313,6 +315,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
           agentId: body.agentId ?? null,
           agentContactId: body.agentContactId ?? null,
           categoryKey: body.categoryKey ?? null,
+          deliveryMethod: body.deliveryMethod ?? null,
           eta: body.eta,
           etd: body.etd,
         });
@@ -358,6 +361,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         agentContactId: t.Optional(t.Nullable(t.String())),
         termsAndConditions: t.Optional(t.Nullable(t.String())),
         categoryKey: t.Optional(t.Nullable(t.String())),
+        deliveryMethod: t.Optional(t.Nullable(t.String())),
         eta: t.Optional(t.String()),
         etd: t.Optional(t.String()),
       }),
@@ -417,6 +421,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         eta: t.Optional(t.Nullable(t.String())),
         etd: t.Optional(t.Nullable(t.String())),
         deliveredAt: t.Optional(t.Nullable(t.String())),
+        deliveryMethod: t.Optional(t.Nullable(t.String())),
         lossReason: t.Optional(t.Nullable(t.String())),
       }),
       detail: {
@@ -466,6 +471,40 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         if (!updated) {
           return { success: false, data: null, message: 'Order not found' };
         }
+
+        // Auto-send the Bunker Booking email when converting to an order
+        // (CONFIRMED), if enabled in Admin Settings. A failed email must never
+        // break the conversion.
+        if (body.status === 'CONFIRMED') {
+          try {
+            const { autoSendOnConvert } = await getBookingEmailSettings();
+            if (autoSendOnConvert) {
+              const fullOrder = await getOrderById(orderId);
+              if (fullOrder) {
+                const { subject, body: htmlBody } = await composeBookingEmail(fullOrder);
+                const { to, cc } = await resolveBookingRecipients(fullOrder);
+                if (to.length) {
+                  await sendDocumentEmail({
+                    documentType: 'BUNKER_BOOKING',
+                    orderId,
+                    tenantId: auth.tenantId,
+                    sentByUserId: auth.sub,
+                    senderEmail: auth.email,
+                    senderName: (await db.select({ name: users.name }).from(users).where(eq(users.id, auth.sub)).limit(1))[0]?.name ?? 'Fueld',
+                    recipientEmail: to.join(', '),
+                    ccEmails: cc,
+                    bccEmails: [],
+                    subject,
+                    htmlBody,
+                  });
+                }
+              }
+            }
+          } catch (bookingErr) {
+            console.error('[Orders] Auto booking email failed:', bookingErr);
+          }
+        }
+
         return { success: true, data: updated } satisfies ApiResponse<typeof updated>;
       } catch (err) {
         console.error('[Orders] Status update failed:', err);

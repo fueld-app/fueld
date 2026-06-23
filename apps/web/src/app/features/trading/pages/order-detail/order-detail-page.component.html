@@ -294,6 +294,8 @@
     @if (allowDeliveredEdit()) {
       <app-order-delivery-card
         [deliveredAtLocal]="deliveredAtLocal()"
+        [deliveryMethod]="order()?.deliveryMethod ?? null"
+        [deliveryMethodOptions]="refData.configuredDeliveryMethods()"
         [nomination]="supplierNomination()"
         [internalDeliveredAt]="formatStoredDateOnlyLabel(activeSupplierDeliveredAt())"
         [dateMismatch]="supplierNominationDateMismatch()"
@@ -301,6 +303,7 @@
         [supplierLabel]="activeOrderSupplier()?.company?.name ?? null"
         [timezoneAbbr]="placeTimezoneAbbr()"
         (deliveredAtChange)="onDeliveredAtChange($event)"
+        (deliveryMethodChange)="onDeliveryMethodChange($event)"
       />
     }
 } @placeholder { <div></div> }

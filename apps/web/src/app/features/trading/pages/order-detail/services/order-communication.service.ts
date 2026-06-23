@@ -87,6 +87,42 @@ export class OrderCommunicationService {
       });
   }
 
+  /** Open the send-email modal pre-filled with the Bunker Booking email. */
+  openBookingEmailModal(
+    orderId: string,
+    emailModal: any,
+    showToast: (type: 'success' | 'error', msg: string) => void,
+  ): void {
+    if (!orderId) return;
+
+    this.emailDocumentType.set('BUNKER_BOOKING');
+    this.emailPdfFileName.set('');
+
+    this.http
+      .get<ApiResponse<{ to: string[]; cc: string[]; subject: string; body: string }>>(`${API_URL}/orders/${orderId}/booking-email`)
+      .subscribe({
+        next: (res) => {
+          if (!res.success || !res.data) {
+            showToast('error', 'Failed to compose booking email.');
+            return;
+          }
+          const d = res.data;
+          emailModal?.showWith({
+            recipientEmail: d.to.join(', '),
+            ccEmails: d.cc,
+            bccEmails: [],
+            defaultCcEmails: [],
+            defaultBccEmails: [],
+            subject: d.subject,
+            htmlBody: d.body,
+          });
+        },
+        error: () => {
+          showToast('error', 'Failed to compose booking email.');
+        },
+      });
+  }
+
   onSendEmail(
     payload: SendEmailPayload,
     orderId: string,
@@ -141,6 +177,7 @@ export class OrderCommunicationService {
       PROFORMA: 'proforma',
       INVOICE: 'invoice',
       PORT_DOCUMENTATION: 'invoice',
+      BUNKER_BOOKING: 'invoice',
     };
     const docLabels: Record<DocumentEmailType, string> = {
       OFFER: 'Offer',
@@ -149,6 +186,7 @@ export class OrderCommunicationService {
       PROFORMA: 'Proforma Invoice',
       INVOICE: 'Invoice',
       PORT_DOCUMENTATION: 'Port Documentation',
+      BUNKER_BOOKING: 'Bunker Booking',
     };
 
     try {

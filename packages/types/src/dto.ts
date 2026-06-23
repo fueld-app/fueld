@@ -610,6 +610,7 @@ export interface OrderDto {
   brokerGetsAll?: boolean;
   agentId?: string | null;
   agentContactId?: string | null;
+  deliveryMethod?: string | null;
   termsAndConditions?: string | null;
   placeRemark?: string | null;
   lossReason: string | null;
