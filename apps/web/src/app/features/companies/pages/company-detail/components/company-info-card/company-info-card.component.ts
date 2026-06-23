@@ -16,7 +16,7 @@ import type {
   OwnCompanyDto,
 } from '@fueld/types';
 import { AuthService } from '@app/core/auth/auth.service';
-import { COUNTRIES, type Country, countryLabel as resolveCountryLabel, countryFlagByIso3 } from '../../../../../../shared/data/countries';
+import { SELECTABLE_COUNTRIES, type Country, countryLabel as resolveCountryLabel, countryFlagByIso3 } from '../../../../../../shared/data/countries';
 import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
 
 interface CompanyOfficeDto {
@@ -849,8 +849,8 @@ export class CompanyInfoCardComponent {
   readonly showCountryDropdown = signal(false);
   readonly filteredCountries = computed(() => {
     const q = this.countrySearchQuery().toLowerCase().trim();
-    if (!q) return COUNTRIES.slice(0, 20);
-    return COUNTRIES.filter(c =>
+    if (!q) return SELECTABLE_COUNTRIES.slice(0, 20);
+    return SELECTABLE_COUNTRIES.filter(c =>
       c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q)
     ).slice(0, 20);
   });

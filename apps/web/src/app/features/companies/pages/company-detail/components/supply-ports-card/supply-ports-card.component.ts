@@ -9,7 +9,7 @@ import type {
   ApiResponse, CompanyContactDto, CompanyPlaceSupplyRuleDto, CompanyPlaceSupplyRulePlaceType,
   CompanyPlaceSupplyRuleApplySummaryDto, PortSupplierDto, SupplyPortDto,
 } from '@fueld/types';
-import { COUNTRIES, countryLabel as resolveCountryLabel, countryFlagFromValue, countryFlagByIso3, countryNameByIso3 } from '../../../../../../shared/data/countries';
+import { SELECTABLE_COUNTRIES, countryLabel as resolveCountryLabel, countryFlagFromValue, countryFlagByIso3, countryNameByIso3 } from '../../../../../../shared/data/countries';
 import { API } from '@app/core/config/api';
 
 interface LocalPlaceOption {
@@ -415,7 +415,7 @@ export class SupplyPortsCardComponent implements OnChanges {
 
   readonly productOptions = SUPPLY_PORT_PRODUCT_OPTIONS;
   readonly ruleTypeOptions = PLACE_RULE_TYPE_OPTIONS;
-  readonly allCountries = COUNTRIES;
+  readonly allCountries = SELECTABLE_COUNTRIES;
 
   private placeSearchTimeout: ReturnType<typeof setTimeout> | null = null;
 

@@ -287,10 +287,29 @@ export const COUNTRIES: Country[] = [
   { code: 'ZWE', name: 'Zimbabwe' },
 ];
 
-/** Alphabetically sorted country list for dropdown ordering. */
+/** Alphabetically sorted country list (all codes, incl. historical/registers).
+ * Use SELECTABLE_COUNTRIES for dropdowns. */
 export const SORTED_COUNTRIES: Country[] = [...COUNTRIES].sort((a, b) =>
   a.name.localeCompare(b.name),
 );
+
+/**
+ * Codes kept in COUNTRIES for legacy/display resolution but NOT shown in
+ * dropdowns: maritime/subnational registers (DIS/NIS/RIF/Azores/Canary Is./
+ * Madeira/Tahiti), dissolved/historical states (Czechoslovakia, East Germany,
+ * USSR, Yugoslavia, Zaire, Netherlands Antilles, Saudi-Iraqi Neutral Zone),
+ * and Unknown. Stored data with these codes still resolves to a recognisable
+ * name + flag, but users can no longer pick them for new entries.
+ */
+const NON_SELECTABLE_CODES = new Set([
+  'DIS', 'NIS', 'RIF', 'AZO', 'CNI', 'PMD', 'TAH',
+  'CSK', 'DDR', 'SUN', 'YUG', 'ZAR', 'ANT', 'NTZ', 'UNK',
+]);
+
+/** Selectable, alphabetically sorted countries for dropdowns / typeaheads. */
+export const SELECTABLE_COUNTRIES: Country[] = [...COUNTRIES]
+  .filter((c) => !NON_SELECTABLE_CODES.has(c.code))
+  .sort((a, b) => a.name.localeCompare(b.name));
 
 /** ISO-3 code → Country (uppercase keys). */
 export const COUNTRIES_BY_CODE: ReadonlyMap<string, Country> = new Map(

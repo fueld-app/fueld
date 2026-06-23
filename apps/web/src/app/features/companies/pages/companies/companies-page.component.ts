@@ -12,7 +12,7 @@ import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subject, of } from 'rxjs';
 import { debounceTime, switchMap, tap, catchError, takeUntil } from 'rxjs/operators';
 import type { CounterpartyDto, ApiResponse } from '@fueld/types';
-import { COUNTRIES, SORTED_COUNTRIES, countryLabel as resolveCountryLabel, countryFlagFromValue, findCountry } from '../../../../shared/data/countries';
+import { COUNTRIES, SELECTABLE_COUNTRIES, countryLabel as resolveCountryLabel, countryFlagFromValue, findCountry } from '../../../../shared/data/countries';
 import { PaginationComponent, SortHeaderComponent } from '../../../../shared/components';
 import type { SortChangeEvent } from '../../../../shared/components';
 import { RiskMonitoringService } from '@app/core/risk-monitoring/risk-monitoring.service';
@@ -414,7 +414,7 @@ export class CompaniesPageComponent implements OnInit, OnDestroy {
     country: '',
     countryIso: '',
   });
-  readonly countries = SORTED_COUNTRIES;
+  readonly countries = SELECTABLE_COUNTRIES;
   readonly availableTypes = signal<string[]>(['CLIENT', 'SUPPLIER', 'BROKER', 'AGENT']);
   readonly typeOptions = () => this.availableTypes().map((type) => ({ value: type, label: this.typeLabel(type) }));
 

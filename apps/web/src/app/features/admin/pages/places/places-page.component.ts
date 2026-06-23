@@ -12,7 +12,7 @@ import { FormsModule } from '@angular/forms';
 import { firstValueFrom, Subject, of } from 'rxjs';
 import { debounceTime, switchMap, tap, catchError, takeUntil } from 'rxjs/operators';
 import type { PlaceDto, ApiResponse, CreatePlaceDto } from '@fueld/types';
-import { COUNTRIES, SORTED_COUNTRIES, countryLabel as resolveCountryLabel, countryFlagFromValue } from '../../../../shared/data/countries';
+import { COUNTRIES, SELECTABLE_COUNTRIES, countryLabel as resolveCountryLabel, countryFlagFromValue } from '../../../../shared/data/countries';
 import { AREAS } from '../../../../shared/data/areas';
 import { PaginationComponent, SortHeaderComponent } from '../../../../shared/components';
 import type { SortChangeEvent } from '../../../../shared/components';
@@ -470,7 +470,7 @@ export class PlacesPageComponent implements OnInit, OnDestroy {
   readonly creating = signal(false);
   readonly createError = signal<string | null>(null);
   createForm: CreatePlaceDto = { name: '', country: '' };
-  readonly countries = SORTED_COUNTRIES;
+  readonly countries = SELECTABLE_COUNTRIES;
   readonly areas = AREAS;
 
   // ─── Delete state ─────────────────────────────────────────────────

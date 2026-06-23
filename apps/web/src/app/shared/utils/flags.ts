@@ -14,13 +14,13 @@
 const ISO3_TO_ISO2: Record<string, string> = {
   AFG: 'AF', AGO: 'AO', AIA: 'AI', ALA: 'AX', ALB: 'AL', AND: 'AD', ARE: 'AE',
   ARG: 'AR', ARM: 'AM', ASM: 'AS', ATA: 'AQ', ATF: 'TF', ATG: 'AG', AUS: 'AU',
-  AUT: 'AT', AZE: 'AZ', AZO: 'PT',
+  AUT: 'AT', ABW: 'AW', AZE: 'AZ', AZO: 'PT',
 
   BDI: 'BI', BEL: 'BE', BEN: 'BJ', BES: 'BQ', BFA: 'BF', BGD: 'BD', BGR: 'BG',
   BHR: 'BH', BHS: 'BS', BIH: 'BA', BLM: 'BL', BLR: 'BY', BLZ: 'BZ', BMU: 'BM',
   BOL: 'BO', BRA: 'BR', BRB: 'BB', BRN: 'BN', BTN: 'BT', BVT: 'BV', BWA: 'BW',
 
-  CAF: 'CF', CAN: 'CA', CCK: 'CC', CIV: 'CI', CMR: 'CM', CHN: 'CN', CNI: 'ES',
+  CHE: 'CH', CHL: 'CL', CAF: 'CF', CAN: 'CA', CCK: 'CC', CIV: 'CI', CMR: 'CM', CHN: 'CN', CNI: 'ES',
   COD: 'CD', COG: 'CG', COK: 'CK', COL: 'CO', COM: 'KM', CPV: 'CV', CRI: 'CR',
   CUB: 'CU', CUW: 'CW', CXR: 'CX', CYM: 'KY', CYP: 'CY', CZE: 'CZ',
 
@@ -28,7 +28,7 @@ const ISO3_TO_ISO2: Record<string, string> = {
 
   ECU: 'EC', EGY: 'EG', ERI: 'ER', ESH: 'EH', ESP: 'ES', EST: 'EE', ETH: 'ET',
 
-  FIN: 'FI', FJI: 'FJ', FLK: 'FK', FRA: 'FR', FRO: 'FO',
+  FIN: 'FI', FJI: 'FJ', FLK: 'FK', FSM: 'FM', FRA: 'FR', FRO: 'FO',
 
   GAB: 'GA', GBR: 'GB', GEO: 'GE', GGY: 'GG', GHA: 'GH', GIB: 'GI', GIN: 'GN',
   GLP: 'GP', GMB: 'GM', GNB: 'GW', GNQ: 'GQ', GRC: 'GR', GRD: 'GD', GRL: 'GL',
@@ -47,7 +47,7 @@ const ISO3_TO_ISO2: Record<string, string> = {
   LAO: 'LA', LBN: 'LB', LBR: 'LR', LBY: 'LY', LCA: 'LC', LIE: 'LI', LKA: 'LK',
   LSO: 'LS', LTU: 'LT', LUX: 'LU', LVA: 'LV',
 
-  MAC: 'MO', MAF: 'MF', MCO: 'MC', MDA: 'MD', MDG: 'MG', MDV: 'MV', MEX: 'MX',
+  MAC: 'MO', MAF: 'MF', MAR: 'MA', MCO: 'MC', MDA: 'MD', MDG: 'MG', MDV: 'MV', MEX: 'MX',
   MHL: 'MH', MKD: 'MK', MLI: 'ML', MLT: 'MT', MMR: 'MM', MNE: 'ME', MNG: 'MN',
   MNP: 'MP', MOZ: 'MZ', MRT: 'MR', MSR: 'MS', MTQ: 'MQ', MUS: 'MU', MWI: 'MW',
   MYT: 'YT', MYS: 'MY',
@@ -66,7 +66,7 @@ const ISO3_TO_ISO2: Record<string, string> = {
   REU: 'RE', ROU: 'RO', RUS: 'RU', RWA: 'RW',
 
   SAU: 'SA', SDN: 'SD', SEN: 'SN', SGP: 'SG', SGS: 'GS', SHN: 'SH', SLB: 'SB',
-  SLE: 'SL', SLV: 'SV', SMR: 'SM', SOM: 'SO', SPM: 'PM', SRB: 'RS', SSD: 'SS',
+  SLE: 'SL', SLV: 'SV', SMR: 'SM', SOM: 'SO', SPM: 'PM', SRB: 'RS', SSD: 'SS', STP: 'ST', SUR: 'SR',
   SVK: 'SK', SVN: 'SI', SWE: 'SE', SWZ: 'SZ', SXM: 'SX', SJM: 'SJ', SYC: 'SC',
   SYR: 'SY',
 
