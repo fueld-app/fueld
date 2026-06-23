@@ -47,15 +47,37 @@ import { SettingsToastService } from './settings-toast.service';
                   placeholder="Product name"
                   class="app-input flex-1"
                 />
-                <button
-                  (click)="removeCatalogItem(i)"
-                  class="rounded-md p-1.5 text-gray-400 dark:text-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/15 transition-colors shrink-0"
-                  title="Remove item"
-                >
+                <div class="flex items-center gap-0.5 shrink-0">
+                  <button
+                    (click)="moveCatalogItem(i, -1)"
+                    [disabled]="i === 0"
+                    class="rounded-md p-1.5 text-gray-400 dark:text-muted hover:text-gray-700 dark:hover:text-ink hover:bg-gray-100 dark:hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                    title="Move up"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M14.77 12.77a.75.75 0 01-1.06 0L10 9.06l-3.71 3.71a.75.75 0 01-1.06-1.06l4.24-4.24a.75.75 0 011.06 0l4.24 4.24a.75.75 0 010 1.06z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
+                  <button
+                    (click)="moveCatalogItem(i, 1)"
+                    [disabled]="i === catalogItems().length - 1"
+                    class="rounded-md p-1.5 text-gray-400 dark:text-muted hover:text-gray-700 dark:hover:text-ink hover:bg-gray-100 dark:hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                    title="Move down"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M5.23 7.23a.75.75 0 011.06 0L10 10.94l3.71-3.71a.75.75 0 011.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.23 8.29a.75.75 0 010-1.06z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
+                  <button
+                    (click)="removeCatalogItem(i)"
+                    class="rounded-md p-1.5 text-gray-400 dark:text-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/15 transition-colors shrink-0"
+                    title="Remove item"
+                  >
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
                   </svg>
                 </button>
+                </div>
               </div>
               <input
                 type="text"
@@ -344,6 +366,16 @@ export class ProductsSettingsPageComponent implements OnInit {
       ...items,
       { id: crypto.randomUUID(), name: '', description: '', defaultUnit: '', defaultCostPrice: '', defaultSalesPrice: '', defaultTaxRateId: '', categoryKey: '' },
     ]);
+  }
+
+  moveCatalogItem(index: number, direction: -1 | 1): void {
+    this.catalogItems.update((items) => {
+      const target = index + direction;
+      if (target < 0 || target >= items.length) return items;
+      const next = [...items];
+      [next[index], next[target]] = [next[target]!, next[index]!];
+      return next;
+    });
   }
 
   removeCatalogItem(index: number): void {
