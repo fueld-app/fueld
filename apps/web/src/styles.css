@@ -5,6 +5,38 @@
 /* Attribute-based dark mode for Tailwind v4 (data-theme on <html>). */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
+/*
+  Dark-mode divider/border safety net.
+
+  The very-light gray dividers/borders (gray-50/100/200) are barely visible
+  or glare against dark surfaces when a component forgot to add a `dark:`
+  variant. In dark mode, map them to the semantic `--line` color so they always
+  render at the correct dark border weight — globally, including future usage.
+
+  This is safe because:
+   - gray-50/100/200 are never paired with colored `dark:` borders elsewhere,
+     so it only ever matches the `dark:*-line` intent (same color) or fills in
+     a missing dark variant.
+   - gray-300 is intentionally NOT overridden — it pairs with
+     `dark:border-line-strong` for inputs/strong borders (395+ usages).
+   - Colored borders (red/blue/green/…) are untouched.
+  Specificity (attr + class = 0,2,0) beats the light utility (0,1,0) but never
+  competes with gray-300/colored dark variants since the selector doesn't
+  match them.
+*/
+@layer utilities {
+  [data-theme='dark'] .divide-gray-50 > * + *,
+  [data-theme='dark'] .divide-gray-100 > * + *,
+  [data-theme='dark'] .divide-gray-200 > * + * {
+    border-color: var(--line);
+  }
+  [data-theme='dark'] .border-gray-50,
+  [data-theme='dark'] .border-gray-100,
+  [data-theme='dark'] .border-gray-200 {
+    border-color: var(--line);
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    Fueld — Global Styles & Design Tokens (Tailwind v4)
    ═══════════════════════════════════════════════════════════════════════ */
