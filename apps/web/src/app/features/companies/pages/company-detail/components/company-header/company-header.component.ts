@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   input,
   output,
+  computed,
   inject,
 } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
@@ -50,6 +51,15 @@ interface UserOption {
         @if (company().isSanctioned) {
           <span class="inline-flex items-center rounded-full bg-red-100 dark:bg-red-500/15 px-2.5 py-1 text-xs font-medium text-red-700 dark:text-red-400">
             ⚠️ Sanctioned
+          </span>
+        }
+        @if (kycStatus() === 'expired') {
+          <span class="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-400" title="KYC expiry date has passed — due for renewal">
+            ⚠️ KYC expired
+          </span>
+        } @else if (kycStatus() === 'notVerified') {
+          <span class="inline-flex items-center rounded-full bg-gray-100 dark:bg-bg-2 px-2.5 py-1 text-xs font-medium text-gray-600 dark:text-ink-dim" title="No KYC verified date set">
+            KYC not verified
           </span>
         }
         @if (riskSummary()?.isFrozen) {
@@ -227,6 +237,21 @@ export class CompanyHeaderComponent {
   readonly syncClick = output<void>();
   readonly seasearcherClick = output<void>();
   readonly unlinkParentClick = output<void>();
+
+  /** Informational KYC status derived from the saved company dates.
+   *  Returns 'expired' when the expiry date has passed, 'notVerified' when no
+   *  verified date is set, or null when KYC is verified and current (header
+   *  only surfaces warnings — the info card shows the positive state too). */
+  readonly kycStatus = computed<'expired' | 'notVerified' | null>(() => {
+    const c = this.company();
+    const expiry = c.kycExpiryDate ?? null;
+    const verified = c.kycVerifiedDate ?? null;
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    if (expiry && expiry <= today) return 'expired';
+    if (!verified) return 'notVerified';
+    return null;
+  });
 
   typeLabel(type: string): string {
     return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();

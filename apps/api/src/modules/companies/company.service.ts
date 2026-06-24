@@ -972,6 +972,8 @@ export async function updateCompany(
     companyRoles?: string[] | null;
     specialCustomerTerms?: string | null;
     preferredInvoicingCompanyId?: string | null;
+    kycVerifiedDate?: string | null;
+    kycExpiryDate?: string | null;
   },
 ) {
   // Load current company to merge manualOverrides
@@ -998,6 +1000,9 @@ export async function updateCompany(
   if (data.creditLimit !== undefined) setFields.creditLimit = data.creditLimit;
   if (data.specialCustomerTerms !== undefined) setFields.specialCustomerTerms = data.specialCustomerTerms;
   if (data.preferredInvoicingCompanyId !== undefined) setFields.preferredInvoicingCompanyId = data.preferredInvoicingCompanyId;
+  // Manual KYC tracking — not synced from Seasearcher, so no manualOverrides entry.
+  if (data.kycVerifiedDate !== undefined) setFields.kycVerifiedDate = data.kycVerifiedDate;
+  if (data.kycExpiryDate !== undefined) setFields.kycExpiryDate = data.kycExpiryDate;
 
   // Persist manual overrides
   setFields.manualOverrides = [...newOverrides];

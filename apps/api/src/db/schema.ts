@@ -633,6 +633,12 @@ export const counterparties = pgTable('counterparties', {
   // When this supplier is used on an order, default the invoicing company to this own company.
   preferredInvoicingCompanyId: uuid('preferred_invoicing_company_id'),
 
+  // Manual KYC tracking (counterparty due diligence). Informational only —
+  // no order/trade blocking. kycVerifiedDate = when KYC was last completed;
+  // kycExpiryDate = when it expires and is due for renewal. Both nullable.
+  kycVerifiedDate: date('kyc_verified_date'),
+  kycExpiryDate: date('kyc_expiry_date'),
+
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

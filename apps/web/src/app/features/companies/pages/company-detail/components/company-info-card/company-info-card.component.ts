@@ -19,6 +19,15 @@ import { AuthService } from '@app/core/auth/auth.service';
 import { SELECTABLE_COUNTRIES, type Country, countryLabel as resolveCountryLabel, countryFlagByIso3 } from '../../../../../../shared/data/countries';
 import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
 
+/** Today's date as a local YYYY-MM-DD string (for KYC expiry comparison). */
+function todayDateString(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 interface CompanyOfficeDto {
   id: string;
   counterpartyId: string;
@@ -379,6 +388,49 @@ interface CompanyEnrichment {
                   <span class="inline-flex rounded-full bg-green-100 dark:bg-green-500/15 px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-400">No</span>
                 }
               </dd>
+            </div>
+            <div>
+              <dt class="text-gray-500 dark:text-muted">KYC Verified Date</dt>
+              @if (editing()) {
+                <dd class="mt-0.5">
+                  <input
+                    type="date"
+                    [value]="editKycVerifiedDate() ?? ''"
+                    (input)="editKycVerifiedDate.set($any($event.target).value || null)"
+                    class="w-full rounded-md border border-gray-300 dark:border-line-strong px-2.5 py-1.5 text-sm font-medium text-gray-900 dark:text-ink focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
+                  />
+                </dd>
+              } @else {
+                <dd class="mt-0.5 font-medium text-gray-900 dark:text-ink">{{ company()!.kycVerifiedDate ? (company()!.kycVerifiedDate | dateLabel) : '—' }}</dd>
+              }
+            </div>
+            <div>
+              <dt class="text-gray-500 dark:text-muted">KYC Expiry / Renewal Date</dt>
+              @if (editing()) {
+                <dd class="mt-0.5">
+                  <input
+                    type="date"
+                    [value]="editKycExpiryDate() ?? ''"
+                    (input)="editKycExpiryDate.set($any($event.target).value || null)"
+                    class="w-full rounded-md border border-gray-300 dark:border-line-strong px-2.5 py-1.5 text-sm font-medium text-gray-900 dark:text-ink focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
+                  />
+                </dd>
+              } @else {
+                <dd class="mt-0.5 flex flex-wrap items-center gap-2">
+                  <span class="font-medium text-gray-900 dark:text-ink">{{ company()!.kycExpiryDate ? (company()!.kycExpiryDate | dateLabel) : '—' }}</span>
+                  @switch (kycStatus()) {
+                    @case ('expired') {
+                      <span class="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400" title="KYC expiry date has passed">KYC expired</span>
+                    }
+                    @case ('notVerified') {
+                      <span class="inline-flex items-center rounded-full bg-gray-100 dark:bg-bg-2 px-2 py-0.5 text-xs font-medium text-gray-600 dark:text-ink-dim" title="No KYC verified date set">KYC not verified</span>
+                    }
+                    @case ('verified') {
+                      <span class="inline-flex items-center rounded-full bg-green-100 dark:bg-green-500/15 px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-400" title="KYC verified and not expired">KYC verified</span>
+                    }
+                  }
+                </dd>
+              }
             </div>
             @if (companyTypes().includes('SUPPLIER')) {
               <div>
@@ -844,6 +896,18 @@ export class CompanyInfoCardComponent {
   readonly editWebsite = signal('');
   readonly editSpecialCustomerTerms = signal('');
   readonly editPreferredInvoicingCompanyId = signal<string | null>(null);
+  readonly editKycVerifiedDate = signal<string | null>(null);
+  readonly editKycExpiryDate = signal<string | null>(null);
+
+  /** Informational KYC status derived from the saved company dates. */
+  readonly kycStatus = computed<'expired' | 'notVerified' | 'verified' | null>(() => {
+    const c = this.company();
+    const expiry = c.kycExpiryDate ?? null;
+    const verified = c.kycVerifiedDate ?? null;
+    if (expiry && expiry <= todayDateString()) return 'expired';
+    if (!verified) return 'notVerified';
+    return 'verified';
+  });
 
   readonly countrySearchQuery = signal('');
   readonly showCountryDropdown = signal(false);
@@ -937,6 +1001,8 @@ export class CompanyInfoCardComponent {
     this.editWebsite.set(c.website ?? '');
     this.editSpecialCustomerTerms.set(c.specialCustomerTerms ?? '');
     this.editPreferredInvoicingCompanyId.set(c.preferredInvoicingCompanyId ?? null);
+    this.editKycVerifiedDate.set(c.kycVerifiedDate ?? null);
+    this.editKycExpiryDate.set(c.kycExpiryDate ?? null);
     this.countrySearchQuery.set(c.country ?? '');
     this.showCountryDropdown.set(false);
     this.editing.set(true);
@@ -963,6 +1029,8 @@ export class CompanyInfoCardComponent {
     if (this.editWebsite() !== (c.website ?? '')) body['website'] = this.editWebsite() || null;
     if (this.editSpecialCustomerTerms() !== (c.specialCustomerTerms ?? '')) body['specialCustomerTerms'] = this.editSpecialCustomerTerms() || null;
     if (this.editPreferredInvoicingCompanyId() !== (c.preferredInvoicingCompanyId ?? null)) body['preferredInvoicingCompanyId'] = this.editPreferredInvoicingCompanyId();
+    if (this.editKycVerifiedDate() !== (c.kycVerifiedDate ?? null)) body['kycVerifiedDate'] = this.editKycVerifiedDate();
+    if (this.editKycExpiryDate() !== (c.kycExpiryDate ?? null)) body['kycExpiryDate'] = this.editKycExpiryDate();
     return body;
   }
 

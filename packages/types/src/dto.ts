@@ -244,6 +244,10 @@ export interface CounterpartyDto {
   /** Preferred own company to invoice from when this supplier is used on an order */
   preferredInvoicingCompanyId?: string | null;
   preferredInvoicingCompanyName?: string | null;
+  /** Manual KYC tracking. Date KYC was last completed (YYYY-MM-DD). Null = not yet verified. Informational only. */
+  kycVerifiedDate?: string | null;
+  /** Date KYC expires and is due for renewal (YYYY-MM-DD). Null = no expiry set. Informational only. */
+  kycExpiryDate?: string | null;
 }
 
 /** Lightweight child summary returned alongside a parent company detail. */

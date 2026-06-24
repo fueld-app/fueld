@@ -79,6 +79,47 @@ describe('company.service local flows', () => {
     expect(missing).toBeNull();
   });
 
+  it('persists and returns the manual KYC date fields', async () => {
+    const { } = await seedBasics();
+    const { createCompany, getCompanyById, updateCompany } = await loadCompanyService();
+
+    const created = await createCompany({
+      name: 'KYC Co',
+      types: ['CLIENT'],
+      country: 'Denmark',
+      countryIso: 'DK',
+    });
+
+    // Initially null (not verified, no expiry).
+    const initial = await getCompanyById(created.id);
+    expect(initial?.kycVerifiedDate).toBeNull();
+    expect(initial?.kycExpiryDate).toBeNull();
+
+    // Set both dates.
+    const updated = await updateCompany(created.id, {
+      kycVerifiedDate: '2025-01-15',
+      kycExpiryDate: '2026-01-15',
+    });
+    expect(updated?.kycVerifiedDate).toBe('2025-01-15');
+    expect(updated?.kycExpiryDate).toBe('2026-01-15');
+    // KYC dates are not Seasearcher-synced, so they must not be tracked as manual overrides.
+    expect(updated?.manualOverrides ?? []).not.toContain('kycVerifiedDate');
+    expect(updated?.manualOverrides ?? []).not.toContain('kycExpiryDate');
+
+    // getCompanyById returns them too.
+    const fetched = await getCompanyById(created.id);
+    expect(fetched?.kycVerifiedDate).toBe('2025-01-15');
+    expect(fetched?.kycExpiryDate).toBe('2026-01-15');
+
+    // Clearing (null) is persisted.
+    const cleared = await updateCompany(created.id, {
+      kycVerifiedDate: null,
+      kycExpiryDate: null,
+    });
+    expect(cleared?.kycVerifiedDate).toBeNull();
+    expect(cleared?.kycExpiryDate).toBeNull();
+  });
+
   it('refuses to delete a company referenced as an additional order supplier', async () => {
     const { tenant, client, vessel, place } = await seedBasics();
     const db = await getDb();

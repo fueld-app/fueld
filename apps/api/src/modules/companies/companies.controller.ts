@@ -581,6 +581,8 @@ export const companiesController = new Elysia({ prefix: '/companies' })
             { field: 'website', value: (company) => company.website ?? null },
             { field: 'companyImo', value: (company) => company.companyImo ?? null },
             { field: 'companyRoles', value: (company) => company.companyRoles ?? [] },
+            { field: 'kycVerifiedDate', value: (company) => (company as any).kycVerifiedDate ?? null },
+            { field: 'kycExpiryDate', value: (company) => (company as any).kycExpiryDate ?? null },
           ],
         });
 
@@ -614,6 +616,8 @@ export const companiesController = new Elysia({ prefix: '/companies' })
         companyRoles: t.Optional(t.Nullable(t.Array(t.String()))),
         specialCustomerTerms: t.Optional(t.Nullable(t.String())),
         preferredInvoicingCompanyId: t.Optional(t.Nullable(t.String())),
+        kycVerifiedDate: t.Optional(t.Nullable(t.String())),
+        kycExpiryDate: t.Optional(t.Nullable(t.String())),
       }),
       detail: {
         tags: ['Companies'],
