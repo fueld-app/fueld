@@ -864,8 +864,18 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       const activeSupplier = this.activeOrderSupplier();
       if (!orderId || !activeSupplier || !this._initialLoadComplete) return;
       void this.financialSvc.loadSupplierCreditLines(activeSupplier.companyId);
-      void this.loadCompanyContacts('supplier', activeSupplier.companyId);
-      void this.loadSupplierNominationSummary();
+      // Only load contacts/nomination for persisted suppliers with a chosen company.
+      // Temp supplier tabs (companyId === '' or id starts with 'temp:') have no backend record yet.
+      if (activeSupplier.companyId) {
+        void this.loadCompanyContacts('supplier', activeSupplier.companyId);
+      } else {
+        this.supplierContacts.set([]);
+      }
+      if (!this.isTemporaryOrderSupplierId(activeSupplier.id)) {
+        void this.loadSupplierNominationSummary();
+      } else {
+        this.supplierNomination.set(null);
+      }
     });
   }
 
@@ -1040,6 +1050,11 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
     const id = this.orderId();
     if (!id) return;
     const activeSupplierId = this.hasMultipleOrderSuppliers() ? this.activeOrderSupplier()?.id : null;
+    // Temp supplier IDs (temp:*) have no persisted nomination record; skip the API call.
+    if (activeSupplierId && this.isTemporaryOrderSupplierId(activeSupplierId)) {
+      this.supplierNomination.set(null);
+      return;
+    }
     const query = activeSupplierId ? `?orderSupplierId=${encodeURIComponent(activeSupplierId)}` : '';
     try {
       const res = await firstValueFrom(
@@ -1304,6 +1319,7 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
   // ─── Contact person handlers ─────────────────────────────────────
 
   async loadCompanyContacts(side: 'customer' | 'supplier' | 'broker' | 'agent', companyId: string): Promise<void> {
+    if (!companyId) return; // avoid malformed request for unsaved/temp supplier tabs
     try {
       const res = await firstValueFrom(
         this.http.get<ApiResponse<CompanyContactDto[]>>(`${API_URL}/companies/local/${companyId}/contacts`),
