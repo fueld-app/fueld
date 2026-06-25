@@ -1597,15 +1597,25 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
     if (!res.success || !res.data) return;
 
+    // Preserve unsaved temp supplier tabs (no companyId yet) that the backend
+    // doesn't know about — otherwise the autosave reload wipes them out and
+    // the user loses the empty tab they just opened before picking a company.
+    const persistedIds = new Set(res.data.map((supplier) => supplier.id));
+    const unsavedTempSuppliers = this.orderSuppliers().filter(
+      (supplier) => this.isTemporaryOrderSupplierId(supplier.id) && !persistedIds.has(supplier.id),
+    );
+
+    const merged = unsavedTempSuppliers.length > 0 ? [...res.data, ...unsavedTempSuppliers] : res.data;
+
     this.mergeKnownSuppliers(res.data.map((supplier) => supplier.company));
-    this.orderSuppliers.set(res.data);
+    this.orderSuppliers.set(merged);
     const currentActiveSupplierId = this.activeOrderSupplierId();
-    const preferredSupplierId = (currentActiveSupplierId && res.data.some((supplier) => supplier.id === currentActiveSupplierId)
+    const preferredSupplierId = (currentActiveSupplierId && merged.some((supplier) => supplier.id === currentActiveSupplierId)
       ? currentActiveSupplierId
       : null)
-      ?? res.data.find((supplier) => preferredCompanyId && supplier.companyId === preferredCompanyId)?.id
-      ?? res.data.find((supplier) => supplier.isPrimary)?.id
-      ?? res.data[0]?.id
+      ?? merged.find((supplier) => preferredCompanyId && supplier.companyId === preferredCompanyId)?.id
+      ?? merged.find((supplier) => supplier.isPrimary)?.id
+      ?? merged[0]?.id
       ?? null;
     this.activeOrderSupplierId.set(preferredSupplierId);
   }
