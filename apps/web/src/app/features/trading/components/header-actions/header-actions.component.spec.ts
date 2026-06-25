@@ -61,7 +61,7 @@ describe('HeaderActionsComponent', () => {
     expect(component.displayActions().some((action) => action.key === 'send-port-documentation')).toBe(false);
   });
 
-  it('restricts LIGHT users to cancel + mark delivered only', async () => {
+  it('restricts LIGHT users to cancel + mark delivered + convert-to-order only', async () => {
     const component = await createComponent({ status: OrderStatus.Confirmed, isLight: true });
     const keys = component.displayActions().map((a) => a.key);
 
@@ -71,6 +71,13 @@ describe('HeaderActionsComponent', () => {
     expect(keys).not.toContain('send-confirmation');
     expect(keys).not.toContain('mark-paid');
     expect(keys).not.toContain('generate-invoice');
+  });
+
+  it('shows convert-to-order for LIGHT users on an inquiry', async () => {
+    const component = await createComponent({ status: OrderStatus.Inquiry, isLight: true });
+    const keys = component.displayActions().map((a) => a.key);
+
+    expect(keys).toContain('convert-to-order');
   });
 
   it('shows cancel-inquiry (not cancel-order) for LIGHT users on an inquiry', async () => {

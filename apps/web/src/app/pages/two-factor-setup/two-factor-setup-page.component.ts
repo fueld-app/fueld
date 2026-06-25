@@ -185,7 +185,16 @@ import { DateLabelPipe } from '@app/shared/pipes/date-format.pipe';
                 />
               </div>
             </div>
-            <p class="text-center text-xs text-gray-400 dark:text-muted">QR code refreshes automatically</p>
+            <div class="flex items-center justify-center gap-3">
+              <p class="text-xs text-gray-400 dark:text-muted">QR code refreshes automatically</p>
+              <button
+                (click)="refreshQr()"
+                [disabled]="waLoading()"
+                class="text-xs font-medium text-green-600 dark:text-green-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                @if (waLoading()) { Refreshing… } @else { Refresh QR }
+              </button>
+            </div>
           </div>
         } @else if (waStatus() === 'connecting') {
           <!-- Connecting -->
@@ -1043,6 +1052,13 @@ export class TwoFactorSetupPageComponent implements OnInit, OnDestroy {
     } finally {
       this.waLoading.set(false);
     }
+  }
+
+  async refreshQr(): Promise<void> {
+    // Re-request linking — backend will detect stale QR and generate a fresh one
+    this.waQrDataUrl.set('');
+    this.waStatus.set('connecting');
+    await this.linkWhatsApp();
   }
 
   async unlinkWhatsApp(): Promise<void> {

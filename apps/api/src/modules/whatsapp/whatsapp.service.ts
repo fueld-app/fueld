@@ -40,12 +40,14 @@ interface UserConnection {
   socket: WASocket;
   status: 'connecting' | 'qr' | 'connected' | 'closed';
   qr?: string;          // Current QR string (for frontend to render)
+  qrGeneratedAt?: number; // Timestamp (ms) when QR was last generated — used to detect stale QRs
   phoneNumber?: string;  // Once paired
 }
 
 const connections = new Map<string, UserConnection>();
 const reconnectAttempts = new Map<string, number>();
 const MAX_RECONNECT_ATTEMPTS = 5;
+const QR_STALE_MS = 15_000; // QR codes expire after ~20s; treat as stale after 15s
 
 // ─── Buffer Revival (JSONB round-trip loses Buffer types) ────────────
 
@@ -184,7 +186,16 @@ export async function startWhatsAppSession(userId: string): Promise<{ qr?: strin
       return { status: 'connected' };
     }
     if (existing.status === 'qr' && existing.qr) {
-      return { status: 'qr', qr: existing.qr };
+      // Check if the QR is stale (older than QR_STALE_MS).
+      // WhatsApp QR codes expire after ~20s; a stale QR won't scan.
+      // Tear down the old session and create a fresh one to get a new QR.
+      const qrAge = Date.now() - (existing.qrGeneratedAt ?? 0);
+      if (qrAge < QR_STALE_MS) {
+        return { status: 'qr', qr: existing.qr };
+      }
+      // QR is stale — destroy old socket and fall through to create a new session
+      try { existing.socket?.end(undefined); } catch {}
+      connections.delete(userId);
     }
     if (existing.status === 'connecting') {
       return { status: 'connecting' };
@@ -215,6 +226,7 @@ export async function startWhatsAppSession(userId: string): Promise<{ qr?: strin
 
     if (qr) {
       conn.status = 'qr';
+      conn.qrGeneratedAt = Date.now();
       // Convert raw QR string to data URL so frontend can render as <img>
       try {
         const qrDataUrl = await QRCode.toDataURL(qr, { width: 256, margin: 2 });
@@ -639,9 +651,12 @@ export async function sendWhatsAppMessage(
   const cleaned = recipientPhone.replace(/[^0-9]/g, '');
   const jid = `${cleaned}@s.whatsapp.net`;
 
+  // Interpolate template variables (e.g. {{Phone}} → recipient phone number)
+  const resolvedText = interpolateTemplate(text, { phone: recipientPhone });
+
   try {
     // Send text message
-    await conn.socket.sendMessage(jid, { text });
+    await conn.socket.sendMessage(jid, { text: resolvedText });
 
     // Send PDF if provided
     if (pdfBuffer && pdfFileName) {

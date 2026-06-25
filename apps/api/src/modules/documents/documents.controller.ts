@@ -857,7 +857,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
             orderNumber,
             paymentTerms,
             eta: order.eta ?? null,
-            agentName: order.agentContact?.name ?? order.agent?.name ?? null,
+            agentName: order.agent?.name ?? null,
             customerNote: docType === 'NOMINATION' ? order.supplierNote ?? null : order.customerNote ?? null,
             items: order.items?.map((item: any) => ({
               quantity: item.quantity,
@@ -889,7 +889,7 @@ export const documentsController = new Elysia({ prefix: '/orders' })
           orderNumber,
           paymentTerms,
           eta: order.eta ?? null,
-          agentName: order.agentContact?.name ?? order.agent?.name ?? null,
+          agentName: order.agent?.name ?? null,
           customerNote: docType === 'NOMINATION' ? order.supplierNote ?? null : order.customerNote ?? null,
           items: order.items?.map((item: any) => ({
             quantity: item.quantity,

@@ -358,12 +358,13 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
               : action,
           );
 
-    // LIGHT users only get cancel + mark delivered (no financial/email actions).
+    // LIGHT users get cancel + mark delivered + convert-to-order (no financial/email actions).
     if (isLight) {
       nextActions = nextActions.filter((action) =>
         action.key === 'cancel-inquiry'
         || action.key === 'cancel-order'
-        || action.key === 'mark-delivered',
+        || action.key === 'mark-delivered'
+        || action.key === 'convert-to-order',
       );
     }
 
