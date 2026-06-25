@@ -652,7 +652,8 @@ export async function sendWhatsAppMessage(
   const jid = `${cleaned}@s.whatsapp.net`;
 
   // Interpolate template variables (e.g. {{Phone}} → recipient phone number)
-  const resolvedText = interpolateTemplate(text, { phone: recipientPhone });
+  // Support both {{Phone}} (as shown in admin UI) and {{phone}} (lowercase convention)
+  const resolvedText = interpolateTemplate(text, { Phone: recipientPhone, phone: recipientPhone });
 
   try {
     // Send text message
