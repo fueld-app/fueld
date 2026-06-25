@@ -1597,12 +1597,13 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
 
     if (!res.success || !res.data) return;
 
-    // Preserve unsaved temp supplier tabs (no companyId yet) that the backend
-    // doesn't know about — otherwise the autosave reload wipes them out and
-    // the user loses the empty tab they just opened before picking a company.
+    // Preserve unsaved temp supplier tabs that have no companyId yet — the
+    // backend doesn't know about them. Temp suppliers WITH a companyId were
+    // just POSTed in syncOrderSupplierRecords and now exist as real persisted
+    // records, so they must NOT be preserved (that would create duplicates).
     const persistedIds = new Set(res.data.map((supplier) => supplier.id));
     const unsavedTempSuppliers = this.orderSuppliers().filter(
-      (supplier) => this.isTemporaryOrderSupplierId(supplier.id) && !persistedIds.has(supplier.id),
+      (supplier) => this.isTemporaryOrderSupplierId(supplier.id) && !supplier.companyId && !persistedIds.has(supplier.id),
     );
 
     const merged = unsavedTempSuppliers.length > 0 ? [...res.data, ...unsavedTempSuppliers] : res.data;
