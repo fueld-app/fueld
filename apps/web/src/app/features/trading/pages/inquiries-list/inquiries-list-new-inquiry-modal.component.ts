@@ -159,6 +159,18 @@ interface LliSearchResult {
                 />
               </div>
             </div>
+
+            <!-- Response deadline (optional) -->
+            <div>
+              <label for="new-response-deadline" class="block text-sm font-medium text-gray-700 dark:text-ink-dim mb-1.5">Response Deadline <span class="text-gray-400 dark:text-muted font-normal">(optional)</span></label>
+              <input
+                id="new-response-deadline"
+                type="datetime-local"
+                [ngModel]="newResponseDeadline()"
+                (ngModelChange)="newResponseDeadline.set($event)"
+                class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3.5 py-2.5 text-sm shadow-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
+              />
+            </div>
           </div>
 
           <div class="flex items-center justify-end gap-3 border-t border-gray-200 dark:border-line px-6 py-4">
@@ -206,6 +218,7 @@ export class InquiriesListNewInquiryModalComponent {
   readonly newResponsibleUserId = signal('');
   readonly newEta = signal('');
   readonly newEtd = signal('');
+  readonly newResponseDeadline = signal('');
 
   /* ---- loading / search ---- */
   readonly creating = signal(false);
@@ -573,6 +586,7 @@ export class InquiriesListNewInquiryModalComponent {
           salesRepId: this.newResponsibleUserId() || undefined,
           eta: this.newEta() || undefined,
           etd: this.newEtd() || undefined,
+          responseDeadlineAt: this.newResponseDeadline() || undefined,
         }),
       );
       if (res.success) {
@@ -595,6 +609,7 @@ export class InquiriesListNewInquiryModalComponent {
     this.newResponsibleUserId.set('');
     this.newEta.set('');
     this.newEtd.set('');
+    this.newResponseDeadline.set('');
     this.selectedClient.set(null);
     this.selectedVessel.set(null);
     this.selectedPlace.set(null);
