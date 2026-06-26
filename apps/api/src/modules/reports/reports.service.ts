@@ -581,9 +581,18 @@ async function fetchScopedDataset(
     .innerJoin(vessels, eq(orders.vesselId, vessels.id))
     .where(and(...conditions));
 
-  const teamFilteredOrderRows = filtersApplied.teamId
-    ? orderRows.filter((row) => row.teamId === filtersApplied.teamId)
-    : orderRows;
+  // When filtering by team, look up all users who belong to that team via user_teams.
+  // This correctly handles users who belong to multiple teams — their orders appear
+  // under every team they are a member of, not just their primaryTeamId.
+  let teamFilteredOrderRows = orderRows;
+  if (filtersApplied.teamId) {
+    const teamUserIds = await db
+      .select({ userId: userTeams.userId })
+      .from(userTeams)
+      .where(eq(userTeams.teamId, filtersApplied.teamId));
+    const teamUserIdSet = new Set(teamUserIds.map((r) => r.userId));
+    teamFilteredOrderRows = orderRows.filter((row) => teamUserIdSet.has(row.traderId));
+  }
 
   const tenant = await db.query.tenants.findFirst({
     where: eq(tenants.id, tenantId),

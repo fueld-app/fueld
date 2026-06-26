@@ -14,6 +14,7 @@ import {
   createTeam,
   updateTeam,
   deleteTeam,
+  setTeamMembers,
   listCompanyGroups,
   createCompanyGroup,
   updateCompanyGroup,
@@ -252,7 +253,7 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   .get('/teams', async ({ auth }) => {
     try {
       requireAdmin(auth);
-      const data = await listTeams();
+      const data = await listTeams(auth!.tenantId);
       return { success: true, data } satisfies ApiResponse<unknown>;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed';
@@ -265,7 +266,7 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   .post('/teams', async ({ auth, body }) => {
     try {
       requireAdmin(auth);
-      const data = await createTeam(body);
+      const data = await createTeam(body, auth!.tenantId);
       return { success: true, data } satisfies ApiResponse<unknown>;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed';
@@ -282,7 +283,7 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   .patch('/teams/:id', async ({ auth, params, body }) => {
     try {
       requireAdmin(auth);
-      const data = await updateTeam(params.id, body);
+      const data = await updateTeam(params.id, body, auth!.tenantId);
       return { success: true, data } satisfies ApiResponse<unknown>;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed';
@@ -300,7 +301,7 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   .delete('/teams/:id', async ({ auth, params }) => {
     try {
       requireAdmin(auth);
-      const data = await deleteTeam(params.id);
+      const data = await deleteTeam(params.id, auth!.tenantId);
       return { success: true, data } satisfies ApiResponse<unknown>;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed';
@@ -309,6 +310,21 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   }, {
     params: t.Object({ id: t.String() }),
     detail: { tags: ['Admin Settings'], summary: 'Delete a team' },
+  })
+
+  .put('/teams/:id/members', async ({ auth, params, body }) => {
+    try {
+      requireAdmin(auth);
+      const data = await setTeamMembers(auth!.tenantId, params.id, body.memberIds);
+      return { success: true, data } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    params: t.Object({ id: t.String() }),
+    body: t.Object({ memberIds: t.Array(t.String()) }),
+    detail: { tags: ['Admin Settings'], summary: 'Replace all team members (bulk)' },
   })
 
   // ═══════════════════════════════════════════════════════════════════
@@ -384,7 +400,7 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   .patch('/users/:id/teams', async ({ auth, params, body }) => {
     try {
       requireAdmin(auth);
-      const data = await updateUserTeams(params.id, body.teamIds);
+      const data = await updateUserTeams(params.id, body.teamIds, auth!.tenantId);
       return { success: true, data } satisfies ApiResponse<unknown>;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed';
@@ -399,7 +415,7 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   .get('/users/:id/companies', async ({ auth, params }) => {
     try {
       requireAdmin(auth);
-      const data = await getUserCompanyAccess(params.id);
+      const data = await getUserCompanyAccess(params.id, auth!.tenantId);
       return { success: true, data } satisfies ApiResponse<unknown>;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed';
@@ -413,7 +429,7 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   .put('/users/:id/companies', async ({ auth, params, body }) => {
     try {
       requireAdmin(auth);
-      const data = await setUserCompanyOverrides(params.id, body.companyIds);
+      const data = await setUserCompanyOverrides(params.id, body.companyIds, auth!.tenantId);
       return { success: true, data } satisfies ApiResponse<unknown>;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed';
@@ -428,7 +444,7 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
   // ── Accessible own companies for current user (non-admin) ────────
   .get('/my-companies', async ({ auth }) => {
     try {
-      const data = await getUserCompanyAccess(auth.sub);
+      const data = await getUserCompanyAccess(auth.sub, auth!.tenantId);
       return { success: true, data } satisfies ApiResponse<unknown>;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed';

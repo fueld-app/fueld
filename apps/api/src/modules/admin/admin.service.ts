@@ -386,15 +386,30 @@ export async function toggleUserActive(userId: string, isActive: boolean) {
 
 // ── Update User Teams ──────────────────────────────────────────────
 
-export async function updateUserTeams(userId: string, teamIds: string[]) {
-  // Validate user exists
+export async function updateUserTeams(userId: string, teamIds: string[], tenantId?: string) {
+  const tid = tenantId ?? await getTenantId();
+
+  // Validate user exists and belongs to this tenant
   const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
   if (!user) throw new Error('User not found');
+  if (user.tenantId !== tid) throw new Error('User not found');
+
+  const cleaned = Array.from(new Set(teamIds.filter((id) => id && id.trim().length > 0)));
+
+  // Validate all teamIds belong to this tenant
+  if (cleaned.length > 0) {
+    const validTeams = await db
+      .select({ id: teams.id })
+      .from(teams)
+      .where(and(inArray(teams.id, cleaned), eq(teams.tenantId, tid)));
+    if (validTeams.length !== cleaned.length) {
+      throw new Error('One or more teams not found in this tenant');
+    }
+  }
 
   // Replace all team associations for this user
   await db.delete(userTeams).where(eq(userTeams.userId, userId));
 
-  const cleaned = Array.from(new Set(teamIds.filter((id) => id && id.trim().length > 0)));
   if (cleaned.length > 0) {
     await db.insert(userTeams).values(
       cleaned.map((teamId) => ({ userId, teamId })),

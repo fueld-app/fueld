@@ -2,7 +2,7 @@
 //  Settings Service — Own companies, teams, company groups
 // ═══════════════════════════════════════════════════════════════════════
 
-import { eq, and, sql, isNull, inArray } from 'drizzle-orm';
+import { eq, and, sql, isNull, inArray, not } from 'drizzle-orm';
 import { db } from '../../db';
 import {
   counterparties,
@@ -226,8 +226,20 @@ export async function updateOwnCompanyTerms(companyId: string, data: {
 //  TEAMS
 // ═══════════════════════════════════════════════════════════════════════
 
-export async function listTeams(): Promise<TeamDto[]> {
-  const tenantId = await getTenantId();
+/** Validate that all companyIds are counterparties belonging to the given tenant. */
+async function validateCompanyIdsBelongToTenant(companyIds: string[], tenantId: string): Promise<void> {
+  if (companyIds.length === 0) return;
+  const valid = await db
+    .select({ id: counterparties.id })
+    .from(counterparties)
+    .where(and(inArray(counterparties.id, companyIds), eq(counterparties.tenantId, tenantId)));
+  if (valid.length !== companyIds.length) {
+    throw new Error('One or more companies not found in this tenant');
+  }
+}
+
+export async function listTeams(tenantId?: string): Promise<TeamDto[]> {
+  const tid = tenantId ?? await getTenantId();
 
   const teamRows = await db
     .select({
@@ -238,7 +250,7 @@ export async function listTeams(): Promise<TeamDto[]> {
       updatedAt: teams.updatedAt,
     })
     .from(teams)
-    .where(eq(teams.tenantId, tenantId))
+    .where(eq(teams.tenantId, tid))
     .orderBy(teams.name);
 
   const result: TeamDto[] = [];
@@ -284,12 +296,17 @@ export async function listTeams(): Promise<TeamDto[]> {
   return result;
 }
 
-export async function createTeam(data: { name: string; companyIds: string[] }): Promise<TeamDto> {
-  const tenantId = await getTenantId();
+export async function createTeam(data: { name: string; companyIds: string[] }, tenantId?: string): Promise<TeamDto> {
+  const tid = tenantId ?? await getTenantId();
+
+  // Validate all companyIds are counterparties in this tenant
+  if (data.companyIds.length > 0) {
+    await validateCompanyIdsBelongToTenant(data.companyIds, tid);
+  }
 
   const [team] = await db
     .insert(teams)
-    .values({ tenantId, name: data.name })
+    .values({ tenantId: tid, name: data.name })
     .returning();
 
   // Insert team ↔ company links
@@ -299,13 +316,22 @@ export async function createTeam(data: { name: string; companyIds: string[] }): 
     );
   }
 
-  return (await listTeams()).find((t) => t.id === team!.id)!;
+  return (await listTeams(tid)).find((t) => t.id === team!.id)!;
 }
 
 export async function updateTeam(
   teamId: string,
   data: { name?: string; companyIds?: string[] },
+  tenantId?: string,
 ): Promise<TeamDto> {
+  const tid = tenantId ?? await getTenantId();
+
+  // Verify the team belongs to this tenant before updating
+  const existing = await db.query.teams.findFirst({
+    where: and(eq(teams.id, teamId), eq(teams.tenantId, tid)),
+  });
+  if (!existing) throw new Error('Team not found');
+
   if (data.name !== undefined) {
     await db
       .update(teams)
@@ -314,6 +340,11 @@ export async function updateTeam(
   }
 
   if (data.companyIds !== undefined) {
+    // Validate all companyIds are counterparties in this tenant
+    if (data.companyIds.length > 0) {
+      await validateCompanyIdsBelongToTenant(data.companyIds, tid);
+    }
+
     // Replace all team company links
     await db.delete(teamCompanies).where(eq(teamCompanies.teamId, teamId));
     if (data.companyIds.length > 0) {
@@ -323,12 +354,20 @@ export async function updateTeam(
     }
   }
 
-  const result = (await listTeams()).find((t) => t.id === teamId);
+  const result = (await listTeams(tid)).find((t) => t.id === teamId);
   if (!result) throw new Error('Team not found');
   return result;
 }
 
-export async function deleteTeam(teamId: string) {
+export async function deleteTeam(teamId: string, tenantId?: string) {
+  const tid = tenantId ?? await getTenantId();
+
+  // Verify the team belongs to this tenant before deleting
+  const existing = await db.query.teams.findFirst({
+    where: and(eq(teams.id, teamId), eq(teams.tenantId, tid)),
+  });
+  if (!existing) throw new Error('Team not found');
+
   // Remove user-team associations from join table
   await db.delete(userTeams).where(eq(userTeams.teamId, teamId));
 
@@ -345,6 +384,56 @@ export async function deleteTeam(teamId: string) {
 
   if (!deleted) throw new Error('Team not found');
   return deleted;
+}
+
+export async function setTeamMembers(tenantId: string, teamId: string, memberIds: string[]): Promise<TeamDto> {
+  const tid = tenantId ?? await getTenantId();
+
+  // Verify team belongs to tenant
+  const existing = await db.query.teams.findFirst({
+    where: and(eq(teams.id, teamId), eq(teams.tenantId, tid)),
+  });
+  if (!existing) throw new Error('Team not found');
+
+  const cleaned = Array.from(new Set(memberIds.filter((id) => id && id.trim().length > 0)));
+
+  // Validate all memberIds are users in this tenant
+  if (cleaned.length > 0) {
+    const validUsers = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(inArray(users.id, cleaned), eq(users.tenantId, tid)));
+    if (validUsers.length !== cleaned.length) {
+      throw new Error('One or more users not found in this tenant');
+    }
+  }
+
+  // Transactionally replace all members
+  await db.transaction(async (tx) => {
+    // Remove all current members
+    await tx.delete(userTeams).where(eq(userTeams.teamId, teamId));
+
+    // Insert new members
+    if (cleaned.length > 0) {
+      await tx.insert(userTeams).values(cleaned.map(userId => ({ userId, teamId })));
+    }
+
+    // For users being removed who had this team as primary, clear primaryTeamId
+    await tx.update(users)
+      .set({ primaryTeamId: null })
+      .where(and(eq(users.primaryTeamId, teamId), not(inArray(users.id, cleaned))));
+
+    // For users being added who don't have a primary team, set this as primary
+    if (cleaned.length > 0) {
+      await tx.update(users)
+        .set({ primaryTeamId: teamId })
+        .where(and(inArray(users.id, cleaned), isNull(users.primaryTeamId)));
+    }
+  });
+
+  const result = (await listTeams(tid)).find(t => t.id === teamId);
+  if (!result) throw new Error('Team not found');
+  return result;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -450,7 +539,9 @@ export async function deleteCompanyGroup(groupId: string) {
 //  USER COMPANY ACCESS — resolve which own companies a user can access
 // ═══════════════════════════════════════════════════════════════════════
 
-export async function getUserCompanyAccess(userId: string): Promise<OwnCompanyDto[]> {
+export async function getUserCompanyAccess(userId: string, tenantId?: string): Promise<OwnCompanyDto[]> {
+  const tid = tenantId ?? await getTenantId();
+
   // Check for per-user overrides first
   const overrides = await (async () => {
     try {
@@ -458,14 +549,14 @@ export async function getUserCompanyAccess(userId: string): Promise<OwnCompanyDt
         .select(OWN_COMPANY_SELECT)
         .from(userCompanyOverrides)
         .innerJoin(counterparties, eq(userCompanyOverrides.counterpartyId, counterparties.id))
-        .where(eq(userCompanyOverrides.userId, userId));
+        .where(and(eq(userCompanyOverrides.userId, userId), eq(counterparties.tenantId, tid)));
     } catch (err) {
       if (!isMissingCompanyRegistrationNumberColumnError(err)) throw err;
       const legacy = await db
         .select(OWN_COMPANY_SELECT_LEGACY)
         .from(userCompanyOverrides)
         .innerJoin(counterparties, eq(userCompanyOverrides.counterpartyId, counterparties.id))
-        .where(eq(userCompanyOverrides.userId, userId));
+        .where(and(eq(userCompanyOverrides.userId, userId), eq(counterparties.tenantId, tid)));
       return withLegacyRegistrationNumber(legacy);
     }
   })();
@@ -493,14 +584,14 @@ export async function getUserCompanyAccess(userId: string): Promise<OwnCompanyDt
         .select(OWN_COMPANY_SELECT)
         .from(teamCompanies)
         .innerJoin(counterparties, eq(teamCompanies.counterpartyId, counterparties.id))
-        .where(inArray(teamCompanies.teamId, teamIds));
+        .where(and(inArray(teamCompanies.teamId, teamIds), eq(counterparties.tenantId, tid)));
     } catch (err) {
       if (!isMissingCompanyRegistrationNumberColumnError(err)) throw err;
       const legacy = await db
         .select(OWN_COMPANY_SELECT_LEGACY)
         .from(teamCompanies)
         .innerJoin(counterparties, eq(teamCompanies.counterpartyId, counterparties.id))
-        .where(inArray(teamCompanies.teamId, teamIds));
+        .where(and(inArray(teamCompanies.teamId, teamIds), eq(counterparties.tenantId, tid)));
       return withLegacyRegistrationNumber(legacy);
     }
   })();
@@ -509,7 +600,9 @@ export async function getUserCompanyAccess(userId: string): Promise<OwnCompanyDt
   return teamCos.length > 0 ? teamCos : listOwnCompanies();
 }
 
-export async function setUserCompanyOverrides(userId: string, companyIds: string[]) {
+export async function setUserCompanyOverrides(userId: string, companyIds: string[], tenantId?: string) {
+  const tid = tenantId ?? await getTenantId();
+
   await db.delete(userCompanyOverrides).where(eq(userCompanyOverrides.userId, userId));
 
   if (companyIds.length > 0) {
@@ -518,7 +611,7 @@ export async function setUserCompanyOverrides(userId: string, companyIds: string
     );
   }
 
-  return getUserCompanyAccess(userId);
+  return getUserCompanyAccess(userId, tid);
 }
 
 // ═══════════════════════════════════════════════════════════════════════

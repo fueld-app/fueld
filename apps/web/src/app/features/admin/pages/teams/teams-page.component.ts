@@ -320,6 +320,8 @@ export class TeamsPageComponent implements OnInit {
 
     try {
       const companyIds = Array.from(this.selectedCompanyIds());
+      let teamId: string | null = null;
+
       if (this.editingId()) {
         await firstValueFrom(
           this.http.patch<ApiResponse<TeamDto>>(`${API}/admin/settings/teams/${this.editingId()}`, {
@@ -327,18 +329,20 @@ export class TeamsPageComponent implements OnInit {
             companyIds,
           }),
         );
+        teamId = this.editingId();
       } else {
-        await firstValueFrom(
+        const createRes = await firstValueFrom(
           this.http.post<ApiResponse<TeamDto>>(`${API}/admin/settings/teams`, {
             name,
             companyIds,
           }),
         );
+        teamId = createRes.data?.id ?? null;
       }
+
       this.showModal.set(false);
 
-      // After saving, update member assignments
-      const teamId = this.editingId() || (await this.getLastTeamId());
+      // Sync members via single bulk PUT call
       if (teamId) {
         await this.syncMembers(teamId);
       }
@@ -352,45 +356,11 @@ export class TeamsPageComponent implements OnInit {
     }
   }
 
-  private async getLastTeamId(): Promise<string | null> {
-    try {
-      const res = await firstValueFrom(
-        this.http.get<ApiResponse<TeamDto[]>>(`${API}/admin/settings/teams`),
-      );
-      if (res.success && res.data.length) {
-        // Return the most recently created team
-        return res.data[res.data.length - 1].id;
-      }
-    } catch { /* ignore */ }
-    return null;
-  }
-
   private async syncMembers(teamId: string): Promise<void> {
-    const desiredMembers = this.selectedMemberIds();
-    // Find current team to get existing members
-    const currentTeam = this.teams().find(t => t.id === teamId);
-    const currentMemberIds = new Set(currentTeam?.memberIds ?? []);
-
-    // Users to add to this team
-    for (const userId of desiredMembers) {
-      if (!currentMemberIds.has(userId)) {
-        const user = this.allUsers().find(u => u.id === userId);
-        const teamIds = Array.from(new Set([...(user?.teamIds ?? []), teamId]));
-        await firstValueFrom(
-          this.http.patch<ApiResponse<unknown>>(`${API}/admin/settings/users/${userId}/teams`, { teamIds }),
-        );
-      }
-    }
-    // Users to remove from this team
-    for (const userId of currentMemberIds) {
-      if (!desiredMembers.has(userId)) {
-        const user = this.allUsers().find(u => u.id === userId);
-        const teamIds = (user?.teamIds ?? []).filter(t => t !== teamId);
-        await firstValueFrom(
-          this.http.patch<ApiResponse<unknown>>(`${API}/admin/settings/users/${userId}/teams`, { teamIds }),
-        );
-      }
-    }
+    const memberIds = Array.from(this.selectedMemberIds());
+    await firstValueFrom(
+      this.http.put<ApiResponse<unknown>>(`${API}/admin/settings/teams/${teamId}/members`, { memberIds }),
+    );
   }
 
   confirmDelete(team: TeamDto): void {
