@@ -105,6 +105,8 @@ import {
   disconnect as disconnectQuickBooks,
   setDesktopCredentials,
   isAppConfigured as isQBAppConfigured,
+  syncOrderToQuickBooks,
+  getOrderSyncStatus,
 } from '../quickbooks/quickbooks.service';
 import { updateUserTeams } from './admin.service';
 import { sendTemplatedGroupMessage } from '../whatsapp/whatsapp.service';
@@ -853,6 +855,37 @@ export const settingsController = new Elysia({ prefix: '/admin/settings' })
     }
   }, {
     detail: { tags: ['Admin Settings'], summary: 'Disconnect QuickBooks integration' },
+  })
+
+  // Sync an order's invoice to QuickBooks Online
+  .post('/integrations/quickbooks/sync-order/:orderId', async ({ auth, params }) => {
+    try {
+      requireAdmin(auth);
+      const result = await syncOrderToQuickBooks(params.orderId);
+      return {
+        success: true,
+        data: { qbInvoiceId: result.qbInvoiceId, qbInvoiceNumber: result.qbInvoiceNumber },
+      } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to sync to QuickBooks';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Sync an order\'s invoice to QuickBooks Online' },
+  })
+
+  // Check if an order's invoice has been synced to QuickBooks
+  .get('/integrations/quickbooks/order-status/:orderId', async ({ auth, params }) => {
+    try {
+      requireAdmin(auth);
+      const status = await getOrderSyncStatus(params.orderId);
+      return { success: true, data: status } satisfies ApiResponse<unknown>;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed';
+      return { success: false, data: null, message } satisfies ApiResponse<null>;
+    }
+  }, {
+    detail: { tags: ['Admin Settings'], summary: 'Check if an order\'s invoice is synced to QuickBooks' },
   })
 
   // ═══════════════════════════════════════════════════════════════════

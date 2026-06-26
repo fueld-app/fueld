@@ -36,6 +36,7 @@ export type HeaderAction =
   | 'send-booking'
   | 'mark-delivered'
   | 'mark-paid'
+  | 'sync-quickbooks'
   | 'reopen-order';
 
 interface ActionItem {
@@ -148,6 +149,12 @@ const ACTIONS: ActionItem[] = [
     label: 'Mark Paid',
     icon: 'M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z',
     color: 'text-green-600',
+  },
+  {
+    key: 'sync-quickbooks',
+    label: 'Sync to QuickBooks',
+    icon: 'M12 6V12H18M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z',
+    color: 'text-emerald-600',
   },
   {
     key: 'reopen-order',
@@ -355,6 +362,8 @@ export class HeaderActionsComponent implements OnInit, OnDestroy {
                 ? { ...action, disabled: !canMarkDelivered }
               : action.key === 'mark-paid'
                 ? { ...action, disabled: !canMarkPaid }
+              : action.key === 'sync-quickbooks'
+                ? { ...action, disabled: !hasLineItems, dividerBefore: true }
               : action,
           );
 

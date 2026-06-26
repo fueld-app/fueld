@@ -71,6 +71,18 @@ import { IntegrationsToastService } from './integrations-toast.service';
               </div>
             }
           </div>
+          @if (status()!.connectionType === 'online' && status()!.tokenExpiresAt) {
+            <div class="mt-2 flex items-center gap-2 text-xs">
+              @if (isTokenExpiringSoon()) {
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 dark:bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-400 ring-1 ring-amber-600/20">
+                  <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+                  Token expires soon — reconnect if sync stops working
+                </span>
+              } @else {
+                <span class="text-gray-400 dark:text-muted">Token expires: {{ formatDate(status()!.tokenExpiresAt!) }}</span>
+              }
+            </div>
+          }
         </div>
       }
 
@@ -240,6 +252,14 @@ export class QuickBooksIntegrationCardComponent implements OnInit {
 
   status(): IntegrationStatusDto | null {
     return this.integration() ?? null;
+  }
+
+  /** True if the QBO access token expires within 24 hours. */
+  isTokenExpiringSoon(): boolean {
+    const exp = this.status()?.tokenExpiresAt;
+    if (!exp) return false;
+    const msUntilExpiry = new Date(exp).getTime() - Date.now();
+    return msUntilExpiry < 24 * 60 * 60 * 1000; // 24h
   }
 
   ngOnInit(): void {

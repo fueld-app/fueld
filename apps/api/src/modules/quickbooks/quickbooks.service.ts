@@ -6,11 +6,11 @@
 //  using the same AES-256-GCM scheme as LLI credentials.
 // ═══════════════════════════════════════════════════════════════════════
 
-import { eq, and } from 'drizzle-orm';
+import { eq, and, desc } from 'drizzle-orm';
 import { db } from '../../db';
-import { integrationCredentials, tenants, users } from '../../db/schema';
+import { integrationCredentials, tenants, users, orders, invoices, orderItems, counterparties } from '../../db/schema';
 import { encrypt, decrypt } from '../../lib/crypto';
-import { randomBytes, createHash } from 'crypto';
+import { randomBytes } from 'crypto';
 import type { IntegrationStatusDto } from '@fueld/types';
 
 // ─── Constants ───────────────────────────────────────────────────────
@@ -71,6 +71,8 @@ function cleanExpiredStates() {
 async function upsertCredential(tenantId: string, key: string, value: string, userId: string) {
   const enc = encrypt(value);
   const now = new Date();
+  // updatedBy is a UUID column — empty string is not valid, convert to null
+  const updatedBy = userId || null;
 
   const existing = await db
     .select({ id: integrationCredentials.id })
@@ -91,7 +93,7 @@ async function upsertCredential(tenantId: string, key: string, value: string, us
         encryptedValue: enc.encrypted,
         iv: enc.iv,
         authTag: enc.authTag,
-        updatedBy: userId,
+        updatedBy,
         updatedAt: now,
       })
       .where(eq(integrationCredentials.id, existing[0].id));
@@ -103,7 +105,7 @@ async function upsertCredential(tenantId: string, key: string, value: string, us
       encryptedValue: enc.encrypted,
       iv: enc.iv,
       authTag: enc.authTag,
-      updatedBy: userId,
+      updatedBy: updatedBy as string | null,
     });
   }
 }
@@ -529,4 +531,313 @@ export async function disconnect(userId: string): Promise<void> {
  */
 export function isAppConfigured(): boolean {
   return isQBAppConfigured();
+}
+
+// ─── QuickBooks Invoice Sync ────────────────────────────────────────────
+
+/**
+ * Find or create a QuickBooks customer for a given counterparty.
+ * Stores the QB customer ID in integrationCredentials for future lookups.
+ * Returns the QB customer ID.
+ */
+export async function findOrCreateQBCustomer(counterpartyId: string): Promise<{ id: string; name: string }> {
+  const tenantId = await getTenantId();
+
+  // Check if we already have a QB customer ID for this counterparty
+  const existingQbId = await getCredential(tenantId, `qb_customer_${counterpartyId}`);
+  if (existingQbId) {
+    // We have a stored QB customer ID — return it (with name from counterparty)
+    const [counterparty] = await db
+      .select({ name: counterparties.name })
+      .from(counterparties)
+      .where(eq(counterparties.id, counterpartyId))
+      .limit(1);
+    return { id: existingQbId, name: counterparty?.name ?? 'Unknown' };
+  }
+
+  // Fetch counterparty details
+  const [counterparty] = await db
+    .select({
+      name: counterparties.name,
+      headOfficeEmail: counterparties.headOfficeEmail,
+      headOfficePhone: counterparties.headOfficePhone,
+    })
+    .from(counterparties)
+    .where(eq(counterparties.id, counterpartyId))
+    .limit(1);
+
+  if (!counterparty) throw new Error(`Counterparty ${counterpartyId} not found`);
+
+  const tokenInfo = await getValidAccessToken();
+  if (!tokenInfo) throw new Error('QuickBooks is not connected. Please connect via Settings → Integrations → QuickBooks.');
+
+  const { token, realmId } = tokenInfo;
+  const apiBase = getQBConfig().environment === 'production' ? QB_API_BASE_PROD : QB_API_BASE_SANDBOX;
+
+  // Query QB for an existing customer with the same DisplayName
+  const queryRes = await fetch(
+    `${apiBase}/v3/company/${realmId}/query?query=${encodeURIComponent(`SELECT Id, DisplayName FROM Customer WHERE DisplayName = '${counterparty.name.replace(/'/g, "\\'")}' MAXRESULTS 1`)}`,
+    { headers: { Accept: 'application/json', Authorization: `Bearer ${token}` } },
+  );
+
+  if (queryRes.ok) {
+    const queryData = await queryRes.json() as { QueryResponse?: { Customer?: { Id: string; DisplayName: string }[] } };
+    const existing = queryData.QueryResponse?.Customer?.[0];
+    if (existing) {
+      // Store the QB customer ID for future lookups
+      await upsertCredential(tenantId, `qb_customer_${counterpartyId}`, existing.Id, '');
+      return { id: existing.Id, name: existing.DisplayName };
+    }
+  }
+
+  // Customer not found — create a new one
+  const customerBody: Record<string, unknown> = {
+    DisplayName: counterparty.name,
+  };
+  if (counterparty.headOfficeEmail) {
+    customerBody.PrimaryEmailAddr = { Address: counterparty.headOfficeEmail };
+  }
+  if (counterparty.headOfficePhone) {
+    customerBody.PrimaryPhone = { FreeFormNumber: counterparty.headOfficePhone };
+  }
+
+  const createRes = await fetch(`${apiBase}/v3/company/${realmId}/customer`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(customerBody),
+  });
+
+  if (!createRes.ok) {
+    const errText = await createRes.text();
+    throw new Error(`Failed to create QuickBooks customer: ${createRes.status} ${errText}`);
+  }
+
+  const createData = await createRes.json() as { Customer?: { Id: string; DisplayName: string } };
+  const qbCustomer = createData.Customer;
+  if (!qbCustomer?.Id) throw new Error('QuickBooks customer creation returned no ID');
+
+  // Store the QB customer ID
+  await upsertCredential(tenantId, `qb_customer_${counterpartyId}`, qbCustomer.Id, '');
+  console.log(`[QB] Created customer "${qbCustomer.DisplayName}" (QB ID: ${qbCustomer.Id})`);
+  return { id: qbCustomer.Id, name: qbCustomer.DisplayName };
+}
+
+/**
+ * Create a QuickBooks invoice from a Fueld invoice + order data.
+ * Stores the QB invoice ID in integrationCredentials.
+ * Returns the QB invoice ID.
+ */
+export async function createQBInvoice(invoiceId: string): Promise<{ qbInvoiceId: string; qbInvoiceNumber: string }> {
+  const tenantId = await getTenantId();
+
+  // Check if already synced
+  const existingQbInvoiceId = await getCredential(tenantId, `qb_invoice_${invoiceId}`);
+  if (existingQbInvoiceId) {
+    throw new Error('This invoice has already been synced to QuickBooks.');
+  }
+
+  // Fetch invoice with order + items
+  const [invoice] = await db
+    .select()
+    .from(invoices)
+    .where(eq(invoices.id, invoiceId))
+    .limit(1);
+  if (!invoice) throw new Error(`Invoice ${invoiceId} not found`);
+
+  const [order] = await db
+    .select()
+    .from(orders)
+    .where(eq(orders.id, invoice.orderId))
+    .limit(1);
+  if (!order) throw new Error(`Order for invoice not found`);
+
+  const items = await db
+    .select()
+    .from(orderItems)
+    .where(eq(orderItems.orderId, order.id))
+    .orderBy(orderItems.sortOrder);
+
+  // Find or create the QB customer
+  const customer = await findOrCreateQBCustomer(order.clientId);
+
+  const tokenInfo = await getValidAccessToken();
+  if (!tokenInfo) throw new Error('QuickBooks is not connected.');
+
+  const { token, realmId } = tokenInfo;
+  const apiBase = getQBConfig().environment === 'production' ? QB_API_BASE_PROD : QB_API_BASE_SANDBOX;
+
+  // Find a fallback Item in QB (for SalesItemLineDetail)
+  let fallbackItemId = '1'; // Default to first item
+  try {
+    const itemQueryRes = await fetch(
+      `${apiBase}/v3/company/${realmId}/query?query=${encodeURIComponent('SELECT Id, Name FROM Item WHERE Active = true MAXRESULTS 1')}`,
+      { headers: { Accept: 'application/json', Authorization: `Bearer ${token}` } },
+    );
+    if (itemQueryRes.ok) {
+      const itemData = await itemQueryRes.json() as { QueryResponse?: { Item?: { Id: string; Name: string }[] } };
+      const firstItem = itemData.QueryResponse?.Item?.[0];
+      if (firstItem?.Id) fallbackItemId = firstItem.Id;
+    }
+  } catch {
+    // Non-critical — use default item ID
+  }
+
+  // Build line items
+  const lines = items.map((item) => {
+    const qty = parseFloat(item.quantity?.toString() ?? '0');
+    const price = parseFloat(item.salesPrice?.toString() ?? '0');
+    const amount = parseFloat((qty * price).toFixed(2));
+    const desc = [
+      item.productType,
+      item.description?.trim(),
+      `${qty} ${item.salesUnit ?? item.unit} @ ${price} ${item.salesCurrency ?? order.currency}`,
+    ].filter(Boolean).join(' — ');
+
+    return {
+      Amount: amount,
+      DetailType: 'SalesItemLineDetail',
+      Description: desc,
+      SalesItemLineDetail: { ItemRef: { value: fallbackItemId } },
+    };
+  });
+
+  // If no line items, create a single line with the invoice amount
+  if (lines.length === 0) {
+    const amount = parseFloat(invoice.amount?.toString() ?? '0');
+    lines.push({
+      Amount: amount,
+      DetailType: 'SalesItemLineDetail',
+      Description: `Invoice ${invoice.invoiceNumber} — Order ${order.orderNumber ?? ''}`,
+      SalesItemLineDetail: { ItemRef: { value: fallbackItemId } },
+    });
+  }
+
+  // Create QB invoice
+  const invoiceBody = {
+    CustomerRef: { value: customer.id },
+    Line: lines,
+    CustomerMemo: { value: `Fueld Order ${order.orderNumber ?? ''} — Invoice ${invoice.invoiceNumber}` },
+    BillEmail: { Address: '' }, // Will be set if customer has email
+  };
+
+  const createRes = await fetch(`${apiBase}/v3/company/${realmId}/invoice`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(invoiceBody),
+  });
+
+  if (!createRes.ok) {
+    const errText = await createRes.text();
+    throw new Error(`Failed to create QuickBooks invoice: ${createRes.status} ${errText}`);
+  }
+
+  const createData = await createRes.json() as { Invoice?: { Id: string; DocNumber: string } };
+  const qbInvoice = createData.Invoice;
+  if (!qbInvoice?.Id) throw new Error('QuickBooks invoice creation returned no ID');
+
+  // Store the QB invoice ID
+  await upsertCredential(tenantId, `qb_invoice_${invoiceId}`, qbInvoice.Id, '');
+  console.log(`[QB] Created invoice ${qbInvoice.DocNumber} (QB ID: ${qbInvoice.Id}) for Fueld invoice ${invoice.invoiceNumber}`);
+  return { qbInvoiceId: qbInvoice.Id, qbInvoiceNumber: qbInvoice.DocNumber };
+}
+
+/**
+ * Sync an invoice to QuickBooks. This is the main orchestrator.
+ * Throws if QB is not connected or if invoice is already synced.
+ */
+export async function syncInvoiceToQuickBooks(invoiceId: string): Promise<{ qbInvoiceId: string; qbInvoiceNumber: string }> {
+ // Check if already synced
+  const status = await getInvoiceSyncStatus(invoiceId);
+  if (status.synced) {
+    return { qbInvoiceId: status.qbInvoiceId!, qbInvoiceNumber: status.qbInvoiceNumber ?? '' };
+  }
+
+  return createQBInvoice(invoiceId);
+}
+
+/**
+ * Check if an invoice has been synced to QuickBooks.
+ */
+export async function getInvoiceSyncStatus(invoiceId: string): Promise<{
+  synced: boolean;
+  qbInvoiceId: string | null;
+  qbInvoiceNumber: string | null;
+}> {
+  const tenantId = await getTenantId();
+  const qbInvoiceId = await getCredential(tenantId, `qb_invoice_${invoiceId}`);
+  if (!qbInvoiceId) {
+    return { synced: false, qbInvoiceId: null, qbInvoiceNumber: null };
+  }
+
+  // Try to fetch the QB invoice number from the API for display
+  let qbInvoiceNumber: string | null = null;
+  try {
+    const tokenInfo = await getValidAccessToken();
+    if (tokenInfo) {
+      const { token, realmId } = tokenInfo;
+      const apiBase = getQBConfig().environment === 'production' ? QB_API_BASE_PROD : QB_API_BASE_SANDBOX;
+      const res = await fetch(
+        `${apiBase}/v3/company/${realmId}/query?query=${encodeURIComponent(`SELECT DocNumber FROM Invoice WHERE Id = '${qbInvoiceId}' MAXRESULTS 1`)}`,
+        { headers: { Accept: 'application/json', Authorization: `Bearer ${token}` } },
+      );
+      if (res.ok) {
+        const data = await res.json() as { QueryResponse?: { Invoice?: { DocNumber: string }[] } };
+        qbInvoiceNumber = data.QueryResponse?.Invoice?.[0]?.DocNumber ?? null;
+      }
+    }
+  } catch {
+    // Non-critical — we still know it's synced
+  }
+
+  return { synced: true, qbInvoiceId, qbInvoiceNumber };
+}
+
+/**
+ * Sync an order's invoice to QuickBooks. Finds the invoice for the order
+ * and syncs it. This is the order-based entry point used by the frontend.
+ */
+export async function syncOrderToQuickBooks(orderId: string): Promise<{ qbInvoiceId: string; qbInvoiceNumber: string }> {
+  // Find the invoice for this order
+  const [invoice] = await db
+    .select({ id: invoices.id })
+    .from(invoices)
+    .where(eq(invoices.orderId, orderId))
+    .orderBy(desc(invoices.createdAt))
+    .limit(1);
+
+  if (!invoice) {
+    throw new Error('No invoice found for this order. Generate an invoice first.');
+  }
+
+  return syncInvoiceToQuickBooks(invoice.id);
+}
+
+/**
+ * Check if an order's invoice has been synced to QuickBooks.
+ */
+export async function getOrderSyncStatus(orderId: string): Promise<{
+  synced: boolean;
+  qbInvoiceId: string | null;
+  qbInvoiceNumber: string | null;
+}> {
+  const [invoice] = await db
+    .select({ id: invoices.id })
+    .from(invoices)
+    .where(eq(invoices.orderId, orderId))
+    .orderBy(desc(invoices.createdAt))
+    .limit(1);
+
+  if (!invoice) {
+    return { synced: false, qbInvoiceId: null, qbInvoiceNumber: null };
+  }
+
+  return getInvoiceSyncStatus(invoice.id);
 }

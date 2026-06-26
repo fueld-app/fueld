@@ -133,6 +133,9 @@ export class OrderActionService {
       case 'mark-paid':
         await this.markPaid(ctx);
         break;
+      case 'sync-quickbooks':
+        await this.syncToQuickBooks(ctx);
+        break;
       case 'mark-delivered':
         await this.markDelivered(ctx);
         break;
@@ -384,6 +387,27 @@ export class OrderActionService {
     if (ctx.order()?.status === 'PAID') { ctx.showToast('error', 'Order is already marked as paid.'); return; }
     if (!ctx.hasEnoughPaymentsForMarkPaid()) { ctx.showToast('error', 'Add payments equal to the total due before marking as paid.'); ctx.openPaymentModal(); return; }
     ctx.openPaymentModal();
+  }
+
+  private async syncToQuickBooks(ctx: OrderActionContext): Promise<void> {
+    const orderId = ctx.orderId();
+    ctx.showToast('success', 'Syncing to QuickBooks…');
+    try {
+      const res = await firstValueFrom(
+        this.http.post<ApiResponse<{ qbInvoiceId: string; qbInvoiceNumber: string }>>(
+          `${API_URL}/admin/settings/integrations/quickbooks/sync-order/${orderId}`,
+          {},
+        ),
+      );
+      if (res.success && res.data) {
+        ctx.showToast('success', `Synced to QuickBooks — Invoice #${res.data.qbInvoiceNumber}`);
+      } else {
+        ctx.showToast('error', res.message ?? 'Failed to sync to QuickBooks.');
+      }
+    } catch (err: any) {
+      const msg = err?.error?.message ?? 'Failed to sync to QuickBooks. Is QuickBooks connected?';
+      ctx.showToast('error', msg);
+    }
   }
 
   private buildVerifyUrlFromResponse(res: HttpResponse<Blob>): string | null {
