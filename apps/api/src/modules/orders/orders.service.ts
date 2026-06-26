@@ -35,6 +35,7 @@ import {
   getFinancingRateAnnual,
 } from './order-financing';
 import { getFxRate } from '../prices/price.service';
+import { formatStoredDateOnlyLabel } from '../documents/inquiry.utils';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -1876,6 +1877,8 @@ export async function updateOrderStatus(
           customerName: counterparties.name,
           purchaseOrderNumber: orders.purchaseOrderNumber,
           customerNote: orders.customerNote,
+          eta: orders.eta,
+          etd: orders.etd,
         })
         .from(orders)
         .leftJoin(vessels, eq(orders.vesselId, vessels.id))
@@ -1898,6 +1901,16 @@ export async function updateOrderStatus(
       if (orderDetails) {
         const productVars = buildProductTemplateVariables(items);
 
+        // Format dates for template variables
+        const etaLabel = formatStoredDateOnlyLabel(orderDetails.eta);
+        const etdLabel = formatStoredDateOnlyLabel(orderDetails.etd);
+        const deliveryWindow = etaLabel && etdLabel
+          ? `${etaLabel} to ${etdLabel}`
+          : etaLabel || etdLabel || '';
+        const datesLabel = etaLabel && etdLabel
+          ? `${etaLabel} to ${etdLabel}`
+          : etaLabel || etdLabel || '';
+
         sendTemplatedGroupMessage(orderDetails.tenantId, eventType, {
           ...productVars,
           orderNumber: orderDetails.orderNumber ?? id.slice(0, 8),
@@ -1907,6 +1920,10 @@ export async function updateOrderStatus(
           status: newStatus,
           poNumber: orderDetails.purchaseOrderNumber ?? '',
           notes: orderDetails.customerNote ?? '',
+          eta: etaLabel ?? '',
+          etd: etdLabel ?? '',
+          deliveryWindow,
+          dates: datesLabel,
         }).catch((err) => {
           console.error(`[orders] WhatsApp ${eventType} notification failed:`, err);
         });
