@@ -666,6 +666,13 @@
       "when": 1779800000000,
       "tag": "0094_company_kyc_dates",
       "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1782465600000,
+      "tag": "0095_order_response_deadline_at",
+      "breakpoints": true
     }
   ]
 }
