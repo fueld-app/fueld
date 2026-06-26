@@ -307,6 +307,20 @@
       />
     }
 } @placeholder { <div></div> }
+@if (responseDeadlineLabel()) {
+  <div class="rounded-xl border border-gray-200 dark:border-line bg-white dark:bg-surface p-5 shadow-sm h-fit">
+    <h3 class="text-sm font-semibold text-gray-700 dark:text-ink-dim uppercase tracking-wider">Response Deadline</h3>
+    <div class="mt-3 flex items-center gap-2">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" [class.text-red-500]="isDeadlineOverdue()" [class.text-gray-400]="!isDeadlineOverdue()" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      <span class="text-sm font-medium" [class.text-red-600]="isDeadlineOverdue()" [class.text-gray-900]="!isDeadlineOverdue()" [class.dark:text-red-400]="isDeadlineOverdue()" [class.dark:text-ink]="!isDeadlineOverdue()">{{ responseDeadlineLabel() }}</span>
+      @if (isDeadlineOverdue()) {
+        <span class="text-xs font-medium text-red-600 dark:text-red-400">Overdue</span>
+      }
+    </div>
+  </div>
+}
 @defer (on idle) {
     @if (orderId() || order()?.id) {
       <app-order-payments-card

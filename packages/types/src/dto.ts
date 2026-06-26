@@ -615,6 +615,7 @@ export interface OrderDto {
   agentId?: string | null;
   agentContactId?: string | null;
   deliveryMethod?: string | null;
+  responseDeadlineAt?: string | null;
   termsAndConditions?: string | null;
   placeRemark?: string | null;
   lossReason: string | null;
@@ -768,6 +769,7 @@ export interface OrderListRowDto {
   netMarginPct?: number | null;
   /** Display currency for totals — matches item currencies when uniform, otherwise USD. */
   displayCurrency?: string;
+  responseDeadlineAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }

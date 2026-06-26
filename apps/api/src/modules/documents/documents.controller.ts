@@ -1536,6 +1536,14 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       const reminderEnabled = Boolean(body.reminderEnabled && responseDeadlineAt);
       const responseDeadlineFormatted = formatDeadlineHumanDuration(responseDeadlineAt);
 
+      // Persist the response deadline on the order record
+      if (responseDeadlineAt) {
+        await db
+          .update(orders)
+          .set({ responseDeadlineAt: new Date(responseDeadlineAt) })
+          .where(eq(orders.id, orderId));
+      }
+
       // Check if this is the first inquiry batch for this order (for WhatsApp notification)
       const existingInquiries = await db
         .select({ id: supplierInquiries.id, supplierId: supplierInquiries.supplierId })
@@ -1836,6 +1844,14 @@ export const documentsController = new Elysia({ prefix: '/orders' })
       const reminderEnabled = Boolean(body.reminderEnabled && responseDeadlineAt);
       const responseDeadlineFormatted = formatDeadlineHumanDuration(responseDeadlineAt);
       const results: Array<{ recipientId: string; recipientName: string; phone: string; success: boolean; error?: string }> = [];
+
+      // Persist the response deadline on the order record
+      if (responseDeadlineAt) {
+        await db
+          .update(orders)
+          .set({ responseDeadlineAt: new Date(responseDeadlineAt) })
+          .where(eq(orders.id, orderId));
+      }
 
       for (const target of body.recipients) {
         try {

@@ -120,6 +120,14 @@ interface TeamUserOption {
                         </svg>
                         <span>{{ order.salesRepName || '—' }}</span>
                       </div>
+                      @if (order.responseDeadlineAt) {
+                        <div class="flex items-center gap-1.5" [class.text-red-500]="isDeadlineOverdue(order.responseDeadlineAt)" [class.text-gray-400]="!isDeadlineOverdue(order.responseDeadlineAt)" [class.dark:text-muted]="!isDeadlineOverdue(order.responseDeadlineAt)">
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span [class.font-medium]="isDeadlineOverdue(order.responseDeadlineAt)">Due {{ order.responseDeadlineAt | dateLabel }}{{ isDeadlineOverdue(order.responseDeadlineAt) ? ' (overdue)' : '' }}</span>
+                        </div>
+                      }
                     </div>
                   </a>
                 } @empty {
@@ -172,6 +180,11 @@ export class OperationsBoardPageComponent implements OnInit {
     const all = this.filteredOrders();
     return [
       {
+        status: OrderStatus.Inquiry,
+        label: 'Open Inquiries',
+        orders: all.filter((o) => o.status === OrderStatus.Inquiry || o.status === OrderStatus.Offer),
+      },
+      {
         status: OrderStatus.Confirmed,
         label: 'Confirmed',
         orders: all.filter((o) => o.status === OrderStatus.Confirmed),
@@ -198,7 +211,7 @@ export class OperationsBoardPageComponent implements OnInit {
     this.loading.set(true);
     try {
       const params = new URLSearchParams();
-      params.set('statuses', 'CONFIRMED,DELIVERED,INVOICED');
+      params.set('statuses', 'INQUIRY,OFFER,CONFIRMED,DELIVERED,INVOICED');
       params.set('page', '1');
       params.set('limit', '200');
 
@@ -240,6 +253,9 @@ export class OperationsBoardPageComponent implements OnInit {
 
   columnDotClass(status: OrderStatus): string {
     switch (status) {
+      case OrderStatus.Inquiry:
+      case OrderStatus.Offer:
+        return 'bg-purple-500';
       case OrderStatus.Confirmed:
         return 'bg-blue-500';
       case OrderStatus.Delivered:
@@ -249,5 +265,10 @@ export class OperationsBoardPageComponent implements OnInit {
       default:
         return 'bg-gray-400';
     }
+  }
+
+  isDeadlineOverdue(deadline: string | null | undefined): boolean {
+    if (!deadline) return false;
+    return new Date(deadline).getTime() < Date.now();
   }
 }

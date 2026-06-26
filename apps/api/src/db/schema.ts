@@ -961,6 +961,9 @@ export const orders = pgTable('orders', {
   // Delivery
   deliveredAt: timestamp('delivered_at', { withTimezone: true }),
 
+  // Inquiry response deadline — when the supplier should reply by
+  responseDeadlineAt: timestamp('response_deadline_at', { withTimezone: true }),
+
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

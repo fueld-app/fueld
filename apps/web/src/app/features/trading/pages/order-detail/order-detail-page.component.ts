@@ -634,6 +634,26 @@ export class OrderDetailPageComponent implements OnInit, AfterViewInit, OnDestro
       return tz;
     }
   });
+
+  readonly responseDeadlineLabel = computed(() => {
+    const deadline = this.order()?.responseDeadlineAt;
+    if (!deadline) return null;
+    try {
+      return new Intl.DateTimeFormat('en-US', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }).format(new Date(deadline));
+    } catch {
+      return deadline;
+    }
+  });
+
+  readonly isDeadlineOverdue = computed(() => {
+    const deadline = this.order()?.responseDeadlineAt;
+    if (!deadline) return false;
+    return new Date(deadline).getTime() < Date.now();
+  });
+
   readonly etaMinDateTime = computed(() => {
     const eta = this.order()?.eta;
     if (!eta) return '';

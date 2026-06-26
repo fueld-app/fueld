@@ -78,6 +78,8 @@ export class OrderLoaderService {
       totalNetProfit: d.totalNetProfit ?? '0.0000',
       netMarginPct: d.netMarginPct ?? null, categoryKey: d.categoryKey ?? null,
       closedAt: d.closedAt, deliveredAt: d.deliveredAt ?? null,
+      deliveryMethod: d.deliveryMethod ?? null,
+      responseDeadlineAt: d.responseDeadlineAt ?? null,
       createdAt: d.createdAt, updatedAt: d.updatedAt,
     };
 

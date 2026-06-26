@@ -80,6 +80,7 @@ interface CreateOrderInput {
   agentContactId?: string | null;
   categoryKey?: string | null;
   deliveryMethod?: string | null;
+  responseDeadlineAt?: string | null;
 }
 
 interface UpdateOrderInput {
@@ -114,6 +115,7 @@ interface UpdateOrderInput {
   agentContactId?: string | null;
   categoryKey?: string | null;
   deliveryMethod?: string | null;
+  responseDeadlineAt?: string | null;
 }
 
 interface SaveItemInput {
@@ -912,6 +914,7 @@ export async function listOrders(query?: ListOrdersQuery) {
         supplierCreditDays: orders.supplierCreditDays,
         eta: orders.eta,
         dueDate: orders.dueDate,
+        responseDeadlineAt: orders.responseDeadlineAt,
         createdAt: orders.createdAt,
         updatedAt: orders.updatedAt,
       })
@@ -1019,6 +1022,7 @@ export async function listOrders(query?: ListOrdersQuery) {
     invoicingCompanyName: r.invoicingCompanyName,
     eta: r.eta?.toISOString() ?? null,
     dueDate: r.dueDate ?? r.eta?.toISOString() ?? null,
+    responseDeadlineAt: r.responseDeadlineAt?.toISOString() ?? null,
     totalValue: itemAggs[r.id]?.totalValue ?? 0,
     totalProfit: itemAggs[r.id]?.totalProfit ?? 0,
     totalFinancingCost: itemAggs[r.id]?.totalFinancingCost ?? 0,
@@ -1191,6 +1195,7 @@ export async function getOrderById(idOrNumber: string) {
     agentId: row.agentId ?? null,
     agentContactId: row.agentContactId ?? null,
     deliveryMethod: row.deliveryMethod ?? null,
+    responseDeadlineAt: row.responseDeadlineAt?.toISOString() ?? null,
     termsAndConditions: row.termsAndConditions ?? null,
     financingRateAnnual,
     financingDayCountConvention: orderEconomics.dayCountConvention,
@@ -1339,6 +1344,7 @@ export async function createOrder(input: CreateOrderInput) {
     categoryKey: input.categoryKey ?? null,
     placeRemark,
     deliveryMethod: input.deliveryMethod ?? null,
+    responseDeadlineAt: input.responseDeadlineAt ? new Date(input.responseDeadlineAt) : null,
   };
 
   const [created] = await db
@@ -1420,6 +1426,7 @@ export async function updateOrder(id: string, input: UpdateOrderInput, activityU
   if (input.agentContactId !== undefined) setData.agentContactId = input.agentContactId;
   if (input.categoryKey !== undefined) setData.categoryKey = input.categoryKey;
   if (input.deliveryMethod !== undefined) setData.deliveryMethod = input.deliveryMethod ?? null;
+  if (input.responseDeadlineAt !== undefined) setData.responseDeadlineAt = input.responseDeadlineAt ? new Date(input.responseDeadlineAt) : null;
 
   // Auto-set closedAt when status moves to CANCELLED or PAID
   if (input.status === 'CANCELLED' || input.status === 'PAID') {

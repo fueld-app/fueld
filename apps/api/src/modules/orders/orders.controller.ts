@@ -316,6 +316,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
           agentContactId: body.agentContactId ?? null,
           categoryKey: body.categoryKey ?? null,
           deliveryMethod: body.deliveryMethod ?? null,
+          responseDeadlineAt: body.responseDeadlineAt ?? null,
           eta: body.eta,
           etd: body.etd,
         });
@@ -362,6 +363,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         termsAndConditions: t.Optional(t.Nullable(t.String())),
         categoryKey: t.Optional(t.Nullable(t.String())),
         deliveryMethod: t.Optional(t.Nullable(t.String())),
+        responseDeadlineAt: t.Optional(t.Nullable(t.String())),
         eta: t.Optional(t.String()),
         etd: t.Optional(t.String()),
       }),
@@ -422,6 +424,7 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         etd: t.Optional(t.Nullable(t.String())),
         deliveredAt: t.Optional(t.Nullable(t.String())),
         deliveryMethod: t.Optional(t.Nullable(t.String())),
+        responseDeadlineAt: t.Optional(t.Nullable(t.String())),
         lossReason: t.Optional(t.Nullable(t.String())),
       }),
       detail: {
