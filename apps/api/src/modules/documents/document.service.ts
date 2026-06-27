@@ -552,6 +552,18 @@ function formatNumber(val: string | null | undefined, decimals = 2, precision?: 
   return n.toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
 }
 
+/** Format a sales/cost price — uses up to 4 decimal places for small per-unit rates (e.g. $0.001/gal). */
+function formatPrice(val: string | null | undefined, precision?: number | null): string {
+  if (!val) return '—';
+  const n = parseFloat(val);
+  if (isNaN(n)) return '—';
+  if (precision != null) {
+    return n.toLocaleString('en-US', { minimumFractionDigits: precision, maximumFractionDigits: precision });
+  }
+  // Dynamic: 2 minimum, 4 maximum — shows $0.0010 as "0.001", $3.97 as "3.97"
+  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+}
+
 /** Format a number, stripping trailing zeros (e.g. 100.000 → "100", 100.500 → "100.5"). */
 function formatNumberCompact(val: string | null | undefined, maxDecimals = 3): string {
   if (!val) return '—';
@@ -927,7 +939,7 @@ function buildInvoiceDocument(data: {
       { text: item.productType },
       { text: formatNumberCompact(item.quantity, 3), alignment: 'right' },
       { text: item.unit },
-      { text: formatNumber(item.salesPrice, 2, data.costSalesDecimalPrecision ?? undefined), alignment: 'right' },
+      { text: formatPrice(item.salesPrice, data.costSalesDecimalPrecision ?? undefined), alignment: 'right' },
       { text: formatNumber(String(lineTotal), 2), alignment: 'right' },
     ];
   });
@@ -1716,11 +1728,11 @@ export function buildOfferDocument(data: {
       if (item.salesPremium && parseFloat(item.salesPremium)) parts.push({ text: ` + ${formatNumber(item.salesPremium)} /${item.priceUnit ?? item.unit}`, fontSize: 8 });
       if (item.salesBarging && parseFloat(item.salesBarging)) parts.push({ text: `\nbarging ${formatNumber(item.salesBarging)} ${item.salesBargingUnit || 'l/s'}`, fontSize: 8 });
       if (item.salesPriceFinalized) {
-        parts.push({ text: `\n→ ${formatNumber(item.salesPrice)} ${data.currency}/${item.priceUnit ?? item.unit}`, fontSize: 8, bold: true });
+        parts.push({ text: `\n→ ${formatPrice(item.salesPrice, data.costSalesDecimalPrecision ?? undefined)} ${data.currency}/${item.priceUnit ?? item.unit}`, fontSize: 8, bold: true });
       }
       priceCell = { text: parts, alignment: 'right' };
     } else {
-      priceCell = { text: `${data.currency}/${item.priceUnit ?? item.unit}  ${formatNumber(item.salesPrice)}`, alignment: 'right' };
+      priceCell = { text: `${data.currency}/${item.priceUnit ?? item.unit}  ${formatPrice(item.salesPrice, data.costSalesDecimalPrecision ?? undefined)}`, alignment: 'right' };
     }
 
     return [
@@ -2507,14 +2519,14 @@ function buildProformaDocument(data: {
       if (item.salesPremium && parseFloat(item.salesPremium)) parts.push({ text: ` + ${formatNumber(item.salesPremium)} /${item.priceUnit ?? item.unit}`, fontSize: 8 });
       if (item.salesBarging && parseFloat(item.salesBarging)) parts.push({ text: `\nbarging ${formatNumber(item.salesBarging)} ${item.salesBargingUnit || 'l/s'}`, fontSize: 8 });
       if (item.salesPriceFinalized) {
-        parts.push({ text: `\n\u2192 ${formatNumber(item.salesPrice)} ${data.currency}/${item.priceUnit ?? item.unit}`, fontSize: 8, bold: true });
+        parts.push({ text: `\n\u2192 ${formatPrice(item.salesPrice, data.costSalesDecimalPrecision ?? undefined)} ${data.currency}/${item.priceUnit ?? item.unit}`, fontSize: 8, bold: true });
         totalCell = { text: `${formatNumber(String(lineTotal), 2)} ${data.currency}`, alignment: 'right' };
       } else {
         totalCell = { text: 'TBD', alignment: 'right', italics: true, color: '#d97706' };
       }
       priceCell = { text: parts, alignment: 'right' };
     } else {
-      priceCell = { text: `${data.currency}/${item.priceUnit ?? item.unit}  ${formatNumber(item.salesPrice)}`, alignment: 'right' };
+      priceCell = { text: `${data.currency}/${item.priceUnit ?? item.unit}  ${formatPrice(item.salesPrice, data.costSalesDecimalPrecision ?? undefined)}`, alignment: 'right' };
       totalCell = { text: `${formatNumber(String(lineTotal), 2)} ${data.currency}`, alignment: 'right' };
     }
 
