@@ -397,6 +397,11 @@ export const documentsController = new Elysia({ prefix: '/orders' })
         set.status = 400;
         return { success: false, message: 'Select a bank account before generating Proforma Invoice' };
       }
+      // Proforma invoices are pre-delivery documents — do not allow after delivery
+      if (order.status === 'DELIVERED' || order.status === 'INVOICED' || order.status === 'PAID') {
+        set.status = 400;
+        return { success: false, message: 'Proforma invoice cannot be generated after delivery — use the final invoice instead' };
+      }
       const requestedSide = (query.side === 'DESTINATION_BUY' ? 'DESTINATION_BUY' : 'SOURCE_SELL') as 'SOURCE_SELL' | 'DESTINATION_BUY';
       const transferBlock = await getTransferDocumentBlockReason(order, requestedSide);
       if (transferBlock) {
