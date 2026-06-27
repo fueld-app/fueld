@@ -973,7 +973,7 @@ function buildInvoiceDocument(data: {
               { text: 'INVOICE', style: 'invoiceTitle' },
               { text: `#${data.invoiceNumber}`, style: 'invoiceNumber' },
               ...(data.purchaseOrderNumber?.trim() ? [
-                { text: `PO: ${data.purchaseOrderNumber.trim()}`, style: 'invoiceNumber', color: '#374151' } as Content,
+                { text: `PO.: ${data.purchaseOrderNumber.trim()}`, style: 'invoiceNumber', color: '#374151' } as Content,
               ] : []),
             ],
             alignment: 'right',
@@ -1782,7 +1782,7 @@ export function buildOfferDocument(data: {
           [{ text: 'Date:', bold: true, alignment: 'right', margin: [0, 0, 4, 0] }, { text: createdDate, alignment: 'right' }],
           [{ text: 'Ref.:', bold: true, alignment: 'right', margin: [0, 0, 4, 0] }, { text: refNum, alignment: 'right' }],
           ...(data.purchaseOrderNumber?.trim() ? [
-            [{ text: 'PO No.:', bold: true, alignment: 'right', margin: [0, 0, 4, 0] }, { text: data.purchaseOrderNumber.trim(), alignment: 'right' }],
+            [{ text: 'PO.:', bold: true, alignment: 'right', margin: [0, 0, 4, 0] }, { text: data.purchaseOrderNumber.trim(), alignment: 'right' }],
           ] : []),
         ],
       },
@@ -2575,7 +2575,7 @@ function buildProformaDocument(data: {
           [{ text: 'Date:', bold: true, alignment: 'right', margin: [0, 0, 4, 0] }, { text: createdDate, alignment: 'right' }],
           [{ text: 'Ref.:', bold: true, alignment: 'right', margin: [0, 0, 4, 0] }, { text: refNum, alignment: 'right' }],
           ...(data.purchaseOrderNumber?.trim() ? [
-            [{ text: 'PO No.:', bold: true, alignment: 'right', margin: [0, 0, 4, 0] }, { text: data.purchaseOrderNumber.trim(), alignment: 'right' }],
+            [{ text: 'PO.:', bold: true, alignment: 'right', margin: [0, 0, 4, 0] }, { text: data.purchaseOrderNumber.trim(), alignment: 'right' }],
           ] : []),
         ],
       },
