@@ -591,7 +591,7 @@ async function fetchScopedDataset(
       .from(userTeams)
       .where(eq(userTeams.teamId, filtersApplied.teamId));
     const teamUserIdSet = new Set(teamUserIds.map((r) => r.userId));
-    teamFilteredOrderRows = orderRows.filter((row) => teamUserIdSet.has(row.traderId));
+    teamFilteredOrderRows = orderRows.filter((row) => row.traderId != null && teamUserIdSet.has(row.traderId));
   }
 
   const tenant = await db.query.tenants.findFirst({
