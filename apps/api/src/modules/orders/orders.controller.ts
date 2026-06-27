@@ -453,6 +453,9 @@ export const ordersController = new Elysia({ prefix: '/orders' })
         }
 
         if (body.status === 'CANCELLED') {
+          if (order && (order.status === 'DELIVERED' || order.status === 'INVOICED' || order.status === 'PAID')) {
+            return { success: false, data: null, message: 'Cannot cancel an order after delivery' };
+          }
           const reason = body.lossReason?.trim();
           if (!reason) {
             return { success: false, data: null, message: 'Cancellation reason is required' };

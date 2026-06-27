@@ -562,6 +562,24 @@ function formatPrice(val: string | null | undefined, precision?: number | null):
   return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: maxDp });
 }
 
+/** Determine the fixed decimal places needed for the price column so all items align.
+ *  If any item has a sub-cent price (< $0.01), use 4 decimals for all. Otherwise use 2. */
+function computePriceColumnDecimals(items: Array<{ salesPrice: string | null }>): number {
+  for (const item of items) {
+    const n = parseFloat(item.salesPrice ?? '0');
+    if (!isNaN(n) && n !== 0 && Math.abs(n) < 0.01) return 4;
+  }
+  return 2;
+}
+
+/** Format a price with a FIXED number of decimals (both min and max) for column alignment. */
+function formatPriceFixed(val: string | null | undefined, decimals: number): string {
+  if (!val) return '—';
+  const n = parseFloat(val);
+  if (isNaN(n)) return '—';
+  return n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+}
+
 /** Format a number, stripping trailing zeros (e.g. 100.000 → "100", 100.500 → "100.5"). */
 function formatNumberCompact(val: string | null | undefined, maxDecimals = 3): string {
   if (!val) return '—';
@@ -928,6 +946,9 @@ function buildInvoiceDocument(data: {
     { text: 'Total (USD)', style: 'tableHeader', alignment: 'right' },
   ];
 
+  // Compute fixed decimal places for price column so all items align
+  const priceColDecimals = computePriceColumnDecimals(data.items);
+
   const tableRows: TableCell[][] = data.items.map((item, idx) => {
     const qty = parseFloat(item.quantity) || 0;
     const price = parseFloat(item.salesPrice ?? '0') || 0;
@@ -937,7 +958,7 @@ function buildInvoiceDocument(data: {
       { text: item.productType },
       { text: formatNumberCompact(item.quantity, 3), alignment: 'right' },
       { text: item.unit },
-      { text: formatPrice(item.salesPrice, data.costSalesDecimalPrecision ?? undefined), alignment: 'right' },
+      { text: formatPriceFixed(item.salesPrice, priceColDecimals), alignment: 'right' },
       { text: formatNumber(String(lineTotal), 2), alignment: 'right' },
     ];
   });
@@ -1711,6 +1732,9 @@ export function buildOfferDocument(data: {
     { text: 'Price', style: 'tableHeader', alignment: 'right' },
   ];
 
+  // Compute fixed decimal places for price column so all items align
+  const priceColDecimals = computePriceColumnDecimals(data.items);
+
   const tableRows: TableCell[][] = data.items.map((item) => {
     const qty = item.quantityMin && item.quantityMax
       ? `${formatNumberCompact(item.quantityMin, 0)} - ${formatNumberCompact(item.quantityMax, 0)}`
@@ -1726,11 +1750,11 @@ export function buildOfferDocument(data: {
       if (item.salesPremium && parseFloat(item.salesPremium)) parts.push({ text: ` + ${formatNumber(item.salesPremium)} /${item.priceUnit ?? item.unit}`, fontSize: 8 });
       if (item.salesBarging && parseFloat(item.salesBarging)) parts.push({ text: `\nbarging ${formatNumber(item.salesBarging)} ${item.salesBargingUnit || 'l/s'}`, fontSize: 8 });
       if (item.salesPriceFinalized) {
-        parts.push({ text: `\n→ ${formatPrice(item.salesPrice, data.costSalesDecimalPrecision ?? undefined)} ${data.currency}/${item.priceUnit ?? item.unit}`, fontSize: 8, bold: true });
+        parts.push({ text: `\n→ ${formatPriceFixed(item.salesPrice, priceColDecimals)} ${data.currency}/${item.priceUnit ?? item.unit}`, fontSize: 8, bold: true });
       }
       priceCell = { text: parts, alignment: 'right' };
     } else {
-      priceCell = { text: `${data.currency}/${item.priceUnit ?? item.unit}  ${formatPrice(item.salesPrice, data.costSalesDecimalPrecision ?? undefined)}`, alignment: 'right' };
+      priceCell = { text: `${data.currency}/${item.priceUnit ?? item.unit}  ${formatPriceFixed(item.salesPrice, priceColDecimals)}`, alignment: 'right' };
     }
 
     return [
@@ -2501,6 +2525,9 @@ function buildProformaDocument(data: {
     { text: 'Total amount', style: 'tableHeader', alignment: 'right' },
   ];
 
+  // Compute fixed decimal places for price column so all items align
+  const priceColDecimals = computePriceColumnDecimals(data.items);
+
   const tableRows: TableCell[][] = data.items.map((item) => {
     const qty = parseFloat(item.quantity) || 0;
     const unitPrice = parseFloat(item.salesPrice ?? '0') || 0;
@@ -2517,14 +2544,14 @@ function buildProformaDocument(data: {
       if (item.salesPremium && parseFloat(item.salesPremium)) parts.push({ text: ` + ${formatNumber(item.salesPremium)} /${item.priceUnit ?? item.unit}`, fontSize: 8 });
       if (item.salesBarging && parseFloat(item.salesBarging)) parts.push({ text: `\nbarging ${formatNumber(item.salesBarging)} ${item.salesBargingUnit || 'l/s'}`, fontSize: 8 });
       if (item.salesPriceFinalized) {
-        parts.push({ text: `\n\u2192 ${formatPrice(item.salesPrice, data.costSalesDecimalPrecision ?? undefined)} ${data.currency}/${item.priceUnit ?? item.unit}`, fontSize: 8, bold: true });
+        parts.push({ text: `\n\u2192 ${formatPriceFixed(item.salesPrice, priceColDecimals)} ${data.currency}/${item.priceUnit ?? item.unit}`, fontSize: 8, bold: true });
         totalCell = { text: `${formatNumber(String(lineTotal), 2)} ${data.currency}`, alignment: 'right' };
       } else {
         totalCell = { text: 'TBD', alignment: 'right', italics: true, color: '#d97706' };
       }
       priceCell = { text: parts, alignment: 'right' };
     } else {
-      priceCell = { text: `${data.currency}/${item.priceUnit ?? item.unit}  ${formatPrice(item.salesPrice, data.costSalesDecimalPrecision ?? undefined)}`, alignment: 'right' };
+      priceCell = { text: `${data.currency}/${item.priceUnit ?? item.unit}  ${formatPriceFixed(item.salesPrice, priceColDecimals)}`, alignment: 'right' };
       totalCell = { text: `${formatNumber(String(lineTotal), 2)} ${data.currency}`, alignment: 'right' };
     }
 
@@ -2706,38 +2733,40 @@ function buildProformaDocument(data: {
       } as Content,
       { text: '', margin: [0, 6, 0, 0] } as Content,
 
-      // Payment terms + QR code (2-column: terms/notes on left, QR right-aligned)
-      {
-        columns: [
-          {
-            width: '*',
-            stack: [
-              ...(data.paymentTerms
-                ? [{ text: [{ text: 'Payment terms:  ', bold: true }, { text: data.paymentTerms.replace(/_/g, ' ') }], margin: [0, 0, 0, 2] } as Content]
-                : []),
-              ...(data.dueDate
-                ? [{ text: [{ text: 'Due date:  ', bold: true }, { text: data.dueDate }], margin: [0, 0, 0, 2] } as Content]
-                : []),
-              // Notes directly under the due date
-              ...buildNotesSection({
-                customerNote: data.customerNote,
-                termsAndConditions: data.termsAndConditions ?? null,
-                itemNotes: data.itemNotes,
-              }),
-            ],
-          },
-          ...(data.verifyUrl ? [{
-            width: 'auto',
-            stack: [
-              { image: data.verifyUrl, fit: [80, 80], alignment: 'right', link: data.verifyLink ?? undefined } as Content,
-              { text: 'Scan or click to verify', fontSize: 7, color: '#1a56db', alignment: 'center', margin: [0, 4, 0, 0], link: data.verifyLink ?? undefined } as Content,
-              ...(data.verifyLink ? [
-                { text: `Verify domain: ${new URL(data.verifyLink).hostname}`, fontSize: 6, color: '#6b7280', alignment: 'center', margin: [0, 2, 0, 0] } as Content,
-              ] : []),
-            ],
-          } as Content] : []),
-        ],
-      } as Content,
+      // Payment terms
+      ...(data.paymentTerms
+        ? [{ text: [{ text: 'Payment terms:  ', bold: true }, { text: data.paymentTerms.replace(/_/g, ' ') }], margin: [0, 0, 0, 2] } as Content]
+        : []),
+      ...(data.dueDate
+        ? [{ text: [{ text: 'Due date:  ', bold: true }, { text: data.dueDate }], margin: [0, 0, 0, 2] } as Content]
+        : []),
+
+      // Notes (directly under due date — no gap)
+      ...buildNotesSection({
+        customerNote: data.customerNote,
+        termsAndConditions: data.termsAndConditions ?? null,
+        itemNotes: data.itemNotes,
+      }),
+
+      // QR code (right-aligned, after notes)
+      ...(data.verifyUrl ? [
+        {
+          columns: [
+            { width: '*', text: '' },
+            {
+              width: 'auto',
+              stack: [
+                { image: data.verifyUrl, fit: [80, 80], alignment: 'right', link: data.verifyLink ?? undefined } as Content,
+                { text: 'Scan or click to verify', fontSize: 7, color: '#1a56db', alignment: 'center', margin: [0, 4, 0, 0], link: data.verifyLink ?? undefined } as Content,
+                ...(data.verifyLink ? [
+                  { text: `Verify domain: ${new URL(data.verifyLink).hostname}`, fontSize: 6, color: '#6b7280', alignment: 'center', margin: [0, 2, 0, 0] } as Content,
+                ] : []),
+              ],
+            },
+          ],
+          margin: [0, 8, 0, 0],
+        } as Content,
+      ] : []),
 
       // ── Remittance Instructions ──
       ...(data.bank ? [
