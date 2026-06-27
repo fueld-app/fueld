@@ -1312,6 +1312,7 @@ export async function generateInvoicePdfBuffer(invoiceId: string): Promise<Buffe
     paymentTerms: formatCustomerPaymentTerms(order.customerPaymentTermType, order.customerCreditDays),
     customerNote: order.customerNote ?? null,
     purchaseOrderNumber: order.purchaseOrderNumber ?? null,
+    deliveredAt: order.deliveredAt ?? null,
     termsAndConditions: order.termsAndConditions ?? null,
     placeRemark: order.placeRemark ?? order.place.orderRemark ?? null,
     companyName: order.invoicingCompany?.name ?? null,
@@ -1462,6 +1463,7 @@ export async function generateOrderInvoicePdfBuffer(orderId: string): Promise<{
     ),
     customerNote: order.customerNote ?? null,
     purchaseOrderNumber: order.purchaseOrderNumber ?? null,
+    deliveredAt: order.deliveredAt ?? null,
     termsAndConditions: order.termsAndConditions ?? null,
     placeRemark: order.placeRemark ?? order.place.orderRemark ?? null,
     companyName: order.invoicingCompany?.name ?? null,
@@ -1765,7 +1767,7 @@ export function buildOfferDocument(data: {
     // Date / Ref — tabular so labels and values are column-aligned
     rightStack.push({
       table: {
-        widths: ['*', 'auto'],
+        widths: ['auto', 'auto'],
         body: [
           [{ text: 'Date:', bold: true, alignment: 'right', margin: [0, 0, 4, 0] }, { text: createdDate, alignment: 'right' }],
           [{ text: 'Ref.:', bold: true, alignment: 'right', margin: [0, 0, 4, 0] }, { text: refNum, alignment: 'right' }],
@@ -2448,6 +2450,7 @@ function buildProformaDocument(data: {
   docTitle?: string;
   printMeta?: DocumentPrintMeta | null;
   purchaseOrderNumber?: string | null;
+  deliveredAt?: Date | null;
 }): TDocumentDefinitions {
   // ── Prepare data ──────────────────────────────────────────────────
   const refNum = data.orderNumber ?? 'DRAFT';
@@ -2530,16 +2533,11 @@ function buildProformaDocument(data: {
   }, 0);
   const totalAmountDueLabel = `Total amount due to ${data.companyName?.trim() || 'Company'}`;
 
-  // Delivery date string
+  // Delivery date string — use the actual marked delivery date (deliveredAt), not ETA/ETD range
   let deliveryDateStr = '';
-  if (data.eta) {
-    const hasRange = !!data.etd;
-    const fmtEta = formatDateTimeForDisplay(data.eta, data.timezone, hasRange, data.dateFormat ?? undefined);
-    deliveryDateStr = fmtEta ?? data.eta;
-    if (data.etd) {
-      const fmtEtd = formatDateTimeForDisplay(data.etd, data.timezone, false, data.dateFormat ?? undefined);
-      deliveryDateStr += ` to ${fmtEtd ?? data.etd}`;
-    }
+  if (data.deliveredAt) {
+    const fmtDelivered = formatDateTimeForDisplay(data.deliveredAt.toISOString(), data.timezone, false, data.dateFormat ?? undefined);
+    deliveryDateStr = fmtDelivered ?? formatStoredDateOnlyForDisplay(data.deliveredAt, data.timezone, data.dateFormat ?? undefined) ?? '';
   }
 
   // "For account of" line (like reference PDF)
@@ -2562,7 +2560,7 @@ function buildProformaDocument(data: {
     // Date / Ref — tabular so labels and values are column-aligned
     rightStack.push({
       table: {
-        widths: ['*', 'auto'],
+        widths: ['auto', 'auto'],
         body: [
           [{ text: 'Date:', bold: true, alignment: 'right', margin: [0, 0, 4, 0] }, { text: createdDate, alignment: 'right' }],
           [{ text: 'Ref.:', bold: true, alignment: 'right', margin: [0, 0, 4, 0] }, { text: refNum, alignment: 'right' }],
@@ -2921,6 +2919,7 @@ export async function generateProformaInvoicePdfBuffer(orderId: string): Promise
     paymentTerms,
     customerNote: order.customerNote ?? null,
     purchaseOrderNumber: order.purchaseOrderNumber ?? null,
+    deliveredAt: order.deliveredAt ?? null,
     termsAndConditions: order.termsAndConditions ?? null,
     placeRemark: order.placeRemark ?? order.place.orderRemark ?? null,
     companyName: order.invoicingCompany?.name ?? null,
