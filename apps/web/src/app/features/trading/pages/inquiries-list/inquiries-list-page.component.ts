@@ -14,17 +14,18 @@ import { RouterLink, Router, ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { FormsModule } from '@angular/forms';
 import { StatusBadgeComponent } from '../../../../shared/components/status-badge/status-badge.component';
-import { SearchableDropdownComponent, type DropdownOption } from '../../../../shared/components/searchable-dropdown/searchable-dropdown.component';
+import { type DropdownOption } from '../../../../shared/components/searchable-dropdown/searchable-dropdown.component';
 import { PaginationComponent, SortHeaderComponent } from '../../../../shared/components';
 import { ColumnPickerComponent, type ColumnOption } from '../../../../shared/components/column-picker/column-picker.component';
 import type { SortChangeEvent } from '../../../../shared/components';
-import type { ApiResponse, CounterpartyDto, OrderListRowDto, UserUiPreferences } from '@fueld/types';
+import type { ApiResponse, OrderListRowDto, UserUiPreferences } from '@fueld/types';
 import { InquiriesListNewInquiryModalComponent } from './inquiries-list-new-inquiry-modal.component';
 import type { TeamUserOption } from './inquiries-list.types';
 import { DecimalPipe } from '@angular/common';
 import { DateLabelPipe } from '../../../../shared/pipes/date-format.pipe';
 import { DateFormatService } from '@app/core/services/date-format.service';
 import { firstValueFrom } from 'rxjs';
+import { FilterOverlayComponent, type FilterState, EMPTY_FILTERS } from '../../../../shared/components/filter-overlay/filter-overlay.component';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Inquiries List Page — INQUIRY + OFFER status orders
@@ -40,7 +41,7 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
 @Component({
   selector: 'app-inquiries-list-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, StatusBadgeComponent, FormsModule, DecimalPipe, DateLabelPipe, SearchableDropdownComponent, PaginationComponent, SortHeaderComponent, ColumnPickerComponent, InquiriesListNewInquiryModalComponent],
+  imports: [RouterLink, StatusBadgeComponent, FormsModule, DecimalPipe, DateLabelPipe, PaginationComponent, SortHeaderComponent, ColumnPickerComponent, InquiriesListNewInquiryModalComponent, FilterOverlayComponent],
   template: `
     <div>
       <!-- Header -->
@@ -49,8 +50,8 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
         <p class="mt-1 text-sm text-gray-500 dark:text-muted">{{ subtitleText() }}</p>
       </div>
 
-      <!-- Search bar -->
-      <div class="mb-4 flex flex-wrap items-end gap-3">
+      <!-- Search bar + Filter button -->
+      <div class="mb-4 flex flex-wrap items-center gap-3">
         <input
           type="text"
           [ngModel]="searchTerm()"
@@ -58,29 +59,11 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
           [placeholder]="searchPlaceholder()"
           class="w-full max-w-md rounded-lg border border-gray-300 dark:border-line-strong px-4 py-2.5 text-sm shadow-sm placeholder:text-gray-400 dark:placeholder:text-muted focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
         />
-        <div class="w-56">
-          <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">Broker</label>
-          <app-searchable-dropdown
-            placeholder="Filter by broker…"
-            [options]="brokerFilterOptions()"
-            [selected]="filterBrokerId()"
-            [loading]="brokerFilterLoading()"
-            [asyncSearch]="true"
-            [clearable]="true"
-            (searchChange)="searchBrokerFilter($event)"
-            (selectionChange)="onBrokerFilterChange($event)"
-          />
-        </div>
-        <div class="w-56">
-          <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">Responsible</label>
-          <app-searchable-dropdown
-            placeholder="Filter by responsible…"
-            [options]="responsibleFilterOptions()"
-            [selected]="filterResponsibleId()"
-            [clearable]="true"
-            (selectionChange)="onResponsibleFilterChange($event)"
-          />
-        </div>
+        <app-filter-overlay
+          [filters]="filterState()"
+          [responsibleOptions]="responsibleFilterOptions()"
+          (filtersChange)="onFiltersChange($event)"
+        />
         <div class="ml-auto">
           <app-column-picker
             [columns]="allColumnOptions()"
@@ -91,6 +74,23 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
           />
         </div>
       </div>
+
+      <!-- Active filter pills -->
+      @if (activeFilterPills().length > 0) {
+        <div class="mb-4 flex flex-wrap gap-2">
+          @for (pill of activeFilterPills(); track pill.key) {
+            <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-50 dark:bg-brand-700/15 px-3 py-1 text-xs font-medium text-brand-700 dark:text-brand-400">
+              {{ pill.label }}: {{ pill.value }}
+              <button type="button" (click)="removeFilter(pill.key)" class="inline-flex items-center justify-center rounded-full hover:bg-brand-100 dark:hover:bg-brand-700/25 w-4 h-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/>
+                </svg>
+              </button>
+            </span>
+          }
+          <button type="button" (click)="clearAllFilters()" class="text-xs text-gray-500 dark:text-muted hover:text-gray-700 dark:hover:text-ink-dim underline">Clear all</button>
+        </div>
+      }
 
       <!-- Loading state -->
       @if (loading()) {
@@ -493,14 +493,36 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   }
 
   // ─── Broker filter ────────────────────────────────────────────────
-  readonly filterBrokerId = signal('');
-  readonly brokerFilterOptions = signal<DropdownOption[]>([]);
-  readonly brokerFilterLoading = signal(false);
-  readonly filterResponsibleId = signal('');
+  // Filter state
+  readonly filterState = signal<FilterState>({ ...EMPTY_FILTERS });
   readonly teamUsers = signal<TeamUserOption[]>([]);
   readonly responsibleFilterOptions = computed<DropdownOption[]>(() =>
     this.teamUsers().map((user) => ({ value: user.id, label: user.name })),
   );
+
+  // Filter pills
+  readonly activeFilterPills = computed(() => {
+    const f = this.filterState();
+    const pills: Array<{ key: keyof FilterState; label: string; value: string }> = [];
+    if (f.clientId) { const opt = this.clientFilterLabel(); pills.push({ key: 'clientId', label: 'Client', value: opt || f.clientId.slice(0, 8) }); }
+    if (f.vesselId) pills.push({ key: 'vesselId', label: 'Vessel', value: this.vesselFilterLabel() || f.vesselId.slice(0, 8) });
+    if (f.placeId) pills.push({ key: 'placeId', label: 'Port', value: this.placeFilterLabel() || f.placeId.slice(0, 8) });
+    if (f.salesRepId) { const u = this.teamUsers().find(u => u.id === f.salesRepId); pills.push({ key: 'salesRepId', label: 'Responsible', value: u?.name ?? f.salesRepId.slice(0, 8) }); }
+    if (f.brokerId) pills.push({ key: 'brokerId', label: 'Broker', value: this.brokerFilterLabel() || f.brokerId.slice(0, 8) });
+    if (f.invoicingCompanyId) pills.push({ key: 'invoicingCompanyId', label: 'Invoicing', value: this.invoicingFilterLabel() || f.invoicingCompanyId.slice(0, 8) });
+    if (f.dateFrom) pills.push({ key: 'dateFrom', label: 'ETA from', value: f.dateFrom });
+    if (f.dateTo) pills.push({ key: 'dateTo', label: 'ETA to', value: f.dateTo });
+    return pills;
+  });
+
+  // Labels for filter pills (resolved from option lists)
+  readonly clientFilterLabel = signal('');
+  readonly vesselFilterLabel = signal('');
+  readonly placeFilterLabel = signal('');
+  readonly brokerFilterLabel = signal('');
+  readonly invoicingFilterLabel = signal('');
+
+  private readonly filterStorageKey = computed(() => `filter_${this.resolvedMode()}`);
 
   // ─── New inquiry modal ────────────────────────────────────────────
 
@@ -536,6 +558,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   // ─── Lifecycle ────────────────────────────────────────────────────
 
   ngOnInit(): void {
+    this.loadSavedFilters();
     this.loadInquiries();
     void this.loadResponsibleUsers();
     void this.userPrefs.load();
@@ -581,8 +604,15 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
       params.set('page', String(this.currentPage()));
       params.set('limit', String(this.pageSize()));
       if (this.searchTerm()) params.set('search', this.searchTerm());
-      if (this.filterBrokerId()) params.set('brokerId', this.filterBrokerId());
-      if (this.filterResponsibleId()) params.set('salesRepId', this.filterResponsibleId());
+      const f = this.filterState();
+      if (f.brokerId) params.set('brokerId', f.brokerId);
+      if (f.salesRepId) params.set('salesRepId', f.salesRepId);
+      if (f.clientId) params.set('clientId', f.clientId);
+      if (f.vesselId) params.set('vesselId', f.vesselId);
+      if (f.placeId) params.set('placeId', f.placeId);
+      if (f.invoicingCompanyId) params.set('invoicingCompanyId', f.invoicingCompanyId);
+      if (f.dateFrom) params.set('dateFrom', f.dateFrom);
+      if (f.dateTo) params.set('dateTo', f.dateTo);
       if (this.activeSortBy()) params.set('sortBy', this.activeSortBy());
       if (this.activeSortBy()) params.set('sortDir', this.activeSortDir());
 
@@ -628,34 +658,41 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
     }, 300);
   }
 
-  async searchBrokerFilter(term: string): Promise<void> {
-    this.brokerFilterLoading.set(true);
+  onFiltersChange(state: FilterState): void {
+    this.filterState.set(state);
+    this.saveFilters();
+    this.currentPage.set(1);
+    this.loadInquiries();
+  }
+
+  removeFilter(key: keyof FilterState): void {
+    this.filterState.update((f) => ({ ...f, [key]: '' }));
+    this.saveFilters();
+    this.currentPage.set(1);
+    this.loadInquiries();
+  }
+
+  clearAllFilters(): void {
+    this.filterState.set({ ...EMPTY_FILTERS });
+    this.saveFilters();
+    this.currentPage.set(1);
+    this.loadInquiries();
+  }
+
+  private loadSavedFilters(): void {
     try {
-      const res = await firstValueFrom(
-        this.http.get<ApiResponse<{ companies: CounterpartyDto[]; total: number }>>(
-          `${API}/companies/local?type=BROKER&search=${encodeURIComponent(term)}&limit=20`,
-        ),
-      );
-      if (res.success) {
-        this.brokerFilterOptions.set(
-          res.data.companies.map((c) => ({ value: c.id, label: c.name })),
-        );
+      const raw = localStorage.getItem(this.filterStorageKey());
+      if (raw) {
+        const saved = JSON.parse(raw) as Partial<FilterState>;
+        this.filterState.set({ ...EMPTY_FILTERS, ...saved });
       }
-    } catch { /* ignore */ } finally {
-      this.brokerFilterLoading.set(false);
-    }
+    } catch { /* ignore */ }
   }
 
-  onBrokerFilterChange(value: string): void {
-    this.filterBrokerId.set(value ?? '');
-    this.currentPage.set(1);
-    this.loadInquiries();
-  }
-
-  onResponsibleFilterChange(value: string): void {
-    this.filterResponsibleId.set(value ?? '');
-    this.currentPage.set(1);
-    this.loadInquiries();
+  private saveFilters(): void {
+    try {
+      localStorage.setItem(this.filterStorageKey(), JSON.stringify(this.filterState()));
+    } catch { /* ignore */ }
   }
 
   goToPage(page: number): void {

@@ -4,7 +4,7 @@
 //  An "inquiry" is simply an order with status INQUIRY or OFFER.
 // ═══════════════════════════════════════════════════════════════════════
 
-import { eq, and, desc, asc, sql, ilike, inArray, or, isNull } from 'drizzle-orm';
+import { eq, and, desc, asc, sql, ilike, inArray, or, isNull, gte, lte } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { db } from '../../db';
 import {
@@ -44,6 +44,12 @@ interface ListOrdersQuery {
   statuses?: string[];     // filter by status(es), e.g. ['INQUIRY','OFFER'] for inquiries
   salesRepId?: string;
   brokerId?: string;       // filter by broker company
+  clientId?: string;        // filter by client company
+  vesselId?: string;       // filter by vessel
+  placeId?: string;        // filter by port/place
+  invoicingCompanyId?: string; // filter by invoicing company
+  dateFrom?: string;       // filter ETA >= date (ISO string)
+  dateTo?: string;         // filter ETA <= date (ISO string)
   sortBy?: string;
   sortDir?: 'asc' | 'desc';
   page?: number;
@@ -852,6 +858,30 @@ export async function listOrders(query?: ListOrdersQuery) {
 
   if (query?.brokerId) {
     conditions.push(eq(orders.brokerId, query.brokerId));
+  }
+
+  if (query?.clientId) {
+    conditions.push(eq(orders.clientId, query.clientId));
+  }
+
+  if (query?.vesselId) {
+    conditions.push(eq(orders.vesselId, query.vesselId));
+  }
+
+  if (query?.placeId) {
+    conditions.push(eq(orders.placeId, query.placeId));
+  }
+
+  if (query?.invoicingCompanyId) {
+    conditions.push(eq(orders.invoicingCompanyId, query.invoicingCompanyId));
+  }
+
+  if (query?.dateFrom) {
+    conditions.push(gte(orders.eta, new Date(query.dateFrom)));
+  }
+
+  if (query?.dateTo) {
+    conditions.push(lte(orders.eta, new Date(query.dateTo)));
   }
 
   if (query?.search) {
