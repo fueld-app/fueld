@@ -2706,7 +2706,7 @@ function buildProformaDocument(data: {
       } as Content,
       { text: '', margin: [0, 6, 0, 0] } as Content,
 
-      // Payment terms + QR code (2-column: terms on left, QR right-aligned)
+      // Payment terms + QR code (2-column: terms/notes on left, QR right-aligned)
       {
         columns: [
           {
@@ -2718,6 +2718,12 @@ function buildProformaDocument(data: {
               ...(data.dueDate
                 ? [{ text: [{ text: 'Due date:  ', bold: true }, { text: data.dueDate }], margin: [0, 0, 0, 2] } as Content]
                 : []),
+              // Notes directly under the due date
+              ...buildNotesSection({
+                customerNote: data.customerNote,
+                termsAndConditions: data.termsAndConditions ?? null,
+                itemNotes: data.itemNotes,
+              }),
             ],
           },
           ...(data.verifyUrl ? [{
@@ -2732,13 +2738,6 @@ function buildProformaDocument(data: {
           } as Content] : []),
         ],
       } as Content,
-
-      // Notes
-      ...buildNotesSection({
-        customerNote: data.customerNote,
-        termsAndConditions: data.termsAndConditions ?? null,
-        itemNotes: data.itemNotes,
-      }),
 
       // ── Remittance Instructions ──
       ...(data.bank ? [
