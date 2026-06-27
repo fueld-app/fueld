@@ -2706,13 +2706,32 @@ function buildProformaDocument(data: {
       } as Content,
       { text: '', margin: [0, 6, 0, 0] } as Content,
 
-      // Payment terms
-      ...(data.paymentTerms
-        ? [{ text: [{ text: 'Payment terms:  ', bold: true }, { text: data.paymentTerms.replace(/_/g, ' ') }], margin: [0, 0, 0, 2] } as Content]
-        : []),
-      ...(data.dueDate
-        ? [{ text: [{ text: 'Due date:  ', bold: true }, { text: data.dueDate }], margin: [0, 0, 0, 2] } as Content]
-        : []),
+      // Payment terms + QR code (2-column: terms on left, QR right-aligned)
+      {
+        columns: [
+          {
+            width: '*',
+            stack: [
+              ...(data.paymentTerms
+                ? [{ text: [{ text: 'Payment terms:  ', bold: true }, { text: data.paymentTerms.replace(/_/g, ' ') }], margin: [0, 0, 0, 2] } as Content]
+                : []),
+              ...(data.dueDate
+                ? [{ text: [{ text: 'Due date:  ', bold: true }, { text: data.dueDate }], margin: [0, 0, 0, 2] } as Content]
+                : []),
+            ],
+          },
+          ...(data.verifyUrl ? [{
+            width: 'auto',
+            stack: [
+              { image: data.verifyUrl, fit: [80, 80], alignment: 'right', link: data.verifyLink ?? undefined } as Content,
+              { text: 'Scan or click to verify', fontSize: 7, color: '#1a56db', alignment: 'center', margin: [0, 4, 0, 0], link: data.verifyLink ?? undefined } as Content,
+              ...(data.verifyLink ? [
+                { text: `Verify domain: ${new URL(data.verifyLink).hostname}`, fontSize: 6, color: '#6b7280', alignment: 'center', margin: [0, 2, 0, 0] } as Content,
+              ] : []),
+            ],
+          } as Content] : []),
+        ],
+      } as Content,
 
       // Notes
       ...buildNotesSection({
@@ -2809,34 +2828,11 @@ function buildProformaDocument(data: {
         margin: [0, 10, 0, 0],
       } as Content] : []),
 
-      // ── Fraud Prevention + QR (2-column) ──
-      ...((data.fraudPreventionText || data.verifyUrl) ? [
+      // ── Fraud Prevention (QR moved to payment terms section) ──
+      ...(data.fraudPreventionText ? [
         { text: '', margin: [0, 10, 0, 0] } as Content,
-        {
-          columns: [
-            {
-              width: '*',
-              stack: [
-                ...(data.fraudPreventionText ? [
-                  { text: 'FRAUD PREVENTION', fontSize: 9, bold: true, margin: [0, 0, 0, 4] } as Content,
-                  { text: data.fraudPreventionText, fontSize: 8, color: '#374151', margin: [0, 0, 10, 0] } as Content,
-                ] : []),
-              ],
-            },
-            {
-              width: 'auto',
-              stack: [
-                ...(data.verifyUrl ? [
-                  { image: data.verifyUrl, fit: [80, 80], alignment: 'right', link: data.verifyLink ?? undefined } as Content,
-                  { text: 'Scan or click to verify', fontSize: 7, color: '#1a56db', alignment: 'center', margin: [0, 4, 0, 0], link: data.verifyLink ?? undefined } as Content,
-                  ...(data.verifyLink ? [
-                    { text: `Verify domain: ${new URL(data.verifyLink).hostname}`, fontSize: 6, color: '#6b7280', alignment: 'center', margin: [0, 2, 0, 0] } as Content,
-                  ] : []),
-                ] : []),
-              ],
-            },
-          ],
-        } as Content,
+        { text: 'FRAUD PREVENTION', fontSize: 9, bold: true, margin: [0, 0, 0, 4] } as Content,
+        { text: data.fraudPreventionText, fontSize: 8, color: '#374151', margin: [0, 0, 10, 0] } as Content,
       ] : []),
     ],
     footer: footerFn,
