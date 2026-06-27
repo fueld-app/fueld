@@ -557,11 +557,9 @@ function formatPrice(val: string | null | undefined, precision?: number | null):
   if (!val) return '—';
   const n = parseFloat(val);
   if (isNaN(n)) return '—';
-  if (precision != null) {
-    return n.toLocaleString('en-US', { minimumFractionDigits: precision, maximumFractionDigits: precision });
-  }
-  // Dynamic: 2 minimum, 4 maximum — shows $0.0010 as "0.001", $3.97 as "3.97"
-  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+  // Cap at 4 decimals — sales_price is numeric(12,4). Dynamic min 2, max 4.
+  const maxDp = precision != null ? Math.min(precision, 4) : 4;
+  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: maxDp });
 }
 
 /** Format a number, stripping trailing zeros (e.g. 100.000 → "100", 100.500 → "100.5"). */

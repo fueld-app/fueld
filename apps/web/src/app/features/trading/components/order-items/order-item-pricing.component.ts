@@ -290,8 +290,8 @@ export class OrderItemPricingComponent {
   readonly fieldChange = output<{ field: string; value: unknown }>();
   readonly plattsSelect = output<string>();
 
-  /** Number pipe format string derived from the configurable precision. */
-  protected priceFormat = computed(() => `1.2-${this.decimalPrecision()}`);
+  /** Number pipe format string derived from the configurable precision (capped at 4 — sales_price is numeric(12,4)). */
+  protected priceFormat = computed(() => `1.2-${Math.min(this.decimalPrecision(), 4)}`);
 
   /** Derive which pricing model is active based on side. */
   protected pricingModel = computed(() => {
