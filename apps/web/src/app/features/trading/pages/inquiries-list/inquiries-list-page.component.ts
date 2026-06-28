@@ -511,20 +511,26 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
     { key: 'created', label: 'Created', type: 'date-range' },
   ]);
 
+  /** Shared method to build filter URL params from filter state. */
+  private buildFilterParams(params: URLSearchParams, state?: FilterState): void {
+    const f = state ?? this.filterState();
+    if (f['clientId']) params.set('clientId', f['clientId']);
+    if (f['vesselId']) params.set('vesselId', f['vesselId']);
+    if (f['placeId']) params.set('placeId', f['placeId']);
+    if (f['salesRepId']) params.set('salesRepId', f['salesRepId']);
+    if (f['brokerId']) params.set('brokerId', f['brokerId']);
+    if (f['invoicingCompanyId']) params.set('invoicingCompanyId', f['invoicingCompanyId']);
+    if (f['etaFrom']) params.set('dateFrom', f['etaFrom']);
+    if (f['etaTo']) params.set('dateTo', f['etaTo']);
+    if (f['createdFrom']) params.set('createdFrom', f['createdFrom']);
+    if (f['createdTo']) params.set('createdTo', f['createdTo']);
+  }
+
   /** Count function — calls the API with draft filters to get total matching results. */
   readonly filterCountFn = (filters: FilterState): Promise<number> => {
     const params = new URLSearchParams();
     this.applyStatusFilter(params);
-    if (filters['clientId']) params.set('clientId', filters['clientId']);
-    if (filters['vesselId']) params.set('vesselId', filters['vesselId']);
-    if (filters['placeId']) params.set('placeId', filters['placeId']);
-    if (filters['salesRepId']) params.set('salesRepId', filters['salesRepId']);
-    if (filters['brokerId']) params.set('brokerId', filters['brokerId']);
-    if (filters['invoicingCompanyId']) params.set('invoicingCompanyId', filters['invoicingCompanyId']);
-    if (filters['etaFrom']) params.set('dateFrom', filters['etaFrom']);
-    if (filters['etaTo']) params.set('dateTo', filters['etaTo']);
-    if (filters['createdFrom']) params.set('createdFrom', filters['createdFrom']);
-    if (filters['createdTo']) params.set('createdTo', filters['createdTo']);
+    this.buildFilterParams(params, filters);
     params.set('limit', '1');
     return firstValueFrom(this.http.get<ApiResponse<{ items: unknown[]; total: number }>>(`${API}/orders?${params}`))
       .then(res => res.success ? res.data.total : 0)
@@ -631,17 +637,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
       params.set('page', String(this.currentPage()));
       params.set('limit', String(this.pageSize()));
       if (this.searchTerm()) params.set('search', this.searchTerm());
-      const f = this.filterState();
-      if (f['brokerId']) params.set('brokerId', f['brokerId']);
-      if (f['salesRepId']) params.set('salesRepId', f['salesRepId']);
-      if (f['clientId']) params.set('clientId', f['clientId']);
-      if (f['vesselId']) params.set('vesselId', f['vesselId']);
-      if (f['placeId']) params.set('placeId', f['placeId']);
-      if (f['invoicingCompanyId']) params.set('invoicingCompanyId', f['invoicingCompanyId']);
-      if (f['etaFrom']) params.set('dateFrom', f['etaFrom']);
-      if (f['etaTo']) params.set('dateTo', f['etaTo']);
-      if (f['createdFrom']) params.set('createdFrom', f['createdFrom']);
-      if (f['createdTo']) params.set('createdTo', f['createdTo']);
+      this.buildFilterParams(params);
       if (this.activeSortBy()) params.set('sortBy', this.activeSortBy());
       if (this.activeSortBy()) params.set('sortDir', this.activeSortDir());
 

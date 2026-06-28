@@ -197,12 +197,26 @@ export class FilterOverlayComponent {
       const d = this.draft();
       const fn = this.countFn();
       if (!fn || !this.isOpen()) return;
+      // Suppress count when no filters are active
+      if (!this.hasActiveFilters(d)) {
+        this.resultCount.set(null);
+        return;
+      }
       // Debounce
       if (this.countTimeout) clearTimeout(this.countTimeout);
       this.countTimeout = setTimeout(() => {
         this.fetchCount(fn, d);
       }, 500);
     });
+  }
+
+  /** Checks if any non-labels values in the state are non-empty strings. */
+  private hasActiveFilters(state: FilterState): boolean {
+    for (const [key, val] of Object.entries(state)) {
+      if (key === 'labels') continue;
+      if (typeof val === 'string' && val.trim()) return true;
+    }
+    return false;
   }
 
   @HostListener('document:keydown.escape')
