@@ -25,7 +25,7 @@ import { DecimalPipe } from '@angular/common';
 import { DateLabelPipe } from '../../../../shared/pipes/date-format.pipe';
 import { DateFormatService } from '@app/core/services/date-format.service';
 import { firstValueFrom } from 'rxjs';
-import { FilterOverlayComponent, type FilterState, EMPTY_FILTERS } from '../../../../shared/components/filter-overlay/filter-overlay.component';
+import { FilterOverlayComponent, type FilterState, EMPTY_FILTERS, type FilterFieldDef } from '../../../../shared/components/filter-overlay/filter-overlay.component';
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Inquiries List Page — INQUIRY + OFFER status orders
@@ -61,7 +61,8 @@ import { NewInquiryModalService } from '@app/core/trading/new-inquiry-modal.serv
         />
         <app-filter-overlay
           [filters]="filterState()"
-          [responsibleOptions]="responsibleFilterOptions()"
+          [fields]="filterFields()"
+          [countFn]="filterCountFn"
           (filtersChange)="onFiltersChange($event)"
         />
         <div class="ml-auto">
@@ -417,8 +418,6 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
       { field: 'dueDate', label: 'Due Date', sortable: true },
       { field: 'createdAt', label: 'Created', sortable: true },
     ];
-    // Financial columns are computed per-row, so the API cannot sort by them;
-    // leave them non-sortable to avoid a silent fallback to createdAt.
     if (this.auth.canSeePrices()) {
       base.push({ field: 'value', label: 'Value' });
     }
@@ -492,29 +491,60 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
     } as Partial<UserUiPreferences>);
   }
 
-  // ─── Broker filter ────────────────────────────────────────────────
-  // Filter state
+  // ─── Filter configuration (config-driven) ──────────────────────────
+
   readonly filterState = signal<FilterState>({ ...EMPTY_FILTERS });
   readonly teamUsers = signal<TeamUserOption[]>([]);
   readonly responsibleFilterOptions = computed<DropdownOption[]>(() =>
     this.teamUsers().map((user) => ({ value: user.id, label: user.name })),
   );
-  readonly applyingFilters = signal(false);
+
+  /** Filter field definitions — passed to the overlay component. */
+  readonly filterFields = computed<FilterFieldDef[]>(() => [
+    { key: 'clientId', label: 'Client', type: 'dropdown', searchFn: (term) => this.searchCompanies('CLIENT', term) },
+    { key: 'vesselId', label: 'Vessel', type: 'dropdown', searchFn: (term) => this.searchVessels(term) },
+    { key: 'placeId', label: 'Port', type: 'dropdown', searchFn: (term) => this.searchPlaces(term) },
+    { key: 'salesRepId', label: 'Responsible', type: 'dropdown', options: this.responsibleFilterOptions() },
+    { key: 'brokerId', label: 'Broker', type: 'dropdown', searchFn: (term) => this.searchCompanies('BROKER', term) },
+    { key: 'invoicingCompanyId', label: 'Invoicing Company', type: 'dropdown', searchFn: (term) => this.searchInvoicingCompanies(term) },
+    { key: 'eta', label: 'ETA', type: 'date-range' },
+    { key: 'created', label: 'Created', type: 'date-range' },
+  ]);
+
+  /** Count function — calls the API with draft filters to get total matching results. */
+  readonly filterCountFn = (filters: FilterState): Promise<number> => {
+    const params = new URLSearchParams();
+    this.applyStatusFilter(params);
+    if (filters['clientId']) params.set('clientId', filters['clientId']);
+    if (filters['vesselId']) params.set('vesselId', filters['vesselId']);
+    if (filters['placeId']) params.set('placeId', filters['placeId']);
+    if (filters['salesRepId']) params.set('salesRepId', filters['salesRepId']);
+    if (filters['brokerId']) params.set('brokerId', filters['brokerId']);
+    if (filters['invoicingCompanyId']) params.set('invoicingCompanyId', filters['invoicingCompanyId']);
+    if (filters['etaFrom']) params.set('dateFrom', filters['etaFrom']);
+    if (filters['etaTo']) params.set('dateTo', filters['etaTo']);
+    if (filters['createdFrom']) params.set('createdFrom', filters['createdFrom']);
+    if (filters['createdTo']) params.set('createdTo', filters['createdTo']);
+    params.set('limit', '1');
+    return firstValueFrom(this.http.get<ApiResponse<{ items: unknown[]; total: number }>>(`${API}/orders?${params}`))
+      .then(res => res.success ? res.data.total : 0)
+      .catch(() => 0);
+  };
 
   // Filter pills — uses labels from FilterState (persisted to localStorage)
   readonly activeFilterPills = computed(() => {
     const f = this.filterState();
-    const pills: Array<{ key: keyof FilterState; label: string; value: string }> = [];
-    if (f.clientId) pills.push({ key: 'clientId', label: 'Client', value: f.labels['clientId'] ?? f.clientId.slice(0, 8) });
-    if (f.vesselId) pills.push({ key: 'vesselId', label: 'Vessel', value: f.labels['vesselId'] ?? f.vesselId.slice(0, 8) });
-    if (f.placeId) pills.push({ key: 'placeId', label: 'Port', value: f.labels['placeId'] ?? f.placeId.slice(0, 8) });
-    if (f.salesRepId) pills.push({ key: 'salesRepId', label: 'Responsible', value: f.labels['salesRepId'] ?? f.salesRepId.slice(0, 8) });
-    if (f.brokerId) pills.push({ key: 'brokerId', label: 'Broker', value: f.labels['brokerId'] ?? f.brokerId.slice(0, 8) });
-    if (f.invoicingCompanyId) pills.push({ key: 'invoicingCompanyId', label: 'Invoicing', value: f.labels['invoicingCompanyId'] ?? f.invoicingCompanyId.slice(0, 8) });
-    if (f.dateFrom) pills.push({ key: 'dateFrom', label: 'ETA from', value: f.dateFrom });
-    if (f.dateTo) pills.push({ key: 'dateTo', label: 'ETA to', value: f.dateTo });
-    if (f.createdFrom) pills.push({ key: 'createdFrom', label: 'Created from', value: f.createdFrom });
-    if (f.createdTo) pills.push({ key: 'createdTo', label: 'Created to', value: f.createdTo });
+    const pills: Array<{ key: string; label: string; value: string }> = [];
+    if (f['clientId']) pills.push({ key: 'clientId', label: 'Client', value: f.labels['clientId'] ?? f['clientId'].slice(0, 8) });
+    if (f['vesselId']) pills.push({ key: 'vesselId', label: 'Vessel', value: f.labels['vesselId'] ?? f['vesselId'].slice(0, 8) });
+    if (f['placeId']) pills.push({ key: 'placeId', label: 'Port', value: f.labels['placeId'] ?? f['placeId'].slice(0, 8) });
+    if (f['salesRepId']) pills.push({ key: 'salesRepId', label: 'Responsible', value: f.labels['salesRepId'] ?? f['salesRepId'].slice(0, 8) });
+    if (f['brokerId']) pills.push({ key: 'brokerId', label: 'Broker', value: f.labels['brokerId'] ?? f['brokerId'].slice(0, 8) });
+    if (f['invoicingCompanyId']) pills.push({ key: 'invoicingCompanyId', label: 'Invoicing', value: f.labels['invoicingCompanyId'] ?? f['invoicingCompanyId'].slice(0, 8) });
+    if (f['etaFrom']) pills.push({ key: 'etaFrom', label: 'ETA from', value: f['etaFrom'] });
+    if (f['etaTo']) pills.push({ key: 'etaTo', label: 'ETA to', value: f['etaTo'] });
+    if (f['createdFrom']) pills.push({ key: 'createdFrom', label: 'Created from', value: f['createdFrom'] });
+    if (f['createdTo']) pills.push({ key: 'createdTo', label: 'Created to', value: f['createdTo'] });
     return pills;
   });
 
@@ -523,10 +553,8 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
   // ─── New inquiry modal ────────────────────────────────────────────
 
   readonly showNewInquiryModal = signal(false);
-
   readonly newInquiryModalOpen = computed(() => this.showNewInquiryModal());
 
-  /** Open the modal (called from template empty-state button or external service) */
   openNewInquiryModal(): void {
     this.showNewInquiryModal.set(true);
   }
@@ -560,7 +588,6 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
     void this.userPrefs.load();
     void this.dateFormatSvc.load();
     if (!this.isOrders()) {
-      // Auto-open modal when navigated with ?new=1 (e.g. from navbar button)
       this.queryParamSub = this.route.queryParamMap.subscribe((params) => {
         if (params.get('new') === '1') {
           this.showNewInquiryModal.set(true);
@@ -580,37 +607,41 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
 
   // ─── Data loading ─────────────────────────────────────────────────
 
+  private applyStatusFilter(params: URLSearchParams): void {
+    if (this.isActiveOrders()) {
+      params.set('statuses', 'CONFIRMED');
+    } else if (this.isDeliveredOrders()) {
+      params.set('statuses', 'DELIVERED');
+    } else if (this.isInvoicedOrders()) {
+      params.set('statuses', 'INVOICED');
+    } else if (this.isCompletedOrders()) {
+      params.set('statuses', 'PAID');
+    } else if (this.isCancelledOrders()) {
+      params.set('statuses', 'CANCELLED');
+    } else {
+      params.set('statuses', 'INQUIRY,OFFER');
+    }
+  }
+
   async loadInquiries(): Promise<void> {
     this.loading.set(true);
     try {
       const params = new URLSearchParams();
-      if (this.isActiveOrders()) {
-        params.set('statuses', 'CONFIRMED');
-      } else if (this.isDeliveredOrders()) {
-        params.set('statuses', 'DELIVERED');
-      } else if (this.isInvoicedOrders()) {
-        params.set('statuses', 'INVOICED');
-      } else if (this.isCompletedOrders()) {
-        params.set('statuses', 'PAID');
-      } else if (this.isCancelledOrders()) {
-        params.set('statuses', 'CANCELLED');
-      } else {
-        params.set('statuses', 'INQUIRY,OFFER');
-      }
+      this.applyStatusFilter(params);
       params.set('page', String(this.currentPage()));
       params.set('limit', String(this.pageSize()));
       if (this.searchTerm()) params.set('search', this.searchTerm());
       const f = this.filterState();
-      if (f.brokerId) params.set('brokerId', f.brokerId);
-      if (f.salesRepId) params.set('salesRepId', f.salesRepId);
-      if (f.clientId) params.set('clientId', f.clientId);
-      if (f.vesselId) params.set('vesselId', f.vesselId);
-      if (f.placeId) params.set('placeId', f.placeId);
-      if (f.invoicingCompanyId) params.set('invoicingCompanyId', f.invoicingCompanyId);
-      if (f.dateFrom) params.set('dateFrom', f.dateFrom);
-      if (f.dateTo) params.set('dateTo', f.dateTo);
-      if (f.createdFrom) params.set('createdFrom', f.createdFrom);
-      if (f.createdTo) params.set('createdTo', f.createdTo);
+      if (f['brokerId']) params.set('brokerId', f['brokerId']);
+      if (f['salesRepId']) params.set('salesRepId', f['salesRepId']);
+      if (f['clientId']) params.set('clientId', f['clientId']);
+      if (f['vesselId']) params.set('vesselId', f['vesselId']);
+      if (f['placeId']) params.set('placeId', f['placeId']);
+      if (f['invoicingCompanyId']) params.set('invoicingCompanyId', f['invoicingCompanyId']);
+      if (f['etaFrom']) params.set('dateFrom', f['etaFrom']);
+      if (f['etaTo']) params.set('dateTo', f['etaTo']);
+      if (f['createdFrom']) params.set('createdFrom', f['createdFrom']);
+      if (f['createdTo']) params.set('createdTo', f['createdTo']);
       if (this.activeSortBy()) params.set('sortBy', this.activeSortBy());
       if (this.activeSortBy()) params.set('sortDir', this.activeSortDir());
 
@@ -643,6 +674,57 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
     }
   }
 
+  // ─── Filter search helpers ────────────────────────────────────────
+
+  private async searchCompanies(type: string, term: string): Promise<DropdownOption[]> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ companies: Array<{ id: string; name: string }> }>>(
+          `${API}/companies/local?type=${type}&search=${encodeURIComponent(term)}&limit=20`,
+        ),
+      );
+      return res.success ? res.data.companies.map((c) => ({ value: c.id, label: c.name })) : [];
+    } catch { return []; }
+  }
+
+  private async searchVessels(term: string): Promise<DropdownOption[]> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ items: Array<{ id: string; name: string }> }>>(
+          `${API}/vessels?search=${encodeURIComponent(term)}&limit=20`,
+        ),
+      );
+      return res.success && res.data?.items ? res.data.items.map((v) => ({ value: v.id, label: v.name })) : [];
+    } catch { return []; }
+  }
+
+  private async searchPlaces(term: string): Promise<DropdownOption[]> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<{ items: Array<{ id: string; name: string }> }>>(
+          `${API}/places?search=${encodeURIComponent(term)}&limit=20`,
+        ),
+      );
+      return res.success && res.data?.items ? res.data.items.map((p) => ({ value: p.id, label: p.name })) : [];
+    } catch { return []; }
+  }
+
+  private async searchInvoicingCompanies(term: string): Promise<DropdownOption[]> {
+    try {
+      const res = await firstValueFrom(
+        this.http.get<ApiResponse<Array<{ id: string; name: string }>>>(
+          `${API}/admin/settings/own-companies`,
+        ),
+      );
+      if (res.success && Array.isArray(res.data)) {
+        return res.data
+          .filter((c) => !term || c.name.toLowerCase().includes(term.toLowerCase()))
+          .map((c) => ({ value: c.id, label: c.name }));
+      }
+      return [];
+    } catch { return []; }
+  }
+
   // ─── Actions ──────────────────────────────────────────────────────
 
   private searchTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -663,15 +745,20 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
     this.loadInquiries();
   }
 
-  removeFilter(key: keyof FilterState): void {
-    this.filterState.update((f) => ({ ...f, [key]: '' }));
+  removeFilter(key: string): void {
+    this.filterState.update((f) => {
+      const next = { ...f, [key]: '' };
+      const { [key]: _removed, ...restLabels } = f.labels;
+      next.labels = restLabels;
+      return next;
+    });
     this.saveFilters();
     this.currentPage.set(1);
     this.loadInquiries();
   }
 
   clearAllFilters(): void {
-    this.filterState.set({ ...EMPTY_FILTERS });
+    this.filterState.set({ labels: {} });
     this.saveFilters();
     this.currentPage.set(1);
     this.loadInquiries();
@@ -682,7 +769,7 @@ export class InquiriesListPageComponent implements OnInit, OnDestroy {
       const raw = localStorage.getItem(this.filterStorageKey());
       if (raw) {
         const saved = JSON.parse(raw) as Partial<FilterState>;
-        this.filterState.set({ ...EMPTY_FILTERS, ...saved });
+        this.filterState.set({ labels: {}, ...saved });
       }
     } catch { /* ignore */ }
   }

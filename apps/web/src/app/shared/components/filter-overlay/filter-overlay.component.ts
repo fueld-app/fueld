@@ -4,64 +4,32 @@ import {
   signal,
   input,
   output,
-  inject,
   computed,
   HostListener,
+  effect,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
 import { SearchableDropdownComponent, type DropdownOption } from '../searchable-dropdown/searchable-dropdown.component';
-import { API } from '@app/core/config/api';
-import type { ApiResponse } from '@fueld/types';
 
 // ═══════════════════════════════════════════════════════════════════════
-//  Filter Overlay — Toggleable filter panel with searchable dropdowns
+//  Filter Overlay — Config-driven, reusable toggleable filter panel
 // ═══════════════════════════════════════════════════════════════════════
 
-export interface FilterState {
-  clientId: string;
-  vesselId: string;
-  placeId: string;
-  salesRepId: string;
-  brokerId: string;
-  invoicingCompanyId: string;
-  dateFrom: string;
-  dateTo: string;
-  createdFrom: string;
-  createdTo: string;
-  /** Human-readable labels for pill display (persisted to localStorage) */
-  labels: Record<string, string>;
-}
+/** Generic filter state — a map of key→value strings plus a labels map for display. */
+export type FilterState = Record<string, string> & { labels: Record<string, string> };
 
-export const EMPTY_FILTERS: FilterState = {
-  clientId: '',
-  vesselId: '',
-  placeId: '',
-  salesRepId: '',
-  brokerId: '',
-  invoicingCompanyId: '',
-  dateFrom: '',
-  dateTo: '',
-  createdFrom: '',
-  createdTo: '',
-  labels: {},
-};
+export const EMPTY_FILTERS: FilterState = { labels: {} };
 
-export interface FilterFieldConfig {
-  key: keyof FilterState;
+/** Field definition that the parent passes to configure the overlay. */
+export interface FilterFieldDef {
+  key: string;
   label: string;
-  options: 'async-client' | 'async-vessel' | 'async-place' | 'async-broker' | 'async-invoicing' | 'static-responsible';
+  type: 'dropdown' | 'date-range';
+  /** Static options for type='dropdown' — parent provides pre-loaded list. */
+  options?: DropdownOption[];
+  /** Async search function for type='dropdown' — parent provides. */
+  searchFn?: (term: string) => Promise<DropdownOption[]>;
 }
-
-const FIELD_CONFIGS: FilterFieldConfig[] = [
-  { key: 'clientId', label: 'Client', options: 'async-client' },
-  { key: 'vesselId', label: 'Vessel', options: 'async-vessel' },
-  { key: 'placeId', label: 'Port', options: 'async-place' },
-  { key: 'salesRepId', label: 'Responsible', options: 'static-responsible' },
-  { key: 'brokerId', label: 'Broker', options: 'async-broker' },
-  { key: 'invoicingCompanyId', label: 'Invoicing Company', options: 'async-invoicing' },
-];
 
 @Component({
   selector: 'app-filter-overlay',
@@ -76,8 +44,7 @@ const FIELD_CONFIGS: FilterFieldConfig[] = [
         class="inline-flex items-center gap-2 rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm font-medium text-gray-700 dark:text-ink-dim hover:bg-gray-50 dark:hover:bg-surface-tint transition-colors"
       >
         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M3.232 4.565a.75.75 0 01.99-.243l4.372 2.193a.75.75 0 01-.746 1.304L3.5 5.496v7.95l4.117-2.482a.75.75 0 01.766 1.273L3.5 15.496v.004a.75.75 0 01-1.5 0v-11a.75.75 0 01.232-.435zM15.232 4.565a.75.75 0 01.99-.243l4.372 2.193a.75.75 0 01-.746 1.304L15.5 5.496v7.95l4.117-2.482a.75.75 0 01.766 1.273L15.5 15.496v.004a.75.75 0 01-1.5 0v-11a.75.75 0 01.232-.435z" clip-rule="evenodd" />
-          <path d="M10 3a.75.75 0 01.75.75v12.5a.75.75 0 01-1.5 0V3.75A.75.75 0 0110 3z" />
+          <path fill-rule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V5zm3.5 2a.75.75 0 000 1.5h7a.75.75 0 000-1.5h-7zM6 10.5A.75.75 0 016.75 10h4.5a.75.75 0 010 1.5h-4.5A.75.75 0 016 10.5z" clip-rule="evenodd" />
         </svg>
         Filters
         @if (activeCount() > 0) {
@@ -104,73 +71,66 @@ const FIELD_CONFIGS: FilterFieldConfig[] = [
 
           <!-- Filter fields -->
           <div class="max-h-[60vh] overflow-y-auto px-4 py-4 space-y-4">
-            <div class="grid grid-cols-2 gap-3">
-              @for (field of fieldConfigs; track field.key) {
-                <div>
-                  <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">{{ field.label }}</label>
-                  <app-searchable-dropdown
-                    [placeholder]="'Filter by ' + field.label + '…'"
-                    [options]="getOptions(field.key)()"
-                    [selected]="draft()[field.key]"
-                    [loading]="getLoading(field.key)()"
-                    [asyncSearch]="field.options !== 'static-responsible'"
-                    [clearable]="true"
-                    [minSearchLength]="1"
-                    (searchChange)="onAsyncSearch(field.key, $event)"
-                    (selectionChange)="onFieldChange(field.key, $event)"
+            <!-- Dropdown fields -->
+            @if (dropdownFields().length > 0) {
+              <div class="grid grid-cols-2 gap-3">
+                @for (field of dropdownFields(); track field.key) {
+                  <div>
+                    <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-muted">{{ field.label }}</label>
+                    <app-searchable-dropdown
+                      [placeholder]="'Filter by ' + field.label + '…'"
+                      [options]="getOptions(field)()"
+                      [selected]="draft()[field.key] ?? ''"
+                      [loading]="getLoading(field.key)()"
+                      [asyncSearch]="!!field.searchFn"
+                      [clearable]="true"
+                      [minSearchLength]="1"
+                      (searchChange)="onAsyncSearch(field, $event)"
+                      (selectionChange)="onFieldChange(field.key, $event)"
+                    />
+                  </div>
+                }
+              </div>
+            }
+
+            <!-- Date range fields -->
+            @for (field of dateRangeFields(); track field.key) {
+              <div>
+                <div class="mb-1 text-xs font-medium text-gray-500 dark:text-muted">{{ field.label }} range</div>
+                <div class="grid grid-cols-2 gap-3">
+                  <input
+                    type="date"
+                    [ngModel]="draft()[field.key + 'From'] || ''"
+                    (ngModelChange)="onFieldChange(field.key + 'From', $event)"
+                    class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm dark:bg-surface dark:text-ink"
+                  />
+                  <input
+                    type="date"
+                    [ngModel]="draft()[field.key + 'To'] || ''"
+                    (ngModelChange)="onFieldChange(field.key + 'To', $event)"
+                    class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm dark:bg-surface dark:text-ink"
                   />
                 </div>
-              }
-            </div>
-
-            <!-- ETA date range -->
-            <div>
-              <div class="mb-1 text-xs font-medium text-gray-500 dark:text-muted">ETA range</div>
-              <div class="grid grid-cols-2 gap-3">
-                <input
-                  type="date"
-                  [ngModel]="draft().dateFrom || ''"
-                  (ngModelChange)="onFieldChange('dateFrom', $event)"
-                  class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm dark:bg-surface dark:text-ink"
-                />
-                <input
-                  type="date"
-                  [ngModel]="draft().dateTo || ''"
-                  (ngModelChange)="onFieldChange('dateTo', $event)"
-                  class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm dark:bg-surface dark:text-ink"
-                />
               </div>
-            </div>
-
-            <!-- Created date range -->
-            <div>
-              <div class="mb-1 text-xs font-medium text-gray-500 dark:text-muted">Created date range</div>
-              <div class="grid grid-cols-2 gap-3">
-                <input
-                  type="date"
-                  [ngModel]="draft().createdFrom || ''"
-                  (ngModelChange)="onFieldChange('createdFrom', $event)"
-                  class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm dark:bg-surface dark:text-ink"
-                />
-                <input
-                  type="date"
-                  [ngModel]="draft().createdTo || ''"
-                  (ngModelChange)="onFieldChange('createdTo', $event)"
-                  class="w-full rounded-lg border border-gray-300 dark:border-line-strong px-3 py-2 text-sm dark:bg-surface dark:text-ink"
-                />
-              </div>
-            </div>
+            }
           </div>
 
           <!-- Footer -->
           <div class="flex items-center justify-between border-t border-gray-200 dark:border-line px-4 py-3">
-            <button
-              type="button"
-              (click)="clearAll()"
-              class="text-sm font-medium text-gray-600 dark:text-ink-dim hover:text-gray-900 dark:hover:text-ink"
-            >
-              Clear all
-            </button>
+            <div class="flex items-center gap-3">
+              <button
+                type="button"
+                (click)="clearAll()"
+                class="text-sm font-medium text-gray-600 dark:text-ink-dim hover:text-gray-900 dark:hover:text-ink"
+              >
+                Clear all
+              </button>
+              @if (resultCount() !== null) {
+                <span class="text-xs text-gray-500 dark:text-muted">
+                  @if (resultCount() === -1) { … } @else { {{ resultCount() }} results match }
+                </span>
+              }
+            </div>
             <div class="flex gap-2">
               <button
                 type="button"
@@ -194,44 +154,53 @@ const FIELD_CONFIGS: FilterFieldConfig[] = [
   `,
 })
 export class FilterOverlayComponent {
-  private readonly http = inject(HttpClient);
-
-  /** Current filter state (applied) */
+  /** Current applied filter state */
   readonly filters = input<FilterState>(EMPTY_FILTERS);
-  /** Responsible users options (static, provided by parent) */
-  readonly responsibleOptions = input<DropdownOption[]>([]);
+  /** Field definitions — parent configures which fields to show */
+  readonly fields = input<FilterFieldDef[]>([]);
+  /** Optional count function — parent provides. Returns total matching results. */
+  readonly countFn = input<((filters: FilterState) => Promise<number>) | null>(null);
   /** Emitted when user clicks Apply */
   readonly filtersChange = output<FilterState>();
 
   readonly isOpen = signal(false);
   readonly draft = signal<FilterState>(EMPTY_FILTERS);
 
-  // Async search options per field
-  readonly clientOptions = signal<DropdownOption[]>([]);
-  readonly clientLoading = signal(false);
-  readonly vesselOptions = signal<DropdownOption[]>([]);
-  readonly vesselLoading = signal(false);
-  readonly placeOptions = signal<DropdownOption[]>([]);
-  readonly placeLoading = signal(false);
-  readonly brokerOptions = signal<DropdownOption[]>([]);
-  readonly brokerLoading = signal(false);
-  readonly invoicingOptions = signal<DropdownOption[]>([]);
-  readonly invoicingLoading = signal(false);
+  // Per-field async search state
+  readonly asyncOptions = signal<Record<string, DropdownOption[]>>({});
+  readonly asyncLoading = signal<Record<string, boolean>>({});
 
-  readonly fieldConfigs: FilterFieldConfig[] = FIELD_CONFIGS;
+  // Result count: null = no countFn, -1 = loading, >=0 = result count
+  readonly resultCount = signal<number | null>(null);
+  private countAbort: AbortController | null = null;
+  private countTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  readonly dropdownFields = computed(() => this.fields().filter((f) => f.type === 'dropdown'));
+  readonly dateRangeFields = computed(() => this.fields().filter((f) => f.type === 'date-range'));
 
   readonly activeCount = computed(() => {
     const f = this.filters();
     let count = 0;
-    for (const field of FIELD_CONFIGS) {
-      if ((f[field.key] as string)?.trim()) count++;
+    for (const [key, val] of Object.entries(f)) {
+      if (key === 'labels') continue;
+      if (val?.trim()) count++;
     }
-    if (f.dateFrom?.trim()) count++;
-    if (f.dateTo?.trim()) count++;
-    if (f.createdFrom?.trim()) count++;
-    if (f.createdTo?.trim()) count++;
     return count;
   });
+
+  constructor() {
+    // Recompute result count when draft changes (debounced)
+    effect(() => {
+      const d = this.draft();
+      const fn = this.countFn();
+      if (!fn || !this.isOpen()) return;
+      // Debounce
+      if (this.countTimeout) clearTimeout(this.countTimeout);
+      this.countTimeout = setTimeout(() => {
+        this.fetchCount(fn, d);
+      }, 500);
+    });
+  }
 
   @HostListener('document:keydown.escape')
   onEscapeKey(): void {
@@ -257,25 +226,21 @@ export class FilterOverlayComponent {
   }
 
   clearAll(): void {
-    this.draft.set({ ...EMPTY_FILTERS });
+    this.draft.set({ labels: {} });
   }
 
-  onFieldChange(key: keyof FilterState, value: string): void {
+  onFieldChange(key: string, value: string): void {
     this.draft.update((d) => {
       const next = { ...d, [key]: value ?? '' } as FilterState;
-      // Resolve label for dropdown selections
-      if (value && key !== 'dateFrom' && key !== 'dateTo' && key !== 'createdFrom' && key !== 'createdTo') {
-        const opts = this.getOptions(key)();
+      if (value) {
+        // Resolve label from field options or async options
+        const field = this.fields().find((f) => f.key === key);
+        let opts: DropdownOption[] = [];
+        if (field?.options) opts = field.options;
+        else if (field?.searchFn) opts = this.asyncOptions()[key] ?? [];
         const match = opts.find((o) => o.value === value);
-        if (match) {
-          next.labels = { ...d.labels, [key]: match.label };
-        } else if (key === 'salesRepId') {
-          // Responsible options are provided by parent — already in opts
-          const r = opts.find((o) => o.value === value);
-          if (r) next.labels = { ...d.labels, [key]: r.label };
-        }
-      } else if (!value) {
-        // Clear label when value is cleared
+        if (match) next.labels = { ...d.labels, [key]: match.label };
+      } else {
         const { [key]: _removed, ...restLabels } = d.labels;
         next.labels = restLabels;
       }
@@ -283,100 +248,46 @@ export class FilterOverlayComponent {
     });
   }
 
-  getOptions(key: keyof FilterState): ReturnType<typeof signal<DropdownOption[]>> {
-    switch (key) {
-      case 'clientId': return this.clientOptions;
-      case 'vesselId': return this.vesselOptions;
-      case 'placeId': return this.placeOptions;
-      case 'brokerId': return this.brokerOptions;
-      case 'invoicingCompanyId': return this.invoicingOptions;
-      case 'salesRepId': return signal(this.responsibleOptions());
-      default: return signal([]);
-    }
+  getOptions(field: FilterFieldDef): ReturnType<typeof signal<DropdownOption[]>> {
+    if (field.options) return signal(field.options);
+    return signal(this.asyncOptions()[field.key] ?? []);
   }
 
-  getLoading(key: keyof FilterState): ReturnType<typeof signal<boolean>> {
-    switch (key) {
-      case 'clientId': return this.clientLoading;
-      case 'vesselId': return this.vesselLoading;
-      case 'placeId': return this.placeLoading;
-      case 'brokerId': return this.brokerLoading;
-      case 'invoicingCompanyId': return this.invoicingLoading;
-      default: return signal(false);
-    }
+  getLoading(key: string): ReturnType<typeof signal<boolean>> {
+    return signal(this.asyncLoading()[key] ?? false);
   }
 
   private searchTimeouts: Record<string, ReturnType<typeof setTimeout> | null> = {};
 
-  async onAsyncSearch(key: keyof FilterState, term: string): Promise<void> {
-    const timerKey = String(key);
-    if (this.searchTimeouts[timerKey]) clearTimeout(this.searchTimeouts[timerKey]!);
-    this.searchTimeouts[timerKey] = setTimeout(() => this.doSearch(key, term), 300);
+  async onAsyncSearch(field: FilterFieldDef, term: string): Promise<void> {
+    const key = field.key;
+    if (this.searchTimeouts[key]) clearTimeout(this.searchTimeouts[key]!);
+    this.searchTimeouts[key] = setTimeout(() => this.doSearch(field, term), 300);
   }
 
-  private async doSearch(key: keyof FilterState, term: string): Promise<void> {
+  private async doSearch(field: FilterFieldDef, term: string): Promise<void> {
+    if (!field.searchFn) return;
+    const key = field.key;
+    this.asyncLoading.update((s) => ({ ...s, [key]: true }));
     try {
-      switch (key) {
-        case 'clientId': {
-          this.clientLoading.set(true);
-          const res = await firstValueFrom(
-            this.http.get<ApiResponse<{ companies: Array<{ id: string; name: string }> }>>(
-              `${API}/companies/local?type=CLIENT&search=${encodeURIComponent(term)}&limit=20`,
-            ),
-          );
-          if (res.success) this.clientOptions.set(res.data.companies.map((c) => ({ value: c.id, label: c.name })));
-          this.clientLoading.set(false);
-          break;
-        }
-        case 'vesselId': {
-          this.vesselLoading.set(true);
-          const res = await firstValueFrom(
-            this.http.get<ApiResponse<{ items: Array<{ id: string; name: string }> }>>(
-              `${API}/vessels?search=${encodeURIComponent(term)}&limit=20`,
-            ),
-          );
-          if (res.success && res.data?.items) this.vesselOptions.set(res.data.items.map((v) => ({ value: v.id, label: v.name })));
-          this.vesselLoading.set(false);
-          break;
-        }
-        case 'placeId': {
-          this.placeLoading.set(true);
-          const res = await firstValueFrom(
-            this.http.get<ApiResponse<{ items: Array<{ id: string; name: string }> }>>(
-              `${API}/places?search=${encodeURIComponent(term)}&limit=20`,
-            ),
-          );
-          if (res.success && res.data?.items) this.placeOptions.set(res.data.items.map((p) => ({ value: p.id, label: p.name })));
-          this.placeLoading.set(false);
-          break;
-        }
-        case 'brokerId': {
-          this.brokerLoading.set(true);
-          const res = await firstValueFrom(
-            this.http.get<ApiResponse<{ companies: Array<{ id: string; name: string }> }>>(
-              `${API}/companies/local?type=BROKER&search=${encodeURIComponent(term)}&limit=20`,
-            ),
-          );
-          if (res.success) this.brokerOptions.set(res.data.companies.map((c) => ({ value: c.id, label: c.name })));
-          this.brokerLoading.set(false);
-          break;
-        }
-        case 'invoicingCompanyId': {
-          this.invoicingLoading.set(true);
-          const res = await firstValueFrom(
-            this.http.get<ApiResponse<Array<{ id: string; name: string }>>>(
-              `${API}/admin/settings/own-companies`,
-            ),
-          );
-          if (res.success && Array.isArray(res.data)) {
-            this.invoicingOptions.set(res.data
-              .filter((c) => !term || c.name.toLowerCase().includes(term.toLowerCase()))
-              .map((c) => ({ value: c.id, label: c.name })));
-          }
-          this.invoicingLoading.set(false);
-          break;
-        }
-      }
-    } catch { /* ignore search errors */ }
+      const opts = await field.searchFn(term);
+      this.asyncOptions.update((s) => ({ ...s, [key]: opts }));
+    } catch { /* ignore */ } finally {
+      this.asyncLoading.update((s) => ({ ...s, [key]: false }));
+    }
+  }
+
+  private async fetchCount(fn: (filters: FilterState) => Promise<number>, filters: FilterState): Promise<void> {
+    // Cancel previous in-flight
+    if (this.countAbort) this.countAbort.abort();
+    this.countAbort = new AbortController();
+    const signal = this.countAbort.signal;
+    this.resultCount.set(-1); // loading
+    try {
+      const count = await fn(filters);
+      if (!signal.aborted) this.resultCount.set(count);
+    } catch {
+      if (!signal.aborted) this.resultCount.set(null);
+    }
   }
 }
