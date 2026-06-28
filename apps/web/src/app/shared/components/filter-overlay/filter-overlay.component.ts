@@ -16,7 +16,10 @@ import { SearchableDropdownComponent, type DropdownOption } from '../searchable-
 // ═══════════════════════════════════════════════════════════════════════
 
 /** Generic filter state — a map of key→value strings plus a labels map for display. */
-export type FilterState = Record<string, string> & { labels: Record<string, string> };
+export interface FilterState {
+  labels: Record<string, string>;
+  [key: string]: any;
+}
 
 export const EMPTY_FILTERS: FilterState = { labels: {} };
 
@@ -183,7 +186,7 @@ export class FilterOverlayComponent {
     let count = 0;
     for (const [key, val] of Object.entries(f)) {
       if (key === 'labels') continue;
-      if (val?.trim()) count++;
+      if (typeof val === 'string' && val?.trim()) count++;
     }
     return count;
   });
